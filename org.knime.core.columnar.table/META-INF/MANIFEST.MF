@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: KNIME Table Access Plugin
+Bundle-SymbolicName: org.knime.core.columnar.table;singleton:=true
+Bundle-Version: 4.2.0.qualifier
+Bundle-Vendor: KNIME AG, Zurich, Switzerland
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-ActivationPolicy: lazy
+Export-Package: org.knime.core.columnar.table
+Bundle-ClassPath: .
+Require-Bundle: org.knime.core.columnar;bundle-version="[4.2.0,4.3.0)"

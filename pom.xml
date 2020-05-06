@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.knime.maven</groupId>
+		<!-- For some bizarre reason this must be the AP parent otherwise the Tycho build fails. -->
+		<artifactId>ap.parent</artifactId>
+		<version>1.0.0</version>
+	</parent>
+
+	<groupId>org.knime</groupId>
+	<artifactId>knime-table</artifactId>
+	<version>${revision}${changelist}</version>
+	<packaging>pom</packaging>
+	<name>Aggregator POM for knime-table</name>
+
+	<properties>
+		<revision>4.2.0</revision>
+		<changelist>-LOCAL</changelist>
+		<maven.install.skip>true</maven.install.skip>
+		<maven.deploy.skip>true</maven.deploy.skip>
+	</properties>
+
+	<profiles>
+		<profile>
+			<id>AP</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+
+			<properties>
+				<feature-branch-extension.branchListProperty>git.branch</feature-branch-extension.branchListProperty>
+				<feature-branch-extension.appendArtifactoryProperties>false</feature-branch-extension.appendArtifactoryProperties>
+				<changelist>-SNAPSHOT</changelist>
+			</properties>
+
+			<modules>
+				<module>org.knime.core.columnar/pom-AP.xml</module>
+				<module>org.knime.core.columnar.table/pom-AP.xml</module>
+				<module>org.knime.core.columnar.array/pom-AP.xml</module>
+				<module>org.knime.update.table</module>
+			</modules>
+			<repositories>
+				<repository>
+					<id>p2-knime-tp</id>
+					<layout>p2</layout>
+					<url>${knime.tp.p2}</url>
+				</repository>
+			</repositories>
+		</profile>
+		<profile>
+			<id>test</id>
+			<modules>
+				<module>org.knime.core.columnar/pom.xml</module>
+				<module>org.knime.core.columnar.table/pom.xml</module>
+				<module>org.knime.core.columnar.array/pom.xml</module>
+			</modules>
+
+			<properties>
+				<feature-branch-extension.appendArtifactoryProperties>true</feature-branch-extension.appendArtifactoryProperties>
+			</properties>
+
+		</profile>
+	</profiles>
+</project>
+
+<!-- vim: set ts=4: -->
