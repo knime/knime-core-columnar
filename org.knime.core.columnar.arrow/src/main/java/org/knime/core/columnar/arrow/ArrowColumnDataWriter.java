@@ -1,0 +1,200 @@
+package org.knime.core.columnar.arrow;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.WritableByteChannel;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.TypeLayout;
+import org.apache.arrow.vector.VectorLoader;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.VectorUnloader;
+import org.apache.arrow.vector.dictionary.Dictionary;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.ipc.ArrowFileWriter;
+import org.apache.arrow.vector.ipc.message.ArrowBlock;
+import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
+import org.apache.arrow.vector.ipc.message.ArrowFieldNode;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.ColumnData;
+import org.knime.core.columnar.arrow.data.ArrowData;
+import org.knime.core.columnar.arrow.data.ArrowDictionaryHolder;
+import org.knime.core.columnar.chunk.ColumnDataWriter;
+import org.knime.core.columnar.data.BinarySupplData;
+
+class ArrowColumnDataWriter implements ColumnDataWriter {
+
+	private final File m_file;
+	private final FieldVectorWriter m_writer;
+	private final BufferAllocator m_allocator;
+	private final int m_chunkSize;
+
+	public ArrowColumnDataWriter(File file, BufferAllocator allocator, int chunkSize) {
+		m_file = file;
+		m_allocator = allocator;
+		m_writer = new FieldVectorWriter(m_file);
+		m_chunkSize = chunkSize;
+	}
+
+	@Override
+	public void close() throws Exception {
+		m_writer.close();
+	}
+
+	@Override
+	public void write(ColumnData[] data) throws IOException {
+		final List<FieldVector> vectors = new ArrayList<FieldVector>(data.length);
+		final ArrowDictProvider dicts = new ArrowDictProvider();
+		for (int i = 0; i < data.length; i++) {
+
+			final ArrowData<?> arrowData = (ArrowData<?>) data[i];
+			vectors.add(arrowData.get());
+			if (arrowData instanceof ArrowDictionaryHolder) {
+				dicts.add(new Dictionary(((ArrowDictionaryHolder<?>) arrowData).getDictionary(),
+						arrowData.get().getField().getFieldType().getDictionary()));
+			} else if (arrowData instanceof BinarySupplData) {
+				/*
+				 * TODO recursive parsing for dictionaries for all nested types (especially if
+				 * we have struct types different to BinarySupplData later).
+				 * 
+				 * This implementation doesn't work for level-2 nested dictionaries.
+				 */
+				final ArrowData<?> chunk = (ArrowData<?>) ((BinarySupplData<?>) arrowData).getChunk();
+				if (chunk instanceof ArrowDictionaryHolder) {
+					dicts.add(new Dictionary(((ArrowDictionaryHolder<?>) chunk).getDictionary(),
+							chunk.get().getField().getFieldType().getDictionary()));
+				}
+			}
+		}
+
+		m_writer.write(vectors, dicts);
+	}
+
+	class FieldVectorWriter implements AutoCloseable {
+
+		private final File m_file;
+		private CustomArrowFileWriter m_writer;
+		private VectorLoader m_vectorLoader;
+		private VectorSchemaRoot m_root;
+
+		public FieldVectorWriter(final File file) {
+			m_file = file;
+		}
+
+		@SuppressWarnings("resource")
+		public void write(List<FieldVector> vecs, ArrowDictProvider dicts) throws IOException {
+			if (m_writer == null) {
+				final ArrayList<Field> fields = new ArrayList<>(vecs.size());
+				for (final FieldVector v : vecs) {
+					fields.add(v.getField());
+				}
+				final Map<String, String> metadata = new HashMap<>();
+				metadata.put(ArrowColumnStore.CFG_ARROW_CHUNK_SIZE, String.valueOf(m_chunkSize));
+				m_root = VectorSchemaRoot.create(new Schema(fields, metadata), m_allocator);
+				m_vectorLoader = new VectorLoader(m_root);
+				m_writer = new CustomArrowFileWriter(m_root, dicts, new RandomAccessFile(m_file, "rw").getChannel());
+			} else {
+				// Write dictionaries starting from second iteration.
+				for (final Dictionary dict : dicts) {
+					DictionaryEncoding encoding = dict.getEncoding();
+					FieldVector vector = dict.getVector();
+					int count = vector.getValueCount();
+					final VectorSchemaRoot dictRoot = new VectorSchemaRoot(Collections.singletonList(vector.getField()),
+							Collections.singletonList(vector), count);
+					VectorUnloader unloader = new VectorUnloader(dictRoot);
+					try (ArrowRecordBatch batch = unloader.getRecordBatch();
+							ArrowDictionaryBatch dictBatch = new ArrowDictionaryBatch(encoding.getId(), batch, false)) {
+						m_writer.writeDictionaryBatch(dictBatch);
+					}
+					dictRoot.close();
+				}
+			}
+
+			final List<ArrowFieldNode> nodes = new ArrayList<>();
+			final List<ArrowBuf> buffers = new ArrayList<>();
+			for (final FieldVector vec : vecs) {
+				appendNodes(vec, nodes, buffers);
+			}
+
+			try (final ArrowRecordBatch batch = new ArrowRecordBatch((int) vecs.get(0).getValueCount(), nodes,
+					buffers)) {
+				m_vectorLoader.load(batch);
+				m_writer.writeBatch();
+			}
+		}
+
+		@Override
+		public void close() throws Exception {
+			if (m_writer != null) {
+				m_writer.close();
+				m_root.close();
+			}
+		}
+
+		// TODO: Copied from org.apache.arrow.vector.VectorUnloader. Is there a better
+		// way to do all of this (including writing vectors in general)?
+		private void appendNodes(final FieldVector vector, final List<ArrowFieldNode> nodes,
+				final List<ArrowBuf> buffers) {
+			nodes.add(new ArrowFieldNode(vector.getValueCount(), vector.getNullCount()));
+			final List<ArrowBuf> fieldBuffers = vector.getFieldBuffers();
+			final int expectedBufferCount = TypeLayout.getTypeBufferCount(vector.getField().getType());
+			if (fieldBuffers.size() != expectedBufferCount) {
+				throw new IllegalArgumentException(
+						String.format("wrong number of buffers for field %s in vector %s. found: %s", vector.getField(),
+								vector.getClass().getSimpleName(), fieldBuffers));
+			}
+			buffers.addAll(fieldBuffers);
+			for (final FieldVector child : vector.getChildrenFromFields()) {
+				appendNodes(child, nodes, buffers);
+			}
+		}
+	}
+
+	final class ArrowDictProvider implements DictionaryProvider, Iterable<Dictionary> {
+
+		private final Map<Long, Dictionary> m_dicts = new HashMap<>();
+
+		@Override
+		public Dictionary lookup(long index) {
+			return m_dicts.get(index);
+		}
+
+		public final void add(Dictionary dict) {
+			m_dicts.put(dict.getEncoding().getId(), dict);
+		}
+
+		public long size() {
+			return m_dicts.size();
+		}
+
+		@Override
+		public Iterator<Dictionary> iterator() {
+			return m_dicts.values().iterator();
+		}
+	}
+
+	final class CustomArrowFileWriter extends ArrowFileWriter {
+		CustomArrowFileWriter(VectorSchemaRoot root, //
+				DictionaryProvider provider, //
+				WritableByteChannel out) {
+			super(root, provider, out);
+		}
+
+		@Override
+		public ArrowBlock writeDictionaryBatch(ArrowDictionaryBatch batch) throws IOException {
+			return super.writeDictionaryBatch(batch);
+		}
+	}
+}

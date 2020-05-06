@@ -1,0 +1,24 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: KNIME Columnar Store Plugin - Arrow Implementation
+Bundle-SymbolicName: org.knime.core.columnar.arrow;singleton:=true
+Bundle-Version: 4.2.0.qualifier
+Bundle-ClassPath: .,
+ libs/arrow-format-1.0.0.jar,
+ libs/arrow-memory-core-1.0.0.jar,
+ libs/arrow-memory-netty-1.0.0.jar,
+ libs/arrow-vector-1.0.0.jar,
+ libs/flatbuffers-java-1.9.0.jar,
+ libs/netty-buffer-4.1.51.Final.jar,
+ libs/netty-common-4.1.51.Final.jar
+Bundle-Vendor: KNIME AG, Zurich, Switzerland
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-ActivationPolicy: lazy
+Require-Bundle: com.google.guava;bundle-version="[19.0.0,20.0.0)",
+ org.junit;bundle-version="[4.12.0,5.0.0)",
+ org.slf4j.api;bundle-version="[1.7.2,2.0.0)",
+ com.fasterxml.jackson.core.jackson-core;bundle-version="[2.10.2,3.0.0)",
+ com.fasterxml.jackson.core.jackson-databind;bundle-version="[2.10.2,3.0.0)",
+ com.fasterxml.jackson.core.jackson-annotations;bundle-version="[2.10.2,3.0.0)",
+ org.knime.core.columnar;bundle-version="[4.2.0,5.0.0)"
+Export-Package: org.knime.core.columnar.arrow
