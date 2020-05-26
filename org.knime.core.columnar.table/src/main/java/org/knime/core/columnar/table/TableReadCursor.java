@@ -15,7 +15,7 @@ public final class TableReadCursor implements AutoCloseable {
 
 	private ColumnData[] m_currentData;
 
-	public TableReadCursor(final ColumnDataReader reader, final ColumnDataAccess<ColumnData>[] access) {
+	TableReadCursor(final ColumnDataReader reader, final ColumnDataAccess<ColumnData>[] access) {
 		m_reader = reader;
 		m_access = access;
 		m_numChunks = m_reader.getNumEntries();
