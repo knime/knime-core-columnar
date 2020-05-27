@@ -64,10 +64,9 @@ public final class TableWriteCursor implements AutoCloseable {
 			try {
 				m_writer.write(m_currentData);
 			} catch (IOException e) {
-				// TODO
-				throw new RuntimeException("TODO", e);
+				throw new RuntimeException("Problem occured when writing column chunk.", e);
 			}
-			for (ColumnData data : m_currentData) {
+			for (final ColumnData data : m_currentData) {
 				data.release();
 			}
 			m_currentData = null;
