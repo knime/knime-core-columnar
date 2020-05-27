@@ -8,12 +8,12 @@ public final class TableUtils {
 	}
 
 	// TODO check compatibility of schema
-	public static ReadTable createReadTable(TableSchema schema, ColumnReadStore store) {
+	public static ColumnStoreReadTable createReadTable(TableSchema schema, ColumnReadStore store) {
 		return new ColumnStoreReadTable(schema, store);
 	}
 
 	// TODO check compatibility of schema
-	public static WriteTable createWriteTable(TableSchema schema, ColumnStore store) {
+	public static ColumnStoreWriteTable createWriteTable(TableSchema schema, ColumnStore store) {
 		return new ColumnStoreWriteTable(schema, store);
 	}
 }

@@ -3,29 +3,32 @@ package org.knime.core.columnar.table;
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnStore;
 
-public class ColumnStoreWriteTable implements WriteTable, AutoCloseable {
+public class ColumnStoreWriteTable implements WriteTable {
 
 	private final TableSchema m_schema;
-	private final ColumnStore m_delegate;
+	private final ColumnStore m_store;
 	private TableWriteCursor m_cursor;
 
 	// state dependent.
-	private boolean m_closedForWriting;
-	private ReadTable m_readTable;
+	private ColumnStoreReadTable m_readTable;
 
-	public ColumnStoreWriteTable(TableSchema schema, ColumnStore store) {
-		m_delegate = store;
+	ColumnStoreWriteTable(TableSchema schema, ColumnStore store) {
+		m_store = store;
 		m_schema = schema;
+	}
+
+	public ColumnStore getStore() {
+		return m_store;
 	}
 
 	@Override
 	public TableWriteCursor getCursor() {
-		if (m_closedForWriting) {
+		if (m_readTable != null) {
 			throw new IllegalStateException("ColumnStoreWriteTable closed for writing.");
 		}
 
 		if (m_cursor == null) {
-			m_cursor = new TableWriteCursor(m_delegate.getFactory(), m_delegate.getWriter(), createAccess(m_schema));
+			m_cursor = new TableWriteCursor(m_store.getFactory(), m_store.getWriter(), createAccess(m_schema));
 		}
 		return m_cursor;
 	}
@@ -53,16 +56,19 @@ public class ColumnStoreWriteTable implements WriteTable, AutoCloseable {
 
 	@Override
 	public void close() throws Exception {
-		m_delegate.close();
+		m_store.close();
 	}
 
 	@Override
-	public ReadTable closeForWriting() {
-		m_closedForWriting = true;
-		if (m_readTable == null) {
-			m_readTable = new ColumnStoreReadTable(m_schema, m_delegate);
+	public ColumnStoreReadTable createReadTable() throws Exception {
+		if (m_cursor != null) {
+			m_cursor.close();
+			m_cursor = null;
 		}
+		if (m_readTable == null) {
+			m_readTable = new ColumnStoreReadTable(m_schema, m_store);
+		}
+
 		return m_readTable;
 	}
-
 }

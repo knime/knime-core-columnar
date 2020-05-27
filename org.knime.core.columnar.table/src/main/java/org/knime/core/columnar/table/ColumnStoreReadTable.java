@@ -4,7 +4,7 @@ import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnReadStore;
 import org.knime.core.columnar.chunk.ColumnReaderConfig;
 
-class ColumnStoreReadTable implements ReadTable {
+public final class ColumnStoreReadTable implements ReadTable {
 
 	private final TableSchema m_schema;
 	private final ColumnReadStore m_delegate;
@@ -32,6 +32,10 @@ class ColumnStoreReadTable implements ReadTable {
 	@Override
 	public int getNumColumns() {
 		return m_schema.getNumColumns();
+	}
+
+	public ColumnReadStore getStore() {
+		return m_delegate;
 	}
 
 	private ColumnDataAccess<ColumnData>[] createAccess(TableSchema schema, ColumnReaderConfig config) {

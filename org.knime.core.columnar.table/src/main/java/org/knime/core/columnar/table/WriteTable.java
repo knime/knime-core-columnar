@@ -1,6 +1,6 @@
 package org.knime.core.columnar.table;
 
-public interface WriteTable {
+public interface WriteTable extends AutoCloseable {
 
 	int getNumColumns();
 
@@ -15,5 +15,5 @@ public interface WriteTable {
 
 	TableSchema getSchema();
 
-	ReadTable closeForWriting();
+	ReadTable createReadTable() throws Exception;
 }
