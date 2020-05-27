@@ -10,6 +10,7 @@ public abstract class AbstractColumnDataAccess<C extends ColumnData> implements 
 	@Override
 	public void load(C data) {
 		m_data = data;
+		m_index = -1;
 	}
 
 	@Override

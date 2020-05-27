@@ -70,6 +70,7 @@ public final class TableWriteCursor implements AutoCloseable {
 			for (ColumnData data : m_currentData) {
 				data.release();
 			}
+			m_currentData = null;
 		}
 	}
 }
