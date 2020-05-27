@@ -6,6 +6,7 @@ Bundle-Version: 4.2.0.qualifier
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
-Export-Package: org.knime.core.columnar.table
+Export-Package: org.knime.core.columnar.table,
+ org.knime.core.columnar.table.type
 Bundle-ClassPath: .
 Require-Bundle: org.knime.core.columnar;bundle-version="[4.2.0,4.3.0)"
