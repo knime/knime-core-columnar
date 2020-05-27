@@ -4,6 +4,10 @@ import org.knime.core.columnar.data.StringData;
 
 // TODO we may want to store sparse arrays etc differently.
 class StringArrayChunk extends AbstractArrayChunk<String[]> implements StringData {
+	
+	private int m_stringLengthTotal = 0;
+
+	private int m_sizeOfIndex = 0;
 
 	// Read case
 	public StringArrayChunk(int capacity) {
@@ -35,4 +39,18 @@ class StringArrayChunk extends AbstractArrayChunk<String[]> implements StringDat
 		// TODO Auto-generated method stub
 
 	}
+	
+	@Override
+	public int sizeOf() {
+		for (; m_sizeOfIndex < getNumValues(); m_sizeOfIndex++) {
+			m_stringLengthTotal += getString(m_sizeOfIndex).length();
+		}
+		// for a 64 bit VM with more than 32 GB heap space:
+		// 24 bytes for String array object
+		// 8 bytes per reference on String
+		// 32 bytes per String object (including held character array)
+		// 2 bytes per character
+		return 24 + 8 * getMaxCapacity() + 32 * getNumValues() + m_stringLengthTotal * 2;
+	}
+
 }

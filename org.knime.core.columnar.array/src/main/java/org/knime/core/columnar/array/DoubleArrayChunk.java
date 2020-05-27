@@ -23,4 +23,13 @@ class DoubleArrayChunk extends AbstractNativeArrayChunk<double[]> implements Dou
 	public void setDouble(int index, double val) {
 		m_array[index] = val;
 	}
+	
+	@Override
+	public int sizeOf() {
+		// for a 64 bit VM with more than 32 GB heap space:
+		// 24 bytes for double array object
+		// 8 bytes per double
+		return super.sizeOf() + 24 + 8 * getMaxCapacity();
+	}
+	
 }

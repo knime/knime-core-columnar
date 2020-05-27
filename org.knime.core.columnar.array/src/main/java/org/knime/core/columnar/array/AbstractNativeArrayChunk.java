@@ -20,4 +20,14 @@ abstract class AbstractNativeArrayChunk<A> extends AbstractArrayChunk<A> {
 		final int i1 = (int) index >>> 6;
 		m_isMissing[i1] = m_isMissing[i1] | 1l << (index & 63);
 	}
+	
+
+	@Override
+	public int sizeOf() {
+		// for a 64 bit VM with more than 32 GB heap space:
+		// 24 bytes for double array object
+		// 8 bytes per double
+		return 24 + 8 * m_isMissing.length;
+	}
+	
 }

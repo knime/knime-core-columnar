@@ -1,6 +1,6 @@
 package org.knime.core.columnar;
 
-public interface ColumnData {
+public interface ColumnData extends ReferencedData {
 
 	// WRITE
 	/**
@@ -26,14 +26,4 @@ public interface ColumnData {
 	 */
 	int getNumValues();
 
-	// REFERENCED
-	/**
-	 * Release reference
-	 */
-	void release();
-
-	/**
-	 * Retain reference
-	 */
-	void retain();
 }

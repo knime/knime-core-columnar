@@ -3,6 +3,8 @@ Bundle-ManifestVersion: 2
 Bundle-Name: KNIME Table Plugin
 Bundle-SymbolicName: org.knime.core.columnar;singleton:=true
 Bundle-Version: 4.2.0.qualifier
+Bundle-ClassPath: .,
+ libs/concurrentlinkedhashmap-lru-1.4.2.jar
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy

@@ -3,7 +3,7 @@ package org.knime.core.columnar.table;
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnStore;
 
-class ColumnStoreWriteTable implements WriteTable, AutoCloseable {
+public class ColumnStoreWriteTable implements WriteTable, AutoCloseable {
 
 	private final TableSchema m_schema;
 	private final ColumnStore m_delegate;
