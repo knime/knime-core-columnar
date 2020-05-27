@@ -121,10 +121,6 @@ public class CachedColumnReadStore implements ColumnReadStore {
 
 		// TODO: pre-fetch subsequent chunks on cache miss
 		return new ColumnDataReader() {
-			@Override
-			public int getNumEntries() {
-				return m_numChunks.get();
-			}
 
 			@Override
 			public ColumnData[] read(int chunkIndex) {
@@ -139,6 +135,11 @@ public class CachedColumnReadStore implements ColumnReadStore {
 				}
 
 				return data;
+			}
+			
+			@Override
+			public int getNumEntries() {
+				return m_numChunks.get();
 			}
 
 			@Override
