@@ -8,7 +8,8 @@ Bundle-ClassPath: .,
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
-Bundle-ClassPath: .
+Bundle-ClassPath: .,
+ libs/concurrentlinkedhashmap-lru-1.4.2.jar
 Export-Package: org.knime.core.columnar,
  org.knime.core.columnar.cache,
  org.knime.core.columnar.chunk,
