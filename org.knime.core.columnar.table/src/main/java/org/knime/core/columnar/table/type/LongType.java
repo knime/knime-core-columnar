@@ -20,11 +20,11 @@ public class LongType implements ColumnType<LongData> {
 	}
 
 	public static interface LongReadValue extends NullableReadValue {
-		long getLong();
+		long getLongValue();
 	}
 
 	public static interface LongWriteValue extends NullableWriteValue {
-		void setLong(long value);
+		void setLongValue(long value);
 	}
 
 	static class LongAccess extends AbstractColumnDataAccess<LongData> implements LongReadValue, LongWriteValue {
@@ -35,7 +35,7 @@ public class LongType implements ColumnType<LongData> {
 		}
 
 		@Override
-		public void setLong(long value) {
+		public void setLongValue(long value) {
 			m_data.setLong(m_index, value);
 		}
 
@@ -45,7 +45,7 @@ public class LongType implements ColumnType<LongData> {
 		}
 
 		@Override
-		public long getLong() {
+		public long getLongValue() {
 			return m_data.getLong(m_index);
 		}
 	}

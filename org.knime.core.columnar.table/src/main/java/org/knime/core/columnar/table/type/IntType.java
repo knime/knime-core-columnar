@@ -20,11 +20,11 @@ public class IntType implements ColumnType<IntData> {
 	}
 
 	public static interface IntReadValue extends NullableReadValue {
-		int getInt();
+		int getIntValue();
 	}
 
 	public static interface IntWriteValue extends NullableWriteValue {
-		void setInt(int value);
+		void setIntValue(int value);
 	}
 
 	public static class IntAccess extends AbstractColumnDataAccess<IntData> implements IntReadValue, IntWriteValue {
@@ -35,7 +35,7 @@ public class IntType implements ColumnType<IntData> {
 		}
 
 		@Override
-		public void setInt(int value) {
+		public void setIntValue(int value) {
 			m_data.setInt(m_index, value);
 		}
 
@@ -45,7 +45,7 @@ public class IntType implements ColumnType<IntData> {
 		}
 
 		@Override
-		public int getInt() {
+		public int getIntValue() {
 			return m_data.getInt(m_index);
 		}
 	}

@@ -15,11 +15,11 @@ public class DoubleType implements ColumnType<DoubleData> {
 	}
 
 	public static interface DoubleReadValue extends NullableReadValue {
-		double getDouble();
+		double getDoubleValue();
 	}
 
 	public static interface DoubleWriteValue extends NullableWriteValue {
-		void setDouble(double value);
+		void setDoubleValue(double value);
 	}
 
 	static class DoubleAccess extends AbstractColumnDataAccess<DoubleData>
@@ -31,7 +31,7 @@ public class DoubleType implements ColumnType<DoubleData> {
 		}
 
 		@Override
-		public void setDouble(double value) {
+		public void setDoubleValue(double value) {
 			m_data.setDouble(m_index, value);
 		}
 
@@ -41,7 +41,7 @@ public class DoubleType implements ColumnType<DoubleData> {
 		}
 
 		@Override
-		public double getDouble() {
+		public double getDoubleValue() {
 			return m_data.getDouble(m_index);
 		}
 	}
