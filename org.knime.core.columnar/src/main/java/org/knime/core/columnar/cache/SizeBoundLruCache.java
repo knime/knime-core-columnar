@@ -97,5 +97,10 @@ final class SizeBoundLruCache<K, C extends ReferencedData> implements LoadingEvi
 		}
 		return null;
 	}
+	
+	@Override
+	public int size() {
+		return m_lruCache.size();
+	}
 
 }

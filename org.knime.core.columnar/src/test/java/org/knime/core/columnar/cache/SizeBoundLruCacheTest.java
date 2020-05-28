@@ -1,61 +1,94 @@
 package org.knime.core.columnar.cache;
 
 import org.junit.Test;
-import org.junit.Assert;
-import org.knime.core.columnar.ReferencedData;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.knime.core.columnar.cache.SizeBoundLruCache;
+import org.knime.core.columnar.cache.CacheTestUtils.TestColumnData;
 
 public class SizeBoundLruCacheTest {
 
-	private static class TestData implements ReferencedData {
+	@Test
+	public void testPutGet() throws Exception {
+		final LoadingEvictingChunkCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
+		final TestColumnData data = new TestColumnData(1);
+		assertEquals(0, data.getRefs());
 
-		private final int m_sizeOf;
+		cache.retainAndPutIfAbsent(1, data);
+		assertEquals(1, cache.size());
+		assertEquals(1, data.getRefs());
 
-		private int m_refs;
+		assertEquals(data, cache.retainAndGet(1));
+		assertEquals(2, data.getRefs());
 
-		public TestData(int sizeOf) {
-			m_sizeOf = sizeOf;
-		}
-
-		@Override
-		public void release() {
-			m_refs--;
-		}
-
-		@Override
-		public void retain() {
-			m_refs++;
-		}
-
-		@Override
-		public int sizeOf() {
-			return m_sizeOf;
-		}
+		assertEquals(data, cache.retainAndGet(1, i -> null, (i, d) -> {
+		}));
+		assertEquals(3, data.getRefs());
 	}
 
 	@Test
-	public void sizeTest() {
-		SizeBoundLruCache<Integer, TestData> cache = new SizeBoundLruCache<>(5);
-		TestData c1 = new TestData(2);
-		TestData c2 = new TestData(2);
-		TestData c3 = new TestData(2);
+	public void testPutEvictLoadGet() throws Exception {
+		final LoadingEvictingChunkCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
+		final TestColumnData data1 = new TestColumnData(1);
+		final TestColumnData data2 = new TestColumnData(1);
+		assertEquals(0, data1.getRefs());
 
-		cache.retainAndPutIfAbsent(1, c1);
-		cache.retainAndPutIfAbsent(2, c2);
-		cache.retainAndPutIfAbsent(3, c3);
+		final AtomicBoolean evicted = new AtomicBoolean();
+		cache.retainAndPutIfAbsent(1, data1, (i, d) -> evicted.set(true));
+		assertEquals(1, cache.size());
+		assertEquals(1, data1.getRefs());
 
-		Assert.assertEquals(null, cache.retainAndGet(1));
-		Assert.assertEquals(c2, cache.retainAndGet(2));
-		c2.release();
-		Assert.assertEquals(c3, cache.retainAndGet(3));
-		c3.release();
-		cache.remove(2);
-		c2.release();
-		cache.remove(3);
-		c3.release();
-		Assert.assertEquals(0, c1.m_refs);
-		Assert.assertEquals(0, c2.m_refs);
-		Assert.assertEquals(0, c3.m_refs);
+		cache.retainAndPutIfAbsent(2, data2);
+		assertEquals(true, evicted.get());
+		assertEquals(1, cache.size());
+		assertEquals(0, data1.getRefs());
+
+		assertNull(cache.retainAndGet(1));
+		assertEquals(data1, cache.retainAndGet(1, i -> data1, (i, data) -> {
+		}));
+		assertEquals(2, data1.getRefs());
+	}
+	
+	@Test
+	public void testPutRemove() throws Exception {
+		final LoadingEvictingChunkCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
+		final TestColumnData data = new TestColumnData(1);
+		assertEquals(0, data.getRefs());
+
+		cache.retainAndPutIfAbsent(1, data);
+		assertEquals(1, cache.size());
+		assertEquals(1, data.getRefs());
+
+		assertEquals(data, cache.remove(1));
+		assertEquals(1, data.getRefs());
+		
+		assertNull(cache.remove(1));
+	}
+	
+	@Test
+	public void testLru() throws Exception {
+		final LoadingEvictingChunkCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(2);
+		final TestColumnData data1 = new TestColumnData(1);
+		final TestColumnData data2 = new TestColumnData(1);
+		final TestColumnData data3 = new TestColumnData(1);
+		
+		cache.retainAndPutIfAbsent(1, data1); // content in cache: 1
+		cache.retainAndPutIfAbsent(2, data2); // content in cache: 2->1
+		cache.retainAndPutIfAbsent(3, data3); // content in cache: 3->2
+		assertEquals(2, cache.size());
+		
+		assertEquals(data3, cache.retainAndGet(3)); // content in cache: 3->2
+		assertEquals(data2, cache.retainAndGet(2)); // content in cache: 2->3
+		assertNull(cache.retainAndGet(1));
+		
+		cache.retainAndPutIfAbsent(1, data1); // content in cache: 1->2
+		assertEquals(data1, cache.retainAndGet(1));
+		assertEquals(data2, cache.retainAndGet(2));
+		assertNull(cache.retainAndGet(3));
 	}
 
 }

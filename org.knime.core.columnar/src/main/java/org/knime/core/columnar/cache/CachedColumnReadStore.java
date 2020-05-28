@@ -15,6 +15,15 @@ import org.knime.core.columnar.chunk.ColumnReaderConfig;
 
 //TODO: thread safety considerations
 public class CachedColumnReadStore implements ColumnReadStore {
+	
+	public static class CachedColumnReadStoreCache {
+
+		private final LoadingEvictingChunkCache<ColumnDataUniqueId, ColumnData> m_cache;
+		
+		public CachedColumnReadStoreCache(int cacheSize) {
+			m_cache = new SizeBoundLruCache<>(cacheSize);
+		}
+	}
 
 	private static final Object DUMMY = new Object();
 
@@ -82,10 +91,10 @@ public class CachedColumnReadStore implements ColumnReadStore {
 
 	private final Map<ColumnDataUniqueId, Object> m_inCache = new ConcurrentHashMap<>();
 	
-	public CachedColumnReadStore(final ColumnReadStore delegate, final int cacheSize) {
+	public CachedColumnReadStore(final ColumnReadStore delegate, final CachedColumnReadStoreCache cache) {
 		m_delegate = delegate;
 		m_schema = delegate.getSchema();
-		m_cache = new SizeBoundLruCache<>(cacheSize);
+		m_cache = cache.m_cache;
 		
 		// TODO: reading column chunks one by one is too expensive
 		m_loader = id -> {

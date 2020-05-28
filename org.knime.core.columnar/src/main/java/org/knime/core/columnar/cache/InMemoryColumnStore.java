@@ -18,25 +18,37 @@ import org.knime.core.columnar.chunk.ColumnReaderConfig;
 public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 
 	private final ColumnStoreSchema m_schema;
-	
+
 	private final List<ColumnData[]> m_batches = new ArrayList<>();
-	
+
 	private final ColumnDataWriter m_writer = new ColumnDataWriter() {
-		
+
 		@Override
 		public void write(ColumnData[] batch) throws IOException {
+			if (m_writerClosed) {
+				throw new IllegalStateException("Table store writer has already been closed.");
+			}
+			if (m_storeClosed) {
+				throw new IllegalStateException("Column store has already been closed.");
+			}
+
 			for (ColumnData data : batch) {
 				data.retain();
 				m_sizeOf += data.sizeOf();
 			}
 			m_batches.add(batch);
 		}
-		
+
 		@Override
 		public void close() throws Exception {
+			m_writerClosed = true;
 		}
 	};
-	
+
+	private volatile boolean m_writerClosed;
+
+	private volatile boolean m_storeClosed;
+
 	private int m_sizeOf = 0;
 
 	InMemoryColumnStore(ColumnStoreSchema schema) {
@@ -73,15 +85,33 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 
 	@Override
 	public void saveToFile(File f) throws IOException {
+		if (!m_writerClosed) {
+			throw new IllegalStateException("Table store writer has not been closed.");
+		}
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
+		
 		throw new UnsupportedOperationException("Saving to file not supported by in-memory column store.");
 	}
 
 	@Override
 	public ColumnDataReader createReader(ColumnReaderConfig config) {
+		if (!m_writerClosed) {
+			throw new IllegalStateException("Table store writer has not been closed.");
+		}
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
+
 		return new ColumnDataReader() {
-			
+
 			@Override
 			public ColumnData[] read(int index) throws IOException {
+				if (m_storeClosed) {
+					throw new IllegalStateException("Column store has already been closed.");
+				}
+				
 				final int[] indices = config.getColumnIndices();
 				final boolean isSelection = indices != null;
 				final int numRequested = isSelection ? indices.length : m_schema.getNumColumns();
@@ -95,31 +125,38 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 
 				return batch;
 			}
-			
+
 			@Override
 			public int getNumEntries() {
 				return m_batches.size();
 			}
-			
+
 			@Override
 			public void close() throws Exception {
 			}
 		};
 	}
-	
+
 	@Override
 	public ColumnStoreSchema getSchema() {
 		return m_schema;
 	}
-	
+
 	@Override
 	public ColumnDataFactory getFactory() {
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
+		
 		throw new UnsupportedOperationException("Creating new ColumnData not supported by in-memory column store.");
 	}
 
 	@Override
 	public void close() throws Exception {
-		release();
+		if (!m_storeClosed) {
+			release();
+		}
+		m_storeClosed = true;
 	}
-	
+
 }

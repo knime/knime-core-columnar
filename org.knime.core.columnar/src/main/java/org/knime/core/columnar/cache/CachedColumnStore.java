@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnStore;
 import org.knime.core.columnar.ColumnStoreSchema;
+import org.knime.core.columnar.cache.CachedColumnReadStore.CachedColumnReadStoreCache;
 import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
@@ -44,17 +45,19 @@ public final class CachedColumnStore implements ColumnStore {
 
 		@Override
 		public void close() throws Exception {
-			m_delegateWriter.close();
+			if (m_delegateWriter != null) {
+				m_delegateWriter.close();
+			}
 			m_writerClosed = true;
 		}
 	};
 	
 	private volatile boolean m_writerClosed;
 	
-	public CachedColumnStore(final ColumnStore delegate, final int cacheSize) {
+	public CachedColumnStore(final ColumnStore delegate, final CachedColumnReadStoreCache cache) {
 		m_delegate = delegate;
 		m_schema = delegate.getSchema();
-		m_readCache = new CachedColumnReadStore(delegate, cacheSize);
+		m_readCache = new CachedColumnReadStore(delegate, cache);
 	}
 
 	@Override

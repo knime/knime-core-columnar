@@ -16,5 +16,7 @@ interface LoadingEvictingChunkCache<K, C extends ReferencedData> {
 	C retainAndGet(K key, Function<? super K, ? extends C> loader, BiConsumer<? super K, ? super C> evictor);
 
 	C remove(K key);
+	
+	int size();
 
 }

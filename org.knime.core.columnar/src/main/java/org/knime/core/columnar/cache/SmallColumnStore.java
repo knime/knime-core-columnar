@@ -16,6 +16,22 @@ import org.knime.core.columnar.chunk.ColumnReaderConfig;
 //TODO: thread safety considerations
 public class SmallColumnStore implements ColumnStore {
 
+	public static class SmallColumnStoreCache {
+
+		private final int m_smallTableThreshold;
+
+		private final LoadingEvictingChunkCache<SmallColumnStore, InMemoryColumnStore> m_cache;
+
+		public SmallColumnStoreCache(int smallTableThreshold, int cacheSize) {
+			m_smallTableThreshold = smallTableThreshold;
+			m_cache = new SizeBoundLruCache<>(cacheSize);
+		}
+		
+		int size() {
+			return m_cache.size();
+		}
+	}
+
 	private final ColumnStore m_delegate;
 
 	private final ColumnStoreSchema m_schema;
@@ -30,13 +46,15 @@ public class SmallColumnStore implements ColumnStore {
 
 	private volatile boolean m_writerClosed;
 
+	private volatile boolean m_storeClosed;
+
 	private final AtomicBoolean m_isFlushed = new AtomicBoolean();
 
-	public SmallColumnStore(ColumnStore delegate, int smallTableThreshold, int cacheSize) {
+	public SmallColumnStore(ColumnStore delegate, SmallColumnStoreCache cache) {
 		m_delegate = delegate;
 		m_schema = delegate.getSchema();
-		m_cache = new SizeBoundLruCache<>(cacheSize);
-		m_smallTableThreshold = smallTableThreshold;
+		m_cache = cache.m_cache;
+		m_smallTableThreshold = cache.m_smallTableThreshold;
 
 		m_writer = new ColumnDataWriter() {
 
@@ -53,31 +71,30 @@ public class SmallColumnStore implements ColumnStore {
 
 				m_numChunks.incrementAndGet();
 
-				int sizeOf = 0;
-				for (ColumnData data : batch) {
-					sizeOf += data.sizeOf();
-				}
 				if (m_table != null) {
-					if (m_table.sizeOf() + sizeOf <= m_smallTableThreshold) {
-						for (ColumnData data : batch) {
-							data.retain();
-						}
-						m_table.getWriter().write(batch);
-						return;
-					} else {
-						try (ColumnDataReader reader = m_table.createReader(() -> null)) {
-							for (int i = 0; i < reader.getNumEntries(); i++) {
-								initAndWrite(reader.read(i));
+					m_table.getWriter().write(batch);
+					if (m_table.sizeOf() > m_smallTableThreshold) {
+						try {
+							m_table.getWriter().close();
+							try (ColumnDataReader reader = m_table.createReader(() -> null)) {
+								for (int i = 0; i < reader.getNumEntries(); i++) {
+									ColumnData[] cached = reader.read(i);
+									initAndWrite(cached);
+									for (ColumnData data : cached) {
+										data.release();
+									}
+								}
+								m_table.close();
 							}
-							m_table.close();
 						} catch (Exception e) {
 							// TODO: revisit error handling
 							throw new IOException("Error while flushing small table.", e);
 						}
 						m_table = null;
 					}
+				} else {
+					initAndWrite(batch);
 				}
-				initAndWrite(batch);
 			}
 
 			private void initAndWrite(ColumnData[] batch) throws IOException {
@@ -90,14 +107,16 @@ public class SmallColumnStore implements ColumnStore {
 			@Override
 			public void close() throws Exception {
 				if (m_table != null) {
+					m_table.getWriter().close();
 					m_cache.retainAndPutIfAbsent(SmallColumnStore.this, m_table, (store, table) -> {
 						synchronized (m_isFlushed) {
 							if (m_isFlushed.compareAndSet(false, true)) {
 								try (ColumnDataWriter delegateWriter = m_delegate.getWriter();
-										ColumnDataReader reader = m_table.createReader(() -> null)) {
+										ColumnDataReader reader = table.createReader(() -> null)) {
 									for (int i = 0; i < reader.getNumEntries(); i++) {
 										delegateWriter.write(reader.read(i));
 									}
+									table.close();
 								} catch (Exception e) {
 									// TODO: revisit error handling
 									throw new RuntimeException("Error while flushing small table.", e);
@@ -105,10 +124,12 @@ public class SmallColumnStore implements ColumnStore {
 							}
 						}
 					});
-					m_table.release();
+					m_table.release(); // from here on out, the cache holds is responsible for retaining
+					m_table = null;
 				} else if (m_delegateWriter != null) {
 					m_delegateWriter.close();
 					m_isFlushed.set(true);
+					m_delegateWriter = null;
 				}
 				m_writerClosed = true;
 			}
@@ -126,6 +147,9 @@ public class SmallColumnStore implements ColumnStore {
 		if (!m_writerClosed) {
 			throw new IllegalStateException("Table store writer has not been closed.");
 		}
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
 
 		synchronized (m_isFlushed) {
 			if (m_isFlushed.compareAndSet(false, true)) {
@@ -134,7 +158,11 @@ public class SmallColumnStore implements ColumnStore {
 					try (ColumnDataWriter delegateWriter = m_delegate.getWriter();
 							ColumnDataReader reader = cached.createReader(() -> null)) {
 						for (int i = 0; i < reader.getNumEntries(); i++) {
-							delegateWriter.write(reader.read(i));
+							ColumnData[] batch = reader.read(i);
+							delegateWriter.write(batch);
+							for (ColumnData data : batch) {
+								data.release();
+							}
 						}
 					} catch (Exception e) {
 						throw new IOException("Error while flushing small table.", e);
@@ -151,6 +179,9 @@ public class SmallColumnStore implements ColumnStore {
 		if (!m_writerClosed) {
 			throw new IllegalStateException("Table store writer has not been closed.");
 		}
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
 
 		return new ColumnDataReader() {
 
@@ -159,14 +190,18 @@ public class SmallColumnStore implements ColumnStore {
 
 			@Override
 			public ColumnData[] read(int chunkIndex) throws IOException {
-				if (chunkIndex == 0) {
-					final InMemoryColumnStore cached = m_cache.retainAndGet(SmallColumnStore.this);
-					if (cached != null) {
-						try (ColumnDataReader reader = cached.createReader(config)) {
-							return reader.read(chunkIndex);
-						} catch (Exception e) {
-							throw new IOException("Error while reading from small table.", e);
-						}
+				if (m_storeClosed) {
+					throw new IllegalStateException("Column store has already been closed.");
+				}
+
+				final InMemoryColumnStore cached = m_cache.retainAndGet(SmallColumnStore.this);
+				if (cached != null) {
+					try (ColumnDataReader reader = cached.createReader(config)) {
+						ColumnData[] batch = reader.read(chunkIndex);
+						cached.release();
+						return batch;
+					} catch (Exception e) {
+						throw new IOException("Error while reading from small table.", e);
 					}
 				}
 				if (m_delegateReader == null) {
@@ -196,6 +231,10 @@ public class SmallColumnStore implements ColumnStore {
 
 	@Override
 	public ColumnDataFactory getFactory() {
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
+
 		return m_delegate.getFactory();
 	}
 
@@ -207,6 +246,7 @@ public class SmallColumnStore implements ColumnStore {
 		}
 		m_writer.close();
 		m_delegate.close();
+		m_storeClosed = true;
 	}
 
 }
