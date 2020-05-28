@@ -1,9 +1,10 @@
 package org.knime.core.columnar.data;
 
+import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnDataSpec;
 import org.knime.core.columnar.NullableColumnData;
 
-public interface BinarySupplData<C extends NullableColumnData> extends NullableColumnData {
+public interface BinarySupplData<C extends ColumnData> extends NullableColumnData {
 	C getChunk();
 
 	VarBinaryData getBinarySupplData();
