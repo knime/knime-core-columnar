@@ -32,7 +32,7 @@ public final class CachedColumnStore implements ColumnStore {
 		@Override
 		public void write(final ColumnData[] data) throws IOException {
 			if (m_writerClosed) {
-				throw new IllegalStateException("Attempting to write with an already closed writer.");
+				throw new IllegalStateException("Table store writer has already been closed.");
 			}
 
 			m_readCache.addBatch(data);
@@ -54,6 +54,8 @@ public final class CachedColumnStore implements ColumnStore {
 	
 	private volatile boolean m_writerClosed;
 	
+	private volatile boolean m_storeClosed;
+	
 	public CachedColumnStore(final ColumnStore delegate, final CachedColumnReadStoreCache cache) {
 		m_delegate = delegate;
 		m_schema = delegate.getSchema();
@@ -67,11 +69,22 @@ public final class CachedColumnStore implements ColumnStore {
 	
 	@Override
 	public void saveToFile(File file) throws IOException {
+		if (!m_writerClosed) {
+			throw new IllegalStateException("Table store writer has not been closed.");
+		}
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
+		
 		m_delegate.saveToFile(file);
 	}
 	
 	@Override
 	public ColumnDataReader createReader(ColumnReaderConfig config) {
+		if (!m_writerClosed) {
+			throw new IllegalStateException("Table store writer has not been closed.");
+		}
+		
 		return m_readCache.createReader(config);
 	}
 	
@@ -82,6 +95,10 @@ public final class CachedColumnStore implements ColumnStore {
 
 	@Override
 	public ColumnDataFactory getFactory() {
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
+		
 		return m_delegate.getFactory();
 	}
 	
@@ -90,6 +107,7 @@ public final class CachedColumnStore implements ColumnStore {
 		m_writer.close();
 		m_readCache.close();
 		m_delegate.close();
+		m_storeClosed = true;
 	}
 	
 }

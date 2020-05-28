@@ -120,9 +120,7 @@ class CacheTestUtils {
 					final TestColumnData[] all = table.get(i);
 					written = Arrays.stream(indices).mapToObj(index -> all[index]).toArray(TestColumnData[]::new);
 				}
-				final int refs = checkRefs(table);
 				final ColumnData[] batch = reader.read(i);
-				assertEquals(refs + 1, checkRefs(written));
 				assertArrayEquals(written, batch);
 				for (final ColumnData data : batch) {
 					data.release();

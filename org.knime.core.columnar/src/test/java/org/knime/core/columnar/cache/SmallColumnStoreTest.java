@@ -29,7 +29,7 @@ public class SmallColumnStoreTest {
 	private static final int smallTableWidth = 2;
 	private static final int sizeOfColumnData = 1;
 
-	private SmallColumnStoreCache generateSmallTableSizedCache() {
+	private SmallColumnStoreCache generateCache() {
 		final int sizeOfSmallTable = smallTableHeight * smallTableHeight * sizeOfColumnData;
 		return new SmallColumnStoreCache(sizeOfSmallTable, sizeOfSmallTable);
 	}
@@ -55,7 +55,7 @@ public class SmallColumnStoreTest {
 		assertEquals(0, checkRefs(smallTable));
 
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache())) {
+				final ColumnStore store = new SmallColumnStore(delegate, generateCache())) {
 
 			writeTable(store, smallTable);
 			assertFalse(tableInStore(delegate, smallTable));
@@ -74,7 +74,7 @@ public class SmallColumnStoreTest {
 		assertEquals(0, checkRefs(smallTable));
 
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache())) {
+				final ColumnStore store = new SmallColumnStore(delegate, generateCache())) {
 
 			writeTable(store, smallTable);
 			assertFalse(tableInStore(delegate, smallTable));
@@ -93,7 +93,7 @@ public class SmallColumnStoreTest {
 		assertEquals(0, checkRefs(smallTable));
 
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache())) {
+				final ColumnStore store = new SmallColumnStore(delegate, generateCache())) {
 
 			writeTable(store, smallTable);
 			assertFalse(tableInStore(delegate, smallTable));
@@ -112,7 +112,7 @@ public class SmallColumnStoreTest {
 		assertEquals(0, checkRefs(largeTable));
 
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache())) {
+				final ColumnStore store = new SmallColumnStore(delegate, generateCache())) {
 
 			writeTable(store, largeTable);
 			assertTrue(tableInStore(delegate, largeTable));
@@ -133,7 +133,7 @@ public class SmallColumnStoreTest {
 		assertEquals(0, checkRefs(smallTable2));
 
 		final ColumnStoreSchema schema = generateSchema();
-		final SmallColumnStoreCache cache = generateSmallTableSizedCache();
+		final SmallColumnStoreCache cache = generateCache();
 
 		try (final ColumnStore delegate1 = new InMemoryColumnStore(schema);
 				final ColumnStore store1 = new SmallColumnStore(delegate1, cache);
@@ -167,7 +167,7 @@ public class SmallColumnStoreTest {
 		assertEquals(0, checkRefs(smallTable2));
 
 		final ColumnStoreSchema schema = generateSchema();
-		final SmallColumnStoreCache cache = generateSmallTableSizedCache();
+		final SmallColumnStoreCache cache = generateCache();
 
 		try (final ColumnStore delegate1 = new InMemoryColumnStore(schema);
 				final ColumnStore store1 = new SmallColumnStore(delegate1, cache);
@@ -210,7 +210,7 @@ public class SmallColumnStoreTest {
 		assertEquals(0, checkRefs(smallTable2));
 
 		final ColumnStoreSchema schema = generateSchema();
-		final SmallColumnStoreCache cache = generateSmallTableSizedCache();
+		final SmallColumnStoreCache cache = generateCache();
 
 		try (final ColumnStore delegate1 = new InMemoryColumnStore(schema);
 				final ColumnStore store1 = new SmallColumnStore(delegate1, cache);
@@ -250,7 +250,7 @@ public class SmallColumnStoreTest {
 	public void testCacheEmptyAfterClear() throws Exception {
 		
 		final List<TestColumnData[]> smallTable = generateSmallTable();
-		final SmallColumnStoreCache cache = generateSmallTableSizedCache();
+		final SmallColumnStoreCache cache = generateCache();
 
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
 				final ColumnStore store = new SmallColumnStore(delegate, cache)) {
@@ -264,7 +264,7 @@ public class SmallColumnStoreTest {
 	@Test
 	public void testWriterSingleton() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache())) {
+				final ColumnStore store = new SmallColumnStore(delegate, generateCache())) {
 			assertEquals(store.getWriter(), store.getWriter());
 		}
 	}
@@ -272,7 +272,7 @@ public class SmallColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnWriteAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema())) {
-			final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache());
+			final ColumnStore store = new SmallColumnStore(delegate, generateCache());
 			store.close();
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				writer.write(createBatch(1, 1));
@@ -283,7 +283,7 @@ public class SmallColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnSaveWhileWriterOpen() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache())) {
+				final ColumnStore store = new SmallColumnStore(delegate, generateCache())) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				store.saveToFile(null);
 			}
@@ -293,7 +293,7 @@ public class SmallColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnSaveAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema())) {
-			final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache());
+			final ColumnStore store = new SmallColumnStore(delegate, generateCache());
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				writer.write(createBatch(1, 1));
 			}
@@ -305,7 +305,7 @@ public class SmallColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnCreateReaderWhileWriterOpen() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache())) {
+				final ColumnStore store = new SmallColumnStore(delegate, generateCache())) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				try (final ColumnDataReader reader = store.createReader(() -> null)) {
 				}
@@ -316,7 +316,7 @@ public class SmallColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema())) {
-			final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache());
+			final ColumnStore store = new SmallColumnStore(delegate, generateCache());
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				writer.write(createBatch(1, 1));
 			}
@@ -329,7 +329,7 @@ public class SmallColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnReadAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema())) {
-			final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache());
+			final ColumnStore store = new SmallColumnStore(delegate, generateCache());
 			try (ColumnDataWriter writer = store.getWriter()) {
 				writer.write(createBatch(1, 1));
 			}
@@ -343,7 +343,7 @@ public class SmallColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnGetFactoryAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema())) {
-			final ColumnStore store = new SmallColumnStore(delegate, generateSmallTableSizedCache());
+			final ColumnStore store = new SmallColumnStore(delegate, generateCache());
 			store.close();
 			store.getFactory();
 		}

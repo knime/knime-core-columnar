@@ -23,6 +23,10 @@ public class CachedColumnReadStore implements ColumnReadStore {
 		public CachedColumnReadStoreCache(int cacheSize) {
 			m_cache = new SizeBoundLruCache<>(cacheSize);
 		}
+		
+		int size() {
+			return m_cache.size();
+		}
 	}
 
 	private static final Object DUMMY = new Object();
@@ -91,6 +95,8 @@ public class CachedColumnReadStore implements ColumnReadStore {
 
 	private final Map<ColumnDataUniqueId, Object> m_inCache = new ConcurrentHashMap<>();
 	
+	private volatile boolean m_storeClosed;
+	
 	public CachedColumnReadStore(final ColumnReadStore delegate, final CachedColumnReadStoreCache cache) {
 		m_delegate = delegate;
 		m_schema = delegate.getSchema();
@@ -107,7 +113,9 @@ public class CachedColumnReadStore implements ColumnReadStore {
 			};
 			try (final ColumnDataReader reader = m_delegate.createReader(config)) {
 				m_numChunks.compareAndSet(0, reader.getNumEntries());
-				return reader.read(id.getChunkIndex())[0];
+				final ColumnData data = reader.read(id.getChunkIndex())[0];
+				data.release();
+				return data;
 			} catch (Exception e) {
 				// TODO: handle exception properly
 				throw new RuntimeException("Exception while loading column chunk.", e);
@@ -121,18 +129,26 @@ public class CachedColumnReadStore implements ColumnReadStore {
 		final int numChunks = m_numChunks.getAndIncrement();
 		for (int i = 0; i < batch.length; i++) {
 			final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(i, numChunks);
+			m_inCache.put(ccUID, DUMMY);
 			m_cache.retainAndPutIfAbsent(ccUID, batch[i], m_evictor);
 		}
 	}
 
 	@Override
 	public ColumnDataReader createReader(ColumnReaderConfig config) {
+		if (m_storeClosed) {
+			throw new IllegalStateException("Column store has already been closed.");
+		}
 
 		// TODO: pre-fetch subsequent chunks on cache miss
 		return new ColumnDataReader() {
 
 			@Override
 			public ColumnData[] read(int chunkIndex) {
+				if (m_storeClosed) {
+					throw new IllegalStateException("Column store has already been closed.");
+				}
+				
 				final int[] indices = config.getColumnIndices();
 				final boolean isSelection = indices != null;
 				final int numRequested = isSelection ? indices.length : m_schema.getNumColumns();
@@ -171,6 +187,7 @@ public class CachedColumnReadStore implements ColumnReadStore {
 			}
 		}
 		m_inCache.clear();
+		m_storeClosed = true;
 	}
 
 }
