@@ -20,8 +20,25 @@ public final class ColumnStoreReadTable implements ReadTable {
 	}
 
 	@Override
-	public TableReadCursor newCursor(ColumnReaderConfig config) {
-		return new TableReadCursor(m_delegate.createReader(config), createAccess(m_schema, config));
+	public TableReadCursor newCursor(final ColumnReaderConfig config) {
+		if (config.getColumnIndices() == null) {
+			return new FilteredTableReadCursor(m_delegate.createReader(config), createAccess(m_schema, config),
+					config.getColumnIndices());
+		} else {
+			return newCursor();
+		}
+	}
+
+	@Override
+	public TableReadCursor newCursor() {
+		final ColumnReaderConfig empty = new ColumnReaderConfig() {
+
+			@Override
+			public int[] getColumnIndices() {
+				return null;
+			}
+		};
+		return new DefaultTableReadCursor(m_delegate.createReader(empty), createAccess(m_schema, empty));
 	}
 
 	@Override
