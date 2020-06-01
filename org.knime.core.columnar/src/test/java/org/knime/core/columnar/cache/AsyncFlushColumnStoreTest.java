@@ -6,8 +6,6 @@ import static org.knime.core.columnar.cache.CacheTestUtils.createBatch;
 import static org.knime.core.columnar.cache.CacheTestUtils.createSchema;
 import static org.knime.core.columnar.cache.CacheTestUtils.createTable;
 import static org.knime.core.columnar.cache.CacheTestUtils.readAndCompareTable;
-import static org.knime.core.columnar.cache.CacheTestUtils.readSelectionAndCompareTable;
-import static org.knime.core.columnar.cache.CacheTestUtils.readTwiceAndCompareTable;
 import static org.knime.core.columnar.cache.CacheTestUtils.writeTable;
 
 import java.util.List;

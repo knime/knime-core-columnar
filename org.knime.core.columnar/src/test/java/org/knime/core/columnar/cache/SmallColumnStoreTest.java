@@ -1,17 +1,17 @@
 package org.knime.core.columnar.cache;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.cache.CacheTestUtils.checkRefs;
+import static org.knime.core.columnar.cache.CacheTestUtils.createBatch;
+import static org.knime.core.columnar.cache.CacheTestUtils.createSchema;
+import static org.knime.core.columnar.cache.CacheTestUtils.createTable;
 import static org.knime.core.columnar.cache.CacheTestUtils.readAndCompareTable;
 import static org.knime.core.columnar.cache.CacheTestUtils.readSelectionAndCompareTable;
 import static org.knime.core.columnar.cache.CacheTestUtils.readTwiceAndCompareTable;
 import static org.knime.core.columnar.cache.CacheTestUtils.tableInStore;
 import static org.knime.core.columnar.cache.CacheTestUtils.writeTable;
-import static org.knime.core.columnar.cache.CacheTestUtils.createTable;
-import static org.knime.core.columnar.cache.CacheTestUtils.createBatch;
-import static org.knime.core.columnar.cache.CacheTestUtils.createSchema;
 
 import java.util.List;
 

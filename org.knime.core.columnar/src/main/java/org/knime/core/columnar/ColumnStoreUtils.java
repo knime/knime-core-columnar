@@ -2,10 +2,10 @@ package org.knime.core.columnar;
 
 import org.knime.core.columnar.cache.AsyncFlushColumnStore;
 import org.knime.core.columnar.cache.CachedColumnReadStore;
+import org.knime.core.columnar.cache.CachedColumnReadStore.CachedColumnReadStoreCache;
 import org.knime.core.columnar.cache.CachedColumnStore;
 import org.knime.core.columnar.cache.SmallColumnStore;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.cache.CachedColumnReadStore.CachedColumnReadStoreCache;
 
 public class ColumnStoreUtils {
 

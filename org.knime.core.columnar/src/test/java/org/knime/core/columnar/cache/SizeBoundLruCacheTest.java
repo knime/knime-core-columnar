@@ -1,13 +1,11 @@
 package org.knime.core.columnar.cache;
 
-import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.knime.core.columnar.cache.SizeBoundLruCache;
+import org.junit.Test;
 import org.knime.core.columnar.cache.CacheTestUtils.TestColumnData;
 
 public class SizeBoundLruCacheTest {
