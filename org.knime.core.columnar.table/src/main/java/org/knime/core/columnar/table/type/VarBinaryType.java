@@ -10,7 +10,7 @@ import org.knime.core.columnar.table.NullableWriteValue;
 public class VarBinaryType implements ColumnType<VarBinaryData> {
 
 	@Override
-	public ColumnDataSpec<VarBinaryData> getChunkSpec() {
+	public ColumnDataSpec<VarBinaryData> getColumnDataSpec() {
 		return new VarBinaryData.VarBinaryDataSpec();
 	}
 

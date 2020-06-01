@@ -12,7 +12,7 @@ import org.knime.core.columnar.table.NullableWriteValue;
 public class LocalDateType implements ColumnType<LocalDateData> {
 
 	@Override
-	public ColumnDataSpec<LocalDateData> getChunkSpec() {
+	public ColumnDataSpec<LocalDateData> getColumnDataSpec() {
 		return new LocalDateData.LocalDateDataSpec();
 	}
 

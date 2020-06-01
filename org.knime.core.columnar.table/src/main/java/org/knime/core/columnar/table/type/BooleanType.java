@@ -47,7 +47,7 @@ public class BooleanType implements ColumnType<BooleanData> {
 	}
 
 	@Override
-	public ColumnDataSpec<BooleanData> getChunkSpec() {
+	public ColumnDataSpec<BooleanData> getColumnDataSpec() {
 		return new BooleanData.BooleanDataSpec();
 	}
 }

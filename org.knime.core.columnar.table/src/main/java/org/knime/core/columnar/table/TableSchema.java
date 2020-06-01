@@ -11,6 +11,6 @@ public interface TableSchema extends ColumnStoreSchema {
 
 	@Override
 	default ColumnDataSpec<?> getColumnDataSpec(int idx) {
-		return getColumnSpec(idx).getChunkSpec();
+		return getColumnSpec(idx).getColumnDataSpec();
 	}
 }

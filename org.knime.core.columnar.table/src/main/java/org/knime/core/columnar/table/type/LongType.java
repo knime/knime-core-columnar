@@ -10,7 +10,7 @@ import org.knime.core.columnar.table.NullableWriteValue;
 public class LongType implements ColumnType<LongData> {
 
 	@Override
-	public ColumnDataSpec<LongData> getChunkSpec() {
+	public ColumnDataSpec<LongData> getColumnDataSpec() {
 		return new LongData.LongDataSpec();
 	}
 

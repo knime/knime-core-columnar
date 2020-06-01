@@ -10,7 +10,7 @@ import org.knime.core.columnar.table.NullableWriteValue;
 public class FloatType implements ColumnType<FloatData> {
 
 	@Override
-	public ColumnDataSpec<FloatData> getChunkSpec() {
+	public ColumnDataSpec<FloatData> getColumnDataSpec() {
 		return new FloatData.FloatDataSpec();
 	}
 

@@ -10,7 +10,7 @@ import org.knime.core.columnar.table.NullableWriteValue;
 public class IntType implements ColumnType<IntData> {
 
 	@Override
-	public ColumnDataSpec<IntData> getChunkSpec() {
+	public ColumnDataSpec<IntData> getColumnDataSpec() {
 		return new IntData.IntDataSpec();
 	}
 

@@ -17,7 +17,7 @@ public class DurationType implements ColumnType<DurationData> {
 	}
 
 	@Override
-	public ColumnDataSpec<DurationData> getChunkSpec() {
+	public ColumnDataSpec<DurationData> getColumnDataSpec() {
 		return new DurationData.DurationDataSpec();
 	}
 

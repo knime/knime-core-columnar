@@ -12,7 +12,7 @@ import org.knime.core.columnar.table.NullableWriteValue;
 public class PeriodType implements ColumnType<PeriodData> {
 
 	@Override
-	public ColumnDataSpec<PeriodData> getChunkSpec() {
+	public ColumnDataSpec<PeriodData> getColumnDataSpec() {
 		return new PeriodData.PeriodDataSpec();
 	}
 

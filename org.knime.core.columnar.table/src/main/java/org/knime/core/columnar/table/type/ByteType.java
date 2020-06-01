@@ -15,7 +15,7 @@ public class ByteType implements ColumnType<ByteData> {
 	}
 
 	@Override
-	public ColumnDataSpec<ByteData> getChunkSpec() {
+	public ColumnDataSpec<ByteData> getColumnDataSpec() {
 		return new ByteData.ByteDataSpec();
 	}
 

@@ -47,7 +47,7 @@ public class DoubleType implements ColumnType<DoubleData> {
 	}
 
 	@Override
-	public ColumnDataSpec<DoubleData> getChunkSpec() {
+	public ColumnDataSpec<DoubleData> getColumnDataSpec() {
 		return new DoubleData.DoubleDataSpec();
 	}
 

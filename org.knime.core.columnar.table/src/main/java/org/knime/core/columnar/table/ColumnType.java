@@ -6,9 +6,8 @@ import org.knime.core.columnar.ColumnDataSpec;
 public interface ColumnType<C extends ColumnData> {
 
 	// inside
-	ColumnDataSpec<C> getChunkSpec();
+	ColumnDataSpec<C> getColumnDataSpec();
 
-	// outside
 	ColumnDataAccess<C> createAccess();
 
 }

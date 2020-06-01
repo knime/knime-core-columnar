@@ -15,7 +15,7 @@ public class StringType implements ColumnType<StringData> {
 	}
 
 	@Override
-	public ColumnDataSpec<StringData> getChunkSpec() {
+	public ColumnDataSpec<StringData> getColumnDataSpec() {
 		return new StringData.StringDataSpec(m_dictEncoded);
 	}
 
