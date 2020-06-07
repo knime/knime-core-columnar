@@ -146,7 +146,7 @@ class CacheTestUtils {
 	}
 
 	static boolean tableInStore(ColumnStore store, List<TestColumnData[]> table) throws Exception {
-		try (final ColumnDataReader reader = store.createReader(() -> null)) {
+		try (final ColumnDataReader reader = store.createReader()) {
 		} catch (IllegalStateException e) {
 			return false;
 		}

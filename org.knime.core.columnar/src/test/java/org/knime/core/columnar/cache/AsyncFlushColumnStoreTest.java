@@ -117,7 +117,7 @@ public class AsyncFlushColumnStoreTest {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
 				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
-				try (final ColumnDataReader reader = store.createReader(() -> null)) {
+				try (final ColumnDataReader reader = store.createReader()) {
 				}
 			}
 		}
@@ -131,7 +131,7 @@ public class AsyncFlushColumnStoreTest {
 				writer.write(createBatch(1, 1));
 			}
 			store.close();
-			try (final ColumnDataReader reader = store.createReader(() -> null)) {
+			try (final ColumnDataReader reader = store.createReader()) {
 			}
 		}
 	}

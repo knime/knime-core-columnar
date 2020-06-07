@@ -186,7 +186,7 @@ public class CachedColumnStoreTest {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
 				final ColumnStore store = new CachedColumnStore(delegate, generateCache())) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
-				try (final ColumnDataReader reader = store.createReader(() -> null)) {
+				try (final ColumnDataReader reader = store.createReader()) {
 				}
 			}
 		}
@@ -200,7 +200,7 @@ public class CachedColumnStoreTest {
 				writer.write(createBatch(1, 1));
 			}
 			store.close();
-			try (final ColumnDataReader reader = store.createReader(() -> null)) {
+			try (final ColumnDataReader reader = store.createReader()) {
 			}
 		}
 	}
@@ -212,7 +212,7 @@ public class CachedColumnStoreTest {
 			try (ColumnDataWriter writer = store.getWriter()) {
 				writer.write(createBatch(1, 1));
 			}
-			try (final ColumnDataReader reader = store.createReader(() -> null)) {
+			try (final ColumnDataReader reader = store.createReader()) {
 				store.close();
 				reader.read(0);
 			}
