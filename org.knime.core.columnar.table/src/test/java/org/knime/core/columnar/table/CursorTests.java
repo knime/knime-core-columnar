@@ -50,9 +50,15 @@ public class CursorTests {
 			readIdentity(0, numRows - 1, rCursor);
 		}
 
-		// test cursor with filter from 5-10
+		// test random subset
 		try (TableReadCursor rCursor = rTable.cursor(TestColumnarTableUtils.createTableReadCursorConfig(42, 99, 0))) {
 			readIdentity(42, 99, rCursor);
+		}
+
+		// test cursor with filter min-max
+		try (TableReadCursor rCursor = rTable
+				.cursor(TestColumnarTableUtils.createTableReadCursorConfig(42, numRows - 1, 0))) {
+			readIdentity(42, numRows - 1, rCursor);
 		}
 
 		rTable.close();
