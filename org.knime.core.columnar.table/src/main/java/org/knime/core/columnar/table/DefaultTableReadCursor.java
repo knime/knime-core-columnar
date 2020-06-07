@@ -15,10 +15,10 @@ final class DefaultTableReadCursor implements TableReadCursor {
 
 	private ColumnData[] m_currentData;
 
-	DefaultTableReadCursor(final ColumnDataReader reader, final ColumnDataAccess<ColumnData>[] access) {
+	DefaultTableReadCursor(final ColumnDataReader reader, TableSchema schema) {
 		m_reader = reader;
-		m_access = access;
-		m_numChunks = m_reader.getNumEntries();
+		m_access = createAccess(schema);
+		m_numChunks = m_reader.getNumChunks();
 
 		switchToNextData();
 	}
@@ -60,6 +60,12 @@ final class DefaultTableReadCursor implements TableReadCursor {
 		}
 	}
 
+	@Override
+	public void close() throws Exception {
+		releaseCurrentData();
+		m_reader.close();
+	}
+
 	private void releaseCurrentData() {
 		if (m_currentData != null) {
 			for (final ColumnData data : m_currentData) {
@@ -68,9 +74,14 @@ final class DefaultTableReadCursor implements TableReadCursor {
 		}
 	}
 
-	@Override
-	public void close() throws Exception {
-		releaseCurrentData();
-		m_reader.close();
+	private ColumnDataAccess<ColumnData>[] createAccess(TableSchema schema) {
+		@SuppressWarnings("unchecked")
+		final ColumnDataAccess<? extends ColumnData>[] accesses = new ColumnDataAccess[schema.getNumColumns()];
+		for (int i = 0; i < accesses.length; i++) {
+			accesses[i] = schema.getColumnSpec(i).createAccess();
+		}
+		@SuppressWarnings("unchecked")
+		final ColumnDataAccess<ColumnData>[] cast = (ColumnDataAccess<ColumnData>[]) accesses;
+		return cast;
 	}
 }

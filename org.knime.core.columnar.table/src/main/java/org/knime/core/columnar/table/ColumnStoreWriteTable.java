@@ -54,9 +54,13 @@ public class ColumnStoreWriteTable implements WriteTable {
 		return cast;
 	}
 
-	@Override
-	public void close() throws Exception {
-		m_store.close();
+	public void close() {
+		try {
+			m_store.close();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	@Override
