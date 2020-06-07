@@ -1,6 +1,7 @@
 package org.knime.core.columnar;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 import org.knime.core.columnar.chunk.ColumnDataWriter;
@@ -23,6 +24,10 @@ public class TestColumnDataWriter implements ColumnDataWriter {
 		final Double[][] data = new Double[record.length][];
 		for (int i = 0; i < data.length; i++) {
 			data[i] = ((TestDoubleColumnData) record[i]).get();
+			// handle last 
+			if (data[i].length > record[i].getNumValues()) {
+				data[i] = Arrays.copyOf(data[i], record[i].getNumValues());
+			}
 		}
 
 		m_chunks.add(data);

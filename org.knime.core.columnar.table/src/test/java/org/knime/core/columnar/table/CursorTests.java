@@ -17,19 +17,8 @@ public class CursorTests {
 		int chunkSize = 10;
 
 		WriteTable wTable = TestColumnarTableUtils.createWriteTable(numColumns, chunkSize);
-		try (TableWriteCursor wCursor = wTable.getCursor()) {
 
-			TestDoubleWriteValue wValue = wCursor.get(0);
-
-			for (int i = 0; i < numRows; i++) {
-				wCursor.fwd();
-				if (i % 13 == 0) {
-					wValue.setMissing();
-				} else {
-					wValue.setDouble(i);
-				}
-			}
-		}
+		fillWriteTable(numRows, wTable);
 
 		// create read table
 		ReadTable rTable = wTable.createReadTable();
@@ -41,7 +30,20 @@ public class CursorTests {
 		try (TableReadCursor rCursor = rTable.cursor()) {
 			readIdentity(0, numRows - 1, rCursor);
 		}
+	}
 
+	@Test
+	public void testTableFilter() throws Exception {
+		int numRows = 107;
+		int numColumns = 1;
+		int chunkSize = 10;
+
+		WriteTable wTable = TestColumnarTableUtils.createWriteTable(numColumns, chunkSize);
+
+		fillWriteTable(numRows, wTable);
+
+		// create read table
+		ReadTable rTable = wTable.createReadTable();
 		// test cursor with filter which doesn't actually filter
 		try (TableReadCursor rCursor = rTable
 				.cursor(TestColumnarTableUtils.createTableReadCursorConfig(0, numRows - 1, 0))) {
@@ -54,7 +56,21 @@ public class CursorTests {
 		}
 
 		rTable.close();
+	}
 
+	private void fillWriteTable(int numRows, WriteTable wTable) throws Exception {
+		try (TableWriteCursor wCursor = wTable.getCursor()) {
+			TestDoubleWriteValue wValue = wCursor.get(0);
+
+			for (int i = 0; i < numRows; i++) {
+				wCursor.fwd();
+				if (i % 13 == 0) {
+					wValue.setMissing();
+				} else {
+					wValue.setDouble(i);
+				}
+			}
+		}
 	}
 
 	private void readIdentity(int firstIndex, int lastIndex, TableReadCursor rCursor) throws Exception {
