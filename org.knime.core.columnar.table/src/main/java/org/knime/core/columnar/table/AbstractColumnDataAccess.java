@@ -19,11 +19,6 @@ public abstract class AbstractColumnDataAccess<C extends ColumnData> implements 
 	}
 
 	@Override
-	public void reset() {
-		m_index = -1;
-	}
-
-	@Override
 	public void setIndex(int index) {
 		m_index = index;
 	}

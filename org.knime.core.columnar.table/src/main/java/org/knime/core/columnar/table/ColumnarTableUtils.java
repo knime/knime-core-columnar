@@ -3,8 +3,8 @@ package org.knime.core.columnar.table;
 import org.knime.core.columnar.ColumnReadStore;
 import org.knime.core.columnar.ColumnStore;
 
-public final class TableUtils {
-	private TableUtils() {
+public final class ColumnarTableUtils {
+	private ColumnarTableUtils() {
 	}
 
 	// TODO check compatibility of schema

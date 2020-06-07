@@ -16,11 +16,6 @@ public interface ColumnDataAccess<C extends ColumnData> extends ReadValue, Write
 	 * Fwd the internal cursor
 	 */
 	void fwd();
-
-	/**
-	 * resets internal cursor to -1
-	 */
-	void reset();
 	
 	/**
 	 * @param set index

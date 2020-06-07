@@ -10,13 +10,13 @@ class TestColumnarTableUtils {
 
 	static final WriteTable createWriteTable(int numColumns, int chunkCapacity) {
 		final TableSchema schema = schema(numColumns);
-		return TableUtils.createWriteTable(schema,
+		return ColumnarTableUtils.createWriteTable(schema,
 				new TestColumnStoreFactory().createWriteStore(schema, null, chunkCapacity));
 	}
 
 	static final WriteTable createWriteTableWithCache(int numColumns, int chunkCapacity) {
 		final TableSchema schema = schema(numColumns);
-		return TableUtils.createWriteTable(schema,
+		return ColumnarTableUtils.createWriteTable(schema,
 				ColumnStoreUtils.cache(new TestColumnStoreFactory().createWriteStore(schema, null, chunkCapacity)));
 	}
 
