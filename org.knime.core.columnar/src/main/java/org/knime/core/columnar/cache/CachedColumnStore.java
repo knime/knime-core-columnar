@@ -11,7 +11,7 @@ import org.knime.core.columnar.cache.CachedColumnReadStore.CachedColumnReadStore
 import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.chunk.ColumnReaderConfig;
+import org.knime.core.columnar.chunk.ColumnSelection;
 
 //TODO: thread safety considerations
 public final class CachedColumnStore implements ColumnStore {
@@ -80,7 +80,7 @@ public final class CachedColumnStore implements ColumnStore {
 	}
 	
 	@Override
-	public ColumnDataReader createReader(ColumnReaderConfig config) {
+	public ColumnDataReader createReader(ColumnSelection config) {
 		if (!m_writerClosed) {
 			throw new IllegalStateException("Table store writer has not been closed.");
 		}

@@ -14,6 +14,7 @@ import org.knime.core.columnar.ColumnStore;
 import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
+import org.knime.core.columnar.chunk.ColumnSelectionUtil;
 
 class CacheTestUtils {
 
@@ -110,9 +111,9 @@ class CacheTestUtils {
 
 	static void readSelectionAndCompareTable(ColumnStore store, List<TestColumnData[]> table, int... indices)
 			throws Exception {
-		try (final ColumnDataReader reader = store.createReader(() -> indices)) {
-			assertEquals(table.size(), reader.getNumEntries());
-			for (int i = 0; i < reader.getNumEntries(); i++) {
+		try (final ColumnDataReader reader = store.createReader(ColumnSelectionUtil.create(indices))) {
+			assertEquals(table.size(), reader.getNumChunks());
+			for (int i = 0; i < reader.getNumChunks(); i++) {
 				final TestColumnData[] written;
 				if (indices == null) {
 					written = table.get(i);
@@ -130,10 +131,10 @@ class CacheTestUtils {
 	}
 
 	static void readTwiceAndCompareTable(ColumnStore store) throws Exception {
-		try (final ColumnDataReader reader1 = store.createReader(() -> null);
-				final ColumnDataReader reader2 = store.createReader(() -> null)) {
-			assertEquals(reader1.getNumEntries(), reader2.getNumEntries());
-			for (int i = 0; i < reader1.getNumEntries(); i++) {
+		try (final ColumnDataReader reader1 = store.createReader();
+				final ColumnDataReader reader2 = store.createReader()) {
+			assertEquals(reader1.getNumChunks(), reader2.getNumChunks());
+			for (int i = 0; i < reader1.getNumChunks(); i++) {
 				final ColumnData[] batch1 = reader1.read(i);
 				final ColumnData[] batch2 = reader2.read(i);
 				assertArrayEquals(batch1, batch2);

@@ -11,7 +11,8 @@ import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnReadStore;
 import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnReaderConfig;
+import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.chunk.ColumnSelectionUtil;
 
 //TODO: thread safety considerations
 public class CachedColumnReadStore implements ColumnReadStore {
@@ -105,14 +106,10 @@ public class CachedColumnReadStore implements ColumnReadStore {
 		// TODO: reading column chunks one by one is too expensive
 		m_loader = id -> {
 			m_inCache.put(id, DUMMY);
-			ColumnReaderConfig config = new ColumnReaderConfig() {
-				@Override
-				public int[] getColumnIndices() {
-					return new int[] { id.getColumnIndex() };
-				}
-			};
+			ColumnSelection config = ColumnSelectionUtil.create(new int[] { id.getColumnIndex() });
 			try (final ColumnDataReader reader = m_delegate.createReader(config)) {
-				m_numChunks.compareAndSet(0, reader.getNumEntries());
+				m_numChunks.compareAndSet(0, reader.getNumChunks());
+				m_maxDataCapacity.compareAndSet(0, reader.getMaxDataCapacity());
 				final ColumnData data = reader.read(id.getChunkIndex())[0];
 				data.release();
 				return data;
@@ -133,9 +130,9 @@ public class CachedColumnReadStore implements ColumnReadStore {
 			m_cache.retainAndPutIfAbsent(ccUID, batch[i], m_evictor);
 		}
 	}
-
+	
 	@Override
-	public ColumnDataReader createReader(ColumnReaderConfig config) {
+	public ColumnDataReader createReader(ColumnSelection config) {
 		if (m_storeClosed) {
 			throw new IllegalStateException("Column store has already been closed.");
 		}
@@ -149,13 +146,19 @@ public class CachedColumnReadStore implements ColumnReadStore {
 					throw new IllegalStateException("Column store has already been closed.");
 				}
 				
-				final int[] indices = config.getColumnIndices();
-				final boolean isSelection = indices != null;
-				final int numRequested = isSelection ? indices.length : m_schema.getNumColumns();
+				final int[] indices;
+				if (config != null) {
+					indices = config.get();
+				} else {
+					indices = null;
+				}
+
+				final int numRequested = indices != null ? indices.length : m_schema.getNumColumns();
 				final ColumnData[] data = new ColumnData[numRequested];
 
 				for (int i = 0; i < numRequested; i++) {
-					final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(isSelection ? indices[i] : i, chunkIndex);
+					final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(indices != null ? indices[i] : i,
+							chunkIndex);
 					data[i] = m_cache.retainAndGet(ccUID, m_loader, m_evictor);
 				}
 

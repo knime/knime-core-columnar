@@ -12,7 +12,7 @@ import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.chunk.ColumnReaderConfig;
+import org.knime.core.columnar.chunk.ColumnSelection;
 
 // not! thread-safe
 public class InMemoryColumnStore implements ColumnStore, ReferencedData {
@@ -96,7 +96,7 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 	}
 
 	@Override
-	public ColumnDataReader createReader(ColumnReaderConfig config) {
+	public ColumnDataReader createReader(ColumnSelection config) {
 		if (!m_writerClosed) {
 			throw new IllegalStateException("Table store writer has not been closed.");
 		}
@@ -111,14 +111,19 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 				if (m_storeClosed) {
 					throw new IllegalStateException("Column store has already been closed.");
 				}
+
+				final int[] indices;
+				if (config != null) {
+					indices = config.get();
+				} else {
+					indices = null;
+				}
 				
-				final int[] indices = config.getColumnIndices();
-				final boolean isSelection = indices != null;
-				final int numRequested = isSelection ? indices.length : m_schema.getNumColumns();
+				final int numRequested = indices != null ? indices.length : m_schema.getNumColumns();
 				final ColumnData[] batch = new ColumnData[numRequested];
 
 				for (int i = 0; i < numRequested; i++) {
-					final ColumnData data = m_batches.get(index)[isSelection ? indices[i] : i];
+					final ColumnData data = m_batches.get(index)[indices != null ? indices[i] : i];
 					data.retain();
 					batch[i] = data;
 				}

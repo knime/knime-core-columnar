@@ -11,7 +11,7 @@ import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.chunk.ColumnReaderConfig;
+import org.knime.core.columnar.chunk.ColumnSelection;
 
 //TODO: thread safety considerations
 public class SmallColumnStore implements ColumnStore {
@@ -76,7 +76,7 @@ public class SmallColumnStore implements ColumnStore {
 					if (m_table.sizeOf() > m_smallTableThreshold) {
 						try {
 							m_table.getWriter().close();
-							try (ColumnDataReader reader = m_table.createReader(() -> null)) {
+							try (ColumnDataReader reader = m_table.createReader()) {
 								for (int i = 0; i < reader.getNumEntries(); i++) {
 									ColumnData[] cached = reader.read(i);
 									initAndWrite(cached);
@@ -112,7 +112,7 @@ public class SmallColumnStore implements ColumnStore {
 						synchronized (m_isFlushed) {
 							if (m_isFlushed.compareAndSet(false, true)) {
 								try (ColumnDataWriter delegateWriter = m_delegate.getWriter();
-										ColumnDataReader reader = table.createReader(() -> null)) {
+										ColumnDataReader reader = table.createReader()) {
 									for (int i = 0; i < reader.getNumEntries(); i++) {
 										delegateWriter.write(reader.read(i));
 									}
@@ -156,7 +156,7 @@ public class SmallColumnStore implements ColumnStore {
 				final InMemoryColumnStore cached = m_cache.retainAndGet(SmallColumnStore.this);
 				if (cached != null) {
 					try (ColumnDataWriter delegateWriter = m_delegate.getWriter();
-							ColumnDataReader reader = cached.createReader(() -> null)) {
+							ColumnDataReader reader = cached.createReader()) {
 						for (int i = 0; i < reader.getNumEntries(); i++) {
 							ColumnData[] batch = reader.read(i);
 							delegateWriter.write(batch);
@@ -175,7 +175,7 @@ public class SmallColumnStore implements ColumnStore {
 	}
 
 	@Override
-	public ColumnDataReader createReader(ColumnReaderConfig config) {
+	public ColumnDataReader createReader(ColumnSelection config) {
 		if (!m_writerClosed) {
 			throw new IllegalStateException("Table store writer has not been closed.");
 		}
