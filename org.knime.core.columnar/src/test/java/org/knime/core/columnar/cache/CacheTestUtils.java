@@ -45,7 +45,8 @@ class CacheTestUtils {
 
 		@Override
 		public int getNumValues() {
-			throw new UnsupportedOperationException();
+			// TODO accurate?
+			return 42;
 		}
 
 		@Override
