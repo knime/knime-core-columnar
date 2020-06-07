@@ -77,7 +77,7 @@ public class SmallColumnStore implements ColumnStore {
 						try {
 							m_table.getWriter().close();
 							try (ColumnDataReader reader = m_table.createReader()) {
-								for (int i = 0; i < reader.getNumEntries(); i++) {
+								for (int i = 0; i < reader.getNumChunks(); i++) {
 									ColumnData[] cached = reader.read(i);
 									initAndWrite(cached);
 									for (ColumnData data : cached) {
@@ -113,7 +113,7 @@ public class SmallColumnStore implements ColumnStore {
 							if (m_isFlushed.compareAndSet(false, true)) {
 								try (ColumnDataWriter delegateWriter = m_delegate.getWriter();
 										ColumnDataReader reader = table.createReader()) {
-									for (int i = 0; i < reader.getNumEntries(); i++) {
+									for (int i = 0; i < reader.getNumChunks(); i++) {
 										delegateWriter.write(reader.read(i));
 									}
 									table.close();
@@ -136,7 +136,7 @@ public class SmallColumnStore implements ColumnStore {
 
 		};
 	}
-
+	
 	@Override
 	public ColumnDataWriter getWriter() {
 		return m_writer;
@@ -157,7 +157,7 @@ public class SmallColumnStore implements ColumnStore {
 				if (cached != null) {
 					try (ColumnDataWriter delegateWriter = m_delegate.getWriter();
 							ColumnDataReader reader = cached.createReader()) {
-						for (int i = 0; i < reader.getNumEntries(); i++) {
+						for (int i = 0; i < reader.getNumChunks(); i++) {
 							ColumnData[] batch = reader.read(i);
 							delegateWriter.write(batch);
 							for (ColumnData data : batch) {
@@ -218,9 +218,15 @@ public class SmallColumnStore implements ColumnStore {
 			}
 
 			@Override
-			public int getNumEntries() {
+			public int getNumChunks() {
 				return m_numChunks.get();
 			}
+			
+			@Override
+			public int getMaxDataCapacity() {
+				return m_delegateReader.getMaxDataCapacity();
+			}
+
 		};
 	}
 
@@ -248,5 +254,4 @@ public class SmallColumnStore implements ColumnStore {
 		m_delegate.close();
 		m_storeClosed = true;
 	}
-
 }

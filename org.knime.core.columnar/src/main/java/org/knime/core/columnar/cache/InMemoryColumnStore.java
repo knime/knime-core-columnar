@@ -21,7 +21,9 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 
 	private final List<ColumnData[]> m_batches = new ArrayList<>();
 
-	private final ColumnDataWriter m_writer = new ColumnDataWriter() {
+	private int m_maxDataCapacity;
+
+	private ColumnDataWriter m_writer = new ColumnDataWriter() {
 
 		@Override
 		public void write(ColumnData[] batch) throws IOException {
@@ -35,6 +37,7 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 			for (ColumnData data : batch) {
 				data.retain();
 				m_sizeOf += data.sizeOf();
+				m_maxDataCapacity = Math.max(m_maxDataCapacity, data.getNumValues());
 			}
 			m_batches.add(batch);
 		}
@@ -51,10 +54,11 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 
 	private int m_sizeOf = 0;
 
+
 	InMemoryColumnStore(ColumnStoreSchema schema) {
 		m_schema = schema;
 	}
-
+	
 	@Override
 	public void release() {
 		for (ColumnData[] batch : m_batches) {
@@ -132,8 +136,13 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 			}
 
 			@Override
-			public int getNumEntries() {
+			public int getNumChunks() {
 				return m_batches.size();
+			}
+			
+			@Override
+			public int getMaxDataCapacity() {
+				return m_maxDataCapacity;
 			}
 
 			@Override

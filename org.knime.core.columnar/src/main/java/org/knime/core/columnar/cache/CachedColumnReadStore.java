@@ -88,6 +88,8 @@ public class CachedColumnReadStore implements ColumnReadStore {
 
 	private final AtomicInteger m_numChunks = new AtomicInteger();
 	
+	private final AtomicInteger m_maxDataCapacity = new AtomicInteger();
+	
 	private final LoadingEvictingChunkCache<ColumnDataUniqueId, ColumnData> m_cache;
 
 	private final Function<ColumnDataUniqueId, ColumnData> m_loader;
@@ -97,7 +99,7 @@ public class CachedColumnReadStore implements ColumnReadStore {
 	private final Map<ColumnDataUniqueId, Object> m_inCache = new ConcurrentHashMap<>();
 	
 	private volatile boolean m_storeClosed;
-	
+
 	public CachedColumnReadStore(final ColumnReadStore delegate, final CachedColumnReadStoreCache cache) {
 		m_delegate = delegate;
 		m_schema = delegate.getSchema();
@@ -166,13 +168,19 @@ public class CachedColumnReadStore implements ColumnReadStore {
 			}
 			
 			@Override
-			public int getNumEntries() {
+			public int getNumChunks() {
 				return m_numChunks.get();
+			}
+			
+			@Override
+			public int getMaxDataCapacity() {
+				return m_maxDataCapacity.get();
 			}
 
 			@Override
 			public void close() throws Exception {
 			}
+
 		};
 	}
 

@@ -6,7 +6,9 @@ import org.knime.core.columnar.ColumnData;
 
 public interface ColumnDataReader extends AutoCloseable {
 
-	ColumnData[] read(int rowBatchIndex) throws IOException;
+	ColumnData[] read(int chunkIndex) throws IOException;
 
-	int getNumEntries();
+	int getNumChunks();
+
+	int getMaxDataCapacity();
 }
