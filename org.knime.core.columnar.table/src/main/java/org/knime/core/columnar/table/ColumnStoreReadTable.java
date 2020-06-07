@@ -19,7 +19,7 @@ public final class ColumnStoreReadTable implements ReadTable {
 	}
 
 	@Override
-	public TableReadCursor cursor(final TableReadCursorConfig config) {
+	public TableReadCursor cursor(final TableReadFilter config) {
 		if (config != null) {
 			final ColumnSelection columnConfig = config.getColumnSelection();
 			return new FilteredTableReadCursor(//

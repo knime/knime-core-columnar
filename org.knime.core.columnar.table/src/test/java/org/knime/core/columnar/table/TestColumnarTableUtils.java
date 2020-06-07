@@ -35,9 +35,9 @@ class TestColumnarTableUtils {
 		};
 	}
 
-	static TableReadCursorConfig createTableReadCursorConfig(long minRowIndex, long maxRowIndex,
+	static TableReadFilter createTableReadCursorConfig(long minRowIndex, long maxRowIndex,
 			int... selectedColumns) {
-		return new TableReadCursorConfig() {
+		return new TableReadFilter() {
 
 			@Override
 			public ColumnSelection getColumnSelection() {

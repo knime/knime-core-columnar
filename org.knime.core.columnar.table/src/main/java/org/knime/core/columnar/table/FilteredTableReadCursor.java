@@ -22,7 +22,7 @@ final class FilteredTableReadCursor implements TableReadCursor {
 
 	FilteredTableReadCursor(final ColumnDataReader reader, //
 			final TableSchema schema, //
-			final TableReadCursorConfig config) {
+			final TableReadFilter config) {
 		m_reader = reader;
 		m_access = createAccess(schema, config.getColumnSelection());
 

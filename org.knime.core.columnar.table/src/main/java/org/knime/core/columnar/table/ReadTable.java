@@ -4,7 +4,7 @@ public interface ReadTable extends AutoCloseable {
 
 	int getNumColumns();
 
-	TableReadCursor cursor(TableReadCursorConfig config);
+	TableReadCursor cursor(TableReadFilter config);
 
 	TableReadCursor cursor();
 
