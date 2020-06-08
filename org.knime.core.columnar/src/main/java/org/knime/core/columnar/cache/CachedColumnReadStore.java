@@ -4,15 +4,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnReadStore;
 import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnSelection;
-import org.knime.core.columnar.chunk.ColumnSelectionUtil;
 
 //TODO: thread safety considerations
 public class CachedColumnReadStore implements ColumnReadStore {
@@ -92,8 +92,6 @@ public class CachedColumnReadStore implements ColumnReadStore {
 	
 	private final LoadingEvictingChunkCache<ColumnDataUniqueId, ColumnData> m_cache;
 
-	private final Function<ColumnDataUniqueId, ColumnData> m_loader;
-
 	private final BiConsumer<ColumnDataUniqueId, ColumnData> m_evictor;
 
 	private final Map<ColumnDataUniqueId, Object> m_inCache = new ConcurrentHashMap<>();
@@ -104,23 +102,6 @@ public class CachedColumnReadStore implements ColumnReadStore {
 		m_delegate = delegate;
 		m_schema = delegate.getSchema();
 		m_cache = cache.m_cache;
-		
-		// TODO: reading column chunks one by one is too expensive
-		m_loader = id -> {
-			m_inCache.put(id, DUMMY);
-			ColumnSelection config = ColumnSelectionUtil.create(new int[] { id.getColumnIndex() });
-			try (final ColumnDataReader reader = m_delegate.createReader(config)) {
-				m_numChunks.compareAndSet(0, reader.getNumChunks());
-				m_maxDataCapacity.compareAndSet(0, reader.getMaxDataCapacity());
-				final ColumnData data = reader.read(id.getChunkIndex())[0];
-				data.release();
-				return data;
-			} catch (Exception e) {
-				// TODO: handle exception properly
-				throw new RuntimeException("Exception while loading column chunk.", e);
-			}
-		};
-		
 		m_evictor = (k, c) -> m_inCache.remove(k);
 	}
 
@@ -157,13 +138,30 @@ public class CachedColumnReadStore implements ColumnReadStore {
 
 				final int numRequested = indices != null ? indices.length : m_schema.getNumColumns();
 				final ColumnData[] data = new ColumnData[numRequested];
-
+				final AtomicReference<ColumnData[]> loadedDataRef = new AtomicReference<>();
+				
 				for (int i = 0; i < numRequested; i++) {
-					final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(indices != null ? indices[i] : i,
-							chunkIndex);
-					data[i] = m_cache.retainAndGet(ccUID, m_loader, m_evictor);
+					final int colIndex = indices != null ? indices[i] : i;
+					final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(colIndex, chunkIndex);
+					
+					final Supplier<ColumnData> loader = () -> {
+						if (loadedDataRef.get() == null) {
+							try (final ColumnDataReader reader = m_delegate.createReader(config)) {
+								// TODO comment on what is happening here
+								m_numChunks.compareAndSet(0, reader.getNumChunks());
+								m_maxDataCapacity.compareAndSet(0, reader.getMaxDataCapacity());
+								loadedDataRef.compareAndSet(null, reader.read(chunkIndex));
+							} catch (Exception e) {
+								// TODO: handle exception properly
+								throw new RuntimeException("Exception while loading column chunk.", e);
+							}
+						}
+						m_inCache.put(ccUID, DUMMY);
+						return loadedDataRef.get()[colIndex];
+					};
+					data[i] = m_cache.retainAndGet(ccUID, loader, m_evictor);
 				}
-
+				
 				return data;
 			}
 			

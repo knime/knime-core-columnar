@@ -23,7 +23,7 @@ public class SizeBoundLruCacheTest {
 		assertEquals(data, cache.retainAndGet(1));
 		assertEquals(2, data.getRefs());
 
-		assertEquals(data, cache.retainAndGet(1, i -> null, (i, d) -> {
+		assertEquals(data, cache.retainAndGet(1, () -> null, (i, d) -> {
 		}));
 		assertEquals(3, data.getRefs());
 	}
@@ -46,7 +46,10 @@ public class SizeBoundLruCacheTest {
 		assertEquals(0, data1.getRefs());
 
 		assertNull(cache.retainAndGet(1));
-		assertEquals(data1, cache.retainAndGet(1, i -> data1, (i, data) -> {
+		assertEquals(data1, cache.retainAndGet(1, () -> {
+			data1.retain();
+			return data1;
+		}, (i, data) -> {
 		}));
 		assertEquals(2, data1.getRefs());
 	}

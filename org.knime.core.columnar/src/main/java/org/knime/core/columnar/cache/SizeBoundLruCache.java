@@ -2,7 +2,7 @@ package org.knime.core.columnar.cache;
 
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.knime.core.columnar.ReferencedData;
 
@@ -74,13 +74,12 @@ final class SizeBoundLruCache<K, C extends ReferencedData> implements LoadingEvi
 	// (2) we replace already existing entries with themselves, leading to another
 	// weighing, amongst other things
 	@Override
-	public C retainAndGet(K key, Function<? super K, ? extends C> loader, BiConsumer<? super K, ? super C> evictor) {
+	public C retainAndGet(K key, Supplier<? extends C> loader, BiConsumer<? super K, ? super C> evictor) {
 		return m_lruCache.compute(key, (k, c) -> {
 			if (c == null) {
-				final C loaded = loader.apply(k);
+				final C loaded = loader.get(); // data is already retained at this point
 				assert loaded != null;
 				assert loaded.sizeOf() > 0;
-				loaded.retain(); // retain for the cache (just as if we retainAndPutifAbsent were called)
 				loaded.retain(); // retain for the caller of this method
 				return new ChunkWithEvictor(loaded, evictor);
 			}
