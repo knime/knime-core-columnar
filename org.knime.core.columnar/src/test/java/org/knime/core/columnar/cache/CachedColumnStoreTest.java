@@ -22,21 +22,21 @@ import org.knime.core.columnar.chunk.ColumnDataWriter;
 
 public class CachedColumnStoreTest {
 	
-	private static final int tableHeight = 2;
-	private static final int tableWidth = 2;
-	private static final int sizeOfColumnData = 1;
-	private static final int sizeOfTable = tableHeight * tableWidth * sizeOfColumnData;
+	private static final int TABLE_HEIGHT = 2;
+	private static final int TABLE_WIDTH = 2;
+	private static final int SIZE_OF_COLUMN_DATA = 1;
+	private static final int SIZE_OF_TABLE = TABLE_HEIGHT * TABLE_WIDTH * SIZE_OF_COLUMN_DATA;
 
-	private CachedColumnReadStoreCache generateCache() {
-		return new CachedColumnReadStoreCache(sizeOfTable);
+	private static CachedColumnReadStoreCache generateCache() {
+		return new CachedColumnReadStoreCache(SIZE_OF_TABLE);
 	}
 
-	private List<TestColumnData[]> generateTable() {
-		return createTable(tableHeight, tableWidth, sizeOfColumnData);
+	private static List<TestColumnData[]> generateTable() {
+		return createTable(TABLE_HEIGHT, TABLE_WIDTH, SIZE_OF_COLUMN_DATA);
 	}
 
-	private ColumnStoreSchema generateSchema() {
-		return createSchema(tableWidth);
+	private static ColumnStoreSchema generateSchema() {
+		return createSchema(TABLE_WIDTH);
 	}
 
 	@Test
@@ -135,7 +135,7 @@ public class CachedColumnStoreTest {
 				final ColumnStore store = new CachedColumnStore(delegate, cache)) {
 
 			writeTable(store, table);
-			assertEquals(sizeOfTable, cache.size());
+			assertEquals(SIZE_OF_TABLE, cache.size());
 		}
 		assertEquals(0, cache.size());
 	}

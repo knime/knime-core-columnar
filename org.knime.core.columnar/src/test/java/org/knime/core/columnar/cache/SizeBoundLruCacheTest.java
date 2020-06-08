@@ -12,7 +12,7 @@ public class SizeBoundLruCacheTest {
 
 	@Test
 	public void testPutGet() throws Exception {
-		final LoadingEvictingChunkCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
+		final LoadingEvictingCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
 		final TestColumnData data = new TestColumnData(1);
 		assertEquals(0, data.getRefs());
 
@@ -30,7 +30,7 @@ public class SizeBoundLruCacheTest {
 
 	@Test
 	public void testPutEvictLoadGet() throws Exception {
-		final LoadingEvictingChunkCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
+		final LoadingEvictingCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
 		final TestColumnData data1 = new TestColumnData(1);
 		final TestColumnData data2 = new TestColumnData(1);
 		assertEquals(0, data1.getRefs());
@@ -56,7 +56,7 @@ public class SizeBoundLruCacheTest {
 	
 	@Test
 	public void testPutRemove() throws Exception {
-		final LoadingEvictingChunkCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
+		final LoadingEvictingCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(1);
 		final TestColumnData data = new TestColumnData(1);
 		assertEquals(0, data.getRefs());
 
@@ -72,7 +72,7 @@ public class SizeBoundLruCacheTest {
 	
 	@Test
 	public void testLru() throws Exception {
-		final LoadingEvictingChunkCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(2);
+		final LoadingEvictingCache<Integer, TestColumnData> cache = new SizeBoundLruCache<>(2);
 		final TestColumnData data1 = new TestColumnData(1);
 		final TestColumnData data2 = new TestColumnData(1);
 		final TestColumnData data3 = new TestColumnData(1);

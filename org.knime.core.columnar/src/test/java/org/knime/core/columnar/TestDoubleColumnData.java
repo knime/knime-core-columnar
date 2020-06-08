@@ -12,7 +12,7 @@ class TestDoubleColumnData implements ColumnData, DoubleData {
 
 	private int m_chunkCapacity;
 
-	private AtomicInteger m_ref = new AtomicInteger();
+	private AtomicInteger m_ref = new AtomicInteger(1);
 
 	TestDoubleColumnData(int chunkCapacity) {
 		m_chunkCapacity = chunkCapacity;
@@ -37,6 +37,9 @@ class TestDoubleColumnData implements ColumnData, DoubleData {
 
 	@Override
 	public int sizeOf() {
+		if (m_values == null) {
+			System.out.println("test");
+		}
 		return m_values.length * 8;
 	}
 

@@ -21,16 +21,16 @@ import org.knime.core.columnar.chunk.ColumnDataWriter;
 
 public class InMemoryColumnStoreTest {
 	
-	private static final int tableHeight = 2;
-	private static final int tableWidth = 2;
-	private static final int sizeOfColumnData = 1;
+	private static final int TABLE_HEIGHT = 2;
+	private static final int TABLE_WIDTH = 2;
+	private static final int SIZE_OF_COLUMN_DATA = 1;
 	
-	private List<TestColumnData[]> generateTable() {
-		return createTable(tableHeight, tableWidth, sizeOfColumnData);
+	private static List<TestColumnData[]> generateTable() {
+		return createTable(TABLE_HEIGHT, TABLE_WIDTH, SIZE_OF_COLUMN_DATA);
 	}
 
-	private ColumnStoreSchema generateSchema() {
-		return createSchema(tableWidth);
+	private static ColumnStoreSchema generateSchema() {
+		return createSchema(TABLE_WIDTH);
 	}
 	
 	@Test

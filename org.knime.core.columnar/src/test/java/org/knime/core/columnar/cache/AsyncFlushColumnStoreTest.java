@@ -14,22 +14,28 @@ import org.junit.Test;
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnStore;
 import org.knime.core.columnar.ColumnStoreSchema;
+import org.knime.core.columnar.cache.AsyncFlushColumnStore.AsyncFlushColumnStoreExecutor;
 import org.knime.core.columnar.cache.CacheTestUtils.TestColumnData;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
 
 public class AsyncFlushColumnStoreTest {
 
-	private static final int tableHeight = 2;
-	private static final int tableWidth = 2;
-	private static final int sizeOfColumnData = 1;
+	private static final int TABLE_HEIGHT = 4;
+	private static final int TABLE_WIDTH = 2;
+	private static final int SIZE_OF_COLUMN_DATA = 1;
+	private static final int ASYNC_ECECUTOR_QUEUE_SIZE = 2;
 
-	private List<TestColumnData[]> generateTable() {
-		return createTable(tableHeight, tableWidth, sizeOfColumnData);
+	private static List<TestColumnData[]> generateTable() {
+		return createTable(TABLE_HEIGHT, TABLE_WIDTH, SIZE_OF_COLUMN_DATA);
 	}
 
-	private ColumnStoreSchema generateSchema() {
-		return createSchema(tableWidth);
+	private static ColumnStoreSchema generateSchema() {
+		return createSchema(TABLE_WIDTH);
+	}
+
+	private static AsyncFlushColumnStoreExecutor generateExecutor() {
+		return new AsyncFlushColumnStoreExecutor(ASYNC_ECECUTOR_QUEUE_SIZE);
 	}
 
 	@Test
@@ -39,7 +45,7 @@ public class AsyncFlushColumnStoreTest {
 		assertEquals(0, checkRefs(table));
 
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final ColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			writeTable(store, table);
 			assertEquals(1, checkRefs(table));
 
@@ -48,7 +54,7 @@ public class AsyncFlushColumnStoreTest {
 		}
 		assertEquals(0, checkRefs(table));
 	}
-	
+
 	@Test
 	public void testWriteWaitWriteRead() throws Exception {
 
@@ -56,11 +62,11 @@ public class AsyncFlushColumnStoreTest {
 		assertEquals(0, checkRefs(table));
 
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final AsyncFlushColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final AsyncFlushColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				for (final ColumnData[] batch : table) {
 					writer.write(batch);
-					store.waitForFutureAndLogExceptions();
+					store.waitForAndHandleFutures();
 				}
 			}
 			assertEquals(1, checkRefs(table));
@@ -74,7 +80,7 @@ public class AsyncFlushColumnStoreTest {
 	@Test
 	public void testWriterSingleton() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final ColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			assertEquals(store.getWriter(), store.getWriter());
 		}
 	}
@@ -82,7 +88,7 @@ public class AsyncFlushColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnWriteAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final ColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			store.close();
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				writer.write(createBatch(1, 1));
@@ -93,7 +99,7 @@ public class AsyncFlushColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnSaveWhileWriterOpen() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final ColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				store.saveToFile(null);
 			}
@@ -103,7 +109,7 @@ public class AsyncFlushColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnSaveAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final ColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				writer.write(createBatch(1, 1));
 			}
@@ -115,7 +121,7 @@ public class AsyncFlushColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnCreateReaderWhileWriterOpen() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final ColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				try (final ColumnDataReader reader = store.createReader()) {
 				}
@@ -126,7 +132,7 @@ public class AsyncFlushColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final ColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			try (final ColumnDataWriter writer = store.getWriter()) {
 				writer.write(createBatch(1, 1));
 			}
@@ -139,7 +145,7 @@ public class AsyncFlushColumnStoreTest {
 	@Test(expected = IllegalStateException.class)
 	public void exceptionOnGetFactoryAfterStoreClose() throws Exception {
 		try (final ColumnStore delegate = new InMemoryColumnStore(generateSchema());
-				final ColumnStore store = new AsyncFlushColumnStore(delegate)) {
+				final ColumnStore store = new AsyncFlushColumnStore(delegate, generateExecutor())) {
 			store.close();
 			store.getFactory();
 		}

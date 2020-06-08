@@ -25,28 +25,26 @@ import org.knime.core.columnar.chunk.ColumnDataWriter;
 
 public class SmallColumnStoreTest {
 	
-	private static final int smallTableHeight = 2;
-	private static final int smallTableWidth = 2;
-	private static final int sizeOfColumnData = 1;
+	private static final int SMALL_TABLE_HEIGHT = 2;
+	private static final int SMALL_TABLE_WIDTH = 2;
+	private static final int SIZE_OF_COLUMN_DATA = 1;
 
-	private SmallColumnStoreCache generateCache() {
-		final int sizeOfSmallTable = smallTableHeight * smallTableHeight * sizeOfColumnData;
+	private static SmallColumnStoreCache generateCache() {
+		final int sizeOfSmallTable = SMALL_TABLE_HEIGHT * SMALL_TABLE_HEIGHT * SIZE_OF_COLUMN_DATA;
 		return new SmallColumnStoreCache(sizeOfSmallTable, sizeOfSmallTable);
 	}
 
-	private List<TestColumnData[]> generateSmallTable() {
-		return createTable(smallTableHeight, smallTableWidth, sizeOfColumnData);
+	private static List<TestColumnData[]> generateSmallTable() {
+		return createTable(SMALL_TABLE_HEIGHT, SMALL_TABLE_WIDTH, SIZE_OF_COLUMN_DATA);
 	}
 
-	private List<TestColumnData[]> generate2SmallTableSizedTable() {
-		return createTable(smallTableHeight * 2, smallTableWidth, sizeOfColumnData);
+	private static List<TestColumnData[]> generate2SmallTableSizedTable() {
+		return createTable(SMALL_TABLE_HEIGHT * 2, SMALL_TABLE_WIDTH, SIZE_OF_COLUMN_DATA);
 	}
 
-	private ColumnStoreSchema generateSchema() {
-		return createSchema(smallTableWidth);
+	private static ColumnStoreSchema generateSchema() {
+		return createSchema(SMALL_TABLE_WIDTH);
 	}
-
-	// column access
 
 	@Test
 	public void testSmallWriteRead() throws Exception {

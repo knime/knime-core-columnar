@@ -1,5 +1,7 @@
 package org.knime.core.columnar.cache;
 
+import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
+
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,22 +13,113 @@ import java.util.function.Supplier;
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnReadStore;
 import org.knime.core.columnar.ColumnStoreSchema;
+import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnSelection;
 
-//TODO: thread safety considerations
-public class CachedColumnReadStore implements ColumnReadStore {
-	
-	public static class CachedColumnReadStoreCache {
+/**
+ * A {@link ColumnReadStore} that reads {@link ColumnData} from a delegate
+ * column store and places it in a fixed-size {@link SmallColumnStoreCache LRU
+ * cache} in memory for faster subsequent access. The store allows concurrent
+ * reading via multiple {@link ColumnDataReader ColumnDataReaders}.
+ * 
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public final class CachedColumnReadStore implements ColumnReadStore {
 
-		private final LoadingEvictingChunkCache<ColumnDataUniqueId, ColumnData> m_cache;
-		
-		public CachedColumnReadStoreCache(int cacheSize) {
+	public static final class CachedColumnReadStoreCache {
+
+		private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_cache;
+
+		public CachedColumnReadStoreCache(long cacheSize) {
 			m_cache = new SizeBoundLruCache<>(cacheSize);
 		}
-		
+
 		int size() {
 			return m_cache.size();
+		}
+	}
+
+	private final class CachedColumnStoreReader implements ColumnDataReader {
+
+		private final ColumnSelection m_selection;
+
+		CachedColumnStoreReader(ColumnSelection selection) {
+			m_selection = selection;
+		}
+
+		@Override
+		public ColumnData[] read(int chunkIndex) {
+			if (m_storeClosed) {
+				throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+			}
+
+			final int[] indices;
+			if (m_selection != null) {
+				indices = m_selection.get();
+			} else {
+				indices = null;
+			}
+
+			final int numRequested = indices != null ? indices.length : m_schema.getNumColumns();
+			final ColumnData[] data = new ColumnData[numRequested];
+			final AtomicReference<ColumnData[]> loadedDataRef = new AtomicReference<>();
+
+			for (int i = 0; i < numRequested; i++) {
+				final int colIndex = indices != null ? indices[i] : i;
+				final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(colIndex, chunkIndex);
+
+				final Supplier<ColumnData> loader = () -> {
+					if (loadedDataRef.get() == null) {
+						try (final ColumnDataReader reader = m_delegate.createReader(m_selection)) {
+							/**
+							 * The m_numChunks and m_maxDataCapacity fields are already set when data is
+							 * added to this store via #addBatch. It is set here only for the case where we
+							 * are only reading data.
+							 */
+							m_numChunks.compareAndSet(0, reader.getNumChunks());
+							m_maxDataCapacity.compareAndSet(0, reader.getMaxDataCapacity());
+							loadedDataRef.compareAndSet(null, reader.read(chunkIndex));
+						} catch (Exception e) {
+							throw new IllegalStateException("Exception while loading column data.", e);
+						}
+					}
+					m_inCache.put(ccUID, DUMMY);
+					return loadedDataRef.get()[colIndex];
+				};
+				data[i] = m_cache.retainAndGet(ccUID, loader, m_evictor);
+			}
+
+			return data;
+		}
+
+		@Override
+		public int getNumChunks() {
+			if (m_numChunks.get() == 0) {
+				try (final ColumnDataReader reader = m_delegate.createReader(m_selection)) {
+					m_numChunks.compareAndSet(0, reader.getNumChunks());
+				} catch (Exception e) {
+					throw new IllegalStateException("Exception while getting number of chunks from delegate.", e);
+				}
+			}
+			return m_numChunks.get();
+		}
+
+		@Override
+		public int getMaxDataCapacity() {
+			if (m_maxDataCapacity.get() == 0) {
+				try (final ColumnDataReader reader = m_delegate.createReader(m_selection)) {
+					m_maxDataCapacity.compareAndSet(0, reader.getMaxDataCapacity());
+				} catch (Exception e) {
+					throw new IllegalStateException("Exception while obtaining max data capacity from delegate.", e);
+				}
+			}
+			return m_maxDataCapacity.get();
+		}
+
+		@Override
+		public void close() throws Exception {
+			// no resources held
 		}
 	}
 
@@ -67,14 +160,6 @@ public class CachedColumnReadStore implements ColumnReadStore {
 					&& m_chunkIndex == other.m_chunkIndex;
 		}
 
-		int getColumnIndex() {
-			return m_columnIndex;
-		}
-
-		int getChunkIndex() {
-			return m_chunkIndex;
-		}
-
 		@Override
 		public String toString() {
 			return String.join(",", m_tableStore.toString(), Integer.toString(m_columnIndex),
@@ -87,15 +172,15 @@ public class CachedColumnReadStore implements ColumnReadStore {
 	private final ColumnStoreSchema m_schema;
 
 	private final AtomicInteger m_numChunks = new AtomicInteger();
-	
+
 	private final AtomicInteger m_maxDataCapacity = new AtomicInteger();
-	
-	private final LoadingEvictingChunkCache<ColumnDataUniqueId, ColumnData> m_cache;
+
+	private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_cache;
 
 	private final BiConsumer<ColumnDataUniqueId, ColumnData> m_evictor;
 
 	private final Map<ColumnDataUniqueId, Object> m_inCache = new ConcurrentHashMap<>();
-	
+
 	private volatile boolean m_storeClosed;
 
 	public CachedColumnReadStore(final ColumnReadStore delegate, final CachedColumnReadStoreCache cache) {
@@ -108,78 +193,20 @@ public class CachedColumnReadStore implements ColumnReadStore {
 	void addBatch(final ColumnData[] batch) {
 		final int numChunks = m_numChunks.getAndIncrement();
 		for (int i = 0; i < batch.length; i++) {
+			m_maxDataCapacity.compareAndSet(0, batch[i].getMaxCapacity());
 			final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(i, numChunks);
 			m_inCache.put(ccUID, DUMMY);
 			m_cache.retainAndPutIfAbsent(ccUID, batch[i], m_evictor);
 		}
 	}
-	
+
 	@Override
-	public ColumnDataReader createReader(ColumnSelection config) {
+	public ColumnDataReader createReader(ColumnSelection selection) {
 		if (m_storeClosed) {
-			throw new IllegalStateException("Column store has already been closed.");
+			throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
 		}
 
-		// TODO: pre-fetch subsequent chunks on cache miss
-		return new ColumnDataReader() {
-
-			@Override
-			public ColumnData[] read(int chunkIndex) {
-				if (m_storeClosed) {
-					throw new IllegalStateException("Column store has already been closed.");
-				}
-				
-				final int[] indices;
-				if (config != null) {
-					indices = config.get();
-				} else {
-					indices = null;
-				}
-
-				final int numRequested = indices != null ? indices.length : m_schema.getNumColumns();
-				final ColumnData[] data = new ColumnData[numRequested];
-				final AtomicReference<ColumnData[]> loadedDataRef = new AtomicReference<>();
-				
-				for (int i = 0; i < numRequested; i++) {
-					final int colIndex = indices != null ? indices[i] : i;
-					final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(colIndex, chunkIndex);
-					
-					final Supplier<ColumnData> loader = () -> {
-						if (loadedDataRef.get() == null) {
-							try (final ColumnDataReader reader = m_delegate.createReader(config)) {
-								// TODO comment on what is happening here
-								m_numChunks.compareAndSet(0, reader.getNumChunks());
-								m_maxDataCapacity.compareAndSet(0, reader.getMaxDataCapacity());
-								loadedDataRef.compareAndSet(null, reader.read(chunkIndex));
-							} catch (Exception e) {
-								// TODO: handle exception properly
-								throw new RuntimeException("Exception while loading column chunk.", e);
-							}
-						}
-						m_inCache.put(ccUID, DUMMY);
-						return loadedDataRef.get()[colIndex];
-					};
-					data[i] = m_cache.retainAndGet(ccUID, loader, m_evictor);
-				}
-				
-				return data;
-			}
-			
-			@Override
-			public int getNumChunks() {
-				return m_numChunks.get();
-			}
-			
-			@Override
-			public int getMaxDataCapacity() {
-				return m_maxDataCapacity.get();
-			}
-
-			@Override
-			public void close() throws Exception {
-			}
-
-		};
+		return new CachedColumnStoreReader(selection);
 	}
 
 	@Override
@@ -198,5 +225,4 @@ public class CachedColumnReadStore implements ColumnReadStore {
 		m_inCache.clear();
 		m_storeClosed = true;
 	}
-
 }

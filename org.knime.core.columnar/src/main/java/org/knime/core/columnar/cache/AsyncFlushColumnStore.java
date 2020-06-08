@@ -1,5 +1,9 @@
 package org.knime.core.columnar.cache;
 
+import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
+import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
+import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Queue;
@@ -9,7 +13,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -21,72 +26,81 @@ import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
 import org.knime.core.columnar.chunk.ColumnSelection;
 
-//TODO: thread safety considerations
+/**
+ * A {@link ColumnStore} that asynchronously passes {@link ColumnData} on to a
+ * delegate column store. It waits for the termination of this asynchronous
+ * write process when data is read. The store allows concurrent reading via
+ * multiple {@link ColumnDataReader ColumnDataReaders} once the
+ * {@link ColumnDataWriter} has been closed.
+ * 
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public class AsyncFlushColumnStore implements ColumnStore {
 
-	// TODO: more threads?
-	private static final ExecutorService ASYNC_EXECUTOR = Executors.newSingleThreadExecutor(new ThreadFactory() {
-		private final AtomicLong m_threadCount = new AtomicLong();
+	public static final class AsyncFlushColumnStoreExecutor {
 
-		@Override
-		public Thread newThread(final Runnable r) {
-			return new Thread(r, "KNIME-BackgroundTableWriter-" + m_threadCount.incrementAndGet());
+		private static final AtomicLong THREAD_COUNT = new AtomicLong();
+
+		private final Semaphore m_semaphore;
+
+		private final ExecutorService m_executor;
+
+		public AsyncFlushColumnStoreExecutor(int queueSize) {
+			m_semaphore = new Semaphore(queueSize);
+			m_executor = Executors.newSingleThreadExecutor(
+					r -> new Thread(r, "KNIME-BackgroundTableWriter-" + THREAD_COUNT.incrementAndGet()));
 		}
-	});
 
-	private final ColumnStore m_delegate;
+		private Future<Void> submit(final Callable<Void> command) throws InterruptedException {
+			m_semaphore.acquire();
+			try {
+				return m_executor.submit(() -> {
+					try {
+						return command.call();
+					} finally {
+						m_semaphore.release();
+					}
+				});
+			} catch (RejectedExecutionException e) {
+				m_semaphore.release();
+				throw e;
+			}
+		}
+	}
 
-	private final ColumnStoreSchema m_schema;
-
-	private final AtomicInteger m_numChunks = new AtomicInteger();
-
-	private final Queue<ColumnData[]> m_unflushed = new ConcurrentLinkedQueue<>();
-
-	private final ColumnDataWriter m_writer = new ColumnDataWriter() {
+	private final class AsyncFlushColumnStoreWriter implements ColumnDataWriter {
 
 		@Override
 		public void write(ColumnData[] batch) {
 			if (m_writerClosed) {
-				throw new IllegalStateException("Table store writer has already been closed.");
+				throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
 			}
 
 			for (final ColumnData data : batch) {
 				data.retain();
 			}
 			m_numChunks.incrementAndGet();
-			m_unflushed.add(batch);
 
 			if (m_delegateWriter == null) {
 				m_delegateWriter = m_delegate.getWriter();
 			}
 
-			if (m_asyncFlushFuture != null && m_asyncFlushFuture.isDone()) {
-				waitForFutureAndLogExceptions();
-				m_asyncFlushFuture = null;
-			}
+			handleDoneFutures();
 
-			if (m_asyncFlushFuture == null) {
-				m_asyncFlushFuture = ASYNC_EXECUTOR.submit(new Callable<Void>() {
+			try {
+				m_futures.add(m_executor.submit(new Callable<Void>() {
 					@Override
-					public Void call() throws Exception {
-						ColumnData[] previousBatch;
-						while ((previousBatch = m_unflushed.poll()) != null) {
-//							if (Thread.currentThread().isInterrupted()) {
-//								break;
-//							}
-							m_delegateWriter.write(previousBatch);
-							for (final ColumnData data : previousBatch) {
-								data.release();
-							}
-						}
-						// TODO: race condition - delegate writer might never be closed
-						if (m_writerClosed) {
-							m_delegateWriter.close();
-						}
+					public Void call() throws IOException {
 
+						m_delegateWriter.write(batch);
+						for (final ColumnData data : batch) {
+							data.release();
+						}
 						return null;
 					}
-				});
+				}));
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
 			}
 		}
 
@@ -94,13 +108,50 @@ public class AsyncFlushColumnStore implements ColumnStore {
 		public void close() throws Exception {
 			m_writerClosed = true;
 
-			if (m_asyncFlushFuture != null && m_asyncFlushFuture.isDone()) {
-				waitForFutureAndLogExceptions();
-				m_asyncFlushFuture = null;
-				m_delegateWriter.close();
+			handleDoneFutures();
+
+			if (m_delegateWriter != null) {
+				if (m_futures.isEmpty()) {
+					m_delegateWriter.close();
+				} else {
+					m_futures.add(m_executor.submit(new Callable<Void>() {
+						@Override
+						public Void call() throws Exception {
+
+							m_delegateWriter.close();
+							return null;
+						}
+					}));
+				}
 			}
 		}
-	};
+
+		private void handleDoneFutures() {
+			while (!m_futures.isEmpty()) {
+				final Future<Void> future = m_futures.peek();
+				if (future.isDone()) {
+					waitForAndHandleFuture(future);
+					// we do not have to concern ourselves with thread safety here:
+					// there is only a single thread calling this method
+					m_futures.remove();
+				} else {
+					break;
+				}
+			}
+		}
+	}
+
+	private final AsyncFlushColumnStoreExecutor m_executor;
+
+	private final ColumnStore m_delegate;
+
+	private final ColumnStoreSchema m_schema;
+
+	private final AtomicInteger m_numChunks = new AtomicInteger();
+
+	private final Queue<Future<Void>> m_futures = new ConcurrentLinkedQueue<>();
+
+	private final ColumnDataWriter m_writer;
 
 	// lazily initialized
 	private ColumnDataWriter m_delegateWriter;
@@ -109,24 +160,28 @@ public class AsyncFlushColumnStore implements ColumnStore {
 
 	private volatile boolean m_storeClosed;
 
-	private Future<Void> m_asyncFlushFuture;
-
-	public AsyncFlushColumnStore(final ColumnStore delegate) {
+	public AsyncFlushColumnStore(final ColumnStore delegate, final AsyncFlushColumnStoreExecutor executor) {
 		m_delegate = delegate;
 		m_schema = delegate.getSchema();
+		m_executor = executor;
+		m_writer = new AsyncFlushColumnStoreWriter();
 	}
 
-	void waitForFutureAndLogExceptions() {
+	void waitForAndHandleFutures() {
+		Future<Void> future;
+		while ((future = m_futures.poll()) != null) {
+			waitForAndHandleFuture(future);
+		}
+	}
+
+	private void waitForAndHandleFuture(Future<Void> future) {
 		try {
-			m_asyncFlushFuture.get();
+			future.get();
 		} catch (InterruptedException e) {
-			// TODO replace with logger and also log exception
-			System.err.println("Interrupted while writing cached rows to file.");
 			// Restore interrupted state...
 			Thread.currentThread().interrupt();
 		} catch (ExecutionException e) {
-			// TODO replace with logger and also log exception
-			System.err.println("Failed to asynchronously write cached rows to file.");
+			throw new IllegalStateException("Failed to asynchronously write cached rows to file.", e);
 		}
 	}
 
@@ -138,33 +193,27 @@ public class AsyncFlushColumnStore implements ColumnStore {
 	@Override
 	public void saveToFile(File file) throws IOException {
 		if (!m_writerClosed) {
-			throw new IllegalStateException("Table store writer has not been closed.");
+			throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
 		}
 		if (m_storeClosed) {
-			throw new IllegalStateException("Column store has already been closed.");
+			throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
 		}
 
-		if (m_asyncFlushFuture != null) {
-			waitForFutureAndLogExceptions();
-			m_asyncFlushFuture = null;
-		}
+		waitForAndHandleFutures();
 		m_delegate.saveToFile(file);
 	}
 
 	@Override
-	public ColumnDataReader createReader(ColumnSelection config) {
+	public ColumnDataReader createReader(ColumnSelection selection) {
 		if (!m_writerClosed) {
-			throw new IllegalStateException("Table store writer has not been closed.");
+			throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
 		}
 		if (m_storeClosed) {
-			throw new IllegalStateException("Column store has already been closed.");
+			throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
 		}
 
-		if (m_asyncFlushFuture != null) {
-			waitForFutureAndLogExceptions();
-			m_asyncFlushFuture = null;
-		}
-		return m_delegate.createReader(config);
+		waitForAndHandleFutures();
+		return m_delegate.createReader(selection);
 	}
 
 	@Override
@@ -175,7 +224,7 @@ public class AsyncFlushColumnStore implements ColumnStore {
 	@Override
 	public ColumnDataFactory getFactory() {
 		if (m_storeClosed) {
-			throw new IllegalStateException("Column store has already been closed.");
+			throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
 		}
 
 		return m_delegate.getFactory();
@@ -184,18 +233,8 @@ public class AsyncFlushColumnStore implements ColumnStore {
 	@Override
 	public void close() throws Exception {
 		m_storeClosed = true;
-		if (m_asyncFlushFuture != null) {
-//			m_asyncFlushFuture.cancel(true);
-			waitForFutureAndLogExceptions();
-		}
-		ColumnData[] batch;
-		while ((batch = m_unflushed.poll()) != null) {
-			for (final ColumnData data : batch) {
-				data.release();
-			}
-		}
+		waitForAndHandleFutures();
 		m_writer.close();
 		m_delegate.close();
 	}
-
 }
