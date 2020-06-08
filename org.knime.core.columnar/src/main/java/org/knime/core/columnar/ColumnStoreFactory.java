@@ -12,11 +12,10 @@ public interface ColumnStoreFactory {
 	 * 
 	 * @param the          physical {@link ColumnStoreSchema}
 	 * @param file         to store data if out of memory
-	 * @param minChunkSize the size of one chunk. NB: {@link ColumnStoreFactory} can
-	 *                     adjust chunkSize.
+	 * @param minChunkSize the size of one chunk.
 	 * @return a {@link ColumnStore} with the given schema.
 	 */
-	ColumnStore createWriteStore(ColumnStoreSchema schema, File file, final int minChunkSize);
+	ColumnStore createWriteStore(ColumnStoreSchema schema, File file, int minChunkSize);
 
 	/**
 	 * Creates a new {@link ColumnReadStore}, reading data from the provided file.
