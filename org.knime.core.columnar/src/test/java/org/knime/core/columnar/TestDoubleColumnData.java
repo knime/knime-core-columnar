@@ -37,9 +37,6 @@ class TestDoubleColumnData implements ColumnData, DoubleData {
 
 	@Override
 	public int sizeOf() {
-		if (m_values == null) {
-			System.out.println("test");
-		}
 		return m_values.length * 8;
 	}
 

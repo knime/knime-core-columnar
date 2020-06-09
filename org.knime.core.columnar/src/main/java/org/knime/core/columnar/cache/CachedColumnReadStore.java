@@ -85,9 +85,19 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 						}
 					}
 					m_inCache.put(ccUID, DUMMY);
-					return loadedDataRef.get()[colIndex];
+					final ColumnData[] loadedData = loadedDataRef.get();
+					loadedData[colIndex].retain();
+					return loadedData[colIndex];
 				};
 				data[i] = m_cache.retainAndGet(ccUID, loader, m_evictor);
+			}
+			
+			final ColumnData[] loadedData = loadedDataRef.get();
+			if (loadedData != null) {
+				for (int i = 0; i < numRequested; i++) {
+					final int colIndex = indices != null ? indices[i] : i;
+					loadedData[colIndex].release();
+				}
 			}
 
 			return data;
