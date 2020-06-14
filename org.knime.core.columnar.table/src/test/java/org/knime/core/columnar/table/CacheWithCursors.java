@@ -10,7 +10,7 @@ public class CacheWithCursors {
 
 	@Test
 	public void testCache() throws Exception {
-		int numRows = 2_500_000;
+		int numRows = 5_500_000;
 		int numColumns = 32;
 		int chunkSize = 64_000;
 

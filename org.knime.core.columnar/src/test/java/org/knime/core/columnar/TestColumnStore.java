@@ -17,10 +17,13 @@ public class TestColumnStore implements ColumnStore {
 
 	public List<Double[][]> m_chunks;
 
+	private List<TestDoubleColumnData[]> m_tracker;
+
 	public TestColumnStore(ColumnStoreSchema schema, int maxDataCapacity) {
 		m_schema = schema;
 		m_maxDataCapacity = maxDataCapacity;
 		m_chunks = new ArrayList<Double[][]>();
+		m_tracker = new ArrayList<TestDoubleColumnData[]>();
 	}
 
 	@Override
@@ -40,12 +43,45 @@ public class TestColumnStore implements ColumnStore {
 
 	@Override
 	public ColumnDataReader createReader(ColumnSelection config) {
-		return new TestColumnDataReader(m_chunks, m_maxDataCapacity);
+		final TestColumnDataReader reader = new TestColumnDataReader(m_chunks, m_maxDataCapacity);
+		return new ColumnDataReader() {
+
+			@Override
+			public void close() throws Exception {
+				reader.close();
+			}
+
+			@Override
+			public ColumnData[] read(int chunkIndex) throws IOException {
+				final ColumnData[] data = reader.read(chunkIndex);
+				m_tracker.add((TestDoubleColumnData[]) data);
+				return data;
+			}
+
+			@Override
+			public int getNumChunks() {
+				return reader.getNumChunks();
+			}
+
+			@Override
+			public int getMaxDataCapacity() {
+				return reader.getMaxDataCapacity();
+			}
+		};
 	}
 
 	@Override
 	public void close() throws Exception {
 		m_chunks = null;
+
+		// check if all memory has been released before closing this store.
+		for (TestDoubleColumnData[] chunk : m_tracker) {
+			for (TestDoubleColumnData data : chunk) {
+				if (!data.isClosed()) {
+					throw new IllegalStateException("Data not closed.");
+				}
+			}
+		}
 	}
 
 	@Override
