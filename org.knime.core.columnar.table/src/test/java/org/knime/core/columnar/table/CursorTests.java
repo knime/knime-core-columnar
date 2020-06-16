@@ -5,8 +5,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
-import org.knime.core.columnar.table.TestColumnarTableUtils.TestDoubleColumnType.TestDoubleReadValue;
-import org.knime.core.columnar.table.TestColumnarTableUtils.TestDoubleColumnType.TestDoubleWriteValue;
+import org.knime.core.columnar.table.ColumnarTableTestUtils.TestDoubleColumnType.TestDoubleReadValue;
+import org.knime.core.columnar.table.ColumnarTableTestUtils.TestDoubleColumnType.TestDoubleWriteValue;
 
 public class CursorTests {
 
@@ -16,7 +16,7 @@ public class CursorTests {
 		int numColumns = 1;
 		int chunkSize = 10;
 
-		WriteTable wTable = TestColumnarTableUtils.createWriteTable(numColumns, chunkSize);
+		WriteTable wTable = ColumnarTableTestUtils.createWriteTable(numColumns, chunkSize);
 
 		fillWriteTable(numRows, wTable);
 
@@ -38,7 +38,7 @@ public class CursorTests {
 		int numColumns = 1;
 		int chunkSize = 10;
 
-		WriteTable wTable = TestColumnarTableUtils.createWriteTable(numColumns, chunkSize);
+		WriteTable wTable = ColumnarTableTestUtils.createWriteTable(numColumns, chunkSize);
 
 		fillWriteTable(numRows, wTable);
 
@@ -46,18 +46,18 @@ public class CursorTests {
 		ReadTable rTable = wTable.createReadTable();
 		// test cursor with filter which doesn't actually filter
 		try (TableReadCursor rCursor = rTable
-				.cursor(TestColumnarTableUtils.createTableReadCursorConfig(0, numRows - 1, 0))) {
+				.cursor(ColumnarTableTestUtils.createTableReadCursorConfig(0, numRows - 1, 0))) {
 			readIdentity(0, numRows - 1, rCursor);
 		}
 
 		// test random subset
-		try (TableReadCursor rCursor = rTable.cursor(TestColumnarTableUtils.createTableReadCursorConfig(42, 99, 0))) {
+		try (TableReadCursor rCursor = rTable.cursor(ColumnarTableTestUtils.createTableReadCursorConfig(42, 99, 0))) {
 			readIdentity(42, 99, rCursor);
 		}
 
 		// test cursor with filter min-max
 		try (TableReadCursor rCursor = rTable
-				.cursor(TestColumnarTableUtils.createTableReadCursorConfig(42, numRows - 1, 0))) {
+				.cursor(ColumnarTableTestUtils.createTableReadCursorConfig(42, numRows - 1, 0))) {
 			readIdentity(42, numRows - 1, rCursor);
 		}
 

@@ -1,7 +1,7 @@
 package org.knime.core.columnar;
 
 public interface ColumnStoreSchema {
-	ColumnDataSpec<?> getColumnDataSpec(int idx);
+	ColumnDataSpec<?> getColumnDataSpec(int index);
 
 	int getNumColumns();
 }

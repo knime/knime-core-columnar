@@ -6,7 +6,7 @@ import org.knime.core.columnar.TestColumnStoreFactory;
 import org.knime.core.columnar.chunk.ColumnSelection;
 import org.knime.core.columnar.data.DoubleData;
 
-class TestColumnarTableUtils {
+class ColumnarTableTestUtils {
 
 	static final WriteTable createWriteTable(int numColumns, int chunkCapacity) {
 		final TableSchema schema = schema(numColumns);

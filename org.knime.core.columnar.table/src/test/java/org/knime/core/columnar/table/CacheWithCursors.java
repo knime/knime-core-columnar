@@ -3,18 +3,18 @@ package org.knime.core.columnar.table;
 import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
-import org.knime.core.columnar.table.TestColumnarTableUtils.TestDoubleColumnType.TestDoubleReadValue;
-import org.knime.core.columnar.table.TestColumnarTableUtils.TestDoubleColumnType.TestDoubleWriteValue;
+import org.knime.core.columnar.table.ColumnarTableTestUtils.TestDoubleColumnType.TestDoubleReadValue;
+import org.knime.core.columnar.table.ColumnarTableTestUtils.TestDoubleColumnType.TestDoubleWriteValue;
 
 public class CacheWithCursors {
 
 	@Test
 	public void testCache() throws Exception {
-		int numRows = 5_500_000;
+		int numRows = 1337;
 		int numColumns = 32;
-		int chunkSize = 64_000;
+		int chunkSize = 37;
 
-		final WriteTable wTable = TestColumnarTableUtils.createWriteTableWithCache(numColumns, chunkSize);
+		final WriteTable wTable = ColumnarTableTestUtils.createWriteTableWithCache(numColumns, chunkSize);
 		try (TableWriteCursor wCursor = wTable.getCursor()) {
 			for (int i = 0; i < numRows; i++) {
 				wCursor.fwd();
