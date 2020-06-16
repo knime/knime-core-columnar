@@ -2,7 +2,6 @@ package org.knime.core.columnar;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.data.DoubleData;
 
 class TestDoubleColumnData implements ColumnData, DoubleData {
@@ -82,6 +81,10 @@ class TestDoubleColumnData implements ColumnData, DoubleData {
 
 	public Double[] get() {
 		return m_values;
+	}
+
+	public boolean isClosed() {
+		return m_values == null;
 	}
 
 }
