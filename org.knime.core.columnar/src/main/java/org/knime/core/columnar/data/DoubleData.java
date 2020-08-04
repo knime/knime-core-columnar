@@ -3,6 +3,7 @@ package org.knime.core.columnar.data;
 import org.knime.core.columnar.ColumnDataSpec;
 
 public interface DoubleData extends NumericReadData {
+	@Override
 	double getDouble(int index);
 
 	void setDouble(int index, double val);
@@ -11,7 +12,7 @@ public interface DoubleData extends NumericReadData {
 		return new DoubleDataSpec();
 	}
 
-	class DoubleDataSpec implements ColumnDataSpec<DoubleData> {
+	public class DoubleDataSpec implements ColumnDataSpec<DoubleData> {
 		@Override
 		public Class<? extends DoubleData> getColumnDataType() {
 			return DoubleData.class;
