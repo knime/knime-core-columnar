@@ -6,7 +6,10 @@ import java.util.function.Supplier;
 
 import org.knime.core.columnar.ReferencedData;
 
-import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.Weigher;
 
 /**
  * A {@link LoadingEvictingCache} that holds data up to a fixed maximum
@@ -33,15 +36,22 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
 	private final Map<K, DataWithEvictor> m_lruCache;
 
 	SizeBoundLruCache(final long maxSize) {
-		m_lruCache = (new ConcurrentLinkedHashMap.Builder<K, DataWithEvictor>()) //
-				// cache is bound by size in bytes
-				.maximumWeightedCapacity(maxSize)
-				.weigher(dataWithEvictor -> Math.max(1, dataWithEvictor.m_data.sizeOf()))
-				// on eviction, run evictor and release data
-				.listener((k, evicted) -> {
-					evicted.m_evictor.accept(k, evicted.m_data);
-					evicted.m_data.release();
-				}).build();
+		
+		final Weigher<K, DataWithEvictor> weigher = (k, dataWithEvictor) -> Math.max(1, dataWithEvictor.m_data.sizeOf());
+		
+		final RemovalListener<K, DataWithEvictor> removalListener = removalNotification -> {
+			if (removalNotification.wasEvicted()) {
+				final K k = removalNotification.getKey();
+				final DataWithEvictor evicted = removalNotification.getValue();
+				evicted.m_evictor.accept(k, evicted.m_data);
+				evicted.m_data.release();
+			}
+		};
+		
+		final Cache<K, DataWithEvictor> cache = CacheBuilder.newBuilder().maximumWeight(maxSize).weigher(weigher)
+				.removalListener(removalListener).build();
+				
+		m_lruCache = cache.asMap();
 	}
 
 	@Override
