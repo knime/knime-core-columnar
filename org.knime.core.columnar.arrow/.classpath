@@ -1,17 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry exported="true" kind="lib" path="libs/flatbuffers-java-1.9.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="libs/netty-buffer-4.1.51.Final.jar"/>
-	<classpathentry exported="true" kind="lib" path="libs/netty-common-4.1.51.Final.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8">
 		<attributes>
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry exported="true" kind="lib" path="libs/arrow-memory-unsafe-1.0.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/flatbuffers-java-1.9.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="libs/arrow-format-1.0.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="libs/arrow-memory-core-1.0.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="libs/arrow-memory-netty-1.0.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="libs/arrow-vector-1.0.0.jar"/>
 	<classpathentry kind="src" output="target/classes" path="src/main/java">
 		<attributes>
