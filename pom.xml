@@ -41,7 +41,8 @@
 				<module>org.knime.core.columnar/pom-AP.xml</module>
 				<module>org.knime.core.columnar.table/pom-AP.xml</module>
 				<module>org.knime.core.columnar.array/pom-AP.xml</module>
-				<module>org.knime.update.table</module>
+				<module>org.knime.features.core.columnar</module>
+				<module>org.knime.update.core.columnar</module>
 			</modules>
 			<repositories>
 				<repository>
