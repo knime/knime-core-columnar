@@ -5,12 +5,12 @@
 
 	<parent>
 		<groupId>org.knime</groupId>
-		<artifactId>knime-table</artifactId>
+		<artifactId>knime-core-columnar</artifactId>
 		<version>${revision}${changelist}</version>
 	</parent>
 
 	<groupId>org.knime</groupId>
-	<artifactId>org.knime.table</artifactId>
+	<artifactId>org.knime.core.columnar</artifactId>
 	<version>${revision}${changelist}</version>
 	<packaging>${packaging.default}</packaging>
 </project>

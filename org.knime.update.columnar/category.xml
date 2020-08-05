@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <site>
    <bundle id="org.knime.core.columnar" version="0.0.0">
-       <category name="knime-table" />
+       <category name="knime-core-columnar" />
    </bundle>
    <bundle id="org.knime.core.columnar.table" version="0.0.0">
-       <category name="knime-table" />
+       <category name="knime-core-columnar" />
     </bundle>
    <bundle id="org.knime.core.columnar.array" version="0.0.0">
-       <category name="knime-table" />
+       <category name="knime-core-columnar" />
     </bundle>
 
-   <category-def name="knime-table" label="Build artifacts from knime-table">
-       <description>Build artifacts from knime-table</description>
+   <category-def name="knime-core-columnar" label="Build artifacts from knime-core-columnar">
+       <description>Build artifacts from knime-core-columnar</description>
    </category-def>
 </site>

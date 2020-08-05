@@ -13,7 +13,7 @@ properties([
 ])
 
 try {
-    knimetools.defaultTychoBuild('org.knime.update.table')
+    knimetools.defaultTychoBuild('org.knime.update.columnar')
 
     stage('Sonarqube analysis') {
         env.lastStage = env.STAGE_NAME

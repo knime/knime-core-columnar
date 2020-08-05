@@ -12,10 +12,10 @@
 	</parent>
 
 	<groupId>org.knime</groupId>
-	<artifactId>knime-table</artifactId>
+	<artifactId>knime-core-columnar</artifactId>
 	<version>${revision}${changelist}</version>
 	<packaging>pom</packaging>
-	<name>Aggregator POM for knime-table</name>
+	<name>Aggregator POM for knime-core-columnar</name>
 
 	<properties>
 		<revision>4.2.0</revision>
