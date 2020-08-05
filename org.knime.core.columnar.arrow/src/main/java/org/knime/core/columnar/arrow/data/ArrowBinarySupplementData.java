@@ -6,6 +6,8 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.complex.StructVector;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.data.BinarySupplData;
 
 public class ArrowBinarySupplementData<C extends ArrowData<?>> implements BinarySupplData<C>, ArrowData<StructVector> {
@@ -107,7 +109,7 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
 	private static final class CustomStructVector extends StructVector {
 
 		public CustomStructVector(String name, BufferAllocator allocator) {
-			super(name, allocator, null, null);
+			super(name, allocator, new FieldType(false, ArrowType.Struct.INSTANCE, null, null), null);
 		}
 
 		@Override
