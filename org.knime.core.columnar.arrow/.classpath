@@ -6,11 +6,6 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
-	<classpathentry exported="true" kind="lib" path="libs/arrow-memory-unsafe-1.0.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="libs/flatbuffers-java-1.9.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="libs/arrow-format-1.0.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="libs/arrow-memory-core-1.0.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="libs/arrow-vector-1.0.0.jar"/>
 	<classpathentry kind="src" output="target/classes" path="src/main/java">
 		<attributes>
 			<attribute name="optional" value="true"/>
