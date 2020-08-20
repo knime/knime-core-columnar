@@ -1,3 +1,48 @@
+/*
+ * ------------------------------------------------------------------------
+ *
+ *  Copyright by KNIME AG, Zurich, Switzerland
+ *  Website: http://www.knime.com; Email: contact@knime.com
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License, Version 3, as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *
+ *  Additional permission under GNU GPL version 3 section 7:
+ *
+ *  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+ *  Hence, KNIME and ECLIPSE are both independent programs and are not
+ *  derived from each other. Should, however, the interpretation of the
+ *  GNU GPL Version 3 ("License") under any applicable laws result in
+ *  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
+ *  you the additional permission to use and propagate KNIME together with
+ *  ECLIPSE with only the license terms in place for ECLIPSE applying to
+ *  ECLIPSE and the GNU GPL Version 3 applying for KNIME, provided the
+ *  license terms of ECLIPSE themselves allow for the respective use and
+ *  propagation of ECLIPSE together with KNIME.
+ *
+ *  Additional permission relating to nodes for KNIME that extend the Node
+ *  Extension (and in particular that are based on subclasses of NodeModel,
+ *  NodeDialog, and NodeView) and that only interoperate with KNIME through
+ *  standard APIs ("Nodes"):
+ *  Nodes are deemed to be separate and independent programs and to not be
+ *  covered works.  Notwithstanding anything to the contrary in the
+ *  License, the License does not apply to Nodes, you are not required to
+ *  license Nodes under the License, and you are granted a license to
+ *  prepare and propagate Nodes, in each case even if such Nodes are
+ *  propagated with or for interoperation with KNIME.  The owner of a Node
+ *  may freely choose the license terms applicable to such Node, including
+ *  when such Node is propagated with or for interoperation with KNIME.
+ * ---------------------------------------------------------------------
+ */
 package org.knime.core.columnar.table;
 
 import org.knime.core.columnar.ColumnData;
@@ -6,109 +51,114 @@ import org.knime.core.columnar.chunk.ColumnSelection;
 
 final class FilteredTableReadCursor implements TableReadCursor {
 
-	private final ColumnDataReader m_reader;
-	private final ColumnDataAccess<ColumnData>[] m_access;
+    private final ColumnDataReader m_reader;
 
-	// filter
-	private final int m_numChunks;
-	private final long m_lastChunkMaxIndex;
-	private final int[] m_selection;
+    private final ColumnDataAccess<ColumnData>[] m_access;
 
-	private int m_chunkIndex = 0;
-	private int m_currentDataMaxIndex;
-	private int m_index = -1;
+    // filter
+    private final int m_numChunks;
 
-	private ColumnData[] m_currentData;
+    private final long m_lastChunkMaxIndex;
 
-	FilteredTableReadCursor(final ColumnDataReader reader, //
-			final TableSchema schema, //
-			final TableReadFilter config) {
-		m_reader = reader;
-		m_access = createAccess(schema, config.getColumnSelection());
+    private final int[] m_selection;
 
-		m_selection = config.getColumnSelection().get();
+    private int m_chunkIndex = 0;
 
-		// starting with current chunk index. Iterating numChunks
-		m_chunkIndex = (int) (config.getMinRowIndex() / reader.getMaxDataCapacity());
-		m_numChunks = (int) Math.min(m_reader.getNumChunks(),
-				(config.getMaxRowIndex() / reader.getMaxDataCapacity()) + 1);
-		m_index = (int) (config.getMinRowIndex() % reader.getMaxDataCapacity()) - 1;
-		m_lastChunkMaxIndex = config.getMaxRowIndex() % reader.getMaxDataCapacity();
+    private int m_currentDataMaxIndex;
 
-		switchToNextData();
+    private int m_index = -1;
 
-		for (final int i : m_selection) {
-			m_access[i].setIndex(m_index);
-		}
-	}
+    private ColumnData[] m_currentData;
 
-	@Override
-	public void fwd() {
-		if (++m_index > m_currentDataMaxIndex) {
-			switchToNextData();
-			m_index = 0;
-		}
-		for (final int i : m_selection) {
-			m_access[i].fwd();
-		}
-	}
+    FilteredTableReadCursor(final ColumnDataReader reader, //
+        final TableSchema schema, //
+        final TableReadFilter config) {
+        m_reader = reader;
+        m_access = createAccess(schema, config.getColumnSelection());
 
-	@Override
-	public <R extends ReadValue> R get(int index) {
-		@SuppressWarnings("unchecked")
-		final R cast = (R) m_access[index];
-		return cast;
-	}
+        m_selection = config.getColumnSelection().get();
 
-	@Override
-	public boolean canFwd() {
-		return m_index < m_currentDataMaxIndex || m_chunkIndex < m_numChunks;
-	}
+        // starting with current chunk index. Iterating numChunks
+        m_chunkIndex = (int)(config.getMinRowIndex() / reader.getMaxDataCapacity());
+        m_numChunks =
+            (int)Math.min(m_reader.getNumChunks(), (config.getMaxRowIndex() / reader.getMaxDataCapacity()) + 1);
+        m_index = (int)(config.getMinRowIndex() % reader.getMaxDataCapacity()) - 1;
+        m_lastChunkMaxIndex = config.getMaxRowIndex() % reader.getMaxDataCapacity();
 
-	@Override
-	public void close() throws Exception {
-		releaseCurrentData();
-		m_reader.close();
-	}
+        switchToNextData();
 
-	private void switchToNextData() {
-		try {
-			releaseCurrentData();
-			m_currentData = m_reader.read(m_chunkIndex++);
-			for (final int i : m_selection) {
-				m_access[i].load(m_currentData[i]);
-			}
+        for (final int i : m_selection) {
+            m_access[i].setIndex(m_index);
+        }
+    }
 
-			// as soon as we're in the last chunk, we might want to iterate fewer values.
-			if (m_chunkIndex == m_numChunks) {
-				// TODO get rid of cast.
-				m_currentDataMaxIndex = (int) m_lastChunkMaxIndex;
-			} else {
-				m_currentDataMaxIndex = m_currentData[0].getNumValues() - 1;
-			}
-		} catch (final Exception e) {
-			// TODO
-			throw new RuntimeException(e);
-		}
-	}
+    @Override
+    public void fwd() {
+        if (++m_index > m_currentDataMaxIndex) {
+            switchToNextData();
+            m_index = 0;
+        }
+        for (final int i : m_selection) {
+            m_access[i].fwd();
+        }
+    }
 
-	private void releaseCurrentData() {
-		if (m_currentData != null) {
-			for (final int i : m_selection) {
-				m_currentData[i].release();
-			}
-		}
-	}
+    @Override
+    public <R extends ReadValue> R get(final int index) {
+        @SuppressWarnings("unchecked")
+        final R cast = (R)m_access[index];
+        return cast;
+    }
 
-	private ColumnDataAccess<ColumnData>[] createAccess(TableSchema schema, ColumnSelection config) {
-		@SuppressWarnings("unchecked")
-		final ColumnDataAccess<? extends ColumnData>[] accesses = new ColumnDataAccess[schema.getNumColumns()];
-		final int[] selectedColumns = config.get();
-		for (int i = 0; i < selectedColumns.length; i++) {
-			accesses[selectedColumns[i]] = schema.getColumnSpec(selectedColumns[i]).createAccess();
-		}
-		@SuppressWarnings("unchecked")
-		final ColumnDataAccess<ColumnData>[] cast = (ColumnDataAccess<ColumnData>[]) accesses;
-		return cast;
-	}
+    @Override
+    public boolean canFwd() {
+        return m_index < m_currentDataMaxIndex || m_chunkIndex < m_numChunks;
+    }
+
+    @Override
+    public void close() throws Exception {
+        releaseCurrentData();
+        m_reader.close();
+    }
+
+    private void switchToNextData() {
+        try {
+            releaseCurrentData();
+            m_currentData = m_reader.read(m_chunkIndex++);
+            for (final int i : m_selection) {
+                m_access[i].load(m_currentData[i]);
+            }
+
+            // as soon as we're in the last chunk, we might want to iterate fewer values.
+            if (m_chunkIndex == m_numChunks) {
+                // TODO get rid of cast.
+                m_currentDataMaxIndex = (int)m_lastChunkMaxIndex;
+            } else {
+                m_currentDataMaxIndex = m_currentData[0].getNumValues() - 1;
+            }
+        } catch (final Exception e) {
+            // TODO
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void releaseCurrentData() {
+        if (m_currentData != null) {
+            for (final int i : m_selection) {
+                m_currentData[i].release();
+            }
+        }
+    }
+
+    private ColumnDataAccess<ColumnData>[] createAccess(final TableSchema schema, final ColumnSelection config) {
+        @SuppressWarnings("unchecked")
+        final ColumnDataAccess<? extends ColumnData>[] accesses = new ColumnDataAccess[schema.getNumColumns()];
+        final int[] selectedColumns = config.get();
+        for (int i = 0; i < selectedColumns.length; i++) {
+            accesses[selectedColumns[i]] = schema.getColumnSpec(selectedColumns[i]).createAccess();
+        }
+        @SuppressWarnings("unchecked")
+        final ColumnDataAccess<ColumnData>[] cast = (ColumnDataAccess<ColumnData>[])accesses;
+        return cast;
+    }
 }
