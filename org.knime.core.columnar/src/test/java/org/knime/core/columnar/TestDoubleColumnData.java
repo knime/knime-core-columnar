@@ -45,48 +45,52 @@
  */
 package org.knime.core.columnar;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.knime.core.columnar.data.DoubleData;
 
-class TestDoubleColumnData implements ColumnData, DoubleData {
-
-    public Double[] m_values;
-
-    public int m_numValues;
+/**
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+@SuppressWarnings("javadoc")
+public class TestDoubleColumnData implements DoubleData {
 
     private int m_chunkCapacity;
 
-    private AtomicInteger m_ref = new AtomicInteger(1);
+    private int m_refs = 1;
 
-    TestDoubleColumnData(final int chunkCapacity) {
-        m_chunkCapacity = chunkCapacity;
+    private Double[] m_values;
+
+    private int m_numValues;
+
+    TestDoubleColumnData() {
     }
 
-    public TestDoubleColumnData(final Double[] doubles) {
+    TestDoubleColumnData(final Double[] doubles) {
+        m_chunkCapacity = doubles.length;
         m_values = doubles;
         m_numValues = doubles.length;
     }
 
     @Override
-    public void release() {
-        if (m_ref.decrementAndGet() == 0) {
+    public synchronized void release() {
+        if (--m_refs == 0) {
             m_values = null;
         }
     }
 
     @Override
-    public void retain() {
-        m_ref.incrementAndGet();
+    public synchronized void retain() {
+        m_refs++;
     }
 
     @Override
     public int sizeOf() {
-        return m_values.length * 8;
+        return m_numValues;
     }
 
     @Override
     public void ensureCapacity(final int capacity) {
+        m_chunkCapacity = capacity;
         m_values = new Double[m_chunkCapacity];
     }
 
@@ -96,41 +100,41 @@ class TestDoubleColumnData implements ColumnData, DoubleData {
     }
 
     @Override
-    public void setNumValues(final int numValues) {
+    public synchronized void setNumValues(final int numValues) {
         m_numValues = numValues;
     }
 
     @Override
-    public int getNumValues() {
+    public synchronized int getNumValues() {
         return m_numValues;
     }
 
     @Override
-    public void setMissing(final int index) {
+    public synchronized void setMissing(final int index) {
         m_values[index] = null;
     }
 
     @Override
-    public boolean isMissing(final int index) {
+    public synchronized boolean isMissing(final int index) {
         return m_values[index] == null;
     }
 
     @Override
-    public double getDouble(final int index) {
+    public synchronized double getDouble(final int index) {
         return m_values[index];
     }
 
     @Override
-    public void setDouble(final int index, final double val) {
+    public synchronized void setDouble(final int index, final double val) {
         m_values[index] = val;
     }
 
-    public Double[] get() {
+    Double[] get() {
         return m_values;
     }
 
-    public boolean isClosed() {
-        return m_values == null;
+    public synchronized int getRefs() {
+        return m_refs;
     }
 
 }

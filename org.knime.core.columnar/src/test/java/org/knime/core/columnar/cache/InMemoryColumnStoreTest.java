@@ -46,22 +46,21 @@
 package org.knime.core.columnar.cache;
 
 import static org.junit.Assert.assertEquals;
-import static org.knime.core.columnar.cache.CacheTestUtils.checkRefs;
-import static org.knime.core.columnar.cache.CacheTestUtils.createBatch;
-import static org.knime.core.columnar.cache.CacheTestUtils.createSchema;
-import static org.knime.core.columnar.cache.CacheTestUtils.createTable;
-import static org.knime.core.columnar.cache.CacheTestUtils.readAndCompareTable;
-import static org.knime.core.columnar.cache.CacheTestUtils.readSelectionAndCompareTable;
-import static org.knime.core.columnar.cache.CacheTestUtils.readTwiceAndCompareTable;
-import static org.knime.core.columnar.cache.CacheTestUtils.writeTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.checkRefs;
+import static org.knime.core.columnar.TestColumnStoreUtils.createBatch;
+import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultSchema;
+import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.readAndCompareTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.readSelectionAndCompareTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
 
 import java.util.List;
 
 import org.junit.Test;
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnStore;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.cache.CacheTestUtils.TestColumnData;
+import org.knime.core.columnar.TestDoubleColumnData;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
 
@@ -71,32 +70,18 @@ import org.knime.core.columnar.chunk.ColumnDataWriter;
 @SuppressWarnings("javadoc")
 public class InMemoryColumnStoreTest {
 
-    private static final int TABLE_HEIGHT = 2;
-
-    private static final int TABLE_WIDTH = 2;
-
-    private static final int SIZE_OF_COLUMN_DATA = 1;
-
-    private static List<TestColumnData[]> generateTable() {
-        return createTable(TABLE_HEIGHT, TABLE_WIDTH, SIZE_OF_COLUMN_DATA);
-    }
-
-    private static ColumnStoreSchema generateSchema() {
-        return createSchema(TABLE_WIDTH);
-    }
-
     @Test
     public void testSizeOf() throws Exception {
 
-        final List<TestColumnData[]> table = generateTable();
+        final List<TestDoubleColumnData[]> table = generateDefaultTable();
         int sizeOf = 0;
-        for (TestColumnData[] batch : table) {
+        for (TestDoubleColumnData[] batch : table) {
             for (ColumnData data : batch) {
                 sizeOf += data.sizeOf();
             }
         }
 
-        try (final InMemoryColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final InMemoryColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             writeTable(store, table);
             assertEquals(sizeOf, store.sizeOf());
         }
@@ -105,84 +90,84 @@ public class InMemoryColumnStoreTest {
     @Test
     public void testRetain() throws Exception {
 
-        final List<TestColumnData[]> table = generateTable();
-        assertEquals(0, checkRefs(table));
+        final List<TestDoubleColumnData[]> table = generateDefaultTable();
+        assertEquals(1, checkRefs(table));
 
-        try (final InMemoryColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final InMemoryColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             writeTable(store, table);
-            assertEquals(1, checkRefs(table));
+            assertEquals(2, checkRefs(table));
 
             store.retain();
-            assertEquals(2, checkRefs(table));
+            assertEquals(3, checkRefs(table));
         }
     }
 
     @Test
     public void testRelease() throws Exception {
 
-        final List<TestColumnData[]> table = generateTable();
-        assertEquals(0, checkRefs(table));
+        final List<TestDoubleColumnData[]> table = generateDefaultTable();
+        assertEquals(1, checkRefs(table));
 
-        try (final InMemoryColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final InMemoryColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             writeTable(store, table);
-            assertEquals(1, checkRefs(table));
+            assertEquals(2, checkRefs(table));
 
             store.release();
-            assertEquals(0, checkRefs(table));
+            assertEquals(1, checkRefs(table));
         }
     }
 
     @Test
     public void testWriteRead() throws Exception {
 
-        final List<TestColumnData[]> table = generateTable();
-        assertEquals(0, checkRefs(table));
+        final List<TestDoubleColumnData[]> table = generateDefaultTable();
+        assertEquals(1, checkRefs(table));
 
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             writeTable(store, table);
-            assertEquals(1, checkRefs(table));
+            assertEquals(2, checkRefs(table));
 
             readAndCompareTable(store, table);
-            assertEquals(1, checkRefs(table));
+            assertEquals(2, checkRefs(table));
         }
-        assertEquals(0, checkRefs(table));
+        assertEquals(1, checkRefs(table));
     }
 
     @Test
     public void testWriteMultiRead() throws Exception {
 
-        final List<TestColumnData[]> table = generateTable();
-        assertEquals(0, checkRefs(table));
+        final List<TestDoubleColumnData[]> table = generateDefaultTable();
+        assertEquals(1, checkRefs(table));
 
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             writeTable(store, table);
-            assertEquals(1, checkRefs(table));
+            assertEquals(2, checkRefs(table));
 
             readTwiceAndCompareTable(store);
-            assertEquals(1, checkRefs(table));
+            assertEquals(2, checkRefs(table));
         }
-        assertEquals(0, checkRefs(table));
+        assertEquals(1, checkRefs(table));
     }
 
     @Test
     public void testWriteReadSelection() throws Exception {
 
-        final List<TestColumnData[]> table = generateTable();
-        assertEquals(0, checkRefs(table));
+        final List<TestDoubleColumnData[]> table = generateDefaultTable();
+        assertEquals(1, checkRefs(table));
 
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             writeTable(store, table);
-            assertEquals(1, checkRefs(table));
+            assertEquals(2, checkRefs(table));
 
             readSelectionAndCompareTable(store, table, 0);
-            assertEquals(1, checkRefs(table));
+            assertEquals(2, checkRefs(table));
         }
-        assertEquals(0, checkRefs(table));
+        assertEquals(1, checkRefs(table));
     }
 
     @Test
     public void testFactorySingleton() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             assertEquals(store.getFactory(), store.getFactory());
         }
     }
@@ -190,14 +175,14 @@ public class InMemoryColumnStoreTest {
     @SuppressWarnings("resource")
     @Test
     public void testWriterSingleton() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             assertEquals(store.getWriter(), store.getWriter());
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             store.close();
             store.getFactory().create();
         }
@@ -205,7 +190,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterWriterClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.close();
                 writer.write(createBatch(1, 1));
@@ -215,7 +200,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterStoreClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             store.close();
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
@@ -225,7 +210,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             try (ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
             }
@@ -238,7 +223,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             try (ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
             }
@@ -251,7 +236,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetFactoryAfterStoreClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             store.close();
             store.getFactory();
         }
@@ -260,7 +245,7 @@ public class InMemoryColumnStoreTest {
     @SuppressWarnings("resource")
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterStoreClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             store.close();
             store.getWriter();
         }
@@ -268,7 +253,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveWhileWriterOpen() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 store.saveToFile(null);
             }
@@ -277,7 +262,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveAfterStoreClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
             }
@@ -288,7 +273,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderWhileWriterOpen() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 try (final ColumnDataReader reader = store.createReader()) {
                 }
@@ -298,7 +283,7 @@ public class InMemoryColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
-        try (final ColumnStore store = new InMemoryColumnStore(generateSchema())) {
+        try (final ColumnStore store = new InMemoryColumnStore(generateDefaultSchema())) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
             }

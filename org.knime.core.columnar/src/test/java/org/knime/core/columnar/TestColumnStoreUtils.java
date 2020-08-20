@@ -42,22 +42,21 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   20 Aug 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.cache;
+package org.knime.core.columnar;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.ColumnStore;
-import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
 import org.knime.core.columnar.chunk.ColumnSelectionUtil;
@@ -65,60 +64,38 @@ import org.knime.core.columnar.chunk.ColumnSelectionUtil;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-class CacheTestUtils {
+@SuppressWarnings("javadoc")
+public class TestColumnStoreUtils {
 
-    static class TestColumnData implements ColumnData {
+    private static final int DEF_TABLE_HEIGHT = 2;
 
-        private final int m_sizeOf;
+    private static final int DEF_TABLE_WIDTH = 2;
 
-        private AtomicInteger m_refs = new AtomicInteger();
+    private static final int DEF_SIZE_OF_COLUMN_DATA = 1;
 
-        TestColumnData(final int sizeOf) {
-            m_sizeOf = sizeOf;
-        }
+    public static final int DEF_SIZE_OF_TABLE = DEF_TABLE_HEIGHT * DEF_TABLE_WIDTH * DEF_SIZE_OF_COLUMN_DATA;
 
-        @Override
-        public void ensureCapacity(final int capacity) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int getMaxCapacity() {
-            return 0;
-        }
-
-        @Override
-        public void setNumValues(final int numValues) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int getNumValues() {
-            return 0;
-        }
-
-        @Override
-        public void release() {
-            m_refs.decrementAndGet();
-        }
-
-        @Override
-        public void retain() {
-            m_refs.incrementAndGet();
-        }
-
-        @Override
-        public int sizeOf() {
-            return m_sizeOf;
-        }
-
-        int getRefs() {
-            return m_refs.get();
-        }
-
+    private TestColumnStoreUtils() {
+        // Utility class
     }
 
-    static ColumnStoreSchema createSchema(final int numColumns) {
+    public static List<TestDoubleColumnData[]> generateDefaultTable() {
+        return createTable(DEF_TABLE_HEIGHT, DEF_TABLE_WIDTH, DEF_SIZE_OF_COLUMN_DATA);
+    }
+
+    public static List<TestDoubleColumnData[]> generateDoubleSizedDefaultTable() {
+        return createTable(DEF_TABLE_HEIGHT * 2, DEF_TABLE_WIDTH, DEF_SIZE_OF_COLUMN_DATA);
+    }
+
+    public static ColumnStoreSchema generateDefaultSchema() {
+        return createSchema(DEF_TABLE_WIDTH);
+    }
+
+    public static ColumnStore generateDefaultTestColumnStore() {
+        return new TestColumnStore(generateDefaultSchema(), DEF_SIZE_OF_COLUMN_DATA);
+    }
+
+    public static ColumnStoreSchema createSchema(final int numColumns) {
         return new ColumnStoreSchema() {
             @Override
             public int getNumColumns() {
@@ -132,54 +109,67 @@ class CacheTestUtils {
         };
     }
 
-    static int checkRefs(final List<TestColumnData[]> table) {
+    public static int checkRefs(final List<TestDoubleColumnData[]> table) {
         if (table.size() == 0) {
             return 0;
         }
         final int refs = checkRefs(table.get(0));
-        for (final TestColumnData[] batch : table) {
+        for (final TestDoubleColumnData[] batch : table) {
             assertEquals(refs, checkRefs(batch));
         }
         return refs;
     }
 
-    static int checkRefs(final TestColumnData[] batch) {
+    public static int checkRefs(final TestDoubleColumnData[] batch) {
         if (batch.length == 0) {
             return 0;
         }
         final int refs = batch[0].getRefs();
-        for (final TestColumnData data : batch) {
+        for (final TestDoubleColumnData data : batch) {
             assertEquals(refs, data.getRefs());
         }
         return refs;
     }
 
-    static void readAndCompareTable(final ColumnStore store, final List<TestColumnData[]> table) throws Exception {
-        readSelectionAndCompareTable(store, table, null);
+    public static List<TestDoubleColumnData[]> readAndCompareTable(final ColumnStore store,
+        final List<TestDoubleColumnData[]> table) throws Exception {
+        return readSelectionAndCompareTable(store, table, null);
     }
 
-    static void readSelectionAndCompareTable(final ColumnStore store, final List<TestColumnData[]> table, final int... indices)
-        throws Exception {
+    public static List<TestDoubleColumnData[]> readSelectionAndCompareTable(final ColumnStore store,
+        final List<TestDoubleColumnData[]> table, final int... indices) throws Exception {
+
         try (final ColumnDataReader reader = store.createReader(ColumnSelectionUtil.create(indices))) {
             assertEquals(table.size(), reader.getNumChunks());
+
+            final List<TestDoubleColumnData[]> result = new ArrayList<>();
             for (int i = 0; i < reader.getNumChunks(); i++) {
-                final TestColumnData[] written;
+                final TestDoubleColumnData[] written;
                 if (indices == null) {
                     written = table.get(i);
                 } else {
-                    final TestColumnData[] all = table.get(i);
-                    written = Arrays.stream(indices).mapToObj(index -> all[index]).toArray(TestColumnData[]::new);
+                    final TestDoubleColumnData[] all = table.get(i);
+                    written = Arrays.stream(indices).mapToObj(index -> all[index]).toArray(TestDoubleColumnData[]::new);
                 }
-                final ColumnData[] batch = reader.read(i);
-                assertArrayEquals(written, batch);
+                final TestDoubleColumnData[] batch = Arrays.stream(reader.read(i))
+                    .map(data -> (TestDoubleColumnData)data).toArray(TestDoubleColumnData[]::new);
+
+                assertEquals(written.length, batch.length);
+                for (int j = 0; j < written.length; j++) {
+                    assertArrayEquals(written[j].get(), (batch[j]).get());
+                }
+
                 for (final ColumnData data : batch) {
                     data.release();
                 }
+
+                result.add(batch);
             }
+            return result;
         }
     }
 
-    static void readTwiceAndCompareTable(final ColumnStore store) throws Exception {
+    public static void readTwiceAndCompareTable(final ColumnStore store) throws Exception {
         try (final ColumnDataReader reader1 = store.createReader();
                 final ColumnDataReader reader2 = store.createReader()) {
             assertEquals(reader1.getNumChunks(), reader2.getNumChunks());
@@ -195,7 +185,8 @@ class CacheTestUtils {
         }
     }
 
-    static boolean tableInStore(final ColumnStore store, final List<TestColumnData[]> table) throws Exception {
+    public static boolean tableInStore(final ColumnStore store, final List<TestDoubleColumnData[]> table)
+        throws Exception {
         try (final ColumnDataReader reader = store.createReader()) {
         } catch (IllegalStateException e) {
             return false;
@@ -204,7 +195,7 @@ class CacheTestUtils {
         return true;
     }
 
-    static void writeTable(final ColumnStore store, final List<TestColumnData[]> table) throws Exception {
+    public static void writeTable(final ColumnStore store, final List<TestDoubleColumnData[]> table) throws Exception {
         try (final ColumnDataWriter writer = store.getWriter()) {
             for (final ColumnData[] batch : table) {
                 writer.write(batch);
@@ -212,12 +203,23 @@ class CacheTestUtils {
         }
     }
 
-    static List<TestColumnData[]> createTable(final int height, final int width, final int size) {
+    public static List<TestDoubleColumnData[]> createTable(final int height, final int width, final int size) {
         return IntStream.range(0, height).mapToObj(i -> createBatch(width, size)).collect(Collectors.toList());
     }
 
-    static TestColumnData[] createBatch(final int width, final int size) {
-        return IntStream.range(0, width).mapToObj(i -> new TestColumnData(size)).toArray(TestColumnData[]::new);
+    public static TestDoubleColumnData[] createBatch(final int width, final int size) {
+        final TestDoubleColumnData[] batch =
+            IntStream.range(0, width).mapToObj(i -> new TestDoubleColumnData()).toArray(TestDoubleColumnData[]::new);
+
+        for (final TestDoubleColumnData data : batch) {
+            data.ensureCapacity(size);
+            for (int i = 0; i < size; i++) {
+                data.setDouble(0, i);
+            }
+            data.setNumValues(size);
+        }
+
+        return batch;
     }
 
 }

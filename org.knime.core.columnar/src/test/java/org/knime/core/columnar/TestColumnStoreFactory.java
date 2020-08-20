@@ -47,6 +47,10 @@ package org.knime.core.columnar;
 
 import java.io.File;
 
+/**
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public class TestColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
@@ -58,4 +62,5 @@ public class TestColumnStoreFactory implements ColumnStoreFactory {
     public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final File file) {
         throw new UnsupportedOperationException("not implemented");
     }
+
 }
