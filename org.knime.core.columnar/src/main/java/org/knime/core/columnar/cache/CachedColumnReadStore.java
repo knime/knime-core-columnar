@@ -1,16 +1,59 @@
+/*
+ * ------------------------------------------------------------------------
+ *
+ *  Copyright by KNIME AG, Zurich, Switzerland
+ *  Website: http://www.knime.com; Email: contact@knime.com
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License, Version 3, as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *
+ *  Additional permission under GNU GPL version 3 section 7:
+ *
+ *  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+ *  Hence, KNIME and ECLIPSE are both independent programs and are not
+ *  derived from each other. Should, however, the interpretation of the
+ *  GNU GPL Version 3 ("License") under any applicable laws result in
+ *  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
+ *  you the additional permission to use and propagate KNIME together with
+ *  ECLIPSE with only the license terms in place for ECLIPSE applying to
+ *  ECLIPSE and the GNU GPL Version 3 applying for KNIME, provided the
+ *  license terms of ECLIPSE themselves allow for the respective use and
+ *  propagation of ECLIPSE together with KNIME.
+ *
+ *  Additional permission relating to nodes for KNIME that extend the Node
+ *  Extension (and in particular that are based on subclasses of NodeModel,
+ *  NodeDialog, and NodeView) and that only interoperate with KNIME through
+ *  standard APIs ("Nodes"):
+ *  Nodes are deemed to be separate and independent programs and to not be
+ *  covered works.  Notwithstanding anything to the contrary in the
+ *  License, the License does not apply to Nodes, you are not required to
+ *  license Nodes under the License, and you are granted a license to
+ *  prepare and propagate Nodes, in each case even if such Nodes are
+ *  propagated with or for interoperation with KNIME.  The owner of a Node
+ *  may freely choose the license terms applicable to such Node, including
+ *  when such Node is propagated with or for interoperation with KNIME.
+ * ---------------------------------------------------------------------
+ */
 package org.knime.core.columnar.cache;
 
+import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
 import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
 
 import java.io.IOException;
-
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnReadStore;
@@ -20,221 +63,257 @@ import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnSelection;
 
 /**
- * A {@link ColumnReadStore} that reads {@link ColumnData} from a delegate
- * column store and places it in a fixed-size {@link SmallColumnStoreCache LRU
- * cache} in memory for faster subsequent access. The store allows concurrent
- * reading via multiple {@link ColumnDataReader ColumnDataReaders}.
- * 
+ * A {@link ColumnReadStore} that reads {@link ColumnData} from a delegate column store and places it in a fixed-size
+ * {@link SmallColumnStoreCache LRU cache} in memory for faster subsequent access. The store allows concurrent reading
+ * via multiple {@link ColumnDataReader ColumnDataReaders}.
+ *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class CachedColumnReadStore implements ColumnReadStore {
 
-	public static final class CachedColumnReadStoreCache {
+    /**
+     * A cache for storing data that can be shared between multiple {@link CachedColumnReadStore
+     * CachedColumnReadStores}.
+     */
+    public static final class CachedColumnReadStoreCache {
 
-		private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_cache;
+        private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_cache;
 
-		public CachedColumnReadStoreCache(long cacheSize) {
-			m_cache = new SizeBoundLruCache<>(cacheSize);
-		}
+        /**
+         * @param cacheSize the size of the cache in bytes
+         */
+        public CachedColumnReadStoreCache(final long cacheSize) {
+            m_cache = new SizeBoundLruCache<>(cacheSize);
+        }
 
-		int size() {
-			return m_cache.size();
-		}
-	}
+        int size() {
+            return m_cache.size();
+        }
+    }
 
-	private final class CachedColumnStoreReader implements ColumnDataReader {
+    private final class CachedColumnStoreReader implements ColumnDataReader {
 
-		private final ColumnSelection m_selection;
+        private final class Loader implements Function<ColumnDataUniqueId, ColumnData>, AutoCloseable {
 
-		CachedColumnStoreReader(ColumnSelection selection) {
-			m_selection = selection;
-		}
+            private ColumnData[] m_loadedData;
 
-		@Override
-		public ColumnData[] read(int chunkIndex) {
-			if (m_storeClosed) {
-				throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-			}
+            @Override
+            public ColumnData apply(final ColumnDataUniqueId ccUID) {
+                if (m_loadedData == null) {
+                    try {
+                        initDelegateReader();
+                        m_onUseDelegateReader.run();
+                        m_loadedData = m_delegateReader.read(ccUID.m_chunkIndex);
+                    } catch (IOException e) {
+                        throw new IllegalStateException("Exception while loading column data.", e);
+                    }
+                }
+                m_inCache.put(ccUID, DUMMY);
+                m_loadedData[ccUID.m_columnIndex].retain();
+                return m_loadedData[ccUID.m_columnIndex];
+            }
 
-			final int[] indices;
-			if (m_selection != null) {
-				indices = m_selection.get();
-			} else {
-				indices = null;
-			}
+            @Override
+            public void close() {
+                if (m_loadedData != null) {
+                    final int[] indices = m_selection != null ? m_selection.get() : null;
+                    final int numRequested = indices != null ? indices.length : getSchema().getNumColumns();
+                    for (int i = 0; i < numRequested; i++) {
+                        final int colIndex = indices != null ? indices[i] : i;
+                        m_loadedData[colIndex].release();
+                    }
+                }
+            }
+        }
 
-			final int numRequested = indices != null ? indices.length : m_schema.getNumColumns();
-			final ColumnData[] data = new ColumnData[numRequested];
-			final AtomicReference<ColumnData[]> loadedDataRef = new AtomicReference<>();
+        private final ColumnSelection m_selection;
 
-			for (int i = 0; i < numRequested; i++) {
-				final int colIndex = indices != null ? indices[i] : i;
-				final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(colIndex, chunkIndex);
+        private final Runnable m_onUseDelegateReader;
 
-				final Supplier<ColumnData> loader = () -> {
-					if (loadedDataRef.get() == null) {
-						try (final ColumnDataReader reader = m_delegate.createReader(m_selection)) {
-							/**
-							 * The m_numChunks and m_maxDataCapacity fields are already set when data is
-							 * added to this store via #addBatch. It is set here only for the case where we
-							 * are only reading data.
-							 */
-							m_numChunks.compareAndSet(0, reader.getNumChunks());
-							m_maxDataCapacity.compareAndSet(0, reader.getMaxDataCapacity());
-							loadedDataRef.compareAndSet(null, reader.read(chunkIndex));
-						} catch (Exception e) {
-							throw new IllegalStateException("Exception while loading column data.", e);
-						}
-					}
-					m_inCache.put(ccUID, DUMMY);
-					final ColumnData[] loadedData = loadedDataRef.get();
-					loadedData[colIndex].retain();
-					return loadedData[colIndex];
-				};
-				data[i] = m_cache.retainAndGet(ccUID, loader, m_evictor);
-			}
-			
-			final ColumnData[] loadedData = loadedDataRef.get();
-			if (loadedData != null) {
-				for (int i = 0; i < numRequested; i++) {
-					final int colIndex = indices != null ? indices[i] : i;
-					loadedData[colIndex].release();
-				}
-			}
+        // lazily initialized
+        private ColumnDataReader m_delegateReader;
 
-			return data;
-		}
+        private boolean m_readerClosed;
 
-		@Override
-		public int getNumChunks() {
-			if (m_numChunks.get() == 0) {
-				try (final ColumnDataReader reader = m_delegate.createReader(m_selection)) {
-					m_numChunks.compareAndSet(0, reader.getNumChunks());
-				} catch (Exception e) {
-					throw new IllegalStateException("Exception while getting number of chunks from delegate.", e);
-				}
-			}
-			return m_numChunks.get();
-		}
+        CachedColumnStoreReader(final ColumnSelection selection, final Runnable onUseDelegateReader) {
+            m_selection = selection;
+            m_onUseDelegateReader = onUseDelegateReader;
+        }
 
-		@Override
-		public int getMaxDataCapacity() {
-			if (m_maxDataCapacity.get() == 0) {
-				try (final ColumnDataReader reader = m_delegate.createReader(m_selection)) {
-					m_maxDataCapacity.compareAndSet(0, reader.getMaxDataCapacity());
-				} catch (Exception e) {
-					throw new IllegalStateException("Exception while obtaining max data capacity from delegate.", e);
-				}
-			}
-			return m_maxDataCapacity.get();
-		}
+        private void initDelegateReader() {
+            if (m_delegateReader == null) {
+                m_delegateReader = m_delegate.createReader(m_selection);
+            }
+        }
 
-		@Override
-		public void close() throws IOException {
-			// no resources held
-		}
-	}
+        @Override
+        public ColumnData[] read(final int chunkIndex) {
+            if (m_readerClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
+            }
+            if (m_storeClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
 
-	private static final Object DUMMY = new Object();
+            final int[] indices = m_selection != null ? m_selection.get() : null;
+            final int numRequested = indices != null ? indices.length : getSchema().getNumColumns();
+            final ColumnData[] data = new ColumnData[numRequested];
 
-	private class ColumnDataUniqueId {
+            try (final Loader loader = new Loader()) {
+                for (int i = 0; i < numRequested; i++) {
+                    final int colIndex = indices != null ? indices[i] : i;
+                    final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(colIndex, chunkIndex);
+                    data[i] = m_cache.retainAndGet(ccUID, () -> loader.apply(ccUID), m_evictor);
+                }
+            }
 
-		private final CachedColumnReadStore m_tableStore;
+            return data;
+        }
 
-		private final int m_columnIndex;
+        @Override
+        public int getNumChunks() {
+            if (m_numChunks == 0) {
+                initDelegateReader();
+                m_onUseDelegateReader.run();
+                m_numChunks = m_delegateReader.getNumChunks();
+            }
+            return m_numChunks;
+        }
 
-		private final int m_chunkIndex;
+        @Override
+        public int getMaxDataCapacity() {
+            if (m_maxDataCapacity == 0) {
+                initDelegateReader();
+                m_maxDataCapacity = m_delegateReader.getMaxDataCapacity();
+            }
+            return m_maxDataCapacity;
+        }
 
-		private ColumnDataUniqueId(final int columnIndex, final int chunkIndex) {
-			m_tableStore = CachedColumnReadStore.this;
-			m_columnIndex = columnIndex;
-			m_chunkIndex = chunkIndex;
-		}
+        @Override
+        public void close() throws IOException {
+            if (m_delegateReader != null) {
+                m_delegateReader.close();
+            }
+            m_readerClosed = true;
+        }
 
-		@Override
-		public int hashCode() {
-			int result = 17;
-			result = 31 * result + m_tableStore.hashCode();
-			result = 31 * result + m_columnIndex;
-			result = 31 * result + m_chunkIndex;
-			return result;
-		}
+    }
 
-		@Override
-		public boolean equals(Object object) {
-			if (object == this)
-				return true;
-			if (!(object instanceof ColumnDataUniqueId)) {
-				return false;
-			}
-			final ColumnDataUniqueId other = (ColumnDataUniqueId) object;
-			return Objects.equals(m_tableStore, other.m_tableStore) && m_columnIndex == other.m_columnIndex
-					&& m_chunkIndex == other.m_chunkIndex;
-		}
+    private static final Object DUMMY = new Object();
 
-		@Override
-		public String toString() {
-			return String.join(",", m_tableStore.toString(), Integer.toString(m_columnIndex),
-					Integer.toString(m_chunkIndex));
-		}
-	}
+    class ColumnDataUniqueId {
 
-	private final ColumnReadStore m_delegate;
+        private final CachedColumnReadStore m_tableStore;
 
-	private final ColumnStoreSchema m_schema;
+        private final int m_columnIndex;
 
-	private final AtomicInteger m_numChunks = new AtomicInteger();
+        private final int m_chunkIndex;
 
-	private final AtomicInteger m_maxDataCapacity = new AtomicInteger();
+        ColumnDataUniqueId(final int columnIndex, final int chunkIndex) {
+            m_tableStore = CachedColumnReadStore.this;
+            m_columnIndex = columnIndex;
+            m_chunkIndex = chunkIndex;
+        }
 
-	private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_cache;
+        int getChunkIndex() {
+            return m_chunkIndex;
+        }
 
-	private final BiConsumer<ColumnDataUniqueId, ColumnData> m_evictor;
+        @Override
+        public int hashCode() {
+            int result = 17;
+            result = 31 * result + m_tableStore.hashCode();
+            result = 31 * result + m_columnIndex;
+            result = 31 * result + m_chunkIndex;
+            return result;
+        }
 
-	private final Map<ColumnDataUniqueId, Object> m_inCache = new ConcurrentHashMap<>();
+        @Override
+        public boolean equals(final Object object) {
+            if (object == this) {
+                return true;
+            }
+            if (!(object instanceof ColumnDataUniqueId)) {
+                return false;
+            }
+            final ColumnDataUniqueId other = (ColumnDataUniqueId)object;
+            return Objects.equals(m_tableStore, other.m_tableStore) && m_columnIndex == other.m_columnIndex
+                && m_chunkIndex == other.m_chunkIndex;
+        }
 
-	private volatile boolean m_storeClosed;
+        @Override
+        public String toString() {
+            return String.join(",", m_tableStore.toString(), Integer.toString(m_columnIndex),
+                Integer.toString(m_chunkIndex));
+        }
 
-	public CachedColumnReadStore(final ColumnReadStore delegate, final CachedColumnReadStoreCache cache) {
-		m_delegate = delegate;
-		m_schema = delegate.getSchema();
-		m_cache = cache.m_cache;
-		m_evictor = (k, c) -> m_inCache.remove(k);
-	}
+    }
 
-	void addBatch(final ColumnData[] batch) {
-		final int numChunks = m_numChunks.getAndIncrement();
-		for (int i = 0; i < batch.length; i++) {
-			m_maxDataCapacity.compareAndSet(0, batch[i].getMaxCapacity());
-			final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(i, numChunks);
-			m_inCache.put(ccUID, DUMMY);
-			m_cache.retainAndPutIfAbsent(ccUID, batch[i], m_evictor);
-		}
-	}
+    private final ColumnReadStore m_delegate;
 
-	@Override
-	public ColumnDataReader createReader(ColumnSelection selection) {
-		if (m_storeClosed) {
-			throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-		}
+    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_cache;
 
-		return new CachedColumnStoreReader(selection);
-	}
+    private final Map<ColumnDataUniqueId, Object> m_inCache = new ConcurrentHashMap<>();
 
-	@Override
-	public ColumnStoreSchema getSchema() {
-		return m_schema;
-	}
+    private final BiConsumer<ColumnDataUniqueId, ColumnData> m_evictor = (k, c) -> {
+        m_inCache.remove(k);
+        c.release();
+    };
 
-	@Override
-	public void close() throws IOException {
-		for (ColumnDataUniqueId id : m_inCache.keySet()) {
-			final ColumnData removed = m_cache.remove(id);
-			if (removed != null) {
-				removed.release();
-			}
-		}
-		m_inCache.clear();
-		m_storeClosed = true;
-	}
+    private int m_numChunks = 0;
+
+    private int m_maxDataCapacity = 0;
+
+    // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
+    private volatile boolean m_storeClosed;
+
+    /**
+     * @param delegate the delegate from which to read in case of a cache miss
+     * @param cache the cache for obtaining and storing data
+     */
+    public CachedColumnReadStore(final ColumnReadStore delegate, final CachedColumnReadStoreCache cache) {
+        m_delegate = delegate;
+        m_cache = cache.m_cache;
+    }
+
+    void addBatch(final ColumnData[] batch, final BiConsumer<ColumnDataUniqueId, ColumnData> evictor) {
+        for (int i = 0; i < batch.length; i++) {
+            m_maxDataCapacity = Math.max(m_maxDataCapacity, batch[i].getMaxCapacity());
+            final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(i, m_numChunks);
+            m_inCache.put(ccUID, DUMMY);
+            m_cache.retainAndPut(ccUID, batch[i], evictor.andThen(m_evictor));
+        }
+        m_numChunks++;
+    }
+
+    @Override
+    public ColumnStoreSchema getSchema() {
+        return m_delegate.getSchema();
+    }
+
+    ColumnDataReader createReader(final ColumnSelection selection, final Runnable onUseDelegateReader) {
+        if (m_storeClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+        }
+
+        return new CachedColumnStoreReader(selection, onUseDelegateReader);
+    }
+
+    @Override
+    public ColumnDataReader createReader(final ColumnSelection selection) {
+        return createReader(selection, () -> {
+        });
+    }
+
+    @Override
+    public void close() {
+        for (final ColumnDataUniqueId id : m_inCache.keySet()) {
+            final ColumnData removed = m_cache.remove(id);
+            if (removed != null) {
+                removed.release();
+            }
+        }
+        m_inCache.clear();
+        m_storeClosed = true;
+    }
 }

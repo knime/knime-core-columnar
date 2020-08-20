@@ -7,6 +7,7 @@ Bundle-Vendor: KNIME AG
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
 Require-Bundle: org.junit;bundle-version="[4.12.0,5.0.0)";resolution:=optional,
+ org.awaitility;bundle-version="[3.0.0,4.0.0)",
  com.google.guava;bundle-version="19.0.0"
 Export-Package: org.knime.core.columnar,
  org.knime.core.columnar.cache,

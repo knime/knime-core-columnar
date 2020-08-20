@@ -45,11 +45,9 @@
  */
 package org.knime.core.columnar;
 
-import org.knime.core.columnar.cache.AsyncFlushColumnStore;
-import org.knime.core.columnar.cache.AsyncFlushColumnStore.AsyncFlushColumnStoreExecutor;
+import org.knime.core.columnar.cache.AsyncFlushCachedColumnStore;
 import org.knime.core.columnar.cache.CachedColumnReadStore;
 import org.knime.core.columnar.cache.CachedColumnReadStore.CachedColumnReadStoreCache;
-import org.knime.core.columnar.cache.CachedColumnStore;
 import org.knime.core.columnar.cache.SmallColumnStore;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 
@@ -58,6 +56,8 @@ public class ColumnStoreUtils {
     public static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
 
     public static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
+
+    public static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
 
     public static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
@@ -76,19 +76,11 @@ public class ColumnStoreUtils {
     private static final CachedColumnReadStoreCache COLUMN_DATA_CACHE =
         new CachedColumnReadStoreCache(COLUMN_DATA_CACHE_SIZE);
 
-    // how many batches of column data can be queued for for being asynchronously flushed to disk
-    private static final int ASYNC_FLUSH_QUEUE_SIZE = 1000;
-
-    private static final AsyncFlushColumnStoreExecutor ASYNC_FLUSH_EXECUTOR =
-        new AsyncFlushColumnStoreExecutor(ASYNC_FLUSH_QUEUE_SIZE);
-
     private ColumnStoreUtils() {
     }
 
     public static ColumnStore cache(final ColumnStore store) {
-        return new SmallColumnStore(
-            new CachedColumnStore(new AsyncFlushColumnStore(store, ASYNC_FLUSH_EXECUTOR), COLUMN_DATA_CACHE),
-            SMALL_TABLES_CACHE);
+        return new SmallColumnStore(new AsyncFlushCachedColumnStore(store, COLUMN_DATA_CACHE), SMALL_TABLES_CACHE);
     }
 
     public static ColumnReadStore cache(final ColumnReadStore store) {
