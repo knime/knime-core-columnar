@@ -88,7 +88,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() throws IOException {
         m_reader.close();
     }
 
@@ -226,7 +226,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() throws IOException {
             if (m_root != null) {
                 m_reader.close();
             }

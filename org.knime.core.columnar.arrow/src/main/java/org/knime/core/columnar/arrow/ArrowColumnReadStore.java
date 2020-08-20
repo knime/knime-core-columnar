@@ -70,7 +70,7 @@ class ArrowColumnReadStore implements ColumnReadStore {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         m_allocator.close();
     }
 

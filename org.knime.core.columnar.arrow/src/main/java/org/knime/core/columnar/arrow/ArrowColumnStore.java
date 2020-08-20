@@ -90,7 +90,7 @@ final class ArrowColumnStore implements ColumnStore {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         m_delegate.close();
         m_file.delete();
         m_allocator.close();

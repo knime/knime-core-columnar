@@ -97,7 +97,7 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         m_writer.close();
     }
 
@@ -187,7 +187,7 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() {
             if (m_writer != null) {
                 m_writer.close();
                 m_root.close();
