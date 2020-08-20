@@ -64,7 +64,7 @@ class TestColumnDataReader implements ColumnDataReader {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         m_closed = true;
     }
 

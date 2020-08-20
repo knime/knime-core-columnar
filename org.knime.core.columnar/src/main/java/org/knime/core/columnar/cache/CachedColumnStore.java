@@ -50,7 +50,7 @@ public final class CachedColumnStore implements ColumnStore {
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() throws IOException {
 			if (m_delegateWriter != null) {
 				m_delegateWriter.close();
 			}
@@ -120,7 +120,7 @@ public final class CachedColumnStore implements ColumnStore {
 	}
 
 	@Override
-	public void close() throws Exception {
+	public void close() throws IOException {
 		m_writer.close();
 		m_readCache.close();
 		m_delegate.close();

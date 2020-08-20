@@ -93,7 +93,7 @@ public class TestColumnStore implements ColumnStore {
         return new ColumnDataReader() {
 
             @Override
-            public void close() throws Exception {
+            public void close() {
                 reader.close();
             }
 
@@ -117,7 +117,7 @@ public class TestColumnStore implements ColumnStore {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         m_chunks = null;
 
         // check if all memory has been released before closing this store.

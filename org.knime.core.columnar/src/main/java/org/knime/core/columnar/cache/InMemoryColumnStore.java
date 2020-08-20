@@ -51,7 +51,7 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() throws IOException {
 			m_writerClosed = true;
 		}
 	}
@@ -107,7 +107,7 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() throws IOException {
 			// no resources held
 		}
 	}
@@ -192,7 +192,7 @@ public class InMemoryColumnStore implements ColumnStore, ReferencedData {
 	}
 
 	@Override
-	public void close() throws Exception {
+	public void close() throws IOException {
 		if (!m_storeClosed) {
 			release();
 		}

@@ -105,7 +105,7 @@ public class AsyncFlushColumnStore implements ColumnStore {
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() throws IOException {
 			m_writerClosed = true;
 
 			handleDoneFutures();
@@ -114,14 +114,18 @@ public class AsyncFlushColumnStore implements ColumnStore {
 				if (m_futures.isEmpty()) {
 					m_delegateWriter.close();
 				} else {
-					m_futures.add(m_executor.submit(new Callable<Void>() {
-						@Override
-						public Void call() throws Exception {
+					try {
+                        m_futures.add(m_executor.submit(new Callable<Void>() {
+                        	@Override
+                        	public Void call() throws Exception {
 
-							m_delegateWriter.close();
-							return null;
-						}
-					}));
+                        		m_delegateWriter.close();
+                        		return null;
+                        	}
+                        }));
+                    } catch (InterruptedException ex) {
+                        // TODO Auto-generated catch block
+                    }
 				}
 			}
 		}
@@ -231,7 +235,7 @@ public class AsyncFlushColumnStore implements ColumnStore {
 	}
 
 	@Override
-	public void close() throws Exception {
+	public void close() throws IOException {
 		m_storeClosed = true;
 		waitForAndHandleFutures();
 		m_writer.close();

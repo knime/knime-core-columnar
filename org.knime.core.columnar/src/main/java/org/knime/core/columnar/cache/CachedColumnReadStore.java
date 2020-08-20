@@ -2,6 +2,8 @@ package org.knime.core.columnar.cache;
 
 import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
 
+import java.io.IOException;
+
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -128,7 +130,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() throws IOException {
 			// no resources held
 		}
 	}
@@ -225,7 +227,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 	}
 
 	@Override
-	public void close() throws Exception {
+	public void close() throws IOException {
 		for (ColumnDataUniqueId id : m_inCache.keySet()) {
 			final ColumnData removed = m_cache.remove(id);
 			if (removed != null) {

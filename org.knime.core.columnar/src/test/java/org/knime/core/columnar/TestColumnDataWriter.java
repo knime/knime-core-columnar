@@ -60,7 +60,7 @@ public class TestColumnDataWriter implements ColumnDataWriter {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         m_chunks = null;
     }
 

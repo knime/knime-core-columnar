@@ -56,4 +56,7 @@ public interface ColumnDataReader extends AutoCloseable {
     int getNumChunks();
 
     int getMaxDataCapacity();
+
+    @Override
+    void close() throws IOException;
 }

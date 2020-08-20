@@ -51,4 +51,7 @@ import org.knime.core.columnar.ColumnData;
 
 public interface ColumnDataWriter extends AutoCloseable {
     void write(final ColumnData[] record) throws IOException;
+
+    @Override
+    void close() throws IOException;
 }

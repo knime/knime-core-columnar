@@ -99,7 +99,7 @@ public final class SmallColumnStore implements ColumnStore {
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() throws IOException {
 			if (m_table != null) {
 				m_table.getWriter().close();
 				m_cache.retainAndPutIfAbsent(SmallColumnStore.this, m_table, (store, table) -> {
@@ -162,7 +162,7 @@ public final class SmallColumnStore implements ColumnStore {
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() throws IOException {
 			if (m_delegateReader != null) {
 				m_delegateReader.close();
 			}
@@ -269,7 +269,7 @@ public final class SmallColumnStore implements ColumnStore {
 	}
 
 	@Override
-	public void close() throws Exception {
+	public void close() throws IOException {
 		final InMemoryColumnStore removed = m_cache.remove(SmallColumnStore.this);
 		if (removed != null) {
 			removed.release();
