@@ -66,14 +66,14 @@ public class SizeBoundLruCacheTest {
         final TestDoubleColumnData[] data = TestColumnStoreUtils.createBatch(1, 1);
         assertEquals(1, data[0].getRefs());
 
-        cache.retainAndPut(0, data[0]);
+        cache.put(0, data[0]);
         assertEquals(1, cache.size());
         assertEquals(2, data[0].getRefs());
 
-        assertEquals(data[0], cache.retainAndGet(0));
+        assertEquals(data[0], cache.getRetained(0));
         assertEquals(3, data[0].getRefs());
 
-        assertEquals(data[0], cache.retainAndGet(0, () -> null, (i, d) -> data[0].release()));
+        assertEquals(data[0], cache.getRetained(0, () -> null, (i, d) -> {}));
         assertEquals(4, data[0].getRefs());
     }
 
@@ -84,23 +84,23 @@ public class SizeBoundLruCacheTest {
         assertEquals(1, data[0].getRefs());
 
         final AtomicBoolean evicted = new AtomicBoolean();
-        cache.retainAndPut(0, data[0], (i, d) -> {
+        cache.put(0, data[0], (i, d) -> {
             evicted.set(true);
-            d.release();
         });
         assertEquals(1, cache.size());
         assertEquals(2, data[0].getRefs());
 
-        cache.retainAndPut(1, data[1]);
+        cache.put(1, data[1]);
         assertEquals(true, evicted.get());
         assertEquals(1, cache.size());
         assertEquals(1, data[0].getRefs());
 
-        assertNull(cache.retainAndGet(0));
-        assertEquals(data[0], cache.retainAndGet(0, () -> {
+        assertNull(cache.getRetained(0));
+        assertEquals(data[0], cache.getRetained(0, () -> {
             data[0].retain();
             return data[0];
-        }, (i, d) -> d.release()));
+        }, (i, d) -> {
+        }));
         assertEquals(3, data[0].getRefs());
     }
 
@@ -110,14 +110,14 @@ public class SizeBoundLruCacheTest {
         final TestDoubleColumnData[] data = TestColumnStoreUtils.createBatch(1, 1);
         assertEquals(1, data[0].getRefs());
 
-        cache.retainAndPut(0, data[0]);
+        cache.put(0, data[0]);
         assertEquals(1, cache.size());
         assertEquals(2, data[0].getRefs());
 
-        assertEquals(data[0], cache.remove(0));
+        assertEquals(data[0], cache.removeRetained(0));
         assertEquals(2, data[0].getRefs());
 
-        assertNull(cache.remove(0));
+        assertNull(cache.removeRetained(0));
     }
 
     @Test
@@ -125,19 +125,19 @@ public class SizeBoundLruCacheTest {
         final LoadingEvictingCache<Integer, TestDoubleColumnData> cache = new SizeBoundLruCache<>(2);
         final TestDoubleColumnData[] data = TestColumnStoreUtils.createBatch(3, 1);
 
-        cache.retainAndPut(0, data[0]); // content in cache: 0
-        cache.retainAndPut(1, data[1]); // content in cache: 1->0
-        cache.retainAndPut(2, data[2]); // content in cache: 2->1
+        cache.put(0, data[0]); // content in cache: 0
+        cache.put(1, data[1]); // content in cache: 1->0
+        cache.put(2, data[2]); // content in cache: 2->1
         assertEquals(2, cache.size());
 
-        assertEquals(data[2], cache.retainAndGet(2)); // content in cache: 2->1
-        assertEquals(data[1], cache.retainAndGet(1)); // content in cache: 1->2
-        assertNull(cache.retainAndGet(0));
+        assertEquals(data[2], cache.getRetained(2)); // content in cache: 2->1
+        assertEquals(data[1], cache.getRetained(1)); // content in cache: 1->2
+        assertNull(cache.getRetained(0));
 
-        cache.retainAndPut(0, data[0]); // content in cache: 0->1
-        assertEquals(data[0], cache.retainAndGet(0));
-        assertEquals(data[1], cache.retainAndGet(1));
-        assertNull(cache.retainAndGet(2));
+        cache.put(0, data[0]); // content in cache: 0->1
+        assertEquals(data[0], cache.getRetained(0));
+        assertEquals(data[1], cache.getRetained(1));
+        assertNull(cache.getRetained(2));
     }
 
 }

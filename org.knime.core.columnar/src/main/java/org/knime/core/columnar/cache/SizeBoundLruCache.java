@@ -46,8 +46,6 @@
 package org.knime.core.columnar.cache;
 
 import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 
 import org.knime.core.columnar.ReferencedData;
 
@@ -70,9 +68,9 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
     private static final class DataWithEvictor<K, D extends ReferencedData> {
         private final D m_data;
 
-        private final BiConsumer<? super K, ? super D> m_evictor;
+        private final Evictor<? super K, ? super D> m_evictor;
 
-        DataWithEvictor(final D data, final BiConsumer<? super K, ? super D> evictor) {
+        DataWithEvictor(final D data, final Evictor<? super K, ? super D> evictor) {
             m_data = data;
             m_evictor = evictor;
         }
@@ -88,7 +86,8 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
         final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
             if (removalNotification.wasEvicted()) {
                 final DataWithEvictor<K, D> evicted = removalNotification.getValue();
-                evicted.m_evictor.accept(removalNotification.getKey(), evicted.m_data);
+                evicted.m_evictor.evict(removalNotification.getKey(), evicted.m_data);
+                evicted.m_data.release();
             }
         };
 
@@ -99,37 +98,40 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
     }
 
     @Override
-    public void retainAndPut(final K key, final D data, final BiConsumer<? super K, ? super D> evictor) {
+    public void put(final K key, final D data, final Evictor<? super K, ? super D> evictor) {
         data.retain();
         m_lruCache.put(key, new DataWithEvictor<K, D>(data, evictor));
     }
 
     @Override
-    public D retainAndGet(final K key) {
-        final DataWithEvictor<K, D> cached = m_lruCache.computeIfPresent(key, (k, c) -> {
-            c.m_data.retain(); // retain for the caller of this method
-            return c;
+    public D getRetained(final K key) {
+        final DataWithEvictor<K, D> cached = m_lruCache.computeIfPresent(key, (k, d) -> {
+            d.m_data.retain(); // retain for the caller of this method
+            return d;
         });
         return cached == null ? null : cached.m_data;
     }
 
     @Override
-    public D retainAndGet(final K key, final Supplier<? extends D> loader,
-        final BiConsumer<? super K, ? super D> evictor) {
-        return m_lruCache.compute(key, (k, c) -> {
-            if (c == null) {
-                final D loaded = loader.get(); // data is already retained by the loader
+    public D getRetained(final K key, final Loader<? extends D> loader, final Evictor<? super K, ? super D> evictor) {
+        final DataWithEvictor<K, D> cached = m_lruCache.compute(key, (k, d) -> {
+            if (d == null) {
+                final D loaded = loader.loadRetained(); // data is already retained by the loader
+                if (loaded == null) {
+                    return null;
+                }
                 loaded.retain(); // retain for the caller of this method
                 return new DataWithEvictor<K, D>(loaded, evictor);
             } else {
-                c.m_data.retain(); // retain for the caller of this method
-                return c;
+                d.m_data.retain(); // retain for the caller of this method
+                return d;
             }
-        }).m_data;
+        });
+        return cached == null ? null : cached.m_data;
     }
 
     @Override
-    public D remove(final K key) {
+    public D removeRetained(final K key) {
         final DataWithEvictor<K, D> removed = m_lruCache.remove(key);
         return removed == null ? null : removed.m_data;
     }

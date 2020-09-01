@@ -62,15 +62,15 @@ import static org.knime.core.columnar.TestColumnStoreUtils.tableInStore;
 import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
 
 import java.util.List;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.knime.core.columnar.ColumnStore;
 import org.knime.core.columnar.TestDoubleColumnData;
-import org.knime.core.columnar.cache.CachedColumnReadStore.CachedColumnReadStoreCache;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
 
@@ -80,8 +80,10 @@ import org.knime.core.columnar.chunk.ColumnDataWriter;
 @SuppressWarnings("javadoc")
 public class AsyncFlushCachedColumnStoreTest {
 
-    private static CachedColumnReadStoreCache generateCache(final int numTablesHeld) {
-        return new CachedColumnReadStoreCache(numTablesHeld * DEF_SIZE_OF_TABLE);
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
+
+    private static CachedColumnStoreCache generateCache(final int numTablesHeld) {
+        return new CachedColumnStoreCache(numTablesHeld * DEF_SIZE_OF_TABLE);
     }
 
     @Rule
@@ -93,15 +95,18 @@ public class AsyncFlushCachedColumnStoreTest {
         final List<TestDoubleColumnData[]> table = generateDefaultTable();
         assertEquals(1, checkRefs(table));
 
-        // delay flush
-        final Lock lock = new ReentrantLock();
-        lock.lock();
-        AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            lock.lock();
-        });
-
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1))) {
+                final AsyncFlushCachedColumnStore store =
+                    new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR)) {
+
+            // delay flush
+            final CountDownLatch latch = new CountDownLatch(1);
+            store.enqueueRunnable(() -> {
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {
+                }
+            });
 
             writeTable(store, table);
             assertEquals(2, checkRefs(table)); // held in the cache
@@ -112,9 +117,8 @@ public class AsyncFlushCachedColumnStoreTest {
             assertFalse(tableInStore(delegate, table)); // not held in the delegate
 
             // wait for flush
-            lock.unlock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            latch.countDown();
+            store.waitForAndHandleFuture();
             assertEquals(2, checkRefs(table)); // held in the cache
             assertTrue(tableInStore(delegate, table)); // held in the delegate
         }
@@ -129,14 +133,14 @@ public class AsyncFlushCachedColumnStoreTest {
         assertEquals(1, checkRefs(table));
 
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final AsyncFlushCachedColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1))) {
+                final AsyncFlushCachedColumnStore store =
+                    new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR)) {
 
             writeTable(store, table);
             assertEquals(2, checkRefs(table)); // held in the cache
 
             // wait for flush
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            store.waitForAndHandleFuture();
             assertEquals(2, checkRefs(table)); // held in the cache
             assertTrue(tableInStore(delegate, table)); // held in the delegate
 
@@ -154,15 +158,18 @@ public class AsyncFlushCachedColumnStoreTest {
         final List<TestDoubleColumnData[]> smallTable = generateDefaultTable();
         assertEquals(1, checkRefs(smallTable));
 
-        // delay flush
-        final Lock lock = new ReentrantLock();
-        lock.lock();
-        AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            lock.lock();
-        });
-
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1))) {
+                final AsyncFlushCachedColumnStore store =
+                    new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR)) {
+
+            // delay flush
+            final CountDownLatch latch = new CountDownLatch(1);
+            store.enqueueRunnable(() -> {
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {
+                }
+            });
 
             writeTable(store, smallTable);
             assertEquals(2, checkRefs(smallTable)); // held in the cache
@@ -173,9 +180,8 @@ public class AsyncFlushCachedColumnStoreTest {
             assertFalse(tableInStore(delegate, smallTable)); // not held in the delegate
 
             // wait for flush
-            lock.unlock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            latch.countDown();
+            store.waitForAndHandleFuture();
             assertEquals(2, checkRefs(smallTable)); // held in the cache
             assertTrue(tableInStore(delegate, smallTable)); // held in the delegate
         }
@@ -189,15 +195,18 @@ public class AsyncFlushCachedColumnStoreTest {
         final List<TestDoubleColumnData[]> smallTable = generateDefaultTable();
         assertEquals(1, checkRefs(smallTable));
 
-        // delay flush
-        final Lock lock = new ReentrantLock();
-        lock.lock();
-        AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            lock.lock();
-        });
-
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1))) {
+                final AsyncFlushCachedColumnStore store =
+                    new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR)) {
+
+            // delay flush
+            final CountDownLatch latch = new CountDownLatch(1);
+            store.enqueueRunnable(() -> {
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {
+                }
+            });
 
             writeTable(store, smallTable);
             assertEquals(2, checkRefs(smallTable)); // held in the cache
@@ -208,9 +217,8 @@ public class AsyncFlushCachedColumnStoreTest {
             assertFalse(tableInStore(delegate, smallTable)); // not held in the delegate
 
             // wait for flush
-            lock.unlock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            latch.countDown();
+            store.waitForAndHandleFuture();
             assertEquals(2, checkRefs(smallTable)); // held in the cache
             assertTrue(tableInStore(delegate, smallTable)); // held in the delegate
         }
@@ -226,26 +234,28 @@ public class AsyncFlushCachedColumnStoreTest {
         assertEquals(1, checkRefs(table1));
         assertEquals(1, checkRefs(table2));
 
-        final CachedColumnReadStoreCache cache = generateCache(1); // held by the test
+        final CachedColumnStoreCache cache = generateCache(1); // held by the test
 
         try (final ColumnStore delegate1 = generateDefaultTestColumnStore();
-                final ColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache);
+                final AsyncFlushCachedColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache, EXECUTOR);
                 final ColumnStore delegate2 = generateDefaultTestColumnStore();
-                final ColumnStore store2 = new AsyncFlushCachedColumnStore(delegate2, cache)) {
+                final AsyncFlushCachedColumnStore store2 =
+                    new AsyncFlushCachedColumnStore(delegate2, cache, EXECUTOR)) {
 
             writeTable(store1, table1);
 
             // wait for flush of table1
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            store1.waitForAndHandleFuture();
             assertEquals(2, checkRefs(table1)); // held in the cache
             assertTrue(tableInStore(delegate1, table1)); // held in the delegate
 
-            // delay flush of tables written from here on out
-            final Lock lock = new ReentrantLock();
-            lock.lock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-                lock.lock();
+            // delay flush of table2
+            final CountDownLatch latch = new CountDownLatch(1);
+            store2.enqueueRunnable(() -> {
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {
+                }
             });
 
             writeTable(store2, table2); // evict table1
@@ -253,9 +263,8 @@ public class AsyncFlushCachedColumnStoreTest {
             assertEquals(2, checkRefs(table2)); // held in the cache
 
             // wait for flush of table2
-            lock.unlock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            latch.countDown();
+            store2.waitForAndHandleFuture();
             assertEquals(1, checkRefs(table1)); // not held in the cache
             assertTrue(tableInStore(delegate1, table1)); // held in the delegate
             assertEquals(2, checkRefs(table2)); // held in the cache
@@ -284,19 +293,22 @@ public class AsyncFlushCachedColumnStoreTest {
 
         final List<TestDoubleColumnData[]> table1 = generateDefaultTable();
         final List<TestDoubleColumnData[]> table2 = generateDefaultTable();
-        final CachedColumnReadStoreCache cache = generateCache(1);
-
-        // delay flush
-        final Lock flushLock = new ReentrantLock();
-        flushLock.lock();
-        AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            flushLock.lock();
-        });
+        final CachedColumnStoreCache cache = generateCache(1);
 
         try (final ColumnStore delegate1 = generateDefaultTestColumnStore();
-                final ColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache);
+                final AsyncFlushCachedColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache, EXECUTOR);
                 final ColumnStore delegate2 = generateDefaultTestColumnStore();
-                final ColumnStore store2 = new AsyncFlushCachedColumnStore(delegate2, cache)) {
+                final AsyncFlushCachedColumnStore store2 =
+                    new AsyncFlushCachedColumnStore(delegate2, cache, EXECUTOR)) {
+
+            // delay flush of table1
+            final CountDownLatch flushLatch = new CountDownLatch(1);
+            store1.enqueueRunnable(() -> {
+                try {
+                    flushLatch.await();
+                } catch (InterruptedException ex) {
+                }
+            });
 
             writeTable(store1, table1);
             assertEquals(2, checkRefs(table1)); // held in the cache
@@ -304,12 +316,11 @@ public class AsyncFlushCachedColumnStoreTest {
             assertEquals(DEF_SIZE_OF_TABLE, cache.size());
 
             // block on write, since table1 has not been flushed
-            final Lock writeLock = new ReentrantLock();
-            writeLock.lock();
+            final CountDownLatch writeLatch = new CountDownLatch(1);
             final Runnable r = () -> {
                 try {
                     writeTable(store2, table2);
-                    writeLock.unlock();
+                    writeLatch.countDown();
                 } catch (Exception e) {
                 }
             };
@@ -319,11 +330,10 @@ public class AsyncFlushCachedColumnStoreTest {
             await().pollDelay(ONE_HUNDRED_MILLISECONDS).until(() -> t.getState() == Thread.State.WAITING);
             assertEquals(DEF_SIZE_OF_TABLE, cache.size());
 
-            // wait for flush
-            flushLock.unlock();
-            writeLock.lock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            // wait for flush of table1
+            flushLatch.countDown();
+            writeLatch.await();
+            store1.waitForAndHandleFuture();
 
             assertEquals(1, checkRefs(table1)); // not held in the cache
             assertTrue(tableInStore(delegate1, table1)); // held in the delegate
@@ -339,28 +349,36 @@ public class AsyncFlushCachedColumnStoreTest {
         final List<TestDoubleColumnData[]> table1 = generateDefaultTable();
         final List<TestDoubleColumnData[]> table2 = generateDefaultTable();
         final List<TestDoubleColumnData[]> table3 = generateDefaultTable();
-        final CachedColumnReadStoreCache cache = generateCache(2);
+        final CachedColumnStoreCache cache = generateCache(2);
 
         try (final ColumnStore delegate1 = generateDefaultTestColumnStore();
-                final ColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache);
+                final AsyncFlushCachedColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache, EXECUTOR);
                 final ColumnStore delegate2 = generateDefaultTestColumnStore();
-                final ColumnStore store2 = new AsyncFlushCachedColumnStore(delegate2, cache);
+                final AsyncFlushCachedColumnStore store2 = new AsyncFlushCachedColumnStore(delegate2, cache, EXECUTOR);
                 final ColumnStore delegate3 = generateDefaultTestColumnStore();
-                final ColumnStore store3 = new AsyncFlushCachedColumnStore(delegate3, cache)) {
+                final AsyncFlushCachedColumnStore store3 =
+                    new AsyncFlushCachedColumnStore(delegate3, cache, EXECUTOR)) {
 
             writeTable(store1, table1);
-            // wait for flush
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            // wait for flush of table1
+            store1.waitForAndHandleFuture();
             assertEquals(2, checkRefs(table1)); // held in the cache
             assertTrue(tableInStore(delegate1, table1)); // held in the delegate
             assertEquals(DEF_SIZE_OF_TABLE, cache.size());
 
-            // delay flush
-            final Lock lock = new ReentrantLock();
-            lock.lock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-                lock.lock();
+            // delay flush of table2 and table3
+            final CountDownLatch latch = new CountDownLatch(1);
+            store2.enqueueRunnable(() -> {
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {
+                }
+            });
+            store3.enqueueRunnable(() -> {
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {
+                }
             });
 
             writeTable(store2, table2); // cache & queue flush of table2
@@ -374,10 +392,10 @@ public class AsyncFlushCachedColumnStoreTest {
             assertFalse(tableInStore(delegate3, table3)); // not held in the delegate
             assertEquals(2 * DEF_SIZE_OF_TABLE, cache.size());
 
-            // wait for flush
-            lock.unlock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            // wait for flush of table2 and table3
+            latch.countDown();
+            store2.waitForAndHandleFuture();
+            store3.waitForAndHandleFuture();
 
             assertEquals(1, checkRefs(table1)); // not held in the cache
             assertTrue(tableInStore(delegate1, table1)); // held in the delegate
@@ -395,28 +413,36 @@ public class AsyncFlushCachedColumnStoreTest {
         final List<TestDoubleColumnData[]> table1 = generateDefaultTable();
         final List<TestDoubleColumnData[]> table2 = generateDefaultTable();
         final List<TestDoubleColumnData[]> table3 = generateDefaultTable();
-        final CachedColumnReadStoreCache cache = generateCache(2);
+        final CachedColumnStoreCache cache = generateCache(2);
 
         try (final ColumnStore delegate1 = generateDefaultTestColumnStore();
-                final ColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache);
+                final AsyncFlushCachedColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache, EXECUTOR);
                 final ColumnStore delegate2 = generateDefaultTestColumnStore();
-                final ColumnStore store2 = new AsyncFlushCachedColumnStore(delegate2, cache);
+                final AsyncFlushCachedColumnStore store2 = new AsyncFlushCachedColumnStore(delegate2, cache, EXECUTOR);
                 final ColumnStore delegate3 = generateDefaultTestColumnStore();
-                final ColumnStore store3 = new AsyncFlushCachedColumnStore(delegate3, cache)) {
+                final AsyncFlushCachedColumnStore store3 =
+                    new AsyncFlushCachedColumnStore(delegate3, cache, EXECUTOR)) {
 
             writeTable(store1, table1);
-            // wait for flush
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            // wait for flush of table1
+            store1.waitForAndHandleFuture();
             assertEquals(2, checkRefs(table1)); // held in the cache
             assertTrue(tableInStore(delegate1, table1)); // held in the delegate
             assertEquals(DEF_SIZE_OF_TABLE, cache.size());
 
-            // delay flush
-            final Lock flushLock = new ReentrantLock();
-            flushLock.lock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-                flushLock.lock();
+            // delay flush of table2 and table3
+            final CountDownLatch flushLatch = new CountDownLatch(1);
+            store2.enqueueRunnable(() -> {
+                try {
+                    flushLatch.await();
+                } catch (InterruptedException ex) {
+                }
+            });
+            store3.enqueueRunnable(() -> {
+                try {
+                    flushLatch.await();
+                } catch (InterruptedException ex) {
+                }
             });
 
             writeTable(store2, table2); // cache & queue flush of table2
@@ -426,12 +452,11 @@ public class AsyncFlushCachedColumnStoreTest {
             readAndCompareTable(store1, table1); // read table1 to make table2 next in line for eviction
 
             // block on write, since table2 has not been flushed
-            final Lock writeLock = new ReentrantLock();
-            writeLock.lock();
+            final CountDownLatch writeLatch = new CountDownLatch(1);
             final Runnable r = () -> {
                 try {
                     writeTable(store3, table3);
-                    writeLock.unlock();
+                    writeLatch.countDown();
                 } catch (Exception e) {
                 }
             };
@@ -442,10 +467,10 @@ public class AsyncFlushCachedColumnStoreTest {
             assertEquals(2 * DEF_SIZE_OF_TABLE, cache.size());
 
             // wait for flush
-            flushLock.unlock();
-            writeLock.lock();
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            flushLatch.countDown();
+            writeLatch.await();
+            store2.waitForAndHandleFuture();
+            store3.waitForAndHandleFuture();
 
             assertEquals(2, checkRefs(table1)); // held in the cache
             assertTrue(tableInStore(delegate1, table1)); // held in the delegate
@@ -461,17 +486,16 @@ public class AsyncFlushCachedColumnStoreTest {
     public void testCacheEmptyAfterClear() throws Exception {
 
         final List<TestDoubleColumnData[]> table = generateDefaultTable();
-        final CachedColumnReadStoreCache cache = generateCache(1);
+        final CachedColumnStoreCache cache = generateCache(1);
 
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, cache)) {
+                final AsyncFlushCachedColumnStore store = new AsyncFlushCachedColumnStore(delegate, cache, EXECUTOR)) {
 
             writeTable(store, table);
             assertEquals(2, checkRefs(table));
 
             // wait for flush of table
-            AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-            }).get();
+            store.waitForAndHandleFuture();
             assertEquals(DEF_SIZE_OF_TABLE, cache.size());
             assertEquals(2, checkRefs(table)); // held in the cache
             assertTrue(tableInStore(delegate, table)); // held in the delegate
@@ -486,21 +510,23 @@ public class AsyncFlushCachedColumnStoreTest {
 
         final List<TestDoubleColumnData[]> table1 = generateDefaultTable();
         final List<TestDoubleColumnData[]> table2 = generateDefaultTable();
-        final CachedColumnReadStoreCache cache = generateCache(2);
+        final CachedColumnStoreCache cache = generateCache(2);
 
         try (final ColumnStore delegate1 = generateDefaultTestColumnStore();
-                final ColumnStore store1 = new AsyncFlushCachedColumnStore(delegate1, cache)) {
+                final AsyncFlushCachedColumnStore store1 =
+                    new AsyncFlushCachedColumnStore(delegate1, cache, EXECUTOR)) {
 
             writeTable(store1, table1);
 
             try (final ColumnStore delegate2 = generateDefaultTestColumnStore();
-                    final ColumnStore store2 = new AsyncFlushCachedColumnStore(delegate2, cache)) {
+                    final AsyncFlushCachedColumnStore store2 =
+                        new AsyncFlushCachedColumnStore(delegate2, cache, EXECUTOR)) {
 
                 writeTable(store2, table2);
 
                 // wait for flush of tables
-                AsyncFlushCachedColumnStore.EXECUTOR.submit(() -> {
-                }).get();
+                store1.waitForAndHandleFuture();
+                store2.waitForAndHandleFuture();
                 assertEquals(2 * DEF_SIZE_OF_TABLE, cache.size());
                 assertEquals(2, checkRefs(table1)); // held in the cache
                 assertTrue(tableInStore(delegate1, table1)); // held in the delegate
@@ -521,7 +547,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test
     public void testFactorySingleton() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1))) {
+                final AsyncFlushCachedColumnStore store =
+                    new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR)) {
             assertEquals(store.getFactory(), store.getFactory());
         }
     }
@@ -530,7 +557,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test
     public void testWriterSingleton() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1))) {
+                final AsyncFlushCachedColumnStore store =
+                    new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR)) {
             assertEquals(store.getWriter(), store.getWriter());
         }
     }
@@ -539,7 +567,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final AsyncFlushCachedColumnStore store =
+                new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             store.close();
             store.getFactory().create();
         }
@@ -549,7 +578,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterWriterClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final AsyncFlushCachedColumnStore store =
+                new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.close();
                 writer.write(createBatch(1, 1));
@@ -561,7 +591,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final AsyncFlushCachedColumnStore store =
+                new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             store.close();
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
@@ -573,7 +604,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final AsyncFlushCachedColumnStore store =
+                new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             try (ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
             }
@@ -588,7 +620,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final AsyncFlushCachedColumnStore store =
+                new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             try (ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
             }
@@ -603,7 +636,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetFactoryAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final AsyncFlushCachedColumnStore store =
+                new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             store.close();
             store.getFactory();
         }
@@ -613,7 +647,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final AsyncFlushCachedColumnStore store =
+                new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             store.close();
             store.getWriter();
         }
@@ -622,7 +657,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveWhileWriterOpen() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1))) {
+                final AsyncFlushCachedColumnStore store =
+                    new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 store.saveToFile(null);
             }
@@ -633,7 +669,7 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
             }
@@ -645,7 +681,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderWhileWriterOpen() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1))) {
+                final AsyncFlushCachedColumnStore store =
+                    new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 try (final ColumnDataReader reader = store.createReader()) {
                 }
@@ -657,7 +694,8 @@ public class AsyncFlushCachedColumnStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore()) {
-            final ColumnStore store = new AsyncFlushCachedColumnStore(delegate, generateCache(1));
+            final AsyncFlushCachedColumnStore store =
+                new AsyncFlushCachedColumnStore(delegate, generateCache(1), EXECUTOR);
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.write(createBatch(1, 1));
             }

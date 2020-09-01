@@ -45,30 +45,25 @@
  */
 package org.knime.core.columnar.cache;
 
+import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
 import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
 import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
 import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Queue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiConsumer;
+import java.util.stream.IntStream;
 
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnStore;
 import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.cache.CachedColumnReadStore.CachedColumnReadStoreCache;
-import org.knime.core.columnar.cache.CachedColumnReadStore.ColumnDataUniqueId;
+import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
@@ -87,56 +82,17 @@ import org.knime.core.columnar.chunk.ColumnSelection;
  */
 public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
-    private static void waitForAndHandleFuture(final Future<Void> future) {
-        try {
-            future.get();
-        } catch (final InterruptedException e) {
-            // Restore interrupted state...
-            Thread.currentThread().interrupt();
-        } catch (final ExecutionException e) {
-            throw new IllegalStateException("Failed to asynchronously write cached rows to file.", e);
-        }
-    }
+    private static final String ERROR_ON_INTERRUPT = "Interrupted while writing for asynchronous write thread.";
 
-    private static final AtomicLong THREAD_COUNT = new AtomicLong();
-
-    static final ExecutorService EXECUTOR = Executors
-        .newSingleThreadExecutor(r -> new Thread(r, "KNIME-BackgroundTableWriter-" + THREAD_COUNT.incrementAndGet()));
+    private static final CountDownLatch DUMMY = new CountDownLatch(0);
 
     private final class AsyncFlushCachedColumnStoreWriter implements ColumnDataWriter {
 
         private final ColumnDataWriter m_delegateWriter;
 
-        /**
-         * After a ColumnData is evicted (but before it is released), we check if we have to raise the maxEvictIndex.
-         * For instance if we have evicted data at index 1 in the past and now evict data at index 3, we would raise the
-         * maxEvictIndex by 2 from 1 to 3.
-         */
-        private final AtomicInteger m_maxEvictIndex = new AtomicInteger(-1);
-
-        /**
-         * We start at 0 permits. After one batch of ColumnData has been flushed, we gain (release) 1 permit. if we
-         * raise the maxEvictIndex by i, we request i permits. Since we always flush sequentially, this assures that
-         * whenever we evict unflushed data, we wait for the asynchronous writer thread to catch up.
-         */
-        private final Semaphore m_semaphore = new Semaphore(0);
-
         AsyncFlushCachedColumnStoreWriter() {
             m_delegateWriter = m_delegate.getWriter();
         }
-
-        private final BiConsumer<ColumnDataUniqueId, ColumnData> m_evictor = (k, d) -> {
-            final int index = k.getChunkIndex();
-            final int maxEvictIndex = m_maxEvictIndex.getAndAccumulate(index, Math::max);
-            if (index > maxEvictIndex) {
-                try {
-                    m_semaphore.acquire(index - maxEvictIndex);
-                } catch (InterruptedException e) {
-                    // Restore interrupted state...
-                    Thread.currentThread().interrupt();
-                }
-            }
-        };
 
         @Override
         public void write(final ColumnData[] batch) throws IOException {
@@ -147,47 +103,136 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            handleDoneFutures();
+            handleDoneFuture();
 
-            try {
-                m_futures.add(EXECUTOR.submit(new Callable<Void>() {
-                    @Override
-                    public Void call() throws IOException {
-                        try {
-                            m_delegateWriter.write(batch);
-                        } finally {
-                            m_semaphore.release();
-                        }
-                        return null;
-                    }
-                }));
-            } catch (final RejectedExecutionException e) {
-                m_semaphore.release();
-                throw e;
+            final CountDownLatch batchFlushed = new CountDownLatch(1);
+            enqueueRunnable(() -> {
+                try {
+                    m_delegateWriter.write(batch);
+                } catch (IOException e) {
+                    throw new IllegalStateException(String.format("Failed to write batch %d.", m_numChunks), e);
+                } finally {
+                    batchFlushed.countDown();
+                }
+            });
+
+            for (int i = 0; i < batch.length; i++) {
+                m_maxDataCapacity = Math.max(m_maxDataCapacity, batch[i].getMaxCapacity());
+                final ColumnDataUniqueId ccUID =
+                    new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, m_numChunks);
+                m_cachedData.put(ccUID, batchFlushed);
+                m_globalCache.put(ccUID, batch[i], m_evictor);
             }
-
-            m_readCache.addBatch(batch, m_evictor);
+            m_numChunks++;
         }
 
         @Override
         public void close() {
             m_writerClosed = true;
 
-            handleDoneFutures();
+            handleDoneFuture();
 
-            m_futures.add(EXECUTOR.submit(new Callable<Void>() {
-                @Override
-                public Void call() throws Exception {
+            enqueueRunnable(() -> {
+                try {
                     m_delegateWriter.close();
-                    return null;
+                } catch (IOException e) {
+                    throw new IllegalStateException("Failed to close writer.", e);
                 }
-            }));
+            });
         }
 
-        private void handleDoneFutures() {
-            while (!m_futures.isEmpty() && m_futures.peek().isDone()) {
-                waitForAndHandleFuture(m_futures.remove());
+        private void handleDoneFuture() {
+            if (m_future.isDone()) {
+                try {
+                    waitForAndHandleFuture();
+                } catch (InterruptedException ex) {
+                    // Restore interrupted state
+                    Thread.currentThread().interrupt();
+                    // since we just checked whether the future is done, we likely never end up in this code block
+                }
             }
+        }
+
+    }
+
+    private final class AsyncFlushCachedColumnStoreReader implements ColumnDataReader {
+
+        private final ColumnSelection m_selection;
+
+        private final int[] m_indices;
+
+        private final BufferedBatchLoader m_batchLoader;
+
+        // lazily initialized
+        private ColumnDataReader m_delegateReader;
+
+        private boolean m_readerClosed;
+
+        AsyncFlushCachedColumnStoreReader(final ColumnSelection selection) {
+            m_indices = selection != null && selection.get() != null ? selection.get()
+                : IntStream.range(0, getSchema().getNumColumns()).toArray();
+            m_selection = selection;
+            m_batchLoader = new BufferedBatchLoader(m_indices);
+        }
+
+        @Override
+        public ColumnData[] read(final int chunkIndex) {
+            if (m_readerClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
+            }
+            if (m_storeClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
+
+            final ColumnData[] batch = new ColumnData[getSchema().getNumColumns()];
+
+            for (final int i : m_indices) {
+                final ColumnDataUniqueId ccUID =
+                    new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, chunkIndex);
+                batch[i] = m_globalCache.getRetained(ccUID, () -> {
+                    try {
+                        waitForAndHandleFuture();
+                    } catch (InterruptedException e) {
+                        // Restore interrupted state...
+                        Thread.currentThread().interrupt();
+                        // when interrupted here (e.g., because the reading node is cancelled), we should not proceed
+                        // this way, the cache stays in a consistent state
+                        throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+                    }
+                    if (m_delegateReader == null) {
+                        m_delegateReader = m_delegate.createReader(m_selection);
+                    }
+                    m_cachedData.put(ccUID, DUMMY);
+                    try {
+                        final ColumnData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex)[i];
+                        data.retain();
+                        return data;
+                    } catch (IOException e) {
+                        throw new IllegalStateException("Exception while loading column data.", e);
+                    }
+                }, m_evictor);
+            }
+
+            return batch;
+        }
+
+        @Override
+        public int getNumChunks() {
+            return m_numChunks;
+        }
+
+        @Override
+        public int getMaxDataCapacity() {
+            return m_maxDataCapacity;
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (m_delegateReader != null) {
+                m_delegateReader.close();
+            }
+            m_batchLoader.close();
+            m_readerClosed = true;
         }
 
     }
@@ -198,9 +243,32 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
     private final AsyncFlushCachedColumnStoreWriter m_writer;
 
-    private final CachedColumnReadStore m_readCache;
+    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_globalCache;
 
-    private final Queue<Future<Void>> m_futures = new ConcurrentLinkedQueue<>();
+    private final Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
+
+    private final Evictor<ColumnDataUniqueId, ColumnData> m_evictor = (k, c) -> {
+        try {
+            m_cachedData.remove(k).await();
+        } catch (InterruptedException e) {
+            // Restore interrupted state...
+            Thread.currentThread().interrupt();
+            // when interrupted here (e.g., because some other node that pushes data into the cache is cancelled), we
+            // either lose the unflushed, to-be-evicted data, because it will be released once evicted from the cache
+            // or we retain it and accept that we temporarily use up more off-heap memory than the cache allows
+            c.retain();
+            enqueueRunnable(c::release);
+            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+        }
+    };
+
+    private final ExecutorService m_executor;
+
+    private int m_numChunks = 0;
+
+    private int m_maxDataCapacity = 0;
+
+    private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
     // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
     private volatile boolean m_writerClosed;
@@ -211,17 +279,32 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
     /**
      * @param delegate the delegate to which to write asynchronously
      * @param cache the cache for storing data
+     * @param executor the executor to which to submit asynchronous writes to the delegate
      */
-    public AsyncFlushCachedColumnStore(final ColumnStore delegate, final CachedColumnReadStoreCache cache) {
+    public AsyncFlushCachedColumnStore(final ColumnStore delegate, final CachedColumnStoreCache cache,
+        final ExecutorService executor) {
         m_delegate = delegate;
         m_factory = delegate.getFactory();
         m_writer = new AsyncFlushCachedColumnStoreWriter();
-        m_readCache = new CachedColumnReadStore(delegate, cache);
+        m_globalCache = cache.getCache();
+        m_executor = executor;
+    }
+
+    void enqueueRunnable(final Runnable r) {
+        m_future = m_future.thenRunAsync(r, m_executor);
+    }
+
+    void waitForAndHandleFuture() throws InterruptedException {
+        try {
+            m_future.get();
+        } catch (final ExecutionException e) {
+            throw new IllegalStateException("Failed to asynchronously write cached rows to file.", e);
+        }
     }
 
     @Override
     public ColumnStoreSchema getSchema() {
-        return m_readCache.getSchema();
+        return m_delegate.getSchema();
     }
 
     @Override
@@ -251,15 +334,14 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        waitForAndHandleFutures();
-        m_delegate.saveToFile(file);
-    }
-
-    private void waitForAndHandleFutures() {
-        Future<Void> future;
-        while ((future = m_futures.poll()) != null) {
-            waitForAndHandleFuture(future);
+        try {
+            waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            // Restore interrupted state...
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
         }
+        m_delegate.saveToFile(file);
     }
 
     @Override
@@ -267,19 +349,26 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
         if (!m_writerClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }
+        if (m_storeClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+        }
 
-        return m_readCache.createReader(selection, this::waitForAndHandleFutures);
+        return new AsyncFlushCachedColumnStoreReader(selection);
     }
 
     @Override
     public void close() throws IOException {
         m_storeClosed = true;
 
-        while (!m_futures.isEmpty()) {
-            m_futures.poll().cancel(true);
-        }
+        m_future.cancel(true);
 
-        m_readCache.close();
+        for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
+            final ColumnData removed = m_globalCache.removeRetained(id);
+            if (removed != null) {
+                removed.release();
+            }
+        }
+        m_cachedData.clear();
         m_delegate.close();
     }
 

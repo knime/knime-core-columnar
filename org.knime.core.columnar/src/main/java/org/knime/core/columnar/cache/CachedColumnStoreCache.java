@@ -42,58 +42,36 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   2 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.cache;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
+import org.knime.core.columnar.ColumnData;
 
-import org.knime.core.columnar.cache.AsyncFlushCachedColumnStore;
-import org.knime.core.columnar.cache.CachedColumnReadStore;
-import org.knime.core.columnar.cache.CachedColumnStoreCache;
-import org.knime.core.columnar.cache.SmallColumnStore;
-import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
+/**
+ * A cache for storing data that can be shared between multiple {@link CachedColumnReadStore CachedColumnReadStores}.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public final class CachedColumnStoreCache {
 
-public class ColumnStoreUtils {
+    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_cache;
 
-    public static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
-
-    public static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
-
-    public static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
-
-    public static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
-
-    // the size (in bytes) up to which a table is considered small
-    private static final int SMALL_TABLE_THRESHOLD = 1 << 20; // 1 MB
-
-    // the size (in bytes) of the LRU cache for entire small tables
-    private static final long SMALL_TABLES_CACHE_SIZE = 1L << 25; // 32 MB, i.e., holds up to 32 small tables
-
-    private static final SmallColumnStoreCache SMALL_TABLES_CACHE =
-        new SmallColumnStoreCache(SMALL_TABLE_THRESHOLD, SMALL_TABLES_CACHE_SIZE);
-
-    // the size (in bytes) of the LRU cache for ColumnData of all tables
-    private static final long COLUMN_DATA_CACHE_SIZE = 1L << 30; // 1 GB
-
-    private static final CachedColumnStoreCache COLUMN_DATA_CACHE = new CachedColumnStoreCache(COLUMN_DATA_CACHE_SIZE);
-
-    private static final AtomicLong THREAD_COUNT = new AtomicLong();
-
-    private static final ExecutorService ASYNC_FLUSH_EXECUTOR = Executors.newFixedThreadPool(4,
-        r -> new Thread(r, "KNIME-BackgroundColumnStoreWriter-" + THREAD_COUNT.incrementAndGet()));
-
-    private ColumnStoreUtils() {
+    /**
+     * @param cacheSize the size of the cache in bytes
+     */
+    public CachedColumnStoreCache(final long cacheSize) {
+        m_cache = new SizeBoundLruCache<>(cacheSize);
     }
 
-    public static ColumnStore cache(final ColumnStore store) {
-        return new SmallColumnStore(new AsyncFlushCachedColumnStore(store, COLUMN_DATA_CACHE, ASYNC_FLUSH_EXECUTOR),
-            SMALL_TABLES_CACHE);
+    int size() {
+        return m_cache.size();
     }
 
-    public static ColumnReadStore cache(final ColumnReadStore store) {
-        return new CachedColumnReadStore(store, COLUMN_DATA_CACHE);
+    LoadingEvictingCache<ColumnDataUniqueId, ColumnData> getCache() {
+        return m_cache;
     }
 
 }

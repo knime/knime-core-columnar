@@ -46,8 +46,6 @@
 package org.knime.core.columnar.cache;
 
 import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 
 import org.knime.core.columnar.ReferencedData;
 
@@ -64,50 +62,59 @@ import org.knime.core.columnar.ReferencedData;
  */
 interface LoadingEvictingCache<K, D extends ReferencedData> {
 
+    @FunctionalInterface
+    static interface Loader<D extends ReferencedData> {
+        D loadRetained();
+    }
+
+    @FunctionalInterface
+    static interface Evictor<K, D extends ReferencedData> {
+        void evict(final K key, final D data);
+    }
+
     /**
-     * Retains the given data and associates it with the key.
+     * Associates the given data with the given key and places it in the cache.
      *
      * @param key key with which the specified data is to be associated
      * @param data data to be retained and associated with the specified key
      */
-    default void retainAndPut(final K key, final D data) {
-        retainAndPut(key, data, (k, d) -> d.release());
+    default void put(final K key, final D data) {
+        put(key, data, (k, d) -> {
+        });
     }
 
     /**
-     * Retains the given data and associates it with the key. If, at some point, the data is evicted from the cache, the
-     * given evictor is called. The evictor is responsible for releasing the data.
+     * Associates the given data with the given key and places it in the cache. If, at some point, the data is evicted
+     * from the cache, the given evictor is called.
      *
      * @param key key with which the specified data is to be associated
      * @param data data to be retained and associated with the specified key
      * @param evictor consumer that accepts entries that are evicted
      */
-    void retainAndPut(K key, D data, BiConsumer<? super K, ? super D> evictor);
+    void put(final K key, final D data, final Evictor<? super K, ? super D> evictor);
 
     /**
-     * Retains the data to which the specified key is mapped and returns it. Returns null if this cache contains no
-     * mapping for the key. It is up to the client calling this method to release the returned data once it is no longer
-     * needed.
+     * Returns the retained data to which the specified key is mapped. Returns null if this cache contains no mapping
+     * for the key. It is up to the client calling this method to release the returned data once it is no longer needed.
      *
      * @param key key whose associated value is to be returned
      * @return retained data to which the specified key is mapped, or null if this cache contains no mapping for the key
      */
-    D retainAndGet(K key);
+    D getRetained(final K key);
 
     /**
-     * Retains the data to which the specified key is mapped and returns it. If this cache contains no mapping for the
-     * key, the given loader is called. The retained, non-null, data provided by the loader is then associated with the
-     * given key, retained (again), and returned. If, at some point, the data is evicted from the cache, the given
-     * evictor is called. The evictor is responsible for releasing the data, just as the loader is responsible for
-     * retaining the data. It is up to the client calling this method to release the returned data once it is no longer
-     * needed.
+     * Returns the retained data to which the specified key is mapped. If this cache contains no mapping for the key,
+     * the given loader is called. The retained data provided by the loader is then associated with the given key,
+     * placed in the cache, and returned. If, at some point, the data is evicted from the cache, the given evictor is
+     * called. It is up to the client calling this method to release the returned data once it is no longer needed.
      *
      * @param key key whose associated value is to be returned
      * @param loader supplier of retained data
      * @param evictor consumer that accepts entries that are evicted
-     * @return retained, already present or recently loaded data to which the specified key is mapped
+     * @return retained, already present or recently loaded data to which the specified key is mapped, or null if the
+     *         loader returned null
      */
-    D retainAndGet(K key, Supplier<? extends D> loader, BiConsumer<? super K, ? super D> evictor);
+    D getRetained(final K key, final Loader<? extends D> loader, final Evictor<? super K, ? super D> evictor);
 
     /**
      * Removes the mapping for a key from this cache if it is present (optional operation). Returns the retained data to
@@ -118,7 +125,7 @@ interface LoadingEvictingCache<K, D extends ReferencedData> {
      * @return the retained data to which the specified key was mapped, or null if the cache contained no mapping for
      *         the key
      */
-    D remove(K key);
+    D removeRetained(final K key);
 
     /**
      * Returns the approximate number of key-data mappings in this cache.

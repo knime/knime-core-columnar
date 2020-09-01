@@ -144,23 +144,22 @@ public class TestColumnStoreUtils {
 
             final List<TestDoubleColumnData[]> result = new ArrayList<>();
             for (int i = 0; i < reader.getNumChunks(); i++) {
-                final TestDoubleColumnData[] written;
-                if (indices == null) {
-                    written = table.get(i);
-                } else {
-                    final TestDoubleColumnData[] all = table.get(i);
-                    written = Arrays.stream(indices).mapToObj(index -> all[index]).toArray(TestDoubleColumnData[]::new);
-                }
+                final TestDoubleColumnData[] written = table.get(i);
                 final TestDoubleColumnData[] batch = Arrays.stream(reader.read(i))
                     .map(data -> (TestDoubleColumnData)data).toArray(TestDoubleColumnData[]::new);
 
                 assertEquals(written.length, batch.length);
-                for (int j = 0; j < written.length; j++) {
-                    assertArrayEquals(written[j].get(), (batch[j]).get());
-                }
 
-                for (final ColumnData data : batch) {
-                    data.release();
+                if (indices == null) {
+                    for (int j = 0; j < written.length; j++) {
+                        assertArrayEquals(written[j].get(), (batch[j]).get());
+                        batch[j].release();
+                    }
+                } else {
+                    for (int j = 0; j < indices.length; j++) {
+                        assertArrayEquals(written[indices[j]].get(), (batch[indices[j]]).get());
+                        batch[j].release();
+                    }
                 }
 
                 result.add(batch);
