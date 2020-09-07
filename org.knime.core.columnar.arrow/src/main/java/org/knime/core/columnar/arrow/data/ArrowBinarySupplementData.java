@@ -54,6 +54,7 @@ import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.data.BinarySupplData;
+import org.knime.core.columnar.phantom.CloseableCloser;
 
 public class ArrowBinarySupplementData<C extends ArrowData<?>> implements BinarySupplData<C>, ArrowData<StructVector> {
 
@@ -65,9 +66,24 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
 
     private final StructVector m_vector;
 
-    public ArrowBinarySupplementData(final BufferAllocator allocator, final C chunk) {
+    CloseableCloser m_vectorCloser;
+
+    public static <C extends ArrowData<?>> ArrowBinarySupplementData createEmpty(final BufferAllocator allocator,
+        final C chunk) {
+        final ArrowBinarySupplementData data = new ArrowBinarySupplementData(allocator, chunk);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Binary Supplement Data");
+        return data;
+    }
+
+    public static <C extends ArrowData<?>> ArrowBinarySupplementData wrap(final StructVector vector, final C chunk) {
+        final ArrowBinarySupplementData data = new ArrowBinarySupplementData(vector, chunk);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Binary Supplement Data");
+        return data;
+    }
+
+    private ArrowBinarySupplementData(final BufferAllocator allocator, final C chunk) {
         m_chunk = chunk;
-        m_binarySuppl = new ArrowVarBinaryData(allocator);
+        m_binarySuppl = ArrowVarBinaryData.createEmpty(allocator);
         final CustomStructVector vector = new CustomStructVector("BinarySuppl", allocator);
 
         vector.putChild("Data", m_chunk.get());
@@ -75,10 +91,10 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
         m_vector = vector;
     }
 
-    public ArrowBinarySupplementData(final StructVector vector, final C chunk) {
+    private ArrowBinarySupplementData(final StructVector vector, final C chunk) {
         m_vector = vector;
         m_chunk = chunk;
-        m_binarySuppl = new ArrowVarBinaryData((VarBinaryVector)vector.getChildByOrdinal(1));
+        m_binarySuppl = ArrowVarBinaryData.wrap((VarBinaryVector)vector.getChildByOrdinal(1));
     }
 
     @Override
@@ -133,6 +149,9 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
         m_chunk.release();
         if (m_ref.decrementAndGet() == 0) {
             m_vector.close();
+            if (m_vectorCloser != null) {
+                m_vectorCloser.close();
+            }
         }
     }
 

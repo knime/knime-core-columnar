@@ -49,14 +49,27 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.Float4Vector;
 import org.knime.core.columnar.data.FloatData;
+import org.knime.core.columnar.phantom.CloseableCloser;
 
 public class ArrowFloatData extends AbstractFieldVectorData<Float4Vector> implements FloatData {
 
-    public ArrowFloatData(final BufferAllocator allocator) {
+    public static ArrowFloatData createEmpty(final BufferAllocator allocator) {
+        final ArrowFloatData data = new ArrowFloatData(allocator);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Float Data");
+        return data;
+    }
+
+    public static ArrowFloatData wrap(final Float4Vector vector) {
+        final ArrowFloatData data = new ArrowFloatData(vector);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Float Data");
+        return data;
+    }
+
+    private ArrowFloatData(final BufferAllocator allocator) {
         super(allocator);
     }
 
-    public ArrowFloatData(final Float4Vector vector) {
+    private ArrowFloatData(final Float4Vector vector) {
         super(vector);
     }
 

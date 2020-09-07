@@ -49,14 +49,27 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.knime.core.columnar.data.LongData;
+import org.knime.core.columnar.phantom.CloseableCloser;
 
 public class ArrowLongData extends AbstractFieldVectorData<BigIntVector> implements LongData {
 
-    public ArrowLongData(final BufferAllocator allocator) {
+    public static ArrowLongData createEmpty(final BufferAllocator allocator) {
+        final ArrowLongData data = new ArrowLongData(allocator);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Long Data");
+        return data;
+    }
+
+    public static ArrowLongData wrap(final BigIntVector vector) {
+        final ArrowLongData data = new ArrowLongData(vector);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Long Data");
+        return data;
+    }
+
+    private ArrowLongData(final BufferAllocator allocator) {
         super(allocator);
     }
 
-    public ArrowLongData(final BigIntVector vector) {
+    private ArrowLongData(final BigIntVector vector) {
         super(vector);
     }
 

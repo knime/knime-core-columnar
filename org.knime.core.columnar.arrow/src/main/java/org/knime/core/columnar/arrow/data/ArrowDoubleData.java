@@ -49,14 +49,27 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.Float8Vector;
 import org.knime.core.columnar.data.DoubleData;
+import org.knime.core.columnar.phantom.CloseableCloser;
 
 public class ArrowDoubleData extends AbstractFieldVectorData<Float8Vector> implements DoubleData {
 
-    public ArrowDoubleData(final BufferAllocator allocator) {
+    public static ArrowDoubleData createEmpty(final BufferAllocator allocator) {
+        final ArrowDoubleData data = new ArrowDoubleData(allocator);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Double Data");
+        return data;
+    }
+
+    public static ArrowDoubleData wrap(final Float8Vector vector) {
+        final ArrowDoubleData data = new ArrowDoubleData(vector);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Double Data");
+        return data;
+    }
+
+    private ArrowDoubleData(final BufferAllocator allocator) {
         super(allocator);
     }
 
-    public ArrowDoubleData(final Float8Vector vector) {
+    private ArrowDoubleData(final Float8Vector vector) {
         super(vector);
     }
 

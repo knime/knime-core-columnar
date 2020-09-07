@@ -49,14 +49,27 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.knime.core.columnar.data.VarBinaryData;
+import org.knime.core.columnar.phantom.CloseableCloser;
 
 public class ArrowVarBinaryData extends AbstractFieldVectorData<VarBinaryVector> implements VarBinaryData {
 
-    public ArrowVarBinaryData(final BufferAllocator allocator) {
+    public static ArrowVarBinaryData createEmpty(final BufferAllocator allocator) {
+        final ArrowVarBinaryData data = new ArrowVarBinaryData(allocator);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Var Binary Data");
+        return data;
+    }
+
+    public static ArrowVarBinaryData wrap(final VarBinaryVector vector) {
+        final ArrowVarBinaryData data = new ArrowVarBinaryData(vector);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Var Binary Data");
+        return data;
+    }
+
+    private ArrowVarBinaryData(final BufferAllocator allocator) {
         super(allocator);
     }
 
-    public ArrowVarBinaryData(final VarBinaryVector vector) {
+    private ArrowVarBinaryData(final VarBinaryVector vector) {
         super(vector);
     }
 

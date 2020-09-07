@@ -49,14 +49,27 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.IntVector;
 import org.knime.core.columnar.data.IntData;
+import org.knime.core.columnar.phantom.CloseableCloser;
 
 public class ArrowIntData extends AbstractFieldVectorData<IntVector> implements IntData {
 
-    public ArrowIntData(final BufferAllocator allocator) {
+    public static ArrowIntData createEmpty(final BufferAllocator allocator) {
+        final ArrowIntData data = new ArrowIntData(allocator);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Int Data");
+        return data;
+    }
+
+    public static ArrowIntData wrap(final IntVector vector) {
+        final ArrowIntData data = new ArrowIntData(vector);
+        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Int Data");
+        return data;
+    }
+
+    private ArrowIntData(final BufferAllocator allocator) {
         super(allocator);
     }
 
-    public ArrowIntData(final IntVector vector) {
+    private ArrowIntData(final IntVector vector) {
         super(vector);
     }
 

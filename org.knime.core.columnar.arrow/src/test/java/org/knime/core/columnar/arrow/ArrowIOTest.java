@@ -85,13 +85,13 @@ public class ArrowIOTest extends AbstractArrowTest {
         File tmp = createTmpFile();
         ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, m_alloc, 1024);
 
-        final ArrowDoubleData data = new ArrowDoubleData(m_alloc);
+        final ArrowDoubleData data = ArrowDoubleData.createEmpty(m_alloc);
         data.ensureCapacity(1024);
         data.setNumValues(1024);
         writer.write(new ColumnData[]{data});
         data.release();
 
-        final ArrowDoubleData dataShort = new ArrowDoubleData(m_alloc);
+        final ArrowDoubleData dataShort = ArrowDoubleData.createEmpty(m_alloc);
         dataShort.ensureCapacity(1024);
         dataShort.setNumValues(42);
         writer.write(new ColumnData[]{dataShort});
@@ -120,7 +120,7 @@ public class ArrowIOTest extends AbstractArrowTest {
         for (int c = 0; c < 32; c++) {
             final ArrowDoubleData[] data = new ArrowDoubleData[m_schema.getNumColumns()];
             for (int i = 0; i < m_schema.getNumColumns(); i++) {
-                data[i] = new ArrowDoubleData(m_alloc);
+                data[i] = ArrowDoubleData.createEmpty(m_alloc);
                 data[i].ensureCapacity(1024);
                 for (int j = 0; j < 1024; j++) {
                     if (j % 13 == 0) {
