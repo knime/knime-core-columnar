@@ -85,10 +85,4 @@ public class ArrowLongData extends AbstractFieldVectorData<BigIntVector> impleme
         // TODO we can speed things likely up directly accessing validity buffer
         BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
     }
-
-    @Override
-    public double getDouble(final int index) {
-        return m_vector.get(index);
-    }
-
 }
