@@ -309,6 +309,9 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
     @Override
     public ColumnDataFactory getFactory() {
+        if (m_writerClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+        }
         if (m_storeClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
@@ -318,6 +321,9 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
     @Override
     public ColumnDataWriter getWriter() {
+        if (m_writerClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+        }
         if (m_storeClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }

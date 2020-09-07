@@ -49,7 +49,8 @@ import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOS
 import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
 
 import java.io.IOException;
-import java.util.Map;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
@@ -69,8 +70,6 @@ import org.knime.core.columnar.chunk.ColumnSelection;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class CachedColumnReadStore implements ColumnReadStore {
-
-    private static final Object DUMMY = new Object();
 
     private final class CachedColumnStoreReader implements ColumnDataReader {
 
@@ -105,7 +104,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
             for (int i : m_indices) {
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(CachedColumnReadStore.this, i, chunkIndex);
                 batch[i] = m_globalCache.getRetained(ccUID, () -> {
-                    m_cachedData.put(ccUID, DUMMY);
+                    m_cachedData.add(ccUID);
                     try {
                         final ColumnData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex)[i];
                         data.retain();
@@ -142,7 +141,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 
     private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_globalCache;
 
-    private final Map<ColumnDataUniqueId, Object> m_cachedData = new ConcurrentHashMap<>();
+    private final Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
     private volatile boolean m_storeClosed;
@@ -168,7 +167,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 
     @Override
     public void close() {
-        for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
+        for (final ColumnDataUniqueId id : m_cachedData) {
             final ColumnData removed = m_globalCache.removeRetained(id);
             if (removed != null) {
                 removed.release();

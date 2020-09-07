@@ -205,14 +205,15 @@ public final class SmallColumnStore implements ColumnStore {
 
     private final class SmallColumnStoreReader implements ColumnDataReader {
 
-        private final ColumnSelection m_selection;
+        private final int[] m_indices;
 
         private final Table m_table;
 
         private boolean m_readerClosed;
 
         SmallColumnStoreReader(final ColumnSelection selection, final Table table) {
-            m_selection = selection;
+            m_indices = selection != null && selection.get() != null ? selection.get()
+                : IntStream.range(0, getSchema().getNumColumns()).toArray();
             m_table = table;
         }
 
@@ -225,12 +226,12 @@ public final class SmallColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final ColumnData[] batch = m_table.getBatch(chunkIndex);
+            final ColumnData[] batch = new ColumnData[getSchema().getNumColumns()];
 
-            final int[] indices = m_selection != null && m_selection.get() != null ? m_selection.get()
-                : IntStream.range(0, getSchema().getNumColumns()).toArray();
-            for (final int i : indices) {
+            for (final int i : m_indices) {
+                batch[i] = m_table.getBatch(chunkIndex)[i];
                 batch[i].retain();
+
             }
             return batch;
         }
@@ -293,6 +294,9 @@ public final class SmallColumnStore implements ColumnStore {
 
     @Override
     public ColumnDataFactory getFactory() {
+        if (m_writerClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+        }
         if (m_storeClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
@@ -302,6 +306,9 @@ public final class SmallColumnStore implements ColumnStore {
 
     @Override
     public SmallColumnStoreWriter getWriter() {
+        if (m_writerClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+        }
         if (m_storeClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
