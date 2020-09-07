@@ -46,8 +46,10 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ColumnDataSpec;
+import org.knime.core.columnar.NullableColumnData;
 
-public interface ByteData extends NumericReadData {
+public interface ByteData extends NullableColumnData {
+
     byte getByte(int index);
 
     void setByte(int index, byte val);

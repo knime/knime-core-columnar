@@ -46,8 +46,9 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ColumnDataSpec;
+import org.knime.core.columnar.NullableColumnData;
 
-public interface IntData extends NumericReadData {
+public interface IntData extends NullableColumnData {
     int getInt(int index);
 
     void setInt(int index, int integer);
