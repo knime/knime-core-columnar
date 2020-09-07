@@ -54,6 +54,8 @@ import org.knime.core.columnar.cache.CachedColumnReadStore;
 import org.knime.core.columnar.cache.CachedColumnStoreCache;
 import org.knime.core.columnar.cache.SmallColumnStore;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
+import org.knime.core.columnar.phantom.PhantomReferenceReadStore;
+import org.knime.core.columnar.phantom.PhantomReferenceStore;
 
 public class ColumnStoreUtils {
 
@@ -88,12 +90,12 @@ public class ColumnStoreUtils {
     }
 
     public static ColumnStore cache(final ColumnStore store) {
-        return new SmallColumnStore(new AsyncFlushCachedColumnStore(store, COLUMN_DATA_CACHE, ASYNC_FLUSH_EXECUTOR),
-            SMALL_TABLES_CACHE);
+        return PhantomReferenceStore.create(new SmallColumnStore(
+            new AsyncFlushCachedColumnStore(store, COLUMN_DATA_CACHE, ASYNC_FLUSH_EXECUTOR), SMALL_TABLES_CACHE));
     }
 
     public static ColumnReadStore cache(final ColumnReadStore store) {
-        return new CachedColumnReadStore(store, COLUMN_DATA_CACHE);
+        return PhantomReferenceReadStore.create(new CachedColumnReadStore(store, COLUMN_DATA_CACHE));
     }
 
 }

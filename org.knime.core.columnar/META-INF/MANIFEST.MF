@@ -13,4 +13,4 @@ Export-Package: org.knime.core.columnar,
  org.knime.core.columnar.cache,
  org.knime.core.columnar.chunk,
  org.knime.core.columnar.data,
- org.knime.core.columnar.domain
+ org.knime.core.columnar.phantom
