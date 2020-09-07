@@ -45,14 +45,34 @@
  */
 package org.knime.core.columnar;
 
+import java.io.Closeable;
+
 import org.knime.core.columnar.data.DoubleData;
+import org.knime.core.columnar.phantom.CloseableCloser;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class TestDoubleColumnData implements DoubleData {
+public final class TestDoubleColumnData implements DoubleData {
+
+    public static final class Delegate implements Closeable {
+
+        private boolean m_closed = false;
+
+        @Override
+        public void close() {
+            m_closed = true;
+        }
+
+        public boolean isClosed() {
+            return m_closed;
+        }
+
+    }
+
+    private final Delegate m_delegate = new Delegate();
 
     private int m_chunkCapacity;
 
@@ -62,10 +82,24 @@ public class TestDoubleColumnData implements DoubleData {
 
     private int m_numValues;
 
-    TestDoubleColumnData() {
+    private CloseableCloser m_closed;
+
+    public static TestDoubleColumnData create() {
+        final TestDoubleColumnData data = new TestDoubleColumnData();
+        data.m_closed = CloseableCloser.create(data, data.m_delegate, "Test Column Data");
+        return data;
     }
 
-    TestDoubleColumnData(final Double[] doubles) {
+    private TestDoubleColumnData() {
+    }
+
+    public static TestDoubleColumnData create(final Double... doubles) {
+        final TestDoubleColumnData data = new TestDoubleColumnData(doubles);
+        data.m_closed = CloseableCloser.create(data, data.m_delegate, "Test Column Data");
+        return data;
+    }
+
+    private TestDoubleColumnData(final Double[] doubles) {
         m_chunkCapacity = doubles.length;
         m_values = doubles;
         m_numValues = doubles.length;
@@ -74,7 +108,7 @@ public class TestDoubleColumnData implements DoubleData {
     @Override
     public synchronized void release() {
         if (--m_refs == 0) {
-            m_values = null;
+            close();
         }
     }
 
@@ -135,6 +169,14 @@ public class TestDoubleColumnData implements DoubleData {
 
     public synchronized int getRefs() {
         return m_refs;
+    }
+
+    public void close() {
+        m_closed.close();
+    }
+
+    public Delegate getDelegate() {
+        return m_delegate;
     }
 
 }

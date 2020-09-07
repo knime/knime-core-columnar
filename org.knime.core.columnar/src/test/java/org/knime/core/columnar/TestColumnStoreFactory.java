@@ -51,7 +51,7 @@ import java.io.File;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public class TestColumnStoreFactory implements ColumnStoreFactory {
+public final class TestColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
     public ColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int chunkCapacity) {

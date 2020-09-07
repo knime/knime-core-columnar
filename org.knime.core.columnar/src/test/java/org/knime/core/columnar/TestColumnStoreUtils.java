@@ -51,6 +51,8 @@ package org.knime.core.columnar;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -65,34 +67,47 @@ import org.knime.core.columnar.chunk.ColumnSelectionUtil;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class TestColumnStoreUtils {
+public final class TestColumnStoreUtils {
 
-    private static final int DEF_TABLE_HEIGHT = 2;
+    private static double RUNNING_DOUBLE = 0d;
 
-    private static final int DEF_TABLE_WIDTH = 2;
+    public static final class TestTable implements Closeable {
+        private final List<TestDoubleColumnData[]> m_batches;
 
-    private static final int DEF_SIZE_OF_COLUMN_DATA = 1;
+        public TestTable(final List<TestDoubleColumnData[]> batches) {
+            m_batches = batches;
+        }
 
-    public static final int DEF_SIZE_OF_TABLE = DEF_TABLE_HEIGHT * DEF_TABLE_WIDTH * DEF_SIZE_OF_COLUMN_DATA;
+        public TestDoubleColumnData[] getBatch(final int index) {
+            return m_batches.get(index);
+        }
+
+        @Override
+        public void close() throws IOException {
+            for (TestDoubleColumnData[] batch : m_batches) {
+                for (TestDoubleColumnData data : batch) {
+                    if (data != null) {
+                        data.release();
+                    }
+                }
+            }
+        }
+
+        private int size() {
+            return m_batches.size();
+        }
+    }
+
+    private static final int DEF_NUM_COLUMNS = 2;
+
+    private static final int DEF_NUM_BATCHES = 2;
+
+    public static final int DEF_SIZE_OF_DATA = 2;
+
+    public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * DEF_NUM_COLUMNS * DEF_SIZE_OF_DATA;
 
     private TestColumnStoreUtils() {
         // Utility class
-    }
-
-    public static List<TestDoubleColumnData[]> generateDefaultTable() {
-        return createTable(DEF_TABLE_HEIGHT, DEF_TABLE_WIDTH, DEF_SIZE_OF_COLUMN_DATA);
-    }
-
-    public static List<TestDoubleColumnData[]> generateDoubleSizedDefaultTable() {
-        return createTable(DEF_TABLE_HEIGHT * 2, DEF_TABLE_WIDTH, DEF_SIZE_OF_COLUMN_DATA);
-    }
-
-    public static ColumnStoreSchema generateDefaultSchema() {
-        return createSchema(DEF_TABLE_WIDTH);
-    }
-
-    public static ColumnStore generateDefaultTestColumnStore() {
-        return new TestColumnStore(generateDefaultSchema(), DEF_SIZE_OF_COLUMN_DATA);
     }
 
     public static ColumnStoreSchema createSchema(final int numColumns) {
@@ -109,18 +124,43 @@ public class TestColumnStoreUtils {
         };
     }
 
-    public static int checkRefs(final List<TestDoubleColumnData[]> table) {
-        if (table.size() == 0) {
-            return 0;
-        }
-        final int refs = checkRefs(table.get(0));
-        for (final TestDoubleColumnData[] batch : table) {
-            assertEquals(refs, checkRefs(batch));
-        }
-        return refs;
+    public static ColumnStoreSchema generateDefaultSchema() {
+        return createSchema(DEF_NUM_COLUMNS);
     }
 
-    public static int checkRefs(final TestDoubleColumnData[] batch) {
+    public static TestColumnStore generateDefaultTestColumnStore() {
+        return new TestColumnStore(generateDefaultSchema(), DEF_SIZE_OF_DATA);
+    }
+
+    private static TestDoubleColumnData[] createBatch(final ColumnStore store) {
+        final TestDoubleColumnData[] batch = (TestDoubleColumnData[])store.getFactory().create();
+
+        for (final TestDoubleColumnData data : batch) {
+            for (int i = 0; i < data.getMaxCapacity(); i++) {
+                data.setDouble(i, RUNNING_DOUBLE++);
+            }
+            data.setNumValues(data.getMaxCapacity());
+        }
+
+        return batch;
+    }
+
+    public static TestTable createTable(final ColumnStore store, final int numBatches) {
+        final TestTable table = new TestTable(
+            IntStream.range(0, numBatches).mapToObj(i -> createBatch(store)).collect(Collectors.toList()));
+        assertEquals(1, checkRefs(table));
+        return table;
+    }
+
+    public static TestTable generateDefaultTable(final ColumnStore store) {
+        return createTable(store, DEF_NUM_BATCHES);
+    }
+
+    public static TestTable generateDoubleSizedDefaultTable(final ColumnStore store) {
+        return createTable(store, 2 * DEF_NUM_BATCHES);
+    }
+
+    private static int checkRefs(final TestDoubleColumnData[] batch) {
         if (batch.length == 0) {
             return 0;
         }
@@ -131,20 +171,48 @@ public class TestColumnStoreUtils {
         return refs;
     }
 
-    public static List<TestDoubleColumnData[]> readAndCompareTable(final ColumnStore store,
-        final List<TestDoubleColumnData[]> table) throws Exception {
+    public static int checkRefs(final TestTable table) {
+        if (table.size() == 0) {
+            return 0;
+        }
+        final int refs = checkRefs(table.getBatch(0));
+        for (int i = 0; i < table.size(); i++) {
+            assertEquals(refs, checkRefs(table.getBatch(i)));
+        }
+        return refs;
+    }
+
+    public static void writeTable(final ColumnStore store, final TestTable table) throws IOException {
+        try (final ColumnDataWriter writer = store.getWriter()) {
+            for (int i = 0; i < table.size(); i++) {
+                writer.write(table.getBatch(i));
+            }
+        }
+    }
+
+    public static boolean tableInStore(final ColumnStore store, final TestTable table) throws IOException {
+        try (final ColumnDataReader reader = store.createReader()) {
+        } catch (IllegalStateException e) {
+            return false;
+        }
+        try (final TestTable reassembledTable = readAndCompareTable(store, table)) {
+        }
+        return true;
+    }
+
+    public static TestTable readAndCompareTable(final ColumnStore store, final TestTable table) throws IOException {
         return readSelectionAndCompareTable(store, table, null);
     }
 
-    public static List<TestDoubleColumnData[]> readSelectionAndCompareTable(final ColumnStore store,
-        final List<TestDoubleColumnData[]> table, final int... indices) throws Exception {
+    public static TestTable readSelectionAndCompareTable(final ColumnStore store, final TestTable table,
+        final int... indices) throws IOException {
 
         try (final ColumnDataReader reader = store.createReader(ColumnSelectionUtil.create(indices))) {
             assertEquals(table.size(), reader.getNumChunks());
 
             final List<TestDoubleColumnData[]> result = new ArrayList<>();
             for (int i = 0; i < reader.getNumChunks(); i++) {
-                final TestDoubleColumnData[] written = table.get(i);
+                final TestDoubleColumnData[] written = table.getBatch(i);
                 final TestDoubleColumnData[] batch = Arrays.stream(reader.read(i))
                     .map(data -> (TestDoubleColumnData)data).toArray(TestDoubleColumnData[]::new);
 
@@ -153,72 +221,42 @@ public class TestColumnStoreUtils {
                 if (indices == null) {
                     for (int j = 0; j < written.length; j++) {
                         assertArrayEquals(written[j].get(), (batch[j]).get());
-                        batch[j].release();
                     }
                 } else {
                     for (int j = 0; j < indices.length; j++) {
                         assertArrayEquals(written[indices[j]].get(), (batch[indices[j]]).get());
-                        batch[j].release();
                     }
                 }
 
                 result.add(batch);
             }
-            return result;
+            return new TestTable(result);
         }
     }
 
-    public static void readTwiceAndCompareTable(final ColumnStore store) throws Exception {
+    public static void readTwiceAndCompareTable(final ColumnStore store) throws IOException {
         try (final ColumnDataReader reader1 = store.createReader();
                 final ColumnDataReader reader2 = store.createReader()) {
             assertEquals(reader1.getNumChunks(), reader2.getNumChunks());
             for (int i = 0; i < reader1.getNumChunks(); i++) {
-                final ColumnData[] batch1 = reader1.read(i);
-                final ColumnData[] batch2 = reader2.read(i);
-                assertArrayEquals(batch1, batch2);
+                final TestDoubleColumnData[] batch1 = Arrays.stream(reader1.read(i))
+                    .map(data -> (TestDoubleColumnData)data).toArray(TestDoubleColumnData[]::new);
+                final TestDoubleColumnData[] batch2 = Arrays.stream(reader2.read(i))
+                    .map(data -> (TestDoubleColumnData)data).toArray(TestDoubleColumnData[]::new);
+
+                assertEquals(batch1.length, batch2.length);
+                for (int j = 0; j < batch1.length; j++) {
+                    assertArrayEquals(batch1[j].get(), (batch2[j]).get());
+                }
+
                 for (final ColumnData data : batch1) {
                     data.release();
+                }
+                for (final ColumnData data : batch2) {
                     data.release();
                 }
             }
         }
-    }
-
-    public static boolean tableInStore(final ColumnStore store, final List<TestDoubleColumnData[]> table)
-        throws Exception {
-        try (final ColumnDataReader reader = store.createReader()) {
-        } catch (IllegalStateException e) {
-            return false;
-        }
-        readAndCompareTable(store, table);
-        return true;
-    }
-
-    public static void writeTable(final ColumnStore store, final List<TestDoubleColumnData[]> table) throws Exception {
-        try (final ColumnDataWriter writer = store.getWriter()) {
-            for (final ColumnData[] batch : table) {
-                writer.write(batch);
-            }
-        }
-    }
-
-    public static List<TestDoubleColumnData[]> createTable(final int height, final int width, final int size) {
-        return IntStream.range(0, height).mapToObj(i -> createBatch(width, size)).collect(Collectors.toList());
-    }
-
-    public static TestDoubleColumnData[] createBatch(final int width, final int size) {
-        final TestDoubleColumnData[] batch =
-            IntStream.range(0, width).mapToObj(i -> new TestDoubleColumnData()).toArray(TestDoubleColumnData[]::new);
-
-        for (final TestDoubleColumnData data : batch) {
-            data.ensureCapacity(size);
-            for (int i = 0; i < size; i++) {
-                data.setDouble(0, i);
-            }
-            data.setNumValues(size);
-        }
-
-        return batch;
     }
 
 }

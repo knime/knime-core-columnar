@@ -55,6 +55,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
@@ -68,7 +70,7 @@ import org.knime.core.columnar.chunk.ColumnSelection;
 @SuppressWarnings("javadoc")
 public final class TestColumnStore implements ColumnStore {
 
-    private final class TestColumnDataFactory implements ColumnDataFactory {
+    final class TestColumnDataFactory implements ColumnDataFactory {
 
         @Override
         public ColumnData[] create() {
@@ -76,9 +78,10 @@ public final class TestColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final ColumnData[] data = new ColumnData[m_schema.getNumColumns()];
+            final TestDoubleColumnData[] data = new TestDoubleColumnData[m_schema.getNumColumns()];
+            m_tracker.add(data);
             for (int i = 0; i < m_schema.getNumColumns(); i++) {
-                data[i] = new TestDoubleColumnData();
+                data[i] = TestDoubleColumnData.create();
                 data[i].ensureCapacity(m_maxDataCapacity);
             }
             return data;
@@ -86,7 +89,7 @@ public final class TestColumnStore implements ColumnStore {
 
     }
 
-    private final class TestColumnDataWriter implements ColumnDataWriter {
+    final class TestColumnDataWriter implements ColumnDataWriter {
 
         @Override
         public void write(final ColumnData[] batch) throws IOException {
@@ -116,9 +119,17 @@ public final class TestColumnStore implements ColumnStore {
 
     }
 
-    private final class TestColumnDataReader implements ColumnDataReader {
+    final class TestColumnDataReader implements ColumnDataReader {
+
+        private final int[] m_indices;
 
         private boolean m_readerClosed;
+
+        TestColumnDataReader(final ColumnSelection selection) {
+            m_indices = selection != null && selection.get() != null ? selection.get()
+                : IntStream.range(0, getSchema().getNumColumns()).toArray();
+            m_numOpenReaders.incrementAndGet();
+        }
 
         @Override
         public ColumnData[] read(final int chunkIndex) throws IOException {
@@ -130,12 +141,13 @@ public final class TestColumnStore implements ColumnStore {
             }
 
             final Double[][] data = m_batches.get(chunkIndex);
-            final TestDoubleColumnData[] columnData = new TestDoubleColumnData[data.length];
-            m_tracker.add(columnData);
-            for (int i = 0; i < data.length; i++) {
-                columnData[i] = new TestDoubleColumnData(data[i]);
+
+            final TestDoubleColumnData[] batch = new TestDoubleColumnData[data.length];
+            m_tracker.add(batch);
+            for (final int i : m_indices) {
+                batch[i] = TestDoubleColumnData.create(data[i]);
             }
-            return columnData;
+            return batch;
         }
 
         @Override
@@ -151,6 +163,7 @@ public final class TestColumnStore implements ColumnStore {
         @Override
         public void close() {
             m_readerClosed = true;
+            m_numOpenReaders.decrementAndGet();
         }
 
     }
@@ -163,9 +176,11 @@ public final class TestColumnStore implements ColumnStore {
 
     private final ColumnDataWriter m_writer = new TestColumnDataWriter();
 
-    private final List<Double[][]> m_batches = new ArrayList<Double[][]>();
+    private final List<Double[][]> m_batches = new ArrayList<>();
 
-    private final List<TestDoubleColumnData[]> m_tracker = new ArrayList<TestDoubleColumnData[]>();
+    private final List<TestDoubleColumnData[]> m_tracker = new ArrayList<>();
+
+    private final AtomicInteger m_numOpenReaders = new AtomicInteger();
 
     // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
     private volatile boolean m_writerClosed;
@@ -214,7 +229,7 @@ public final class TestColumnStore implements ColumnStore {
     }
 
     @Override
-    public ColumnDataReader createReader(final ColumnSelection config) {
+    public ColumnDataReader createReader(final ColumnSelection selection) {
         if (!m_writerClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }
@@ -222,7 +237,7 @@ public final class TestColumnStore implements ColumnStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        return new TestColumnDataReader();
+        return new TestColumnDataReader(selection);
     }
 
     @Override
@@ -232,11 +247,23 @@ public final class TestColumnStore implements ColumnStore {
         // check if all memory has been released before closing this store.
         for (final TestDoubleColumnData[] chunk : m_tracker) {
             for (final TestDoubleColumnData data : chunk) {
-                if (data.getRefs() != 0) {
+                if (data != null && data.getRefs() != 0) {
                     throw new IllegalStateException("Data not closed.");
                 }
             }
         }
+    }
+
+    public boolean isStoreClosed() {
+        return m_storeClosed;
+    }
+
+    public boolean isWriterClosed() {
+        return m_writerClosed;
+    }
+
+    public int getNumOpenReaders() {
+        return m_numOpenReaders.get();
     }
 
 }
