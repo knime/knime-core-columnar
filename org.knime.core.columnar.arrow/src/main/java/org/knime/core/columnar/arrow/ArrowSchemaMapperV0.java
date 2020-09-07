@@ -50,6 +50,7 @@ import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -61,6 +62,7 @@ import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
 import org.knime.core.columnar.arrow.data.ArrowIntData;
 import org.knime.core.columnar.arrow.data.ArrowLongData;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData;
 import org.knime.core.columnar.arrow.data.ArrowVarCharData;
 import org.knime.core.columnar.data.BinarySupplData;
 import org.knime.core.columnar.data.BinarySupplData.BinarySupplDataSpec;
@@ -72,6 +74,8 @@ import org.knime.core.columnar.data.LongData;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.StringData;
 import org.knime.core.columnar.data.StringData.StringDataSpec;
+import org.knime.core.columnar.data.VarBinaryData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 
 final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
 
@@ -104,6 +108,8 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
             return arrowSpec;
         } else if (spec instanceof LongDataSpec) {
             return new ArrowLongDataSpec();
+        } else if (spec instanceof VarBinaryDataSpec) {
+            return new ArrowVarBinaryDataSpec();
         }
         throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
 
@@ -142,6 +148,19 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         @Override
         public IntData wrap(final FieldVector vector, final DictionaryProvider provider) {
             return new ArrowIntData((IntVector)vector);
+        }
+    }
+
+    static class ArrowVarBinaryDataSpec implements ArrowColumnDataSpec<VarBinaryData> {
+
+        @Override
+        public VarBinaryData createEmpty(final BufferAllocator allocator) {
+            return new ArrowVarBinaryData(allocator);
+        }
+
+        @Override
+        public VarBinaryData wrap(final FieldVector vector, final DictionaryProvider provider) {
+            return new ArrowVarBinaryData((VarBinaryVector)vector);
         }
     }
 
