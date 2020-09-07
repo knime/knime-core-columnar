@@ -45,12 +45,13 @@
  */
 package org.knime.core.columnar;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnSelection;
 
-public interface ColumnReadStore extends AutoCloseable {
+public interface ColumnReadStore extends Closeable {
     ColumnDataReader createReader(ColumnSelection config);
 
     default ColumnDataReader createReader() {

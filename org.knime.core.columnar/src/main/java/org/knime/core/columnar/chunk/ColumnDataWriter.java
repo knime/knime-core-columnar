@@ -45,11 +45,12 @@
  */
 package org.knime.core.columnar.chunk;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 import org.knime.core.columnar.ColumnData;
 
-public interface ColumnDataWriter extends AutoCloseable {
+public interface ColumnDataWriter extends Closeable {
     void write(final ColumnData[] record) throws IOException;
 
     @Override

@@ -45,11 +45,12 @@
  */
 package org.knime.core.columnar.chunk;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 import org.knime.core.columnar.ColumnData;
 
-public interface ColumnDataReader extends AutoCloseable {
+public interface ColumnDataReader extends Closeable {
 
     ColumnData[] read(int chunkIndex) throws IOException;
 

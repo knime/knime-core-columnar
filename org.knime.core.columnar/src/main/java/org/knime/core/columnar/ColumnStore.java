@@ -45,7 +45,7 @@
  */
 package org.knime.core.columnar;
 
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore, AutoCloseable {
+public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
     @Override
     ColumnStoreSchema getSchema();
 }
