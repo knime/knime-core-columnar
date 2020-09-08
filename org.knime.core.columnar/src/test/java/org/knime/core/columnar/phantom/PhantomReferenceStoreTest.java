@@ -85,6 +85,7 @@ public class PhantomReferenceStoreTest {
     public void setup() {
         CloseableCloser.OPEN_FINALIZERS.clear();
         System.gc();
+        CloseableCloser.poll();
     }
 
     @Rule
