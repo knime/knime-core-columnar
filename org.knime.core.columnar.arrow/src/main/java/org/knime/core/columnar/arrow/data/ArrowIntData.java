@@ -95,6 +95,11 @@ public class ArrowIntData extends AbstractFieldVectorData<IntVector> implements 
     }
 
     @Override
+    public double getDouble(final int index) {
+        return m_vector.get(index);
+    }
+
+    @Override
     public void ensureCapacityInternal(final int chunkSize) {
         m_vector.allocateNew(chunkSize);
     }
