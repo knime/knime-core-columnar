@@ -137,9 +137,12 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
         // TODO only set if any value is set.
         if (m_binarySuppl.get().getLastSet() != 0 && m_vector instanceof CustomStructVector) {
             ((CustomStructVector)m_vector).putChild("BinarySuppl", m_binarySuppl.get());
+            m_binarySuppl.setNumValues(numValues);
         } else {
             m_binarySuppl.get().clear();
         }
+        m_chunk.setNumValues(numValues);
+        // TODO: needed?
         m_vector.setValueCount(numValues);
     }
 
