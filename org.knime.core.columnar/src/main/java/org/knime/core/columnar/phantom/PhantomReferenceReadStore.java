@@ -128,9 +128,9 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
 
         @Override
         public void close() throws IOException {
-            m_delegate.close();
             m_closed.close();
             m_openReaders.remove(this);
+            m_delegate.close();
         }
 
     }
@@ -175,11 +175,11 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
 
     @Override
     public void close() throws IOException {
-        m_delegate.close();
         m_closed.close();
         for (final Reader reader : m_openReaders) {
-            reader.close();
+            reader.m_closed.closeCloseableAndSelf();
         }
+        m_delegate.close();
     }
 
 }

@@ -228,11 +228,11 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
         @Override
         public void close() throws IOException {
+            m_readerClosed = true;
+            m_batchLoader.close();
             if (m_delegateReader != null) {
                 m_delegateReader.close();
             }
-            m_batchLoader.close();
-            m_readerClosed = true;
         }
 
     }

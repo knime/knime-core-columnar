@@ -184,6 +184,7 @@ public final class SmallColumnStore implements ColumnStore {
 
         @Override
         public void close() throws IOException {
+            m_writerClosed = true;
             if (m_table != null) {
                 m_globalCache.put(SmallColumnStore.this, m_table, (store, table) -> {
                     try {
@@ -198,7 +199,6 @@ public final class SmallColumnStore implements ColumnStore {
             } else {
                 closeDelegateWriter();
             }
-            m_writerClosed = true;
         }
 
     }
@@ -238,8 +238,8 @@ public final class SmallColumnStore implements ColumnStore {
 
         @Override
         public void close() throws IOException {
-            m_table.release();
             m_readerClosed = true;
+            m_table.release();
         }
 
         @Override
@@ -368,12 +368,12 @@ public final class SmallColumnStore implements ColumnStore {
 
     @Override
     public void close() throws IOException {
+        m_storeClosed = true;
         final Table removed = m_globalCache.removeRetained(SmallColumnStore.this);
         if (removed != null) {
             removed.release();
         }
         m_delegate.close();
-        m_storeClosed = true;
     }
 
 }
