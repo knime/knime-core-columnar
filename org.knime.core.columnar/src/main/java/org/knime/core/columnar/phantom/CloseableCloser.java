@@ -148,7 +148,7 @@ public final class CloseableCloser extends PhantomReference<Object> implements C
         return m_closed.get();
     }
 
-    private void closeCloseableAndSelf() throws IOException {
+    void closeCloseableAndSelf() throws IOException {
         if (!isClosed()) {
             System.err.println(String.format("%s resource was not closed.", m_resourceName));
             System.err.println(String.format("Construction time call stack: %s", m_stackTraceAtConstructionTime));
