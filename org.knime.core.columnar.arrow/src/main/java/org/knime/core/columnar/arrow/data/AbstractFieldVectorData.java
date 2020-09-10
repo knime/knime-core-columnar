@@ -49,13 +49,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.knime.core.columnar.phantom.CloseableCloser;
 
 abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowData<F> {
 
-    final F m_vector;
-
-    CloseableCloser m_vectorCloser;
+    protected final F m_vector;
 
     private final AtomicInteger m_refCounter = new AtomicInteger(1);
 
@@ -65,7 +62,7 @@ abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowDa
         m_vector = create(allocator);
     }
 
-    abstract F create(BufferAllocator allocator);
+    protected abstract F create(BufferAllocator allocator);
 
     AbstractFieldVectorData(final F vector) {
         m_vector = vector;
@@ -111,9 +108,6 @@ abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowDa
     public synchronized void release() {
         if (m_refCounter.decrementAndGet() == 0) {
             m_vector.close();
-            if (m_vectorCloser != null) {
-                m_vectorCloser.close();
-            }
         }
     }
 

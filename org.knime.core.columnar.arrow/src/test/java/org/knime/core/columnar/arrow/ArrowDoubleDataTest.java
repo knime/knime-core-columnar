@@ -91,7 +91,7 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
 
     @Test
     public void testAlloc() {
-        ArrowDoubleData data = ArrowDoubleData.createEmpty(m_alloc);
+        ArrowDoubleData data = new ArrowDoubleData(m_alloc);
         data.ensureCapacity(1024);
         assertTrue(data.get().getValueCapacity() > 1024);
 
@@ -111,7 +111,7 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
 
     @Test
     public void testSizeOf() {
-        ArrowDoubleData data = ArrowDoubleData.createEmpty(m_alloc);
+        ArrowDoubleData data = new ArrowDoubleData(m_alloc);
         data.ensureCapacity(1024);
         // actual size can be bigger than ensured capacity.
         assertEquals(data.sizeOf(), data.get().getDataBuffer().capacity() + data.get().getValidityBuffer().capacity());
@@ -122,7 +122,7 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
     public void testIOWithMissing() throws Exception {
         File tmp = createTmpFile();
         ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, m_alloc, 1024);
-        ArrowDoubleData data = ArrowDoubleData.createEmpty(m_alloc);
+        ArrowDoubleData data = new ArrowDoubleData(m_alloc);
         data.ensureCapacity(1024);
         for (int i = 0; i < 1024; i++) {
             if (i % 13 == 0) {
@@ -158,7 +158,7 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
 
     @Test
     public void testIdentityWithMissing() {
-        ArrowDoubleData data = ArrowDoubleData.createEmpty(m_alloc);
+        ArrowDoubleData data = new ArrowDoubleData(m_alloc);
         data.ensureCapacity(1024);
         for (int i = 0; i < data.getMaxCapacity(); i++) {
             if (i % 13 == 0) {

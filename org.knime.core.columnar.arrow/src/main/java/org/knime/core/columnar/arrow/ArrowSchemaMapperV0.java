@@ -118,36 +118,36 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
     static class ArrowLongDataSpec implements ArrowColumnDataSpec<LongData> {
         @Override
         public LongData createEmpty(final BufferAllocator allocator) {
-            return ArrowLongData.createEmpty(allocator);
+            return new ArrowLongData(allocator);
         }
 
         @Override
         public LongData wrap(final FieldVector vector, final DictionaryProvider provider) {
-            return ArrowLongData.wrap((BigIntVector)vector);
+            return new ArrowLongData((BigIntVector)vector);
         }
     }
 
     static class ArrowDoubleDataSpec implements ArrowColumnDataSpec<DoubleData> {
         @Override
         public DoubleData createEmpty(final BufferAllocator allocator) {
-            return ArrowDoubleData.createEmpty(allocator);
+            return new ArrowDoubleData(allocator);
         }
 
         @Override
         public DoubleData wrap(final FieldVector vector, final DictionaryProvider provider) {
-            return ArrowDoubleData.wrap((Float8Vector)vector);
+            return new ArrowDoubleData((Float8Vector)vector);
         }
     }
 
     static class ArrowIntDataSpec implements ArrowColumnDataSpec<IntData> {
         @Override
         public IntData createEmpty(final BufferAllocator allocator) {
-            return ArrowIntData.createEmpty(allocator);
+            return new ArrowIntData(allocator);
         }
 
         @Override
         public IntData wrap(final FieldVector vector, final DictionaryProvider provider) {
-            return ArrowIntData.wrap((IntVector)vector);
+            return new ArrowIntData((IntVector)vector);
         }
     }
 
@@ -155,12 +155,12 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
 
         @Override
         public VarBinaryData createEmpty(final BufferAllocator allocator) {
-            return ArrowVarBinaryData.createEmpty(allocator);
+            return new ArrowVarBinaryData(allocator);
         }
 
         @Override
         public VarBinaryData wrap(final FieldVector vector, final DictionaryProvider provider) {
-            return ArrowVarBinaryData.wrap((VarBinaryVector)vector);
+            return new ArrowVarBinaryData((VarBinaryVector)vector);
         }
     }
 
@@ -178,7 +178,7 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
 
         @Override
         public BinarySupplData<C> createEmpty(final BufferAllocator allocator) {
-            return ArrowBinarySupplementData.createEmpty(allocator, m_arrowChunkSpec.createEmpty(allocator));
+            return new ArrowBinarySupplementData<C>(allocator, m_arrowChunkSpec.createEmpty(allocator));
         }
 
         @Override
@@ -186,7 +186,7 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
             @SuppressWarnings("unchecked")
             final ArrowColumnDataSpec<C> arrowSpec = (ArrowColumnDataSpec<C>)getMapping(m_spec.getChildSpec());
             final C wrapped = arrowSpec.wrap((FieldVector)((StructVector)vector).getChildByOrdinal(0), provider);
-            return ArrowBinarySupplementData.wrap((StructVector)vector, wrapped);
+            return new ArrowBinarySupplementData<>((StructVector)vector, wrapped);
         }
     }
 
@@ -203,19 +203,19 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         @Override
         public StringData createEmpty(final BufferAllocator allocator) {
             if (m_spec.isDictEnabled()) {
-                return ArrowDictEncodedStringData.createEmpty(allocator, id);
+                return new ArrowDictEncodedStringData(allocator, id);
             } else {
-                return ArrowVarCharData.createEmpty(allocator);
+                return new ArrowVarCharData(allocator);
             }
         }
 
         @Override
         public StringData wrap(final FieldVector vector, final DictionaryProvider provider) {
             if (m_spec.isDictEnabled()) {
-                return ArrowDictEncodedStringData.wrap((IntVector)vector, (VarCharVector)provider
+                return new ArrowDictEncodedStringData((IntVector)vector, (VarCharVector)provider
                     .lookup(vector.getField().getFieldType().getDictionary().getId()).getVector());
             } else {
-                return ArrowVarCharData.wrap((VarCharVector)vector);
+                return new ArrowVarCharData((VarCharVector)vector);
             }
         }
     }

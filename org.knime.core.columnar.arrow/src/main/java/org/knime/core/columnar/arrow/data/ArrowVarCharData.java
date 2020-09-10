@@ -58,7 +58,6 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.VarCharVector;
 import org.knime.core.columnar.data.StringData;
-import org.knime.core.columnar.phantom.CloseableCloser;
 
 public class ArrowVarCharData implements StringData, ArrowData<VarCharVector> {
 
@@ -73,29 +72,15 @@ public class ArrowVarCharData implements StringData, ArrowData<VarCharVector> {
 
     private final VarCharVector m_vector;
 
-    CloseableCloser m_vectorCloser;
-
     private int m_numValues;
 
     private int m_maxCapacity;
 
-    public static ArrowVarCharData createEmpty(final BufferAllocator allocator) {
-        final ArrowVarCharData data = new ArrowVarCharData(allocator);
-        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Var Char Data");
-        return data;
-    }
-
-    public static ArrowVarCharData wrap(final VarCharVector vector) {
-        final ArrowVarCharData data = new ArrowVarCharData(vector);
-        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Var Char Data");
-        return data;
-    }
-
-    private ArrowVarCharData(final BufferAllocator allocator) {
+    public ArrowVarCharData(final BufferAllocator allocator) {
         m_vector = new VarCharVector("VarCharVector", allocator);
     }
 
-    private ArrowVarCharData(final VarCharVector vector) {
+    public ArrowVarCharData(final VarCharVector vector) {
         m_vector = vector;
         m_numValues = vector.getValueCount();
     }
@@ -166,9 +151,6 @@ public class ArrowVarCharData implements StringData, ArrowData<VarCharVector> {
     public synchronized void release() {
         if (m_refCounter.decrementAndGet() == 0) {
             m_vector.close();
-            if (m_vectorCloser != null) {
-                m_vectorCloser.close();
-            }
         }
     }
 

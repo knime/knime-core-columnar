@@ -62,7 +62,6 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.data.StringData;
-import org.knime.core.columnar.phantom.CloseableCloser;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -88,11 +87,7 @@ public class ArrowDictEncodedStringData
 
     private VarCharVector m_dictionary;
 
-    CloseableCloser m_dictionaryCloser;
-
     private IntVector m_vector;
-
-    CloseableCloser m_vectorCloser;
 
     private int m_numValues;
 
@@ -100,24 +95,8 @@ public class ArrowDictEncodedStringData
 
     private int m_runningDictIndex;
 
-    public static ArrowDictEncodedStringData createEmpty(final BufferAllocator allocator, final long id) {
-        final ArrowDictEncodedStringData data = new ArrowDictEncodedStringData(allocator, id);
-        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Dict Encoded String Data");
-        return data;
-    }
-
-    public static ArrowDictEncodedStringData wrap(final IntVector vector, final VarCharVector dict) {
-        final ArrowDictEncodedStringData data = new ArrowDictEncodedStringData(vector, dict);
-        data.m_vectorCloser = CloseableCloser.create(data, data.m_vector, "Arrow Dict Encoded String Data Vector");
-        if (dict != null) {
-            data.m_dictionaryCloser =
-                CloseableCloser.create(data, data.m_dictionary, "Arrow Dict Encoded String Data Dictionary");
-        }
-        return data;
-    }
-
     // loaded from disc
-    private ArrowDictEncodedStringData(final IntVector vector, final VarCharVector dict) {
+    public ArrowDictEncodedStringData(final IntVector vector, final VarCharVector dict) {
         try {
             m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
             m_invInMemDict = m_inMemDict.inverse();
@@ -141,7 +120,7 @@ public class ArrowDictEncodedStringData
     }
 
     // on first create
-    private ArrowDictEncodedStringData(final BufferAllocator allocator, final long id) {
+    public ArrowDictEncodedStringData(final BufferAllocator allocator, final long id) {
         this(
             new IntVector("Indices",
                 new FieldType(false, MinorType.INT.getType(), new DictionaryEncoding(id, false, null)), allocator),
@@ -176,8 +155,6 @@ public class ArrowDictEncodedStringData
                     m_dictionary.set(i, encode.array(), 0, encode.limit());
                 }
                 m_dictionary.setValueCount(m_inMemDict.size());
-                m_dictionaryCloser =
-                    CloseableCloser.create(this, m_dictionary, "Arrow Dict Encoded String Data Dictionary");
             } catch (CharacterCodingException e) {
                 // TODO
                 throw new RuntimeException(e);
@@ -231,14 +208,8 @@ public class ArrowDictEncodedStringData
     public void release() {
         if (m_refCounter.decrementAndGet() == 0) {
             m_vector.close();
-            if (m_vectorCloser != null) {
-                m_vectorCloser.close();
-            }
             if (m_dictionary != null) {
                 m_dictionary.close();
-                if (m_dictionaryCloser != null) {
-                    m_dictionaryCloser.close();
-                }
             }
         }
     }
