@@ -50,8 +50,6 @@ package org.knime.core.columnar.phantom;
 
 import static org.knime.core.columnar.phantom.CloseableCloser.stackTraceToString;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 import java.util.Collections;
@@ -62,16 +60,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Implementation of a {@link PhantomReference} for referent objects that work with a {@link Closeable}. It can be used
- * to make sure that if the referent fails to close its Closeable, the Closeable will be closed at some point after the
- * referent has been reclaimed by the garbage collector. It can be used, for instance, to detect memory leaks.
+ * Implementation of a {@link PhantomReference} for referent objects that work with a {@link AutoCloseable Closeable}.
+ * It can be used to make sure that if the referent fails to close its Closeable, the Closeable will be closed at some
+ * point after the referent has been reclaimed by the garbage collector. It can be used, for instance, to detect memory
+ * leaks.
  *
  * <p>
  * The lifecycle and suggested usage of this class is as follows: A new DelegateCloser can be
- * {@link #create(Object, Closeable, String) created} for a referent and should be closed {@link #close() closed} by the
- * referent along with its Closeable. If left unclosed, the DelegateCloser will be enqueued in a {@link ReferenceQueue}
- * once the referent has been reclaimed by the garbage collector. This queue is periodically polled. If any unclosed
- * Closeables are detected, they are closed and an error is logged.
+ * {@link #create(Object, AutoCloseable, String) created} for a referent and should be closed {@link #close() closed} by
+ * the referent along with its Closeable. If left unclosed, the DelegateCloser will be enqueued in a
+ * {@link ReferenceQueue} once the referent has been reclaimed by the garbage collector. This queue is periodically
+ * polled. If any unclosed Closeables are detected, they are closed and an error is logged.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -98,7 +97,7 @@ public final class CloseableDelegateFinalizer extends PhantomReference<Object> i
         while ((finalizer = (CloseableDelegateFinalizer)ENQUEUED_FINALIZERS.poll()) != null) {
             try {
                 finalizer.closeCloseableAndLogOutput();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 System.err.println(String.format("Error when attempting to close open resource: %s.", e.getMessage()));
                 System.err.println(String.format("Stack trace: %s", stackTraceToString(e.getStackTrace())));
             }
@@ -113,9 +112,9 @@ public final class CloseableDelegateFinalizer extends PhantomReference<Object> i
      * @return a new CloseableCloser that, if left unclosed itself, will close the closeable held by the referent once
      *         the garbage collector reclaims the referent
      */
-    public static CloseableDelegateFinalizer create(final Object referent, final Closeable closeable) {
+    public static CloseableDelegateFinalizer create(final Object referent, final AutoCloseable closeable) {
         final CloseableDelegateFinalizer dc =
-            new CloseableDelegateFinalizer(referent, closeable, referent.getClass().getSimpleName());
+            new CloseableDelegateFinalizer(referent, closeable, closeable.getClass().getSimpleName());
         OPEN_FINALIZERS.add(dc);
         return dc;
     }
@@ -124,11 +123,11 @@ public final class CloseableDelegateFinalizer extends PhantomReference<Object> i
      * @param referent referent object that works with a Closeable
      * @param closeable the Closeable which should be closed once the referent has been reclaimed by the garbage
      *            collector
-     * @param name a human-readable String representation of the referent object class
+     * @param name a human-readable String representation of the Closeable class
      * @return a new CloseableCloser that, if left unclosed itself, will close the closeable held by the referent once
      *         the garbage collector reclaims the referent
      */
-    public static CloseableDelegateFinalizer create(final Object referent, final Closeable closeable,
+    public static CloseableDelegateFinalizer create(final Object referent, final AutoCloseable closeable,
         final String name) {
         final CloseableDelegateFinalizer dc = new CloseableDelegateFinalizer(referent, closeable, name);
         OPEN_FINALIZERS.add(dc);
@@ -137,7 +136,8 @@ public final class CloseableDelegateFinalizer extends PhantomReference<Object> i
 
     private final CloseableCloser m_closer;
 
-    private CloseableDelegateFinalizer(final Object referent, final Closeable closeable, final String resourceName) {
+    private CloseableDelegateFinalizer(final Object referent, final AutoCloseable closeable,
+        final String resourceName) {
         super(referent, ENQUEUED_FINALIZERS);
         m_closer = new CloseableCloser(closeable, resourceName);
     }
@@ -154,7 +154,7 @@ public final class CloseableDelegateFinalizer extends PhantomReference<Object> i
     }
 
     @Override
-    public void closeCloseableAndLogOutput() throws IOException {
+    public void closeCloseableAndLogOutput() throws Exception {
         m_closer.closeCloseableAndLogOutput();
         close();
     }

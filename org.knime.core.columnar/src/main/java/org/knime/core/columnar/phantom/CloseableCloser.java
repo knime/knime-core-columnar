@@ -48,17 +48,16 @@
  */
 package org.knime.core.columnar.phantom;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
- * A class for handling potentially unclosed {@link Closeable Closeables} in order to detect and address resource leaks.
+ * A class for handling potentially unclosed {@link AutoCloseable Closeables} in order to detect and address resource
+ * leaks.
  *
  * The lifecycle and suggested usage of this class is as follows: A new CloseableCloser can be
- * {@link #CloseableCloser(Closeable) created} and should be {@link #close() closed} alongside the to-be-monitored
+ * {@link #CloseableCloser(AutoCloseable) created} and should be {@link #close() closed} alongside the to-be-monitored
  * Closeable. If left unclosed, it can be used to manually close the Closeable and log some output for detecting the
  * resource leak.
  *
@@ -70,7 +69,7 @@ public final class CloseableCloser implements CloseableHandler {
         return Arrays.stream(stack).map(StackTraceElement::toString).collect(Collectors.joining("\n  "));
     }
 
-    private final Closeable m_closeable;
+    private final AutoCloseable m_closeable;
 
     private final AtomicBoolean m_closed = new AtomicBoolean();
 
@@ -79,17 +78,17 @@ public final class CloseableCloser implements CloseableHandler {
     private final String m_stackTraceAtConstructionTime = stackTraceToString(Thread.currentThread().getStackTrace());
 
     /**
-     * @param closeable the Closeable that should be handled
+     * @param closeable the closeable that should be handled
      */
-    public CloseableCloser(final Closeable closeable) {
+    public CloseableCloser(final AutoCloseable closeable) {
         this(closeable, closeable.getClass().getSimpleName());
     }
 
     /**
-     * @param closeable the Closeable that should be handled
+     * @param closeable the closeable that should be handled
      * @param resourceName a human-readable String representation of the referent object class
      */
-    public CloseableCloser(final Closeable closeable, final String resourceName) {
+    public CloseableCloser(final AutoCloseable closeable, final String resourceName) {
         m_closeable = closeable;
         m_resourceName = resourceName;
     }
@@ -105,13 +104,14 @@ public final class CloseableCloser implements CloseableHandler {
     }
 
     @Override
-    public void closeCloseableAndLogOutput() throws IOException {
+    public void closeCloseableAndLogOutput() throws Exception {
         if (!isClosed()) {
-            System.err.println(String.format("%s resource was not closed.", m_resourceName));
+            m_closeable.close();
+            System.err.println(String.format(
+                "%s resource was not correctly released by its owner and was only released just now.", m_resourceName));
             System.err.println(String.format("Construction time call stack: %s", m_stackTraceAtConstructionTime));
             System.err.println(
                 String.format("Current call stack: %s", stackTraceToString(Thread.currentThread().getStackTrace())));
-            m_closeable.close();
         }
         close();
     }

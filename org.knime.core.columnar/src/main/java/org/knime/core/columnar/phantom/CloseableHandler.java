@@ -49,10 +49,9 @@
 package org.knime.core.columnar.phantom;
 
 import java.io.Closeable;
-import java.io.IOException;
 
 /**
- * An interface for classes that handle potentially unclosed {@link Closeable Closeables} in order to detect and address
+ * An interface for classes that handle potentially unclosed {@link AutoCloseable Closeables} in order to detect and address
  * resource leaks. Classes implementing this interface should be created and closed alongside the to-be-monitored
  * Closeable. If left unclosed, they can be used to manually close the Closeable and log some output for detecting the
  * resource leak.
@@ -79,8 +78,8 @@ public interface CloseableHandler extends Closeable {
      * Manually close the Closeable handled by this class. Also close self. Log some output for detecting and debugging
      * the potential resource leak.
      *
-     * @throws IOException if an IOException occurs while closing the handled Closeable
+     * @throws Exception if an Exception occurs while closing the handled Closeable
      */
-    void closeCloseableAndLogOutput() throws IOException;
+    void closeCloseableAndLogOutput() throws Exception;
 
 }
