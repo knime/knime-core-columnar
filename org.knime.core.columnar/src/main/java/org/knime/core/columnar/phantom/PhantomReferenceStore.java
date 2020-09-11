@@ -234,9 +234,7 @@ public final class PhantomReferenceStore implements ColumnStore {
     @Override
     public void close() throws IOException {
         m_closed.close();
-        if (!m_writerClosed.isClosed()) {
-            m_writerClosed.closeCloseableAndLogOutput();
-        }
+        m_writer.close();
         m_readStore.close();
         m_delegate.close();
     }

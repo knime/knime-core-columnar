@@ -212,24 +212,6 @@ public class PhantomReferenceStoreTest {
 
     @Test
     @SuppressWarnings("resource")
-    public void testCloseUnclosedReaderOnCloseStore() throws Exception {
-
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore()) {
-            delegate.getWriter().close();
-            final ColumnReadStore store = PhantomReferenceReadStore.create(delegate);
-            store.createReader();
-            assertEquals(1, delegate.getNumOpenReaders());
-            checkOpenFinalizers(2); // read store and reader
-
-            store.close();
-            assertEquals(0, delegate.getNumOpenReaders());
-
-            checkNoOpenFinalizers();
-        }
-    }
-
-    @Test
-    @SuppressWarnings("resource")
     public void testCloseUnclosedDataOnGC() throws Exception {
 
         TestDoubleColumnData data = TestDoubleColumnData.create(0d);

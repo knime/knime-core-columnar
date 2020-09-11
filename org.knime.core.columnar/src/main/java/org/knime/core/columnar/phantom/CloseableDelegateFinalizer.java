@@ -137,8 +137,8 @@ public final class CloseableDelegateFinalizer extends PhantomReference<Object> i
 
     private final CloseableCloser m_closer;
 
-    private CloseableDelegateFinalizer(final Object resource, final Closeable closeable, final String resourceName) {
-        super(resource, ENQUEUED_FINALIZERS);
+    private CloseableDelegateFinalizer(final Object referent, final Closeable closeable, final String resourceName) {
+        super(referent, ENQUEUED_FINALIZERS);
         m_closer = new CloseableCloser(closeable, resourceName);
     }
 

@@ -53,9 +53,6 @@ import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSE
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnReadStore;
@@ -67,12 +64,8 @@ import org.knime.core.columnar.chunk.ColumnSelection;
  * A {@link ColumnReadStore} that delegates all operations to a delegate store. Similarly, any of its created
  * {@link ColumnDataReader readers} delegate their operations to the readers of the delegate store. Invocations of
  * {@link Closeable#close()} on the store or any of its created readers are also delegated. The purpose of this
- * PhantomReferenceReadStore is to make sure that
- * <ol>
- * <li>when this store or any of its created readers remain unclosed when reclaimed by the garbage collector, the
- * respective delegate store and readers are closed;</li>
- * <li>all of its {@link ColumnDataReader readers} are closed when the store itself is closed.</li>
- * </ol>
+ * PhantomReferenceReadStore is to make sure that when this store or any of its created readers remain unclosed when
+ * reclaimed by the garbage collector, the respective delegate store and readers are closed.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -84,24 +77,18 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
 
         private final CloseableHandler m_storeClosed;
 
-        private final Set<CloseableHandler> m_openReaderCloseables;
-
         // effectively final (set in the static factory method)
         private CloseableDelegateFinalizer m_closed;
 
-        static Reader create(final ColumnDataReader delegate, final CloseableHandler storeClosed,
-            final Set<CloseableHandler> openCloseables) {
-            final Reader reader = new Reader(delegate, storeClosed, openCloseables);
+        static Reader create(final ColumnDataReader delegate, final CloseableHandler storeClosed) {
+            final Reader reader = new Reader(delegate, storeClosed);
             reader.m_closed = CloseableDelegateFinalizer.create(reader, delegate, "Column Data Reader");
-            openCloseables.add(reader.m_closed);
             return reader;
         }
 
-        private Reader(final ColumnDataReader delegate, final CloseableHandler storeClosed,
-            final Set<CloseableHandler> openCloseables) {
+        private Reader(final ColumnDataReader delegate, final CloseableHandler storeClosed) {
             m_delegate = delegate;
             m_storeClosed = storeClosed;
-            m_openReaderCloseables = openCloseables;
         }
 
         @Override
@@ -129,16 +116,12 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
         @Override
         public void close() throws IOException {
             m_closed.close();
-            m_openReaderCloseables.remove(m_closed);
             m_delegate.close();
         }
 
     }
 
     private final ColumnReadStore m_delegate;
-
-    // weakly-hashed
-    private final Set<CloseableHandler> m_openReaderCloseables;
 
     // effectively final (set in the static factory method)
     private CloseableHandler m_closed;
@@ -155,7 +138,6 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
 
     private PhantomReferenceReadStore(final ColumnReadStore delegate) {
         m_delegate = delegate;
-        m_openReaderCloseables = Collections.newSetFromMap(new ConcurrentHashMap<>());
     }
 
     @Override
@@ -170,15 +152,12 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        return Reader.create(m_delegate.createReader(selection), m_closed, m_openReaderCloseables);
+        return Reader.create(m_delegate.createReader(selection), m_closed);
     }
 
     @Override
     public void close() throws IOException {
         m_closed.close();
-        for (final CloseableHandler closer : m_openReaderCloseables) {
-            closer.closeCloseableAndLogOutput();
-        }
         m_delegate.close();
     }
 
