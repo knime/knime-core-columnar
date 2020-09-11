@@ -49,16 +49,16 @@ import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnDataSpec;
 import org.knime.core.columnar.NullableColumnData;
 
-public interface BinarySupplData<C extends ColumnData> extends NullableColumnData {
+public interface StringSupplData<C extends ColumnData> extends NullableColumnData {
     C getChunk();
 
-    VarBinaryData getBinarySupplData();
+    StringData getStringSupplData();
 
-    public static class BinarySupplDataSpec<C extends NullableColumnData>
-        implements ColumnDataSpec<BinarySupplData<C>> {
+    public static class StringSupplDataSpec<C extends NullableColumnData>
+        implements ColumnDataSpec<StringSupplData<C>> {
         private final ColumnDataSpec<C> m_spec;
 
-        public BinarySupplDataSpec(final ColumnDataSpec<C> spec) {
+        public StringSupplDataSpec(final ColumnDataSpec<C> spec) {
             m_spec = spec;
         }
 
@@ -69,7 +69,7 @@ public interface BinarySupplData<C extends ColumnData> extends NullableColumnDat
         @SuppressWarnings({"rawtypes", "unchecked"})
         @Override
         public Class getColumnDataType() {
-            return BinarySupplData.class;
+            return StringSupplData.class;
         }
     }
 }
