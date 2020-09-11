@@ -57,8 +57,8 @@ import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.data.StringSupplData;
 import org.knime.core.columnar.data.StringData;
+import org.knime.core.columnar.data.MissingValueData;
 
 public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
 
@@ -130,7 +130,7 @@ public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
 
             @Override
             public ColumnDataSpec<?> getColumnDataSpec(final int idx) {
-                return new StringSupplData.StringSupplDataSpec<>(new StringData.StringDataSpec(true));
+                return new MissingValueData.StringSupplDataSpec<>(new StringData.StringDataSpec(true));
             }
         };
 
@@ -143,9 +143,9 @@ public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
         for (int c = 0; c < numChunks; c++) {
             final ColumnData[] data = dataFac.create();
             @SuppressWarnings("unchecked")
-            final StringSupplData<StringData> cast = (StringSupplData<StringData>)data[0];
+            final MissingValueData<StringData> cast = (MissingValueData<StringData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
-                cast.getChunk().setString(i, "Test " + i);
+                cast.getColumnData().setString(i, "Test " + i);
             }
             cast.setNumValues(chunkSize);
             writer.write(data);
@@ -158,9 +158,9 @@ public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
         for (int c = 0; c < numChunks; c++) {
             final ColumnData[] data = reader.read(c);
             @SuppressWarnings("unchecked")
-            final StringSupplData<StringData> cast = (StringSupplData<StringData>)data[0];
+            final MissingValueData<StringData> cast = (MissingValueData<StringData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
-                assertEquals("Test " + i, cast.getChunk().getString(i));
+                assertEquals("Test " + i, cast.getColumnData().getString(i));
             }
             cast.release();
         }

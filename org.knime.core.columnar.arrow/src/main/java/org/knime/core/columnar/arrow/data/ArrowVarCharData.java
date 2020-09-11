@@ -68,6 +68,24 @@ public class ArrowVarCharData implements StringData, ArrowData<VarCharVector> {
     private final CharsetEncoder ENCODER = Charset.forName("UTF-8").newEncoder()
         .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
 
+    private synchronized ByteBuffer encode(final String value) {
+        try {
+            return ENCODER.encode(CharBuffer.wrap(value.toCharArray()));
+        } catch (CharacterCodingException e) {
+            // TODO
+            throw new RuntimeException(e);
+        }
+    }
+
+    private synchronized String decode(final byte[] values) {
+        try {
+            return DECODER.decode(ByteBuffer.wrap(values)).toString();
+        } catch (CharacterCodingException e) {
+            // TODO
+            throw new RuntimeException(e);
+        }
+    }
+
     private final AtomicInteger m_refCounter = new AtomicInteger(1);
 
     private final VarCharVector m_vector;
@@ -87,23 +105,13 @@ public class ArrowVarCharData implements StringData, ArrowData<VarCharVector> {
 
     @Override
     public String getString(final int index) {
-        try {
-            return DECODER.decode(ByteBuffer.wrap(m_vector.get(index))).toString();
-        } catch (CharacterCodingException e) {
-            // TODO
-            throw new RuntimeException(e);
-        }
+        return decode(m_vector.get(index));
     }
 
     @Override
     public void setString(final int index, final String value) {
-        try {
-            ByteBuffer encode = ENCODER.encode(CharBuffer.wrap(value.toCharArray()));
-            m_vector.setSafe(index, encode.array(), 0, encode.limit());
-        } catch (CharacterCodingException e) {
-            // TODO
-            throw new RuntimeException(e);
-        }
+        final ByteBuffer encode = encode(value);
+        m_vector.setSafe(index, encode.array(), 0, encode.limit());
     }
 
     @Override

@@ -57,7 +57,7 @@ import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
 import org.knime.core.columnar.data.IntData;
-import org.knime.core.columnar.data.StringSupplData;
+import org.knime.core.columnar.data.MissingValueData;
 
 public class ArrowStringSupplTest {
 
@@ -77,7 +77,7 @@ public class ArrowStringSupplTest {
 
             @Override
             public ColumnDataSpec<?> getColumnDataSpec(final int idx) {
-                return new StringSupplData.StringSupplDataSpec<>(new IntData.IntDataSpec());
+                return new MissingValueData.StringSupplDataSpec<>(new IntData.IntDataSpec());
             }
         };
 
@@ -90,11 +90,11 @@ public class ArrowStringSupplTest {
         for (int c = 0; c < numChunks; c++) {
             final ColumnData[] data = dataFac.create();
             @SuppressWarnings("unchecked")
-            final StringSupplData<IntData> cast = (StringSupplData<IntData>)data[0];
+            final MissingValueData<IntData> cast = (MissingValueData<IntData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
-                cast.getChunk().setInt(i, i);
+                cast.getColumnData().setInt(i, i);
                 if (i % 2 == 0) {
-                    cast.getStringSupplData().setString(i, "Test " + i);
+                    cast.setMissingWithCause(i, "Test " + i);
                 }
             }
             cast.setNumValues(chunkSize);
@@ -108,11 +108,11 @@ public class ArrowStringSupplTest {
         for (int c = 0; c < numChunks; c++) {
             final ColumnData[] data = reader.read(c);
             @SuppressWarnings("unchecked")
-            final StringSupplData<IntData> cast = (StringSupplData<IntData>)data[0];
+            final MissingValueData<IntData> cast = (MissingValueData<IntData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
-                assertEquals(i, cast.getChunk().getInt(i));
+                assertEquals(i, cast.getColumnData().getInt(i));
                 if (i % 2 == 0) {
-                    assertEquals(cast.getStringSupplData().getString(i), "Test " + i);
+                    assertEquals(cast.getMissingValueCause(i), "Test " + i);
                 }
             }
             cast.release();

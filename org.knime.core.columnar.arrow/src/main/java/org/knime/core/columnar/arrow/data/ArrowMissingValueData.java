@@ -49,115 +49,133 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.data.StringData;
-import org.knime.core.columnar.data.StringSupplData;
+import org.knime.core.columnar.data.MissingValueData;
 import org.knime.core.columnar.phantom.CloseableCloser;
 
-public class ArrowStringSupplData<C extends ArrowData<?>> implements StringSupplData<C>, ArrowData<StructVector> {
+public class ArrowMissingValueData<C extends ArrowData<?>> implements MissingValueData<C>, ArrowData<StructVector> {
 
     private AtomicInteger m_ref = new AtomicInteger(1);
 
-    private final ArrowVarCharData m_stringSuppl;
+    private final ArrowVarCharData m_supplement;
 
-    private C m_chunk;
+    private C m_data;
 
-    private final StructVector m_vector;
+    private final StructVector m_struct;
 
     CloseableCloser m_vectorCloser;
 
-    public ArrowStringSupplData(final BufferAllocator allocator, final C chunk) {
-        m_chunk = chunk;
-        m_stringSuppl = new ArrowVarCharData(allocator);
+    private boolean m_hasSupplement = false;
+
+    public ArrowMissingValueData(final BufferAllocator allocator, final C data) {
+        m_data = data;
+        m_supplement = new ArrowVarCharData(allocator);
         final CustomStructVector vector = new CustomStructVector("String Supplement", allocator);
 
-        vector.putChild("Data", m_chunk.get());
+        vector.putChild("Data", m_data.get());
 
-        m_vector = vector;
+        m_struct = vector;
     }
 
-    public ArrowStringSupplData(final StructVector vector, final C chunk) {
-        m_vector = vector;
-        m_chunk = chunk;
-        m_stringSuppl = new ArrowVarCharData((VarCharVector)vector.getChildByOrdinal(1));
+    public ArrowMissingValueData(final StructVector struct, final C data) {
+        m_struct = struct;
+        m_data = data;
+        final ValueVector supplement = struct.getChildByOrdinal(1);
+        if (supplement != null) {
+            m_supplement = new ArrowVarCharData((VarCharVector)supplement);
+        } else {
+            m_supplement = null;
+        }
     }
 
     @Override
     public void setMissing(final int index) {
-        m_chunk.setMissing(index);
+        m_data.setMissing(index);
     }
 
     @Override
     public void ensureCapacity(final int chunkSize) {
-        m_chunk.ensureCapacity(chunkSize);
+        m_data.ensureCapacity(chunkSize);
     }
 
     @Override
-    public C getChunk() {
-        return m_chunk;
-    }
-
-    @Override
-    public StringData getStringSupplData() {
-        return m_stringSuppl;
+    public C getColumnData() {
+        return m_data;
     }
 
     @Override
     public boolean isMissing(final int index) {
-        return m_chunk.isMissing(index);
+        return m_data.isMissing(index);
     }
 
     @Override
     public int getMaxCapacity() {
-        return m_chunk.getMaxCapacity();
+        return m_data.getMaxCapacity();
     }
 
     @Override
     public int getNumValues() {
-        return m_chunk.getNumValues();
+        return m_data.getNumValues();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setMissingWithCause(final int i, final String value) {
+        m_supplement.setString(i, value);
+        m_hasSupplement = true;
+    }
+
+    @Override
+    public String getMissingValueCause(final int index) {
+        return (!m_hasSupplement || !m_data.isMissing(index)) ? null : m_supplement.getString(index);
     }
 
     @Override
     public void setNumValues(final int numValues) {
         // TODO only set if any value is set.
-        if (m_stringSuppl.get().getLastSet() != 0 && m_vector instanceof CustomStructVector) {
-            ((CustomStructVector)m_vector).putChild("String Supplement", m_stringSuppl.get());
-            m_stringSuppl.setNumValues(numValues);
+        if (m_hasSupplement) {
+            ((CustomStructVector)m_struct).putChild("String Supplement Child", m_supplement.get());
+            m_supplement.setNumValues(numValues);
         } else {
-            m_stringSuppl.get().clear();
+            // TODO release OK?
+            m_supplement.release();
         }
-        m_chunk.setNumValues(numValues);
+        m_data.setNumValues(numValues);
+
         // TODO: needed?
-        m_vector.setValueCount(numValues);
+        m_struct.setValueCount(numValues);
     }
 
     @Override
     public synchronized void release() {
-        m_stringSuppl.release();
-        m_chunk.release();
+        m_supplement.release();
+        m_data.release();
         if (m_ref.decrementAndGet() == 0) {
-            m_vector.close();
+            m_struct.close();
         }
     }
 
     @Override
     public synchronized void retain() {
-        m_stringSuppl.retain();
-        m_chunk.retain();
+        m_supplement.retain();
+        m_data.retain();
         m_ref.incrementAndGet();
     }
 
     @Override
     public StructVector get() {
-        return m_vector;
+        return m_struct;
     }
 
     @Override
     public int sizeOf() {
-        return (int)(m_stringSuppl.sizeOf() + m_chunk.sizeOf() + m_vector.getValidityBuffer().capacity());
+        return (int)(m_supplement.sizeOf() + m_data.sizeOf() + m_struct.getValidityBuffer().capacity());
     }
 
     private static final class CustomStructVector extends StructVector {
@@ -172,4 +190,5 @@ public class ArrowStringSupplData<C extends ArrowData<?>> implements StringSuppl
         }
 
     }
+
 }

@@ -61,7 +61,7 @@ import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
 import org.knime.core.columnar.arrow.data.ArrowIntData;
 import org.knime.core.columnar.arrow.data.ArrowLongData;
-import org.knime.core.columnar.arrow.data.ArrowStringSupplData;
+import org.knime.core.columnar.arrow.data.ArrowMissingValueData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData;
 import org.knime.core.columnar.arrow.data.ArrowVarCharData;
 import org.knime.core.columnar.data.DoubleData;
@@ -70,10 +70,10 @@ import org.knime.core.columnar.data.IntData;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
 import org.knime.core.columnar.data.LongData;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
+import org.knime.core.columnar.data.MissingValueData;
+import org.knime.core.columnar.data.MissingValueData.StringSupplDataSpec;
 import org.knime.core.columnar.data.StringData;
 import org.knime.core.columnar.data.StringData.StringDataSpec;
-import org.knime.core.columnar.data.StringSupplData;
-import org.knime.core.columnar.data.StringSupplData.StringSupplDataSpec;
 import org.knime.core.columnar.data.VarBinaryData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 
@@ -164,7 +164,7 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         }
     }
 
-    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>> implements ArrowColumnDataSpec<StringSupplData<C>> {
+    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>> implements ArrowColumnDataSpec<MissingValueData<C>> {
 
         private final StringSupplDataSpec<C> m_spec;
 
@@ -177,16 +177,16 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         }
 
         @Override
-        public StringSupplData<C> createEmpty(final BufferAllocator allocator) {
-            return new ArrowStringSupplData(allocator, m_arrowChunkSpec.createEmpty(allocator));
+        public MissingValueData<C> createEmpty(final BufferAllocator allocator) {
+            return new ArrowMissingValueData(allocator, m_arrowChunkSpec.createEmpty(allocator));
         }
 
         @Override
-        public StringSupplData<C> wrap(final FieldVector vector, final DictionaryProvider provider) {
+        public MissingValueData<C> wrap(final FieldVector vector, final DictionaryProvider provider) {
             @SuppressWarnings("unchecked")
             final ArrowColumnDataSpec<C> arrowSpec = (ArrowColumnDataSpec<C>)getMapping(m_spec.getChildSpec());
             final C wrapped = arrowSpec.wrap((FieldVector)((StructVector)vector).getChildByOrdinal(0), provider);
-            return new ArrowStringSupplData((StructVector)vector, wrapped);
+            return new ArrowMissingValueData((StructVector)vector, wrapped);
         }
     }
 
