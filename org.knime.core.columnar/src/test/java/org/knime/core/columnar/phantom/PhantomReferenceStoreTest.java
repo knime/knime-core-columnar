@@ -83,21 +83,21 @@ public class PhantomReferenceStoreTest {
 
     @Before
     public void setup() {
-        CloseableCloser.OPEN_FINALIZERS.clear();
+        CloseableDelegateFinalizer.OPEN_FINALIZERS.clear();
         System.gc();
-        CloseableCloser.poll();
+        CloseableDelegateFinalizer.poll();
     }
 
     @Rule
     public Timeout globalTimeout = Timeout.seconds(60);
 
     private static void checkOpenFinalizers(final int numOpenFinalizers) {
-        assertEquals(numOpenFinalizers, CloseableCloser.OPEN_FINALIZERS.size());
+        assertEquals(numOpenFinalizers, CloseableDelegateFinalizer.OPEN_FINALIZERS.size());
     }
 
     private static void checkNoOpenFinalizers() {
-        assertTrue("There are enqueued finalizers of delegates.", CloseableCloser.ENQUEUED_FINALIZERS.poll() == null);
-        assertTrue("There are open references on finalizers of delegates.", CloseableCloser.OPEN_FINALIZERS.isEmpty());
+        assertTrue("There are enqueued finalizers of delegates.", CloseableDelegateFinalizer.ENQUEUED_FINALIZERS.poll() == null);
+        assertTrue("There are open references on finalizers of delegates.", CloseableDelegateFinalizer.OPEN_FINALIZERS.isEmpty());
     }
 
     @Test
@@ -115,7 +115,7 @@ public class PhantomReferenceStoreTest {
             System.gc();
             await().until(() -> ref.get() == null);
 
-            CloseableCloser.poll();
+            CloseableDelegateFinalizer.poll();
             assertTrue(delegate.isStoreClosed());
 
             checkNoOpenFinalizers();
@@ -140,7 +140,7 @@ public class PhantomReferenceStoreTest {
             System.gc();
             await().until(() -> storeRef.get() == null && writerRef.get() == null);
 
-            CloseableCloser.poll();
+            CloseableDelegateFinalizer.poll();
             assertTrue(delegate.isWriterClosed());
 
             checkNoOpenFinalizers();
@@ -155,7 +155,7 @@ public class PhantomReferenceStoreTest {
             final ColumnStore store = PhantomReferenceStore.create(delegate);
             store.getWriter();
             assertFalse(delegate.isWriterClosed());
-            assertEquals(3, CloseableCloser.OPEN_FINALIZERS.size()); // write store, read store, and writer
+            assertEquals(3, CloseableDelegateFinalizer.OPEN_FINALIZERS.size()); // write store, read store, and writer
 
             store.close();
             assertTrue(delegate.isWriterClosed());
@@ -179,7 +179,7 @@ public class PhantomReferenceStoreTest {
             System.gc();
             await().until(() -> ref.get() == null);
 
-            CloseableCloser.poll();
+            CloseableDelegateFinalizer.poll();
             assertTrue(delegate.isStoreClosed());
 
             checkNoOpenFinalizers();
@@ -203,7 +203,7 @@ public class PhantomReferenceStoreTest {
             System.gc();
             await().until(() -> ref.get() == null);
 
-            CloseableCloser.poll();
+            CloseableDelegateFinalizer.poll();
             assertEquals(0, delegate.getNumOpenReaders());
         }
 
@@ -243,7 +243,7 @@ public class PhantomReferenceStoreTest {
         System.gc();
         await().until(() -> ref.get() == null);
 
-        CloseableCloser.poll();
+        CloseableDelegateFinalizer.poll();
         assertTrue(dataDelegate.isClosed());
         checkNoOpenFinalizers();
     }

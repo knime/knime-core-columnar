@@ -84,12 +84,12 @@ public final class PhantomReferenceStore implements ColumnStore {
 
         private final ColumnDataFactory m_delegate;
 
-        private final CloseableCloser m_writerClosed;
+        private final CloseableHandler m_writerClosed;
 
-        private final CloseableCloser m_storeClosed;
+        private final CloseableHandler m_storeClosed;
 
-        Factory(final ColumnDataFactory delegate, final CloseableCloser writerClosed,
-            final CloseableCloser storeClosed) {
+        Factory(final ColumnDataFactory delegate, final CloseableHandler writerClosed,
+            final CloseableHandler storeClosed) {
             m_delegate = delegate;
             m_writerClosed = writerClosed;
             m_storeClosed = storeClosed;
@@ -113,18 +113,18 @@ public final class PhantomReferenceStore implements ColumnStore {
 
         private final ColumnDataWriter m_delegate;
 
-        private final CloseableCloser m_storeClosed;
+        private final CloseableHandler m_storeClosed;
 
         // effectively final (set in the static factory method)
-        private CloseableCloser m_closed;
+        private CloseableHandler m_closed;
 
-        static Writer create(final ColumnDataWriter delegate, final CloseableCloser storeClosed) {
+        static Writer create(final ColumnDataWriter delegate, final CloseableHandler storeClosed) {
             final Writer writer = new Writer(delegate, storeClosed);
-            writer.m_closed = CloseableCloser.create(writer, delegate, "Column Data Writer");
+            writer.m_closed = CloseableDelegateFinalizer.create(writer, delegate, "Column Data Writer");
             return writer;
         }
 
-        private Writer(final ColumnDataWriter delegate, final CloseableCloser storeClosed) {
+        private Writer(final ColumnDataWriter delegate, final CloseableHandler storeClosed) {
             m_delegate = delegate;
             m_storeClosed = storeClosed;
         }
@@ -154,22 +154,22 @@ public final class PhantomReferenceStore implements ColumnStore {
     private final PhantomReferenceReadStore m_readStore;
 
     // effectively final (set in the static factory method)
-    private CloseableCloser m_closed;
+    private CloseableHandler m_closed;
 
     private Writer m_writer;
 
-    private CloseableCloser m_writerClosed;
+    private CloseableHandler m_writerClosed;
 
     private Factory m_factory;
 
     /**
      * @param delegate the delegate to which to write
-     * @return a new PhantomReferenceStore with a registered {@link CloseableCloser}
+     * @return a new PhantomReferenceStore with a registered {@link CloseableDelegateFinalizer}
      */
     @SuppressWarnings("resource")
     public static PhantomReferenceStore create(final ColumnStore delegate) {
         final PhantomReferenceStore store = new PhantomReferenceStore(delegate);
-        store.m_closed = CloseableCloser.create(store, delegate, "Column Store");
+        store.m_closed = CloseableDelegateFinalizer.create(store, delegate, "Column Store");
         store.m_writer = Writer.create(delegate.getWriter(), store.m_closed);
         store.m_writerClosed = store.m_writer.m_closed;
         store.m_factory = new Factory(delegate.getFactory(), store.m_writerClosed, store.m_closed);
@@ -235,7 +235,7 @@ public final class PhantomReferenceStore implements ColumnStore {
     public void close() throws IOException {
         m_closed.close();
         if (!m_writerClosed.isClosed()) {
-            m_writer.m_closed.closeCloseableAndSelf();
+            m_writerClosed.closeCloseableAndLogOutput();
         }
         m_readStore.close();
         m_delegate.close();

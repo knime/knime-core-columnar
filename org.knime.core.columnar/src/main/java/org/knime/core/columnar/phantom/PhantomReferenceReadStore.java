@@ -55,7 +55,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnReadStore;
@@ -82,26 +82,26 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
 
         private final ColumnDataReader m_delegate;
 
-        private final CloseableCloser m_storeClosed;
+        private final CloseableHandler m_storeClosed;
 
-        private final Set<Reader> m_openReaders;
+        private final Set<CloseableHandler> m_openReaderCloseables;
 
         // effectively final (set in the static factory method)
-        private CloseableCloser m_closed;
+        private CloseableDelegateFinalizer m_closed;
 
-        static Reader create(final ColumnDataReader delegate, final CloseableCloser storeClosed,
-            final Set<Reader> openReaders) {
-            final Reader reader = new Reader(delegate, storeClosed, openReaders);
-            openReaders.add(reader);
-            reader.m_closed = CloseableCloser.create(reader, delegate, "Column Data Reader");
+        static Reader create(final ColumnDataReader delegate, final CloseableHandler storeClosed,
+            final Set<CloseableHandler> openCloseables) {
+            final Reader reader = new Reader(delegate, storeClosed, openCloseables);
+            reader.m_closed = CloseableDelegateFinalizer.create(reader, delegate, "Column Data Reader");
+            openCloseables.add(reader.m_closed);
             return reader;
         }
 
-        private Reader(final ColumnDataReader delegate, final CloseableCloser storeClosed,
-            final Set<Reader> openReaders) {
+        private Reader(final ColumnDataReader delegate, final CloseableHandler storeClosed,
+            final Set<CloseableHandler> openCloseables) {
             m_delegate = delegate;
             m_storeClosed = storeClosed;
-            m_openReaders = openReaders;
+            m_openReaderCloseables = openCloseables;
         }
 
         @Override
@@ -129,7 +129,7 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
         @Override
         public void close() throws IOException {
             m_closed.close();
-            m_openReaders.remove(this);
+            m_openReaderCloseables.remove(m_closed);
             m_delegate.close();
         }
 
@@ -138,24 +138,24 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
     private final ColumnReadStore m_delegate;
 
     // weakly-hashed
-    private final Set<Reader> m_openReaders;
+    private final Set<CloseableHandler> m_openReaderCloseables;
 
     // effectively final (set in the static factory method)
-    private CloseableCloser m_closed;
+    private CloseableHandler m_closed;
 
     /**
      * @param delegate the delegate to which to write
-     * @return a new PhantomReferenceReadStore with a registered {@link CloseableCloser}
+     * @return a new PhantomReferenceReadStore with a registered {@link CloseableDelegateFinalizer}
      */
     public static PhantomReferenceReadStore create(final ColumnReadStore delegate) {
         final PhantomReferenceReadStore store = new PhantomReferenceReadStore(delegate);
-        store.m_closed = CloseableCloser.create(store, delegate, "Column Read Store");
+        store.m_closed = CloseableDelegateFinalizer.create(store, delegate, "Column Read Store");
         return store;
     }
 
     private PhantomReferenceReadStore(final ColumnReadStore delegate) {
         m_delegate = delegate;
-        m_openReaders = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
+        m_openReaderCloseables = Collections.newSetFromMap(new ConcurrentHashMap<>());
     }
 
     @Override
@@ -170,14 +170,14 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        return Reader.create(m_delegate.createReader(selection), m_closed, m_openReaders);
+        return Reader.create(m_delegate.createReader(selection), m_closed, m_openReaderCloseables);
     }
 
     @Override
     public void close() throws IOException {
         m_closed.close();
-        for (final Reader reader : m_openReaders) {
-            reader.m_closed.closeCloseableAndSelf();
+        for (final CloseableHandler closer : m_openReaderCloseables) {
+            closer.closeCloseableAndLogOutput();
         }
         m_delegate.close();
     }

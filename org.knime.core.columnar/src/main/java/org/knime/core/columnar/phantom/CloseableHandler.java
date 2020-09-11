@@ -50,70 +50,37 @@ package org.knime.core.columnar.phantom;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 /**
- * A class for handling potentially unclosed {@link Closeable Closeables} in order to detect and address resource leaks.
- *
- * The lifecycle and suggested usage of this class is as follows: A new CloseableCloser can be
- * {@link #CloseableCloser(Closeable) created} and should be {@link #close() closed} alongside the to-be-monitored
- * Closeable. If left unclosed, it can be used to manually close the Closeable and log some output for detecting the
+ * An interface for classes that handle potentially unclosed {@link Closeable Closeables} in order to detect and address
+ * resource leaks. Classes implementing this interface should be created and closed alongside the to-be-monitored
+ * Closeable. If left unclosed, they can be used to manually close the Closeable and log some output for detecting the
  * resource leak.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class CloseableCloser implements CloseableHandler {
-
-    static String stackTraceToString(final StackTraceElement[] stack) {
-        return Arrays.stream(stack).map(StackTraceElement::toString).collect(Collectors.joining("\n  "));
-    }
-
-    private final Closeable m_closeable;
-
-    private final AtomicBoolean m_closed = new AtomicBoolean();
-
-    private final String m_resourceName;
-
-    private final String m_stackTraceAtConstructionTime = stackTraceToString(Thread.currentThread().getStackTrace());
+public interface CloseableHandler extends Closeable {
 
     /**
-     * @param closeable the Closeable that should be handled
+     * Close this CloseableHandler. Should be invoked when the Closeable handled by this class is closed.
      */
-    public CloseableCloser(final Closeable closeable) {
-        this(closeable, closeable.getClass().getSimpleName());
-    }
+    @Override
+    void close();
 
     /**
-     * @param closeable the Closeable that should be handled
-     * @param resourceName a human-readable String representation of the referent object class
+     * A method that can be called for determining whether this class (and the Closeable it handled) have already been
+     * closed.
+     *
+     * @return true, if this CloseableHandler has already been closed; false otherwise
      */
-    public CloseableCloser(final Closeable closeable, final String resourceName) {
-        m_closeable = closeable;
-        m_resourceName = resourceName;
-    }
+    boolean isClosed();
 
-    @Override
-    public void close() {
-        m_closed.set(true);
-    }
-
-    @Override
-    public boolean isClosed() {
-        return m_closed.get();
-    }
-
-    @Override
-    public void closeCloseableAndLogOutput() throws IOException {
-        if (!isClosed()) {
-            System.err.println(String.format("%s resource was not closed.", m_resourceName));
-            System.err.println(String.format("Construction time call stack: %s", m_stackTraceAtConstructionTime));
-            System.err.println(
-                String.format("Current call stack: %s", stackTraceToString(Thread.currentThread().getStackTrace())));
-            m_closeable.close();
-        }
-        close();
-    }
+    /**
+     * Manually close the Closeable handled by this class. Also close self. Log some output for detecting and debugging
+     * the potential resource leak.
+     *
+     * @throws IOException if an IOException occurs while closing the handled Closeable
+     */
+    void closeCloseableAndLogOutput() throws IOException;
 
 }

@@ -48,7 +48,7 @@ package org.knime.core.columnar;
 import java.io.Closeable;
 
 import org.knime.core.columnar.data.DoubleData;
-import org.knime.core.columnar.phantom.CloseableCloser;
+import org.knime.core.columnar.phantom.CloseableDelegateFinalizer;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -82,11 +82,11 @@ public final class TestDoubleColumnData implements DoubleData {
 
     private int m_numValues;
 
-    private CloseableCloser m_closed;
+    private CloseableDelegateFinalizer m_closed;
 
     public static TestDoubleColumnData create() {
         final TestDoubleColumnData data = new TestDoubleColumnData();
-        data.m_closed = CloseableCloser.create(data, data.m_delegate, "Test Column Data");
+        data.m_closed = CloseableDelegateFinalizer.create(data, data.m_delegate, "Test Column Data");
         return data;
     }
 
@@ -95,7 +95,7 @@ public final class TestDoubleColumnData implements DoubleData {
 
     public static TestDoubleColumnData create(final Double... doubles) {
         final TestDoubleColumnData data = new TestDoubleColumnData(doubles);
-        data.m_closed = CloseableCloser.create(data, data.m_delegate, "Test Column Data");
+        data.m_closed = CloseableDelegateFinalizer.create(data, data.m_delegate, "Test Column Data");
         return data;
     }
 
