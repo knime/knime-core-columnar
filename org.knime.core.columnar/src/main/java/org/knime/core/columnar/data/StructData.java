@@ -45,31 +45,28 @@
  */
 package org.knime.core.columnar.data;
 
-import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.ColumnDataSpec;
 import org.knime.core.columnar.NullableColumnData;
 
-public interface StringSupplData<C extends ColumnData> extends NullableColumnData {
-    C getChunk();
+public interface StructData extends NullableColumnData {
 
-    StringData getStringSupplData();
+    NullableColumnData getChunk(int index);
 
-    public static class StringSupplDataSpec<C extends NullableColumnData>
-        implements ColumnDataSpec<StringSupplData<C>> {
-        private final ColumnDataSpec<C> m_spec;
+    public class StructDataSpec implements ColumnDataSpec<StructData> {
 
-        public StringSupplDataSpec(final ColumnDataSpec<C> spec) {
-            m_spec = spec;
+        private ColumnDataSpec<?>[] m_childSpecs;
+
+        public StructDataSpec(final ColumnDataSpec<?>... childSpecs) {
+            m_childSpecs = childSpecs;
         }
 
-        public ColumnDataSpec<C> getChildSpec() {
-            return m_spec;
-        }
-
-        @SuppressWarnings({"rawtypes", "unchecked"})
         @Override
-        public Class getColumnDataType() {
-            return StringSupplData.class;
+        public Class<? extends StructData> getColumnDataType() {
+            return StructData.class;
+        }
+
+        public ColumnDataSpec<?>[] getChildChunkSpecs() {
+            return m_childSpecs;
         }
     }
 }
