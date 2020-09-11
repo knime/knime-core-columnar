@@ -106,12 +106,12 @@ public final class CloseableCloser implements CloseableHandler {
     @Override
     public void closeCloseableAndLogOutput() throws Exception {
         if (!isClosed()) {
-            m_closeable.close();
-            System.err.println(String.format(
-                "%s resource was not correctly released by its owner and was only released just now.", m_resourceName));
+            System.err.println(String.format("%s resource was not correctly released by its owner "
+                + "and will now be released automically by resource leak detection.", m_resourceName));
             System.err.println(String.format("Construction time call stack: %s", m_stackTraceAtConstructionTime));
             System.err.println(
                 String.format("Current call stack: %s", stackTraceToString(Thread.currentThread().getStackTrace())));
+            m_closeable.close();
         }
         close();
     }
