@@ -56,16 +56,14 @@ import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.ColumnDataSpec;
 import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.arrow.data.ArrowBinarySupplementData;
 import org.knime.core.columnar.arrow.data.ArrowData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
 import org.knime.core.columnar.arrow.data.ArrowIntData;
 import org.knime.core.columnar.arrow.data.ArrowLongData;
+import org.knime.core.columnar.arrow.data.ArrowStringSupplData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData;
 import org.knime.core.columnar.arrow.data.ArrowVarCharData;
-import org.knime.core.columnar.data.BinarySupplData;
-import org.knime.core.columnar.data.BinarySupplData.BinarySupplDataSpec;
 import org.knime.core.columnar.data.DoubleData;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.IntData;
@@ -74,6 +72,8 @@ import org.knime.core.columnar.data.LongData;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.StringData;
 import org.knime.core.columnar.data.StringData.StringDataSpec;
+import org.knime.core.columnar.data.StringSupplData;
+import org.knime.core.columnar.data.StringSupplData.StringSupplDataSpec;
 import org.knime.core.columnar.data.VarBinaryData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 
@@ -102,9 +102,9 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
             return new ArrowStringDataSpec((StringDataSpec)spec);
         } else if (spec instanceof IntDataSpec) {
             return new ArrowIntDataSpec();
-        } else if (spec instanceof BinarySupplDataSpec) {
+        } else if (spec instanceof StringSupplDataSpec) {
             @SuppressWarnings({"rawtypes", "unchecked"})
-            ArrowBinarySupplDataSpec<?> arrowSpec = new ArrowBinarySupplDataSpec((BinarySupplDataSpec<?>)spec);
+            ArrowBinarySupplDataSpec<?> arrowSpec = new ArrowBinarySupplDataSpec((StringSupplDataSpec<?>)spec);
             return arrowSpec;
         } else if (spec instanceof LongDataSpec) {
             return new ArrowLongDataSpec();
@@ -164,29 +164,29 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         }
     }
 
-    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>> implements ArrowColumnDataSpec<BinarySupplData<C>> {
+    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>> implements ArrowColumnDataSpec<StringSupplData<C>> {
 
-        private final BinarySupplDataSpec<C> m_spec;
+        private final StringSupplDataSpec<C> m_spec;
 
         private ArrowColumnDataSpec<C> m_arrowChunkSpec;
 
         @SuppressWarnings("unchecked")
-        public ArrowBinarySupplDataSpec(final BinarySupplDataSpec<C> spec) {
+        public ArrowBinarySupplDataSpec(final StringSupplDataSpec<C> spec) {
             m_spec = spec;
             m_arrowChunkSpec = (ArrowColumnDataSpec<C>)ArrowSchemaMapperV0.getMapping(m_spec.getChildSpec());
         }
 
         @Override
-        public BinarySupplData<C> createEmpty(final BufferAllocator allocator) {
-            return new ArrowBinarySupplementData<C>(allocator, m_arrowChunkSpec.createEmpty(allocator));
+        public StringSupplData<C> createEmpty(final BufferAllocator allocator) {
+            return new ArrowStringSupplData(allocator, m_arrowChunkSpec.createEmpty(allocator));
         }
 
         @Override
-        public BinarySupplData<C> wrap(final FieldVector vector, final DictionaryProvider provider) {
+        public StringSupplData<C> wrap(final FieldVector vector, final DictionaryProvider provider) {
             @SuppressWarnings("unchecked")
             final ArrowColumnDataSpec<C> arrowSpec = (ArrowColumnDataSpec<C>)getMapping(m_spec.getChildSpec());
             final C wrapped = arrowSpec.wrap((FieldVector)((StructVector)vector).getChildByOrdinal(0), provider);
-            return new ArrowBinarySupplementData<>((StructVector)vector, wrapped);
+            return new ArrowStringSupplData((StructVector)vector, wrapped);
         }
     }
 

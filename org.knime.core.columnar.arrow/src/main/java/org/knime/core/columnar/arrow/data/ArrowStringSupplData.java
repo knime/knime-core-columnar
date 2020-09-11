@@ -49,36 +49,40 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VarBinaryVector;
+import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.data.BinarySupplData;
+import org.knime.core.columnar.data.StringData;
+import org.knime.core.columnar.data.StringSupplData;
+import org.knime.core.columnar.phantom.CloseableCloser;
 
-public class ArrowBinarySupplementData<C extends ArrowData<?>> implements BinarySupplData<C>, ArrowData<StructVector> {
+public class ArrowStringSupplData<C extends ArrowData<?>> implements StringSupplData<C>, ArrowData<StructVector> {
 
     private AtomicInteger m_ref = new AtomicInteger(1);
 
-    private final ArrowVarBinaryData m_binarySuppl;
+    private final ArrowVarCharData m_stringSuppl;
 
     private C m_chunk;
 
     private final StructVector m_vector;
 
-    public ArrowBinarySupplementData(final BufferAllocator allocator, final C chunk) {
+    CloseableCloser m_vectorCloser;
+
+    public ArrowStringSupplData(final BufferAllocator allocator, final C chunk) {
         m_chunk = chunk;
-        m_binarySuppl = new ArrowVarBinaryData(allocator);
-        final CustomStructVector vector = new CustomStructVector("BinarySuppl", allocator);
+        m_stringSuppl = new ArrowVarCharData(allocator);
+        final CustomStructVector vector = new CustomStructVector("String Supplement", allocator);
 
         vector.putChild("Data", m_chunk.get());
 
         m_vector = vector;
     }
 
-    public ArrowBinarySupplementData(final StructVector vector, final C chunk) {
+    public ArrowStringSupplData(final StructVector vector, final C chunk) {
         m_vector = vector;
         m_chunk = chunk;
-        m_binarySuppl = new ArrowVarBinaryData((VarBinaryVector)vector.getChildByOrdinal(1));
+        m_stringSuppl = new ArrowVarCharData((VarCharVector)vector.getChildByOrdinal(1));
     }
 
     @Override
@@ -97,8 +101,8 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
     }
 
     @Override
-    public ArrowVarBinaryData getBinarySupplData() {
-        return m_binarySuppl;
+    public StringData getStringSupplData() {
+        return m_stringSuppl;
     }
 
     @Override
@@ -119,11 +123,11 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
     @Override
     public void setNumValues(final int numValues) {
         // TODO only set if any value is set.
-        if (m_binarySuppl.get().getLastSet() != 0 && m_vector instanceof CustomStructVector) {
-            ((CustomStructVector)m_vector).putChild("BinarySuppl", m_binarySuppl.get());
-            m_binarySuppl.setNumValues(numValues);
+        if (m_stringSuppl.get().getLastSet() != 0 && m_vector instanceof CustomStructVector) {
+            ((CustomStructVector)m_vector).putChild("String Supplement", m_stringSuppl.get());
+            m_stringSuppl.setNumValues(numValues);
         } else {
-            m_binarySuppl.get().clear();
+            m_stringSuppl.get().clear();
         }
         m_chunk.setNumValues(numValues);
         // TODO: needed?
@@ -132,7 +136,7 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
 
     @Override
     public synchronized void release() {
-        m_binarySuppl.release();
+        m_stringSuppl.release();
         m_chunk.release();
         if (m_ref.decrementAndGet() == 0) {
             m_vector.close();
@@ -141,7 +145,7 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
 
     @Override
     public synchronized void retain() {
-        m_binarySuppl.retain();
+        m_stringSuppl.retain();
         m_chunk.retain();
         m_ref.incrementAndGet();
     }
@@ -153,7 +157,7 @@ public class ArrowBinarySupplementData<C extends ArrowData<?>> implements Binary
 
     @Override
     public int sizeOf() {
-        return (int)(m_binarySuppl.sizeOf() + m_chunk.sizeOf() + m_vector.getValidityBuffer().capacity());
+        return (int)(m_stringSuppl.sizeOf() + m_chunk.sizeOf() + m_vector.getValidityBuffer().capacity());
     }
 
     private static final class CustomStructVector extends StructVector {

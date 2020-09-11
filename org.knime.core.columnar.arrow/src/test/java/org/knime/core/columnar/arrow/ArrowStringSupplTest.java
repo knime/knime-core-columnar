@@ -56,10 +56,10 @@ import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.data.BinarySupplData;
 import org.knime.core.columnar.data.IntData;
+import org.knime.core.columnar.data.StringSupplData;
 
-public class ArrowBinarySupplTest {
+public class ArrowStringSupplTest {
 
     @Test
     public void testBinarySupplement() throws Exception {
@@ -77,7 +77,7 @@ public class ArrowBinarySupplTest {
 
             @Override
             public ColumnDataSpec<?> getColumnDataSpec(final int idx) {
-                return new BinarySupplData.BinarySupplDataSpec<>(new IntData.IntDataSpec());
+                return new StringSupplData.StringSupplDataSpec<>(new IntData.IntDataSpec());
             }
         };
 
@@ -90,15 +90,11 @@ public class ArrowBinarySupplTest {
         for (int c = 0; c < numChunks; c++) {
             final ColumnData[] data = dataFac.create();
             @SuppressWarnings("unchecked")
-            final BinarySupplData<IntData> cast = (BinarySupplData<IntData>)data[0];
+            final StringSupplData<IntData> cast = (StringSupplData<IntData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
                 cast.getChunk().setInt(i, i);
                 if (i % 2 == 0) {
-                    final byte[] test = new byte[5];
-                    for (int j = 0; j < test.length; j++) {
-                        test[j] = (byte)i;
-                    }
-                    cast.getBinarySupplData().setBytes(i, test);
+                    cast.getStringSupplData().setString(i, "Test " + i);
                 }
             }
             cast.setNumValues(chunkSize);
@@ -112,15 +108,11 @@ public class ArrowBinarySupplTest {
         for (int c = 0; c < numChunks; c++) {
             final ColumnData[] data = reader.read(c);
             @SuppressWarnings("unchecked")
-            final BinarySupplData<IntData> cast = (BinarySupplData<IntData>)data[0];
+            final StringSupplData<IntData> cast = (StringSupplData<IntData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
                 assertEquals(i, cast.getChunk().getInt(i));
                 if (i % 2 == 0) {
-                    byte[] test = cast.getBinarySupplData().getBytes(i);
-                    assertEquals(test.length, 5);
-                    for (int j = 0; j < test.length; j++) {
-                        assertEquals((byte)i, test[j]);
-                    }
+                    assertEquals(cast.getStringSupplData().getString(i), "Test " + i);
                 }
             }
             cast.release();
