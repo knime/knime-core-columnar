@@ -57,7 +57,7 @@ import org.knime.core.columnar.chunk.ColumnDataFactory;
 import org.knime.core.columnar.chunk.ColumnDataReader;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
 import org.knime.core.columnar.data.IntData;
-import org.knime.core.columnar.data.MissingValueData;
+import org.knime.core.columnar.data.NullableWithCauseData;
 
 public class ArrowStringSupplTest {
 
@@ -77,7 +77,7 @@ public class ArrowStringSupplTest {
 
             @Override
             public ColumnDataSpec<?> getColumnDataSpec(final int idx) {
-                return new MissingValueData.StringSupplDataSpec<>(new IntData.IntDataSpec());
+                return new NullableWithCauseData.NullableWithCauseDataSpec<>(new IntData.IntDataSpec());
             }
         };
 
@@ -90,7 +90,7 @@ public class ArrowStringSupplTest {
         for (int c = 0; c < numChunks; c++) {
             final ColumnData[] data = dataFac.create();
             @SuppressWarnings("unchecked")
-            final MissingValueData<IntData> cast = (MissingValueData<IntData>)data[0];
+            final NullableWithCauseData<IntData> cast = (NullableWithCauseData<IntData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
                 cast.getColumnData().setInt(i, i);
                 if (i % 2 == 0) {
@@ -108,7 +108,7 @@ public class ArrowStringSupplTest {
         for (int c = 0; c < numChunks; c++) {
             final ColumnData[] data = reader.read(c);
             @SuppressWarnings("unchecked")
-            final MissingValueData<IntData> cast = (MissingValueData<IntData>)data[0];
+            final NullableWithCauseData<IntData> cast = (NullableWithCauseData<IntData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
                 assertEquals(i, cast.getColumnData().getInt(i));
                 if (i % 2 == 0) {

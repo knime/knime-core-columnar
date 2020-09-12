@@ -54,10 +54,11 @@ import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.data.MissingValueData;
+import org.knime.core.columnar.data.NullableWithCauseData;
 import org.knime.core.columnar.phantom.CloseableCloser;
 
-public class ArrowMissingValueData<C extends ArrowData<?>> implements MissingValueData<C>, ArrowData<StructVector> {
+public class ArrowNullableWithCauseData<C extends ArrowData<?>>
+    implements NullableWithCauseData<C>, ArrowData<StructVector> {
 
     private AtomicInteger m_ref = new AtomicInteger(1);
 
@@ -71,7 +72,7 @@ public class ArrowMissingValueData<C extends ArrowData<?>> implements MissingVal
 
     private boolean m_hasSupplement = false;
 
-    public ArrowMissingValueData(final BufferAllocator allocator, final C data) {
+    public ArrowNullableWithCauseData(final BufferAllocator allocator, final C data) {
         m_data = data;
         m_supplement = new ArrowVarCharData(allocator);
         final CustomStructVector vector = new CustomStructVector("String Supplement", allocator);
@@ -81,7 +82,7 @@ public class ArrowMissingValueData<C extends ArrowData<?>> implements MissingVal
         m_struct = vector;
     }
 
-    public ArrowMissingValueData(final StructVector struct, final C data) {
+    public ArrowNullableWithCauseData(final StructVector struct, final C data) {
         m_struct = struct;
         m_data = data;
         final ValueVector supplement = struct.getChildByOrdinal(1);
@@ -154,7 +155,9 @@ public class ArrowMissingValueData<C extends ArrowData<?>> implements MissingVal
 
     @Override
     public synchronized void release() {
-        m_supplement.release();
+        if (m_supplement != null) {
+            m_supplement.release();
+        }
         m_data.release();
         if (m_ref.decrementAndGet() == 0) {
             m_struct.close();
@@ -163,7 +166,9 @@ public class ArrowMissingValueData<C extends ArrowData<?>> implements MissingVal
 
     @Override
     public synchronized void retain() {
-        m_supplement.retain();
+        if (m_supplement != null) {
+            m_supplement.retain();
+        }
         m_data.retain();
         m_ref.incrementAndGet();
     }
@@ -175,7 +180,11 @@ public class ArrowMissingValueData<C extends ArrowData<?>> implements MissingVal
 
     @Override
     public int sizeOf() {
-        return (int)(m_supplement.sizeOf() + m_data.sizeOf() + m_struct.getValidityBuffer().capacity());
+        if (m_hasSupplement) {
+            return (int)(m_supplement.sizeOf() + m_data.sizeOf() + m_struct.getValidityBuffer().capacity());
+        } else {
+            return (int)(m_data.sizeOf() + m_struct.getValidityBuffer().capacity());
+        }
     }
 
     private static final class CustomStructVector extends StructVector {

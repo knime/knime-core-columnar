@@ -77,7 +77,7 @@ import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.arrow.data.ArrowData;
 import org.knime.core.columnar.arrow.data.ArrowDictionaryHolder;
 import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.data.MissingValueData;
+import org.knime.core.columnar.data.NullableWithCauseData;
 
 class ArrowColumnDataWriter implements ColumnDataWriter {
 
@@ -112,14 +112,14 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
             if (arrowData instanceof ArrowDictionaryHolder) {
                 dicts.add(new Dictionary(((ArrowDictionaryHolder<?>)arrowData).getDictionary(),
                     arrowData.get().getField().getFieldType().getDictionary()));
-            } else if (arrowData instanceof MissingValueData) {
+            } else if (arrowData instanceof NullableWithCauseData) {
                 /*
                  * TODO recursive parsing for dictionaries for all nested types (especially if
                  * we have struct types different to BinarySupplData later).
                  *
                  * This implementation doesn't work for level-2 nested dictionaries.
                  */
-                final ArrowData<?> chunk = (ArrowData<?>)((MissingValueData<?>)arrowData).getColumnData();
+                final ArrowData<?> chunk = (ArrowData<?>)((NullableWithCauseData<?>)arrowData).getColumnData();
                 if (chunk instanceof ArrowDictionaryHolder) {
                     dicts.add(new Dictionary(((ArrowDictionaryHolder<?>)chunk).getDictionary(),
                         chunk.get().getField().getFieldType().getDictionary()));

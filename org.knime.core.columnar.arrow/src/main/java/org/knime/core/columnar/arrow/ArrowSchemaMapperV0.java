@@ -61,7 +61,7 @@ import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
 import org.knime.core.columnar.arrow.data.ArrowIntData;
 import org.knime.core.columnar.arrow.data.ArrowLongData;
-import org.knime.core.columnar.arrow.data.ArrowMissingValueData;
+import org.knime.core.columnar.arrow.data.ArrowNullableWithCauseData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData;
 import org.knime.core.columnar.arrow.data.ArrowVarCharData;
 import org.knime.core.columnar.data.DoubleData;
@@ -70,8 +70,8 @@ import org.knime.core.columnar.data.IntData;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
 import org.knime.core.columnar.data.LongData;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
-import org.knime.core.columnar.data.MissingValueData;
-import org.knime.core.columnar.data.MissingValueData.StringSupplDataSpec;
+import org.knime.core.columnar.data.NullableWithCauseData;
+import org.knime.core.columnar.data.NullableWithCauseData.NullableWithCauseDataSpec;
 import org.knime.core.columnar.data.StringData;
 import org.knime.core.columnar.data.StringData.StringDataSpec;
 import org.knime.core.columnar.data.VarBinaryData;
@@ -102,9 +102,9 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
             return new ArrowStringDataSpec((StringDataSpec)spec);
         } else if (spec instanceof IntDataSpec) {
             return new ArrowIntDataSpec();
-        } else if (spec instanceof StringSupplDataSpec) {
+        } else if (spec instanceof NullableWithCauseDataSpec) {
             @SuppressWarnings({"rawtypes", "unchecked"})
-            ArrowBinarySupplDataSpec<?> arrowSpec = new ArrowBinarySupplDataSpec((StringSupplDataSpec<?>)spec);
+            ArrowBinarySupplDataSpec<?> arrowSpec = new ArrowBinarySupplDataSpec((NullableWithCauseDataSpec<?>)spec);
             return arrowSpec;
         } else if (spec instanceof LongDataSpec) {
             return new ArrowLongDataSpec();
@@ -164,29 +164,29 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         }
     }
 
-    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>> implements ArrowColumnDataSpec<MissingValueData<C>> {
+    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>> implements ArrowColumnDataSpec<NullableWithCauseData<C>> {
 
-        private final StringSupplDataSpec<C> m_spec;
+        private final NullableWithCauseDataSpec<C> m_spec;
 
         private ArrowColumnDataSpec<C> m_arrowChunkSpec;
 
         @SuppressWarnings("unchecked")
-        public ArrowBinarySupplDataSpec(final StringSupplDataSpec<C> spec) {
+        public ArrowBinarySupplDataSpec(final NullableWithCauseDataSpec<C> spec) {
             m_spec = spec;
             m_arrowChunkSpec = (ArrowColumnDataSpec<C>)ArrowSchemaMapperV0.getMapping(m_spec.getChildSpec());
         }
 
         @Override
-        public MissingValueData<C> createEmpty(final BufferAllocator allocator) {
-            return new ArrowMissingValueData(allocator, m_arrowChunkSpec.createEmpty(allocator));
+        public NullableWithCauseData<C> createEmpty(final BufferAllocator allocator) {
+            return new ArrowNullableWithCauseData(allocator, m_arrowChunkSpec.createEmpty(allocator));
         }
 
         @Override
-        public MissingValueData<C> wrap(final FieldVector vector, final DictionaryProvider provider) {
+        public NullableWithCauseData<C> wrap(final FieldVector vector, final DictionaryProvider provider) {
             @SuppressWarnings("unchecked")
             final ArrowColumnDataSpec<C> arrowSpec = (ArrowColumnDataSpec<C>)getMapping(m_spec.getChildSpec());
             final C wrapped = arrowSpec.wrap((FieldVector)((StructVector)vector).getChildByOrdinal(0), provider);
-            return new ArrowMissingValueData((StructVector)vector, wrapped);
+            return new ArrowNullableWithCauseData((StructVector)vector, wrapped);
         }
     }
 

@@ -48,8 +48,8 @@ package org.knime.core.columnar.arrow.data;
 import java.util.function.Supplier;
 
 import org.apache.arrow.vector.FieldVector;
-import org.knime.core.columnar.NullableColumnData;
+import org.knime.core.columnar.data.NullableData;
 
-public interface ArrowData<F extends FieldVector> extends Supplier<F>, NullableColumnData {
+public interface ArrowData<F extends FieldVector> extends Supplier<F>, NullableData {
     // NB: Marker interface
 }
