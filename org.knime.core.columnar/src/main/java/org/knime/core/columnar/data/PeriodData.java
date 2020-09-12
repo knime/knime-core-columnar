@@ -48,9 +48,8 @@ package org.knime.core.columnar.data;
 import java.time.Period;
 
 import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface PeriodData extends NullableColumnData {
+public interface PeriodData extends NullableData {
 
     void setPeriod(int index, Period Period);
 

@@ -46,11 +46,10 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface StructData extends NullableColumnData {
+public interface StructData extends NullableData {
 
-    NullableColumnData getChunk(int index);
+    NullableData getChunk(int index);
 
     public class StructDataSpec implements ColumnDataSpec<StructData> {
 

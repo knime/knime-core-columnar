@@ -48,9 +48,8 @@ package org.knime.core.columnar.data;
 import java.time.LocalDateTime;
 
 import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface LocalDateTimeData extends NullableColumnData {
+public interface LocalDateTimeData extends NullableData {
     void setLocalDateTime(int index, LocalDateTime localDateTime);
 
     LocalDateTime getLocalDateTime(int index);

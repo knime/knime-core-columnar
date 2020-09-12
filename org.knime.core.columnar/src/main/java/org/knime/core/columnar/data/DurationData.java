@@ -48,9 +48,8 @@ package org.knime.core.columnar.data;
 import java.time.Duration;
 
 import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface DurationData extends NullableColumnData {
+public interface DurationData extends NullableData {
     void setDuration(int index, Duration localDateTime);
 
     Duration getDuration(int index);

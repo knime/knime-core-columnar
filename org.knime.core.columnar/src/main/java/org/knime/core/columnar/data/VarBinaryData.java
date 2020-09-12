@@ -46,9 +46,8 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface VarBinaryData extends NullableColumnData {
+public interface VarBinaryData extends NullableData {
     void setBytes(int index, byte[] data);
 
     byte[] getBytes(int index);

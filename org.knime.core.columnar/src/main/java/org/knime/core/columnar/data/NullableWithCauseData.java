@@ -43,17 +43,35 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.data;
 
-public interface NullableColumnData extends ColumnData {
-    /**
-     * @param set value missing at index. Default is false.
-     */
-    void setMissing(int index);
+import org.knime.core.columnar.ColumnData;
+import org.knime.core.columnar.ColumnDataSpec;
 
-    /**
-     * @param index of value
-     * @return true, if value is missing. Default is false.
-     */
-    boolean isMissing(int index);
+public interface NullableWithCauseData<C extends ColumnData> extends NullableData {
+    C getColumnData();
+
+    void setMissingWithCause(int i, String string);
+
+    String getMissingValueCause(int index);
+
+    public static class NullableWithCauseDataSpec<C extends NullableData>
+        implements ColumnDataSpec<NullableWithCauseData<C>> {
+        private final ColumnDataSpec<C> m_spec;
+
+        public NullableWithCauseDataSpec(final ColumnDataSpec<C> spec) {
+            m_spec = spec;
+        }
+
+        public ColumnDataSpec<C> getChildSpec() {
+            return m_spec;
+        }
+
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        @Override
+        public Class getColumnDataType() {
+            return NullableWithCauseData.class;
+        }
+    }
+
 }

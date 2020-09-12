@@ -46,9 +46,8 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface StringData extends NullableColumnData {
+public interface StringData extends NullableData {
     String getString(int index);
 
     void setString(int index, String val);

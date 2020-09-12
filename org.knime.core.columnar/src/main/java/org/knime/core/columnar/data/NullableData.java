@@ -46,33 +46,16 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface MissingValueData<C extends ColumnData> extends NullableColumnData {
-    C getColumnData();
+public interface NullableData extends ColumnData {
+    /**
+     * @param set value missing at index. Default is false.
+     */
+    void setMissing(int index);
 
-    void setMissingWithCause(int i, String string);
-
-    String getMissingValueCause(int index);
-
-    public static class StringSupplDataSpec<C extends NullableColumnData>
-        implements ColumnDataSpec<MissingValueData<C>> {
-        private final ColumnDataSpec<C> m_spec;
-
-        public StringSupplDataSpec(final ColumnDataSpec<C> spec) {
-            m_spec = spec;
-        }
-
-        public ColumnDataSpec<C> getChildSpec() {
-            return m_spec;
-        }
-
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        @Override
-        public Class getColumnDataType() {
-            return MissingValueData.class;
-        }
-    }
-
+    /**
+     * @param index of value
+     * @return true, if value is missing. Default is false.
+     */
+    boolean isMissing(int index);
 }

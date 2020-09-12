@@ -46,9 +46,8 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface FloatData extends NullableColumnData {
+public interface FloatData extends NullableData {
 
     float getFloat(int index);
 

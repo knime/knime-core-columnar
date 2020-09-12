@@ -46,9 +46,8 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.NullableColumnData;
 
-public interface DoubleData extends NullableColumnData {
+public interface DoubleData extends NullableData {
 
     double getDouble(int index);
 
