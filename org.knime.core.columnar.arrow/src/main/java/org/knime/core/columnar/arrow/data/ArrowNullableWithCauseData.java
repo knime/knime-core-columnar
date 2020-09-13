@@ -45,11 +45,12 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.types.pojo.ArrowType;
@@ -58,39 +59,32 @@ import org.knime.core.columnar.data.NullableWithCauseData;
 import org.knime.core.columnar.phantom.CloseableCloser;
 
 public class ArrowNullableWithCauseData<C extends ArrowData<?>>
-    implements NullableWithCauseData<C>, ArrowData<StructVector> {
+    implements NullableWithCauseData<C>, ArrowData<FieldVector> {
+
+    public final static String CFG_HAS_MISSING_WITH_CAUSE = "HAS_MISSING_WITH_CAUSE";
 
     private AtomicInteger m_ref = new AtomicInteger(1);
 
-    private final ArrowVarCharData m_supplement;
+    private ArrowVarCharData m_supplement;
 
     private C m_data;
 
-    private final StructVector m_struct;
-
     CloseableCloser m_vectorCloser;
 
-    private boolean m_hasSupplement = false;
+    private FieldVector m_vector;
 
     public ArrowNullableWithCauseData(final BufferAllocator allocator, final C data) {
         m_data = data;
-        m_supplement = new ArrowVarCharData(allocator);
-        final CustomStructVector vector = new CustomStructVector("String Supplement", allocator);
-
-        vector.putChild("Data", m_data.get());
-
-        m_struct = vector;
     }
 
-    public ArrowNullableWithCauseData(final StructVector struct, final C data) {
-        m_struct = struct;
+    public ArrowNullableWithCauseData(final C data, final StructVector vector) {
+        m_vector = vector;
+        m_supplement = new ArrowVarCharData((VarCharVector)vector.getChildByOrdinal(1));
+    }
+
+    public ArrowNullableWithCauseData(final C data) {
         m_data = data;
-        final ValueVector supplement = struct.getChildByOrdinal(1);
-        if (supplement != null) {
-            m_supplement = new ArrowVarCharData((VarCharVector)supplement);
-        } else {
-            m_supplement = null;
-        }
+        m_vector = data.get();
     }
 
     @Override
@@ -127,70 +121,81 @@ public class ArrowNullableWithCauseData<C extends ArrowData<?>>
      * {@inheritDoc}
      */
     @Override
-    public void setMissingWithCause(final int i, final String value) {
-        m_supplement.setString(i, value);
-        m_hasSupplement = true;
+    public void setMissingWithCause(final int index, final String value) {
+        if (m_supplement == null) {
+            m_supplement = new ArrowVarCharData(m_data.get().getAllocator());
+            m_supplement.ensureCapacity(m_data.getMaxCapacity());
+        }
+        setMissing(index);
+        m_supplement.setString(index, value);
     }
 
     @Override
     public String getMissingValueCause(final int index) {
-        return (!m_hasSupplement || !m_data.isMissing(index)) ? null : m_supplement.getString(index);
+        return (!hasSupplement() || !m_data.isMissing(index)) ? null : m_supplement.getString(index);
     }
 
     @Override
     public void setNumValues(final int numValues) {
         // TODO only set if any value is set.
-        if (m_hasSupplement) {
-            ((CustomStructVector)m_struct).putChild("String Supplement Child", m_supplement.get());
-            m_supplement.setNumValues(numValues);
-        } else {
-            // TODO release OK?
-            m_supplement.release();
-        }
         m_data.setNumValues(numValues);
-
-        // TODO: needed?
-        m_struct.setValueCount(numValues);
+        if (hasSupplement()) {
+            CustomStructVector struct = new CustomStructVector("String Supplement", m_data.get().getAllocator());
+            struct.putChild("Data", m_data.get());
+            struct.putChild("String Supplement Child", m_supplement.get());
+            struct.setValueCount(numValues);
+            m_vector = struct;
+        } else {
+            m_vector = m_data.get();
+        }
     }
 
     @Override
     public synchronized void release() {
-        if (m_supplement != null) {
-            m_supplement.release();
-        }
-        m_data.release();
         if (m_ref.decrementAndGet() == 0) {
-            m_struct.close();
+            if (hasSupplement()) {
+                m_supplement.release();
+
+                if (m_vector != null) {
+                    m_vector.clear();
+                }
+            }
+            m_data.release();
         }
     }
 
     @Override
     public synchronized void retain() {
-        if (m_supplement != null) {
-            m_supplement.retain();
-        }
-        m_data.retain();
         m_ref.incrementAndGet();
     }
 
     @Override
-    public StructVector get() {
-        return m_struct;
+    public FieldVector get() {
+        return m_vector;
     }
 
     @Override
     public int sizeOf() {
-        if (m_hasSupplement) {
-            return (int)(m_supplement.sizeOf() + m_data.sizeOf() + m_struct.getValidityBuffer().capacity());
+        if (hasSupplement()) {
+            return (int)(m_supplement.sizeOf() + m_data.sizeOf() + m_vector.getValidityBuffer().capacity());
         } else {
-            return (int)(m_data.sizeOf() + m_struct.getValidityBuffer().capacity());
+            return (m_data.sizeOf());
         }
+    }
+
+    private boolean hasSupplement() {
+        return m_supplement != null;
     }
 
     private static final class CustomStructVector extends StructVector {
 
+        private static final Map<String, String> METADATA = new HashMap<>();
+        static {
+            METADATA.put(CFG_HAS_MISSING_WITH_CAUSE, "true");
+        }
+
         public CustomStructVector(final String name, final BufferAllocator allocator) {
-            super(name, allocator, new FieldType(false, ArrowType.Struct.INSTANCE, null, null), null);
+            super(name, allocator, new FieldType(false, ArrowType.Struct.INSTANCE, null, METADATA), null);
         }
 
         @Override

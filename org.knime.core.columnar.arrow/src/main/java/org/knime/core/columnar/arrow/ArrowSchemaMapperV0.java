@@ -45,6 +45,8 @@
  */
 package org.knime.core.columnar.arrow;
 
+import java.util.Map;
+
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
@@ -164,7 +166,8 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         }
     }
 
-    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>> implements ArrowColumnDataSpec<NullableWithCauseData<C>> {
+    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>>
+        implements ArrowColumnDataSpec<NullableWithCauseData<C>> {
 
         private final NullableWithCauseDataSpec<C> m_spec;
 
@@ -185,8 +188,14 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         public NullableWithCauseData<C> wrap(final FieldVector vector, final DictionaryProvider provider) {
             @SuppressWarnings("unchecked")
             final ArrowColumnDataSpec<C> arrowSpec = (ArrowColumnDataSpec<C>)getMapping(m_spec.getChildSpec());
-            final C wrapped = arrowSpec.wrap((FieldVector)((StructVector)vector).getChildByOrdinal(0), provider);
-            return new ArrowNullableWithCauseData((StructVector)vector, wrapped);
+            final Map<String, String> metadata = vector.getField().getMetadata();
+            if (metadata.get(ArrowNullableWithCauseData.CFG_HAS_MISSING_WITH_CAUSE) != null) {
+                final C wrapped = arrowSpec.wrap((FieldVector)((StructVector)vector).getChildByOrdinal(0), provider);
+                return new ArrowNullableWithCauseData(wrapped, (StructVector)vector);
+            } else {
+                return new ArrowNullableWithCauseData<C>(arrowSpec.wrap(vector, provider));
+            }
+
         }
     }
 

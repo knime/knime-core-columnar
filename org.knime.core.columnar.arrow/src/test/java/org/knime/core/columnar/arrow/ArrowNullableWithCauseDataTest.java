@@ -59,7 +59,7 @@ import org.knime.core.columnar.chunk.ColumnDataWriter;
 import org.knime.core.columnar.data.IntData;
 import org.knime.core.columnar.data.NullableWithCauseData;
 
-public class ArrowStringSupplTest {
+public class ArrowNullableWithCauseDataTest {
 
     @Test
     public void testBinarySupplement() throws Exception {
@@ -92,9 +92,10 @@ public class ArrowStringSupplTest {
             @SuppressWarnings("unchecked")
             final NullableWithCauseData<IntData> cast = (NullableWithCauseData<IntData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
-                cast.getColumnData().setInt(i, i);
                 if (i % 2 == 0) {
                     cast.setMissingWithCause(i, "Test " + i);
+                } else {
+                    cast.getColumnData().setInt(i, i);
                 }
             }
             cast.setNumValues(chunkSize);
@@ -110,9 +111,10 @@ public class ArrowStringSupplTest {
             @SuppressWarnings("unchecked")
             final NullableWithCauseData<IntData> cast = (NullableWithCauseData<IntData>)data[0];
             for (int i = 0; i < chunkSize; i++) {
-                assertEquals(i, cast.getColumnData().getInt(i));
                 if (i % 2 == 0) {
                     assertEquals(cast.getMissingValueCause(i), "Test " + i);
+                } else {
+                    assertEquals(i, cast.getColumnData().getInt(i));
                 }
             }
             cast.release();
