@@ -58,6 +58,8 @@ abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowDa
 
     private int m_maxCapacity;
 
+    private int m_numValues;
+
     AbstractFieldVectorData(final BufferAllocator allocator) {
         m_vector = create(allocator);
     }
@@ -95,11 +97,12 @@ abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowDa
 
     @Override
     public int getNumValues() {
-        return m_vector.getValueCount();
+        return m_numValues;
     }
 
     @Override
     public void setNumValues(final int numValues) {
+        m_numValues = numValues;
         m_vector.setValueCount(numValues);
     }
 
