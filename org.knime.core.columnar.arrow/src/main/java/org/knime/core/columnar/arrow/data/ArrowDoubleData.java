@@ -77,6 +77,11 @@ public class ArrowDoubleData extends AbstractFieldVectorData<Float8Vector> imple
     }
 
     @Override
+    public boolean isMissing(final int index) {
+        return m_vector.isSet(index) == 0;
+    }
+
+    @Override
     public void ensureCapacityInternal(final int chunkSize) {
         m_vector.allocateNew(chunkSize);
     }
