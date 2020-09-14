@@ -42,21 +42,42 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 20, 2020 (dietzc): created
  */
 package org.knime.core.columnar.data;
 
-import org.knime.core.columnar.ColumnDataSpec;
+@SuppressWarnings("javadoc")
+public final class ByteData {
 
-public interface ByteData extends NullableData {
+    private ByteData() {
+    }
 
-    byte getByte(int index);
+    public interface ByteReadData extends ColumnData {
+        byte getByte(int index);
+    }
 
-    void setByte(int index, byte val);
+    public interface ByteWriteData extends ColumnWriteData {
 
-    class ByteDataSpec implements ColumnDataSpec<ByteData> {
+        void setByte(int index, byte val);
+
         @Override
-        public Class<? extends ByteData> getColumnDataType() {
-            return ByteData.class;
+        ByteReadData close(int length);
+
+    }
+
+    public static final class ByteDataSpec implements ColumnDataSpec {
+
+        public static final ByteDataSpec INSTANCE = new ByteDataSpec();
+
+        private ByteDataSpec() {
         }
+
+        @Override
+        public <R> R accept(final Mapper<R> v) {
+            return v.visit(this);
+        }
+
     }
 }

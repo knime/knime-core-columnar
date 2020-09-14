@@ -50,7 +50,7 @@ package org.knime.core.columnar.cache;
 
 import java.util.Objects;
 
-import org.knime.core.columnar.ColumnReadStore;
+import org.knime.core.columnar.store.ColumnReadStore;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany

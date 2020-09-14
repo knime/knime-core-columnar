@@ -47,7 +47,8 @@ package org.knime.core.columnar;
 
 import java.io.Closeable;
 
-import org.knime.core.columnar.data.DoubleData;
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.phantom.CloseableDelegateFinalizer;
 
 /**
@@ -55,7 +56,7 @@ import org.knime.core.columnar.phantom.CloseableDelegateFinalizer;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestDoubleColumnData implements DoubleData {
+public final class TestDoubleColumnData implements DoubleWriteData, DoubleReadData {
 
     public static final class Delegate implements Closeable {
 
@@ -84,13 +85,15 @@ public final class TestDoubleColumnData implements DoubleData {
 
     private CloseableDelegateFinalizer m_closed;
 
-    public static TestDoubleColumnData create() {
-        final TestDoubleColumnData data = new TestDoubleColumnData();
+    public static TestDoubleColumnData create(final int capacity) {
+        final TestDoubleColumnData data = new TestDoubleColumnData(capacity);
         data.m_closed = CloseableDelegateFinalizer.create(data, data.m_delegate, "Test Column Data");
         return data;
     }
 
-    private TestDoubleColumnData() {
+    private TestDoubleColumnData(final int capacity) {
+        m_chunkCapacity = capacity;
+        m_values = new Double[capacity];
     }
 
     public static TestDoubleColumnData create(final Double... doubles) {
@@ -122,24 +125,40 @@ public final class TestDoubleColumnData implements DoubleData {
         return m_numValues;
     }
 
-    @Override
-    public void ensureCapacity(final int capacity) {
-        m_chunkCapacity = capacity;
-        m_values = new Double[m_chunkCapacity];
-    }
+//    @Override
+//    public void ensureCapacity(final int capacity) {
+//        m_chunkCapacity = capacity;
+//        m_values = new Double[m_chunkCapacity];
+//    }
+//
+//    @Override
+//    public int getMaxCapacity() {
+//        return m_chunkCapacity;
+//    }
+//
+//    @Override
+//    public synchronized void setNumValues(final int numValues) {
+//        m_numValues = numValues;
+//    }
+//
+//    @Override
+//    public synchronized int getNumValues() {
+//        return m_numValues;
+//    }
 
     @Override
-    public int getMaxCapacity() {
+    public int capacity() {
         return m_chunkCapacity;
     }
 
     @Override
-    public synchronized void setNumValues(final int numValues) {
-        m_numValues = numValues;
+    public DoubleReadData close(final int length) {
+        m_numValues = length;
+        return this;
     }
 
     @Override
-    public synchronized int getNumValues() {
+    public int length() {
         return m_numValues;
     }
 

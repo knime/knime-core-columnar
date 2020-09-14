@@ -47,18 +47,39 @@ package org.knime.core.columnar.data;
 
 import java.time.Period;
 
-import org.knime.core.columnar.ColumnDataSpec;
+@SuppressWarnings("javadoc")
+public final class PeriodData {
 
-public interface PeriodData extends NullableData {
-
-    void setPeriod(int index, Period Period);
-
-    Period getPeriod(int index);
-
-    public final class PeriodDataSpec implements ColumnDataSpec<PeriodData> {
-        @Override
-        public Class<? extends PeriodData> getColumnDataType() {
-            return PeriodData.class;
-        }
+    private PeriodData() {
     }
+
+    public static interface PeriodReadData extends ColumnData {
+
+        Period getPeriod(int index);
+
+    }
+
+    public static interface PeriodWriteData extends ColumnWriteData {
+
+        void setPeriod(int index, Period val);
+
+        @Override
+        PeriodReadData close(int length);
+
+    }
+
+    public static final class PeriodDataSpec implements ColumnDataSpec {
+
+        public static final PeriodDataSpec INSTANCE = new PeriodDataSpec();
+
+        private PeriodDataSpec() {
+        }
+
+        @Override
+        public <R> R accept(final Mapper<R> v) {
+            return v.visit(this);
+        }
+
+    }
+
 }

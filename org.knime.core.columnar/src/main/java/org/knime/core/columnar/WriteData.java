@@ -45,21 +45,11 @@
  */
 package org.knime.core.columnar;
 
-import java.io.Closeable;
-import java.io.IOException;
+@SuppressWarnings("javadoc")
+public interface WriteData extends ReferencedData {
 
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnSelection;
+    int capacity();
 
-public interface ColumnReadStore extends Closeable {
-    ColumnDataReader createReader(ColumnSelection config);
+    ReadData close(int length);
 
-    default ColumnDataReader createReader() {
-        return createReader(null);
-    }
-
-    ColumnStoreSchema getSchema();
-
-    @Override
-    void close() throws IOException;
 }

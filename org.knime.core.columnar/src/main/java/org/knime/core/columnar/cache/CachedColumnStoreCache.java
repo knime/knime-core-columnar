@@ -48,7 +48,7 @@
  */
 package org.knime.core.columnar.cache;
 
-import org.knime.core.columnar.ColumnData;
+import org.knime.core.columnar.data.ColumnData;
 
 /**
  * A cache for storing data that can be shared between multiple {@link CachedColumnReadStore CachedColumnReadStores}.

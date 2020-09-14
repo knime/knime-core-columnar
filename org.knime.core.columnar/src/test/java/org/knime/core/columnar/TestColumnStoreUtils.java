@@ -54,14 +54,19 @@ import static org.junit.Assert.assertEquals;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.chunk.ColumnSelectionUtil;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.DefaultBatch;
+import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -118,7 +123,7 @@ public final class TestColumnStoreUtils {
             }
 
             @Override
-            public ColumnDataSpec<?> getColumnDataSpec(final int idx) {
+            public ColumnDataSpec getColumnDataSpec(final int idx) {
                 return null;
             }
         };
@@ -133,16 +138,18 @@ public final class TestColumnStoreUtils {
     }
 
     private static TestDoubleColumnData[] createBatch(final ColumnStore store) {
-        final TestDoubleColumnData[] batch = (TestDoubleColumnData[])store.getFactory().create();
+        final WriteBatch batch = store.getFactory().create();
+        final TestDoubleColumnData[] data = new TestDoubleColumnData[store.getSchema().getNumColumns()];
 
-        for (final TestDoubleColumnData data : batch) {
-            for (int i = 0; i < data.getMaxCapacity(); i++) {
-                data.setDouble(i, RUNNING_DOUBLE++);
+        for (int i = 0; i < store.getSchema().getNumColumns(); i++) {
+            for (int j = 0; j < batch.capacity(); j++) {
+                data[i] = ((TestDoubleColumnData)batch.get(i));
+                data[i].setDouble(j, RUNNING_DOUBLE++);
             }
-            data.setNumValues(data.getMaxCapacity());
         }
+        batch.close(batch.capacity());
 
-        return batch;
+        return data;
     }
 
     public static TestTable createTable(final ColumnStore store, final int numBatches) {
@@ -185,7 +192,9 @@ public final class TestColumnStoreUtils {
     public static void writeTable(final ColumnStore store, final TestTable table) throws IOException {
         try (final ColumnDataWriter writer = store.getWriter()) {
             for (int i = 0; i < table.size(); i++) {
-                writer.write(table.getBatch(i));
+                final TestDoubleColumnData[] batch = table.getBatch(i);
+                final int length = batch[0].length();
+                writer.write(new DefaultBatch(store.getSchema(), batch, length));
             }
         }
     }
@@ -207,28 +216,31 @@ public final class TestColumnStoreUtils {
     public static TestTable readSelectionAndCompareTable(final ColumnStore store, final TestTable table,
         final int... indices) throws IOException {
 
-        try (final ColumnDataReader reader = store.createReader(ColumnSelectionUtil.create(indices))) {
-            assertEquals(table.size(), reader.getNumChunks());
+        try (final ColumnDataReader reader = indices == null ? store.createReader()
+            : store.createReader(new FilteredColumnSelection(store.getSchema(), indices))) {
+            assertEquals(table.size(), reader.getNumBatches());
 
             final List<TestDoubleColumnData[]> result = new ArrayList<>();
-            for (int i = 0; i < reader.getNumChunks(); i++) {
+            for (int i = 0; i < reader.getNumBatches(); i++) {
                 final TestDoubleColumnData[] written = table.getBatch(i);
-                final TestDoubleColumnData[] batch = Arrays.stream(reader.read(i))
-                    .map(data -> (TestDoubleColumnData)data).toArray(TestDoubleColumnData[]::new);
+                final Batch batch = reader.readRetained(i);
+                final TestDoubleColumnData[] data = new TestDoubleColumnData[store.getSchema().getNumColumns()];
 
-                assertEquals(written.length, batch.length);
+                assertEquals(written.length, data.length);
 
                 if (indices == null) {
                     for (int j = 0; j < written.length; j++) {
-                        assertArrayEquals(written[j].get(), (batch[j]).get());
+                        data[j] = (TestDoubleColumnData)batch.get(j);
+                        assertArrayEquals(written[j].get(), data[j].get());
                     }
                 } else {
-                    for (int j = 0; j < indices.length; j++) {
-                        assertArrayEquals(written[indices[j]].get(), (batch[indices[j]]).get());
+                    for (int j : indices) {
+                        data[indices[j]] = (TestDoubleColumnData)batch.get(j);
+                        assertArrayEquals(written[indices[j]].get(), data[indices[j]].get());
                     }
                 }
 
-                result.add(batch);
+                result.add(data);
             }
             return new TestTable(result);
         }
@@ -237,24 +249,19 @@ public final class TestColumnStoreUtils {
     public static void readTwiceAndCompareTable(final ColumnStore store) throws IOException {
         try (final ColumnDataReader reader1 = store.createReader();
                 final ColumnDataReader reader2 = store.createReader()) {
-            assertEquals(reader1.getNumChunks(), reader2.getNumChunks());
-            for (int i = 0; i < reader1.getNumChunks(); i++) {
-                final TestDoubleColumnData[] batch1 = Arrays.stream(reader1.read(i))
-                    .map(data -> (TestDoubleColumnData)data).toArray(TestDoubleColumnData[]::new);
-                final TestDoubleColumnData[] batch2 = Arrays.stream(reader2.read(i))
-                    .map(data -> (TestDoubleColumnData)data).toArray(TestDoubleColumnData[]::new);
+            assertEquals(reader1.getNumBatches(), reader2.getNumBatches());
+            for (int i = 0; i < reader1.getNumBatches(); i++) {
+                final Batch batch1 = reader1.readRetained(i);
+                final Batch batch2 = reader2.readRetained(i);
 
-                assertEquals(batch1.length, batch2.length);
-                for (int j = 0; j < batch1.length; j++) {
-                    assertArrayEquals(batch1[j].get(), (batch2[j]).get());
+                assertEquals(batch1.length(), batch2.length());
+                for (int j = 0; j < batch1.length(); j++) {
+                    assertArrayEquals(((TestDoubleColumnData)batch1.get(j)).get(),
+                        ((TestDoubleColumnData)batch2.get(j)).get());
                 }
 
-                for (final ColumnData data : batch1) {
-                    data.release();
-                }
-                for (final ColumnData data : batch2) {
-                    data.release();
-                }
+                batch1.release();
+                batch2.release();
             }
         }
     }

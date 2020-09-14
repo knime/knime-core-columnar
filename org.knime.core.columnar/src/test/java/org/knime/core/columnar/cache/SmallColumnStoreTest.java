@@ -62,13 +62,13 @@ import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
 import java.io.IOException;
 
 import org.junit.Test;
-import org.knime.core.columnar.ColumnStore;
 import org.knime.core.columnar.TestColumnStore;
 import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStore;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -231,14 +231,14 @@ public class SmallColumnStoreTest {
             checkFlushed(table1, delegate1);
 
             try {
-                store1.saveToFile(null);
+                store1.save(null);
             } catch (UnsupportedOperationException e) {
             }
             checkUncached(table1);
             checkFlushed(table1, delegate1);
 
             try {
-                store2.saveToFile(null);
+                store2.save(null);
             } catch (UnsupportedOperationException e) {
             }
             checkCached(table2);
@@ -272,7 +272,7 @@ public class SmallColumnStoreTest {
             checkUnflushed(table1, delegate1);
 
             try {
-                store1.saveToFile(null);
+                store1.save(null);
             } catch (UnsupportedOperationException e) {
             }
             checkCached(table1);
@@ -285,7 +285,7 @@ public class SmallColumnStoreTest {
             checkFlushed(table1, delegate1);
 
             try {
-                store2.saveToFile(null);
+                store2.save(null);
             } catch (UnsupportedOperationException e) {
             }
             checkCached(table2);
@@ -425,7 +425,7 @@ public class SmallColumnStoreTest {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
-                store.saveToFile(null);
+                store.save(null);
             }
         }
     }
@@ -439,7 +439,7 @@ public class SmallColumnStoreTest {
                 writeTable(store, table);
             }
             store.close();
-            store.saveToFile(null);
+            store.save(null);
         }
     }
 
@@ -478,7 +478,7 @@ public class SmallColumnStoreTest {
             }
             try (final ColumnDataReader reader = store.createReader()) {
                 reader.close();
-                reader.read(0);
+                reader.readRetained(0);
             }
         }
     }
@@ -493,7 +493,7 @@ public class SmallColumnStoreTest {
             }
             try (final ColumnDataReader reader = store.createReader()) {
                 store.close();
-                reader.read(0);
+                reader.readRetained(0);
             }
         }
     }

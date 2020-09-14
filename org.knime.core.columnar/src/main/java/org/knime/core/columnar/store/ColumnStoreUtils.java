@@ -43,7 +43,7 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.store;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -57,7 +57,8 @@ import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.phantom.PhantomReferenceReadStore;
 import org.knime.core.columnar.phantom.PhantomReferenceStore;
 
-public class ColumnStoreUtils {
+@SuppressWarnings("javadoc")
+public final class ColumnStoreUtils {
 
     public static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
 
@@ -89,11 +90,13 @@ public class ColumnStoreUtils {
     private ColumnStoreUtils() {
     }
 
+    @SuppressWarnings("resource")
     public static ColumnStore cache(final ColumnStore store) {
         return PhantomReferenceStore.create(new SmallColumnStore(
             new AsyncFlushCachedColumnStore(store, COLUMN_DATA_CACHE, ASYNC_FLUSH_EXECUTOR), SMALL_TABLES_CACHE));
     }
 
+    @SuppressWarnings("resource")
     public static ColumnReadStore cache(final ColumnReadStore store) {
         return PhantomReferenceReadStore.create(new CachedColumnReadStore(store, COLUMN_DATA_CACHE));
     }

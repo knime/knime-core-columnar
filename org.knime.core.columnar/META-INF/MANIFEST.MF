@@ -10,7 +10,9 @@ Require-Bundle: org.junit;bundle-version="[4.12.0,5.0.0)";resolution:=optional,
  org.awaitility;bundle-version="[3.0.0,4.0.0)";resolution:=optional,
  com.google.guava;bundle-version="19.0.0"
 Export-Package: org.knime.core.columnar,
+ org.knime.core.columnar.batch,
  org.knime.core.columnar.cache,
- org.knime.core.columnar.chunk,
  org.knime.core.columnar.data,
- org.knime.core.columnar.phantom
+ org.knime.core.columnar.filter,
+ org.knime.core.columnar.phantom,
+ org.knime.core.columnar.store

@@ -42,33 +42,60 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   9 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.filter;
 
-import java.io.File;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.function.IntFunction;
 
-/**
- * @author Christian Dietz, KNIME GmbH, Konstanz
- */
-public interface ColumnStoreFactory {
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.DefaultBatch;
+import org.knime.core.columnar.batch.FilteredBatch;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
-    /**
-     * Creates a new {@link ColumnStore}.
-     *
-     * @param the physical {@link ColumnStoreSchema}
-     * @param file to store data if out of memory
-     * @param minChunkSize the size of one chunk.
-     * @return a {@link ColumnStore} with the given schema.
-     */
-    ColumnStore createWriteStore(ColumnStoreSchema schema, File file, int minChunkSize);
+@SuppressWarnings("javadoc")
+public class FilteredColumnSelection implements ColumnSelection {
 
-    /**
-     * Creates a new {@link ColumnReadStore}, reading data from the provided file.
-     *
-     * @param schema creates a {@link ColumnReadStore}.
-     * @param file from which data is read.
-     * @return the ColumnReadStore.
-     */
-    ColumnReadStore createReadStore(ColumnStoreSchema schema, File file);
+    private final ColumnStoreSchema m_schema;
+
+    private final int[] m_indices;
+
+    public FilteredColumnSelection(final ColumnStoreSchema schema, final int... indices) {
+        Objects.requireNonNull(schema, () -> "Column Store schema must not be null.");
+        Objects.requireNonNull(indices, () -> "Indices must not be null.");
+
+        m_schema = schema;
+        m_indices = Arrays.stream(indices).sorted().distinct().toArray();
+        if (m_indices.length > 0) {
+            if (m_indices[0] < 0) {
+                throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", m_indices[0]));
+            }
+            if (m_indices[m_indices.length - 1] > schema.getNumColumns()) {
+                throw new IndexOutOfBoundsException(
+                    String.format("Column index %d larger then the column store's number of columns (%d).",
+                        m_indices[m_indices.length - 1], schema.getNumColumns()));
+            }
+        }
+    }
+
+    public int[] includes() {
+        return m_indices;
+    }
+
+    @Override
+    public Batch createBatch(final IntFunction<ColumnData> function) {
+        final ColumnData[] batch = new ColumnData[m_schema.getNumColumns()];
+        int length = 0;
+        for (int i : includes()) {
+            batch[i] = function.apply(i);
+            length = Math.max(length, batch[i].length());
+        }
+        return new FilteredBatch(this, new DefaultBatch(m_schema, batch, length));
+    }
 
 }

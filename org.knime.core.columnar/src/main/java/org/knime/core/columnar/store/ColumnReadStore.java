@@ -43,39 +43,42 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.data;
+package org.knime.core.columnar.store;
 
+import java.io.Closeable;
+import java.io.IOException;
+
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.DefaultColumnSelection;
+
+/**
+ * A store from which columnar data can be read. The life cycle of a read store
+ * is as follows:
+ * <ol>
+ * <li>Any number of {@link ColumnDataReader readers} are created via
+ * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
+ * <li>Data is read from these readers via
+ * {@link ColumnDataReader#readRetained(int)}.</li>
+ * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
+ * <li>Finally, the store itself is closed via {@link #close()}, upon which any
+ * underlying resources will be relinquished.</li>
+ * </ol>
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
 @SuppressWarnings("javadoc")
-public final class BooleanData {
+public interface ColumnReadStore extends Closeable {
 
-    private BooleanData() {
+    ColumnDataReader createReader(ColumnSelection config);
+
+    default ColumnDataReader createReader() {
+        return createReader(new DefaultColumnSelection(getSchema()));
     }
 
-    public static interface BooleanReadData extends ColumnData {
-        boolean getBoolean(int index);
-    }
+    ColumnStoreSchema getSchema();
 
-    public static interface BooleanWriteData extends ColumnWriteData {
-
-        void setBoolean(int index, boolean val);
-
-        @Override
-        BooleanReadData close(int length);
-
-    }
-
-    public static final class BooleanDataSpec implements ColumnDataSpec {
-
-        public static final BooleanDataSpec INSTANCE = new BooleanDataSpec();
-
-        private BooleanDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
-
-    }
+    @Override
+    void close() throws IOException;
 
 }

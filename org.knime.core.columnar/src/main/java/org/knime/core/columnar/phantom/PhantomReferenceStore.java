@@ -48,21 +48,22 @@
  */
 package org.knime.core.columnar.phantom;
 
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
 
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnStore;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
  * A {@link ColumnStore} that delegates all operations to a delegate store. Similarly, its {@link ColumnDataWriter
@@ -96,7 +97,7 @@ public final class PhantomReferenceStore implements ColumnStore {
         }
 
         @Override
-        public ColumnData[] create() {
+        public WriteBatch create() {
             if (m_writerClosed.isClosed()) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -130,7 +131,7 @@ public final class PhantomReferenceStore implements ColumnStore {
         }
 
         @Override
-        public void write(final ColumnData[] record) throws IOException {
+        public void write(final Batch batch) throws IOException {
             if (m_closed.isClosed()) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -138,7 +139,7 @@ public final class PhantomReferenceStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            m_delegate.write(record);
+            m_delegate.write(batch);
         }
 
         @Override
@@ -211,7 +212,7 @@ public final class PhantomReferenceStore implements ColumnStore {
     }
 
     @Override
-    public void saveToFile(final File f) throws IOException {
+    public void save(final File f) throws IOException {
         if (!m_writerClosed.isClosed()) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }
@@ -219,7 +220,7 @@ public final class PhantomReferenceStore implements ColumnStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        m_delegate.saveToFile(f);
+        m_delegate.save(f);
     }
 
     @Override

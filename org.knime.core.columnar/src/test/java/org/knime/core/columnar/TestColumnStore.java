@@ -45,10 +45,10 @@
  */
 package org.knime.core.columnar;
 
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
 
 import java.io.File;
 import java.io.IOException;
@@ -56,12 +56,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
 
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.DefaultWriteBatch;
+import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -73,18 +77,17 @@ public final class TestColumnStore implements ColumnStore {
     final class TestColumnDataFactory implements ColumnDataFactory {
 
         @Override
-        public ColumnData[] create() {
+        public WriteBatch create() {
             if (m_storeClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
             final TestDoubleColumnData[] data = new TestDoubleColumnData[m_schema.getNumColumns()];
-            m_tracker.add(data);
             for (int i = 0; i < m_schema.getNumColumns(); i++) {
-                data[i] = TestDoubleColumnData.create();
-                data[i].ensureCapacity(m_maxDataCapacity);
+                data[i] = TestDoubleColumnData.create(m_maxDataCapacity);
+                m_tracker.add(data[i]);
             }
-            return data;
+            return new DefaultWriteBatch(m_schema, data, m_maxDataCapacity);
         }
 
     }
@@ -92,7 +95,7 @@ public final class TestColumnStore implements ColumnStore {
     final class TestColumnDataWriter implements ColumnDataWriter {
 
         @Override
-        public void write(final ColumnData[] batch) throws IOException {
+        public void write(final Batch batch) throws IOException {
             if (m_writerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -100,12 +103,13 @@ public final class TestColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final Double[][] data = new Double[batch.length][];
+            final Double[][] data = new Double[batch.length()][];
             for (int i = 0; i < data.length; i++) {
-                data[i] = ((TestDoubleColumnData)batch[i]).get();
+                TestDoubleColumnData testData = (TestDoubleColumnData)batch.get(i);
+                data[i] = testData.get();
                 // last batch might have less values than its max capacity
-                if (data[i].length > batch[i].getNumValues()) {
-                    data[i] = Arrays.copyOf(data[i], batch[i].getNumValues());
+                if (data[i].length > testData.length()) {
+                    data[i] = Arrays.copyOf(data[i], testData.length());
                 }
             }
 
@@ -121,18 +125,17 @@ public final class TestColumnStore implements ColumnStore {
 
     final class TestColumnDataReader implements ColumnDataReader {
 
-        private final int[] m_indices;
+        private final ColumnSelection m_selection;
 
         private boolean m_readerClosed;
 
         TestColumnDataReader(final ColumnSelection selection) {
-            m_indices = selection != null && selection.get() != null ? selection.get()
-                : IntStream.range(0, getSchema().getNumColumns()).toArray();
+            m_selection = selection;
             m_numOpenReaders.incrementAndGet();
         }
 
         @Override
-        public ColumnData[] read(final int chunkIndex) throws IOException {
+        public Batch readRetained(final int chunkIndex) throws IOException {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -141,22 +144,20 @@ public final class TestColumnStore implements ColumnStore {
             }
 
             final Double[][] data = m_batches.get(chunkIndex);
-
-            final TestDoubleColumnData[] batch = new TestDoubleColumnData[data.length];
-            m_tracker.add(batch);
-            for (final int i : m_indices) {
-                batch[i] = TestDoubleColumnData.create(data[i]);
-            }
-            return batch;
+            return m_selection.createBatch(i -> {
+                TestDoubleColumnData newData = TestDoubleColumnData.create(data[i]);
+                m_tracker.add(newData);
+                return newData;
+            });
         }
 
         @Override
-        public int getNumChunks() {
+        public int getNumBatches() {
             return m_batches.size();
         }
 
         @Override
-        public int getMaxDataCapacity() {
+        public int getMaxLength() {
             return m_maxDataCapacity;
         }
 
@@ -178,7 +179,7 @@ public final class TestColumnStore implements ColumnStore {
 
     private final List<Double[][]> m_batches = new ArrayList<>();
 
-    private final List<TestDoubleColumnData[]> m_tracker = new ArrayList<>();
+    private final List<TestDoubleColumnData> m_tracker = new ArrayList<>();
 
     private final AtomicInteger m_numOpenReaders = new AtomicInteger();
 
@@ -217,7 +218,7 @@ public final class TestColumnStore implements ColumnStore {
     }
 
     @Override
-    public void saveToFile(final File f) throws IOException {
+    public void save(final File f) throws IOException {
         if (!m_writerClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }
@@ -245,11 +246,9 @@ public final class TestColumnStore implements ColumnStore {
         m_storeClosed = true;
 
         // check if all memory has been released before closing this store.
-        for (final TestDoubleColumnData[] chunk : m_tracker) {
-            for (final TestDoubleColumnData data : chunk) {
-                if (data != null && data.getRefs() != 0) {
-                    throw new IllegalStateException("Data not closed.");
-                }
+        for (final TestDoubleColumnData data : m_tracker) {
+            if (data.getRefs() != 0) {
+                throw new IllegalStateException("Data not closed.");
             }
         }
     }

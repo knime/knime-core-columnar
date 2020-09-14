@@ -42,33 +42,39 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   21 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.data;
 
 @SuppressWarnings("javadoc")
-public final class BooleanData {
+public final class VoidData {
 
-    private BooleanData() {
+    private VoidData() {
     }
 
-    public static interface BooleanReadData extends ColumnData {
-        boolean getBoolean(int index);
-    }
-
-    public static interface BooleanWriteData extends ColumnWriteData {
-
-        void setBoolean(int index, boolean val);
+    public static interface VoidWriteData extends ColumnWriteData {
 
         @Override
-        BooleanReadData close(int length);
+        VoidReadData close(int length);
 
     }
 
-    public static final class BooleanDataSpec implements ColumnDataSpec {
+    public static interface VoidReadData extends ColumnData {
 
-        public static final BooleanDataSpec INSTANCE = new BooleanDataSpec();
+        @Override
+        default boolean isMissing(final int index) {
+            return true;
+        }
 
-        private BooleanDataSpec() {
+    }
+
+    public static final class VoidDataSpec implements ColumnDataSpec {
+
+        public static final VoidDataSpec INSTANCE = new VoidDataSpec();
+
+        private VoidDataSpec() {
         }
 
         @Override

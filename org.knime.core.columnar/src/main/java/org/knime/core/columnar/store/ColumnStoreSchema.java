@@ -43,9 +43,15 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.store;
 
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
-    @Override
-    ColumnStoreSchema getSchema();
+import org.knime.core.columnar.data.ColumnDataSpec;
+
+@SuppressWarnings("javadoc")
+public interface ColumnStoreSchema {
+
+    ColumnDataSpec getColumnDataSpec(int index);
+
+    int getNumColumns();
+
 }

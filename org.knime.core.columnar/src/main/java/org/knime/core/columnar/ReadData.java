@@ -42,11 +42,15 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   15 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar;
 
-public interface ColumnStoreSchema {
-    ColumnDataSpec<?> getColumnDataSpec(int index);
+@SuppressWarnings("javadoc")
+public interface ReadData extends ReferencedData {
 
-    int getNumColumns();
+    int length();
+
 }

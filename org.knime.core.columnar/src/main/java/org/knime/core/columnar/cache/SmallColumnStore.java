@@ -45,10 +45,10 @@
  */
 package org.knime.core.columnar.cache;
 
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
 
 import java.io.File;
 import java.io.IOException;
@@ -56,19 +56,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
 
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnStore;
-import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
- * A {@link ColumnStore} that stores {@link ColumnData} in a fixed-size {@link SmallColumnStoreCache LRU cache} in
+ * A {@link ColumnStore} that stores {@link ColumnWriteData} in a fixed-size {@link SmallColumnStoreCache LRU cache} in
  * memory if the aggregated {@link ReferencedData#sizeOf() size} of data is below a given threshold. If the threshold is
  * exceeded or once evicted from the cache, the data is passed on to a delegate column store. The store allows
  * concurrent reading via multiple {@link ColumnDataReader ColumnDataReaders} once the {@link ColumnDataWriter} has been
@@ -103,40 +103,34 @@ public final class SmallColumnStore implements ColumnStore {
 
     private static final class Table implements ReferencedData {
 
-        private final List<ColumnData[]> m_batches = Collections.synchronizedList(new ArrayList<>());
+        private final List<Batch> m_batches = Collections.synchronizedList(new ArrayList<>());
 
         private final AtomicInteger m_sizeOf = new AtomicInteger();
 
         private final AtomicInteger m_maxDataCapacity = new AtomicInteger();
 
-        void retainAndAddBatch(final ColumnData[] batch) {
-            for (final ColumnData data : batch) {
-                data.retain();
-                m_sizeOf.addAndGet(data.sizeOf());
-                m_maxDataCapacity.accumulateAndGet(data.getMaxCapacity(), Math::max);
-            }
+        void retainAndAddBatch(final Batch batch) {
+            batch.retain();
+            m_sizeOf.addAndGet(batch.sizeOf());
+            m_maxDataCapacity.accumulateAndGet(batch.length(), Math::max);
             m_batches.add(batch);
         }
 
-        ColumnData[] getBatch(final int index) {
+        Batch getBatch(final int index) {
             return m_batches.get(index);
         }
 
         @Override
         public void release() {
-            for (final ColumnData[] batch : m_batches) {
-                for (final ColumnData data : batch) {
-                    data.release();
-                }
+            for (final Batch batch : m_batches) {
+                batch.release();
             }
         }
 
         @Override
         public void retain() {
-            for (final ColumnData[] batch : m_batches) {
-                for (final ColumnData data : batch) {
-                    data.retain();
-                }
+            for (final Batch batch : m_batches) {
+                batch.retain();
             }
         }
 
@@ -162,7 +156,7 @@ public final class SmallColumnStore implements ColumnStore {
         private Table m_table = new Table();
 
         @Override
-        public void write(final ColumnData[] batch) throws IOException {
+        public void write(final Batch batch) throws IOException {
             if (m_writerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -205,20 +199,19 @@ public final class SmallColumnStore implements ColumnStore {
 
     private final class SmallColumnStoreReader implements ColumnDataReader {
 
-        private final int[] m_indices;
+        private final ColumnSelection m_selection;
 
         private final Table m_table;
 
         private boolean m_readerClosed;
 
         SmallColumnStoreReader(final ColumnSelection selection, final Table table) {
-            m_indices = selection != null && selection.get() != null ? selection.get()
-                : IntStream.range(0, getSchema().getNumColumns()).toArray();
+            m_selection = selection;
             m_table = table;
         }
 
         @Override
-        public ColumnData[] read(final int chunkIndex) throws IOException {
+        public Batch readRetained(final int chunkIndex) throws IOException {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -226,13 +219,8 @@ public final class SmallColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final ColumnData[] batch = new ColumnData[getSchema().getNumColumns()];
-
-            for (final int i : m_indices) {
-                batch[i] = m_table.getBatch(chunkIndex)[i];
-                batch[i].retain();
-
-            }
+            final Batch batch = m_selection.createBatch(i -> m_table.getBatch(chunkIndex).get(i));
+            batch.retain();
             return batch;
         }
 
@@ -243,12 +231,12 @@ public final class SmallColumnStore implements ColumnStore {
         }
 
         @Override
-        public int getNumChunks() {
+        public int getNumBatches() {
             return m_table.getNumChunks();
         }
 
         @Override
-        public int getMaxDataCapacity() {
+        public int getMaxLength() {
             return m_table.getMaxDataCapacity();
         }
 
@@ -326,7 +314,7 @@ public final class SmallColumnStore implements ColumnStore {
         if (!m_flushed) {
             m_delegateWriter = m_delegate.getWriter();
             for (int i = 0; i < table.getNumChunks(); i++) {
-                final ColumnData[] batch = table.getBatch(i);
+                final Batch batch = table.getBatch(i);
                 m_delegateWriter.write(batch);
             }
             m_flushed = true;
@@ -334,7 +322,7 @@ public final class SmallColumnStore implements ColumnStore {
     }
 
     @Override
-    public void saveToFile(final File file) throws IOException {
+    public void save(final File file) throws IOException {
         if (!m_writerClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }
@@ -349,7 +337,7 @@ public final class SmallColumnStore implements ColumnStore {
             cached.release();
         }
 
-        m_delegate.saveToFile(file);
+        m_delegate.save(file);
     }
 
     @Override

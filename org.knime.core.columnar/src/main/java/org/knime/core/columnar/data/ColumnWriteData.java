@@ -45,37 +45,14 @@
  */
 package org.knime.core.columnar.data;
 
+import org.knime.core.columnar.WriteData;
+
 @SuppressWarnings("javadoc")
-public final class BooleanData {
+public interface ColumnWriteData extends WriteData {
 
-    private BooleanData() {
-    }
+    void setMissing(int index);
 
-    public static interface BooleanReadData extends ColumnData {
-        boolean getBoolean(int index);
-    }
-
-    public static interface BooleanWriteData extends ColumnWriteData {
-
-        void setBoolean(int index, boolean val);
-
-        @Override
-        BooleanReadData close(int length);
-
-    }
-
-    public static final class BooleanDataSpec implements ColumnDataSpec {
-
-        public static final BooleanDataSpec INSTANCE = new BooleanDataSpec();
-
-        private BooleanDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
-
-    }
+    @Override
+    ColumnData close(int length);
 
 }

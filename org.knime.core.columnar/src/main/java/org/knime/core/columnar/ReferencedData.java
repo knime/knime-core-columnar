@@ -45,6 +45,7 @@
  */
 package org.knime.core.columnar;
 
+@SuppressWarnings("javadoc")
 public interface ReferencedData {
 
     /**

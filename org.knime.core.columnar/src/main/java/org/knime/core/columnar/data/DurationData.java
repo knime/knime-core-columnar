@@ -47,17 +47,36 @@ package org.knime.core.columnar.data;
 
 import java.time.Duration;
 
-import org.knime.core.columnar.ColumnDataSpec;
+@SuppressWarnings("javadoc")
+public final class DurationData {
 
-public interface DurationData extends NullableData {
-    void setDuration(int index, Duration localDateTime);
+    private DurationData() {
+    }
 
-    Duration getDuration(int index);
+    public static interface DurationReadData extends ColumnData {
+        Duration getDuration(int index);
+    }
 
-    class DurationDataSpec implements ColumnDataSpec<DurationData> {
+    public static interface DurationWriteData extends ColumnWriteData {
+
+        void setDuration(int index, Duration val);
+
         @Override
-        public Class<? extends DurationData> getColumnDataType() {
-            return DurationData.class;
+        DurationReadData close(int length);
+
+    }
+
+    public static final class DurationDataSpec implements ColumnDataSpec {
+
+        public static final DurationDataSpec INSTANCE = new DurationDataSpec();
+
+        private DurationDataSpec() {
         }
+
+        @Override
+        public <R> R accept(final Mapper<R> v) {
+            return v.visit(this);
+        }
+
     }
 }

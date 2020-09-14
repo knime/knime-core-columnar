@@ -48,17 +48,17 @@
  */
 package org.knime.core.columnar.phantom;
 
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
 
 import java.io.Closeable;
 import java.io.IOException;
 
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnReadStore;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
  * A {@link ColumnReadStore} that delegates all operations to a delegate store. Similarly, any of its created
@@ -92,7 +92,7 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
         }
 
         @Override
-        public ColumnData[] read(final int chunkIndex) throws IOException {
+        public Batch readRetained(final int chunkIndex) throws IOException {
             if (m_closed.isClosed()) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -100,17 +100,17 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            return m_delegate.read(chunkIndex);
+            return m_delegate.readRetained(chunkIndex);
         }
 
         @Override
-        public int getNumChunks() {
-            return m_delegate.getNumChunks();
+        public int getNumBatches() {
+            return m_delegate.getNumBatches();
         }
 
         @Override
-        public int getMaxDataCapacity() {
-            return m_delegate.getMaxDataCapacity();
+        public int getMaxLength() {
+            return m_delegate.getMaxLength();
         }
 
         @Override

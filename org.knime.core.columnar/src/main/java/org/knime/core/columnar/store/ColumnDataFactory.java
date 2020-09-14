@@ -43,16 +43,13 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.chunk;
+package org.knime.core.columnar.store;
 
-import java.io.Closeable;
-import java.io.IOException;
+import org.knime.core.columnar.batch.WriteBatch;
 
-import org.knime.core.columnar.ColumnData;
+@SuppressWarnings("javadoc")
+public interface ColumnDataFactory {
 
-public interface ColumnDataWriter extends Closeable {
-    void write(final ColumnData[] record) throws IOException;
+    WriteBatch create();
 
-    @Override
-    void close() throws IOException;
 }

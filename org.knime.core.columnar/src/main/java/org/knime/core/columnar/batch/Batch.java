@@ -42,15 +42,18 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   15 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.chunk;
+package org.knime.core.columnar.batch;
 
-// TODO we could also provide pre-loading hints here?
-public interface ColumnSelection {
-    /**
-     * TODO implement as ranges, e.g. return a ColumnIndicesSelection with a method called 'contains(int i)'?
-     *
-     * @return the selected column indices in ascending order
-     */
-    int[] get();
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.data.ColumnData;
+
+@SuppressWarnings("javadoc")
+public interface Batch extends ReadData {
+
+    ColumnData get(int index);
+
 }

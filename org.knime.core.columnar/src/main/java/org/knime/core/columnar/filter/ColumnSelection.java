@@ -43,32 +43,16 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.filter;
 
-public interface ColumnData extends ReferencedData {
+import java.util.function.IntFunction;
 
-    // WRITE
-    /**
-     * Set the maximum capacity of values
-     */
-    void ensureCapacity(int capacity);
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.data.ColumnData;
 
-    /**
-     * @return maximum capacity of an array
-     */
-    int getMaxCapacity();
+@SuppressWarnings("javadoc")
+public interface ColumnSelection {
 
-    /**
-     * TODO rename to 'finishWriting'?
-     *
-     * @param numValues set number of logically written values
-     */
-    void setNumValues(int numValues);
-
-    // READ
-    /**
-     * @return number of values set
-     */
-    int getNumValues();
+    Batch createBatch (IntFunction<ColumnData> function);
 
 }

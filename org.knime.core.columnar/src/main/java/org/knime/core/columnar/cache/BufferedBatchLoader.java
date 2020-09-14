@@ -51,25 +51,19 @@ package org.knime.core.columnar.cache;
 import java.io.Closeable;
 import java.io.IOException;
 
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.chunk.ColumnDataReader;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.store.ColumnDataReader;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 final class BufferedBatchLoader implements Closeable {
 
-    private final int[] m_indices;
-
     private int m_loadedBatchIndex;
 
-    private ColumnData[] m_loadedBatch;
+    private Batch m_loadedBatch;
 
-    BufferedBatchLoader(final int[] indices) {
-        m_indices = indices;
-    }
-
-    ColumnData[] loadBatch(final ColumnDataReader reader, final int chunkIndex) throws IOException {
+    Batch loadBatch(final ColumnDataReader reader, final int chunkIndex) throws IOException {
         if (m_loadedBatch != null) {
             if (m_loadedBatchIndex == chunkIndex) {
                 return m_loadedBatch;
@@ -77,15 +71,13 @@ final class BufferedBatchLoader implements Closeable {
             releaseBatch();
         }
         m_loadedBatchIndex = chunkIndex;
-        m_loadedBatch = reader.read(chunkIndex);
+        m_loadedBatch = reader.readRetained(chunkIndex);
         return m_loadedBatch;
     }
 
     private void releaseBatch() {
         if (m_loadedBatch != null) {
-            for (int i : m_indices) {
-                m_loadedBatch[i].release();
-            }
+            m_loadedBatch.release();
         }
         m_loadedBatch = null;
     }

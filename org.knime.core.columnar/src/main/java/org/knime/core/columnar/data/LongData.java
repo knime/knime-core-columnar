@@ -42,21 +42,43 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   17 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.data;
 
-import org.knime.core.columnar.ColumnDataSpec;
+@SuppressWarnings("javadoc")
+public final class LongData {
 
-public interface LongData extends NullableData {
-
-    long getLong(int index);
-
-    void setLong(int index, long integer);
-
-    public final class LongDataSpec implements ColumnDataSpec<LongData> {
-        @Override
-        public Class<? extends LongData> getColumnDataType() {
-            return LongData.class;
-        }
+    private LongData() {
     }
+
+    public static interface LongWriteData extends ColumnWriteData {
+
+        void setLong(int index, long val);
+
+        @Override
+        LongReadData close(int length);
+
+    }
+
+    public static interface LongReadData extends ColumnData {
+        long getLong(int index);
+    }
+
+    public static final class LongDataSpec implements ColumnDataSpec {
+
+        public static final LongDataSpec INSTANCE = new LongDataSpec();
+
+        private LongDataSpec() {
+        }
+
+        @Override
+        public <R> R accept(final Mapper<R> v) {
+            return v.visit(this);
+        }
+
+    }
+
 }

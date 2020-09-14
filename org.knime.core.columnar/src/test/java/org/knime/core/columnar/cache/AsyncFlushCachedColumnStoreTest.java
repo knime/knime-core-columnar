@@ -69,12 +69,12 @@ import java.util.concurrent.Executors;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
-import org.knime.core.columnar.ColumnStore;
 import org.knime.core.columnar.TestColumnStore;
 import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStore;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -588,7 +588,7 @@ public class AsyncFlushCachedColumnStoreTest {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
-                store.saveToFile(null);
+                store.save(null);
             }
         }
     }
@@ -602,7 +602,7 @@ public class AsyncFlushCachedColumnStoreTest {
                 writeTable(store, table);
             }
             store.close();
-            store.saveToFile(null);
+            store.save(null);
         }
     }
 
@@ -641,7 +641,7 @@ public class AsyncFlushCachedColumnStoreTest {
             }
             try (final ColumnDataReader reader = store.createReader()) {
                 reader.close();
-                reader.read(0);
+                reader.readRetained(0);
             }
         }
     }
@@ -656,7 +656,7 @@ public class AsyncFlushCachedColumnStoreTest {
             }
             try (final ColumnDataReader reader = store.createReader()) {
                 store.close();
-                reader.read(0);
+                reader.readRetained(0);
             }
         }
     }

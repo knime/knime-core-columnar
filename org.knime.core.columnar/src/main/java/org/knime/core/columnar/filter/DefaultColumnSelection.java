@@ -42,40 +42,44 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   9 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.data;
+package org.knime.core.columnar.filter;
 
+import java.util.Objects;
+import java.util.function.IntFunction;
+
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.DefaultBatch;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.store.ColumnStoreSchema;
+
+/**
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 @SuppressWarnings("javadoc")
-public final class BooleanData {
+public class DefaultColumnSelection implements ColumnSelection {
 
-    private BooleanData() {
+    private final ColumnStoreSchema m_schema;
+
+    public DefaultColumnSelection(final ColumnStoreSchema schema) {
+        Objects.requireNonNull(schema, () -> "Column Store schema must not be null.");
+
+        m_schema = schema;
     }
 
-    public static interface BooleanReadData extends ColumnData {
-        boolean getBoolean(int index);
-    }
-
-    public static interface BooleanWriteData extends ColumnWriteData {
-
-        void setBoolean(int index, boolean val);
-
-        @Override
-        BooleanReadData close(int length);
-
-    }
-
-    public static final class BooleanDataSpec implements ColumnDataSpec {
-
-        public static final BooleanDataSpec INSTANCE = new BooleanDataSpec();
-
-        private BooleanDataSpec() {
+    @Override
+    public Batch createBatch(final IntFunction<ColumnData> function) {
+        final ColumnData[] batch = new ColumnData[m_schema.getNumColumns()];
+        int length = 0;
+        for (int i = 0; i < m_schema.getNumColumns(); i++) {
+            batch[i] = function.apply(i);
+            length = Math.max(length, batch[i].length());
         }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
-
+        return new DefaultBatch(m_schema, batch, length);
     }
 
 }

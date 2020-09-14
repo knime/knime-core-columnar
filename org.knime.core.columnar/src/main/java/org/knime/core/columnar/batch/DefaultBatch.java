@@ -42,22 +42,75 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   15 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.chunk;
+package org.knime.core.columnar.batch;
 
-import java.io.Closeable;
-import java.io.IOException;
+import java.util.Arrays;
+import java.util.Objects;
 
-import org.knime.core.columnar.ColumnData;
+import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
-public interface ColumnDataReader extends Closeable {
+/**
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+@SuppressWarnings("javadoc")
+public class DefaultBatch implements Batch {
 
-    ColumnData[] read(int chunkIndex) throws IOException;
+    private final int m_maxIndex;
 
-    int getNumChunks();
+    private final ColumnData[] m_data;
 
-    int getMaxDataCapacity();
+    private final int m_length;
+
+    public DefaultBatch(final ColumnStoreSchema schema, final ColumnData[] data, final int length) {
+        Objects.requireNonNull(schema, () -> "Column store schema must not be null.");
+        Objects.requireNonNull(data, () -> "Column data must not be null.");
+
+        m_maxIndex = schema.getNumColumns() - 1;
+        m_data = data;
+        m_length = length;
+    }
 
     @Override
-    void close() throws IOException;
+    public ColumnData get(final int colIndex) {
+        if (colIndex < 0) {
+            throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", colIndex));
+        }
+        if (colIndex > m_maxIndex) {
+            throw new IndexOutOfBoundsException(String.format(
+                "Column index %d larger then the column store's number of columns (%d).", colIndex, m_maxIndex));
+        }
+        return m_data[colIndex];
+    }
+
+    @Override
+    public int length() {
+        return m_length;
+    }
+
+    @Override
+    public void release() {
+        for (final ColumnData data : m_data) {
+            data.release();
+        }
+    }
+
+    @Override
+    public void retain() {
+        for (final ColumnData data : m_data) {
+            data.retain();
+        }
+    }
+
+    @Override
+    public int sizeOf() {
+        return Arrays.stream(m_data).mapToInt(ReferencedData::sizeOf).sum();
+    }
+
 }

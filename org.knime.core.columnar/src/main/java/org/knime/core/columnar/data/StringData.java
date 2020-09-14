@@ -42,21 +42,40 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   17 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.data;
 
-import org.knime.core.columnar.ColumnDataSpec;
+@SuppressWarnings("javadoc")
+public final class StringData {
 
-public interface StringData extends NullableData {
-    String getString(int index);
+    private StringData() {
+    }
 
-    void setString(int index, String val);
+    public static interface StringWriteData extends ColumnWriteData {
 
-    public final class StringDataSpec implements ColumnDataSpec<StringData> {
+        void setString(int index, String val);
+
+        @Override
+        StringReadData close(int length);
+
+    }
+
+    public static interface StringReadData extends ColumnData {
+        String getString(int index);
+    }
+
+    public static final class StringDataSpec implements ColumnDataSpec {
+
+        public static final StringDataSpec DICT_ENABLED = new StringDataSpec(true);
+
+        public static final StringDataSpec DICT_DISABLED = new StringDataSpec(false);
 
         private final boolean m_enableDict;
 
-        public StringDataSpec(final boolean enableDict) {
+        private StringDataSpec(final boolean enableDict) {
             m_enableDict = enableDict;
         }
 
@@ -65,9 +84,9 @@ public interface StringData extends NullableData {
         }
 
         @Override
-        public Class<? extends StringData> getColumnDataType() {
-            return StringData.class;
+        public <R> R accept(final Mapper<R> v) {
+            return v.visit(this);
         }
-    }
 
+    }
 }

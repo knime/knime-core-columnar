@@ -42,40 +42,72 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   9 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.data;
+package org.knime.core.columnar.batch;
 
+import java.util.Arrays;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
+
+/**
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 @SuppressWarnings("javadoc")
-public final class BooleanData {
+public class FilteredBatch implements Batch {
 
-    private BooleanData() {
+    private final Set<Integer> m_indices;
+
+    private final Batch m_delegate;
+
+    public FilteredBatch(final FilteredColumnSelection selection, final Batch delegate) {
+        Objects.requireNonNull(selection, () -> "Column selection must not be null.");
+        Objects.requireNonNull(delegate, () -> "Delegate batch must not be null.");
+
+        m_indices = Arrays.stream(selection.includes()).boxed().collect(Collectors.toSet());
+        m_delegate = delegate;
     }
 
-    public static interface BooleanReadData extends ColumnData {
-        boolean getBoolean(int index);
-    }
-
-    public static interface BooleanWriteData extends ColumnWriteData {
-
-        void setBoolean(int index, boolean val);
-
-        @Override
-        BooleanReadData close(int length);
-
-    }
-
-    public static final class BooleanDataSpec implements ColumnDataSpec {
-
-        public static final BooleanDataSpec INSTANCE = new BooleanDataSpec();
-
-        private BooleanDataSpec() {
+    @Override
+    public ColumnData get(final int colIndex) {
+        if (!m_indices.contains(colIndex)) {
+            throw new NoSuchElementException(
+                String.format("Data at index %d is not available in this filtered batch.", colIndex));
         }
+        return m_delegate.get(colIndex);
+    }
 
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
+    @Override
+    public void release() {
+        for (int index : m_indices) {
+            m_delegate.get(index).release();
         }
+    }
 
+    @Override
+    public void retain() {
+        for (int index : m_indices) {
+            m_delegate.get(index).retain();
+        }
+    }
+
+    @Override
+    public int sizeOf() {
+        return m_indices.stream().map(m_delegate::get).mapToInt(ReferencedData::sizeOf).sum();
+    }
+
+    @Override
+    public int length() {
+        return m_delegate.length();
     }
 
 }

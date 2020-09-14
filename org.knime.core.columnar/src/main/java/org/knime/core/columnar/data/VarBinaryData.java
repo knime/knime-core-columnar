@@ -45,17 +45,37 @@
  */
 package org.knime.core.columnar.data;
 
-import org.knime.core.columnar.ColumnDataSpec;
+@SuppressWarnings("javadoc")
+public final class VarBinaryData {
 
-public interface VarBinaryData extends NullableData {
-    void setBytes(int index, byte[] data);
-
-    byte[] getBytes(int index);
-
-    public class VarBinaryDataSpec implements ColumnDataSpec<VarBinaryData> {
-        @Override
-        public Class<? extends VarBinaryData> getColumnDataType() {
-            return VarBinaryData.class;
-        }
+    private VarBinaryData() {
     }
+
+    public static interface VarBinaryWriteData extends ColumnWriteData {
+
+        void setBytes(int index, byte[] val);
+
+        @Override
+        VarBinaryReadData close(int length);
+
+    }
+
+    public static interface VarBinaryReadData extends ColumnData {
+        byte[] getBytes(int index);
+    }
+
+    public static final class VarBinaryDataSpec implements ColumnDataSpec {
+
+        public static final VarBinaryDataSpec INSTANCE = new VarBinaryDataSpec();
+
+        private VarBinaryDataSpec() {
+        }
+
+        @Override
+        public <R> R accept(final Mapper<R> v) {
+            return v.visit(this);
+        }
+
+    }
+
 }

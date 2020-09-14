@@ -43,35 +43,16 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.data;
+package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnDataSpec;
+import java.io.Closeable;
+import java.io.IOException;
 
-public interface NullableWithCauseData<C extends ColumnData> extends NullableData {
-    C getColumnData();
+import org.knime.core.columnar.batch.Batch;
 
-    void setMissingWithCause(int i, String string);
+@SuppressWarnings("javadoc")
+public interface ColumnDataWriter extends Closeable {
 
-    String getMissingValueCause(int index);
-
-    public static class NullableWithCauseDataSpec<C extends NullableData>
-        implements ColumnDataSpec<NullableWithCauseData<C>> {
-        private final ColumnDataSpec<C> m_spec;
-
-        public NullableWithCauseDataSpec(final ColumnDataSpec<C> spec) {
-            m_spec = spec;
-        }
-
-        public ColumnDataSpec<C> getChildSpec() {
-            return m_spec;
-        }
-
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        @Override
-        public Class getColumnDataType() {
-            return NullableWithCauseData.class;
-        }
-    }
+    void write(final Batch batch) throws IOException;
 
 }

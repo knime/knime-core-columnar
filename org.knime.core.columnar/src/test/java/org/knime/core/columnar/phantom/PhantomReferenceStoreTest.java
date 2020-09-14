@@ -65,15 +65,15 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
-import org.knime.core.columnar.ColumnReadStore;
-import org.knime.core.columnar.ColumnStore;
 import org.knime.core.columnar.TestColumnStore;
 import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
 import org.knime.core.columnar.TestDoubleColumnData;
 import org.knime.core.columnar.TestDoubleColumnData.Delegate;
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.store.ColumnStore;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -402,7 +402,7 @@ public class PhantomReferenceStoreTest {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = PhantomReferenceStore.create(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
-                store.saveToFile(null);
+                store.save(null);
             }
         } finally {
             checkNoOpenFinalizers();
@@ -418,7 +418,7 @@ public class PhantomReferenceStoreTest {
                 writeTable(store, table);
             }
             store.close();
-            store.saveToFile(null);
+            store.save(null);
         } finally {
             checkNoOpenFinalizers();
         }
@@ -463,7 +463,7 @@ public class PhantomReferenceStoreTest {
             }
             try (final ColumnDataReader reader = store.createReader()) {
                 reader.close();
-                reader.read(0);
+                reader.readRetained(0);
             }
         } finally {
             checkNoOpenFinalizers();
@@ -480,7 +480,7 @@ public class PhantomReferenceStoreTest {
             }
             try (final ColumnDataReader reader = store.createReader()) {
                 store.close();
-                reader.read(0);
+                reader.readRetained(0);
             }
         } finally {
             checkNoOpenFinalizers();

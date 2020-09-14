@@ -42,9 +42,21 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   8 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.batch;
 
-public interface ColumnDataSpec<C extends ColumnData> {
-    Class<? extends C> getColumnDataType();
+import org.knime.core.columnar.WriteData;
+import org.knime.core.columnar.data.ColumnWriteData;
+
+@SuppressWarnings("javadoc")
+public interface WriteBatch extends WriteData {
+
+    ColumnWriteData get(int index);
+
+    @Override
+    Batch close(final int length);
+
 }

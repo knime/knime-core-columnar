@@ -43,20 +43,20 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.chunk;
+package org.knime.core.columnar.store;
 
-public final class ColumnSelectionUtil {
+import java.io.Closeable;
+import java.io.IOException;
 
-    private ColumnSelectionUtil() {
-    }
+import org.knime.core.columnar.batch.Batch;
 
-    public static ColumnSelection create(final int[] indices) {
-        return new ColumnSelection() {
+@SuppressWarnings("javadoc")
+public interface ColumnDataReader extends Closeable {
 
-            @Override
-            public int[] get() {
-                return indices;
-            }
-        };
-    }
+    Batch readRetained(int index) throws IOException;
+
+    int getNumBatches();
+
+    int getMaxLength();
+
 }

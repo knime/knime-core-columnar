@@ -45,25 +45,26 @@
  */
 package org.knime.core.columnar.cache;
 
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
-import static org.knime.core.columnar.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
+import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.IntStream;
 
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnReadStore;
-import org.knime.core.columnar.ColumnStoreSchema;
+import org.knime.core.columnar.batch.Batch;
 import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
- * A {@link ColumnReadStore} that reads {@link ColumnData} from a delegate column store and places it in a fixed-size
+ * A {@link ColumnReadStore} that reads {@link ColumnWriteData} from a delegate column store and places it in a fixed-size
  * {@link SmallColumnStoreCache LRU cache} in memory for faster subsequent access. The store allows concurrent reading
  * via multiple {@link ColumnDataReader ColumnDataReaders}.
  *
@@ -75,7 +76,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 
         private final ColumnDataReader m_delegateReader;
 
-        private final int[] m_indices;
+        private final ColumnSelection m_selection;
 
         private final BufferedBatchLoader m_batchLoader;
 
@@ -85,13 +86,12 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 
         CachedColumnStoreReader(final ColumnSelection selection) {
             m_delegateReader = m_delegate.createReader(selection);
-            m_indices = selection != null && selection.get() != null ? selection.get()
-                : IntStream.range(0, getSchema().getNumColumns()).toArray();
-            m_batchLoader = new BufferedBatchLoader(m_indices);
+            m_selection = selection;
+            m_batchLoader = new BufferedBatchLoader();
         }
 
         @Override
-        public ColumnData[] read(final int chunkIndex) {
+        public Batch readRetained(final int chunkIndex) {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -99,33 +99,29 @@ public final class CachedColumnReadStore implements ColumnReadStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final ColumnData[] batch = new ColumnData[getSchema().getNumColumns()];
-
-            for (int i : m_indices) {
+            return m_selection.createBatch(i -> {
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(CachedColumnReadStore.this, i, chunkIndex);
-                batch[i] = m_globalCache.getRetained(ccUID, () -> {
+                return m_globalCache.getRetained(ccUID, () -> {
                     m_cachedData.add(ccUID);
                     try {
-                        final ColumnData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex)[i];
+                        final ColumnData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex).get(i);
                         data.retain();
                         return data;
                     } catch (IOException e) {
                         throw new IllegalStateException("Exception while loading column data.", e);
                     }
                 }, m_evictor);
-            }
-
-            return batch;
+            });
         }
 
         @Override
-        public int getNumChunks() {
-            return m_delegateReader.getNumChunks();
+        public int getNumBatches() {
+            return m_delegateReader.getNumBatches();
         }
 
         @Override
-        public int getMaxDataCapacity() {
-            return m_delegateReader.getMaxDataCapacity();
+        public int getMaxLength() {
+            return m_delegateReader.getMaxLength();
         }
 
         @Override

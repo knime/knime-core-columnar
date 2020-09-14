@@ -43,18 +43,33 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.store;
 
 import java.io.File;
-import java.io.IOException;
 
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
+/**
+ * @author Christian Dietz, KNIME GmbH, Konstanz
+ */
+@SuppressWarnings("javadoc")
+public interface ColumnStoreFactory {
 
-public interface ColumnWriteStore {
-    ColumnDataWriter getWriter();
+    /**
+     * Creates a new {@link ColumnStore}.
+     *
+     * @param the physical {@link ColumnStoreSchema}
+     * @param file to store data if out of memory
+     * @param minChunkSize the size of one chunk.
+     * @return a {@link ColumnStore} with the given schema.
+     */
+    ColumnStore createWriteStore(ColumnStoreSchema schema, File file, int minChunkSize);
 
-    ColumnDataFactory getFactory();
+    /**
+     * Creates a new {@link ColumnReadStore}, reading data from the provided file.
+     *
+     * @param schema creates a {@link ColumnReadStore}.
+     * @param file from which data is read.
+     * @return the ColumnReadStore.
+     */
+    ColumnReadStore createReadStore(ColumnStoreSchema schema, File file);
 
-    void saveToFile(File f) throws IOException;
 }

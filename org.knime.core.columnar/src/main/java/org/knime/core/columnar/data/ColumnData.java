@@ -42,20 +42,17 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   15 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.data;
 
-import org.knime.core.columnar.ColumnData;
+import org.knime.core.columnar.ReadData;
 
-public interface NullableData extends ColumnData {
-    /**
-     * @param set value missing at index. Default is false.
-     */
-    void setMissing(int index);
+@SuppressWarnings("javadoc")
+public interface ColumnData extends ReadData {
 
-    /**
-     * @param index of value
-     * @return true, if value is missing. Default is false.
-     */
     boolean isMissing(int index);
+
 }

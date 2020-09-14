@@ -42,25 +42,39 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   17 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.data;
 
-import org.knime.core.columnar.ColumnDataSpec;
-
-public interface DoubleData extends NullableData {
-
-    double getDouble(int index);
-
-    void setDouble(int index, double val);
-
-    default DoubleDataSpec getColumnDataSpec() {
-        return new DoubleDataSpec();
+@SuppressWarnings("javadoc")
+public final class DoubleData {
+    private DoubleData() {
     }
 
-    class DoubleDataSpec implements ColumnDataSpec<DoubleData> {
+    public static interface DoubleReadData extends ColumnData {
+        double getDouble(int index);
+    }
+
+    public static interface DoubleWriteData extends ColumnWriteData {
+        void setDouble(int index, double val);
+
         @Override
-        public Class<? extends DoubleData> getColumnDataType() {
-            return DoubleData.class;
+        DoubleReadData close(int length);
+    }
+
+    public static final class DoubleDataSpec implements ColumnDataSpec {
+
+        public static final DoubleDataSpec INSTANCE = new DoubleDataSpec();
+
+        private DoubleDataSpec() {
         }
+
+        @Override
+        public <R> R accept(final Mapper<R> v) {
+            return v.visit(this);
+        }
+
     }
 }

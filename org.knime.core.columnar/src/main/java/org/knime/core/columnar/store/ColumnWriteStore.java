@@ -43,29 +43,33 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.data;
+package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.ColumnDataSpec;
+import java.io.File;
+import java.io.IOException;
 
-public interface StructData extends NullableData {
+/**
+ * A store to which columnar data can be written. The life cycle of a write
+ * store is as follows:
+ * <ol>
+ * <li>The singleton {@link ColumnDataWriter writer} is obtained via
+ * {@link #getWriter()}.</li>
+ * <li>Data created by a {@link ColumnDataFactory} obtained via
+ * {@link #getFactory()} is written via
+ * {@link ColumnDataWriter#write(ColumnData[])}.</li>
+ * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
+ * </ol>
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
+@SuppressWarnings("javadoc")
+public interface ColumnWriteStore {
 
-    NullableData getChunk(int index);
+    ColumnDataWriter getWriter();
 
-    public class StructDataSpec implements ColumnDataSpec<StructData> {
+    ColumnDataFactory getFactory();
 
-        private ColumnDataSpec<?>[] m_childSpecs;
+    void save(File f) throws IOException;
 
-        public StructDataSpec(final ColumnDataSpec<?>... childSpecs) {
-            m_childSpecs = childSpecs;
-        }
-
-        @Override
-        public Class<? extends StructData> getColumnDataType() {
-            return StructData.class;
-        }
-
-        public ColumnDataSpec<?>[] getChildChunkSpecs() {
-            return m_childSpecs;
-        }
-    }
 }

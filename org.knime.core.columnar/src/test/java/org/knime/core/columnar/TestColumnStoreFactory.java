@@ -47,6 +47,11 @@ package org.knime.core.columnar;
 
 import java.io.File;
 
+import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.ColumnStoreSchema;
+
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
