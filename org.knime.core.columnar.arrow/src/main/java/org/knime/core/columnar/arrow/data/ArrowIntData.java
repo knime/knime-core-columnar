@@ -48,12 +48,13 @@ package org.knime.core.columnar.arrow.data;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.IntVector;
-import org.knime.core.columnar.data.IntData;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
 
-public class ArrowIntData extends AbstractFieldVectorData<IntVector> implements IntData {
+public class ArrowIntData extends AbstractFieldVectorData<IntVector> implements IntWriteData, IntReadData {
 
-    public ArrowIntData(final BufferAllocator allocator) {
-        super(allocator);
+    public ArrowIntData(final BufferAllocator allocator, final int capacity) {
+        super(allocator, capacity);
     }
 
     public ArrowIntData(final IntVector vector) {
@@ -61,8 +62,10 @@ public class ArrowIntData extends AbstractFieldVectorData<IntVector> implements 
     }
 
     @Override
-    protected IntVector create(final BufferAllocator allocator) {
-        return new IntVector("IntVector", allocator);
+    protected IntVector create(final BufferAllocator allocator, final int capacity) {
+        final IntVector vector = new IntVector("IntVector", allocator);
+        vector.allocateNew(capacity);
+        return vector;
     }
 
     @Override
@@ -82,8 +85,9 @@ public class ArrowIntData extends AbstractFieldVectorData<IntVector> implements 
     }
 
     @Override
-    public void ensureCapacityInternal(final int chunkSize) {
-        m_vector.allocateNew(chunkSize);
+    public IntReadData close(final int length) {
+        m_vector.setValueCount(length);
+        return this;
     }
 
 }

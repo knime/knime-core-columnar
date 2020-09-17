@@ -48,20 +48,23 @@ package org.knime.core.columnar.arrow;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.NoSuchElementException;
 
 import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
-import org.knime.core.columnar.data.DoubleData;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.DefaultBatch;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 public class ArrowIOTest extends AbstractArrowTest {
 
@@ -72,7 +75,7 @@ public class ArrowIOTest extends AbstractArrowTest {
     @Before
     public void init() {
         m_alloc = new RootAllocator();
-        m_schema = createWideSchema(new DoubleData.DoubleDataSpec(), 15);
+        m_schema = createWideSchema(ColumnDataSpec.doubleSpec(), 15);
     }
 
     @After
@@ -83,30 +86,29 @@ public class ArrowIOTest extends AbstractArrowTest {
     @Test
     public void testShortChunkIO() throws Exception {
         File tmp = createTmpFile();
-        ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, m_alloc, 1024);
+        ColumnStoreSchema schema = createSchema(ColumnDataSpec.doubleSpec());
+        ArrowColumnDataWriter writer = new ArrowColumnDataWriter(schema, tmp, m_alloc, 1024);
 
-        final ArrowDoubleData data = new ArrowDoubleData(m_alloc);
-        data.ensureCapacity(1024);
-        data.setNumValues(1024);
-        writer.write(new ColumnData[]{data});
+        final ArrowDoubleData data = new ArrowDoubleData(m_alloc, 1024);
+        data.close(1024);
+        writer.write(new DefaultBatch(schema, new ColumnData[]{data}, 1024));
         data.release();
 
-        final ArrowDoubleData dataShort = new ArrowDoubleData(m_alloc);
-        dataShort.ensureCapacity(1024);
-        dataShort.setNumValues(42);
-        writer.write(new ColumnData[]{dataShort});
+        final ArrowDoubleData dataShort = new ArrowDoubleData(m_alloc, 1024);
+        dataShort.close(42);
+        writer.write(new DefaultBatch(schema, new ColumnData[]{dataShort}, 42));
         dataShort.release();
         writer.close();
 
-        ArrowColumnDataReader reader = new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection());
-        ColumnData[] read = reader.read(0);
-        assertEquals(1024, read[0].getNumValues());
-        System.out.println(read[0].sizeOf());
-        read[0].release();
+        ArrowColumnDataReader reader = new ArrowColumnDataReader(schema, tmp, m_alloc, createSelection(schema));
+        ColumnData read = reader.readRetained(0).get(0);
+        assertEquals(1024, read.length());
+        System.out.println(read.sizeOf());
+        read.release();
 
-        ColumnData[] readShort = reader.read(1);
-        assertEquals(42, readShort[0].getNumValues());
-        readShort[0].release();
+        ColumnData readShort = reader.readRetained(1).get(0);
+        assertEquals(42, readShort.length());
+        readShort.release();
 
         reader.close();
         tmp.delete();
@@ -115,13 +117,12 @@ public class ArrowIOTest extends AbstractArrowTest {
     @Test
     public void testIOWithMissing() throws Exception {
         File tmp = createTmpFile();
-        ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, m_alloc, 1024);
+        ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_schema, tmp, m_alloc, 1024);
 
         for (int c = 0; c < 32; c++) {
             final ArrowDoubleData[] data = new ArrowDoubleData[m_schema.getNumColumns()];
             for (int i = 0; i < m_schema.getNumColumns(); i++) {
-                data[i] = new ArrowDoubleData(m_alloc);
-                data[i].ensureCapacity(1024);
+                data[i] = new ArrowDoubleData(m_alloc, 1024);
                 for (int j = 0; j < 1024; j++) {
                     if (j % 13 == 0) {
                         data[i].setMissing(j);
@@ -129,17 +130,17 @@ public class ArrowIOTest extends AbstractArrowTest {
                         data[i].setDouble(j, c * j);
                     }
                 }
-                data[i].setNumValues(1024);
+                data[i].close(1024);
             }
-            writer.write(data);
-            for (ColumnData d : data) {
+            writer.write(new DefaultBatch(m_schema, data, 1024));
+            for (ArrowDoubleData d : data) {
                 d.release();
             }
         }
         writer.close();
 
         // read all
-        ArrowColumnDataReader reader = new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection());
+        ArrowColumnDataReader reader = new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection(m_schema));
         for (int c = 0; c < 32; c++) {
             testRead(reader, c);
         }
@@ -153,14 +154,15 @@ public class ArrowIOTest extends AbstractArrowTest {
 
         // selection
         final ArrowColumnDataReader filteredReader =
-            new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection(13, 19));
-        ColumnData[] filteredData = filteredReader.read(13);
-        for (int i = 0; i < filteredData.length; i++) {
-            if (i == 13 || i == 19) {
-                assertNotNull(filteredData[i]);
-                filteredData[i].release();
+            new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection(m_schema, 9, 13));
+        Batch filteredData = filteredReader.readRetained(13);
+        for (int i = 0; i < m_schema.getNumColumns(); i++) {
+            if (i == 9 || i == 13) {
+                assertNotNull(filteredData.get(i));
+                filteredData.get(i).release();
             } else {
-                assertNull(filteredData[i]);
+                final int finalI = i;
+                assertThrows(NoSuchElementException.class, () -> filteredData.get(finalI));
             }
         }
         filteredReader.close();
@@ -168,21 +170,20 @@ public class ArrowIOTest extends AbstractArrowTest {
     }
 
     private void testRead(final ArrowColumnDataReader reader, final int c) throws IOException {
-        ColumnData[] dataChunk = reader.read(c);
-        assertEquals(m_schema.getNumColumns(), dataChunk.length);
+        Batch dataChunk = reader.readRetained(c);
 
         for (int i = 0; i < m_schema.getNumColumns(); i++) {
-            assertEquals(1024, dataChunk[i].getNumValues());
-            assertTrue(dataChunk[i] instanceof ArrowDoubleData);
-            for (int j = 0; j < dataChunk[i].getNumValues(); j++) {
+            assertEquals(1024, dataChunk.get(i).length());
+            assertTrue(dataChunk.get(i) instanceof ArrowDoubleData);
+            for (int j = 0; j < dataChunk.get(i).length(); j++) {
                 if (j % 13 == 0) {
-                    assertTrue(((ArrowDoubleData)dataChunk[i]).isMissing(j));
+                    assertTrue(((ArrowDoubleData)dataChunk.get(i)).isMissing(j));
                 } else {
-                    assertFalse(((ArrowDoubleData)dataChunk[i]).isMissing(j));
-                    assertEquals(j * c, ((ArrowDoubleData)dataChunk[i]).getDouble(j), 0);
+                    assertFalse(((ArrowDoubleData)dataChunk.get(i)).isMissing(j));
+                    assertEquals(j * c, ((ArrowDoubleData)dataChunk.get(i)).getDouble(j), 0);
                 }
             }
-            dataChunk[i].release();
+            dataChunk.get(i).release();
         }
     }
 

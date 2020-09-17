@@ -48,12 +48,13 @@ package org.knime.core.columnar.arrow.data;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.Float8Vector;
-import org.knime.core.columnar.data.DoubleData;
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 
-public class ArrowDoubleData extends AbstractFieldVectorData<Float8Vector> implements DoubleData {
+public class ArrowDoubleData extends AbstractFieldVectorData<Float8Vector> implements DoubleWriteData, DoubleReadData {
 
-    public ArrowDoubleData(final BufferAllocator allocator) {
-        super(allocator);
+    public ArrowDoubleData(final BufferAllocator allocator, final int capacity) {
+        super(allocator, capacity);
     }
 
     public ArrowDoubleData(final Float8Vector vector) {
@@ -61,8 +62,9 @@ public class ArrowDoubleData extends AbstractFieldVectorData<Float8Vector> imple
     }
 
     @Override
-    protected Float8Vector create(final BufferAllocator allocator) {
+    protected Float8Vector create(final BufferAllocator allocator, final int capacity) {
         final Float8Vector vector = new Float8Vector("Float8Vector", allocator);
+        vector.allocateNew(capacity);
         return vector;
     }
 
@@ -82,14 +84,15 @@ public class ArrowDoubleData extends AbstractFieldVectorData<Float8Vector> imple
     }
 
     @Override
-    public void ensureCapacityInternal(final int chunkSize) {
-        m_vector.allocateNew(chunkSize);
-    }
-
-    @Override
     public void setMissing(final int index) {
         // TODO we can speed things likely up directly accessing validity buffer
         BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
+    }
+
+    @Override
+    public DoubleReadData close(final int length) {
+        m_vector.setValueCount(length);
+        return this;
     }
 
 }

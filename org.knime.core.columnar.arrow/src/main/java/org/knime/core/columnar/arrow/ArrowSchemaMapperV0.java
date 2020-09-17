@@ -45,7 +45,7 @@
  */
 package org.knime.core.columnar.arrow;
 
-import java.util.Map;
+import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
@@ -54,32 +54,46 @@ import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
-import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.arrow.data.ArrowData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
 import org.knime.core.columnar.arrow.data.ArrowIntData;
 import org.knime.core.columnar.arrow.data.ArrowLongData;
-import org.knime.core.columnar.arrow.data.ArrowNullableWithCauseData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData;
 import org.knime.core.columnar.arrow.data.ArrowVarCharData;
-import org.knime.core.columnar.data.DoubleData;
+import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
+import org.knime.core.columnar.data.ByteData.ByteDataSpec;
+import org.knime.core.columnar.data.ColumnDataSpec.Mapper;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
-import org.knime.core.columnar.data.IntData;
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.columnar.data.DurationData.DurationDataSpec;
+import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
-import org.knime.core.columnar.data.LongData;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
+import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
+import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
-import org.knime.core.columnar.data.NullableWithCauseData;
-import org.knime.core.columnar.data.NullableWithCauseData.NullableWithCauseDataSpec;
-import org.knime.core.columnar.data.StringData;
+import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
 import org.knime.core.columnar.data.StringData.StringDataSpec;
-import org.knime.core.columnar.data.VarBinaryData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.columnar.data.VoidData.VoidDataSpec;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
-final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
+final class ArrowSchemaMapperV0 implements ArrowSchemaMapper, Mapper<ArrowColumnDataSpec<?, ?>> {
+
+    static final ArrowSchemaMapperV0 INSTANCE = new ArrowSchemaMapperV0();
+
+    private ArrowSchemaMapperV0() {
+    }
 
     private static long m_id;
 
@@ -88,118 +102,131 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
     }
 
     @Override
-    public ArrowColumnDataSpec<?>[] map(final ColumnStoreSchema schema) {
-        final ArrowColumnDataSpec<?>[] arrowSchema = new ArrowColumnDataSpec<?>[schema.getNumColumns()];
-        for (int i = 0; i < schema.getNumColumns(); i++) {
-            arrowSchema[i] = getMapping(schema.getColumnDataSpec(i));
-        }
-        return arrowSchema;
+    public ArrowColumnDataSpec<?, ?>[] map(final ColumnStoreSchema schema) {
+        return IntStream.range(0, schema.getNumColumns()).mapToObj(schema::getColumnDataSpec)
+            .map(spec -> spec.accept(this)).toArray(ArrowColumnDataSpec<?, ?>[]::new);
     }
 
-    // TODO different pattern
-    private static final ArrowColumnDataSpec<?> getMapping(final ColumnDataSpec<?> spec) {
-        if (spec instanceof DoubleDataSpec) {
-            return new ArrowDoubleDataSpec();
-        } else if (spec instanceof StringDataSpec) {
-            return new ArrowStringDataSpec((StringDataSpec)spec);
-        } else if (spec instanceof IntDataSpec) {
-            return new ArrowIntDataSpec();
-        } else if (spec instanceof NullableWithCauseDataSpec) {
-            @SuppressWarnings({"rawtypes", "unchecked"})
-            ArrowBinarySupplDataSpec<?> arrowSpec = new ArrowBinarySupplDataSpec((NullableWithCauseDataSpec<?>)spec);
-            return arrowSpec;
-        } else if (spec instanceof LongDataSpec) {
-            return new ArrowLongDataSpec();
-        } else if (spec instanceof VarBinaryDataSpec) {
-            return new ArrowVarBinaryDataSpec();
-        }
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final BooleanDataSpec spec) {
         throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
-
     }
 
-    static class ArrowLongDataSpec implements ArrowColumnDataSpec<LongData> {
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final ByteDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowDoubleDataSpec visit(final DoubleDataSpec spec) {
+        return new ArrowDoubleDataSpec();
+    }
+
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final DurationDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final FloatDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowIntDataSpec visit(final IntDataSpec spec) {
+        return new ArrowIntDataSpec();
+    }
+
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final LocalDateDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final LocalDateTimeDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final LocalTimeDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowLongDataSpec visit(final LongDataSpec spec) {
+        return new ArrowLongDataSpec();
+    }
+
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final PeriodDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowStringDataSpec visit(final StringDataSpec spec) {
+        return new ArrowStringDataSpec(spec);
+    }
+
+    @Override
+    public ArrowVarBinaryDataSpec visit(final VarBinaryDataSpec spec) {
+        return new ArrowVarBinaryDataSpec();
+    }
+
+    @Override
+    public ArrowColumnDataSpec<?, ?> visit(final VoidDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    static class ArrowLongDataSpec implements ArrowColumnDataSpec<LongWriteData, LongReadData> {
         @Override
-        public LongData createEmpty(final BufferAllocator allocator) {
-            return new ArrowLongData(allocator);
+        public ArrowLongData createEmpty(final BufferAllocator allocator, final int capacity) {
+            return new ArrowLongData(allocator, capacity);
         }
 
         @Override
-        public LongData wrap(final FieldVector vector, final DictionaryProvider provider) {
+        public ArrowLongData wrap(final FieldVector vector, final DictionaryProvider provider) {
             return new ArrowLongData((BigIntVector)vector);
         }
     }
 
-    static class ArrowDoubleDataSpec implements ArrowColumnDataSpec<DoubleData> {
+    static class ArrowDoubleDataSpec implements ArrowColumnDataSpec<DoubleWriteData, DoubleReadData> {
         @Override
-        public DoubleData createEmpty(final BufferAllocator allocator) {
-            return new ArrowDoubleData(allocator);
+        public ArrowDoubleData createEmpty(final BufferAllocator allocator, final int capacity) {
+            return new ArrowDoubleData(allocator, capacity);
         }
 
         @Override
-        public DoubleData wrap(final FieldVector vector, final DictionaryProvider provider) {
+        public ArrowDoubleData wrap(final FieldVector vector, final DictionaryProvider provider) {
             return new ArrowDoubleData((Float8Vector)vector);
         }
     }
 
-    static class ArrowIntDataSpec implements ArrowColumnDataSpec<IntData> {
+    static class ArrowIntDataSpec implements ArrowColumnDataSpec<IntWriteData, IntReadData> {
         @Override
-        public IntData createEmpty(final BufferAllocator allocator) {
-            return new ArrowIntData(allocator);
+        public ArrowIntData createEmpty(final BufferAllocator allocator, final int capacity) {
+            return new ArrowIntData(allocator, capacity);
         }
 
         @Override
-        public IntData wrap(final FieldVector vector, final DictionaryProvider provider) {
+        public ArrowIntData wrap(final FieldVector vector, final DictionaryProvider provider) {
             return new ArrowIntData((IntVector)vector);
         }
     }
 
-    static class ArrowVarBinaryDataSpec implements ArrowColumnDataSpec<VarBinaryData> {
+    static class ArrowVarBinaryDataSpec implements ArrowColumnDataSpec<VarBinaryWriteData, VarBinaryReadData> {
 
         @Override
-        public VarBinaryData createEmpty(final BufferAllocator allocator) {
-            return new ArrowVarBinaryData(allocator);
+        public ArrowVarBinaryData createEmpty(final BufferAllocator allocator, final int capacity) {
+            return new ArrowVarBinaryData(allocator, capacity);
         }
 
         @Override
-        public VarBinaryData wrap(final FieldVector vector, final DictionaryProvider provider) {
+        public ArrowVarBinaryData wrap(final FieldVector vector, final DictionaryProvider provider) {
             return new ArrowVarBinaryData((VarBinaryVector)vector);
         }
     }
 
-    static class ArrowBinarySupplDataSpec<C extends ArrowData<?>>
-        implements ArrowColumnDataSpec<NullableWithCauseData<C>> {
-
-        private final NullableWithCauseDataSpec<C> m_spec;
-
-        private ArrowColumnDataSpec<C> m_arrowChunkSpec;
-
-        @SuppressWarnings("unchecked")
-        public ArrowBinarySupplDataSpec(final NullableWithCauseDataSpec<C> spec) {
-            m_spec = spec;
-            m_arrowChunkSpec = (ArrowColumnDataSpec<C>)ArrowSchemaMapperV0.getMapping(m_spec.getChildSpec());
-        }
-
-        @Override
-        public NullableWithCauseData<C> createEmpty(final BufferAllocator allocator) {
-            return new ArrowNullableWithCauseData(allocator, m_arrowChunkSpec.createEmpty(allocator));
-        }
-
-        @Override
-        public NullableWithCauseData<C> wrap(final FieldVector vector, final DictionaryProvider provider) {
-            @SuppressWarnings("unchecked")
-            final ArrowColumnDataSpec<C> arrowSpec = (ArrowColumnDataSpec<C>)getMapping(m_spec.getChildSpec());
-            final Map<String, String> metadata = vector.getField().getMetadata();
-            if (metadata.get(ArrowNullableWithCauseData.CFG_HAS_MISSING_WITH_CAUSE) != null) {
-                final C wrapped = arrowSpec.wrap((FieldVector)((StructVector)vector).getChildByOrdinal(0), provider);
-                return new ArrowNullableWithCauseData(wrapped, (StructVector)vector);
-            } else {
-                return new ArrowNullableWithCauseData<C>(arrowSpec.wrap(vector, provider));
-            }
-
-        }
-    }
-
-    static class ArrowStringDataSpec implements ArrowColumnDataSpec<StringData> {
+    static class ArrowStringDataSpec implements ArrowColumnDataSpec<StringWriteData, StringReadData> {
 
         private final StringDataSpec m_spec;
 
@@ -210,16 +237,16 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
         }
 
         @Override
-        public StringData createEmpty(final BufferAllocator allocator) {
+        public StringWriteData createEmpty(final BufferAllocator allocator, final int capacity) {
             if (m_spec.isDictEnabled()) {
-                return new ArrowDictEncodedStringData(allocator, id);
+                return new ArrowDictEncodedStringData(allocator, id, capacity);
             } else {
-                return new ArrowVarCharData(allocator);
+                return new ArrowVarCharData(allocator, capacity);
             }
         }
 
         @Override
-        public StringData wrap(final FieldVector vector, final DictionaryProvider provider) {
+        public StringReadData wrap(final FieldVector vector, final DictionaryProvider provider) {
             if (m_spec.isDictEnabled()) {
                 return new ArrowDictEncodedStringData((IntVector)vector, (VarCharVector)provider
                     .lookup(vector.getField().getFieldType().getDictionary().getId()).getVector());
@@ -228,4 +255,5 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper {
             }
         }
     }
+
 }

@@ -47,15 +47,15 @@ package org.knime.core.columnar.arrow;
 
 import java.io.File;
 
-import org.knime.core.columnar.ColumnStoreFactory;
-import org.knime.core.columnar.ColumnStoreSchema;
+import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
     public ArrowColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int chunkSize) {
         // TODO make this part of the create method?
-        return new ArrowColumnStore(schema, new ArrowSchemaMapperV0(), file, chunkSize);
+        return new ArrowColumnStore(schema, ArrowSchemaMapperV0.INSTANCE, file, chunkSize);
     }
 
     @Override

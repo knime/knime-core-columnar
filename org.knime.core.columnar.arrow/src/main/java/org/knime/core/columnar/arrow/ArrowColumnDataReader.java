@@ -64,16 +64,17 @@ import org.apache.arrow.vector.ipc.SeekableReadChannel;
 import org.apache.arrow.vector.ipc.message.ArrowBlock;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.util.TransferPair;
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 class ArrowColumnDataReader implements ColumnDataReader {
 
     private final FieldVectorReader m_reader;
 
-    private ArrowColumnDataSpec<?>[] m_arrowSchema;
+    private ArrowColumnDataSpec<?, ?>[] m_arrowSchema;
 
     private ColumnSelection m_selection;
 
@@ -83,7 +84,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
         m_selection = selection;
 
         // TODO mapper should actually be read from arrow for backwards compatibility.
-        m_arrowSchema = new ArrowSchemaMapperV0().map(schema);
+        m_arrowSchema = ArrowSchemaMapperV0.INSTANCE.map(schema);
 
     }
 
@@ -93,37 +94,33 @@ class ArrowColumnDataReader implements ColumnDataReader {
     }
 
     @Override
-    public ColumnData[] read(final int chunkIdx) throws IOException {
+    public Batch readRetained(final int chunkIdx) throws IOException {
         final FieldVector[] vectors = m_reader.read(chunkIdx);
         final DictionaryProvider provider = m_reader.dictionaries(chunkIdx);
-        final ColumnData[] data = new ColumnData[vectors.length];
-        if (m_selection != null) {
-            final int[] selected = m_selection.get();
-            int j = 0;
-            for (int i = 0; i < data.length; i++) {
-                if (j < selected.length && selected[j] == i) {
-                    // TODO transfer ownership of dictionary vector for parallel reads
-                    data[i] = m_arrowSchema[i].wrap(vectors[i], provider);
-                    j++;
-                } else {
-                    vectors[i].clear();
-                }
-            }
-        } else {
-            for (int i = 0; i < data.length; i++) {
-                data[i] = m_arrowSchema[i].wrap(vectors[i], provider);
+
+        Batch batch = m_selection.createBatch(i -> {
+         // TODO transfer ownership of dictionary vector for parallel reads
+            ColumnData rdata = m_arrowSchema[i].wrap(vectors[i], provider);
+            vectors[i] = null;
+            return rdata;
+        });
+
+        for (int i = 0; i < vectors.length; i++) {
+            if (vectors[i] != null) {
+                vectors[i].clear();
             }
         }
-        return data;
+
+        return batch;
     }
 
     @Override
-    public int getNumChunks() {
+    public int getNumBatches() {
         return m_reader.getRecords();
     }
 
     @Override
-    public int getMaxDataCapacity() {
+    public int getMaxLength() {
         return m_reader.getChunkSize();
     }
 

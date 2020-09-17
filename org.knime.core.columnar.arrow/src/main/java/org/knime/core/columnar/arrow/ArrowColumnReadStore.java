@@ -49,10 +49,10 @@ import java.io.File;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
-import org.knime.core.columnar.ColumnReadStore;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 class ArrowColumnReadStore implements ColumnReadStore {
 

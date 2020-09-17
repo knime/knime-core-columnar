@@ -56,11 +56,13 @@ import org.apache.arrow.vector.Float8Vector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnStoreSchema;
 import org.knime.core.columnar.arrow.ArrowSchemaMapperV0.ArrowDoubleDataSpec;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
-import org.knime.core.columnar.data.DoubleData;
+import org.knime.core.columnar.batch.DefaultBatch;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 public class ArrowDoubleDataTest extends AbstractArrowTest {
 
@@ -71,7 +73,7 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
     @Before
     public void init() {
         m_alloc = new RootAllocator();
-        m_schema = createSchema(new DoubleData.DoubleDataSpec());
+        m_schema = createSchema(ColumnDataSpec.doubleSpec());
     }
 
     @After
@@ -81,26 +83,27 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
 
     @Test
     public void testMapper() {
-        ArrowSchemaMapperV0 mapper = new ArrowSchemaMapperV0();
-        ArrowColumnDataSpec<?>[] map = mapper.map(m_schema);
+        ArrowSchemaMapperV0 mapper = ArrowSchemaMapperV0.INSTANCE;
+        ArrowColumnDataSpec[] map = mapper.map(m_schema);
         assertTrue(map.length == 1);
         assertTrue(map[0] instanceof ArrowDoubleDataSpec);
-        assertTrue(map[0].createEmpty(m_alloc) instanceof ArrowDoubleData);
+        ColumnWriteData data = map[0].createEmpty(m_alloc, 1024);
+        assertTrue(data instanceof ArrowDoubleData);
         assertTrue(map[0].wrap(new Float8Vector("Arrow", m_alloc), null) instanceof ArrowDoubleData);
+        data.release();
     }
 
     @Test
     public void testAlloc() {
-        ArrowDoubleData data = new ArrowDoubleData(m_alloc);
-        data.ensureCapacity(1024);
+        ArrowDoubleData data = new ArrowDoubleData(m_alloc, 1024);
         assertTrue(data.get().getValueCapacity() > 1024);
 
         for (int i = 0; i < 512; i++) {
             data.setDouble(i, i);
         }
 
-        data.setNumValues(512);
-        assertEquals(512, data.getNumValues());
+        data.close(512);
+        assertEquals(512, data.length());
 
         for (int i = 0; i < 512; i++) {
             assertEquals(i, data.getDouble(i), 0);
@@ -111,8 +114,7 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
 
     @Test
     public void testSizeOf() {
-        ArrowDoubleData data = new ArrowDoubleData(m_alloc);
-        data.ensureCapacity(1024);
+        ArrowDoubleData data = new ArrowDoubleData(m_alloc, 1024);
         // actual size can be bigger than ensured capacity.
         assertEquals(data.sizeOf(), data.get().getDataBuffer().capacity() + data.get().getValidityBuffer().capacity());
         data.release();
@@ -121,9 +123,8 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
     @Test
     public void testIOWithMissing() throws Exception {
         File tmp = createTmpFile();
-        ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, m_alloc, 1024);
-        ArrowDoubleData data = new ArrowDoubleData(m_alloc);
-        data.ensureCapacity(1024);
+        ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_schema, tmp, m_alloc, 1024);
+        ArrowDoubleData data = new ArrowDoubleData(m_alloc, 1024);
         for (int i = 0; i < 1024; i++) {
             if (i % 13 == 0) {
                 data.setMissing(i);
@@ -131,45 +132,43 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
                 data.setDouble(i, i);
             }
         }
-        data.setNumValues(1024);
-        writer.write(new ColumnData[]{data});
+        data.close(1024);
+        writer.write(new DefaultBatch(m_schema, new ColumnData[]{data}, 1024));
         data.release();
         writer.close();
 
-        ArrowColumnDataReader reader = new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection(0));
+        ArrowColumnDataReader reader = new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection(m_schema, 0));
 
-        ColumnData[] dataChunk = reader.read(0);
-        assertEquals(1, dataChunk.length);
-        assertEquals(1024, dataChunk[0].getNumValues());
-        assertTrue(dataChunk[0] instanceof ArrowDoubleData);
+        ColumnData dataChunk = reader.readRetained(0).get(0);
+        assertEquals(1024, dataChunk.length());
+        assertTrue(dataChunk instanceof ArrowDoubleData);
 
-        for (int i = 0; i < dataChunk[0].getNumValues(); i++) {
+        for (int i = 0; i < dataChunk.length(); i++) {
             if (i % 13 == 0) {
-                assertTrue(((ArrowDoubleData)dataChunk[0]).isMissing(i));
+                assertTrue(((ArrowDoubleData)dataChunk).isMissing(i));
             } else {
-                assertFalse(((ArrowDoubleData)dataChunk[0]).isMissing(i));
-                assertEquals(i, ((ArrowDoubleData)dataChunk[0]).getDouble(i), 0);
+                assertFalse(((ArrowDoubleData)dataChunk).isMissing(i));
+                assertEquals(i, ((ArrowDoubleData)dataChunk).getDouble(i), 0);
             }
         }
-        dataChunk[0].release();
+        dataChunk.release();
         reader.close();
         tmp.delete();
     }
 
     @Test
     public void testIdentityWithMissing() {
-        ArrowDoubleData data = new ArrowDoubleData(m_alloc);
-        data.ensureCapacity(1024);
-        for (int i = 0; i < data.getMaxCapacity(); i++) {
+        ArrowDoubleData data = new ArrowDoubleData(m_alloc, 1024);
+        for (int i = 0; i < data.capacity(); i++) {
             if (i % 13 == 0) {
                 data.setMissing(i);
             } else {
                 data.setDouble(i, i);
             }
         }
-        data.setNumValues(1024);
+        data.close(1024);
 
-        for (int i = 0; i < data.getNumValues(); i++) {
+        for (int i = 0; i < data.length(); i++) {
             if (i % 13 == 0) {
                 assertTrue(data.isMissing(i));
             } else {

@@ -50,15 +50,16 @@ import static org.junit.Assert.assertEquals;
 import java.nio.file.Files;
 
 import org.junit.Test;
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.ColumnStore;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.data.NullableWithCauseData;
-import org.knime.core.columnar.data.StringData;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
 
@@ -76,8 +77,8 @@ public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
             }
 
             @Override
-            public ColumnDataSpec<?> getColumnDataSpec(final int idx) {
-                return new StringData.StringDataSpec(true);
+            public ColumnDataSpec getColumnDataSpec(final int idx) {
+                return ColumnDataSpec.dictEncodedStringSpec();
             }
         };
 
@@ -88,13 +89,12 @@ public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
         final ColumnDataWriter writer = store.getWriter();
         ColumnDataFactory fac = store.getFactory();
         for (int c = 0; c < numChunks; c++) {
-            final ColumnData[] data = fac.create();
-            final StringData cast = (StringData)data[0];
+            final WriteBatch batch = fac.create();
+            final StringWriteData cast = (StringWriteData)batch.get(0);
             for (int i = 0; i < chunkSize; i++) {
                 cast.setString(i, "Test" + i * c);
             }
-            cast.setNumValues(chunkSize);
-            writer.write(data);
+            writer.write(batch.close(chunkSize));
             cast.release();
         }
         writer.close();
@@ -102,8 +102,8 @@ public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
         // let's read some data back
         final ColumnDataReader reader = store.createReader();
         for (int c = 0; c < numChunks; c++) {
-            final ColumnData[] data = reader.read(c);
-            final StringData cast = (StringData)data[0];
+            final Batch batch = reader.readRetained(c);
+            final StringReadData cast = (StringReadData)batch.get(0);
             for (int i = 0; i < chunkSize; i++) {
                 assertEquals("Test" + i * c, cast.getString(i));
             }
@@ -114,57 +114,4 @@ public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
         store.close();
     }
 
-    @Test
-    public void testBinarySupplementWithDictEncoding() throws Exception {
-        int numChunks = 32;
-        int chunkSize = 17;
-
-        ArrowColumnStoreFactory factory = new ArrowColumnStoreFactory();
-
-        final ColumnStoreSchema schema = new ColumnStoreSchema() {
-
-            @Override
-            public int getNumColumns() {
-                return 1;
-            }
-
-            @Override
-            public ColumnDataSpec<?> getColumnDataSpec(final int idx) {
-                return new NullableWithCauseData.NullableWithCauseDataSpec<>(new StringData.StringDataSpec(true));
-            }
-        };
-
-        final ArrowColumnStore store =
-            factory.createWriteStore(schema, Files.createTempFile("test", ".knarrow").toFile(), chunkSize);
-
-        // let's store some data
-        final ColumnDataWriter writer = store.getWriter();
-        ColumnDataFactory dataFac = store.getFactory();
-        for (int c = 0; c < numChunks; c++) {
-            final ColumnData[] data = dataFac.create();
-            @SuppressWarnings("unchecked")
-            final NullableWithCauseData<StringData> cast = (NullableWithCauseData<StringData>)data[0];
-            for (int i = 0; i < chunkSize; i++) {
-                cast.getColumnData().setString(i, "Test " + i);
-            }
-            cast.setNumValues(chunkSize);
-            writer.write(data);
-            cast.release();
-        }
-        writer.close();
-
-        // let's read some data back
-        final ColumnDataReader reader = store.createReader();
-        for (int c = 0; c < numChunks; c++) {
-            final ColumnData[] data = reader.read(c);
-            @SuppressWarnings("unchecked")
-            final NullableWithCauseData<StringData> cast = (NullableWithCauseData<StringData>)data[0];
-            for (int i = 0; i < chunkSize; i++) {
-                assertEquals("Test " + i, cast.getColumnData().getString(i));
-            }
-            cast.release();
-        }
-        reader.close();
-        store.close();
-    }
 }

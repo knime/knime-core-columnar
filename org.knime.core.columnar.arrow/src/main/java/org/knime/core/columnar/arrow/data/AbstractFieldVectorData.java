@@ -52,19 +52,15 @@ import org.apache.arrow.vector.FieldVector;
 
 abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowData<F> {
 
-    protected final F m_vector;
-
     private final AtomicInteger m_refCounter = new AtomicInteger(1);
 
-    private int m_maxCapacity;
+    protected final F m_vector;
 
-    private int m_numValues;
-
-    AbstractFieldVectorData(final BufferAllocator allocator) {
-        m_vector = create(allocator);
+    AbstractFieldVectorData(final BufferAllocator allocator, final int capacity) {
+        m_vector = create(allocator, capacity);
     }
 
-    protected abstract F create(BufferAllocator allocator);
+    protected abstract F create(BufferAllocator allocator, final int capacity);
 
     AbstractFieldVectorData(final F vector) {
         m_vector = vector;
@@ -81,29 +77,13 @@ abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowDa
     }
 
     @Override
-    public int getMaxCapacity() {
-        return m_maxCapacity;
+    public int capacity() {
+        return m_vector.getValueCapacity();
     }
 
     @Override
-    public void ensureCapacity(final int chunkSize) {
-        if (chunkSize > m_maxCapacity) {
-            ensureCapacityInternal(chunkSize);
-            m_maxCapacity = chunkSize;
-        }
-    }
-
-    abstract void ensureCapacityInternal(int chunkSize);
-
-    @Override
-    public int getNumValues() {
-        return m_numValues;
-    }
-
-    @Override
-    public void setNumValues(final int numValues) {
-        m_numValues = numValues;
-        m_vector.setValueCount(numValues);
+    public int length() {
+        return m_vector.getValueCount();
     }
 
     // TODO thread safety for ref-counting

@@ -50,13 +50,15 @@ import java.io.IOException;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
-import org.knime.core.columnar.ColumnData;
-import org.knime.core.columnar.ColumnStore;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.chunk.ColumnDataFactory;
-import org.knime.core.columnar.chunk.ColumnDataReader;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.batch.DefaultWriteBatch;
+import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 import com.google.common.io.Files;
 
@@ -77,7 +79,7 @@ final class ArrowColumnStore implements ColumnStore {
 
     private final int m_chunkSize;
 
-    private final ArrowColumnDataSpec<?>[] m_arrowSchema;
+    private final ArrowColumnDataSpec<?, ?>[] m_arrowSchema;
 
     ArrowColumnStore(final ColumnStoreSchema schema, final ArrowSchemaMapper mapper, final File file, final int chunkSize) {
         m_file = file;
@@ -101,7 +103,7 @@ final class ArrowColumnStore implements ColumnStore {
         // TODO also write mapper type information for backwards-compatibility. Readers
         // can first get the mapper type from metadata and instantiate a mapper
         // themselves.
-        return new ArrowColumnDataWriter(m_file, m_allocator, m_chunkSize);
+        return new ArrowColumnDataWriter(m_schema, m_file, m_allocator, m_chunkSize);
     }
 
     @Override
@@ -113,13 +115,12 @@ final class ArrowColumnStore implements ColumnStore {
     public ColumnDataFactory getFactory() {
         return new ColumnDataFactory() {
             @Override
-            public ColumnData[] create() {
-                final ColumnData[] chunk = new ColumnData[m_arrowSchema.length];
+            public WriteBatch create() {
+                final ColumnWriteData[] chunk = new ColumnWriteData[m_arrowSchema.length];
                 for (int i = 0; i < m_arrowSchema.length; i++) {
-                    chunk[i] = m_arrowSchema[i].createEmpty(m_allocator);
-                    chunk[i].ensureCapacity(m_chunkSize);
+                    chunk[i] = m_arrowSchema[i].createEmpty(m_allocator, m_chunkSize);
                 }
-                return chunk;
+                return new DefaultWriteBatch(m_schema, chunk, m_chunkSize);
             }
         };
     }
@@ -130,7 +131,7 @@ final class ArrowColumnStore implements ColumnStore {
     }
 
     @Override
-    public void saveToFile(final File f) throws IOException {
+    public void save(final File f) throws IOException {
         Files.copy(m_file, f);
     }
 }

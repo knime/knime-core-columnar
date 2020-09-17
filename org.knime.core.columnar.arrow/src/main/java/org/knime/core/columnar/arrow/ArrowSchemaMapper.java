@@ -45,7 +45,7 @@
  */
 package org.knime.core.columnar.arrow;
 
-import org.knime.core.columnar.ColumnStoreSchema;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 public interface ArrowSchemaMapper {
 
@@ -55,6 +55,6 @@ public interface ArrowSchemaMapper {
      * @param schema
      * @return
      */
-    ArrowColumnDataSpec<?>[] map(ColumnStoreSchema schema);
+    ArrowColumnDataSpec<?, ?>[] map(ColumnStoreSchema schema);
 
 }

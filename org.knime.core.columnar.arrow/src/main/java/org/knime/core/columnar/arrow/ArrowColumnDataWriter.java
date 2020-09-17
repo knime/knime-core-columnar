@@ -73,13 +73,15 @@ import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.knime.core.columnar.ColumnData;
 import org.knime.core.columnar.arrow.data.ArrowData;
 import org.knime.core.columnar.arrow.data.ArrowDictionaryHolder;
-import org.knime.core.columnar.chunk.ColumnDataWriter;
-import org.knime.core.columnar.data.NullableWithCauseData;
+import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
 class ArrowColumnDataWriter implements ColumnDataWriter {
+
+    private final ColumnStoreSchema m_schema;
 
     private final File m_file;
 
@@ -89,7 +91,8 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
 
     private final int m_chunkSize;
 
-    public ArrowColumnDataWriter(final File file, final BufferAllocator allocator, final int chunkSize) {
+    public ArrowColumnDataWriter(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator, final int chunkSize) {
+        m_schema = schema;
         m_file = file;
         m_allocator = allocator;
         m_writer = new FieldVectorWriter(m_file);
@@ -102,28 +105,16 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
     }
 
     @Override
-    public void write(final ColumnData[] data) throws IOException {
-        final List<FieldVector> vectors = new ArrayList<FieldVector>(data.length);
+    public void write(final Batch batch) throws IOException {
+        final List<FieldVector> vectors = new ArrayList<>(m_schema.getNumColumns());
         final ArrowDictProvider dicts = new ArrowDictProvider();
-        for (int i = 0; i < data.length; i++) {
+        for (int i = 0; i < m_schema.getNumColumns(); i++) {
 
-            final ArrowData<?> arrowData = (ArrowData<?>)data[i];
+            final ArrowData<?> arrowData = (ArrowData<?>)batch.get(i);
             vectors.add(arrowData.get());
             if (arrowData instanceof ArrowDictionaryHolder) {
                 dicts.add(new Dictionary(((ArrowDictionaryHolder<?>)arrowData).getDictionary(),
                     arrowData.get().getField().getFieldType().getDictionary()));
-            } else if (arrowData instanceof NullableWithCauseData) {
-                /*
-                 * TODO recursive parsing for dictionaries for all nested types (especially if
-                 * we have struct types different to BinarySupplData later).
-                 *
-                 * This implementation doesn't work for level-2 nested dictionaries.
-                 */
-                final ArrowData<?> chunk = (ArrowData<?>)((NullableWithCauseData<?>)arrowData).getColumnData();
-                if (chunk instanceof ArrowDictionaryHolder) {
-                    dicts.add(new Dictionary(((ArrowDictionaryHolder<?>)chunk).getDictionary(),
-                        chunk.get().getField().getFieldType().getDictionary()));
-                }
             }
         }
 

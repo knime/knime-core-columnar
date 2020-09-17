@@ -57,9 +57,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.VarCharVector;
-import org.knime.core.columnar.data.StringData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
 
-public class ArrowVarCharData implements StringData, ArrowData<VarCharVector> {
+public class ArrowVarCharData
+    implements StringWriteData, StringReadData, ArrowData<VarCharVector> {
 
     // Efficiency
     private final CharsetDecoder DECODER = Charset.forName("UTF-8").newDecoder()
@@ -90,17 +92,13 @@ public class ArrowVarCharData implements StringData, ArrowData<VarCharVector> {
 
     private final VarCharVector m_vector;
 
-    private int m_numValues;
-
-    private int m_maxCapacity;
-
-    public ArrowVarCharData(final BufferAllocator allocator) {
+    public ArrowVarCharData(final BufferAllocator allocator, final int capacity) {
         m_vector = new VarCharVector("VarCharVector", allocator);
+        m_vector.allocateNew(capacity);
     }
 
     public ArrowVarCharData(final VarCharVector vector) {
         m_vector = vector;
-        m_numValues = vector.getValueCount();
     }
 
     @Override
@@ -126,32 +124,24 @@ public class ArrowVarCharData implements StringData, ArrowData<VarCharVector> {
     }
 
     @Override
-    public int getMaxCapacity() {
-        return m_maxCapacity;
+    public int capacity() {
+        return m_vector.getValueCapacity();
     }
 
     @Override
-    public int getNumValues() {
-        return m_numValues;
+    public StringReadData close(final int length) {
+        m_vector.setValueCount(length);
+        return this;
     }
 
     @Override
-    public void setNumValues(final int numValues) {
-        m_vector.setValueCount(numValues);
-        m_numValues = numValues;
+    public int length() {
+        return m_vector.getValueCount();
     }
 
     @Override
     public VarCharVector get() {
         return m_vector;
-    }
-
-    @Override
-    public void ensureCapacity(final int chunkSize) {
-        if (chunkSize > m_maxCapacity) {
-            m_vector.allocateNew(chunkSize);
-            m_maxCapacity = chunkSize;
-        }
     }
 
     // TODO thread safety for ref-counting

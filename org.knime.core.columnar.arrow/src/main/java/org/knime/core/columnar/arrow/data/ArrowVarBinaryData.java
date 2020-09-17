@@ -48,12 +48,14 @@ package org.knime.core.columnar.arrow.data;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.VarBinaryVector;
-import org.knime.core.columnar.data.VarBinaryData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 
-public class ArrowVarBinaryData extends AbstractFieldVectorData<VarBinaryVector> implements VarBinaryData {
+public class ArrowVarBinaryData extends AbstractFieldVectorData<VarBinaryVector>
+    implements VarBinaryWriteData, VarBinaryReadData {
 
-    public ArrowVarBinaryData(final BufferAllocator allocator) {
-        super(allocator);
+    public ArrowVarBinaryData(final BufferAllocator allocator, final int capacity) {
+        super(allocator, capacity);
     }
 
     public ArrowVarBinaryData(final VarBinaryVector vector) {
@@ -61,8 +63,10 @@ public class ArrowVarBinaryData extends AbstractFieldVectorData<VarBinaryVector>
     }
 
     @Override
-    protected VarBinaryVector create(final BufferAllocator allocator) {
-        return new VarBinaryVector("BinaryVector", allocator);
+    protected VarBinaryVector create(final BufferAllocator allocator, final int capacity) {
+        final VarBinaryVector vector = new VarBinaryVector("BinaryVector", allocator);
+        vector.allocateNew(capacity);
+        return vector;
     }
 
     @Override
@@ -76,14 +80,15 @@ public class ArrowVarBinaryData extends AbstractFieldVectorData<VarBinaryVector>
     }
 
     @Override
-    public void ensureCapacityInternal(final int chunkSize) {
-        m_vector.allocateNew(chunkSize);
-    }
-
-    @Override
     public void setMissing(final int index) {
         // TODO we can speed things likely up directly accessing validity buffer
         BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
+    }
+
+    @Override
+    public VarBinaryReadData close(final int length) {
+        m_vector.setValueCount(length);
+        return this;
     }
 
 }

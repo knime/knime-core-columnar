@@ -48,10 +48,11 @@ package org.knime.core.columnar.arrow;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.ColumnData;
+import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnWriteData;
 
-public interface ArrowColumnDataSpec<C extends ColumnData> {
-    C createEmpty(BufferAllocator allocator);
+public interface ArrowColumnDataSpec<W extends ColumnWriteData, R extends ColumnData> {
+    W createEmpty(BufferAllocator allocator, int capacity);
 
-    C wrap(FieldVector vector, DictionaryProvider provider);
+    R wrap(FieldVector vector, DictionaryProvider provider);
 }

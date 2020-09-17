@@ -61,13 +61,14 @@ import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.data.StringData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
 public class ArrowDictEncodedStringData
-    implements StringData, ArrowDictionaryHolder<VarCharVector>, ArrowData<IntVector> {
+    implements StringWriteData, StringReadData, ArrowDictionaryHolder<VarCharVector>, ArrowData<IntVector> {
 
     // TODO configurable 2048 size of dict? hm...
     private final static int INIT_DICT_SIZE = 2048;
@@ -89,10 +90,6 @@ public class ArrowDictEncodedStringData
 
     private IntVector m_vector;
 
-    private int m_numValues;
-
-    private int m_maxCapacity;
-
     private int m_runningDictIndex;
 
     // loaded from disc
@@ -101,7 +98,6 @@ public class ArrowDictEncodedStringData
             m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
             m_invInMemDict = m_inMemDict.inverse();
             m_vector = vector;
-            m_numValues = vector.getValueCount();
 
             if (dict != null) {
                 for (int i = 0; i < dict.getValueCount(); i++) {
@@ -120,11 +116,12 @@ public class ArrowDictEncodedStringData
     }
 
     // on first create
-    public ArrowDictEncodedStringData(final BufferAllocator allocator, final long id) {
-        this(
-            new IntVector("Indices",
-                new FieldType(false, MinorType.INT.getType(), new DictionaryEncoding(id, false, null)), allocator),
-            null);
+    public ArrowDictEncodedStringData(final BufferAllocator allocator, final long id, final int capacity) {
+        m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
+        m_invInMemDict = m_inMemDict.inverse();
+        m_vector = new IntVector("Indices",
+            new FieldType(false, MinorType.INT.getType(), new DictionaryEncoding(id, false, null)), allocator);
+        m_vector.allocateNew(capacity);
     }
 
     @Override
@@ -175,32 +172,24 @@ public class ArrowDictEncodedStringData
     }
 
     @Override
-    public int getMaxCapacity() {
-        return m_maxCapacity;
+    public int capacity() {
+        return m_vector.getValueCapacity();
     }
 
     @Override
-    public int getNumValues() {
-        return m_numValues;
+    public StringReadData close(final int length) {
+        m_vector.setValueCount(length);
+        return this;
     }
 
     @Override
-    public void setNumValues(final int numValues) {
-        m_vector.setValueCount(numValues);
-        m_numValues = numValues;
+    public int length() {
+        return m_vector.getValueCount();
     }
 
     @Override
     public IntVector get() {
         return m_vector;
-    }
-
-    @Override
-    public void ensureCapacity(final int chunkSize) {
-        if (chunkSize > m_maxCapacity) {
-            m_maxCapacity = chunkSize;
-            m_vector.allocateNew(chunkSize);
-        }
     }
 
     // TODO thread safety for ref-counting

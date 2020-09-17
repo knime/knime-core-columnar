@@ -53,11 +53,13 @@ import java.util.UUID;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.junit.BeforeClass;
-import org.knime.core.columnar.ColumnDataSpec;
-import org.knime.core.columnar.ColumnStore;
-import org.knime.core.columnar.ColumnStoreSchema;
-import org.knime.core.columnar.ColumnStoreUtils;
-import org.knime.core.columnar.chunk.ColumnSelection;
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.DefaultColumnSelection;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.ColumnStoreUtils;
 
 public class AbstractArrowTest {
 
@@ -68,15 +70,15 @@ public class AbstractArrowTest {
         m_factory = new ArrowColumnStoreFactory();
     }
 
-    public ColumnStoreSchema createWideSchema(final ColumnDataSpec<?> type, final int width) {
-        final ColumnDataSpec<?>[] types = new ColumnDataSpec<?>[width];
+    public ColumnStoreSchema createWideSchema(final ColumnDataSpec type, final int width) {
+        final ColumnDataSpec[] types = new ColumnDataSpec[width];
         for (int i = 0; i < width; i++) {
             types[i] = type;
         }
         return createSchema(types);
     }
 
-    public ColumnStoreSchema createSchema(final ColumnDataSpec<?>... types) {
+    public ColumnStoreSchema createSchema(final ColumnDataSpec... types) {
         return new ColumnStoreSchema() {
 
             @Override
@@ -85,20 +87,15 @@ public class AbstractArrowTest {
             }
 
             @Override
-            public ColumnDataSpec<?> getColumnDataSpec(final int index) {
+            public ColumnDataSpec getColumnDataSpec(final int index) {
                 return types[index];
             }
         };
     }
 
-    public ColumnSelection createSelection(final int... selectedIndidces) {
-        return selectedIndidces.length > 0 ? new ColumnSelection() {
-
-            @Override
-            public int[] get() {
-                return selectedIndidces;
-            }
-        } : null;
+    public ColumnSelection createSelection(final ColumnStoreSchema schema, final int... selectedIndidces) {
+        return selectedIndidces.length > 0 ? new FilteredColumnSelection(schema, selectedIndidces)
+            : new DefaultColumnSelection(schema);
     }
 
     public ColumnStore createStore(final int chunkSize, final ColumnStoreSchema schema) throws IOException {
@@ -109,7 +106,7 @@ public class AbstractArrowTest {
         return ColumnStoreUtils.cache(store);
     }
 
-    public ColumnStore createStore(final int chunkSize, final ColumnDataSpec<?>... types) throws IOException {
+    public ColumnStore createStore(final int chunkSize, final ColumnDataSpec... types) throws IOException {
         return createStore(chunkSize, new ColumnStoreSchema() {
 
             @Override
@@ -118,7 +115,7 @@ public class AbstractArrowTest {
             }
 
             @Override
-            public ColumnDataSpec<?> getColumnDataSpec(final int idx) {
+            public ColumnDataSpec getColumnDataSpec(final int idx) {
                 return types[idx];
             }
         });
