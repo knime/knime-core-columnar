@@ -118,7 +118,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             });
 
             m_maxDataCapacity = Math.max(m_maxDataCapacity, batch.length());
-            for (int i = 0; i < batch.length(); i++) {
+            for (int i = 0; i < getSchema().getNumColumns(); i++) {
                 final ColumnDataUniqueId ccUID =
                     new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, m_numChunks);
                 m_cachedData.put(ccUID, batchFlushed);
