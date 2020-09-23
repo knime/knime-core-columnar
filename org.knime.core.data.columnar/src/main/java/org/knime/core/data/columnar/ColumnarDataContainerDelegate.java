@@ -43,36 +43,104 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
+package org.knime.core.data.columnar;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+import java.io.IOException;
+
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DataRow;
+import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.container.ContainerTable;
+import org.knime.core.data.container.DataContainerDelegate;
+import org.knime.core.data.values.RowKeyWriteValue;
+import org.knime.core.data.values.WriteValue;
 
 /**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * TODO
+ * 
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * 
+ * @apiNote API still experimental. It might change in future releases of KNIME
+ *          Analytics Platform.
+ *
+ * @noreference This interface is not intended to be referenced by clients.
+ * @noextend This interface is not intended to be extended by clients.
  */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
+	private final ColumnarRowWriteCursor m_delegate;
+	private final DataTableSpec m_spec;
+
+	private final int m_numColumns;
+
+	private long m_size;
+	private ContainerTable m_containerTable;
+
+	ColumnarDataContainerDelegate(final DataTableSpec spec, final ColumnarRowWriteCursor delegate) throws IOException {
+		// TODO create a cursor with "legacy" columnn type
+		m_delegate = delegate;
+		m_spec = spec;
+		m_numColumns = spec.getNumColumns();
+	}
+
+	@Override
+	public DataTableSpec getTableSpec() {
+		if (m_containerTable != null) {
+			return m_containerTable.getDataTableSpec();
+		}
+		// TODO
+		return m_spec;
+	}
+
+	@Override
+	public long size() {
+		return m_size;
+	}
+
+	@Override
+	public void setMaxPossibleValues(final int maxPossibleValues) {
+		m_delegate.setMaxPossibleValues(maxPossibleValues);
+	}
+
+	@Override
+	public void addRowToTable(final DataRow row) {
+		m_delegate.<RowKeyWriteValue>getWriteValue(-1).setRowKey(row.getKey());
+		for (int i = 0; i < m_numColumns; i++) {
+			m_delegate.<WriteValue<DataCell>>getWriteValue(i).setValue(row.getCell(i));
+		}
+		m_delegate.push();
+		m_size++;
+	}
+
+	@Override
+	public ContainerTable getTable() {
+		if (m_containerTable == null) {
+			throw new IllegalStateException("getTable() can only be called after close() was called.");
+		}
+		return m_containerTable;
+	}
+
+	@Override
+	public void close() {
+		try {
+			m_containerTable = m_delegate.finish();
+			m_delegate.close();
+		} catch (final Exception e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	@Override
+	public void clear() {
+		if (m_containerTable != null) {
+			m_containerTable.clear();
+		} else {
+			try {
+				m_delegate.close();
+			} catch (final Exception ex) {
+				// TODO
+				throw new RuntimeException(ex);
+			}
+		}
+	}
 }

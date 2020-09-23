@@ -43,36 +43,87 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+package org.knime.core.data.columnar.domain;
 
-/**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
+import org.knime.core.columnar.data.StringData.StringReadData;
+
+public final class StringDomain implements NominalDomain<String> {
+
+	private static final StringDomain EMPTY = new StringDomain();
+
+	private final Set<String> m_values;
+
+	private StringDomain() {
+		m_values = Collections.emptySet();
+	}
+
+	public StringDomain(final Set<String> values) {
+		m_values = values != null ? Collections.unmodifiableSet(values) : null;
+	}
+
+	@Override
+	public boolean isValid() {
+		return m_values != null;
+	}
+
+	@Override
+	public Set<String> getValues() {
+		return m_values;
+	}
+
+	public static final class StringDomainCalculator extends AbstractDomainCalculator<StringReadData, StringDomain> {
+
+		private final int m_numMaxValues;
+
+		public StringDomainCalculator(final int numMaxValues) {
+			this(numMaxValues, EMPTY);
+		}
+
+		public StringDomainCalculator(final int numMaxValues, final StringDomain initialDomain) {
+			super(initialDomain);
+			m_numMaxValues = numMaxValues;
+		}
+
+		@Override
+		public StringDomain apply(final StringReadData data) {
+			// TODO: more efficient implementation?
+			// Preserve order
+			Set<String> values = new LinkedHashSet<>();
+			for (int i = 0; i < data.length(); i++) {
+				if (!data.isMissing(i)) {
+					values.add(data.getString(i));
+					if (values.size() > m_numMaxValues) {
+						// Null indicates that domain could not be computed due to excessive
+						// distinct elements. Computed domain will be marked invalid.
+						values = null;
+						break;
+					}
+				}
+			}
+			return new StringDomain(values);
+		}
+
+		@Override
+		public StringDomain merge(final StringDomain original, final StringDomain additional) {
+			Set<String> union;
+			if (original.isValid() && additional.isValid()) {
+				// Preserve order
+				union = new LinkedHashSet<>(original.getValues());
+				union.addAll(additional.getValues());
+				if (union.size() > m_numMaxValues) {
+					// Null indicates that domain could not be computed due to excessive
+					// distinct elements. Merged domain will be marked invalid.
+					union = null;
+				}
+			} else {
+				union = null;
+			}
+			return new StringDomain(union);
+		}
+	}
 }

@@ -43,36 +43,99 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
+package org.knime.core.data.columnar.table;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+import java.util.Iterator;
 
-/**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DataRow;
+import org.knime.core.data.RowCursor;
+import org.knime.core.data.RowKey;
+import org.knime.core.data.container.CloseableRowIterator;
+import org.knime.core.data.values.DataCellReadValue;
 
+public class RowCursorBasedRowIterator extends CloseableRowIterator {
+
+	private final RowCursor m_cursor;
+	private final int m_numValues;
+
+	// todo ensure spec
+	public RowCursorBasedRowIterator(final RowCursor cursor) {
+		m_cursor = cursor;
+		m_numValues = m_cursor.getNumColumns();
+	}
+
+	@Override
+	public boolean hasNext() {
+		return m_cursor.canPoll();
+	}
+
+	@Override
+	public DataRow next() {
+		m_cursor.poll();
+		final DataCell[] cells = new DataCell[m_numValues];
+		for (int i = 0; i < m_numValues; i++) {
+			cells[i] = m_cursor.<DataCellReadValue>getValue(i).getDataCell();
+		}
+
+		return new ColumnStoreTableDataRow(m_cursor.getRowKeyValue().getString(), cells);
+	}
+
+	@Override
+	public void close() {
+		try {
+			m_cursor.close();
+		} catch (Exception e) {
+			// TODO
+			throw new RuntimeException(e);
+		}
+	}
+
+	static class ColumnStoreTableDataRow implements DataRow {
+
+		private final String m_rowKey;
+
+		private final DataCell[] m_cellValues;
+
+		public ColumnStoreTableDataRow(final String rowKey, final DataCell[] cells) {
+			m_rowKey = rowKey;
+			m_cellValues = cells;
+		}
+
+		@Override
+		public Iterator<DataCell> iterator() {
+			return new Iterator<DataCell>() {
+				int idx = 0;
+
+				@Override
+				public boolean hasNext() {
+					return idx < m_cellValues.length;
+				}
+
+				@Override
+				public DataCell next() {
+					return getCell(idx++);
+				}
+			};
+		}
+
+		@Override
+		public int getNumCells() {
+			return m_cellValues.length;
+		}
+
+		@Override
+		public RowKey getKey() {
+			if (m_rowKey == null) {
+				/* TODO OK Behaviour? */
+				return null;
+			}
+			return new RowKey(m_rowKey);
+		}
+
+		@Override
+		public DataCell getCell(final int idx) {
+			return m_cellValues[idx];
+		}
+	}
 }

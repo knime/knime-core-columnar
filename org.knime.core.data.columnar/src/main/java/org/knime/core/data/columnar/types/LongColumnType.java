@@ -43,36 +43,89 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+package org.knime.core.data.columnar.types;
 
-/**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.LongData;
+import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.LongValue;
+import org.knime.core.data.columnar.ColumnType;
+import org.knime.core.data.columnar.IndexSupplier;
+import org.knime.core.data.def.LongCell;
+import org.knime.core.data.values.LongReadValue;
+import org.knime.core.data.values.LongWriteValue;
 
+public final class LongColumnType implements ColumnType<LongWriteData, LongReadData> {
+
+	public static final LongColumnType INSTANCE = new LongColumnType();
+
+	private LongColumnType() {
+	}
+
+	@Override
+	public ColumnDataSpec getColumnDataSpec() {
+		return LongData.LongDataSpec.INSTANCE;
+	}
+
+	@Override
+	public LongReadValue createReadValue(LongReadData data, IndexSupplier index) {
+		return new DefaultLongReadValue(data, index);
+	}
+
+	@Override
+	public LongWriteValue createWriteValue(LongWriteData data, IndexSupplier index) {
+		return new DefaultLongWriteValue(data, index);
+	}
+
+
+
+	private static final class DefaultLongReadValue implements LongReadValue {
+
+		private final IndexSupplier m_index;
+		private final LongReadData m_data;
+
+		DefaultLongReadValue(LongReadData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public long getLongValue() {
+			return m_data.getLong(m_index.getIndex());
+		}
+
+		@Override
+		public double getDoubleValue() {
+			return m_data.getLong(m_index.getIndex());
+		}
+
+		@Override
+		public DataCell getDataCell() {
+			return new LongCell(m_data.getLong(m_index.getIndex()));
+		}
+	}
+
+	private static final class DefaultLongWriteValue implements LongWriteValue {
+
+		private final IndexSupplier m_index;
+		private final LongWriteData m_data;
+
+		DefaultLongWriteValue(LongWriteData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public void setLongValue(final long value) {
+			m_data.setLong(m_index.getIndex(), value);
+		}
+
+		@Override
+		public void setValue(final LongValue value) {
+			m_data.setLong(m_index.getIndex(), value.getLongValue());
+		}
+	}
 }

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE knimeNode PUBLIC "-//UNIKN//DTD KNIME Node 2.0//EN" "http://www.knime.org/Node.dtd">
+<knimeNode icon="" type="Manipulator">
+    <name>Columnar Data Source: Random Test Data</name>
+    <shortDescription>Generates random data and uses KNIME's new API to store the output table.
+    </shortDescription>
+    <fullDescription>
+        <intro>
+        	Generates random data and uses KNIME's new API to store the output table.
+        	This node is only used for performance benchmarks and testing. It's not part of any supported
+        	KNIME extension
+		</intro>
+
+	</fullDescription>
+
+    <ports>
+        <outPort name="Random data" index="0">
+        The data
+        </outPort>
+    </ports>
+</knimeNode>

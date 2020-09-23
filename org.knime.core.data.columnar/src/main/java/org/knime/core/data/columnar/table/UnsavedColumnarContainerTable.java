@@ -43,36 +43,32 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
+package org.knime.core.data.columnar.table;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+import java.io.File;
+import java.io.IOException;
 
-/**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.columnar.ColumnarDataTableSpec;
+import org.knime.core.node.CanceledExecutionException;
+import org.knime.core.node.ExecutionMonitor;
+import org.knime.core.node.NodeSettingsWO;
 
+public class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
+
+	private final ColumnStore m_store;
+
+	public UnsavedColumnarContainerTable(final int tableId, //
+			ColumnStoreFactory factory, ColumnarDataTableSpec spec, ColumnStore store, final long size) {
+		super(tableId, factory, spec, store, size);
+		m_store = store;
+	}
+
+	@Override
+	protected void saveToFileOverwrite(File f, NodeSettingsWO settings, ExecutionMonitor exec)
+			throws IOException, CanceledExecutionException {
+		super.saveToFileOverwrite(f, settings, exec);
+		m_store.save(f);
+	}
 }

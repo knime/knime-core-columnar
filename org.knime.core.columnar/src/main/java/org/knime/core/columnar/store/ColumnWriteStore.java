@@ -48,6 +48,8 @@ package org.knime.core.columnar.store;
 import java.io.File;
 import java.io.IOException;
 
+import org.knime.core.columnar.data.ColumnData;
+
 /**
  * A store to which columnar data can be written. The life cycle of a write
  * store is as follows:

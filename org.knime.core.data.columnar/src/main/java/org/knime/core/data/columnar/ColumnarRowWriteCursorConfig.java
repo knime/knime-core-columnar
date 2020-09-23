@@ -43,36 +43,56 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
+package org.knime.core.data.columnar;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.data.RowKeyConfig;
+import org.knime.core.data.container.DataContainerSettings;
 
 /**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * TODO
+ * 
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * 
+ * @apiNote API still experimental. It might change in future releases of KNIME
+ *          Analytics Platform.
+ *
+ * @noreference This interface is not intended to be referenced by clients.
+ * @noextend This interface is not intended to be extended by clients.
  */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+public final class ColumnarRowWriteCursorConfig {
 
+	private final boolean m_initializeDomains;
+
+	private final int m_maxPossibleNominalDomainValues;
+
+	private final RowKeyConfig m_rowKeyConfig;
+
+	public ColumnarRowWriteCursorConfig(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
+			final RowKeyConfig rowKeyConfig) {
+		m_initializeDomains = initializeDomains;
+		m_maxPossibleNominalDomainValues = maxPossibleNominalDomainValues;
+		m_rowKeyConfig = rowKeyConfig;
+	}
+
+	public ColumnarRowWriteCursorConfig(final DataContainerSettings settings) {
+		this(settings.getInitializeDomain(), //
+				settings.getMaxDomainValues(), //
+				settings.isEnableRowKeys() ? RowKeyConfig.CUSTOM : RowKeyConfig.NOKEY);
+	}
+
+	public ColumnarRowWriteCursorConfig withRowKeyConfig(final RowKeyConfig rowKeyConfig) {
+		return new ColumnarRowWriteCursorConfig(m_initializeDomains, m_maxPossibleNominalDomainValues, rowKeyConfig);
+	}
+
+	public boolean isInitializeDomains() {
+		return m_initializeDomains;
+	}
+
+	public int getMaxPossibleNominalDomainValues() {
+		return m_maxPossibleNominalDomainValues;
+	}
+
+	public RowKeyConfig getRowKeyConfig() {
+		return m_rowKeyConfig;
+	}
 }

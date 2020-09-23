@@ -43,36 +43,82 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+package org.knime.core.data.columnar.types;
 
-/**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DoubleValue;
+import org.knime.core.data.columnar.ColumnType;
+import org.knime.core.data.columnar.IndexSupplier;
+import org.knime.core.data.def.DoubleCell;
+import org.knime.core.data.values.DoubleReadValue;
+import org.knime.core.data.values.DoubleWriteValue;
+import org.knime.core.data.values.ReadValue;
 
+public final class DoubleColumnType implements ColumnType<DoubleWriteData, DoubleReadData> {
+
+	public static final DoubleColumnType INSTANCE = new DoubleColumnType();
+
+	private DoubleColumnType() {
+	}
+
+	@Override
+	public DoubleDataSpec getColumnDataSpec() {
+		return DoubleDataSpec.INSTANCE;
+	}
+
+	@Override
+	public ReadValue createReadValue(DoubleReadData data, IndexSupplier index) {
+		return new ColumnarDoubleReadValue(data, index);
+	}
+
+	@Override
+	public DoubleWriteValue createWriteValue(DoubleWriteData data, IndexSupplier index) {
+		return new ColumnarDoubleWriteValue(data, index);
+	}
+
+	public final static class ColumnarDoubleReadValue implements DoubleReadValue {
+
+		private final IndexSupplier m_index;
+		private final DoubleReadData m_data;
+
+		private ColumnarDoubleReadValue(DoubleReadData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public final double getDoubleValue() {
+			return m_data.getDouble(m_index.getIndex());
+		}
+
+		@Override
+		public DataCell getDataCell() {
+			return new DoubleCell(m_data.getDouble(m_index.getIndex()));
+		}
+	}
+
+	public static final class ColumnarDoubleWriteValue implements DoubleWriteValue {
+
+		private final DoubleWriteData m_data;
+		private final IndexSupplier m_index;
+
+		private ColumnarDoubleWriteValue(DoubleWriteData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public void setValue(DoubleValue value) {
+			m_data.setDouble(m_index.getIndex(), value.getDoubleValue());
+		}
+
+		@Override
+		public void setDoubleValue(double value) {
+			m_data.setDouble(m_index.getIndex(), value);
+		}
+	}
 }

@@ -43,36 +43,94 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+package org.knime.core.data.columnar.types;
 
-/**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.IntData;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.IntValue;
+import org.knime.core.data.columnar.ColumnType;
+import org.knime.core.data.columnar.IndexSupplier;
+import org.knime.core.data.def.IntCell;
+import org.knime.core.data.values.IntReadValue;
+import org.knime.core.data.values.IntWriteValue;
 
+// TODO IntReadValue / IntWriteValue interfaces
+public final class IntColumnType implements ColumnType<IntWriteData, IntReadData> {
+
+	public static final IntColumnType INSTANCE = new IntColumnType();
+
+	private IntColumnType() {
+	}
+
+	@Override
+	public ColumnDataSpec getColumnDataSpec() {
+		return IntData.IntDataSpec.INSTANCE;
+	}
+
+	@Override
+	public ColumnarIntReadValue createReadValue(IntReadData data, IndexSupplier index) {
+		return new ColumnarIntReadValue(data, index);
+	}
+
+	@Override
+	public IntWriteValue createWriteValue(IntWriteData data, IndexSupplier index) {
+		return new ColumnarIntWriteValue(data, index);
+	}
+
+	private static final class ColumnarIntReadValue implements IntReadValue//
+	{
+
+		private final IndexSupplier m_index;
+		private final IntReadData m_data;
+
+		ColumnarIntReadValue(IntReadData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public int getIntValue() {
+			return m_data.getInt(m_index.getIndex());
+		}
+
+		@Override
+		public double getDoubleValue() {
+			return m_data.getInt(m_index.getIndex());
+		}
+
+		@Override
+		public long getLongValue() {
+			return m_data.getInt(m_index.getIndex());
+		}
+
+		@Override
+		public DataCell getDataCell() {
+			return new IntCell(m_data.getInt(m_index.getIndex()));
+		}
+	}
+
+	private static final class ColumnarIntWriteValue implements //
+			IntWriteValue {
+
+		private final IndexSupplier m_index;
+		private final IntWriteData m_data;
+
+		ColumnarIntWriteValue(IntWriteData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		public void setIntValue(final int value) {
+			m_data.setInt(m_index.getIndex(), value);
+		}
+
+		@Override
+		public void setValue(final IntValue cell) {
+			m_data.setInt(m_index.getIndex(), cell.getIntValue());
+		}
+	}
 }

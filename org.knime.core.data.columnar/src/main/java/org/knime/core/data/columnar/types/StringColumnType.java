@@ -43,36 +43,84 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.data.ColumnData;
-import org.knime.core.columnar.filter.ColumnSelection;
+package org.knime.core.data.columnar.types;
 
-/**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
- * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
- * </ol>
- *
- * TODO: loop... more detailed...
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("javadoc")
-public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.StringData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.StringValue;
+import org.knime.core.data.columnar.ColumnType;
+import org.knime.core.data.columnar.IndexSupplier;
+import org.knime.core.data.def.StringCell;
+import org.knime.core.data.values.StringReadValue;
+import org.knime.core.data.values.StringWriteValue;
+
+public final class StringColumnType implements ColumnType<StringWriteData, StringReadData> {
+
+	private final boolean m_isDictEncoded;
+
+	public StringColumnType(final boolean isDictEncoded) {
+		m_isDictEncoded = isDictEncoded;
+	}
+
+	@Override
+	public ColumnDataSpec getColumnDataSpec() {
+		return m_isDictEncoded ? StringData.StringDataSpec.DICT_ENABLED : StringData.StringDataSpec.DICT_DISABLED;
+	}
+
+	@Override
+	public StringReadValue createReadValue(StringReadData data, IndexSupplier index) {
+		return new DefaultStringReadValue(data, index);
+	}
+
+	@Override
+	public StringWriteValue createWriteValue(StringWriteData data, IndexSupplier index) {
+		return new DefaultStringWriteValue(data, index);
+	}
+
+	private final static class DefaultStringReadValue implements StringReadValue {
+
+		private final IndexSupplier m_index;
+		private final StringReadData m_data;
+
+		private DefaultStringReadValue(StringReadData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public String getStringValue() {
+			return m_data.getString(m_index.getIndex());
+		}
+
+		@Override
+		public DataCell getDataCell() {
+			return new StringCell(m_data.getString(m_index.getIndex()));
+		}
+	}
+
+	private final static class DefaultStringWriteValue implements StringWriteValue {
+
+		private final IndexSupplier m_index;
+		private final StringWriteData m_data;
+
+		private DefaultStringWriteValue(StringWriteData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public void setStringValue(final String value) {
+			m_data.setString(m_index.getIndex(), value);
+		}
+
+		@Override
+		public void setValue(final StringValue value) {
+			m_data.setString(m_index.getIndex(), value.getStringValue());
+		}
+	}
 
 }

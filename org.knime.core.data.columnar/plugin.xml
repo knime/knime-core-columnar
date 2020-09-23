@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.knime.core.ExtensionTable">
+      <ExtensionTableLoader
+            extensionTableLoader="org.knime.core.data.columnar.table.ColumnarContainerTableLoader">
+      </ExtensionTableLoader>
+   </extension>
+   <extension
+         point="org.knime.core.TableBackend">
+      <TableBackend
+            backend="org.knime.core.data.columnar.ColumnarTableBackend">
+      </TableBackend>
+   </extension>
+</plugin>
