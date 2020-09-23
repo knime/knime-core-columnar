@@ -201,7 +201,7 @@ public final class SmallColumnStore implements ColumnStore {
 
         private final ColumnSelection m_selection;
 
-        private final Table m_table;
+        private Table m_table;
 
         private boolean m_readerClosed;
 
@@ -227,7 +227,10 @@ public final class SmallColumnStore implements ColumnStore {
         @Override
         public void close() throws IOException {
             m_readerClosed = true;
-            m_table.release();
+            if (m_table != null) {
+                m_table.release();
+                m_table = null;
+            }
         }
 
         @Override
