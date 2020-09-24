@@ -201,7 +201,7 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 			// TODO
 			throw new RuntimeException(e);
 		}
-		if (m_selection != null) {
+		if (m_selection == null) {
 			m_currentValues = create(m_currentBatch);
 		} else {
 			m_currentValues = create(m_currentBatch, m_selection);

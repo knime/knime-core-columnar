@@ -52,7 +52,6 @@ import org.knime.core.data.DataRow;
 import org.knime.core.data.DataType;
 import org.knime.core.data.RowCursor;
 import org.knime.core.data.RowKey;
-import org.knime.core.data.columnar.mapping.DataTypeMapperRegistry;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.values.DataCellReadValue;
 
