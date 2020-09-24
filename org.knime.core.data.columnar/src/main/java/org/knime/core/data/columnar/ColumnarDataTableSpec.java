@@ -51,7 +51,6 @@ import java.util.Map;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.RowKeyConfig;
 
 /*
  * Representation/spec generated from DataTableSpec to build and access fast tables 
@@ -64,5 +63,4 @@ public interface ColumnarDataTableSpec extends ColumnStoreSchema {
 
 	ColumnarDataTableSpec withUpdatedSourceDomains(Map<Integer, DataColumnDomain> updatedSourceDomains);
 
-	RowKeyConfig getRowKeyConfig();
 }

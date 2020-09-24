@@ -16,7 +16,8 @@ import org.knime.core.data.DataTypeConfig;
 import org.knime.core.data.RowKeyConfig;
 import org.knime.core.data.columnar.ColumnType;
 import org.knime.core.data.columnar.ColumnarDataTableSpec;
-import org.knime.core.data.columnar.types.RowKeyColumnType;
+import org.knime.core.data.columnar.types.CustomRowKeyColumnType;
+import org.knime.core.data.columnar.types.NoRowKeyColumnType;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -41,7 +42,18 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 			final Map<DataType, DataTypeMapper> mapping, final Map<Integer, DataTypeConfig> configs) {
 		m_source = source;
 		// TODO: auto row key
-		m_rowKeyType = new RowKeyColumnType(rowKeyConfig);
+		switch (rowKeyConfig) {
+		case CUSTOM:
+			m_rowKeyType = new CustomRowKeyColumnType();
+			break;
+		case NOKEY:
+			m_rowKeyType = new NoRowKeyColumnType();
+			break;
+		default:
+			throw new IllegalArgumentException(
+					"Unknown RowKeyConfig " + rowKeyConfig.name() + ". Most likely an implementation error.");
+
+		}
 		m_rowKeyConfig = rowKeyConfig;
 		m_mapping = mapping;
 		m_configs = configs;
@@ -61,11 +73,6 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 	@Override
 	public ColumnDataSpec getColumnDataSpec(final int index) {
 		return getColumnType(index).getColumnDataSpec();
-	}
-
-	@Override
-	public RowKeyConfig getRowKeyConfig() {
-		return m_rowKeyConfig;
 	}
 
 	@Override
@@ -118,7 +125,7 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 		}
 
 		public static void save(final MappedColumnarDataTableSpec spec, final NodeSettingsWO settings) {
-			settings.addString(CFG_ROW_KEY_CONFIG, spec.getRowKeyConfig().name());
+			settings.addString(CFG_ROW_KEY_CONFIG, spec.m_rowKeyConfig.name());
 
 			final Map<DataType, DataTypeMapper> mapping = spec.m_mapping;
 			// TODO make sure mapping comprises all element types of all collections in all

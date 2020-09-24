@@ -46,11 +46,9 @@
 package org.knime.core.data.columnar.types;
 
 import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
-import org.knime.core.columnar.data.StringData.StringReadData;
-import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
-import org.knime.core.data.RowKeyConfig;
+import org.knime.core.columnar.data.VoidData.VoidReadData;
+import org.knime.core.columnar.data.VoidData.VoidWriteData;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.ColumnType;
 import org.knime.core.data.columnar.IndexSupplier;
@@ -64,87 +62,54 @@ import org.knime.core.data.values.WriteValue;
  *
  * @author Christian Dietz
  */
-public class RowKeyColumnType implements ColumnType<StringWriteData, StringReadData> {
-
-	private RowKeyConfig m_config;
-
-	// TODO
-	public RowKeyColumnType(RowKeyConfig config) {
-		m_config = config;
-	}
+public class NoRowKeyColumnType implements ColumnType<VoidWriteData, VoidReadData> {
 
 	@Override
 	public ColumnDataSpec getColumnDataSpec() {
-		switch (m_config) {
-		case CUSTOM:
-			return StringDataSpec.DICT_DISABLED;
-		case NOKEY:
-			return VoidDataSpec.INSTANCE;
-		default:
-			throw new IllegalArgumentException("Unknown or unsupported RowKeyConfig.");
-		}
+		return VoidDataSpec.INSTANCE;
 	}
 
 	@Override
-	public ReadValue createReadValue(StringReadData data, IndexSupplier index) {
-		return new CustomRowKeyReadValue(data, index);
+	public ReadValue createReadValue(VoidReadData data, IndexSupplier index) {
+		return NoRowKeyReadValue.INSTANCE;
 	}
 
 	@Override
-	public WriteValue<?> createWriteValue(StringWriteData data, IndexSupplier index) {
-		return new CustomRowKeyWriteValue(data, index);
+	public WriteValue<?> createWriteValue(VoidWriteData data, IndexSupplier index) {
+		return NoRowKeyWriteValue.INSTANCE;
 	}
 
-	private static class CustomRowKeyReadValue implements RowKeyReadValue {
+	private static class NoRowKeyReadValue implements RowKeyReadValue {
+		private final static NoRowKeyReadValue INSTANCE = new NoRowKeyReadValue();
 
-		private final IndexSupplier m_index;
-		private final StringReadData m_data;
-
-		private CustomRowKeyReadValue(StringReadData data, IndexSupplier index) {
-			m_data = data;
-			m_index = index;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			return super.equals(obj);
+		private NoRowKeyReadValue() {
 		}
 
 		@Override
 		public String getString() {
-			return m_data.getString(m_index.getIndex());
+			return null;
 		}
 	}
 
-	private static class CustomRowKeyWriteValue implements RowKeyWriteValue {
+	private static class NoRowKeyWriteValue implements RowKeyWriteValue {
 
-		private final IndexSupplier m_index;
-		private final StringWriteData m_data;
+		private final static NoRowKeyWriteValue INSTANCE = new NoRowKeyWriteValue();
 
-		private CustomRowKeyWriteValue(StringWriteData data, IndexSupplier index) {
-			m_data = data;
-			m_index = index;
+		private NoRowKeyWriteValue() {
 		}
 
 		@Override
 		public void setValue(RowKeyReadValue value) {
-			m_data.setString(m_index.getIndex(), value.getString());
 		}
 
 		@Override
 		public void setRowKey(String key) {
-			m_data.setString(m_index.getIndex(), key);
 		}
 
 		@Override
 		public void setRowKey(RowKeyValue key) {
-			m_data.setString(m_index.getIndex(), key.getString());
 		}
 
-		@Override
-		public boolean equals(Object obj) {
-			return super.equals(obj);
-		}
 	}
 
 }

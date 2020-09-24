@@ -50,8 +50,8 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.DoubleData;
 import org.knime.core.columnar.data.IntData;
 import org.knime.core.columnar.data.LongData;

@@ -43,19 +43,90 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.data.columnar;
+package org.knime.core.data.columnar.types;
 
 import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
-import org.knime.core.data.values.ReadValue;
-import org.knime.core.data.values.WriteValue;
+import org.knime.core.columnar.data.StringData.StringDataSpec;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.data.RowKeyValue;
+import org.knime.core.data.columnar.ColumnType;
+import org.knime.core.data.columnar.IndexSupplier;
+import org.knime.core.data.values.RowKeyReadValue;
+import org.knime.core.data.values.RowKeyWriteValue;
 
-public interface ColumnType<W extends ColumnWriteData, R extends ColumnReadData> {
+/**
+ * TODO can be implemented differently later.
+ *
+ * @author Christian Dietz
+ */
+public class CustomRowKeyColumnType implements ColumnType<StringWriteData, StringReadData> {
 
-	ColumnDataSpec getColumnDataSpec();
+	@Override
+	public ColumnDataSpec getColumnDataSpec() {
+		return StringDataSpec.DICT_DISABLED;
+	}
 
-	ReadValue createReadValue(R data, IndexSupplier index);
+	@Override
+	public RowKeyReadValue createReadValue(StringReadData data, IndexSupplier index) {
+		return new CustomRowKeyReadValue(data, index);
+	}
 
-	WriteValue<?> createWriteValue(W data, IndexSupplier index);
+	@Override
+	public RowKeyWriteValue createWriteValue(StringWriteData data, IndexSupplier index) {
+		return new CustomRowKeyWriteValue(data, index);
+	}
+
+	private static class CustomRowKeyReadValue implements RowKeyReadValue {
+
+		private final IndexSupplier m_index;
+		private final StringReadData m_data;
+
+		private CustomRowKeyReadValue(StringReadData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj);
+		}
+
+		@Override
+		public String getString() {
+			return m_data.getString(m_index.getIndex());
+		}
+	}
+
+	private static class CustomRowKeyWriteValue implements RowKeyWriteValue {
+
+		private final IndexSupplier m_index;
+		private final StringWriteData m_data;
+
+		private CustomRowKeyWriteValue(StringWriteData data, IndexSupplier index) {
+			m_data = data;
+			m_index = index;
+		}
+
+		@Override
+		public void setValue(RowKeyReadValue value) {
+			m_data.setString(m_index.getIndex(), value.getString());
+		}
+
+		@Override
+		public void setRowKey(String key) {
+			m_data.setString(m_index.getIndex(), key);
+		}
+
+		@Override
+		public void setRowKey(RowKeyValue key) {
+			m_data.setString(m_index.getIndex(), key.getString());
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj);
+		}
+	}
+
 }

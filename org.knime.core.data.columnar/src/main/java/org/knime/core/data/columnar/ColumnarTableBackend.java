@@ -17,7 +17,6 @@ import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.container.ILocalDataRepository;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.node.ExtensionTable;
-import org.knime.core.node.NodeLogger;
 
 public class ColumnarTableBackend implements TableBackend {
 
