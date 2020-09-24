@@ -63,107 +63,83 @@ import org.knime.core.data.values.RowKeyReadValue;
 
 class ColumnarRowCursor implements RowCursor, IndexSupplier {
 
-	private final ColumnDataReader m_reader;
-
-	private int m_numChunks;
-
-	private int m_chunkIndex = 0;
-
-	private int m_currentDataMaxIndex;
-
-	private Batch m_currentBatch;
-
-	private int m_lastChunkMaxIndex;
+	// effectively final (set in #create)
+	private CloseableCloser m_closer;
 
 	private final Set<CloseableCloser> m_openCursorCloseables;
 
-	private CloseableCloser m_closer;
+	private final ColumnDataReader m_reader;
 
-	private int m_index = -1;
+	private final ColumnarDataTableSpec m_spec;
 
-	private ReadValue[] m_values;
+	private final int m_maxBatchIndex;
 
-	private ColumnarDataTableSpec m_spec;
+	private final int m_lastBatchMaxIndex;
 
-	static ColumnarRowCursor create(ColumnReadStore reader, ColumnarDataTableSpec spec, long fromRowIndex,
+	private Batch m_currentBatch;
+
+	private ReadValue[] m_currentValues;
+
+	private int m_currentBatchIndex;
+
+	private int m_currentIndex;
+
+	private int m_currentMaxIndex;
+
+	static ColumnarRowCursor create(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex,
 			long toRowIndex, Set<CloseableCloser> openCursorCloseables) {
-		final ColumnarRowCursor cursor = new ColumnarRowCursor(reader, spec, fromRowIndex, toRowIndex,
+		final ColumnarRowCursor cursor = new ColumnarRowCursor(store, spec, fromRowIndex, toRowIndex,
 				openCursorCloseables);
 		cursor.m_closer = new CloseableCloser(cursor);
 		openCursorCloseables.add(cursor.m_closer);
 		return cursor;
 	}
 
-	private ColumnarRowCursor(ColumnReadStore reader, ColumnarDataTableSpec spec, long fromRowIndex, long toRowIndex,
-			Set<CloseableCloser> openCursorCloseables) {
-		m_reader = reader.createReader();
-		m_spec = spec;
-
-		m_numChunks = m_reader.getNumBatches();
-
-		// start chunk
-		m_chunkIndex = (int) (fromRowIndex / m_reader.getMaxLength());
-
-		// start index
-		m_index = (int) (fromRowIndex % m_reader.getMaxLength()) - 1;
-
-		// number of chunks
-		m_numChunks = (int) Math.min(m_reader.getNumBatches(), (toRowIndex / m_reader.getMaxLength()) + 1);
-
-		// in the last chunk we only iterate until toRowIndex
-		m_lastChunkMaxIndex = (int) (toRowIndex % m_reader.getMaxLength());
-
-		// switch to next chunk
-		switchToNextData();
-
-		m_openCursorCloseables = openCursorCloseables;
-	}
-
-	@Override
-	public boolean canPoll() {
-		return m_index < m_currentDataMaxIndex || m_chunkIndex < m_numChunks;
-	}
-
 	@Override
 	public boolean poll() {
-		if (++m_index > m_currentDataMaxIndex) {
-			switchToNextData();
-			m_index = 0;
+		// TODO throw appropriate exception in case canPoll = false but poll() called
+		if (++m_currentIndex > m_currentMaxIndex) {
+			m_currentBatch.release();
+			readNextBatch();
+			m_currentIndex = 0;
 		}
 		return canPoll();
 	}
 
 	@Override
+	public boolean canPoll() {
+		return m_currentIndex < m_currentMaxIndex || m_currentBatchIndex < m_maxBatchIndex;
+	}
+
+	@Override
 	public RowKeyValue getRowKeyValue() {
-		return (RowKeyReadValue) m_values[0];
+		return (RowKeyReadValue) m_currentValues[0];
 	}
 
 	@Override
 	public int getNumColumns() {
-		return m_values.length - 1;
+		return m_spec.getNumColumns() - 1;
 	}
 
 	@Override
 	public <V extends DataValue> V getValue(int index) {
 		@SuppressWarnings("unchecked")
-		final V cast = (V) m_values[index + 1];
+		final V cast = (V) m_currentValues[index + 1];
 		return cast;
 	}
 
 	@Override
 	public boolean isMissing(int index) {
-		return m_currentBatch.get(index + 1).isMissing(m_index);
+		return m_currentBatch.get(index + 1).isMissing(m_currentIndex);
 	}
-
-//	@Override
-//	public Optional<String> getMissingValueError(int index) {
-//		return Optional.ofNullable(m_currentBatch.getData(index).getMissingCause(m_index));
-//	}
 
 	@Override
 	public void close() {
 		try {
-			releaseCurrentData();
+			if (m_currentBatch != null) {
+				m_currentBatch.release();
+				m_currentBatch = null;
+			}
 			m_closer.close();
 			m_openCursorCloseables.remove(m_closer);
 			m_reader.close();
@@ -173,24 +149,9 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 		}
 	}
 
-	private void switchToNextData() {
-		try {
-			releaseCurrentData();
-			m_currentBatch = m_reader.readRetained(m_chunkIndex++);
-			m_values = create(m_currentBatch);
-			m_index = -1;
-
-			// as soon as we're in the last chunk, we might want to iterate fewer
-			// values.
-			if (m_chunkIndex == m_numChunks) {
-				m_currentDataMaxIndex = m_lastChunkMaxIndex;
-			} else {
-				m_currentDataMaxIndex = m_currentBatch.length() - 1;
-			}
-		} catch (final Exception e) {
-			// TODO
-			throw new RuntimeException(e);
-		}
+	@Override
+	public final int getIndex() {
+		return m_currentIndex;
 	}
 
 	// Expensive for many columns, but only called once per chunk
@@ -204,15 +165,45 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 		return values;
 	}
 
-	private void releaseCurrentData() {
-		if (m_currentBatch != null) {
-			m_currentBatch.release();
+	private ColumnarRowCursor(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex, long toRowIndex,
+			Set<CloseableCloser> openCursorCloseables) {
+		// TODO check that from fromRowIndex > 0 and <= toRowIndex
+		// check that toRowIndex < table size (which currently cannot be determined)
+
+		m_reader = store.createReader();
+		m_spec = spec;
+		m_openCursorCloseables = openCursorCloseables;
+
+		// number of chunks
+		final int maxLength = m_reader.getMaxLength();
+		if (maxLength < 1) {
+			m_maxBatchIndex = m_lastBatchMaxIndex = m_currentBatchIndex = m_currentIndex = m_currentMaxIndex = -1;
+		} else {
+			m_maxBatchIndex = (int) (toRowIndex / maxLength);
+
+			// in the last chunk we only iterate until toRowIndex
+			m_lastBatchMaxIndex = (int) (toRowIndex % maxLength);
+
+			m_currentBatchIndex = (int) (fromRowIndex / maxLength) - 1;
+
+			// start index
+			m_currentIndex = (int) (fromRowIndex % maxLength) - 1;
+
+			// read next batch
+			readNextBatch();
 		}
 	}
 
-	@Override
-	public final int getIndex() {
-		return m_index;
+	private void readNextBatch() {
+		try {
+			m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
+		} catch (final Exception e) {
+			// TODO
+			throw new RuntimeException(e);
+		}
+		m_currentValues = create(m_currentBatch);
+		// as soon as we're in the last chunk, we might want to iterate fewer
+		// values.
+		m_currentMaxIndex = m_currentBatchIndex != m_maxBatchIndex ? m_currentBatch.length() - 1 : m_lastBatchMaxIndex;
 	}
-
 }
