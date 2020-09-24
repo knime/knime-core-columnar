@@ -64,8 +64,8 @@ import org.apache.arrow.vector.ipc.SeekableReadChannel;
 import org.apache.arrow.vector.ipc.message.ArrowBlock;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.util.TransferPair;
-import org.knime.core.columnar.batch.Batch;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnStoreSchema;
@@ -94,13 +94,13 @@ class ArrowColumnDataReader implements ColumnDataReader {
     }
 
     @Override
-    public Batch readRetained(final int chunkIdx) throws IOException {
+    public ReadBatch readRetained(final int chunkIdx) throws IOException {
         final FieldVector[] vectors = m_reader.read(chunkIdx);
         final DictionaryProvider provider = m_reader.dictionaries(chunkIdx);
 
-        Batch batch = m_selection.createBatch(i -> {
+        ReadBatch batch = m_selection.createBatch(i -> {
          // TODO transfer ownership of dictionary vector for parallel reads
-            ColumnData rdata = m_arrowSchema[i].wrap(vectors[i], provider);
+            ColumnReadData rdata = m_arrowSchema[i].wrap(vectors[i], provider);
             vectors[i] = null;
             return rdata;
         });

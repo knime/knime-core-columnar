@@ -58,8 +58,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.knime.core.columnar.arrow.ArrowSchemaMapperV0.ArrowDoubleDataSpec;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
-import org.knime.core.columnar.batch.DefaultBatch;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.batch.DefaultReadBatch;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
@@ -133,13 +133,13 @@ public class ArrowDoubleDataTest extends AbstractArrowTest {
             }
         }
         data.close(1024);
-        writer.write(new DefaultBatch(m_schema, new ColumnData[]{data}, 1024));
+        writer.write(new DefaultReadBatch(m_schema, new ColumnReadData[]{data}, 1024));
         data.release();
         writer.close();
 
         ArrowColumnDataReader reader = new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection(m_schema, 0));
 
-        ColumnData dataChunk = reader.readRetained(0).get(0);
+        ColumnReadData dataChunk = reader.readRetained(0).get(0);
         assertEquals(1024, dataChunk.length());
         assertTrue(dataChunk instanceof ArrowDoubleData);
 

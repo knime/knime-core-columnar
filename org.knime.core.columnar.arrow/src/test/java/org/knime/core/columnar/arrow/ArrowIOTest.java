@@ -60,9 +60,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData;
-import org.knime.core.columnar.batch.Batch;
-import org.knime.core.columnar.batch.DefaultBatch;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.DefaultReadBatch;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
@@ -91,22 +91,22 @@ public class ArrowIOTest extends AbstractArrowTest {
 
         final ArrowDoubleData data = new ArrowDoubleData(m_alloc, 1024);
         data.close(1024);
-        writer.write(new DefaultBatch(schema, new ColumnData[]{data}, 1024));
+        writer.write(new DefaultReadBatch(schema, new ColumnReadData[]{data}, 1024));
         data.release();
 
         final ArrowDoubleData dataShort = new ArrowDoubleData(m_alloc, 1024);
         dataShort.close(42);
-        writer.write(new DefaultBatch(schema, new ColumnData[]{dataShort}, 42));
+        writer.write(new DefaultReadBatch(schema, new ColumnReadData[]{dataShort}, 42));
         dataShort.release();
         writer.close();
 
         ArrowColumnDataReader reader = new ArrowColumnDataReader(schema, tmp, m_alloc, createSelection(schema));
-        ColumnData read = reader.readRetained(0).get(0);
+        ColumnReadData read = reader.readRetained(0).get(0);
         assertEquals(1024, read.length());
         System.out.println(read.sizeOf());
         read.release();
 
-        ColumnData readShort = reader.readRetained(1).get(0);
+        ColumnReadData readShort = reader.readRetained(1).get(0);
         assertEquals(42, readShort.length());
         readShort.release();
 
@@ -132,7 +132,7 @@ public class ArrowIOTest extends AbstractArrowTest {
                 }
                 data[i].close(1024);
             }
-            writer.write(new DefaultBatch(m_schema, data, 1024));
+            writer.write(new DefaultReadBatch(m_schema, data, 1024));
             for (ArrowDoubleData d : data) {
                 d.release();
             }
@@ -155,7 +155,7 @@ public class ArrowIOTest extends AbstractArrowTest {
         // selection
         final ArrowColumnDataReader filteredReader =
             new ArrowColumnDataReader(m_schema, tmp, m_alloc, createSelection(m_schema, 9, 13));
-        Batch filteredData = filteredReader.readRetained(13);
+        ReadBatch filteredData = filteredReader.readRetained(13);
         for (int i = 0; i < m_schema.getNumColumns(); i++) {
             if (i == 9 || i == 13) {
                 assertNotNull(filteredData.get(i));
@@ -170,7 +170,7 @@ public class ArrowIOTest extends AbstractArrowTest {
     }
 
     private void testRead(final ArrowColumnDataReader reader, final int c) throws IOException {
-        Batch dataChunk = reader.readRetained(c);
+        ReadBatch dataChunk = reader.readRetained(c);
 
         for (int i = 0; i < m_schema.getNumColumns(); i++) {
             assertEquals(1024, dataChunk.get(i).length());

@@ -48,8 +48,8 @@ package org.knime.core.columnar.arrow.data;
 import java.util.function.Supplier;
 
 import org.apache.arrow.vector.FieldVector;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 
-public interface ArrowData<F extends FieldVector> extends Supplier<F>, ColumnWriteData, ColumnData {
+public interface ArrowData<F extends FieldVector> extends Supplier<F>, ColumnWriteData, ColumnReadData {
 }

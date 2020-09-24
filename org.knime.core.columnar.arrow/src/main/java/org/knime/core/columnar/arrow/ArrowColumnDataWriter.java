@@ -75,7 +75,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.data.ArrowData;
 import org.knime.core.columnar.arrow.data.ArrowDictionaryHolder;
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
@@ -105,7 +105,7 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
     }
 
     @Override
-    public void write(final Batch batch) throws IOException {
+    public void write(final ReadBatch batch) throws IOException {
         final List<FieldVector> vectors = new ArrayList<>(m_schema.getNumColumns());
         final ArrowDictProvider dicts = new ArrowDictProvider();
         for (int i = 0; i < m_schema.getNumColumns(); i++) {

@@ -50,7 +50,7 @@ import static org.junit.Assert.assertEquals;
 import java.nio.file.Files;
 
 import org.junit.Test;
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.StringData.StringReadData;
@@ -102,7 +102,7 @@ public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
         // let's read some data back
         final ColumnDataReader reader = store.createReader();
         for (int c = 0; c < numChunks; c++) {
-            final Batch batch = reader.readRetained(c);
+            final ReadBatch batch = reader.readRetained(c);
             final StringReadData cast = (StringReadData)batch.get(0);
             for (int i = 0; i < chunkSize; i++) {
                 assertEquals("Test" + i * c, cast.getString(i));
