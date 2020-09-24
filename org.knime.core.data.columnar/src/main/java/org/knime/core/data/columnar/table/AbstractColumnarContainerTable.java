@@ -202,8 +202,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
 		final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
 		if (colIndicesOpt.isPresent()) {
-			return ColumnFilteredRowCursor.create(m_store, m_spec, fromRowIndex, toRowIndex,
-					toSortedIntArray(colIndicesOpt.get()), m_openCursorCloseables);
+			return ColumnarRowCursor.create(m_store, m_spec, fromRowIndex, toRowIndex, m_openCursorCloseables,
+					toSortedIntArray(colIndicesOpt.get()));
 		} else {
 			return ColumnarRowCursor.create(m_store, m_spec, fromRowIndex, toRowIndex, m_openCursorCloseables);
 		}
@@ -217,8 +217,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 		final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
 		if (colIndicesOpt.isPresent()) {
 			int[] selection = toSortedIntArray(colIndicesOpt.get());
-			return new FilteredColumnarRowIterator(ColumnFilteredRowCursor.create(m_store, m_spec, fromRowIndex,
-					toRowIndex, selection, m_openCursorCloseables), selection);
+			return new FilteredColumnarRowIterator(ColumnarRowCursor.create(m_store, m_spec, fromRowIndex, toRowIndex,
+					m_openCursorCloseables, selection), selection);
 		} else {
 
 			return new RowCursorBasedRowIterator(

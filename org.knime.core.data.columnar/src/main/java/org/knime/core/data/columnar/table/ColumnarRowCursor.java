@@ -76,6 +76,8 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 
 	private final int m_lastBatchMaxIndex;
 
+	private final int[] m_selection;
+
 	private ReadBatch m_currentBatch;
 
 	private ReadValue[] m_currentValues;
@@ -88,11 +90,49 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 
 	static ColumnarRowCursor create(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex,
 			long toRowIndex, Set<CloseableCloser> openCursorCloseables) {
+		return create(store, spec, fromRowIndex, toRowIndex, openCursorCloseables, null);
+	}
+
+	static ColumnarRowCursor create(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex,
+			long toRowIndex, Set<CloseableCloser> openCursorCloseables, int[] selection) {
+		if (selection != null) {
+			selection = addRowKeyIndexToSelection(selection);
+		}
 		final ColumnarRowCursor cursor = new ColumnarRowCursor(store, spec, fromRowIndex, toRowIndex,
-				openCursorCloseables);
+				openCursorCloseables, selection);
 		cursor.m_closer = new CloseableCloser(cursor);
 		openCursorCloseables.add(cursor.m_closer);
 		return cursor;
+	}
+
+	private ColumnarRowCursor(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex, long toRowIndex,
+			Set<CloseableCloser> openCursorCloseables, int[] selection) {
+		// TODO check that from fromRowIndex > 0 and <= toRowIndex
+		// check that toRowIndex < table size (which currently cannot be determined)
+
+		m_selection = selection;
+		m_reader = store.createReader();
+		m_spec = spec;
+		m_openCursorCloseables = openCursorCloseables;
+
+		// number of chunks
+		final int maxLength = m_reader.getMaxLength();
+		if (maxLength < 1) {
+			m_maxBatchIndex = m_lastBatchMaxIndex = m_currentBatchIndex = m_currentIndex = m_currentMaxIndex = -1;
+		} else {
+			m_maxBatchIndex = (int) (toRowIndex / maxLength);
+
+			// in the last chunk we only iterate until toRowIndex
+			m_lastBatchMaxIndex = (int) (toRowIndex % maxLength);
+
+			m_currentBatchIndex = (int) (fromRowIndex / maxLength) - 1;
+
+			// start index
+			m_currentIndex = (int) (fromRowIndex % maxLength) - 1;
+
+			// read next batch
+			readNextBatch();
+		}
 	}
 
 	@Override
@@ -154,6 +194,23 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 		return m_currentIndex;
 	}
 
+	private void readNextBatch() {
+		try {
+			m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
+		} catch (final Exception e) {
+			// TODO
+			throw new RuntimeException(e);
+		}
+		if (m_selection != null) {
+			m_currentValues = create(m_currentBatch);
+		} else {
+			m_currentValues = create(m_currentBatch, m_selection);
+		}
+		// as soon as we're in the last chunk, we might want to iterate fewer
+		// values.
+		m_currentMaxIndex = m_currentBatchIndex != m_maxBatchIndex ? m_currentBatch.length() - 1 : m_lastBatchMaxIndex;
+	}
+
 	// Expensive for many columns, but only called once per chunk
 	private ReadValue[] create(ReadBatch batch) {
 		final ReadValue[] values = new ReadValue[m_spec.getNumColumns()];
@@ -165,45 +222,28 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 		return values;
 	}
 
-	private ColumnarRowCursor(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex, long toRowIndex,
-			Set<CloseableCloser> openCursorCloseables) {
-		// TODO check that from fromRowIndex > 0 and <= toRowIndex
-		// check that toRowIndex < table size (which currently cannot be determined)
-
-		m_reader = store.createReader();
-		m_spec = spec;
-		m_openCursorCloseables = openCursorCloseables;
-
-		// number of chunks
-		final int maxLength = m_reader.getMaxLength();
-		if (maxLength < 1) {
-			m_maxBatchIndex = m_lastBatchMaxIndex = m_currentBatchIndex = m_currentIndex = m_currentMaxIndex = -1;
-		} else {
-			m_maxBatchIndex = (int) (toRowIndex / maxLength);
-
-			// in the last chunk we only iterate until toRowIndex
-			m_lastBatchMaxIndex = (int) (toRowIndex % maxLength);
-
-			m_currentBatchIndex = (int) (fromRowIndex / maxLength) - 1;
-
-			// start index
-			m_currentIndex = (int) (fromRowIndex % maxLength) - 1;
-
-			// read next batch
-			readNextBatch();
+	private final ReadValue[] create(ReadBatch batch, int[] selection) {
+		// TODO Marc Bux: here the assumption is that ColumnDataAccess always has size
+		// of incoming spec with some nulls.
+		final ReadValue[] values = new ReadValue[m_spec.getNumColumns()];
+		for (int i = 0; i < selection.length; i++) {
+			@SuppressWarnings("unchecked")
+			ColumnType<?, ColumnReadData> type = (ColumnType<?, ColumnReadData>) m_spec.getColumnType(selection[i]);
+			values[selection[i]] = type.createReadValue(batch.get(selection[i]), this);
 		}
+		return values;
 	}
 
-	private void readNextBatch() {
-		try {
-			m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
-		} catch (final Exception e) {
-			// TODO
-			throw new RuntimeException(e);
+	private static int[] addRowKeyIndexToSelection(int[] selection) {
+		final int[] colIndicesAsInt = new int[selection.length + 1];
+		// add row key as selected column
+		colIndicesAsInt[0] = 0;
+		int i = 1;
+		for (int index : selection) {
+			colIndicesAsInt[i++] = index + 1;
 		}
-		m_currentValues = create(m_currentBatch);
-		// as soon as we're in the last chunk, we might want to iterate fewer
-		// values.
-		m_currentMaxIndex = m_currentBatchIndex != m_maxBatchIndex ? m_currentBatch.length() - 1 : m_lastBatchMaxIndex;
+
+		return colIndicesAsInt;
 	}
+
 }
