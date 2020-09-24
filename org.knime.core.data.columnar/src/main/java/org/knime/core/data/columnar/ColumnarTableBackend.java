@@ -4,19 +4,23 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 
+import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTypeConfig;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.RowKeyConfig;
 import org.knime.core.data.RowWriteCursor;
 import org.knime.core.data.TableBackend;
+import org.knime.core.data.columnar.mapping.DataTypeMapperRegistry;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.container.ILocalDataRepository;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.node.ExtensionTable;
+import org.knime.core.node.NodeLogger;
 
 public class ColumnarTableBackend implements TableBackend {
+
 	@Override
 	public DataContainerDelegate create(final DataTableSpec spec, final DataContainerSettings settings,
 			final IDataRepository repository, final ILocalDataRepository localRepository,
@@ -40,5 +44,15 @@ public class ColumnarTableBackend implements TableBackend {
 			// TODO
 			throw new RuntimeException(e);
 		}
+	}
+
+	@Override
+	public boolean supports(final DataTableSpec spec) {
+		for (DataColumnSpec colSpec : spec) {
+			if (!DataTypeMapperRegistry.supports(colSpec.getType())) {
+				return false;
+			}
+		}
+		return true;
 	}
 }
