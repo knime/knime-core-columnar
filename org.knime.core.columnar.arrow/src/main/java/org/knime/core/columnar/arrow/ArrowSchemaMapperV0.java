@@ -52,6 +52,7 @@ import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.NullVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -86,6 +87,8 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
+import org.knime.core.columnar.data.VoidData.VoidReadData;
+import org.knime.core.columnar.data.VoidData.VoidWriteData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
 final class ArrowSchemaMapperV0 implements ArrowSchemaMapper, Mapper<ArrowColumnDataSpec<?, ?>> {
@@ -174,7 +177,18 @@ final class ArrowSchemaMapperV0 implements ArrowSchemaMapper, Mapper<ArrowColumn
 
     @Override
     public ArrowColumnDataSpec<?, ?> visit(final VoidDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+        return new ArrowColumnDataSpec<VoidWriteData, VoidReadData>() {
+
+            @Override
+            public VoidWriteData createEmpty(final BufferAllocator allocator, final int capacity) {
+                return new ArrowVoidData(capacity);
+            }
+
+            @Override
+            public VoidReadData wrap(final FieldVector vector, final DictionaryProvider provider) {
+                return new ArrowVoidData((NullVector)vector);
+            }
+        };
     }
 
     static class ArrowLongDataSpec implements ArrowColumnDataSpec<LongWriteData, LongReadData> {
