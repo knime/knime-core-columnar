@@ -104,8 +104,6 @@ public class ColumnFilteredRowCursor implements RowCursor, IndexSupplier {
 			long toRowIndex, int[] selection, Set<CloseableCloser> openCursorCloseables) {
 		m_reader = reader.createReader();
 		m_spec = spec;
-		m_values = createValues(m_currentData);
-
 		m_selection = addRowKeyIndexToSelection(selection);
 
 		// start chunk
@@ -122,6 +120,8 @@ public class ColumnFilteredRowCursor implements RowCursor, IndexSupplier {
 
 		// switch to next chunk
 		switchToNextData();
+		
+		m_values = createValues(m_currentData);
 
 		m_openCursorCloseables = openCursorCloseables;
 	}
