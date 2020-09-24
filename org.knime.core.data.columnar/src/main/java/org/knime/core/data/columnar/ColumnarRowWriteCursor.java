@@ -76,8 +76,7 @@ import org.knime.core.data.columnar.table.UnsavedColumnarContainerTable;
 import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.values.WriteValue;
 
-public final class ColumnarRowWriteCursor
-		implements RowWriteCursor<UnsavedColumnarContainerTable>, IndexSupplier {
+public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColumnarContainerTable>, IndexSupplier {
 
 	private final ColumnStoreFactory m_storeFactory;
 	private final ColumnarDataTableSpec m_spec;
@@ -162,7 +161,7 @@ public final class ColumnarRowWriteCursor
 	private Map<Integer, DataColumnDomain> mapBackDomains(final DataTableSpec sourceSpec) {
 		final Map<Integer, DataColumnDomain> columnDomains = new HashMap<>();
 		for (int i = 0; i < sourceSpec.getNumColumns(); i++) {
-			final ColumnarDomain columnDomain = m_store.getResultDomain(i + 1);
+			final ColumnarDomain columnDomain = m_store.getResultDomain(i);
 			if (columnDomain != null) {
 				final DataColumnSpec columnSpec = sourceSpec.getColumnSpec(i);
 				final DataType columnType = columnSpec.getType();

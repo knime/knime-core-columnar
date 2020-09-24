@@ -64,12 +64,12 @@ import org.knime.core.data.values.WriteValue;
  *
  * @author Christian Dietz
  */
-public class CustomRowKeyColumnType implements ColumnType<StringWriteData, StringReadData> {
+public class RowKeyColumnType implements ColumnType<StringWriteData, StringReadData> {
 
 	private RowKeyConfig m_config;
 
 	// TODO
-	public CustomRowKeyColumnType(RowKeyConfig config) {
+	public RowKeyColumnType(RowKeyConfig config) {
 		m_config = config;
 	}
 

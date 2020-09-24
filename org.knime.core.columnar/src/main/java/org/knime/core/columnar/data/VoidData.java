@@ -59,6 +59,10 @@ public final class VoidData {
         @Override
         VoidReadData close(int length);
 
+        @Override
+        default void setMissing(final int index) {
+        }
+
     }
 
     public static interface VoidReadData extends ColumnReadData {
@@ -66,6 +70,14 @@ public final class VoidData {
         @Override
         default boolean isMissing(final int index) {
             return true;
+        }
+
+        @Override
+        default void release() {
+        }
+
+        @Override
+        default void retain() {
         }
 
     }

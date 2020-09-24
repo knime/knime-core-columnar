@@ -206,7 +206,7 @@ public final class DomainColumnStore implements ColumnStore {
 				final DomainCalculator<ColumnReadData, ColumnarDomain> calculator = (DomainCalculator<ColumnReadData, ColumnarDomain>) m_calculators[i];
 				if (calculator != null) {
 					final Future<ColumnarDomain> merged;
-					final ColumnReadData chunk = record.get(i);
+					final ColumnReadData chunk = record.get(i + 1);
 					// Retain for async. domain computation. Submitted task will release.
 					chunk.retain();
 					try {

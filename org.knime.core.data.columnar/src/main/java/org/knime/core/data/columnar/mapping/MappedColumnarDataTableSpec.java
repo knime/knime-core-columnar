@@ -16,7 +16,7 @@ import org.knime.core.data.DataTypeConfig;
 import org.knime.core.data.RowKeyConfig;
 import org.knime.core.data.columnar.ColumnType;
 import org.knime.core.data.columnar.ColumnarDataTableSpec;
-import org.knime.core.data.columnar.types.CustomRowKeyColumnType;
+import org.knime.core.data.columnar.types.RowKeyColumnType;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -41,7 +41,7 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 			final Map<DataType, DataTypeMapper> mapping, final Map<Integer, DataTypeConfig> configs) {
 		m_source = source;
 		// TODO: auto row key
-		m_rowKeyType = new CustomRowKeyColumnType(rowKeyConfig);
+		m_rowKeyType = new RowKeyColumnType(rowKeyConfig);
 		m_rowKeyConfig = rowKeyConfig;
 		m_mapping = mapping;
 		m_configs = configs;
@@ -54,7 +54,8 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 
 	@Override
 	public int getNumColumns() {
-		return m_source.getNumColumns();
+		// +1 for rowKey.
+		return m_source.getNumColumns() + 1;
 	}
 
 	@Override
@@ -70,10 +71,9 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 	@Override
 	public ColumnType<?, ?> getColumnType(final int index) {
 		// TODO: do we want to cache the column types for very wide tables?
-		if (index != 0 || m_rowKeyConfig == RowKeyConfig.NOKEY) {
+		if (index != 0) {
 			// Subtract offset of row key.
-			final int offset = m_rowKeyConfig == RowKeyConfig.NOKEY ? 0 : 1;
-			final DataTypeMapper mapper = m_mapping.get(m_source.getColumnSpec(index - offset).getType());
+			final DataTypeMapper mapper = m_mapping.get(m_source.getColumnSpec(index - 1).getType());
 			final DataTypeConfig config = m_configs.get(index);
 			if (config != null) {
 				// It must be ensured by the client that mappers and configs match.
@@ -106,7 +106,7 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 
 	public static final class Serializer {
 
-		private static final String CFG_KEY_HAS_CUSTOM_ROW_KEY = "custom_row_key";
+		private static final String CFG_ROW_KEY_CONFIG = "row_key_config";
 
 		private static final String CFG_KEY_MAPPED_DATA_TYPES = "mapped_data_types";
 
@@ -118,7 +118,7 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 		}
 
 		public static void save(final MappedColumnarDataTableSpec spec, final NodeSettingsWO settings) {
-			settings.addString(CFG_KEY_HAS_CUSTOM_ROW_KEY, spec.getRowKeyConfig().name());
+			settings.addString(CFG_ROW_KEY_CONFIG, spec.getRowKeyConfig().name());
 
 			final Map<DataType, DataTypeMapper> mapping = spec.m_mapping;
 			// TODO make sure mapping comprises all element types of all collections in all
@@ -150,7 +150,7 @@ public class MappedColumnarDataTableSpec implements ColumnarDataTableSpec {
 
 		public static MappedColumnarDataTableSpec load(final DataTableSpec source, final NodeSettingsRO settings)
 				throws InvalidSettingsException {
-			final RowKeyConfig rowKeyConfig = RowKeyConfig.valueOf(settings.getString(CFG_KEY_HAS_CUSTOM_ROW_KEY));
+			final RowKeyConfig rowKeyConfig = RowKeyConfig.valueOf(settings.getString(CFG_ROW_KEY_CONFIG));
 
 			final Map<DataType, DataTypeMapper> mapping = new HashMap<>();
 			final DataType[] mappedTypes = settings.getDataTypeArray(CFG_KEY_MAPPED_DATA_TYPES);

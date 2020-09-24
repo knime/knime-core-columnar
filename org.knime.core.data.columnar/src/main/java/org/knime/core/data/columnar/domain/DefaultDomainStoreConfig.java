@@ -125,8 +125,8 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 	 */
 	@Override
 	public DomainCalculator<? extends ColumnReadData, ? extends ColumnarDomain>[] createCalculators() {
-		final DomainCalculator<?, ?>[] domains = new DomainCalculator[m_spec.getNumColumns()];
-		for (int i = 0; i < m_spec.getNumColumns(); i++) {
+		final DomainCalculator<?, ?>[] domains = new DomainCalculator[m_spec.getNumColumns() - 1];
+		for (int i = 1; i < m_spec.getNumColumns(); i++) {
 			ColumnDataSpec spec = m_spec.getColumnDataSpec(i);
 			final ColumnarDomain initialDomain = m_initialDomains.get(i);
 			DomainCalculator<?, ?> calculator = null;
@@ -145,7 +145,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 						() -> new StringDomainCalculator(m_maxPossibleNominalDomainValues));
 			}
 			if (calculator != null) {
-				domains[i] = calculator;
+				domains[i - 1] = calculator;
 			}
 		}
 		return domains;
