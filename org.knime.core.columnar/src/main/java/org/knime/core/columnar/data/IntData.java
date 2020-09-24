@@ -54,7 +54,7 @@ public final class IntData {
     private IntData() {
     }
 
-    public static interface IntReadData extends ColumnData {
+    public static interface IntReadData extends ColumnReadData {
         int getInt(int index);
     }
 

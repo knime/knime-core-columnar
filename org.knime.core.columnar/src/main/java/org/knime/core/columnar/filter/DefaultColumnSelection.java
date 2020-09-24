@@ -51,9 +51,9 @@ package org.knime.core.columnar.filter;
 import java.util.Objects;
 import java.util.function.IntFunction;
 
-import org.knime.core.columnar.batch.Batch;
-import org.knime.core.columnar.batch.DefaultBatch;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.DefaultReadBatch;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
@@ -72,14 +72,14 @@ public class DefaultColumnSelection implements ColumnSelection {
     }
 
     @Override
-    public Batch createBatch(final IntFunction<ColumnData> function) {
-        final ColumnData[] batch = new ColumnData[m_schema.getNumColumns()];
+    public ReadBatch createBatch(final IntFunction<ColumnReadData> function) {
+        final ColumnReadData[] batch = new ColumnReadData[m_schema.getNumColumns()];
         int length = 0;
         for (int i = 0; i < m_schema.getNumColumns(); i++) {
             batch[i] = function.apply(i);
             length = Math.max(length, batch[i].length());
         }
-        return new DefaultBatch(m_schema, batch, length);
+        return new DefaultReadBatch(m_schema, batch, length);
     }
 
 }

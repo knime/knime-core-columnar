@@ -57,6 +57,6 @@ public interface WriteBatch extends WriteData {
     ColumnWriteData get(int index);
 
     @Override
-    Batch close(final int length);
+    ReadBatch close(final int length);
 
 }

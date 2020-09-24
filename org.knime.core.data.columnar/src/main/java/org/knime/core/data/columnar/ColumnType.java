@@ -45,13 +45,13 @@
  */
 package org.knime.core.data.columnar;
 
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.data.values.ReadValue;
 import org.knime.core.data.values.WriteValue;
 
-public interface ColumnType<W extends ColumnWriteData, R extends ColumnData> {
+public interface ColumnType<W extends ColumnWriteData, R extends ColumnReadData> {
 
 	ColumnDataSpec getColumnDataSpec();
 

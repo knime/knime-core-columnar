@@ -54,7 +54,7 @@ public final class ByteData {
     private ByteData() {
     }
 
-    public interface ByteReadData extends ColumnData {
+    public interface ByteReadData extends ColumnReadData {
         byte getByte(int index);
     }
 

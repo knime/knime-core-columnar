@@ -60,7 +60,7 @@ public final class VarBinaryData {
 
     }
 
-    public static interface VarBinaryReadData extends ColumnData {
+    public static interface VarBinaryReadData extends ColumnReadData {
         byte[] getBytes(int index);
     }
 

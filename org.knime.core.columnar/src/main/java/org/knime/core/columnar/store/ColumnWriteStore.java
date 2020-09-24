@@ -48,7 +48,7 @@ package org.knime.core.columnar.store;
 import java.io.File;
 import java.io.IOException;
 
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 
 /**
  * A store to which columnar data can be written. The life cycle of a write
@@ -58,7 +58,7 @@ import org.knime.core.columnar.data.ColumnData;
  * {@link #getWriter()}.</li>
  * <li>Data created by a {@link ColumnDataFactory} obtained via
  * {@link #getFactory()} is written via
- * {@link ColumnDataWriter#write(ColumnData[])}.</li>
+ * {@link ColumnDataWriter#write(ColumnReadData[])}.</li>
  * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
  * </ol>
  *

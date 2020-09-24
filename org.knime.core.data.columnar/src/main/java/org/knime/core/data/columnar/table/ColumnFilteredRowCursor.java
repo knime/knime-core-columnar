@@ -48,8 +48,8 @@ package org.knime.core.data.columnar.table;
 
 import java.util.Set;
 
-import org.knime.core.columnar.batch.Batch;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.phantom.CloseableCloser;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
@@ -87,7 +87,7 @@ public class ColumnFilteredRowCursor implements RowCursor, IndexSupplier {
 
 	private int m_index = -1;
 
-	private Batch m_currentData;
+	private ReadBatch m_currentData;
 
 	private CloseableCloser m_closer;
 
@@ -213,13 +213,13 @@ public class ColumnFilteredRowCursor implements RowCursor, IndexSupplier {
 		}
 	}
 
-	private final ReadValue[] createValues(Batch batch) {
+	private final ReadValue[] createValues(ReadBatch batch) {
 		// TODO Marc Bux: here the assumption is that ColumnDataAccess always has size
 		// of incoming spec with some nulls.
 		final ReadValue[] values = new ReadValue[m_spec.getNumColumns()];
 		for (int i = 0; i < m_selection.length; i++) {
 			@SuppressWarnings("unchecked")
-			ColumnType<?, ColumnData> type = (ColumnType<?, ColumnData>) m_spec.getColumnType(m_selection[i]);
+			ColumnType<?, ColumnReadData> type = (ColumnType<?, ColumnReadData>) m_spec.getColumnType(m_selection[i]);
 			values[m_selection[i]] = type.createReadValue(batch.get(m_selection[i]), this);
 		}
 		return values;

@@ -52,7 +52,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
@@ -115,15 +115,15 @@ public class DefaultWriteBatch implements WriteBatch {
     }
 
     @Override
-    public Batch close(final int length) {
-        final ColumnData[] data = new ColumnData[m_data.length];
+    public ReadBatch close(final int length) {
+        final ColumnReadData[] data = new ColumnReadData[m_data.length];
         int capacity = 0;
         for (int i = 0; i < m_data.length; i++) {
             data[i] = m_data[i].close(length);
             capacity = Math.max(capacity, data[i].length());
         }
 
-        return new DefaultBatch(m_schema, data, capacity);
+        return new DefaultReadBatch(m_schema, data, capacity);
     }
 
 //    @Override

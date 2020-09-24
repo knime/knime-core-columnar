@@ -53,7 +53,7 @@ public final class LocalTimeData {
     private LocalTimeData() {
     }
 
-    public static interface LocalTimeReadData extends ColumnData {
+    public static interface LocalTimeReadData extends ColumnReadData {
 
         LocalTime getLocalTime(int index);
 

@@ -58,8 +58,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.batch.Batch;
-import org.knime.core.columnar.batch.DefaultBatch;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
@@ -194,7 +194,7 @@ public final class TestColumnStoreUtils {
             for (int i = 0; i < table.size(); i++) {
                 final TestDoubleColumnData[] batch = table.getBatch(i);
                 final int length = batch[0].length();
-                writer.write(new DefaultBatch(store.getSchema(), batch, length));
+                writer.write(new DefaultReadBatch(store.getSchema(), batch, length));
             }
         }
     }
@@ -223,7 +223,7 @@ public final class TestColumnStoreUtils {
             final List<TestDoubleColumnData[]> result = new ArrayList<>();
             for (int i = 0; i < reader.getNumBatches(); i++) {
                 final TestDoubleColumnData[] written = table.getBatch(i);
-                final Batch batch = reader.readRetained(i);
+                final ReadBatch batch = reader.readRetained(i);
                 final TestDoubleColumnData[] data = new TestDoubleColumnData[store.getSchema().getNumColumns()];
 
                 assertEquals(written.length, data.length);
@@ -251,8 +251,8 @@ public final class TestColumnStoreUtils {
                 final ColumnDataReader reader2 = store.createReader()) {
             assertEquals(reader1.getNumBatches(), reader2.getNumBatches());
             for (int i = 0; i < reader1.getNumBatches(); i++) {
-                final Batch batch1 = reader1.readRetained(i);
-                final Batch batch2 = reader2.readRetained(i);
+                final ReadBatch batch1 = reader1.readRetained(i);
+                final ReadBatch batch2 = reader2.readRetained(i);
 
                 assertEquals(batch1.length(), batch2.length());
                 for (int j = 0; j < batch1.length(); j++) {

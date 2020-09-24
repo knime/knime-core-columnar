@@ -52,7 +52,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
@@ -60,15 +60,15 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class DefaultBatch implements Batch {
+public class DefaultReadBatch implements ReadBatch {
 
     private final int m_maxIndex;
 
-    private final ColumnData[] m_data;
+    private final ColumnReadData[] m_data;
 
     private final int m_length;
 
-    public DefaultBatch(final ColumnStoreSchema schema, final ColumnData[] data, final int length) {
+    public DefaultReadBatch(final ColumnStoreSchema schema, final ColumnReadData[] data, final int length) {
         Objects.requireNonNull(schema, () -> "Column store schema must not be null.");
         Objects.requireNonNull(data, () -> "Column data must not be null.");
 
@@ -78,7 +78,7 @@ public class DefaultBatch implements Batch {
     }
 
     @Override
-    public ColumnData get(final int colIndex) {
+    public ColumnReadData get(final int colIndex) {
         if (colIndex < 0) {
             throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", colIndex));
         }
@@ -96,14 +96,14 @@ public class DefaultBatch implements Batch {
 
     @Override
     public void release() {
-        for (final ColumnData data : m_data) {
+        for (final ColumnReadData data : m_data) {
             data.release();
         }
     }
 
     @Override
     public void retain() {
-        for (final ColumnData data : m_data) {
+        for (final ColumnReadData data : m_data) {
             data.retain();
         }
     }

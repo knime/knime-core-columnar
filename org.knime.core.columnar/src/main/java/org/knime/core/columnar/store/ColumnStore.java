@@ -45,7 +45,7 @@
  */
 package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
@@ -56,7 +56,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
  * and populated.</li>
  * <li>The singleton {@link ColumnDataWriter writer} is obtained via
  * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnData[])}.</li>
+ * <li>Data is written via {@link ColumnDataWriter#write(ColumnReadData[])}.</li>
  * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
  * <li>Any number of {@link ColumnDataReader readers} are created via
  * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>

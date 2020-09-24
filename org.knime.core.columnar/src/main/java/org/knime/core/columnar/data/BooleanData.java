@@ -51,7 +51,7 @@ public final class BooleanData {
     private BooleanData() {
     }
 
-    public static interface BooleanReadData extends ColumnData {
+    public static interface BooleanReadData extends ColumnReadData {
         boolean getBoolean(int index);
     }
 

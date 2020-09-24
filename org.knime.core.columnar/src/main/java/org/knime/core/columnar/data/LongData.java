@@ -63,7 +63,7 @@ public final class LongData {
 
     }
 
-    public static interface LongReadData extends ColumnData {
+    public static interface LongReadData extends ColumnReadData {
         long getLong(int index);
     }
 

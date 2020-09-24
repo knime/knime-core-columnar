@@ -47,12 +47,12 @@ package org.knime.core.columnar.filter;
 
 import java.util.function.IntFunction;
 
-import org.knime.core.columnar.batch.Batch;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.ColumnReadData;
 
 @SuppressWarnings("javadoc")
 public interface ColumnSelection {
 
-    Batch createBatch (IntFunction<ColumnData> function);
+    ReadBatch createBatch (IntFunction<ColumnReadData> function);
 
 }

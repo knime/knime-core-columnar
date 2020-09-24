@@ -49,11 +49,11 @@
 package org.knime.core.columnar.batch;
 
 import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 
 @SuppressWarnings("javadoc")
-public interface Batch extends ReadData {
+public interface ReadBatch extends ReadData {
 
-    ColumnData get(int index);
+    ColumnReadData get(int index);
 
 }

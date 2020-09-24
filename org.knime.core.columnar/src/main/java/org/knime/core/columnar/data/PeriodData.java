@@ -53,7 +53,7 @@ public final class PeriodData {
     private PeriodData() {
     }
 
-    public static interface PeriodReadData extends ColumnData {
+    public static interface PeriodReadData extends ColumnReadData {
 
         Period getPeriod(int index);
 

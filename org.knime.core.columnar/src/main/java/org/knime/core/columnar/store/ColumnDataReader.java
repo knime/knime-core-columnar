@@ -48,12 +48,12 @@ package org.knime.core.columnar.store;
 import java.io.Closeable;
 import java.io.IOException;
 
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 
 @SuppressWarnings("javadoc")
 public interface ColumnDataReader extends Closeable {
 
-    Batch readRetained(int index) throws IOException;
+    ReadBatch readRetained(int index) throws IOException;
 
     int getNumBatches();
 

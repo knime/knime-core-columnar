@@ -1,9 +1,9 @@
 
 package org.knime.core.data.columnar.domain;
 
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 
-public abstract class AbstractDomainCalculator<C extends ColumnData, D extends ColumnarDomain> //
+public abstract class AbstractDomainCalculator<C extends ColumnReadData, D extends ColumnarDomain> //
 	implements DomainCalculator<C, D>
 {
 

@@ -56,7 +56,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -131,7 +131,7 @@ public final class PhantomReferenceStore implements ColumnStore {
         }
 
         @Override
-        public void write(final Batch batch) throws IOException {
+        public void write(final ReadBatch batch) throws IOException {
             if (m_closed.isClosed()) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }

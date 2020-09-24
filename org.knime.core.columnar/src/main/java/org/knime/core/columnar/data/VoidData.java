@@ -61,7 +61,7 @@ public final class VoidData {
 
     }
 
-    public static interface VoidReadData extends ColumnData {
+    public static interface VoidReadData extends ColumnReadData {
 
         @Override
         default boolean isMissing(final int index) {

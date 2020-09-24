@@ -47,8 +47,8 @@ package org.knime.core.data.columnar.table;
 
 import java.util.Set;
 
-import org.knime.core.columnar.batch.Batch;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.phantom.CloseableCloser;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
@@ -76,7 +76,7 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 
 	private final int m_lastBatchMaxIndex;
 
-	private Batch m_currentBatch;
+	private ReadBatch m_currentBatch;
 
 	private ReadValue[] m_currentValues;
 
@@ -155,11 +155,11 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 	}
 
 	// Expensive for many columns, but only called once per chunk
-	private ReadValue[] create(Batch batch) {
+	private ReadValue[] create(ReadBatch batch) {
 		final ReadValue[] values = new ReadValue[m_spec.getNumColumns()];
 		for (int i = 0; i < values.length; i++) {
 			@SuppressWarnings("unchecked")
-			final ColumnType<?, ColumnData> type = (ColumnType<?, ColumnData>) m_spec.getColumnType(i);
+			final ColumnType<?, ColumnReadData> type = (ColumnType<?, ColumnReadData>) m_spec.getColumnType(i);
 			values[i] = type.createReadValue(batch.get(i), this);
 		}
 		return values;

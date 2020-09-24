@@ -53,6 +53,6 @@ public interface ColumnWriteData extends WriteData {
     void setMissing(int index);
 
     @Override
-    ColumnData close(int length);
+    ColumnReadData close(int length);
 
 }

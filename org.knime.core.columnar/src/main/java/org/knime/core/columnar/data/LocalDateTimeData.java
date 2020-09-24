@@ -53,7 +53,7 @@ public final class LocalDateTimeData {
     private LocalDateTimeData() {
     }
 
-    public static interface LocalDateTimeReadData extends ColumnData {
+    public static interface LocalDateTimeReadData extends ColumnReadData {
 
         LocalDateTime getLocalDateTime(int index);
 

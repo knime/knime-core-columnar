@@ -44,15 +44,70 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   15 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   9 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.data;
+package org.knime.core.columnar.batch;
 
-import org.knime.core.columnar.ReadData;
+import java.util.Arrays;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
+
+/**
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 @SuppressWarnings("javadoc")
-public interface ColumnData extends ReadData {
+public class FilteredReadBatch implements ReadBatch {
 
-    boolean isMissing(int index);
+    private final Set<Integer> m_indices;
+
+    private final ReadBatch m_delegate;
+
+    public FilteredReadBatch(final FilteredColumnSelection selection, final ReadBatch delegate) {
+        Objects.requireNonNull(selection, () -> "Column selection must not be null.");
+        Objects.requireNonNull(delegate, () -> "Delegate batch must not be null.");
+
+        m_indices = Arrays.stream(selection.includes()).boxed().collect(Collectors.toSet());
+        m_delegate = delegate;
+    }
+
+    @Override
+    public ColumnReadData get(final int colIndex) {
+        if (!m_indices.contains(colIndex)) {
+            throw new NoSuchElementException(
+                String.format("Data at index %d is not available in this filtered batch.", colIndex));
+        }
+        return m_delegate.get(colIndex);
+    }
+
+    @Override
+    public void release() {
+        for (int index : m_indices) {
+            m_delegate.get(index).release();
+        }
+    }
+
+    @Override
+    public void retain() {
+        for (int index : m_indices) {
+            m_delegate.get(index).retain();
+        }
+    }
+
+    @Override
+    public int sizeOf() {
+        return m_indices.stream().map(m_delegate::get).mapToInt(ReferencedData::sizeOf).sum();
+    }
+
+    @Override
+    public int length() {
+        return m_delegate.length();
+    }
 
 }

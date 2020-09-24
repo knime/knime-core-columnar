@@ -53,10 +53,10 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
@@ -80,7 +80,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 
         private final BufferedBatchLoader m_batchLoader;
 
-        private final Evictor<ColumnDataUniqueId, ColumnData> m_evictor = (k, c) -> m_cachedData.remove(k);
+        private final Evictor<ColumnDataUniqueId, ColumnReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
 
         private boolean m_readerClosed;
 
@@ -91,7 +91,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
         }
 
         @Override
-        public Batch readRetained(final int chunkIndex) {
+        public ReadBatch readRetained(final int chunkIndex) {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -104,7 +104,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
                 return m_globalCache.getRetained(ccUID, () -> {
                     m_cachedData.add(ccUID);
                     try {
-                        final ColumnData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex).get(i);
+                        final ColumnReadData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex).get(i);
                         data.retain();
                         return data;
                     } catch (IOException e) {
@@ -135,7 +135,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 
     private final ColumnReadStore m_delegate;
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_globalCache;
+    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_globalCache;
 
     private final Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -165,7 +165,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
     public void close() {
         m_storeClosed = true;
         for (final ColumnDataUniqueId id : m_cachedData) {
-            final ColumnData removed = m_globalCache.removeRetained(id);
+            final ColumnReadData removed = m_globalCache.removeRetained(id);
             if (removed != null) {
                 removed.release();
             }

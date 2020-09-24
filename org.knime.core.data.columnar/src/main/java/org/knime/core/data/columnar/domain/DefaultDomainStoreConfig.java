@@ -50,7 +50,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.DoubleData;
 import org.knime.core.columnar.data.IntData;
@@ -124,7 +124,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 	 * domains. Extension point?
 	 */
 	@Override
-	public DomainCalculator<? extends ColumnData, ? extends ColumnarDomain>[] createCalculators() {
+	public DomainCalculator<? extends ColumnReadData, ? extends ColumnarDomain>[] createCalculators() {
 		final DomainCalculator<?, ?>[] domains = new DomainCalculator[m_spec.getNumColumns()];
 		for (int i = 0; i < m_spec.getNumColumns(); i++) {
 			ColumnDataSpec spec = m_spec.getColumnDataSpec(i);

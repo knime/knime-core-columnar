@@ -54,7 +54,7 @@ import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_STORE
 import java.io.Closeable;
 import java.io.IOException;
 
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
@@ -92,7 +92,7 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
         }
 
         @Override
-        public Batch readRetained(final int chunkIndex) throws IOException {
+        public ReadBatch readRetained(final int chunkIndex) throws IOException {
             if (m_closed.isClosed()) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }

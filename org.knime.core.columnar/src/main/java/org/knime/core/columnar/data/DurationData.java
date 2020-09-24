@@ -53,7 +53,7 @@ public final class DurationData {
     private DurationData() {
     }
 
-    public static interface DurationReadData extends ColumnData {
+    public static interface DurationReadData extends ColumnReadData {
         Duration getDuration(int index);
     }
 

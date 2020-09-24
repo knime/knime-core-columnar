@@ -54,7 +54,7 @@ public final class FloatData {
     private FloatData() {
     }
 
-    public static interface FloatReadData extends ColumnData {
+    public static interface FloatReadData extends ColumnReadData {
         float getFloat(int index);
     }
 

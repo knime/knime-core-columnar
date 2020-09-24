@@ -59,10 +59,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -96,7 +96,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
         }
 
         @Override
-        public void write(final Batch batch) throws IOException {
+        public void write(final ReadBatch batch) throws IOException {
             if (m_writerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -173,7 +173,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
         }
 
         @Override
-        public Batch readRetained(final int chunkIndex) {
+        public ReadBatch readRetained(final int chunkIndex) {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -199,7 +199,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
                     }
                     m_cachedData.put(ccUID, DUMMY);
                     try {
-                        final ColumnData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex).get(i);
+                        final ColumnReadData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex).get(i);
                         data.retain();
                         return data;
                     } catch (IOException e) {
@@ -236,11 +236,11 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
     private final AsyncFlushCachedColumnStoreWriter m_writer;
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_globalCache;
+    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_globalCache;
 
     private final Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
 
-    private final Evictor<ColumnDataUniqueId, ColumnData> m_evictor = (k, c) -> {
+    private final Evictor<ColumnDataUniqueId, ColumnReadData> m_evictor = (k, c) -> {
         try {
             m_cachedData.remove(k).await();
         } catch (InterruptedException e) {
@@ -362,7 +362,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
         m_future.cancel(true);
 
         for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
-            final ColumnData removed = m_globalCache.removeRetained(id);
+            final ColumnReadData removed = m_globalCache.removeRetained(id);
             if (removed != null) {
                 removed.release();
             }

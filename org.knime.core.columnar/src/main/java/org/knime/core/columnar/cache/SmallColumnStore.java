@@ -58,7 +58,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -103,33 +103,33 @@ public final class SmallColumnStore implements ColumnStore {
 
     private static final class Table implements ReferencedData {
 
-        private final List<Batch> m_batches = Collections.synchronizedList(new ArrayList<>());
+        private final List<ReadBatch> m_batches = Collections.synchronizedList(new ArrayList<>());
 
         private final AtomicInteger m_sizeOf = new AtomicInteger();
 
         private final AtomicInteger m_maxDataCapacity = new AtomicInteger();
 
-        void retainAndAddBatch(final Batch batch) {
+        void retainAndAddBatch(final ReadBatch batch) {
             batch.retain();
             m_sizeOf.addAndGet(batch.sizeOf());
             m_maxDataCapacity.accumulateAndGet(batch.length(), Math::max);
             m_batches.add(batch);
         }
 
-        Batch getBatch(final int index) {
+        ReadBatch getBatch(final int index) {
             return m_batches.get(index);
         }
 
         @Override
         public void release() {
-            for (final Batch batch : m_batches) {
+            for (final ReadBatch batch : m_batches) {
                 batch.release();
             }
         }
 
         @Override
         public void retain() {
-            for (final Batch batch : m_batches) {
+            for (final ReadBatch batch : m_batches) {
                 batch.retain();
             }
         }
@@ -156,7 +156,7 @@ public final class SmallColumnStore implements ColumnStore {
         private Table m_table = new Table();
 
         @Override
-        public void write(final Batch batch) throws IOException {
+        public void write(final ReadBatch batch) throws IOException {
             if (m_writerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -211,7 +211,7 @@ public final class SmallColumnStore implements ColumnStore {
         }
 
         @Override
-        public Batch readRetained(final int chunkIndex) throws IOException {
+        public ReadBatch readRetained(final int chunkIndex) throws IOException {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -219,7 +219,7 @@ public final class SmallColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final Batch batch = m_selection.createBatch(i -> m_table.getBatch(chunkIndex).get(i));
+            final ReadBatch batch = m_selection.createBatch(i -> m_table.getBatch(chunkIndex).get(i));
             batch.retain();
             return batch;
         }
@@ -317,7 +317,7 @@ public final class SmallColumnStore implements ColumnStore {
         if (!m_flushed) {
             m_delegateWriter = m_delegate.getWriter();
             for (int i = 0; i < table.getNumChunks(); i++) {
-                final Batch batch = table.getBatch(i);
+                final ReadBatch batch = table.getBatch(i);
                 m_delegateWriter.write(batch);
             }
             m_flushed = true;

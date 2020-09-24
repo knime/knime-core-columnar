@@ -48,7 +48,7 @@
  */
 package org.knime.core.columnar.cache;
 
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 
 /**
  * A cache for storing data that can be shared between multiple {@link CachedColumnReadStore CachedColumnReadStores}.
@@ -57,7 +57,7 @@ import org.knime.core.columnar.data.ColumnData;
  */
 public final class CachedColumnStoreCache {
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnData> m_cache;
+    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_cache;
 
     /**
      * @param cacheSize the size of the cache in bytes
@@ -70,7 +70,7 @@ public final class CachedColumnStoreCache {
         return m_cache.size();
     }
 
-    LoadingEvictingCache<ColumnDataUniqueId, ColumnData> getCache() {
+    LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> getCache() {
         return m_cache;
     }
 

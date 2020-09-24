@@ -57,7 +57,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -95,7 +95,7 @@ public final class TestColumnStore implements ColumnStore {
     final class TestColumnDataWriter implements ColumnDataWriter {
 
         @Override
-        public void write(final Batch batch) throws IOException {
+        public void write(final ReadBatch batch) throws IOException {
             if (m_writerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -135,7 +135,7 @@ public final class TestColumnStore implements ColumnStore {
         }
 
         @Override
-        public Batch readRetained(final int chunkIndex) throws IOException {
+        public ReadBatch readRetained(final int chunkIndex) throws IOException {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }

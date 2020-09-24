@@ -48,9 +48,9 @@ package org.knime.core.data.columnar.domain;
 
 import java.util.function.Function;
 
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.data.ColumnReadData;
 
-public interface DomainCalculator<C extends ColumnData, D extends ColumnarDomain> extends Function<C, D> {
+public interface DomainCalculator<C extends ColumnReadData, D extends ColumnarDomain> extends Function<C, D> {
 
 	D createInitialDomain();
 

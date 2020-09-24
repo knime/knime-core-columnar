@@ -51,7 +51,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.knime.core.columnar.arrow.ArrowColumnStoreFactory;
-import org.knime.core.columnar.batch.Batch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -241,7 +241,7 @@ public final class ColumnarRowWriteCursor
 
 	private void releaseCurrentData(final int numValues) {
 		if (m_currentData != null) {
-			final Batch readBatch = m_currentData.close(numValues);
+			final ReadBatch readBatch = m_currentData.close(numValues);
 			try {
 				m_writer.write(readBatch);
 			} catch (final IOException e) {

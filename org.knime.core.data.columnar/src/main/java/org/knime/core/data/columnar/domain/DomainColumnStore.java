@@ -57,8 +57,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import org.knime.core.columnar.batch.Batch;
-import org.knime.core.columnar.data.ColumnData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -148,7 +148,7 @@ public final class DomainColumnStore implements ColumnStore {
 		private DomainStoreConfig m_config;
 
 		/**
-		 * Initialized during the first call to {@link #write(ColumnData[])}.
+		 * Initialized during the first call to {@link #write(ColumnReadData[])}.
 		 */
 		private DomainCalculator<?, ?>[] m_calculators;
 
@@ -161,7 +161,7 @@ public final class DomainColumnStore implements ColumnStore {
 		/**
 		 * Only to be used by {@code ColumnarRowWriteCursor.setMaxPossibleValues(int)}
 		 * for backward compatibility reasons. <br>
-		 * May only be called before the first call to {@link #write(ColumnData[])}.
+		 * May only be called before the first call to {@link #write(ColumnReadData[])}.
 		 */
 		public void setMaxPossibleValues(final int maxPossibleValues) {
 			if (m_calculators != null) {
@@ -173,7 +173,7 @@ public final class DomainColumnStore implements ColumnStore {
 		}
 
 		@Override
-		public void write(final Batch record) throws IOException {
+		public void write(final ReadBatch record) throws IOException {
 			if (m_calculators == null) {
 				m_calculators = m_config.createCalculators();
 				for (int i = 0; i < m_calculators.length; i++) {
@@ -188,7 +188,7 @@ public final class DomainColumnStore implements ColumnStore {
 
 			if (m_duplicateChecker != null) {
 				final Future<Void> duplicateCheck;
-				final ColumnData keyChunk = record.get(0);
+				final ColumnReadData keyChunk = record.get(0);
 				// Retain for async. duplicate checking. Submitted task will release.
 				keyChunk.retain();
 				try {
@@ -203,10 +203,10 @@ public final class DomainColumnStore implements ColumnStore {
 
 			for (int i = 0; i < m_calculators.length; i++) {
 				@SuppressWarnings("unchecked")
-				final DomainCalculator<ColumnData, ColumnarDomain> calculator = (DomainCalculator<ColumnData, ColumnarDomain>) m_calculators[i];
+				final DomainCalculator<ColumnReadData, ColumnarDomain> calculator = (DomainCalculator<ColumnReadData, ColumnarDomain>) m_calculators[i];
 				if (calculator != null) {
 					final Future<ColumnarDomain> merged;
-					final ColumnData chunk = record.get(i);
+					final ColumnReadData chunk = record.get(i);
 					// Retain for async. domain computation. Submitted task will release.
 					chunk.retain();
 					try {
@@ -254,11 +254,11 @@ public final class DomainColumnStore implements ColumnStore {
 
 		private static final class DuplicateCheckTask implements Callable<Void> {
 
-			private final ColumnData m_keyChunk;
+			private final ColumnReadData m_keyChunk;
 
 			private final DuplicateChecker m_duplicateChecker;
 
-			public DuplicateCheckTask(final ColumnData keyChunk, final DuplicateChecker duplicateChecker) {
+			public DuplicateCheckTask(final ColumnReadData keyChunk, final DuplicateChecker duplicateChecker) {
 				m_keyChunk = keyChunk;
 				m_duplicateChecker = duplicateChecker;
 			}
@@ -283,12 +283,12 @@ public final class DomainColumnStore implements ColumnStore {
 
 			private final Future<ColumnarDomain> m_previous;
 
-			private final ColumnData m_chunk;
+			private final ColumnReadData m_chunk;
 
-			private final DomainCalculator<ColumnData, ColumnarDomain> m_calculator;
+			private final DomainCalculator<ColumnReadData, ColumnarDomain> m_calculator;
 
-			public DomainCalculationTask(final Future<ColumnarDomain> previous, final ColumnData chunk,
-					final DomainCalculator<ColumnData, ColumnarDomain> calculator) {
+			public DomainCalculationTask(final Future<ColumnarDomain> previous, final ColumnReadData chunk,
+					final DomainCalculator<ColumnReadData, ColumnarDomain> calculator) {
 				m_previous = previous;
 				m_chunk = chunk;
 				m_calculator = calculator;

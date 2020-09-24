@@ -63,7 +63,7 @@ public final class StringData {
 
     }
 
-    public static interface StringReadData extends ColumnData {
+    public static interface StringReadData extends ColumnReadData {
         String getString(int index);
     }
 

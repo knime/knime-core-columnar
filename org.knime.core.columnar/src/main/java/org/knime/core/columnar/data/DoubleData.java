@@ -53,7 +53,7 @@ public final class DoubleData {
     private DoubleData() {
     }
 
-    public static interface DoubleReadData extends ColumnData {
+    public static interface DoubleReadData extends ColumnReadData {
         double getDouble(int index);
     }
 
