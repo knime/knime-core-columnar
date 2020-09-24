@@ -106,7 +106,12 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 	public void addRowToTable(final DataRow row) {
 		m_delegate.<RowKeyWriteValue>getWriteValue(-1).setRowKey(row.getKey());
 		for (int i = 0; i < m_numColumns; i++) {
-			m_delegate.<WriteValue<DataCell>>getWriteValue(i).setValue(row.getCell(i));
+			final DataCell cell = row.getCell(i);
+			if (!cell.isMissing()) {
+				m_delegate.<WriteValue<DataCell>>getWriteValue(i).setValue(row.getCell(i));
+			} else {
+				m_delegate.setMissing(i);
+			}
 		}
 		m_delegate.push();
 		m_size++;

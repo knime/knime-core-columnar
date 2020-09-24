@@ -49,6 +49,7 @@ import java.util.Iterator;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
+import org.knime.core.data.DataType;
 import org.knime.core.data.RowCursor;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.UnmaterializedCell;
@@ -82,7 +83,11 @@ public class FilteredColumnarRowIterator extends CloseableRowIterator {
 
 		// if RowKey exists, m_offset is 1. rowkey is always part of column selection.
 		for (int i = 0; i < m_selection.length; i++) {
-			cells[m_selection[i]] = m_cursor.<DataCellReadValue>getValue(m_selection[i]).getDataCell();
+			if (m_cursor.isMissing(m_selection[i])) {
+				cells[m_selection[i]] = DataType.getMissingCell();
+			} else {
+				cells[m_selection[i]] = m_cursor.<DataCellReadValue>getValue(m_selection[i]).getDataCell();
+			}
 		}
 		return new PartialFastTableDataRow(m_cursor.getRowKeyValue().getString(), cells);
 	}

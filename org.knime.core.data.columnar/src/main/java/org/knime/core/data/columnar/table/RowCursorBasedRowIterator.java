@@ -49,8 +49,10 @@ import java.util.Iterator;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
+import org.knime.core.data.DataType;
 import org.knime.core.data.RowCursor;
 import org.knime.core.data.RowKey;
+import org.knime.core.data.columnar.mapping.DataTypeMapperRegistry;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.values.DataCellReadValue;
 
@@ -75,7 +77,11 @@ public class RowCursorBasedRowIterator extends CloseableRowIterator {
 		m_cursor.poll();
 		final DataCell[] cells = new DataCell[m_numValues];
 		for (int i = 0; i < m_numValues; i++) {
-			cells[i] = m_cursor.<DataCellReadValue>getValue(i).getDataCell();
+			if(m_cursor.isMissing(i)) {
+				cells[i] = DataType.getMissingCell();
+			}else {
+				cells[i] = m_cursor.<DataCellReadValue>getValue(i).getDataCell();
+			}
 		}
 
 		return new ColumnStoreTableDataRow(m_cursor.getRowKeyValue().getString(), cells);
