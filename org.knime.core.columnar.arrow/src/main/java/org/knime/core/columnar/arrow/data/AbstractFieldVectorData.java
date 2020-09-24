@@ -45,30 +45,32 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.ColumnWriteData;
 
-abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowData<F> {
+/**
+ * Abstract implementation of {@link ColumnReadData} and {@link ColumnWriteData} using Arrow.
+ *
+ * @param <F> Type of the field vector holding the data.
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractReferenceData
+    implements ColumnReadData, ColumnWriteData {
 
-    private final AtomicInteger m_refCounter = new AtomicInteger(1);
-
+    /** The Arrow {@link FieldVector} holding the data */
     protected final F m_vector;
 
-    AbstractFieldVectorData(final BufferAllocator allocator, final int capacity) {
-        m_vector = create(allocator, capacity);
-    }
-
-    protected abstract F create(BufferAllocator allocator, final int capacity);
-
+    /**
+     * Create by wrapping the given vector. Can be an empty vector or a vector already containing data.
+     *
+     * @param vector the vector holding the data
+     */
     AbstractFieldVectorData(final F vector) {
         m_vector = vector;
-    }
-
-    @Override
-    public F get() {
-        return m_vector;
     }
 
     @Override
@@ -86,22 +88,9 @@ abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowDa
         return m_vector.getValueCount();
     }
 
-    // TODO thread safety for ref-counting
     @Override
-    public synchronized void release() {
-        if (m_refCounter.decrementAndGet() == 0) {
-            m_vector.close();
-        }
-    }
-
-    @Override
-    public synchronized void retain() {
-        m_refCounter.getAndIncrement();
-    }
-
-    @Override
-    public int sizeOf() {
-        return (int)(m_vector.getDataBuffer().capacity() + m_vector.getValidityBuffer().capacity());
+    protected void closeResources() {
+        m_vector.close();
     }
 
     @Override
@@ -109,4 +98,20 @@ abstract class AbstractFieldVectorData<F extends FieldVector> implements ArrowDa
         return m_vector.toString();
     }
 
+    /**
+     * An abstract implementation of {@link ArrowColumnDataFactory} for data extending AbstractFieldVectorData and
+     * having no dictionaries.
+     */
+    protected abstract static class AbstractFieldVectorDataFactory implements ArrowColumnDataFactory {
+
+        @Override
+        public FieldVector getVector(final ColumnReadData data) {
+            return ((AbstractFieldVectorData<?>)data).m_vector;
+        }
+
+        @Override
+        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+            return null;
+        }
+    }
 }

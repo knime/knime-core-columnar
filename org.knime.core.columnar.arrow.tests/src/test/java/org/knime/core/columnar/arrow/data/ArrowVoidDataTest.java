@@ -42,82 +42,68 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 30, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import java.io.IOException;
+import static org.junit.Assert.assertTrue;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VarBinaryVector;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 
 /**
- * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
+ * Test {@link ArrowVoidData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowVarBinaryData extends AbstractVariableWitdthData<VarBinaryVector>
-    implements VarBinaryWriteData, VarBinaryReadData {
+public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData> {
 
-    private ArrowVarBinaryData(final VarBinaryVector vector) {
-        super(vector);
+    /** Create the test for {@link ArrowVoidData} */
+    public ArrowVoidDataTest() {
+        super(ArrowVoidDataFactory.INSTANCE);
     }
 
     @Override
-    public byte[] getBytes(final int index) {
-        return m_vector.get(index);
+    protected ArrowVoidData cast(final Object o) {
+        assertTrue(o instanceof ArrowVoidData);
+        return (ArrowVoidData)o;
     }
 
     @Override
-    public void setBytes(final int index, final byte[] value) {
-        m_vector.setSafe(index, value);
+    protected void setValue(final ArrowVoidData data, final int index, final int seed) {
+        // No value to set
     }
 
     @Override
-    public VarBinaryReadData close(final int length) {
-        m_vector.setValueCount(length);
-        return this;
+    protected void checkValue(final ArrowVoidData data, final int index, final int seed) {
+        // No value to check
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
-    public static final class ArrowVarBinaryDataFactory extends AbstractFieldVectorDataFactory {
+    @Override
+    protected boolean isReleased(final ArrowVoidData data) {
+        return false;
+    }
 
-        private static final int CURRENT_VERSION = 0;
+    @Override
+    protected int getMinSize(final int valueCount, final int capacity) {
+        return 0;
+    }
 
-        /** Singleton instance of {@link ArrowVarBinaryDataFactory} */
-        public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
+    @Override
+    public void testReferenceCounting() { // NOSONAR
+        // The void vector is holding no data so we don't care about releasing it
+    }
 
-        private ArrowVarBinaryDataFactory() {
-            // Singleton
-        }
+    @Override
+    public void testMissing() { // NOSONAR
+        // Void data does not support missing values
+    }
 
-        @Override
-        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
-        public ArrowVarBinaryData createWrite(final BufferAllocator allocator, final int capacity) {
-            final VarBinaryVector vector = new VarBinaryVector("BinaryVector", allocator);
-            vector.allocateNew(capacity);
-            return new ArrowVarBinaryData(vector);
-        }
-
-        @Override
-        public ArrowVarBinaryData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final int version) throws IOException {
-            if (version == CURRENT_VERSION) {
-                return new ArrowVarBinaryData((VarBinaryVector)vector);
-            } else {
-                throw new IOException("Cannot read ArrowVarBinaryData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
-            }
-        }
-
-        @Override
-        public int getVersion() {
-            return CURRENT_VERSION;
-        }
+    @Override
+    public void testWriteReadMissing() { // NOSONAR
+        // Void data does not support missing values
     }
 }

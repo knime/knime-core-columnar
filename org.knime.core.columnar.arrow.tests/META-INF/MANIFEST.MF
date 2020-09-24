@@ -5,5 +5,6 @@ Bundle-SymbolicName: org.knime.core.columnar.arrow.tests;singleton:=true
 Bundle-Version: 4.3.0.qualifier
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Fragment-Host: org.knime.core.columnar.arrow;bundle-version="4.3.0"
-Require-Bundle: org.junit;bundle-version="[4.13.0,5.0.0)"
+Require-Bundle: org.junit;bundle-version="[4.13.0,5.0.0)",
+ io.netty.all;bundle-version="[4.1.51, 4.2.0)"
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8

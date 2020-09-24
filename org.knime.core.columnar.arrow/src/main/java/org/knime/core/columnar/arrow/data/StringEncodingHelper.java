@@ -42,82 +42,64 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 4, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import java.io.IOException;
-
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VarBinaryVector;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 
 /**
- * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
+ * A helper class for data implementations that need to encode and decode Strings.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowVarBinaryData extends AbstractVariableWitdthData<VarBinaryVector>
-    implements VarBinaryWriteData, VarBinaryReadData {
+class StringEncodingHelper {
 
-    private ArrowVarBinaryData(final VarBinaryVector vector) {
-        super(vector);
+    private final CharsetDecoder m_decoder = StandardCharsets.UTF_8.newDecoder()
+        .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
+
+    private final CharsetEncoder m_encoder = StandardCharsets.UTF_8.newEncoder()
+        .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
+
+    StringEncodingHelper() {
     }
 
-    @Override
-    public byte[] getBytes(final int index) {
-        return m_vector.get(index);
-    }
-
-    @Override
-    public void setBytes(final int index, final byte[] value) {
-        m_vector.setSafe(index, value);
-    }
-
-    @Override
-    public VarBinaryReadData close(final int length) {
-        m_vector.setValueCount(length);
-        return this;
-    }
-
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
-    public static final class ArrowVarBinaryDataFactory extends AbstractFieldVectorDataFactory {
-
-        private static final int CURRENT_VERSION = 0;
-
-        /** Singleton instance of {@link ArrowVarBinaryDataFactory} */
-        public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
-
-        private ArrowVarBinaryDataFactory() {
-            // Singleton
-        }
-
-        @Override
-        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
-        public ArrowVarBinaryData createWrite(final BufferAllocator allocator, final int capacity) {
-            final VarBinaryVector vector = new VarBinaryVector("BinaryVector", allocator);
-            vector.allocateNew(capacity);
-            return new ArrowVarBinaryData(vector);
-        }
-
-        @Override
-        public ArrowVarBinaryData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final int version) throws IOException {
-            if (version == CURRENT_VERSION) {
-                return new ArrowVarBinaryData((VarBinaryVector)vector);
-            } else {
-                throw new IOException("Cannot read ArrowVarBinaryData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
+    public String decode(final ByteBuffer values) {
+        try {
+            synchronized (m_decoder) {
+                return m_decoder.decode(values).toString();
             }
+        } catch (final CharacterCodingException e) {
+            // This cannot happen because the CodingErrorAction is not REPORT
+            throw new IllegalStateException(e);
         }
+    }
 
-        @Override
-        public int getVersion() {
-            return CURRENT_VERSION;
+    public String decode(final byte[] values) {
+        return decode(ByteBuffer.wrap(values));
+    }
+
+    public ByteBuffer encode(final CharBuffer values) {
+        try {
+            synchronized (m_encoder) {
+                return m_encoder.encode(values);
+            }
+        } catch (final CharacterCodingException e) {
+            // This cannot happen because the CodingErrorAction is not REPORT
+            throw new IllegalStateException(e);
         }
+    }
+
+    public ByteBuffer encode(final String value) {
+        return encode(CharBuffer.wrap(value));
     }
 }

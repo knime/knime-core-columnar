@@ -45,27 +45,28 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.IOException;
+
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BitVectorHelper;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
 
-public class ArrowIntData extends AbstractFieldVectorData<IntVector> implements IntWriteData, IntReadData {
+/**
+ * Arrow implementation of {@link IntWriteData} and {@link IntReadData}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+public final class ArrowIntData extends AbstractFixedWitdthData<IntVector> implements IntWriteData, IntReadData {
 
-    public ArrowIntData(final BufferAllocator allocator, final int capacity) {
-        super(allocator, capacity);
-    }
-
-    public ArrowIntData(final IntVector vector) {
+    private ArrowIntData(final IntVector vector) {
         super(vector);
-    }
-
-    @Override
-    protected IntVector create(final BufferAllocator allocator, final int capacity) {
-        final IntVector vector = new IntVector("IntVector", allocator);
-        vector.allocateNew(capacity);
-        return vector;
     }
 
     @Override
@@ -79,15 +80,45 @@ public class ArrowIntData extends AbstractFieldVectorData<IntVector> implements 
     }
 
     @Override
-    public void setMissing(final int index) {
-        // TODO we can speed things likely up directly accessing validity buffer
-        BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
-    }
-
-    @Override
     public IntReadData close(final int length) {
         m_vector.setValueCount(length);
         return this;
     }
 
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowIntData} */
+    public static final class ArrowIntDataFactory extends AbstractFieldVectorDataFactory {
+
+        private static final int CURRENT_VERSION = 0;
+
+        /** Singleton instance of {@link ArrowIntDataFactory} */
+        public static final ArrowIntDataFactory INSTANCE = new ArrowIntDataFactory();
+
+        private ArrowIntDataFactory() {
+            // Singleton
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
+        public ColumnWriteData createWrite(final BufferAllocator allocator, final int capacity) {
+            final IntVector vector = new IntVector("IntVector", allocator);
+            vector.allocateNew(capacity);
+            return new ArrowIntData(vector);
+        }
+
+        @Override
+        public ColumnReadData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
+            throws IOException {
+            if (version == CURRENT_VERSION) {
+                return new ArrowIntData((IntVector)vector);
+            } else {
+                throw new IOException(
+                    "Cannot read ArrowIntData with version " + version + ". Current version: " + CURRENT_VERSION + ".");
+            }
+        }
+
+        @Override
+        public int getVersion() {
+            return CURRENT_VERSION;
+        }
+    }
 }

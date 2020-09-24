@@ -42,19 +42,36 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   1 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.data;
 
-import org.junit.Test;
+import org.apache.arrow.vector.BaseFixedWidthVector;
 
-public class VoidTest {
+/**
+ * An abstract implementation of Arrow data which uses a {@link BaseFixedWidthVector} for data storage. Handles
+ * #sizeOf() and #setMissing(int).
+ *
+ * @param <F> Type of the field vector holding the data.
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+abstract class AbstractFixedWitdthData<F extends BaseFixedWidthVector> extends AbstractFieldVectorData<F> {
 
-    @Test
-    public void test() {
-
+    AbstractFixedWitdthData(final F vector) {
+        super(vector);
     }
 
+    @Override
+    @SuppressWarnings("resource") // Buffers handled by vector
+    public int sizeOf() {
+        return (int)(m_vector.getDataBuffer().capacity() + m_vector.getValidityBuffer().capacity());
+    }
+
+    @Override
+    public void setMissing(final int index) {
+        // TODO does it make a huge difference to access the validity buffer directly?
+        // #setNull checks if the index is save
+        // BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
+        m_vector.setNull(index);
+    }
 }

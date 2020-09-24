@@ -42,81 +42,41 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 25, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BigIntVector;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.data.LongData.LongReadData;
-import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.columnar.ReferencedData;
 
 /**
- * Arrow implementation of {@link LongWriteData} and {@link LongReadData}.
+ * Abstract implementation of {@link ReferencedData} which counts the references in an {@link AtomicInteger} and calls
+ * the a {@link Runnable} if all references have been released.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowLongData extends AbstractFixedWitdthData<BigIntVector> implements LongWriteData, LongReadData {
+public abstract class AbstractReferenceData implements ReferencedData {
 
-    private ArrowLongData(final BigIntVector vector) {
-        super(vector);
+    private final AtomicInteger m_refCounter = new AtomicInteger(1);
+
+    @Override
+    public void release() {
+        // NB: This is thread safe because this will only be 0 for 1 thread
+        if (m_refCounter.decrementAndGet() == 0) {
+            closeResources();
+        }
     }
 
     @Override
-    public long getLong(final int index) {
-        return m_vector.get(index);
+    public void retain() {
+        m_refCounter.getAndIncrement();
     }
 
-    @Override
-    public void setLong(final int index, final long value) {
-        m_vector.set(index, value);
-    }
-
-    @Override
-    public LongReadData close(final int length) {
-        m_vector.setValueCount(length);
-        return this;
-    }
-
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowLongData} */
-    public static final class ArrowLongDataFactory extends AbstractFieldVectorDataFactory {
-
-        private static final int CURRENT_VERSION = 0;
-
-        /** Singleton instance of {@link ArrowLongDataFactory} */
-        public static final ArrowLongDataFactory INSTANCE = new ArrowLongDataFactory();
-
-        private ArrowLongDataFactory() {
-            // Singleton
-        }
-
-        @Override
-        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
-        public ArrowLongData createWrite(final BufferAllocator allocator, final int capacity) {
-            final BigIntVector vector = new BigIntVector("IntVector", allocator);
-            vector.allocateNew(capacity);
-            return new ArrowLongData(vector);
-        }
-
-        @Override
-        public ArrowLongData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
-            throws IOException {
-            if (version == CURRENT_VERSION) {
-                return new ArrowLongData((BigIntVector)vector);
-            } else {
-                throw new IOException("Cannot read ArrowLongData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
-            }
-        }
-
-        @Override
-        public int getVersion() {
-            return CURRENT_VERSION;
-        }
-    }
+    /**
+     * Called when all references have been released. Close all resources.
+     */
+    protected abstract void closeResources();
 }

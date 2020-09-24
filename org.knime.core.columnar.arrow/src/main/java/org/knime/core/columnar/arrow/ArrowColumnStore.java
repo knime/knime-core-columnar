@@ -47,11 +47,10 @@ package org.knime.core.columnar.arrow;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
-import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -60,50 +59,36 @@ import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
-import com.google.common.io.Files;
-
+/**
+ * A {@link ColumnStore} implementation for Arrow.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
 final class ArrowColumnStore implements ColumnStore {
 
-    // TODO allow configurations of root allocator
-    final static RootAllocator ROOT = new RootAllocator();
-
-    final static String CFG_ARROW_CHUNK_SIZE = "CHUNK_SIZE";
-
     private final File m_file;
-
-    private final BufferAllocator m_allocator;
-
-    private final ColumnStoreSchema m_schema;
 
     private final ArrowColumnReadStore m_delegate;
 
     private final int m_chunkSize;
 
-    private final ArrowColumnDataSpec<?, ?>[] m_arrowSchema;
+    private final ArrowColumnDataFactory[] m_factories;
 
-    ArrowColumnStore(final ColumnStoreSchema schema, final ArrowSchemaMapper mapper, final File file, final int chunkSize) {
+    private final BufferAllocator m_allocator;
+
+    ArrowColumnStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator,
+        final int chunkSize) {
+        m_factories = ArrowSchemaMapper.map(schema);
         m_file = file;
-        m_schema = schema;
-        m_arrowSchema = mapper.map(schema);
+        m_allocator = allocator;
         m_chunkSize = chunkSize;
-        // TODO make configurable
-        m_allocator = ROOT.newChildAllocator("ArrowColumnStore", 0, ROOT.getLimit());
-        m_delegate = new ArrowColumnReadStore(schema, file);
-    }
-
-    @Override
-    public void close() {
-        m_delegate.close();
-        m_file.delete();
-        m_allocator.close();
+        m_delegate = new ArrowColumnReadStore(schema, file, allocator);
     }
 
     @Override
     public ColumnDataWriter getWriter() {
-        // TODO also write mapper type information for backwards-compatibility. Readers
-        // can first get the mapper type from metadata and instantiate a mapper
-        // themselves.
-        return new ArrowColumnDataWriter(m_schema, m_file, m_allocator, m_chunkSize);
+        return new ArrowColumnDataWriter(m_file, m_chunkSize, m_factories);
     }
 
     @Override
@@ -113,25 +98,31 @@ final class ArrowColumnStore implements ColumnStore {
 
     @Override
     public ColumnDataFactory getFactory() {
-        return new ColumnDataFactory() {
-            @Override
-            public WriteBatch create() {
-                final ColumnWriteData[] chunk = new ColumnWriteData[m_arrowSchema.length];
-                for (int i = 0; i < m_arrowSchema.length; i++) {
-                    chunk[i] = m_arrowSchema[i].createEmpty(m_allocator, m_chunkSize);
-                }
-                return new DefaultWriteBatch(m_schema, chunk, m_chunkSize);
+        return () -> {
+            final ColumnWriteData[] chunk = new ColumnWriteData[m_factories.length];
+            for (int i = 0; i < m_factories.length; i++) {
+                chunk[i] = m_factories[i].createWrite(m_allocator, m_chunkSize);
             }
+            return new DefaultWriteBatch(chunk, m_chunkSize);
         };
     }
 
     @Override
     public ColumnStoreSchema getSchema() {
-        return m_schema;
+        return m_delegate.getSchema();
     }
 
     @Override
     public void save(final File f) throws IOException {
-        Files.copy(m_file, f);
+        Files.copy(m_file.toPath(), f.toPath());
+    }
+
+    @Override
+    public void close() throws IOException {
+        m_delegate.close();
+        if (m_file.exists()) {
+            Files.delete(m_file.toPath());
+        }
+        m_allocator.close();
     }
 }

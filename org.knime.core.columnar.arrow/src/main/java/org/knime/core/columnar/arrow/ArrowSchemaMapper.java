@@ -45,16 +45,132 @@
  */
 package org.knime.core.columnar.arrow;
 
+import java.util.stream.IntStream;
+
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowVarCharData.ArrowVarCharDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
+import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
+import org.knime.core.columnar.data.ByteData.ByteDataSpec;
+import org.knime.core.columnar.data.ColumnDataSpec.Mapper;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
+import org.knime.core.columnar.data.DurationData.DurationDataSpec;
+import org.knime.core.columnar.data.FloatData.FloatDataSpec;
+import org.knime.core.columnar.data.IntData.IntDataSpec;
+import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
+import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
+import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
+import org.knime.core.columnar.data.LongData.LongDataSpec;
+import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
+import org.knime.core.columnar.data.StringData.StringDataSpec;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
+import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
-public interface ArrowSchemaMapper {
+/**
+ * Utility class to map a {@link ColumnStoreSchema} to an array of {@link ArrowColumnDataFactory}. The factories can be
+ * used to create, read or write the Arrow implementations of {@link ColumnReadData} and {@link ColumnWriteData}.
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
+final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
+
+    private static final ArrowSchemaMapper INSTANCE = new ArrowSchemaMapper();
+
+    private ArrowSchemaMapper() {
+        // Singleton and the instance is only used in #map
+    }
 
     /**
-     * NB: Individual specs can have a state!
+     * Map each column of the {@link ColumnStoreSchema} to the according {@link ArrowColumnDataFactory}. The factory can
+     * be used to create, read or write the Arrow implementation of {@link ColumnReadData} and {@link ColumnWriteData}.
      *
-     * @param schema
-     * @return
+     * @param schema the schema of the column store
+     * @return the factories
      */
-    ArrowColumnDataSpec<?, ?>[] map(ColumnStoreSchema schema);
+    static ArrowColumnDataFactory[] map(final ColumnStoreSchema schema) {
+        return IntStream.range(0, schema.getNumColumns()) //
+            .mapToObj(schema::getColumnDataSpec) //
+            .map(spec -> spec.accept(INSTANCE)) //
+            .toArray(ArrowColumnDataFactory[]::new);
+    }
 
+    @Override
+    public ArrowColumnDataFactory visit(final BooleanDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final ByteDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowDoubleDataFactory visit(final DoubleDataSpec spec) {
+        return ArrowDoubleDataFactory.INSTANCE;
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final DurationDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowFloatDataFactory visit(final FloatDataSpec spec) {
+        return ArrowFloatDataFactory.INSTANCE;
+    }
+
+    @Override
+    public ArrowIntDataFactory visit(final IntDataSpec spec) {
+        return ArrowIntDataFactory.INSTANCE;
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final LocalDateDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final LocalDateTimeDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final LocalTimeDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowLongDataFactory visit(final LongDataSpec spec) {
+        return ArrowLongDataFactory.INSTANCE;
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final PeriodDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final StringDataSpec spec) {
+        return spec.isDictEnabled() ? ArrowDictEncodedStringDataFactory.INSTANCE : ArrowVarCharDataFactory.INSTANCE;
+    }
+
+    @Override
+    public ArrowVarBinaryDataFactory visit(final VarBinaryDataSpec spec) {
+        return ArrowVarBinaryDataFactory.INSTANCE;
+    }
+
+    @Override
+    public ArrowVoidDataFactory visit(final VoidDataSpec spec) {
+        return ArrowVoidDataFactory.INSTANCE;
+    }
 }

@@ -47,19 +47,67 @@ package org.knime.core.columnar.arrow;
 
 import java.io.File;
 
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
+/**
+ * A {@link ColumnStoreFactory} implementation for Arrow.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
 public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
-    @Override
-    public ArrowColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int chunkSize) {
-        // TODO make this part of the create method?
-        return new ArrowColumnStore(schema, ArrowSchemaMapperV0.INSTANCE, file, chunkSize);
+    private static final RootAllocator ROOT = new RootAllocator();
+
+    private final BufferAllocator m_allocator;
+
+    private long m_initReservation;
+
+    private long m_maxAllocation;
+
+    /**
+     * Create a {@link ColumnStoreFactory} for Arrow using the default root allocator.
+     */
+    public ArrowColumnStoreFactory() {
+        m_allocator = ROOT;
+        m_initReservation = 0;
+        m_maxAllocation = ROOT.getLimit();
+    }
+
+    /**
+     * Create a {@link ColumnStoreFactory} for Arrow using the given allocator. For each {@link ColumnStore} and
+     * {@link ColumnReadStore} the allocator is used to create a child allocator with the given initial reservation and
+     * max allocation.
+     *
+     * @param allocator the allocator to use
+     * @param initReservation the initial reservation for a child allocator
+     * @param maxAllocation the maximum alloaction for the child allocator
+     */
+    public ArrowColumnStoreFactory(final BufferAllocator allocator, final long initReservation,
+        final long maxAllocation) {
+        m_allocator = allocator;
+        m_initReservation = initReservation;
+        m_maxAllocation = maxAllocation;
     }
 
     @Override
+    @SuppressWarnings("resource") // Allocator closed by store
+    public ArrowColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int chunkSize) {
+        final BufferAllocator allocator =
+            m_allocator.newChildAllocator("ArrowColumnStore", m_initReservation, m_maxAllocation);
+        return new ArrowColumnStore(schema, file, allocator, chunkSize);
+    }
+
+    @Override
+    @SuppressWarnings("resource") // Allocator closed by store
     public ArrowColumnReadStore createReadStore(final ColumnStoreSchema schema, final File file) {
-        return new ArrowColumnReadStore(schema, file);
+        final BufferAllocator allocator =
+            m_allocator.newChildAllocator("ArrowColumnReadStore", m_initReservation, m_maxAllocation);
+        return new ArrowColumnReadStore(schema, file, allocator);
     }
 }

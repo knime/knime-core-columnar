@@ -44,76 +44,73 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 24, 2020 (dietzc): created
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.data;
 
-import org.apache.arrow.vector.NullVector;
-import org.knime.core.columnar.arrow.data.ArrowData;
-import org.knime.core.columnar.data.VoidData.VoidReadData;
-import org.knime.core.columnar.data.VoidData.VoidWriteData;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Random;
+
+import org.apache.arrow.vector.VarCharVector;
+import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.ArrowVarCharData.ArrowVarCharDataFactory;
 
 /**
+ * Test {@link ArrowVarCharData}
  *
- * @author dietzc
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowVoidData implements VoidWriteData, VoidReadData, ArrowData<NullVector> {
+public class ArrowVarCharDataTest extends AbstractArrowDataTest<ArrowVarCharData> {
 
-    private int m_length;
+    private static final int MAX_LENGTH = 100;
 
-    private int m_capacity;
-
-    private final NullVector m_vector;
-
-    public ArrowVoidData(final NullVector vector) {
-        m_vector = vector;
+    /** Create the test for {@link ArrowVarCharData} */
+    public ArrowVarCharDataTest() {
+        super(ArrowVarCharDataFactory.INSTANCE);
     }
 
-    public ArrowVoidData(final int capacity) {
-        m_capacity = capacity;
-        m_vector = new NullVector();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public int capacity() {
-        return m_capacity;
+    protected ArrowVarCharData cast(final Object o) {
+        assertTrue(o instanceof ArrowVarCharData);
+        return (ArrowVarCharData)o;
     }
 
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public int sizeOf() {
-        return 0;
+    protected void setValue(final ArrowVarCharData data, final int index, final int seed) {
+        data.setString(index, valueFor(seed));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public VoidReadData close(final int length) {
-        m_length = length;
-        return this;
+    protected void checkValue(final ArrowVarCharData data, final int index, final int seed) {
+        assertEquals(valueFor(seed), data.getString(index));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public int length() {
-        return m_vector.getValueCount();
+    @SuppressWarnings("resource") // Resources handled by vector
+    protected boolean isReleased(final ArrowVarCharData data) {
+        final VarCharVector v = data.m_vector;
+        return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public NullVector get() {
-        return m_vector;
+    protected int getMinSize(final int valueCount, final int capacity) {
+        int numBytes = 0;
+        for (int i = 0; i < valueCount; i++) {
+            numBytes += new Random(i).nextInt(MAX_LENGTH);
+        }
+        return numBytes + // data buffer
+            4 * capacity + // offset buffer
+            (int)Math.ceil(capacity / 8); // validity buffer
     }
 
+    private static String valueFor(final int seed) {
+        final Random random = new Random(seed);
+        final byte[] bytes = new byte[random.nextInt(MAX_LENGTH)];
+        random.nextBytes(bytes);
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
 }

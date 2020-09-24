@@ -45,73 +45,59 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.junit.Assert.assertEquals;
+import java.io.IOException;
 
-import java.nio.file.Files;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.ColumnWriteData;
 
-import org.junit.Test;
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.StringData.StringReadData;
-import org.knime.core.columnar.data.StringData.StringWriteData;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
-import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+/**
+ * An {@link ArrowColumnDataFactory} is used for input and output of a specific Arrow column data type. Can be used to
+ * create a new empty instance ({@link #createWrite(BufferAllocator, int)}), wrap vectors and dictionaries that have
+ * been read from a file ({@link #createRead(FieldVector, DictionaryProvider, int)}) and get vectors and dictionaries
+ * that need to be written to a file.
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
+public interface ArrowColumnDataFactory {
 
-public class ArrowDictionaryEncodingTest extends AbstractArrowTest {
+    /**
+     * Create an empty column data for writing.
+     *
+     * @param allocator the allocator used for memory allocation
+     * @param capacity the capacity of the data
+     * @return the {@link ColumnWriteData}
+     */
+    ColumnWriteData createWrite(BufferAllocator allocator, int capacity);
 
-    @Test
-    public void testDictionaryEncoding() throws Exception {
-        int numChunks = 10;
-        int chunkSize = 1_000;
+    /**
+     * Wrap the given vector and dictionaries into a column data for reading.
+     *
+     * @param vector the vector holding some data
+     * @param provider a dictionary provider holding dictionaries that can be used
+     * @param version the version the vector and dictionaries were written with
+     * @return the {@link ColumnReadData}
+     * @throws IOException if the data cannot be loaded with the given version
+     */
+    ColumnReadData createRead(FieldVector vector, DictionaryProvider provider, int version) throws IOException;
 
-        final ArrowColumnStoreFactory factory = new ArrowColumnStoreFactory();
-        final ColumnStoreSchema schema = new ColumnStoreSchema() {
+    /**
+     * @param data a column data holding some values
+     * @return a {@link FieldVector} which should be written to disk
+     */
+    FieldVector getVector(ColumnReadData data);
 
-            @Override
-            public int getNumColumns() {
-                return 1;
-            }
+    /**
+     * @param data a column data holding some values
+     * @return dictionaries which should be written to disk
+     */
+    DictionaryProvider getDictionaries(ColumnReadData data);
 
-            @Override
-            public ColumnDataSpec getColumnDataSpec(final int idx) {
-                return ColumnDataSpec.dictEncodedStringSpec();
-            }
-        };
-
-        final ColumnStore store =
-            factory.createWriteStore(schema, Files.createTempFile("test", ".knarrow").toFile(), chunkSize);
-
-        // let's store some data
-        final ColumnDataWriter writer = store.getWriter();
-        ColumnDataFactory fac = store.getFactory();
-        for (int c = 0; c < numChunks; c++) {
-            final WriteBatch batch = fac.create();
-            final StringWriteData cast = (StringWriteData)batch.get(0);
-            for (int i = 0; i < chunkSize; i++) {
-                cast.setString(i, "Test" + i * c);
-            }
-            writer.write(batch.close(chunkSize));
-            cast.release();
-        }
-        writer.close();
-
-        // let's read some data back
-        final ColumnDataReader reader = store.createReader();
-        for (int c = 0; c < numChunks; c++) {
-            final ReadBatch batch = reader.readRetained(c);
-            final StringReadData cast = (StringReadData)batch.get(0);
-            for (int i = 0; i < chunkSize; i++) {
-                assertEquals("Test" + i * c, cast.getString(i));
-            }
-            cast.release();
-        }
-
-        reader.close();
-        store.close();
-    }
-
+    /**
+     * @return the current version used for getting the vectors and dictionaries
+     */
+    int getVersion();
 }

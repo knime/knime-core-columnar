@@ -45,212 +45,497 @@
  */
 package org.knime.core.columnar.arrow;
 
+import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY;
+import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_BYTES;
+import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_LENGTH;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.channels.SeekableByteChannel;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Optional;
 
+import org.apache.arrow.flatbuf.DictionaryBatch;
+import org.apache.arrow.flatbuf.Footer;
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.NullVector;
+import org.apache.arrow.vector.TypeLayout;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.SeekableReadChannel;
 import org.apache.arrow.vector.ipc.message.ArrowBlock;
+import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
+import org.apache.arrow.vector.ipc.message.ArrowFieldNode;
+import org.apache.arrow.vector.ipc.message.ArrowFooter;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
-import org.apache.arrow.vector.util.TransferPair;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnStoreSchema;
 
+/**
+ * The ArrowColumnDataWriter reads batches of columns from an Arrow file.
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
 class ArrowColumnDataReader implements ColumnDataReader {
 
-    private final FieldVectorReader m_reader;
+    private final File m_file;
 
-    private ArrowColumnDataSpec<?, ?>[] m_arrowSchema;
+    private final BufferAllocator m_allocator;
 
-    private ColumnSelection m_selection;
+    private final ArrowColumnDataFactory[] m_factories;
 
-    public ArrowColumnDataReader(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator,
-        final ColumnSelection selection) {
-        m_reader = new FieldVectorReader(file, allocator);
-        m_selection = selection;
+    private final ColumnSelection m_columnSelection;
 
-        // TODO mapper should actually be read from arrow for backwards compatibility.
-        m_arrowSchema = ArrowSchemaMapperV0.INSTANCE.map(schema);
+    // Initialized on first #readRetained
+    private ArrowReader m_reader;
 
+    // Initialized on first #readRetained
+    private Schema m_schema;
+
+    // Initialized on first #readRetained
+    private Map<Long, DictionaryDescription> m_dictionaryDescriptions;
+
+    // Initialized on first #readRetained
+    private int[] m_factoryVersions;
+
+    private boolean m_closed;
+
+    ArrowColumnDataReader(final File file, final BufferAllocator allocator, final ArrowColumnDataFactory[] factories,
+        final ColumnSelection columnSelection) {
+        m_file = file;
+        m_allocator = allocator;
+        m_factories = factories;
+        m_columnSelection = columnSelection;
+        m_closed = false;
     }
 
     @Override
-    public void close() throws IOException {
-        m_reader.close();
-    }
-
-    @Override
-    public ReadBatch readRetained(final int chunkIdx) throws IOException {
-        final FieldVector[] vectors = m_reader.read(chunkIdx);
-        final DictionaryProvider provider = m_reader.dictionaries(chunkIdx);
-
-        ReadBatch batch = m_selection.createBatch(i -> {
-         // TODO transfer ownership of dictionary vector for parallel reads
-            ColumnReadData rdata = m_arrowSchema[i].wrap(vectors[i], provider);
-            vectors[i] = null;
-            return rdata;
-        });
-
-        for (int i = 0; i < vectors.length; i++) {
-            if (vectors[i] != null) {
-                vectors[i].clear();
-            }
+    public ReadBatch readRetained(final int index) throws IOException {
+        // Initialize the reader when reading the first batch
+        if (m_reader == null) {
+            initializeReader();
         }
 
-        return batch;
-    }
+        // Read the data
+        final FieldVector[] vectors = readVectors(index);
+        final DictionaryProvider dictionaries = readDictionaries(index);
 
-    @Override
-    public int getNumBatches() {
-        return m_reader.getRecords();
-    }
-
-    @Override
-    public int getMaxLength() {
-        return m_reader.getChunkSize();
-    }
-
-    // not supposed to be thread-safe
-    static class FieldVectorReader implements AutoCloseable {
-
-        // some constants
-        private final BufferAllocator m_alloc;
-
-        // Varies with each partition
-        private VectorSchemaRoot m_root;
-
-        private File m_file;
-
-        private CustomArrowFileReader m_reader;
-
-        private List<ArrowBlock> m_blocks;
-
-        private BufferAllocator m_childAlloc;
-
-        // TODO support for column filtering and row filtering ('TableFilter'), i.e.
-        // only load required columns / rows from disc. Rows should be easily possible
-        // by using 'ArrowBlock'
-        FieldVectorReader(final File file, final BufferAllocator alloc) {
-            m_alloc = alloc;
-            m_childAlloc = alloc.newChildAllocator("FieldVectorReader", 0, alloc.getLimit());
-            m_file = file;
-        }
-
-        DictionaryProvider dictionaries(final long index) throws IOException {
-            initialize();
-
-            // load all dictionaries for index
-            m_reader.loadDictionaries(index);
-            final Map<Long, Dictionary> vecs = m_reader.getDictionaryVectors();
-            final Map<Long, Dictionary> copied = new HashMap<Long, Dictionary>();
-            for (Entry<Long, Dictionary> entry : vecs.entrySet()) {
-                final FieldVector v = entry.getValue().getVector();
-                final TransferPair transferPair = v.getTransferPair(m_alloc);
-                transferPair.transfer();
-                copied.put(entry.getKey(),
-                    new Dictionary((FieldVector)transferPair.getTo(), entry.getValue().getEncoding()));
+        // Create the ColumnData
+        final int numColumns = m_columnSelection.getNumColumns();
+        final ColumnReadData[] data = new ColumnReadData[numColumns];
+        int length = 0;
+        for (int i = 0; i < numColumns; i++) {
+            if (m_columnSelection.isSelected(i)) {
+                data[i] = m_factories[i].createRead(vectors[i], dictionaries, m_factoryVersions[i]);
+                length = Math.max(length, data[i].length());
             }
+        }
+        return new DefaultReadBatch(data, length);
+    }
 
-            // after return, reader doesn't know anything anymore about these dicts and
-            // transfered ownership to caller
-            return new DictionaryProvider() {
-                @Override
-                public Dictionary lookup(final long arg0) {
-                    return copied.get(arg0);
+    /** Read the vectors at the given batch index using the reader */
+    private FieldVector[] readVectors(final int index) throws IOException {
+        try (final ArrowRecordBatch recordBatch = m_reader.readRecordBatch(index)) {
+
+            // The data from the record batch
+            final Iterator<ArrowFieldNode> nodes = recordBatch.getNodes().iterator();
+            final Iterator<ArrowBuf> buffers = recordBatch.getBuffers().iterator();
+
+            // Loop over the schema and load the data into new vectors
+            final List<Field> fields = m_schema.getFields();
+            final FieldVector[] vectors = new FieldVector[fields.size()];
+            for (int i = 0; i < fields.size(); i++) {
+                final Field field = fields.get(i);
+                if (m_columnSelection.isSelected(i)) {
+                    @SuppressWarnings("resource") // Resource handled by caller
+                    final FieldVector vector = field.createVector(m_allocator);
+                    loadVector(vector, nodes, buffers);
+                    vectors[i] = vector;
+                } else {
+                    skipVector(field, nodes, buffers);
                 }
-            };
-        }
-
-        // Assumption for this reader: sequential loading.
-        FieldVector[] read(final long index) throws IOException {
-            initialize();
-
-            // load next record batch
-            m_reader.loadRecordBatch(m_blocks.get((int)index));
-            final List<FieldVector> fieldVectors = m_root.getFieldVectors();
-            final FieldVector[] res = new FieldVector[fieldVectors.size()];
-            for (int i = 0; i < res.length; i++) {
-                final FieldVector v = fieldVectors.get(i);
-                final TransferPair transferPair = v.getTransferPair(m_alloc);
-                transferPair.transfer();
-                res[i] = (FieldVector)transferPair.getTo();
             }
-            return res;
+            return vectors;
+        }
+    }
+
+    private DictionaryProvider readDictionaries(final int index) throws IOException {
+        ArrowDictionaryBatch[] batches = null;
+        try {
+            // Read the dictionary batches
+            batches = m_reader.readDictionaryBatches(index);
+
+            // The provider to hold the dictionaries
+            final MapDictionaryProvider provider = new MapDictionaryProvider();
+
+            // Loop over the batches, create the Dictionary objects and add them to the provider
+            for (final ArrowDictionaryBatch batch : batches) {
+                // Create the vector for this dictionary
+                final long id = batch.getDictionaryId();
+                if (m_dictionaryDescriptions.containsKey(id)) {
+                    final DictionaryDescription description = m_dictionaryDescriptions.get(id);
+                    @SuppressWarnings("resource") // Resource handled by caller
+                    final FieldVector vector = description.m_field.createVector(m_allocator);
+
+                    // Load the data into the vector
+                    @SuppressWarnings("resource") // Closed by the DictionaryBatch
+                    final ArrowRecordBatch data = batch.getDictionary();
+                    loadVector(vector, data.getNodes().iterator(), data.getBuffers().iterator());
+
+                    // Create the dictionary and add it to the provider
+                    provider.put(new Dictionary(vector, description.m_encoding));
+                }
+            }
+            return provider;
+        } finally {
+            if (batches != null) {
+                // Close all dictionary batches
+                for (final ArrowDictionaryBatch d : batches) {
+                    d.close();
+                }
+            }
+        }
+    }
+
+    private synchronized void initializeReader() throws IOException {
+        // Check if another thread already initialized the reader
+        if (m_reader == null) {
+            m_reader = new ArrowReader(m_file, m_allocator);
+            m_dictionaryDescriptions = new HashMap<>();
+            m_schema = mapFileSchemaToMemoryFormat(m_reader.getSchema(), m_columnSelection, m_dictionaryDescriptions);
+            m_factoryVersions = Arrays.stream( //
+                m_reader.getFooter().getMetaData() //
+                    .get(ArrowReaderWriterUtils.ARROW_FACTORY_VERSIONS_KEY) //
+                    .split(","))
+                .mapToInt(Integer::valueOf) //
+                .toArray();
+        }
+    }
+
+    @Override
+    public int getNumBatches() throws IOException {
+        if (m_reader == null) {
+            initializeReader();
+        }
+        return m_reader.getNumberOfBatches();
+    }
+
+    @Override
+    public int getMaxLength() throws IOException {
+        if (m_reader == null) {
+            initializeReader();
+        }
+        return Integer.valueOf(m_reader.getFooter().getMetaData().get(ARROW_CHUNK_SIZE_KEY));
+    }
+
+    @Override
+    public synchronized void close() throws IOException {
+        if (m_reader != null && !m_closed) {
+            m_reader.close();
+            m_closed = true;
+        }
+    }
+
+    /**
+     * Map the given schema from the file format to the memory format (different type of dictionary encoded vectors).
+     * The fields for the dictionaries are added to the map (filtered by the column selection).
+     */
+    private static Schema mapFileSchemaToMemoryFormat(final Schema schema, final ColumnSelection columnSelection,
+        final Map<Long, DictionaryDescription> dictionaryDescriptions) {
+        final List<Field> messageFields = schema.getFields();
+        final List<Field> fields = new ArrayList<>();
+        for (int i = 0; i < messageFields.size(); i++) {
+            fields.add(
+                mapFieldToMemoryFormat(messageFields.get(i), columnSelection.isSelected(i), dictionaryDescriptions));
+        }
+        return new Schema(fields, schema.getCustomMetadata());
+    }
+
+    /**
+     * Map the given field from the file format to the memory format (different type of dictionary encoded vectors). The
+     * fields for the dictionaries are added to the map.
+     */
+    private static Field mapFieldToMemoryFormat(final Field field, final boolean addToDictionaryDescriptions,
+        final Map<Long, DictionaryDescription> dictionaryDescriptions) {
+
+        // Get the memory type
+        final DictionaryEncoding encoding = field.getDictionary();
+        final ArrowType type;
+        final List<Field> mappedChildren;
+        if (encoding == null) {
+            type = field.getType();
+            mappedChildren = mapChildrenToMemoryFormat(field, addToDictionaryDescriptions, dictionaryDescriptions);
+        } else {
+            // Remember a field for the dictionary (to create the vectors of the correct type later)
+            if (addToDictionaryDescriptions) {
+                dictionaryDescriptions.put(encoding.getId(),
+                    getDictionaryDescription(encoding, field, dictionaryDescriptions));
+            }
+
+            // The type of this field
+            type = Optional.ofNullable(encoding.getIndexType()).orElse(new ArrowType.Int(32, true));
+
+            // Dictionary encoded vectors have no children (The children belong to the dictionary type)
+            mappedChildren = null;
         }
 
-        @SuppressWarnings("resource")
-        private void initialize() throws IOException {
-            if (m_reader == null) {
-                m_reader = new CustomArrowFileReader(new RandomAccessFile(m_file, "rw").getChannel(), m_childAlloc);
-                m_root = m_reader.getVectorSchemaRoot();
-                m_blocks = m_reader.getRecordBlocks();
+        // Create the field
+        final FieldType fieldType = new FieldType(field.isNullable(), type, encoding, field.getMetadata());
+        return new Field(field.getName(), fieldType, mappedChildren);
+    }
+
+    /** Get a description of the dictionary with the encoding and the type of the field (in message format) */
+    private static DictionaryDescription getDictionaryDescription(final DictionaryEncoding encoding,
+        final Field messageField, final Map<Long, DictionaryDescription> dictionaryDescriptions) {
+        final long id = encoding.getId();
+        final FieldType fieldType = new FieldType(false, messageField.getType(), null, null);
+        final List<Field> mappedChildren = mapChildrenToMemoryFormat(messageField, true, dictionaryDescriptions);
+        final Field field = new Field("DICT" + id, fieldType, mappedChildren);
+        return new DictionaryDescription(field, encoding);
+    }
+
+    /** Map the children of the field to the memory format and return them */
+    private static List<Field> mapChildrenToMemoryFormat(final Field field, final boolean addToDictionaryDescriptions,
+        final Map<Long, DictionaryDescription> dictionaryDescriptions) {
+        final List<Field> children = field.getChildren();
+        final List<Field> mappedChildren = new ArrayList<>(children.size());
+        for (final Field child : children) {
+            mappedChildren.add(mapFieldToMemoryFormat(child, addToDictionaryDescriptions, dictionaryDescriptions));
+        }
+        return mappedChildren;
+    }
+
+    /** Load the given vector from the next nodes and buffers */
+    private static void loadVector(final FieldVector vector, final Iterator<ArrowFieldNode> nodes,
+        final Iterator<ArrowBuf> buffers) {
+        final Field field = vector.getField();
+        // Load the buffers of this vector
+        final ArrowFieldNode fieldNode = nodes.next();
+        final List<ArrowBuf> ownBuffers = getFieldBuffers(field, buffers);
+        vector.loadFieldBuffers(fieldNode, ownBuffers);
+        // TODO(benjamin) NB: this is a bug in Arrow. The NullVector implementation of #loadFieldBuffers should set the value count
+        if (vector instanceof NullVector) {
+            vector.setValueCount(fieldNode.getLength());
+        }
+
+        // Load the buffers for the children
+        final List<Field> children = field.getChildren();
+        if (!children.isEmpty()) {
+            final List<FieldVector> childrenVectors = vector.getChildrenFromFields();
+            for (int i = 0; i < children.size(); i++) {
+                @SuppressWarnings("resource") // Resource handled by the parent which is handled by the created ColumnData
+                final FieldVector cv = childrenVectors.get(i);
+                loadVector(cv, nodes, buffers);
+            }
+        }
+    }
+
+    /** Skip the given vector from the next nodes and buffers */
+    private static void skipVector(final Field field, final Iterator<ArrowFieldNode> nodes,
+        final Iterator<ArrowBuf> buffers) {
+        // Skip the buffers of this vector
+        nodes.next();
+        skipFieldBuffers(field, buffers);
+
+        // Skip the buffers for the children
+        final List<Field> children = field.getChildren();
+        if (!children.isEmpty()) {
+            for (int i = 0; i < children.size(); i++) {
+                skipVector(children.get(i), nodes, buffers);
+            }
+        }
+    }
+
+    /** Get the buffers for the given field from the iterator */
+    private static List<ArrowBuf> getFieldBuffers(final Field field, final Iterator<ArrowBuf> buffers) {
+        final int bufferCount = TypeLayout.getTypeBufferCount(field.getType());
+        final List<ArrowBuf> bs = new ArrayList<>(bufferCount);
+        for (int i = 0; i < bufferCount; i++) {
+            @SuppressWarnings("resource") // Closed with RecordBatch
+            final ArrowBuf b = buffers.next();
+            bs.add(b);
+        }
+        return bs;
+    }
+
+    /** Skip the buffers for the given field from the iterator */
+    @SuppressWarnings("resource") // Buffers closed by caller (with ArrowRecordBatch#close)
+    private static void skipFieldBuffers(final Field field, final Iterator<ArrowBuf> buffers) {
+        final int bufferCount = TypeLayout.getTypeBufferCount(field.getType());
+        for (int i = 0; i < bufferCount; i++) {
+            buffers.next();
+        }
+    }
+
+    /**
+     * An Arrow reader. {@link ArrowFileReader} has the following problems:
+     * <ul>
+     * <li>VectorSchemaRoot holds vectors that are filled over and over again. Copying of data is required to get the
+     * vectors.</li>
+     * <li>Cannot filter which vectors are allocated</li>
+     * <li>Cannot read specific dictionaries for a batch.</li>
+     * </ul>
+     */
+    private static final class ArrowReader implements AutoCloseable {
+
+        private final SeekableReadChannel m_in;
+
+        private final ArrowFooter m_footer;
+
+        public final BufferAllocator m_allocator;
+
+        private final int m_dictionariesPerBatch;
+
+        private ArrowReader(final File file, final BufferAllocator allocator) throws IOException {
+            @SuppressWarnings("resource") // Channel is closed by close of m_in. The channel closes the file
+            final FileChannel channel = new RandomAccessFile(file, "rw").getChannel(); // NOSONAR: See comment above
+            m_in = new SeekableReadChannel(channel);
+            m_allocator = allocator;
+
+            synchronized (m_in) {
+                checkFileSize(m_in);
+                checkArrowMagic(m_in);
+                m_footer = readFooter(m_in);
+            }
+
+            m_dictionariesPerBatch = getDictionariesPerBatch(m_footer);
+        }
+
+        /** Get the schema of the read file */
+        private Schema getSchema() {
+            return m_footer.getSchema();
+        }
+
+        /** Get the footer of the read file */
+        private ArrowFooter getFooter() {
+            return m_footer;
+        }
+
+        /** Get the number of batches */
+        private int getNumberOfBatches() {
+            return m_footer.getRecordBatches().size();
+        }
+
+        /** Read the record batch for the given index */
+        private ArrowRecordBatch readRecordBatch(final int index) throws IOException {
+            synchronized (m_in) {
+                final ArrowBlock block = m_footer.getRecordBatches().get(index);
+                m_in.setPosition(block.getOffset());
+                return MessageSerializer.deserializeRecordBatch(m_in, block, m_allocator);
             }
         }
 
-        int getChunkSize() {
-            try {
-                initialize();
-                return Integer
-                    .valueOf(m_root.getSchema().getCustomMetadata().get(ArrowColumnStore.CFG_ARROW_CHUNK_SIZE));
-            } catch (IOException e) {
-                // TODO
-                throw new RuntimeException(e);
-            }
-        }
-
-        int getRecords() {
-            try {
-                initialize();
-                return m_blocks.size();
-            } catch (IOException e) {
-                // TODO
-                throw new RuntimeException(e);
+        /** Read the dictionary batches for the given index */
+        private ArrowDictionaryBatch[] readDictionaryBatches(final int index) throws IOException {
+            synchronized (m_in) {
+                final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[m_dictionariesPerBatch];
+                final int offset = m_dictionariesPerBatch * index;
+                for (int i = 0; i < m_dictionariesPerBatch; i++) {
+                    final ArrowBlock block = m_footer.getDictionaries().get(i + offset);
+                    m_in.setPosition(block.getOffset());
+                    @SuppressWarnings("resource") // Resource closed by caller
+                    final ArrowDictionaryBatch batch =
+                        MessageSerializer.deserializeDictionaryBatch(m_in, block, m_allocator);
+                    dictionaryBatches[i] = batch;
+                }
+                return dictionaryBatches;
             }
         }
 
         @Override
         public void close() throws IOException {
-            if (m_root != null) {
-                m_reader.close();
-            }
-            m_childAlloc.close();
+            m_in.close();
         }
+
+        /** Check if the Arrow file has a valid length. Throws an exception if not */
+        private static final void checkFileSize(final SeekableReadChannel in) throws IOException {
+            if (in.size() <= ARROW_MAGIC_LENGTH * 2 + 4) {
+                throw new IOException("Arrow file invalid: File is to small: " + in.size());
+            }
+        }
+
+        /** Check if the Arrow has the arrow magic bytes in the end. Throws an exception if not */
+        private static final void checkArrowMagic(final SeekableReadChannel in) throws IOException {
+            final ByteBuffer buffer = ByteBuffer.allocate(ARROW_MAGIC_LENGTH);
+            in.setPosition(in.size() - buffer.remaining());
+            in.readFully(buffer);
+            buffer.flip();
+            if (!Arrays.equals(buffer.array(), ARROW_MAGIC_BYTES)) {
+                throw new IOException("Arrow file invalid: Magic number missing.");
+            }
+        }
+
+        /** Read the footer length from the file */
+        private static final int readFooterLength(final SeekableReadChannel in) throws IOException {
+            final ByteBuffer buffer = ByteBuffer.allocate(4);
+            in.setPosition(in.size() - ARROW_MAGIC_LENGTH - 4);
+            in.readFully(buffer);
+            buffer.flip();
+            final int footerLength = MessageSerializer.bytesToInt(buffer.array());
+            if (footerLength <= 0 || footerLength + ARROW_MAGIC_LENGTH * 2 + 4 > in.size()) {
+                throw new IOException("Arrow file invalid: Invalid footer length: " + footerLength);
+            }
+            return footerLength;
+        }
+
+        /** Read the footer from the file */
+        private static final ArrowFooter readFooter(final SeekableReadChannel in) throws IOException {
+            final int footerLength = readFooterLength(in);
+            final long footerStart = in.size() - ARROW_MAGIC_LENGTH - 4 - footerLength;
+            final ByteBuffer buffer = ByteBuffer.allocate(footerLength);
+            in.setPosition(footerStart);
+            in.readFully(buffer);
+            buffer.flip();
+            return new ArrowFooter(Footer.getRootAsFooter(buffer));
+        }
+
+        /** Get the number of dictionaries per batch. Throw an exception if the number of dictionaries does not fit */
+        private static int getDictionariesPerBatch(final ArrowFooter footer) throws IOException {
+            final int numBatches = footer.getRecordBatches().size();
+            final int numDictionaries = footer.getDictionaries().size();
+            if (numDictionaries % numBatches != 0) {
+                throw new IOException(
+                    "Arrow file invalid: There must be the same number of dictionaries for each batch.");
+            }
+            return numDictionaries / numBatches;
+        }
+
     }
 
-    final static class CustomArrowFileReader extends ArrowFileReader {
-        private final SeekableReadChannel m_in;
+    /**
+     * Structure holding a {@link Field} and {@link DictionaryEncoding}. Both needed to create a {@link Dictionary} from
+     * a {@link DictionaryBatch}.
+     */
+    private static final class DictionaryDescription {
 
-        CustomArrowFileReader(final SeekableReadChannel in, final BufferAllocator allocator) {
-            super(in, allocator);
-            m_in = in;
-        }
+        private final Field m_field;
 
-        CustomArrowFileReader(final SeekableByteChannel in, final BufferAllocator allocator) {
-            this(new SeekableReadChannel(in), allocator);
-        }
+        private final DictionaryEncoding m_encoding;
 
-        final void loadDictionaries(final long index) throws IOException {
-            final List<ArrowBlock> dictionaryBlocks = getDictionaryBlocks();
-            final int offset = (int)(getDictionaryVectors().size() * index);
-            for (int i = offset; i < offset + getDictionaryVectors().size(); i++) {
-                final ArrowBlock block = dictionaryBlocks.get(i);
-                m_in.setPosition(block.getOffset());
-                loadDictionary(MessageSerializer.deserializeDictionaryBatch(m_in, block, allocator));
-            }
+        private DictionaryDescription(final Field field, final DictionaryEncoding encoding) {
+            m_field = field;
+            m_encoding = encoding;
         }
     }
 }

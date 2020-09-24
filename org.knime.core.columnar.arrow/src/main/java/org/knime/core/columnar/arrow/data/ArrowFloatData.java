@@ -45,27 +45,27 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.IOException;
+
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BitVectorHelper;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float4Vector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.data.FloatData.FloatReadData;
 import org.knime.core.columnar.data.FloatData.FloatWriteData;
 
-public class ArrowFloatData extends AbstractFieldVectorData<Float4Vector> implements FloatWriteData, FloatReadData {
+/**
+ * Arrow implementation of {@link FloatWriteData} and {@link FloatReadData}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+public final class ArrowFloatData extends AbstractFixedWitdthData<Float4Vector>
+    implements FloatWriteData, FloatReadData {
 
-    public ArrowFloatData(final BufferAllocator allocator, final int capacity) {
-        super(allocator, capacity);
-    }
-
-    public ArrowFloatData(final Float4Vector vector) {
+    private ArrowFloatData(final Float4Vector vector) {
         super(vector);
-    }
-
-    @Override
-    protected Float4Vector create(final BufferAllocator allocator, final int capacity) {
-        final Float4Vector vector = new Float4Vector("Float4Vector", allocator);
-        vector.allocateNew(capacity);
-        return vector;
     }
 
     @Override
@@ -79,15 +79,45 @@ public class ArrowFloatData extends AbstractFieldVectorData<Float4Vector> implem
     }
 
     @Override
-    public void setMissing(final int index) {
-        // TODO we can speed things likely up directly accessing validity buffer
-        BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
-    }
-
-    @Override
     public FloatReadData close(final int length) {
         m_vector.setValueCount(length);
         return this;
     }
 
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowFloatData} */
+    public static final class ArrowFloatDataFactory extends AbstractFieldVectorDataFactory {
+
+        private static final int CURRENT_VERSION = 0;
+
+        /** Singleton instance of {@link ArrowFloatDataFactory} */
+        public static final ArrowFloatDataFactory INSTANCE = new ArrowFloatDataFactory();
+
+        private ArrowFloatDataFactory() {
+            // Singleton
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
+        public ArrowFloatData createWrite(final BufferAllocator allocator, final int capacity) {
+            final Float4Vector vector = new Float4Vector("Float4Vector", allocator);
+            vector.allocateNew(capacity);
+            return new ArrowFloatData(vector);
+        }
+
+        @Override
+        public ArrowFloatData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
+            throws IOException {
+            if (version == CURRENT_VERSION) {
+                return new ArrowFloatData((Float4Vector)vector);
+            } else {
+                throw new IOException("Cannot read ArrowFloatData with version " + version + ". Current version: "
+                    + CURRENT_VERSION + ".");
+            }
+        }
+
+        @Override
+        public int getVersion() {
+            return CURRENT_VERSION;
+        }
+    }
 }

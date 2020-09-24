@@ -42,82 +42,64 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 24, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow;
 
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VarBinaryVector;
+import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 
 /**
- * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
+ * Utility class for Arrow.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowVarBinaryData extends AbstractVariableWitdthData<VarBinaryVector>
-    implements VarBinaryWriteData, VarBinaryReadData {
+public final class ArrowReaderWriterUtils {
 
-    private ArrowVarBinaryData(final VarBinaryVector vector) {
-        super(vector);
+    private ArrowReaderWriterUtils() {
+        // Class holding constants
     }
 
-    @Override
-    public byte[] getBytes(final int index) {
-        return m_vector.get(index);
-    }
+    /** The Arrow magic number. These are the first and last bytes of each arrow file */
+    static final byte[] ARROW_MAGIC_BYTES = "ARROW1".getBytes(StandardCharsets.UTF_8);
 
-    @Override
-    public void setBytes(final int index, final byte[] value) {
-        m_vector.setSafe(index, value);
-    }
+    /** The length of the Arrow magic number */
+    static final int ARROW_MAGIC_LENGTH = ARROW_MAGIC_BYTES.length;
 
-    @Override
-    public VarBinaryReadData close(final int length) {
-        m_vector.setValueCount(length);
-        return this;
-    }
+    /** Key for the metadata element holding the chunk size */
+    static final String ARROW_CHUNK_SIZE_KEY = "KNIME:basic:chunkSize";
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
-    public static final class ArrowVarBinaryDataFactory extends AbstractFieldVectorDataFactory {
+    /** Key for the metadata element holding the factory versions */
+    static final String ARROW_FACTORY_VERSIONS_KEY = "KNIME:basic:factoryVersions";
 
-        private static final int CURRENT_VERSION = 0;
+    /** A dictionary provider only holding one single dictionary */
+    public static final class SingletonDictionaryProvider implements DictionaryProvider {
 
-        /** Singleton instance of {@link ArrowVarBinaryDataFactory} */
-        public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
+        private long m_id;
 
-        private ArrowVarBinaryDataFactory() {
-            // Singleton
+        private final Dictionary m_dictionary;
+
+        /**
+         * Create a dictionary provider only holding the given dictionary.
+         *
+         * @param dictionary the dictionary
+         */
+        public SingletonDictionaryProvider(final Dictionary dictionary) {
+            m_dictionary = dictionary;
+            m_id = dictionary.getEncoding().getId();
         }
 
         @Override
-        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
-        public ArrowVarBinaryData createWrite(final BufferAllocator allocator, final int capacity) {
-            final VarBinaryVector vector = new VarBinaryVector("BinaryVector", allocator);
-            vector.allocateNew(capacity);
-            return new ArrowVarBinaryData(vector);
-        }
-
-        @Override
-        public ArrowVarBinaryData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final int version) throws IOException {
-            if (version == CURRENT_VERSION) {
-                return new ArrowVarBinaryData((VarBinaryVector)vector);
+        public Dictionary lookup(final long id) {
+            if (id == m_id) {
+                return m_dictionary;
             } else {
-                throw new IOException("Cannot read ArrowVarBinaryData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
+                return null;
             }
-        }
-
-        @Override
-        public int getVersion() {
-            return CURRENT_VERSION;
         }
     }
 }

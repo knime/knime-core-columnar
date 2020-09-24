@@ -42,6 +42,9 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 24, 2020 (dietzc): created
  */
 package org.knime.core.columnar.arrow.data;
 
@@ -49,70 +52,88 @@ import java.io.IOException;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VarBinaryVector;
+import org.apache.arrow.vector.NullVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.VoidData.VoidReadData;
+import org.knime.core.columnar.data.VoidData.VoidWriteData;
 
 /**
- * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
+ * Arrow implementation of {@link VoidWriteData} and {@link VoidReadData}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowVarBinaryData extends AbstractVariableWitdthData<VarBinaryVector>
-    implements VarBinaryWriteData, VarBinaryReadData {
+public final class ArrowVoidData implements VoidWriteData, VoidReadData {
 
-    private ArrowVarBinaryData(final VarBinaryVector vector) {
-        super(vector);
+    private final int m_capacity;
+
+    private final NullVector m_vector;
+
+    private ArrowVoidData(final NullVector vector, final int capacity) {
+        m_vector = vector;
+        m_capacity = capacity;
     }
 
     @Override
-    public byte[] getBytes(final int index) {
-        return m_vector.get(index);
+    public int capacity() {
+        return m_capacity;
     }
 
     @Override
-    public void setBytes(final int index, final byte[] value) {
-        m_vector.setSafe(index, value);
+    public int sizeOf() {
+        return 0;
     }
 
     @Override
-    public VarBinaryReadData close(final int length) {
+    public VoidReadData close(final int length) {
         m_vector.setValueCount(length);
         return this;
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
-    public static final class ArrowVarBinaryDataFactory extends AbstractFieldVectorDataFactory {
+    @Override
+    public int length() {
+        return m_vector.getValueCount();
+    }
+
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVoidData} */
+    public static final class ArrowVoidDataFactory implements ArrowColumnDataFactory {
 
         private static final int CURRENT_VERSION = 0;
 
-        /** Singleton instance of {@link ArrowVarBinaryDataFactory} */
-        public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
+        /** Singleton instance of {@link ArrowVoidDataFactory} */
+        public static final ArrowVoidDataFactory INSTANCE = new ArrowVoidDataFactory();
 
-        private ArrowVarBinaryDataFactory() {
+        private ArrowVoidDataFactory() {
             // Singleton
         }
 
         @Override
-        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
-        public ArrowVarBinaryData createWrite(final BufferAllocator allocator, final int capacity) {
-            final VarBinaryVector vector = new VarBinaryVector("BinaryVector", allocator);
-            vector.allocateNew(capacity);
-            return new ArrowVarBinaryData(vector);
+        @SuppressWarnings("resource") // NullVector does not need to be closed
+        public ArrowVoidData createWrite(final BufferAllocator allocator, final int capacity) {
+            return new ArrowVoidData(new NullVector(), capacity);
         }
 
         @Override
-        public ArrowVarBinaryData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final int version) throws IOException {
+        public ArrowVoidData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
+            throws IOException {
             if (version == CURRENT_VERSION) {
-                return new ArrowVarBinaryData((VarBinaryVector)vector);
+                return new ArrowVoidData((NullVector)vector, vector.getValueCapacity());
             } else {
-                throw new IOException("Cannot read ArrowVarBinaryData with version " + version + ". Current version: "
+                throw new IOException("Cannot read ArrowVoidData with version " + version + ". Current version: "
                     + CURRENT_VERSION + ".");
             }
+        }
+
+        @Override
+        public FieldVector getVector(final ColumnReadData data) {
+            return ((ArrowVoidData)data).m_vector;
+        }
+
+        @Override
+        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+            return null;
         }
 
         @Override

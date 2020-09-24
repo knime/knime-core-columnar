@@ -45,27 +45,27 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.IOException;
+
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BitVectorHelper;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float8Vector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 
-public class ArrowDoubleData extends AbstractFieldVectorData<Float8Vector> implements DoubleWriteData, DoubleReadData {
+/**
+ * Arrow implementation of {@link DoubleWriteData} and {@link DoubleReadData}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+public final class ArrowDoubleData extends AbstractFixedWitdthData<Float8Vector>
+    implements DoubleWriteData, DoubleReadData {
 
-    public ArrowDoubleData(final BufferAllocator allocator, final int capacity) {
-        super(allocator, capacity);
-    }
-
-    public ArrowDoubleData(final Float8Vector vector) {
+    private ArrowDoubleData(final Float8Vector vector) {
         super(vector);
-    }
-
-    @Override
-    protected Float8Vector create(final BufferAllocator allocator, final int capacity) {
-        final Float8Vector vector = new Float8Vector("Float8Vector", allocator);
-        vector.allocateNew(capacity);
-        return vector;
     }
 
     @Override
@@ -79,20 +79,45 @@ public class ArrowDoubleData extends AbstractFieldVectorData<Float8Vector> imple
     }
 
     @Override
-    public boolean isMissing(final int index) {
-        return m_vector.isSet(index) == 0;
-    }
-
-    @Override
-    public void setMissing(final int index) {
-        // TODO we can speed things likely up directly accessing validity buffer
-        BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
-    }
-
-    @Override
     public DoubleReadData close(final int length) {
         m_vector.setValueCount(length);
         return this;
     }
 
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowDoubleData} */
+    public static final class ArrowDoubleDataFactory extends AbstractFieldVectorDataFactory {
+
+        private static final int CURRENT_VERSION = 0;
+
+        /** Singleton instance of {@link ArrowDoubleDataFactory} */
+        public static final ArrowDoubleDataFactory INSTANCE = new ArrowDoubleDataFactory();
+
+        private ArrowDoubleDataFactory() {
+            // Singleton
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
+        public ArrowDoubleData createWrite(final BufferAllocator allocator, final int capacity) {
+            final Float8Vector vector = new Float8Vector("Float8Vector", allocator);
+            vector.allocateNew(capacity);
+            return new ArrowDoubleData(vector);
+        }
+
+        @Override
+        public ArrowDoubleData createRead(final FieldVector vector, final DictionaryProvider provider,
+            final int version) throws IOException {
+            if (version == CURRENT_VERSION) {
+                return new ArrowDoubleData((Float8Vector)vector);
+            } else {
+                throw new IOException("Cannot read ArrowDoubleData with version " + version + ". Current version: "
+                    + CURRENT_VERSION + ".");
+            }
+        }
+
+        @Override
+        public int getVersion() {
+            return CURRENT_VERSION;
+        }
+    }
 }

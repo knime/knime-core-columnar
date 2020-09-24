@@ -48,25 +48,29 @@ package org.knime.core.columnar.arrow;
 import java.io.File;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
-class ArrowColumnReadStore implements ColumnReadStore {
+/**
+ * A {@link ColumnReadStore} implementation for Arrow.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+final class ArrowColumnReadStore implements ColumnReadStore {
 
     private final BufferAllocator m_allocator;
 
-    private final File m_source;
+    private final File m_file;
 
     private final ColumnStoreSchema m_schema;
 
-    ArrowColumnReadStore(final ColumnStoreSchema schema, final File source) {
+    ArrowColumnReadStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator) {
         m_schema = schema;
-        m_source = source;
-        final RootAllocator root = ArrowColumnStore.ROOT;
-        m_allocator = root.newChildAllocator("ArrowColumnReadStore", 0, root.getLimit());
+        m_file = file;
+        m_allocator = allocator;
     }
 
     @Override
@@ -76,7 +80,8 @@ class ArrowColumnReadStore implements ColumnReadStore {
 
     @Override
     public ColumnDataReader createReader(final ColumnSelection config) {
-        return new ArrowColumnDataReader(m_schema, m_source, m_allocator, config);
+        final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
+        return new ArrowColumnDataReader(m_file, m_allocator, factories, config);
     }
 
     @Override

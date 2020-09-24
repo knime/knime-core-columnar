@@ -45,87 +45,42 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CodingErrorAction;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BitVectorHelper;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 
-public class ArrowVarCharData
-    implements StringWriteData, StringReadData, ArrowData<VarCharVector> {
+/**
+ * Arrow implementation of {@link StringWriteData} and {@link StringReadData} don't using a dictionary.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+public final class ArrowVarCharData extends AbstractVariableWitdthData<VarCharVector>
+    implements StringWriteData, StringReadData {
 
-    // Efficiency
-    private final CharsetDecoder DECODER = Charset.forName("UTF-8").newDecoder()
-        .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
+    private final StringEncodingHelper m_encodingHelper;
 
-    private final CharsetEncoder ENCODER = Charset.forName("UTF-8").newEncoder()
-        .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
-
-    private synchronized ByteBuffer encode(final String value) {
-        try {
-            return ENCODER.encode(CharBuffer.wrap(value.toCharArray()));
-        } catch (CharacterCodingException e) {
-            // TODO
-            throw new RuntimeException(e);
-        }
-    }
-
-    private synchronized String decode(final byte[] values) {
-        try {
-            return DECODER.decode(ByteBuffer.wrap(values)).toString();
-        } catch (CharacterCodingException e) {
-            // TODO
-            throw new RuntimeException(e);
-        }
-    }
-
-    private final AtomicInteger m_refCounter = new AtomicInteger(1);
-
-    private final VarCharVector m_vector;
-
-    public ArrowVarCharData(final BufferAllocator allocator, final int capacity) {
-        m_vector = new VarCharVector("VarCharVector", allocator);
-        m_vector.allocateNew(capacity);
-    }
-
-    public ArrowVarCharData(final VarCharVector vector) {
-        m_vector = vector;
+    private ArrowVarCharData(final VarCharVector vector) {
+        super(vector);
+        m_encodingHelper = new StringEncodingHelper();
     }
 
     @Override
     public String getString(final int index) {
-        return decode(m_vector.get(index));
+        return m_encodingHelper.decode(m_vector.get(index));
     }
 
     @Override
     public void setString(final int index, final String value) {
-        final ByteBuffer encode = encode(value);
+        final ByteBuffer encode = m_encodingHelper.encode(value);
         m_vector.setSafe(index, encode.array(), 0, encode.limit());
-    }
-
-    @Override
-    public void setMissing(final int index) {
-        // TODO we can speed things likely up directly accessing validity buffer
-        BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
-    }
-
-    @Override
-    public boolean isMissing(final int index) {
-        return m_vector.isNull(index);
-    }
-
-    @Override
-    public int capacity() {
-        return m_vector.getValueCapacity();
     }
 
     @Override
@@ -134,39 +89,40 @@ public class ArrowVarCharData
         return this;
     }
 
-    @Override
-    public int length() {
-        return m_vector.getValueCount();
-    }
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarCharData} */
+    public static final class ArrowVarCharDataFactory extends AbstractFieldVectorDataFactory {
 
-    @Override
-    public VarCharVector get() {
-        return m_vector;
-    }
+        private static final int CURRENT_VERSION = 0;
 
-    // TODO thread safety for ref-counting
-    @Override
-    public synchronized void release() {
-        if (m_refCounter.decrementAndGet() == 0) {
-            m_vector.close();
+        /** Singleton instance of {@link ArrowVarCharDataFactory} */
+        public static final ArrowVarCharDataFactory INSTANCE = new ArrowVarCharDataFactory();
+
+        private ArrowVarCharDataFactory() {
+            // Singleton
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
+        public ArrowVarCharData createWrite(final BufferAllocator allocator, final int capacity) {
+            final VarCharVector vector = new VarCharVector("VarCharVector", allocator);
+            vector.allocateNew(capacity);
+            return new ArrowVarCharData(vector);
+        }
+
+        @Override
+        public ArrowVarCharData createRead(final FieldVector vector, final DictionaryProvider provider,
+            final int version) throws IOException {
+            if (version == CURRENT_VERSION) {
+                return new ArrowVarCharData((VarCharVector)vector);
+            } else {
+                throw new IOException("Cannot read ArrowVarCharData with version " + version + ". Current version: "
+                    + CURRENT_VERSION + ".");
+            }
+        }
+
+        @Override
+        public int getVersion() {
+            return CURRENT_VERSION;
         }
     }
-
-    @Override
-    public synchronized void retain() {
-        m_refCounter.getAndIncrement();
-    }
-
-    @Override
-    public int sizeOf() {
-        return (int)(m_vector.getDataBuffer().capacity() + //
-            m_vector.getValidityBuffer().capacity() + //
-            m_vector.getOffsetBuffer().capacity());
-    }
-
-    @Override
-    public String toString() {
-        return m_vector.toString();
-    }
-
 }

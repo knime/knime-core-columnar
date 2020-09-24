@@ -45,11 +45,34 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import java.util.function.Supplier;
+import org.apache.arrow.vector.BaseVariableWidthVector;
 
-import org.apache.arrow.vector.FieldVector;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+/**
+ * An abstract implementation of Arrow data which uses a {@link BaseVariableWidthVector} for data storage. Handles
+ * #sizeOf() and #setMissing(int).
+ *
+ * @param <F> Type of the field vector holding the data.
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+abstract class AbstractVariableWitdthData<F extends BaseVariableWidthVector> extends AbstractFieldVectorData<F> {
 
-public interface ArrowData<F extends FieldVector> extends Supplier<F>, ColumnWriteData, ColumnReadData {
+    AbstractVariableWitdthData(final F vector) {
+        super(vector);
+    }
+
+    @Override
+    @SuppressWarnings("resource") // Buffers handled by vector
+    public int sizeOf() {
+        return (int)(m_vector.getDataBuffer().capacity() + m_vector.getValidityBuffer().capacity()
+            + m_vector.getOffsetBuffer().capacity());
+    }
+
+    @Override
+    public void setMissing(final int index) {
+        // TODO does it make a huge difference to access the validity buffer directly?
+        // #setNull checks if the index is save
+        // BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
+        m_vector.setNull(index);
+    }
 }

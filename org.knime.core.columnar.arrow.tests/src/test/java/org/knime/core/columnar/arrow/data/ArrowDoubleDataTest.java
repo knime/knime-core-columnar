@@ -42,17 +42,58 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.data;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-public interface ArrowColumnDataSpec<W extends ColumnWriteData, R extends ColumnReadData> {
-    W createEmpty(BufferAllocator allocator, int capacity);
+import org.apache.arrow.vector.Float8Vector;
+import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 
-    R wrap(FieldVector vector, DictionaryProvider provider);
+/**
+ * Test {@link ArrowDoubleData}
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleData> {
+
+    /** Create the test for {@link ArrowDoubleData} */
+    public ArrowDoubleDataTest() {
+        super(ArrowDoubleDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowDoubleData cast(final Object o) {
+        assertTrue(o instanceof ArrowDoubleData);
+        return (ArrowDoubleData)o;
+    }
+
+    @Override
+    protected void setValue(final ArrowDoubleData data, final int index, final int seed) {
+        data.setDouble(index, seed);
+    }
+
+    @Override
+    protected void checkValue(final ArrowDoubleData data, final int index, final int seed) {
+        assertEquals(seed, data.getDouble(index), 0);
+    }
+
+    @Override
+    @SuppressWarnings("resource") // Resources handled by vector
+    protected boolean isReleased(final ArrowDoubleData data) {
+        final Float8Vector v = data.m_vector;
+        return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
+    }
+
+    @Override
+    protected int getMinSize(final int valueCount, final int capacity) {
+        return 8 * capacity + // 8 bytes per value for data
+            (int)Math.ceil(capacity / 8); // 1 bit per value for validity buffer
+    }
 }

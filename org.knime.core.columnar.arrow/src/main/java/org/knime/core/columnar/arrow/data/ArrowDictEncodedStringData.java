@@ -45,42 +45,43 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CodingErrorAction;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BitVectorHelper;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.dictionary.Dictionary;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.FieldType;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.SingletonDictionaryProvider;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
-public class ArrowDictEncodedStringData
-    implements StringWriteData, StringReadData, ArrowDictionaryHolder<VarCharVector>, ArrowData<IntVector> {
+/**
+ * Arrow implementation of {@link StringWriteData} and {@link StringReadData} using a dictionary.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ */
+public final class ArrowDictEncodedStringData extends AbstractFieldVectorData<IntVector>
+    implements StringWriteData, StringReadData {
 
-    // TODO configurable 2048 size of dict? hm...
-    private final static int INIT_DICT_SIZE = 2048;
+    private static final long INIT_BYTES_PER_STRING = 128;
 
-    // Efficiency
-    private final CharsetDecoder DECODER = Charset.forName("UTF-8").newDecoder()
-        .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
+    // TODO Make configurable?
+    private static final int INIT_DICT_SIZE = 2048;
 
-    private final CharsetEncoder ENCODER = Charset.forName("UTF-8").newEncoder()
-        .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
-
-    private final AtomicInteger m_refCounter = new AtomicInteger(1);
+    private final StringEncodingHelper m_encodingHelper;
 
     private final BiMap<String, Integer> m_inMemDict;
 
@@ -88,40 +89,21 @@ public class ArrowDictEncodedStringData
 
     private VarCharVector m_dictionary;
 
-    private IntVector m_vector;
+    private int m_runningDictIndex = 0;
 
-    private int m_runningDictIndex;
-
-    // loaded from disc
-    public ArrowDictEncodedStringData(final IntVector vector, final VarCharVector dict) {
-        try {
-            m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
-            m_invInMemDict = m_inMemDict.inverse();
-            m_vector = vector;
-
-            if (dict != null) {
-                for (int i = 0; i < dict.getValueCount(); i++) {
-                    final byte[] val = dict.get(i);
-                    if (val != null) {
-                        m_invInMemDict.put(i, DECODER.decode(ByteBuffer.wrap(val)).toString());
-                    }
-                }
-            }
-            m_dictionary = dict;
-        } catch (Exception e) {
-            release();
-            // TODO
-            throw new RuntimeException(e);
-        }
-    }
-
-    // on first create
-    public ArrowDictEncodedStringData(final BufferAllocator allocator, final long id, final int capacity) {
+    /** Create with dictionary available */
+    private ArrowDictEncodedStringData(final IntVector vector, final VarCharVector dict) {
+        super(vector);
+        m_encodingHelper = new StringEncodingHelper();
         m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
         m_invInMemDict = m_inMemDict.inverse();
-        m_vector = new IntVector("Indices",
-            new FieldType(false, MinorType.INT.getType(), new DictionaryEncoding(id, false, null)), allocator);
-        m_vector.allocateNew(capacity);
+        for (int i = 0; i < dict.getValueCount(); i++) {
+            final byte[] val = dict.get(i);
+            if (val != null) {
+                m_invInMemDict.put(i, m_encodingHelper.decode(val));
+            }
+        }
+        m_dictionary = dict;
     }
 
     @Override
@@ -130,40 +112,33 @@ public class ArrowDictEncodedStringData
     }
 
     @Override
-    public void setString(final int index, final String value) {
-        Integer dictIndex = m_inMemDict.get(value);
-        if (dictIndex == null) {
-            m_inMemDict.put(value, dictIndex = m_runningDictIndex);
-            m_runningDictIndex++;
-        }
+    public synchronized void setString(final int index, final String value) {
+        final Integer dictIndex = m_inMemDict.computeIfAbsent(value, k -> m_runningDictIndex++);
         m_vector.set(index, dictIndex);
     }
 
-    // NB: returns the delta
-    @Override
-    public VarCharVector getDictionary() {
+    VarCharVector getDictionary() {
         // newly created dictionary.
-        if (m_dictionary == null) {
-            try {
-                m_dictionary = new VarCharVector("Dictionary", m_vector.getAllocator());
-                m_dictionary.allocateNew(128 * m_invInMemDict.size(), m_invInMemDict.size());
-                for (int i = 0; i < m_invInMemDict.size(); i++) {
-                    final ByteBuffer encode = ENCODER.encode(CharBuffer.wrap(m_invInMemDict.get(i).toCharArray()));
-                    m_dictionary.set(i, encode.array(), 0, encode.limit());
-                }
-                m_dictionary.setValueCount(m_inMemDict.size());
-            } catch (CharacterCodingException e) {
-                // TODO
-                throw new RuntimeException(e);
-            }
+        final int numDistinctValues = m_inMemDict.size();
+        final int dictValueCount = m_dictionary.getValueCount();
+        if (dictValueCount == 0) {
+            // Allocated new memory for all distinct values
+            m_dictionary.allocateNew(INIT_BYTES_PER_STRING * numDistinctValues, numDistinctValues);
         }
+        // Fill the vector with the encoded values
+        for (int i = dictValueCount; i < numDistinctValues; i++) {
+            final ByteBuffer encode = m_encodingHelper.encode(m_invInMemDict.get(i));
+            m_dictionary.setSafe(i, encode.array(), 0, encode.limit());
+        }
+        m_dictionary.setValueCount(numDistinctValues);
         return m_dictionary;
     }
 
     @Override
     public void setMissing(final int index) {
         // TODO we can speed things likely up directly accessing validity buffer
-        BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
+        // BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
+        m_vector.setNull(index);
     }
 
     @Override
@@ -188,43 +163,82 @@ public class ArrowDictEncodedStringData
     }
 
     @Override
-    public IntVector get() {
-        return m_vector;
-    }
-
-    // TODO thread safety for ref-counting
-    @Override
-    public void release() {
-        if (m_refCounter.decrementAndGet() == 0) {
-            m_vector.close();
-            if (m_dictionary != null) {
-                m_dictionary.close();
-            }
-        }
+    protected void closeResources() {
+        super.closeResources();
+        m_dictionary.close();
     }
 
     @Override
-    public void retain() {
-        m_refCounter.getAndIncrement();
-    }
-
-    @Override
+    @SuppressWarnings("resource") // Buffers handled by vector
     public int sizeOf() {
-        int sizeOf = m_vector.getBufferSize();
-        if (m_dictionary != null) {
-            sizeOf += m_dictionary.getBufferSize();
-        }
-        return sizeOf;
+        return (int)(m_vector.getDataBuffer().capacity() // Index vector
+            + m_vector.getValidityBuffer().capacity() //
+            + m_dictionary.getDataBuffer().capacity() // Dictionary vector
+            + m_dictionary.getValidityBuffer().capacity() //
+            + m_dictionary.getOffsetBuffer().capacity());
     }
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder(m_vector.toString());
-        if (m_dictionary != null) {
-            sb.append(" -> ");
-            sb.append(m_dictionary.toString());
-        }
-        return sb.toString();
+        final String s = super.toString();
+        return new StringBuilder(s) //
+            .append(" -> ").append(m_dictionary.toString()) //
+            .toString();
     }
 
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowDictEncodedStringData} */
+    public static final class ArrowDictEncodedStringDataFactory implements ArrowColumnDataFactory {
+
+        private static final int CURRENT_VERSION = 0;
+
+        /** Singleton instance of {@link ArrowDictEncodedStringDataFactory} */
+        public static final ArrowDictEncodedStringDataFactory INSTANCE = new ArrowDictEncodedStringDataFactory();
+
+        private ArrowDictEncodedStringDataFactory() {
+            // Singleton
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Vector closed by data object
+        public ColumnWriteData createWrite(final BufferAllocator allocator, final int capacity) {
+            final IntVector vector = new IntVector("Indices",
+                new FieldType(false, MinorType.INT.getType(), new DictionaryEncoding(0, false, null)), allocator);
+            vector.allocateNew(capacity);
+            final VarCharVector dict = new VarCharVector("Dictionary", allocator);
+            return new ArrowDictEncodedStringData(vector, dict);
+        }
+
+        @Override
+        public ColumnReadData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
+            throws IOException {
+            if (version == CURRENT_VERSION) {
+                final long dictId = vector.getField().getFieldType().getDictionary().getId();
+                @SuppressWarnings("resource") // Dictionary vector closed by data object
+                final VarCharVector dict = (VarCharVector)provider.lookup(dictId).getVector();
+                return new ArrowDictEncodedStringData((IntVector)vector, dict);
+            } else {
+                throw new IOException("Cannot read ArrowDictEncodedStringData data with version " + version
+                    + ". Current version: " + CURRENT_VERSION + ".");
+            }
+        }
+
+        @Override
+        public FieldVector getVector(final ColumnReadData data) {
+            return ((ArrowDictEncodedStringData)data).m_vector;
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Dictionary vector closed by data object
+        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+            final ArrowDictEncodedStringData stringData = (ArrowDictEncodedStringData)data;
+            final VarCharVector vector = stringData.getDictionary();
+            final Dictionary dictionary = new Dictionary(vector, stringData.m_vector.getField().getDictionary());
+            return new SingletonDictionaryProvider(dictionary);
+        }
+
+        @Override
+        public int getVersion() {
+            return CURRENT_VERSION;
+        }
+    }
 }
