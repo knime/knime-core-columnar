@@ -109,7 +109,9 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             final CountDownLatch batchFlushed = new CountDownLatch(1);
             enqueueRunnable(() -> {
                 try {
-                    m_delegateWriter.write(batch);
+                    if (!m_storeClosed) {
+                        m_delegateWriter.write(batch);
+                    }
                 } catch (IOException e) {
                     throw new IllegalStateException(String.format("Failed to write batch %d.", m_numChunks), e);
                 } finally {
@@ -359,7 +361,13 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
     public void close() throws IOException {
         m_storeClosed = true;
 
-        m_future.cancel(true);
+        try {
+            waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            // Restore interrupted state...
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+        }
 
         for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
             final ColumnReadData removed = m_globalCache.removeRetained(id);
