@@ -115,12 +115,12 @@ public final class CachedColumnReadStore implements ColumnReadStore {
         }
 
         @Override
-        public int getNumBatches() {
+        public int getNumBatches() throws IOException {
             return m_delegateReader.getNumBatches();
         }
 
         @Override
-        public int getMaxLength() {
+        public int getMaxLength() throws IOException {
             return m_delegateReader.getMaxLength();
         }
 

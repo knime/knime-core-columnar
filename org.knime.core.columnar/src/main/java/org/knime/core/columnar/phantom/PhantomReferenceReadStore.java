@@ -104,12 +104,12 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
         }
 
         @Override
-        public int getNumBatches() {
+        public int getNumBatches() throws IOException {
             return m_delegate.getNumBatches();
         }
 
         @Override
-        public int getMaxLength() {
+        public int getMaxLength() throws IOException {
             return m_delegate.getMaxLength();
         }
 

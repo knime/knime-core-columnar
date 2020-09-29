@@ -55,8 +55,8 @@ public interface ColumnDataReader extends Closeable {
 
     ReadBatch readRetained(int index) throws IOException;
 
-    int getNumBatches();
+    int getNumBatches() throws IOException;
 
-    int getMaxLength();
+    int getMaxLength() throws IOException;
 
 }

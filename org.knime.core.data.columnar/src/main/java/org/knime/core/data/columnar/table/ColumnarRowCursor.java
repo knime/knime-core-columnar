@@ -116,7 +116,13 @@ class ColumnarRowCursor implements RowCursor, IndexSupplier {
 		m_openCursorCloseables = openCursorCloseables;
 
 		// number of chunks
-		final int maxLength = m_reader.getMaxLength();
+		final int maxLength;
+		try {
+			maxLength = m_reader.getMaxLength();
+		} catch (final Exception e) {
+			// TODO
+			throw new RuntimeException(e);
+		}
 		if (maxLength < 1) {
 			m_maxBatchIndex = m_lastBatchMaxIndex = m_currentBatchIndex = m_currentIndex = m_currentMaxIndex = -1;
 		} else {
