@@ -148,10 +148,11 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             if (m_future.isDone()) {
                 try {
                     waitForAndHandleFuture();
-                } catch (InterruptedException ex) {
+                } catch (InterruptedException e) {
                     // Restore interrupted state
                     Thread.currentThread().interrupt();
                     // since we just checked whether the future is done, we likely never end up in this code block
+                    throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
                 }
             }
         }
@@ -252,8 +253,12 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             // either lose the unflushed, to-be-evicted data, because it will be released once evicted from the cache
             // or we retain it and accept that we temporarily use up more off-heap memory than the cache allows
             c.retain();
-            enqueueRunnable(c::release);
-            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+            @SuppressWarnings("resource")
+            AsyncFlushCachedColumnStore store = (AsyncFlushCachedColumnStore)k.getStore();
+            store.enqueueRunnable(c::release);
+            System.err.println(String.format("%s "
+                    + "Unflushed data evicted from cache. "
+                    + "Data will be retained and memory will be allocated until flushed.", ERROR_ON_INTERRUPT));
         }
     };
 

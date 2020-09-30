@@ -96,6 +96,10 @@ class ColumnDataUniqueId {
         return String.join(",", m_store.toString(), Integer.toString(m_columnIndex), Integer.toString(m_chunkIndex));
     }
 
+    ColumnReadStore getStore() {
+        return m_store;
+    }
+
     int getColumnIndex() {
         return m_columnIndex;
     }
