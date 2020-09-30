@@ -83,12 +83,15 @@ class ColumnDataUniqueId {
         if (object == this) {
             return true;
         }
-        if (!(object instanceof ColumnDataUniqueId)) {
+        if (object == null) {
             return false;
         }
+        if (getClass() == object.getClass()) {
         final ColumnDataUniqueId other = (ColumnDataUniqueId)object;
         return Objects.equals(m_store, other.m_store) && m_columnIndex == other.m_columnIndex
             && m_chunkIndex == other.m_chunkIndex;
+    }
+        return false;
     }
 
     @Override
