@@ -83,7 +83,7 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  */
 public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
-    private static final String ERROR_ON_INTERRUPT = "Interrupted while writing for asynchronous write thread.";
+    private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for asynchronous write thread.";
 
     private static final CountDownLatch DUMMY = new CountDownLatch(0);
 
