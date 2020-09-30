@@ -71,6 +71,9 @@ public class DefaultReadBatch implements ReadBatch {
     public DefaultReadBatch(final ColumnStoreSchema schema, final ColumnReadData[] data, final int length) {
         Objects.requireNonNull(schema, () -> "Column store schema must not be null.");
         Objects.requireNonNull(data, () -> "Column data must not be null.");
+        if (length < 0) {
+            throw new IllegalArgumentException("Length must be non-negative.");
+        }
 
         m_maxIndex = schema.getNumColumns() - 1;
         m_data = data;

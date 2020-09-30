@@ -72,6 +72,9 @@ public class DefaultWriteBatch implements WriteBatch {
     public DefaultWriteBatch(final ColumnStoreSchema schema, final ColumnWriteData[] data, final int capacity) {
         Objects.requireNonNull(schema, () -> "Column store schema must not be null.");
         Objects.requireNonNull(data, () -> "Column data must not be null.");
+        if (capacity < 0) {
+            throw new IllegalArgumentException("Capacity must be non-negative.");
+        }
 
         m_schema = schema;
         m_data = data;
@@ -116,7 +119,14 @@ public class DefaultWriteBatch implements WriteBatch {
 
     @Override
     public ReadBatch close(final int length) {
-        final ColumnReadData[] data = new ColumnReadData[m_data.length];
+    	if (length < 0) {
+            throw new IllegalArgumentException("Length must be non-negative.");
+        }
+        if (length > m_capacity) {
+            throw new IllegalArgumentException("Length must not be larger than capacity.");
+        }
+
+    	final ColumnReadData[] data = new ColumnReadData[m_data.length];
         int capacity = 0;
         for (int i = 0; i < m_data.length; i++) {
             data[i] = m_data[i].close(length);
@@ -125,26 +135,5 @@ public class DefaultWriteBatch implements WriteBatch {
 
         return new DefaultReadBatch(m_schema, data, capacity);
     }
-
-//    @Override
-//    public void ensureCapacity(final int capacity) {
-//        for (final ColumnWriteData data : m_data) {
-//            data.ensureCapacity(capacity);
-//        }
-//        m_capacity = capacity;
-//    }
-//
-//    @Override
-//    public int getMaxCapacity() {
-//        return m_capacity;
-//    }
-//
-//    @Override
-//    public void finishWritingAndTrim(final int numValues) {
-//        for (final ColumnWriteData data : m_data) {
-//            data.finishWritingAndTrim(numValues);
-//        }
-//        m_capacity = numValues;
-//    }
 
 }
