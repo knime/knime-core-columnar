@@ -195,10 +195,11 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
 		// destroyed.
 		try {
 			if (m_table == null) {
-				// TODO: check if anything gets written in this case -- should not be
-				// the case
-				releaseCurrentData(0);
-				m_writer.close();
+				if (m_currentData != null) {
+					m_currentData.release();
+					m_currentData = null;
+				}
+				// closing the store includes closing the writer (but will make sure duplicate checks and domain calculations are halted)
 				m_store.close();
 			}
 		} catch (final Exception e) {

@@ -75,9 +75,15 @@ import org.knime.core.util.ThreadPool;
 // TODO: make sure everything is closed in case of exceptions, etc.
 public final class DomainColumnStore implements ColumnStore {
 
+	// TODO: should I use ThreadPool or my own executor service?
+	// TODO: how many executors may I block?
+	private static final ThreadPool EXECUTOR = KNIMEConstants.GLOBAL_THREAD_POOL;
+
 	private final ColumnStore m_delegate;
 
 	private final DomainColumnDataWriter m_writer;
+	
+	private volatile boolean m_storeClosed;
 
 	public DomainColumnStore(final ColumnStore delegate, final DomainStoreConfig config) {
 		m_delegate = delegate;
@@ -124,24 +130,22 @@ public final class DomainColumnStore implements ColumnStore {
 
 	@Override
 	public void close() throws IOException {
+		m_storeClosed = true;
+		
 		m_writer.close();
 		m_delegate.close();
 	}
 
-	public static final class DomainColumnDataWriter implements ColumnDataWriter {
+	public final class DomainColumnDataWriter implements ColumnDataWriter {
 
-		// TODO: should I use ThreadPool or my own executor service?
-		// TODO: how many executors may I block?
-		private static final ThreadPool executor = KNIMEConstants.GLOBAL_THREAD_POOL;
-
-		private final ColumnDataWriter m_delegate;
+		private final ColumnDataWriter m_delegateWriter;
 
 		private final DuplicateChecker m_duplicateChecker;
 
 		private final List<Future<Void>> m_duplicateChecks = new ArrayList<>();
 
 		private final Map<Integer, Future<ColumnarDomain>> m_domainCalculations = new HashMap<>();
-
+		
 		/**
 		 * Set in {@link #setMaxPossibleValues(int)}.
 		 */
@@ -153,7 +157,7 @@ public final class DomainColumnStore implements ColumnStore {
 		private DomainCalculator<?, ?>[] m_calculators;
 
 		public DomainColumnDataWriter(final ColumnDataWriter delegate, final DomainStoreConfig config) {
-			m_delegate = delegate;
+			m_delegateWriter = delegate;
 			m_config = config;
 			m_duplicateChecker = config.createDuplicateChecker();
 		}
@@ -192,7 +196,7 @@ public final class DomainColumnStore implements ColumnStore {
 				// Retain for async. duplicate checking. Submitted task will release.
 				keyChunk.retain();
 				try {
-					duplicateCheck = executor.enqueue(new DuplicateCheckTask(keyChunk, m_duplicateChecker));
+					duplicateCheck = EXECUTOR.enqueue(new DuplicateCheckTask(keyChunk, m_duplicateChecker));
 				} catch (final Exception ex) {
 					keyChunk.release();
 					throw ex;
@@ -211,7 +215,7 @@ public final class DomainColumnStore implements ColumnStore {
 					chunk.retain();
 					try {
 						final Future<ColumnarDomain> previous = m_domainCalculations.get(i);
-						merged = executor.enqueue(new DomainCalculationTask(previous, chunk, calculator));
+						merged = EXECUTOR.enqueue(new DomainCalculationTask(previous, chunk, calculator));
 					} catch (final Exception ex) {
 						chunk.release();
 						throw ex;
@@ -220,7 +224,7 @@ public final class DomainColumnStore implements ColumnStore {
 				}
 			}
 
-			m_delegate.write(record);
+			m_delegateWriter.write(record);
 		}
 
 		@Override
@@ -248,11 +252,11 @@ public final class DomainColumnStore implements ColumnStore {
 				if (m_duplicateChecker != null) {
 					m_duplicateChecker.clear();
 				}
-				m_delegate.close();
+				m_delegateWriter.close();
 			}
 		}
 
-		private static final class DuplicateCheckTask implements Callable<Void> {
+		private final class DuplicateCheckTask implements Callable<Void> {
 
 			private final ColumnReadData m_keyChunk;
 
@@ -266,11 +270,13 @@ public final class DomainColumnStore implements ColumnStore {
 			@Override
 			public Void call() throws IOException {
 				try {
-					final StringReadData rowKeyData = (StringReadData) m_keyChunk;
-					for (int i = 0; i < rowKeyData.length(); i++) {
-						// TODO: duplicate checking can be done on the byte level in the
-						// future.
-						m_duplicateChecker.addKey(rowKeyData.getString(i));
+					if (!m_storeClosed) {
+						final StringReadData rowKeyData = (StringReadData) m_keyChunk;
+						for (int i = 0; i < rowKeyData.length(); i++) {
+							// TODO: duplicate checking can be done on the byte level in the
+							// future.
+							m_duplicateChecker.addKey(rowKeyData.getString(i));
+						}
 					}
 				} finally {
 					m_keyChunk.release();
@@ -279,7 +285,7 @@ public final class DomainColumnStore implements ColumnStore {
 			}
 		}
 
-		private static final class DomainCalculationTask implements Callable<ColumnarDomain> {
+		private final class DomainCalculationTask implements Callable<ColumnarDomain> {
 
 			private final Future<ColumnarDomain> m_previous;
 
@@ -297,6 +303,9 @@ public final class DomainColumnStore implements ColumnStore {
 			@Override
 			public ColumnarDomain call() throws InterruptedException, ExecutionException {
 				final ColumnarDomain previous = m_previous.get();
+				if (m_storeClosed) {
+					return previous;
+				}
 				final ColumnarDomain merged;
 				if (previous.isValid()) {
 					final ColumnarDomain current;
