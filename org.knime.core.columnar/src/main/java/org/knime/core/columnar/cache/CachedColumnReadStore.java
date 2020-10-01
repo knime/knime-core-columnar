@@ -99,7 +99,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            return m_selection.createBatch(i -> {
+            return ColumnSelection.createBatch(m_selection, i -> {
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(CachedColumnReadStore.this, i, chunkIndex);
                 return m_globalCache.getRetained(ccUID, () -> {
                     m_cachedData.add(ccUID);

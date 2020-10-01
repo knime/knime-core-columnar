@@ -49,11 +49,11 @@
 package org.knime.core.columnar.batch;
 
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
  *
@@ -68,14 +68,13 @@ public class DefaultReadBatch implements ReadBatch {
 
     private final int m_length;
 
-    public DefaultReadBatch(final ColumnStoreSchema schema, final ColumnReadData[] data, final int length) {
-        Objects.requireNonNull(schema, () -> "Column store schema must not be null.");
+    public DefaultReadBatch(final ColumnReadData[] data, final int length) {
         Objects.requireNonNull(data, () -> "Column data must not be null.");
         if (length < 0) {
             throw new IllegalArgumentException("Length must be non-negative.");
         }
 
-        m_maxIndex = schema.getNumColumns() - 1;
+        m_maxIndex = data.length;
         m_data = data;
         m_length = length;
     }
@@ -89,7 +88,13 @@ public class DefaultReadBatch implements ReadBatch {
             throw new IndexOutOfBoundsException(String.format(
                 "Column index %d larger then the column store's number of columns (%d).", colIndex, m_maxIndex));
         }
-        return m_data[colIndex];
+        final ColumnReadData data = m_data[colIndex];
+        if (data != null) {
+            return data;
+        } else {
+            throw new NoSuchElementException(
+                String.format("Data at index %d is not available in this filtered batch.", colIndex));
+        }
     }
 
     @Override
@@ -100,14 +105,18 @@ public class DefaultReadBatch implements ReadBatch {
     @Override
     public void release() {
         for (final ColumnReadData data : m_data) {
-            data.release();
+            if (data != null) {
+                data.release();
+            }
         }
     }
 
     @Override
     public void retain() {
         for (final ColumnReadData data : m_data) {
-            data.retain();
+            if (data != null) {
+                data.retain();
+            }
         }
     }
 

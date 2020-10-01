@@ -57,8 +57,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -87,7 +87,7 @@ public final class TestColumnStore implements ColumnStore {
                 data[i] = TestDoubleColumnData.create(m_maxDataCapacity);
                 m_tracker.add(data[i]);
             }
-            return new DefaultWriteBatch(m_schema, data, m_maxDataCapacity);
+            return new DefaultWriteBatch(data, m_maxDataCapacity);
         }
 
     }
@@ -144,7 +144,7 @@ public final class TestColumnStore implements ColumnStore {
             }
 
             final Double[][] data = m_batches.get(chunkIndex);
-            return m_selection.createBatch(i -> {
+            return ColumnSelection.createBatch(m_selection, i -> {
                 TestDoubleColumnData newData = TestDoubleColumnData.create(data[i]);
                 m_tracker.add(newData);
                 return newData;

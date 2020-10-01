@@ -219,7 +219,7 @@ public final class SmallColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final ReadBatch batch = m_selection.createBatch(i -> m_table.getBatch(chunkIndex).get(i));
+            final ReadBatch batch = ColumnSelection.createBatch(m_selection, i -> m_table.getBatch(chunkIndex).get(i));
             batch.retain();
             return batch;
         }

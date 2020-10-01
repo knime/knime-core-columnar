@@ -58,8 +58,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.DefaultReadBatch;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
@@ -194,7 +194,7 @@ public final class TestColumnStoreUtils {
             for (int i = 0; i < table.size(); i++) {
                 final TestDoubleColumnData[] batch = table.getBatch(i);
                 final int length = batch[0].length();
-                writer.write(new DefaultReadBatch(store.getSchema(), batch, length));
+                writer.write(new DefaultReadBatch(batch, length));
             }
         }
     }
@@ -217,7 +217,7 @@ public final class TestColumnStoreUtils {
         final int... indices) throws IOException {
 
         try (final ColumnDataReader reader = indices == null ? store.createReader()
-            : store.createReader(new FilteredColumnSelection(store.getSchema(), indices))) {
+            : store.createReader(new FilteredColumnSelection(store.getSchema().getNumColumns(), indices))) {
             assertEquals(table.size(), reader.getNumBatches());
 
             final List<TestDoubleColumnData[]> result = new ArrayList<>();

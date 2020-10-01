@@ -184,7 +184,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            return m_selection.createBatch(i -> {
+            return ColumnSelection.createBatch(m_selection, i -> {
                 final ColumnDataUniqueId ccUID =
                     new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, chunkIndex);
                 return m_globalCache.getRetained(ccUID, () -> {

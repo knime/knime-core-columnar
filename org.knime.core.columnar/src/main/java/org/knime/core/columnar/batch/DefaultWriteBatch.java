@@ -54,7 +54,6 @@ import java.util.Objects;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
-import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
  *
@@ -63,20 +62,16 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
 @SuppressWarnings("javadoc")
 public class DefaultWriteBatch implements WriteBatch {
 
-    private final ColumnStoreSchema m_schema;
-
     private final ColumnWriteData[] m_data;
 
     private final int m_capacity;
 
-    public DefaultWriteBatch(final ColumnStoreSchema schema, final ColumnWriteData[] data, final int capacity) {
-        Objects.requireNonNull(schema, () -> "Column store schema must not be null.");
+    public DefaultWriteBatch(final ColumnWriteData[] data, final int capacity) {
         Objects.requireNonNull(data, () -> "Column data must not be null.");
         if (capacity < 0) {
             throw new IllegalArgumentException("Capacity must be non-negative.");
         }
 
-        m_schema = schema;
         m_data = data;
         m_capacity = capacity;
     }
@@ -133,7 +128,7 @@ public class DefaultWriteBatch implements WriteBatch {
             capacity = Math.max(capacity, data[i].length());
         }
 
-        return new DefaultReadBatch(m_schema, data, capacity);
+        return new DefaultReadBatch(data, capacity);
     }
 
 }

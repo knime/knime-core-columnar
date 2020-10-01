@@ -48,54 +48,41 @@
  */
 package org.knime.core.columnar.filter;
 
-import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Objects;
-import java.util.function.IntFunction;
-
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.batch.DefaultReadBatch;
-import org.knime.core.columnar.batch.FilteredReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import java.util.Set;
 
 @SuppressWarnings("javadoc")
 public class FilteredColumnSelection implements ColumnSelection {
 
-    private final ColumnStoreSchema m_schema;
+    private final int m_numColumns;
 
-    private final int[] m_indices;
+    private final Set<Integer> m_indices;
 
-    public FilteredColumnSelection(final ColumnStoreSchema schema, final int... indices) {
-        Objects.requireNonNull(schema, () -> "Column Store schema must not be null.");
+    public FilteredColumnSelection(final int numColumns, final int... indices) {
         Objects.requireNonNull(indices, () -> "Indices must not be null.");
 
-        m_schema = schema;
-        m_indices = Arrays.stream(indices).sorted().distinct().toArray();
-        if (m_indices.length > 0) {
-            if (m_indices[0] < 0) {
-                throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", m_indices[0]));
+        m_numColumns = numColumns;
+        m_indices = new HashSet<>(indices.length);
+        for (int index : indices) {
+            if (index < 0) {
+                throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
             }
-            if (m_indices[m_indices.length - 1] > schema.getNumColumns()) {
-                throw new IndexOutOfBoundsException(
-                    String.format("Column index %d larger then the column store's number of columns (%d).",
-                        m_indices[m_indices.length - 1], schema.getNumColumns()));
+            if (index > numColumns) {
+                throw new IndexOutOfBoundsException(String.format(
+                    "Column index %d larger then the column store's number of columns (%d).", index, numColumns));
             }
+            m_indices.add(index);
         }
-    }
-
-    public int[] includes() {
-        return m_indices;
     }
 
     @Override
-    public ReadBatch createBatch(final IntFunction<ColumnReadData> function) {
-        final ColumnReadData[] batch = new ColumnReadData[m_schema.getNumColumns()];
-        int length = 0;
-        for (int i : includes()) {
-            batch[i] = function.apply(i);
-            length = Math.max(length, batch[i].length());
-        }
-        return new FilteredReadBatch(this, new DefaultReadBatch(m_schema, batch, length));
+    public boolean isSelected(final int index) {
+        return m_indices.contains(index);
     }
 
+    @Override
+    public int getNumColumns() {
+        return m_numColumns;
+    }
 }

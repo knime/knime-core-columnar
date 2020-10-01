@@ -73,7 +73,7 @@ public interface ColumnReadStore extends Closeable {
     ColumnDataReader createReader(ColumnSelection config);
 
     default ColumnDataReader createReader() {
-        return createReader(new DefaultColumnSelection(getSchema()));
+        return createReader(new DefaultColumnSelection(getSchema().getNumColumns()));
     }
 
     ColumnStoreSchema getSchema();

@@ -48,38 +48,27 @@
  */
 package org.knime.core.columnar.filter;
 
-import java.util.Objects;
-import java.util.function.IntFunction;
-
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.batch.DefaultReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.store.ColumnStoreSchema;
-
 /**
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
 public class DefaultColumnSelection implements ColumnSelection {
 
-    private final ColumnStoreSchema m_schema;
+    private final int m_numColumns;
 
-    public DefaultColumnSelection(final ColumnStoreSchema schema) {
-        Objects.requireNonNull(schema, () -> "Column Store schema must not be null.");
-
-        m_schema = schema;
+    public DefaultColumnSelection(final int numColumns) {
+        m_numColumns = numColumns;
     }
 
     @Override
-    public ReadBatch createBatch(final IntFunction<ColumnReadData> function) {
-        final ColumnReadData[] batch = new ColumnReadData[m_schema.getNumColumns()];
-        int length = 0;
-        for (int i = 0; i < m_schema.getNumColumns(); i++) {
-            batch[i] = function.apply(i);
-            length = Math.max(length, batch[i].length());
-        }
-        return new DefaultReadBatch(m_schema, batch, length);
+    public boolean isSelected(final int index) {
+        return index < m_numColumns;
     }
 
+    @Override
+    public int getNumColumns() {
+        return m_numColumns;
+    }
 }

@@ -47,12 +47,34 @@ package org.knime.core.columnar.filter;
 
 import java.util.function.IntFunction;
 
+import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 
 @SuppressWarnings("javadoc")
 public interface ColumnSelection {
 
-    ReadBatch createBatch (IntFunction<ColumnReadData> function);
+    /**
+     * @param index the index of the column
+     * @return true if the column is selected
+     */
+    boolean isSelected(int index);
 
+    /**
+     * @return the total number of columns. Note that this is not the number of selected columns.
+     */
+    int getNumColumns();
+
+    public static ReadBatch createBatch(final ColumnSelection selection, final IntFunction<ColumnReadData> function) {
+        final int numColumns = selection.getNumColumns();
+        final ColumnReadData[] data = new ColumnReadData[numColumns];
+        int length = 0;
+        for (int i = 0; i < numColumns; i++) {
+            if (selection.isSelected(i)) {
+                data[i] = function.apply(i);
+                length = Math.max(length, data[i].length());
+            }
+        }
+        return new DefaultReadBatch(data, length);
+    }
 }
