@@ -104,6 +104,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
 	@Override
 	public void addRowToTable(final DataRow row) {
+		if (row.getNumCells() != m_numColumns) {
+			throw new IllegalStateException(
+					"Cell count in row " + row.getKey().toString() + " is not equal to length of column names array: "
+							+ row.getNumCells() + " vs. " + m_spec.getNumColumns());
+		}
 		m_delegate.<RowKeyWriteValue>getWriteValue(-1).setRowKey(row.getKey());
 		for (int i = 0; i < m_numColumns; i++) {
 			final DataCell cell = row.getCell(i);
