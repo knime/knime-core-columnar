@@ -2,17 +2,13 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: KNIME Table Plugin
 Bundle-SymbolicName: org.knime.core.columnar;singleton:=true
-Bundle-Version: 4.2.0.qualifier
+Bundle-Version: 4.3.0.qualifier
 Bundle-Vendor: KNIME AG
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
-Require-Bundle: org.junit;bundle-version="[4.12.0,5.0.0)";resolution:=optional,
- org.awaitility;bundle-version="[3.0.0,4.0.0)";resolution:=optional,
+Require-Bundle: 
  com.google.guava;bundle-version="19.0.0"
-Export-Package: org.knime.core.columnar,
- org.knime.core.columnar.batch,
- org.knime.core.columnar.cache,
+Export-Package: org.knime.core.columnar.batch,
  org.knime.core.columnar.data,
  org.knime.core.columnar.filter,
- org.knime.core.columnar.phantom,
  org.knime.core.columnar.store
