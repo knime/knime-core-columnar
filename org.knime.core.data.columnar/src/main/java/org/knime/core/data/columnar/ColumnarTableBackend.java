@@ -1,9 +1,13 @@
 package org.knime.core.data.columnar;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import org.apache.commons.io.IOUtils;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTypeConfig;
@@ -23,8 +27,24 @@ import org.knime.core.data.values.WriteValue;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
+import org.knime.core.node.NodeLogger;
 
 public class ColumnarTableBackend implements TableBackend {
+	
+	private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarTableBackend.class);
+	
+	private static final String DESCRIPTION;
+	
+	static {
+		String d;
+		try (InputStream in = ColumnarTableBackend.class.getResourceAsStream("./description.html")) {
+			d = IOUtils.readLines(in, StandardCharsets.UTF_8).stream().collect(Collectors.joining("\n"));
+		} catch (NullPointerException | IOException ioe) {
+			LOGGER.error("Unable to parse description file", ioe);
+			d = "";
+		}
+		DESCRIPTION = d;
+	}
 
 	@Override
 	public DataContainerDelegate create(final DataTableSpec spec, final DataContainerSettings settings,
@@ -114,7 +134,16 @@ public class ColumnarTableBackend implements TableBackend {
 		public void setMissing(final int index) {
 			m_container.setMissing(index);
 		}
-
+	}
+	
+	@Override
+	public String getShortName() {
+		return "Compact Columnar (Labs)";
+	}
+	
+	@Override
+	public String getDescription() {
+		return DESCRIPTION;
 	}
 
 }
