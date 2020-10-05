@@ -48,9 +48,6 @@
  */
 package org.knime.core.columnar.phantom;
 
-import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_READER_CLOSED;
-import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
-
 import java.io.Closeable;
 import java.io.IOException;
 
@@ -70,6 +67,10 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class PhantomReferenceReadStore implements ColumnReadStore {
+
+    private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
+
+    private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
     private static final class Reader implements ColumnDataReader {
 

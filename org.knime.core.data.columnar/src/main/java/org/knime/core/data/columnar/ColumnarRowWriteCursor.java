@@ -56,7 +56,6 @@ import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreUtils;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
@@ -72,6 +71,7 @@ import org.knime.core.data.columnar.mapping.DataTypeMapper;
 import org.knime.core.data.columnar.mapping.DataTypeMapperRegistry;
 import org.knime.core.data.columnar.mapping.DomainDataTypeMapper;
 import org.knime.core.data.columnar.mapping.DomainMapper;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.table.UnsavedColumnarContainerTable;
 import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.values.WriteValue;
@@ -104,10 +104,12 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
 		m_storeFactory = new ArrowColumnStoreFactory();
 		final Map<Integer, ColumnarDomain> initialDomains = DataTypeMapperRegistry.extractInitialDomains(spec);
 		final DomainStoreConfig domainStoreConfig = new DefaultDomainStoreConfig(m_spec, initialDomains, config);
-		m_store = new DomainColumnStore(ColumnStoreUtils
-				/* Where to get chunk-size from? */
-				.cache(m_storeFactory.createWriteStore(m_spec, DataContainer.createTempFile(".knable"), 28000)),
-				domainStoreConfig);
+
+        m_store =
+            new DomainColumnStore(
+                ColumnarPreferenceUtils.wrap(m_storeFactory.createWriteStore(m_spec,
+                    DataContainer.createTempFile(".knable"), ColumnarPreferenceUtils.getChunkSize())),
+                domainStoreConfig);
 
 		m_columnDataFactory = m_store.getFactory();
 		m_writer = m_store.getWriter();
@@ -229,7 +231,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
 		m_index = 0;
 	}
 
-	private WriteValue<?>[] create(WriteBatch batch) {
+	private WriteValue<?>[] create(final WriteBatch batch) {
 		final WriteValue<?>[] values = new WriteValue<?>[m_spec.getNumColumns()];
 		for (int i = 0; i < values.length; i++) {
 			@SuppressWarnings("unchecked")

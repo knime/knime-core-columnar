@@ -56,11 +56,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.knime.core.columnar.phantom.CloseableCloser;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreUtils;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.RowCursor;
 import org.knime.core.data.columnar.ColumnarDataTableSpec;
 import org.knime.core.data.columnar.mapping.MappedColumnarDataTableSpec;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.filter.TableFilter;
@@ -100,7 +100,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 		m_size = settings.getLong(CFG_TABLE_SIZE);
 		m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
 		m_spec = MappedColumnarDataTableSpec.Serializer.load(context.getTableSpec(), settings);
-		m_store = ColumnStoreUtils.cache(m_factory.createReadStore(m_spec, context.getDataFileRef().getFile()));
+		m_store = ColumnarPreferenceUtils.wrap(m_factory.createReadStore(m_spec, context.getDataFileRef().getFile()));
 	}
 
 	@Override
@@ -236,7 +236,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 		}
 	}
 
-	private static int[] toSortedIntArray(Set<Integer> selection) {
+	private static int[] toSortedIntArray(final Set<Integer> selection) {
 		return selection.stream().sorted().mapToInt((i) -> (i)).toArray();
 	}
 }

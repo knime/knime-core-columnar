@@ -48,10 +48,6 @@
  */
 package org.knime.core.columnar.phantom;
 
-import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_STORE_CLOSED;
-import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_WRITER_CLOSED;
-import static org.knime.core.columnar.store.ColumnStoreUtils.ERROR_MESSAGE_WRITER_NOT_CLOSED;
-
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -80,6 +76,12 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class PhantomReferenceStore implements ColumnStore {
+
+    private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
+
+    private static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
+
+    private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
     private static final class Factory implements ColumnDataFactory {
 

@@ -13,4 +13,19 @@
             backend="org.knime.core.data.columnar.ColumnarTableBackend">
       </TableBackend>
    </extension>
+   <extension
+         point="org.eclipse.core.runtime.preferences">
+      <initializer
+            class="org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer">
+      </initializer>
+   </extension>
+   <extension
+         point="org.eclipse.ui.preferencePages">
+      <page
+            category="org.knime.workbench.ui.preferences"
+            class="org.knime.core.data.columnar.preferences.ColumnarPreferencePage"
+            id="org.knime.core.data.columnar"
+            name="Data Storage (Columnar)">
+      </page>
+   </extension>
 </plugin>
