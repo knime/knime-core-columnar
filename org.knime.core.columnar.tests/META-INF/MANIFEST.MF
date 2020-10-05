@@ -8,6 +8,3 @@ Fragment-Host: org.knime.core.columnar;bundle-version="4.3.0"
 Require-Bundle: org.junit;bundle-version="[4.13.0,5.0.0)",
   org.awaitility;bundle-version="[3.0.0,4.0.0)"
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
-Export-Package: org.knime.core.columnar,
- org.knime.core.columnar.cache,
- org.knime.core.columnar.phantom
