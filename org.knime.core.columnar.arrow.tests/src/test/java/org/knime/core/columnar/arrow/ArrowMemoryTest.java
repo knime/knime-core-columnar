@@ -61,7 +61,6 @@ import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.columnar.store.ColumnStoreSchema;
-import org.knime.core.columnar.store.ColumnStoreUtils;
 
 /**
  * A long running test allocating, writing and reading many chunks.
@@ -92,15 +91,13 @@ public class ArrowMemoryTest {
                 final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
                 final ColumnStoreSchema schema = ArrowTestUtils.createWideSchema(DoubleDataSpec.INSTANCE, numColumns);
 
-                try (final ColumnStore writeStore =
-                    factory.createWriteStore(schema, ArrowTestUtils.createTmpKNIMEArrowFile(), chunkSize);
-                        final ColumnStore store = ColumnStoreUtils.cache(writeStore)) {
+                try (final ColumnStore store =
+                    factory.createWriteStore(schema, ArrowTestUtils.createTmpKNIMEArrowFile(), chunkSize)) {
 
                     storeData(numChunks, chunkSize, numColumns, store);
 
-                    try (final ColumnStore a =
-                        factory.createWriteStore(schema, ArrowTestUtils.createTmpKNIMEArrowFile(), chunkSize);
-                            final ColumnStore copyStore = ColumnStoreUtils.cache(a)) {
+                    try (final ColumnStore copyStore =
+                        factory.createWriteStore(schema, ArrowTestUtils.createTmpKNIMEArrowFile(), chunkSize)) {
 
                         copyData(numChunks, store, copyStore);
                     }
