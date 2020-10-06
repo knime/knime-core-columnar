@@ -22,17 +22,17 @@
 				<groupId>org.eclipse.tycho</groupId>
 				<artifactId>target-platform-configuration</artifactId>
 				<version>${tycho.version}</version>
-				<!--configuration>
+				<configuration>
 					<dependency-resolution>
 						<extraRequirements>
 							<requirement>
 								<type>eclipse-feature</type>
-								<id>org.knime.features.core</id>
+								<id>org.knime.features.core.columnar.arrow</id>
 								<versionRange>0.0.0</versionRange>
 							</requirement>
 						</extraRequirements>
 					</dependency-resolution>
-				</configuration-->
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
