@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.knime.core.columnar.arrow.ArrowColumnStoreFactory;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
@@ -66,6 +65,7 @@ import org.knime.core.data.columnar.domain.ColumnarDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainStoreConfig;
 import org.knime.core.data.columnar.domain.DomainColumnStore;
 import org.knime.core.data.columnar.domain.DomainColumnStore.DomainColumnDataWriter;
+import org.knime.core.data.columnar.factory.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.domain.DomainStoreConfig;
 import org.knime.core.data.columnar.mapping.DataTypeMapper;
 import org.knime.core.data.columnar.mapping.DataTypeMapperRegistry;
@@ -101,7 +101,11 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
 			final ColumnarRowWriteCursorConfig config, final Map<Integer, DataTypeConfig> configs) throws IOException {
 		m_tableId = tableId;
 		m_spec = DataTypeMapperRegistry.convert(spec, config.getRowKeyConfig(), configs);
-		m_storeFactory = new ArrowColumnStoreFactory();
+		try {
+            m_storeFactory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+        } catch (Exception ex) {
+            throw new IOException("Can't determine column store backend", ex);
+        }
 		final Map<Integer, ColumnarDomain> initialDomains = DataTypeMapperRegistry.extractInitialDomains(spec);
 		final DomainStoreConfig domainStoreConfig = new DefaultDomainStoreConfig(m_spec, initialDomains, config);
 

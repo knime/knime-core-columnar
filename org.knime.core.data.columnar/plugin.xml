@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?eclipse version="3.4"?>
 <plugin>
+   <extension-point id="ColumnStoreFactory" name="org.knime.core.data.columnar" schema="schema/ColumnStoreFactory.exsd"/>
    <extension
          point="org.knime.core.ExtensionTable">
       <ExtensionTableLoader
