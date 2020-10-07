@@ -26,10 +26,22 @@
 	<modules>
 		<module>org.knime.core.columnar</module>
 		<module>org.knime.core.columnar.tests</module>
+		<module>org.knime.core.data.columnar</module>
+		<module>org.knime.core.data.columnar.tests</module>
 		<module>org.knime.features.core.columnar</module>
 		<module>org.knime.update.core.columnar</module>
 	</modules>
 	<repositories>
+		<repository>
+			<id>p2-knime-core</id>
+			<layout>p2</layout>
+			<url>${knime.core.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-shared</id>
+			<layout>p2</layout>
+			<url>${knime.shared.p2}</url>
+		</repository>
 		<repository>
 			<id>p2-knime-tp</id>
 			<layout>p2</layout>
