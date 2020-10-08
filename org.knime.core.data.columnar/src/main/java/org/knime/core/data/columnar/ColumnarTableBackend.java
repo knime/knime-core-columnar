@@ -12,18 +12,18 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTypeConfig;
 import org.knime.core.data.IDataRepository;
-import org.knime.core.data.RowContainerCustomKey;
-import org.knime.core.data.RowKeyConfig;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.RowWriteCursor;
 import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.mapping.DataTypeMapperRegistry;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.container.ILocalDataRepository;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
-import org.knime.core.data.values.RowKeyWriteValue;
-import org.knime.core.data.values.WriteValue;
+import org.knime.core.data.v2.RowContainerCustomKey;
+import org.knime.core.data.v2.RowKeyConfig;
+import org.knime.core.data.v2.RowKeyWriteValue;
+import org.knime.core.data.v2.RowWriteCursor;
+import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
@@ -37,7 +37,7 @@ public class ColumnarTableBackend implements TableBackend {
 
 	static {
 		String d;
-		try (InputStream in = ColumnarTableBackend.class.getResourceAsStream("./description.html")) {
+		try (InputStream in = ColumnarTableBackend.class.getResourceAsStream("description.html")) {
 			d = IOUtils.readLines(in, StandardCharsets.UTF_8).stream().collect(Collectors.joining("\n"));
 		} catch (NullPointerException | IOException ioe) {
 			LOGGER.error("Unable to parse description file", ioe);
