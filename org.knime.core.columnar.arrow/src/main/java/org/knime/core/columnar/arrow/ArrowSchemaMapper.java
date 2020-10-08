@@ -52,6 +52,7 @@ import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarCharData.ArrowVarCharDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
@@ -68,6 +69,7 @@ import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
+import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
 import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
 import org.knime.core.columnar.data.StringData.StringDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
@@ -172,5 +174,10 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     @Override
     public ArrowVoidDataFactory visit(final VoidDataSpec spec) {
         return ArrowVoidDataFactory.INSTANCE;
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final ObjectDataSpec<?> spec) {
+        return new ArrowObjectDataFactory<>(spec.getSerializer());
     }
 }
