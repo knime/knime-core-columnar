@@ -23,10 +23,10 @@
    <extension
          point="org.eclipse.ui.preferencePages">
       <page
-            category="org.knime.workbench.ui.preferences"
+            category="org.knime.workbench.ui.preferences.tablebackend"
             class="org.knime.core.data.columnar.preferences.ColumnarPreferencePage"
             id="org.knime.core.data.columnar"
-            name="Data Storage (Columnar)">
+            name="Columnar (Labs)">
       </page>
    </extension>
 </plugin>

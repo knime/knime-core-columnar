@@ -65,8 +65,8 @@ import org.knime.core.data.columnar.domain.ColumnarDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainStoreConfig;
 import org.knime.core.data.columnar.domain.DomainColumnStore;
 import org.knime.core.data.columnar.domain.DomainColumnStore.DomainColumnDataWriter;
-import org.knime.core.data.columnar.factory.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.domain.DomainStoreConfig;
+import org.knime.core.data.columnar.factory.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.mapping.DataTypeMapper;
 import org.knime.core.data.columnar.mapping.DataTypeMapperRegistry;
 import org.knime.core.data.columnar.mapping.DomainDataTypeMapper;
@@ -77,6 +77,10 @@ import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.values.WriteValue;
 
 public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColumnarContainerTable>, IndexSupplier {
+
+    private static final String CHUNK_SIZE_PROPERTY = "knime.columnar.chunksize";
+
+    private static final int CHUNK_SIZE = Integer.getInteger(CHUNK_SIZE_PROPERTY, 28_000);
 
 	private final ColumnStoreFactory m_storeFactory;
 	private final ColumnarDataTableSpec m_spec;
@@ -109,11 +113,10 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
 		final Map<Integer, ColumnarDomain> initialDomains = DataTypeMapperRegistry.extractInitialDomains(spec);
 		final DomainStoreConfig domainStoreConfig = new DefaultDomainStoreConfig(m_spec, initialDomains, config);
 
-        m_store =
-            new DomainColumnStore(
-                ColumnarPreferenceUtils.wrap(m_storeFactory.createWriteStore(m_spec,
-                    DataContainer.createTempFile(".knable"), ColumnarPreferenceUtils.getChunkSize())),
-                domainStoreConfig);
+        m_store = new DomainColumnStore(
+            ColumnarPreferenceUtils
+                .wrap(m_storeFactory.createWriteStore(m_spec, DataContainer.createTempFile(".knable"), CHUNK_SIZE)),
+            domainStoreConfig);
 
 		m_columnDataFactory = m_store.getFactory();
 		m_writer = m_store.getWriter();

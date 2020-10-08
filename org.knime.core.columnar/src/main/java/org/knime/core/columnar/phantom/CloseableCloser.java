@@ -65,6 +65,10 @@ import java.util.stream.Collectors;
  */
 public final class CloseableCloser implements CloseableHandler {
 
+    private static final String VERBOSE_PROPERTY = "knime.columnar.verbose";
+
+    private static final boolean VERBOSE = Boolean.getBoolean(VERBOSE_PROPERTY);
+
     static String stackTraceToString(final StackTraceElement[] stack) {
         return Arrays.stream(stack).map(StackTraceElement::toString).collect(Collectors.joining("\n  "));
     }
@@ -75,7 +79,8 @@ public final class CloseableCloser implements CloseableHandler {
 
     private final String m_resourceName;
 
-    private final String m_stackTraceAtConstructionTime = stackTraceToString(Thread.currentThread().getStackTrace());
+    private final String m_stackTraceAtConstructionTime =
+        VERBOSE ? stackTraceToString(Thread.currentThread().getStackTrace()) : null;
 
     /**
      * @param closeable the closeable that should be handled
@@ -106,11 +111,13 @@ public final class CloseableCloser implements CloseableHandler {
     @Override
     public void closeCloseableAndLogOutput() throws Exception {
         if (!isClosed()) {
-            System.err.println(String.format("%s resource was not correctly released by its owner "
-                + "and will now be released automically by resource leak detection.", m_resourceName));
-            System.err.println(String.format("Construction time call stack: %s", m_stackTraceAtConstructionTime));
-            System.err.println(
-                String.format("Current call stack: %s", stackTraceToString(Thread.currentThread().getStackTrace())));
+            if (VERBOSE) {
+                System.err.println(String.format("%s resource was not correctly released by its owner "
+                        + "and will now be released automically by resource leak detection.", m_resourceName));
+                System.err.println(String.format("Construction time call stack: %s", m_stackTraceAtConstructionTime));
+                System.err.println(
+                    String.format("Current call stack: %s", stackTraceToString(Thread.currentThread().getStackTrace())));
+            }
             m_closeable.close();
         }
         close();

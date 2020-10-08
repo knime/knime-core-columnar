@@ -30,11 +30,11 @@ import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.NodeLogger;
 
 public class ColumnarTableBackend implements TableBackend {
-	
+
 	private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarTableBackend.class);
-	
+
 	private static final String DESCRIPTION;
-	
+
 	static {
 		String d;
 		try (InputStream in = ColumnarTableBackend.class.getResourceAsStream("./description.html")) {
@@ -69,19 +69,18 @@ public class ColumnarTableBackend implements TableBackend {
 		return true;
 	}
 
-	@Override
-	public RowContainerCustomKey create(ExecutionContext context, DataTableSpec spec, DataContainerSettings settings,
-			Map<Integer, DataTypeConfig> additionalConfigs) {
-		try {
-			final ColumnarRowWriteCursor cursor = new ColumnarRowWriteCursor(-1, spec,
-					new ColumnarRowWriteCursorConfig(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-							RowKeyConfig.CUSTOM),
-					additionalConfigs);
-			return new DefaultRowContainerCustomKey(context, cursor);
-		} catch (IOException e) {
-			throw new IllegalStateException(e);
-		}
-	}
+    @Override
+    public RowContainerCustomKey create(final ExecutionContext context, final DataTableSpec spec,
+        final DataContainerSettings settings, final Map<Integer, DataTypeConfig> additionalConfigs) {
+        try {
+            final ColumnarRowWriteCursor cursor =
+                new ColumnarRowWriteCursor(-1, spec, new ColumnarRowWriteCursorConfig(settings.getInitializeDomain(),
+                    settings.getMaxDomainValues(), RowKeyConfig.CUSTOM), additionalConfigs);
+            return new DefaultRowContainerCustomKey(context, cursor);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
 
 	static final class DefaultRowContainerCustomKey implements RowContainerCustomKey {
 
@@ -135,12 +134,12 @@ public class ColumnarTableBackend implements TableBackend {
 			m_container.setMissing(index);
 		}
 	}
-	
+
 	@Override
 	public String getShortName() {
-		return "Compact Columnar (Labs)";
+		return "Columnar (Labs)";
 	}
-	
+
 	@Override
 	public String getDescription() {
 		return DESCRIPTION;

@@ -90,6 +90,8 @@ public final class SmallColumnStore implements ColumnStore {
 
         private final LoadingEvictingCache<SmallColumnStore, Table> m_cache;
 
+        private final long m_cacheSize;
+
         /**
          * @param smallTableThreshold the size (in bytes) that determines whether a table is considered small
          * @param cacheSize the number of small tables the cache should be able to hold
@@ -97,6 +99,11 @@ public final class SmallColumnStore implements ColumnStore {
         public SmallColumnStoreCache(final int smallTableThreshold, final long cacheSize) {
             m_smallTableThreshold = smallTableThreshold;
             m_cache = new SizeBoundLruCache<>(cacheSize);
+            m_cacheSize = cacheSize;
+        }
+
+        public long getMaxSize() {
+            return m_cacheSize;
         }
 
         int size() {

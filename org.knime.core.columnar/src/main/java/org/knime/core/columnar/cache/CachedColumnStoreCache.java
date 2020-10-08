@@ -59,11 +59,18 @@ public final class CachedColumnStoreCache {
 
     private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_cache;
 
+    private final long m_cacheSizeBytes;
+
     /**
-     * @param cacheSize the size of the cache in bytes
+     * @param cacheSizeBytes the size of the cache in bytes
      */
-    public CachedColumnStoreCache(final long cacheSize) {
-        m_cache = new SizeBoundLruCache<>(cacheSize);
+    public CachedColumnStoreCache(final long cacheSizeBytes) {
+        m_cache = new SizeBoundLruCache<>(cacheSizeBytes);
+        m_cacheSizeBytes = cacheSizeBytes;
+    }
+
+    public long getMaxSizeInBytes() {
+        return m_cacheSizeBytes;
     }
 
     int size() {

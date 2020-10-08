@@ -48,9 +48,20 @@
  */
 package org.knime.core.data.columnar.preferences;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryType;
+import java.lang.management.MemoryUsage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javax.management.AttributeNotFoundException;
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanException;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+import javax.management.ReflectionException;
 
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
@@ -69,92 +80,170 @@ import org.osgi.framework.FrameworkUtil;
 @SuppressWarnings("javadoc")
 public final class ColumnarPreferenceUtils {
 
+    private static final String RESERVED_SIZE_PROPERTY = "knime.columnar.reservedmemorymb";
+
+    // by default, reserve 4 GB for system
+    private static final int RESERVED_SIZE = Integer.getInteger(RESERVED_SIZE_PROPERTY, 4096);
+
     private static final String COLUMNAR_SYMBOLIC_NAME =
         FrameworkUtil.getBundle(ColumnarTableBackend.class).getSymbolicName();
 
     static final ScopedPreferenceStore COLUMNAR_STORE =
         new ScopedPreferenceStore(InstanceScope.INSTANCE, COLUMNAR_SYMBOLIC_NAME);
 
-    static final String CHUNK_SIZE_KEY = "knime.core.data.columnar.chunk-size";
+    // the size (in MB) up to which a table is considered small
+    static final String SMALL_TABLE_THRESHOLD_KEY = "knime.core.data.columnar.small-threshold";
 
-    static final int CHUNK_SIZE_DEF = 28_000;
-
-    static final String ENABLE_PHANTOM_REFERENCE_STORE_KEY = "knime.core.data.columnar.emnable-phantom-store";
-
-    static final boolean ENABLE_PHANTOM_REFERENCE_STORE_DEF = true;
-
-    static final String ENABLE_CACHED_STORE_KEY = "knime.core.data.columnar.emnable-cached-store";
-
-    static final boolean ENABLE_CACHED_STORE_DEF = true;
+    // the size (in MB) of the LRU cache for entire small tables
+    static final String SMALL_TABLE_CACHE_SIZE_KEY = "knime.core.data.columnar.small-cache-size";
 
     static final String ASYNC_FLUSH_NUM_THREADS_KEY = "knime.core.data.columnar.flush-num-threads";
 
-    static final int ASYNC_FLUSH_NUM_THREADS_DEF = 4;
+    // the size (in MB) of the LRU cache for ColumnData of all tables
+    static final String COLUMN_DATA_CACHE_SIZE_KEY = "knime.core.data.columnar.data-cache-size";
 
     private static final AtomicLong THREAD_COUNT = new AtomicLong();
 
-    private static final ExecutorService ASYNC_FLUSH_EXECUTOR =
-        Executors.newFixedThreadPool(COLUMNAR_STORE.getInt(ASYNC_FLUSH_NUM_THREADS_KEY),
-            r -> new Thread(r, "KNIME-BackgroundColumnStoreWriter-" + THREAD_COUNT.incrementAndGet()));
+    // lazily initialized
+    private static ExecutorService ASYNC_FLUSH_EXECUTOR;
 
-    static final String COLUMN_DATA_CACHE_SIZE_KEY = "knime.core.data.columnar.data-cache-size";
+    // lazily initialized
+    private static CachedColumnStoreCache COLUMN_DATA_CACHE;
 
-    // the size (in MB) of the LRU cache for ColumnData of all tables
-    static final int COLUMN_DATA_CACHE_SIZE_DEF = 1 << 10; // 1 GB
-
-    private static final CachedColumnStoreCache COLUMN_DATA_CACHE =
-        new CachedColumnStoreCache((long)COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY) << 20);
-
-    static final String ENABLE_SMALL_STORE_KEY = "knime.core.data.columnar.emnable-small-store";
-
-    static final boolean ENABLE_SMALL_STORE_DEF = true;
-
-    static final String SMALL_TABLE_THRESHOLD_KEY = "knime.core.data.columnar.small-threshold";
-
-    // the size (in MB) up to which a table is considered small
-    static final int SMALL_TABLE_THRESHOLD_DEF = 1; // 1 MB
-
-    static final String SMALL_TABLE_CACHE_SIZE_KEY = "knime.core.data.columnar.small-cache-size";
-
-    // the size (in MB) of the LRU cache for entire small tables
-    static final int SMALL_TABLE_CACHE_SIZE_DEF = 1 << 5; // 32 MB, i.e., holds up to 32 small tables
-
-    private static final SmallColumnStoreCache SMALL_TABLE_CACHE =
-        new SmallColumnStoreCache(COLUMNAR_STORE.getInt(SMALL_TABLE_THRESHOLD_KEY) << 20,
-            (long)COLUMNAR_STORE.getInt(SMALL_TABLE_CACHE_SIZE_KEY) << 20);
+    // lazily initialized
+    private static SmallColumnStoreCache SMALL_TABLE_CACHE;
 
     private ColumnarPreferenceUtils() {
     }
 
-    public static int getChunkSize() {
-        return COLUMNAR_STORE.getInt(CHUNK_SIZE_KEY);
+    static long getMaxHeapSize() {
+        return ManagementFactory.getMemoryPoolMXBeans().stream().filter(m -> m.getType() == MemoryType.HEAP)
+            .map(MemoryPoolMXBean::getUsage).mapToLong(MemoryUsage::getMax).sum();
+    }
+
+    private static long getTotalPhysicalMemorySize() {
+        try {
+            // Unfortunately, there does not seem to be a safer way to determine the system's physical memory size.
+            // The closest alternative would be ManagementFactory.getOperatingSystemMXBean::getTotalPhysicalMemorySize,
+            // which is not supported in OpenJDK 8.
+            return ((Long)ManagementFactory.getPlatformMBeanServer()
+                .getAttribute(new ObjectName("java.lang", "type", "OperatingSystem"), "TotalPhysicalMemorySize"))
+                    .longValue();
+        } catch (ClassCastException | InstanceNotFoundException | AttributeNotFoundException
+                | MalformedObjectNameException | ReflectionException | MBeanException ex) {
+        }
+        return 0L;
+    }
+
+    private static long getTotalFreeMemorySize() {
+        try {
+            return ((Long)ManagementFactory.getPlatformMBeanServer()
+                .getAttribute(new ObjectName("java.lang", "type", "OperatingSystem"), "FreePhysicalMemorySize"))
+                    .longValue();
+        } catch (ClassCastException | InstanceNotFoundException | AttributeNotFoundException
+                | MalformedObjectNameException | ReflectionException | MBeanException ex) {
+        }
+        return 0L;
+    }
+
+    /**
+     * @return an estimate of the amount of available off-heap memory (in MB)
+     */
+    static int getUsablePhysicalMemorySizeMB() {
+        final long jvmMemory = (long)(getMaxHeapSize() * 1.25); // add 25% to heap size for GC, code cache, etc.
+        final long totalUnreservedMemory = getTotalPhysicalMemorySize() - ((long)RESERVED_SIZE << 20);
+        final long freeMemorySans1G = getTotalFreeMemorySize() - (1L << 30); // reserve 1 GB for other applications
+
+        final long usablePhysicalMemory = Math.max(Math.min(totalUnreservedMemory - jvmMemory, freeMemorySans1G), 0L);
+        return (int)Math.min(usablePhysicalMemory >> 20, Integer.MAX_VALUE);
+    }
+
+    static int getNumAvailableProcessors() {
+        return Runtime.getRuntime().availableProcessors();
+    }
+
+    private static int getSmallTableThreshold() {
+        return COLUMNAR_STORE.getInt(SMALL_TABLE_THRESHOLD_KEY);
+    }
+
+    static int getSmallTableCacheSize() {
+        return COLUMNAR_STORE.getInt(SMALL_TABLE_CACHE_SIZE_KEY);
+    }
+
+    static int getAsyncFlushNumThreads() {
+        return COLUMNAR_STORE.getInt(ASYNC_FLUSH_NUM_THREADS_KEY);
+    }
+
+    static int getColumnDataCacheSize() {
+        return COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY);
+    }
+
+    private static ExecutorService getAsyncFlushExecutor() {
+        if (ASYNC_FLUSH_EXECUTOR == null) {
+            ASYNC_FLUSH_EXECUTOR = Executors.newFixedThreadPool(getAsyncFlushNumThreads(),
+                r -> new Thread(r, "KNIME-BackgroundColumnStoreWriter-" + THREAD_COUNT.incrementAndGet()));
+        }
+        return ASYNC_FLUSH_EXECUTOR;
+    }
+
+    private static CachedColumnStoreCache getColumnDataCache() {
+        if (COLUMN_DATA_CACHE == null) {
+            long columnDataCacheSize = getColumnDataCacheSize() << 20;
+            long totalFreeMemorySize = getTotalFreeMemorySize();
+
+            if (columnDataCacheSize <= totalFreeMemorySize) {
+                COLUMN_DATA_CACHE = new CachedColumnStoreCache(columnDataCacheSize);
+            } else {
+                COLUMN_DATA_CACHE = new CachedColumnStoreCache(0);
+                System.err.println(String.format(
+                    "Column Data Cache is configured to be of size %dB, but only %dB of memory are available.",
+                    columnDataCacheSize, totalFreeMemorySize));
+            }
+        }
+        return COLUMN_DATA_CACHE;
+    }
+
+    private static SmallColumnStoreCache getSmallTableCache() {
+        if (SMALL_TABLE_CACHE == null) {
+            long smallTableCacheSize = getSmallTableCacheSize() << 20;
+            long totalFreeMemorySize = getTotalFreeMemorySize();
+
+            if (smallTableCacheSize <= totalFreeMemorySize) {
+                SMALL_TABLE_CACHE = new SmallColumnStoreCache(getSmallTableThreshold() << 20, smallTableCacheSize);
+            } else {
+                SMALL_TABLE_CACHE = new SmallColumnStoreCache(getSmallTableThreshold() << 20, 0);
+                System.err.println(String.format(
+                    "Small Table Cache is configured to be of size %dB, but only %dB of memory are available.",
+                    smallTableCacheSize, totalFreeMemorySize));
+            }
+        }
+        return SMALL_TABLE_CACHE;
     }
 
     @SuppressWarnings("resource")
     public static ColumnStore wrap(final ColumnStore store) {
+
+        final CachedColumnStoreCache columnDataCache = getColumnDataCache();
+        final SmallColumnStoreCache smallTableCache = getSmallTableCache();
+
         ColumnStore wrapped = store;
-        if (COLUMNAR_STORE.getBoolean(ENABLE_CACHED_STORE_KEY)) {
-            wrapped = new AsyncFlushCachedColumnStore(wrapped, COLUMN_DATA_CACHE, ASYNC_FLUSH_EXECUTOR);
+
+        if (columnDataCache.getMaxSizeInBytes() > 0) {
+            wrapped = new AsyncFlushCachedColumnStore(wrapped, columnDataCache, getAsyncFlushExecutor());
         }
-        if (COLUMNAR_STORE.getBoolean(ENABLE_SMALL_STORE_KEY)) {
-            wrapped = new SmallColumnStore(wrapped, SMALL_TABLE_CACHE);
+        if (smallTableCache.getMaxSize() > 0) {
+            wrapped = new SmallColumnStore(wrapped, smallTableCache);
         }
-        if (COLUMNAR_STORE.getBoolean(ENABLE_PHANTOM_REFERENCE_STORE_KEY)) {
-            wrapped = PhantomReferenceStore.create(wrapped);
-        }
-        return wrapped;
+        return PhantomReferenceStore.create(wrapped);
     }
 
     @SuppressWarnings("resource")
     public static ColumnReadStore wrap(final ColumnReadStore store) {
         ColumnReadStore wrapped = store;
-        if (COLUMNAR_STORE.getBoolean(ENABLE_CACHED_STORE_KEY)) {
-            wrapped = new CachedColumnReadStore(wrapped, COLUMN_DATA_CACHE);
+        if (getColumnDataCacheSize() > 0) {
+            wrapped = new CachedColumnReadStore(wrapped, getColumnDataCache());
         }
-        if (COLUMNAR_STORE.getBoolean(ENABLE_PHANTOM_REFERENCE_STORE_KEY)) {
-            wrapped = PhantomReferenceReadStore.create(wrapped);
-        }
-        return wrapped;
+        return PhantomReferenceReadStore.create(wrapped);
     }
 
 }
