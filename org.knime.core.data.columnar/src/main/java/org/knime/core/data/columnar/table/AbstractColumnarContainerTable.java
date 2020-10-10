@@ -49,6 +49,7 @@ package org.knime.core.data.columnar.table;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -59,6 +60,7 @@ import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.RowCursor;
 import org.knime.core.data.columnar.ColumnarDataTableSpec;
+import org.knime.core.data.columnar.factory.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.mapping.MappedColumnarDataTableSpec;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.container.CloseableRowIterator;
@@ -226,14 +228,20 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 		}
 	}
 
-	private static <O> O createInstance(final String type) throws InvalidSettingsException {
-		try {
-			@SuppressWarnings("unchecked")
-			final O o = (O) Class.forName(type).getDeclaredConstructor().newInstance();
-			return o;
-		} catch (Exception e) {
-			throw new InvalidSettingsException("Unable to instantiate object of type: " + type, e);
-		}
+	private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
+	    try {
+	        ColumnStoreFactory factory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+	        if (!Objects.equals(factory.getClass().getName(), type)) {
+	            throw new InvalidSettingsException(
+	                String.format("Class of column store factory not as expected (installed: %s, requested: %s)",
+	                    factory.getClass().getName(), type));
+	        }
+	        return factory;
+	    } catch (InvalidSettingsException e) {
+	        throw e;
+	    } catch (Exception e) {
+	        throw new InvalidSettingsException("Unable to instantiate object of type: " + type, e);
+	    }
 	}
 
 	private static int[] toSortedIntArray(final Set<Integer> selection) {
