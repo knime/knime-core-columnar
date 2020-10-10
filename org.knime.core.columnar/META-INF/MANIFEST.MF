@@ -3,7 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: KNIME Table Plugin
 Bundle-SymbolicName: org.knime.core.columnar;singleton:=true
 Bundle-Version: 4.3.0.qualifier
-Bundle-Vendor: KNIME AG
+Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
 Require-Bundle: 

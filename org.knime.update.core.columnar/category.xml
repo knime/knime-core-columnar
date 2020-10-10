@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <site>
-   <feature id="org.knime.features.core.columnar">
-      <category name="knime-core-columnar"/>
-   </feature>
-   <feature id="org.knime.features.core.columnar.source">
-      <category name="knime-core-columnar"/>
-   </feature>
+   <bundle id="org.knime.core.columnar"/>
+   <bundle id="org.knime.core.columnar.source"/>
+   <bundle id="org.knime.core.data.columnar"/>
+   <bundle id="org.knime.core.data.columnar.source"/>
    <category-def name="knime-core-columnar" label="Build artifacts from knime-core-columnar">
       <description>
          Build artifacts from knime-core-columnar
