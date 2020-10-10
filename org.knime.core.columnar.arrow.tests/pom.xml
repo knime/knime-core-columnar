@@ -12,10 +12,6 @@
 	<artifactId>org.knime.core.columnar.arrow.tests</artifactId>
 	<packaging>eclipse-test-plugin</packaging>
   
-    <properties>
-        <revision>4.3.0</revision>
-    </properties>
-
 	<build>
 		<plugins>
 			<plugin>
@@ -27,7 +23,7 @@
 						<extraRequirements>
 							<requirement>
 								<type>eclipse-feature</type>
-								<id>org.knime.features.core.columnar.arrow</id>
+								<id>org.knime.features.core.columnar</id>
 								<versionRange>0.0.0</versionRange>
 							</requirement>
 						</extraRequirements>
