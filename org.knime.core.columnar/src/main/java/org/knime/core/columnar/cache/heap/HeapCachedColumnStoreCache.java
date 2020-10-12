@@ -44,43 +44,35 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 9, 2020 (dietzc): created
+ *   13 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.cache.heap;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.FilteredColumnSelection;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.cache.ColumnDataUniqueId;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 /**
- * Utility class.
+ * In heap memory cache.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class HeapCacheUtils {
+public final class HeapCachedColumnStoreCache {
 
-    private HeapCacheUtils() {
-    }
+    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
 
     /**
-     * Get the indices of all ObjectData in the ColumnStoreSchema.
-     *
-     * @param schema the ColumnStoreSchema
-     * @return indices of ObjectData in the schema
+     * Constructor
      */
-    static final ColumnSelection getObjectDataIndices(final ColumnStoreSchema schema) {
-        final List<Integer> indices = new ArrayList<>();
-        final int length = schema.getNumColumns();
-        for (int i = 0; i < length; i++) {
-            if (schema.getColumnDataSpec(i) instanceof ObjectDataSpec) {
-                indices.add(i);
-            }
-        }
-        return new FilteredColumnSelection(length, indices.stream().mapToInt(Integer::intValue).toArray());
+    public HeapCachedColumnStoreCache() {
+        m_cache = CacheBuilder.newBuilder().weakValues().build();
+    }
+
+    Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> getCache() {
+        return m_cache;
     }
 
 }

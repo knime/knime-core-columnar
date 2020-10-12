@@ -49,40 +49,117 @@
 package org.knime.core.columnar.cache.heap;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.cache.ColumnDataUniqueId;
+import org.knime.core.columnar.data.ObjectData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
+import com.google.common.cache.Cache;
+
 /**
- * TODO
+ * {@link ColumnReadStore} caching {@link ObjectData} as weak references in heap.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @since 4.3
  */
-public class HeapCachedColumnReadStore implements ColumnReadStore {
+public final class HeapCachedColumnReadStore implements ColumnReadStore {
+
+    private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
+
+    private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
+
+    private final class Reader implements ColumnDataReader {
+
+        private final ColumnDataReader m_delegateReader;
+
+        private final ColumnSelection m_selection;
+
+        private boolean m_readerClosed;
+
+        private Reader(final ColumnSelection selection) {
+            m_delegateReader = m_delegate.createReader(selection);
+            m_selection = selection;
+        }
+
+        @Override
+        public ReadBatch readRetained(final int index) throws IOException {
+            if (m_readerClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
+            }
+            if (m_storeClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
+
+            final ReadBatch batch = m_delegateReader.readRetained(index);
+            return ColumnSelection.createBatch(m_selection,
+                i -> m_objectData.isSelected(i) ? wrap(batch, index, i) : batch.get(i));
+        }
+
+        @SuppressWarnings("unchecked")
+        private <T> HeapCachedReadData<T> wrap(final ReadBatch batch, final int index, final int i) {
+            final ObjectReadData<T> columnReadData = (ObjectReadData<T>)batch.get(i);
+            final AtomicReferenceArray<T> array = (AtomicReferenceArray<T>)m_cache.asMap().computeIfAbsent(
+                new ColumnDataUniqueId(HeapCachedColumnReadStore.this, i, index),
+                k -> new AtomicReferenceArray<>(columnReadData.length()));
+            return new HeapCachedReadData<>(columnReadData, array);
+        }
+
+        @Override
+        public int getNumBatches() throws IOException {
+            return m_delegateReader.getNumBatches();
+        }
+
+        @Override
+        public int getMaxLength() throws IOException {
+            return m_delegateReader.getMaxLength();
+        }
+
+        @Override
+        public void close() throws IOException {
+            m_readerClosed = true;
+
+            m_delegateReader.close();
+        }
+
+    }
 
     private final ColumnReadStore m_delegate;
 
-    private final int[] m_selection;
+    private final ColumnSelection m_objectData;
 
-    public HeapCachedColumnReadStore(final ColumnReadStore delegate) {
-        this(delegate, HeapCacheUtils.getObjectDataIndices(delegate.getSchema()));
+    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+
+    private volatile boolean m_storeClosed;
+
+    /**
+     * @param delegate the delegate from which to read
+     * @param cache the delegate from which to read object data in case of a cache miss
+     */
+    public HeapCachedColumnReadStore(final ColumnReadStore delegate, final HeapCachedColumnStoreCache cache) {
+        this(delegate, HeapCacheUtils.getObjectDataIndices(delegate.getSchema()), cache);
     }
 
-    public HeapCachedColumnReadStore(final ColumnReadStore delegate, final int[] selection) {
+    HeapCachedColumnReadStore(final ColumnReadStore delegate, final ColumnSelection selection,
+        final HeapCachedColumnStoreCache cache) {
         m_delegate = delegate;
-        m_selection = selection;
+        m_objectData = selection;
+        m_cache = cache.getCache();
     }
 
-    @SuppressWarnings("resource")
     @Override
-    public ColumnDataReader createReader(final ColumnSelection config) {
-        return new HeapCachedColumnDataReader(m_delegate.createReader(config), m_selection);
+    public ColumnDataReader createReader(final ColumnSelection selection) {
+        if (m_storeClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+        }
+
+        return new Reader(selection);
     }
 
     @Override
@@ -92,55 +169,9 @@ public class HeapCachedColumnReadStore implements ColumnReadStore {
 
     @Override
     public void close() throws IOException {
+        m_storeClosed = true;
+
         m_delegate.close();
-    }
-
-    private static class HeapCachedColumnDataReader implements ColumnDataReader {
-
-        private final int[] m_selection;
-
-        private final ColumnDataReader m_delegate;
-
-        private HeapCachedColumnDataReader(final ColumnDataReader delegate, final int[] selection) {
-            m_delegate = delegate;
-            m_selection = selection;
-        }
-
-        @Override
-        public void close() throws IOException {
-            m_delegate.close();
-        }
-
-        @Override
-        public ReadBatch readRetained(final int index) throws IOException {
-            final ReadBatch batch = m_delegate.readRetained(index);
-            final ColumnReadData[] data = new ColumnReadData[batch.getNumColumns()];
-
-            // TODO do we have to do this for each read? :-(
-            int selectionIndex = 0;
-            for (int i = 0; i < data.length; i++) {
-                final ColumnReadData readData = batch.get(i);
-                if (selectionIndex < m_selection.length && m_selection[selectionIndex] == i
-                    && !(readData instanceof HeapCachedReadData)) {
-                    final ObjectReadData<?> columnReadData = (ObjectReadData<?>)batch.get(i);
-                    data[i] = new HeapCachedReadData<>(columnReadData);
-                    selectionIndex++;
-                } else {
-                    data[i] = batch.get(i);
-                }
-            }
-            return new DefaultReadBatch(data, batch.length());
-        }
-
-        @Override
-        public int getNumBatches() throws IOException {
-            return m_delegate.getNumBatches();
-        }
-
-        @Override
-        public int getMaxLength() throws IOException {
-            return m_delegate.getMaxLength();
-        }
     }
 
 }

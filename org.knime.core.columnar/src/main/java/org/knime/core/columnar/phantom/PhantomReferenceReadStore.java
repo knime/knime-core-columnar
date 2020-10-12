@@ -128,7 +128,7 @@ public final class PhantomReferenceReadStore implements ColumnReadStore {
     private CloseableHandler m_closed;
 
     /**
-     * @param delegate the delegate to which to write
+     * @param delegate the delegate from which to read
      * @return a new PhantomReferenceReadStore with a registered {@link CloseableDelegateFinalizer}
      */
     public static PhantomReferenceReadStore create(final ColumnReadStore delegate) {

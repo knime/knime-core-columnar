@@ -43,20 +43,21 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  *
- * History
- *   Oct 8, 2020 (dietzc): created
  */
 package org.knime.core.columnar.cache.heap;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -65,135 +66,186 @@ import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
+import com.google.common.cache.Cache;
+
 /**
- * TODO Marc: should we just make this part of the cache, due to the 'restrictions' below.
- *
- * Object column store interceptor for in-heap caching of object columns. Needs to be wrapped around an off-heap cache
- * and has to be inside the domain calculation. Reasoning: the objects are cached and only forwarded to the off-heap
- * cache AFTER full serialization.
+ * {@link ColumnStore} interception {@link ObjectReadData} for in-heap caching of objects.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @since 4.3
  */
-public class HeapCachedColumnStore implements ColumnStore {
+public final class HeapCachedColumnStore implements ColumnStore {
 
-    private final ColumnStore m_delegate;
+    private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
 
-    private final int[] m_selection;
+    private static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
 
-    private final HeapCachedColumnReadStore m_readStore;
+    private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
-    /**
-     * Create a new Object {@link ColumnStore}.
-     *
-     * @param delegate store. Requests will be forwarded to that store.
-     */
-    public HeapCachedColumnStore(final ColumnStore delegate) {
-        m_delegate = delegate;
-        m_selection = HeapCacheUtils.getObjectDataIndices(delegate.getSchema());
-        m_readStore = new HeapCachedColumnReadStore(delegate, m_selection);
-    }
+    private final class Factory implements ColumnDataFactory {
 
-    @SuppressWarnings("resource")
-    @Override
-    public ColumnDataWriter getWriter() {
-        return new HeapCachedColumnStoreWriter(m_delegate.getWriter(), m_selection);
-    }
+        private final ColumnDataFactory m_delegateFactory;
 
-    @Override
-    public ColumnDataFactory getFactory() {
-        return new HeapCacheColumnStoreDataFactory(m_delegate.getFactory(), m_delegate.getSchema(), m_selection);
-    }
-
-    @Override
-    public void save(final File f) throws IOException {
-        m_delegate.save(f);
-    }
-
-    @Override
-    public ColumnDataReader createReader(final ColumnSelection config) {
-        return m_readStore.createReader(config);
-    }
-
-    @Override
-    public ColumnStoreSchema getSchema() {
-        return m_delegate.getSchema();
-    }
-
-    @Override
-    public void close() throws IOException {
-        m_delegate.close();
-        m_readStore.close();
-    }
-
-    private static class HeapCacheColumnStoreDataFactory implements ColumnDataFactory {
-
-        private final int[] m_selection;
-
-        private final ColumnDataFactory m_delegate;
-
-        private final ColumnStoreSchema m_schema;
-
-        private HeapCacheColumnStoreDataFactory(final ColumnDataFactory delegate, final ColumnStoreSchema schema,
-            final int[] selection) {
-            m_delegate = delegate;
-            m_schema = schema;
-            m_selection = selection;
+        private Factory() {
+            m_delegateFactory = m_delegate.getFactory();
         }
 
         @Override
         public WriteBatch create() {
-            final WriteBatch batch = m_delegate.create();
-            final ColumnWriteData[] data = new ColumnWriteData[m_schema.getNumColumns()];
+            if (m_writerClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+            }
+            if (m_storeClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
 
-            // we assume sorting in selection
-            int selectionIndex = 0;
+            final WriteBatch batch = m_delegateFactory.create();
+            final ColumnWriteData[] data = new ColumnWriteData[getSchema().getNumColumns()];
+
             for (int i = 0; i < data.length; i++) {
-                if (selectionIndex < m_selection.length && m_selection[selectionIndex] == i) {
+                if (m_objectData.isSelected(i)) {
                     final ObjectWriteData<?> columnWriteData = (ObjectWriteData<?>)batch.get(i);
                     data[i] = new HeapCachedWriteData<>(columnWriteData);
-                    selectionIndex++;
                 } else {
                     data[i] = batch.get(i);
                 }
             }
             return new DefaultWriteBatch(data, batch.capacity());
         }
+
     }
 
-    private static class HeapCachedColumnStoreWriter implements ColumnDataWriter {
+    private final class Writer implements ColumnDataWriter {
 
-        private final ColumnDataWriter m_delegate;
+        private final ColumnDataWriter m_delegateWriter;
 
-        private final int[] m_selection;
+        private int m_numBatches;
 
-        private HeapCachedColumnStoreWriter(final ColumnDataWriter delegate, final int[] selection) {
-            m_delegate = delegate;
-            m_selection = selection;
-        }
-
-        @Override
-        public void close() throws IOException {
-            // TODO close what ever needs to be closed for this guy, e.g. cache etc
-            m_delegate.close();
+        private Writer() {
+            m_delegateWriter = m_delegate.getWriter();
         }
 
         @Override
         public void write(final ReadBatch batch) throws IOException {
+            if (m_writerClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+            }
+            if (m_storeClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
+
             // TODO wait until flushed.
 
             final ColumnReadData[] data = new ColumnReadData[batch.getNumColumns()];
-            int selectionIndex = 0;
             for (int i = 0; i < data.length; i++) {
-                if (selectionIndex < m_selection.length && m_selection[selectionIndex] == i) {
+                if (m_objectData.isSelected(i)) {
                     final HeapCachedReadData<?> heapCachedData = (HeapCachedReadData<?>)batch.get(i);
+                    m_cache.put(new ColumnDataUniqueId(m_readStore, i, m_numBatches), heapCachedData.getData());
+                    m_numBatches++;
                     data[i] = heapCachedData.getDelegate();
-                    selectionIndex++;
                 } else {
                     data[i] = batch.get(i);
                 }
             }
-            m_delegate.write(new DefaultReadBatch(data, batch.length()));
+            m_delegateWriter.write(new DefaultReadBatch(data, batch.length()));
+        }
+
+        @Override
+        public void close() throws IOException {
+            m_writerClosed = true;
+
+            m_delegateWriter.close();
         }
 
     }
+
+    private final ColumnStore m_delegate;
+
+    private final HeapCachedColumnReadStore m_readStore;
+
+    private final Factory m_factory;
+
+    private final Writer m_writer;
+
+    private final ColumnSelection m_objectData;
+
+    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+
+    private volatile boolean m_writerClosed;
+
+    private volatile boolean m_storeClosed;
+
+    /**
+     * @param delegate the delegate to which to write
+     * @param cache the in-heap cache for storing object data
+     */
+    public HeapCachedColumnStore(final ColumnStore delegate, final HeapCachedColumnStoreCache cache) {
+        m_delegate = delegate;
+        m_objectData = HeapCacheUtils.getObjectDataIndices(delegate.getSchema());
+        m_readStore = new HeapCachedColumnReadStore(delegate, cache);
+        m_factory = new Factory();
+        m_writer = new Writer();
+        m_cache = cache.getCache();
+    }
+
+    @Override
+    public ColumnStoreSchema getSchema() {
+        return m_readStore.getSchema();
+    }
+
+    @Override
+    public ColumnDataFactory getFactory() {
+        if (m_writerClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+        }
+        if (m_storeClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+        }
+
+        return m_factory;
+    }
+
+    @Override
+    public ColumnDataWriter getWriter() {
+        if (m_writerClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+        }
+        if (m_storeClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+        }
+
+        return m_writer;
+    }
+
+    @Override
+    public void save(final File f) throws IOException {
+        if (!m_writerClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
+        }
+        if (m_storeClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+        }
+
+        m_delegate.save(f);
+    }
+
+    @Override
+    public ColumnDataReader createReader(final ColumnSelection config) {
+        if (!m_writerClosed) {
+            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
+        }
+
+        return m_readStore.createReader(config);
+    }
+
+    @Override
+    public void close() throws IOException {
+        m_storeClosed = true;
+
+        m_writer.close();
+        m_readStore.close();
+        m_delegate.close();
+    }
+
 }

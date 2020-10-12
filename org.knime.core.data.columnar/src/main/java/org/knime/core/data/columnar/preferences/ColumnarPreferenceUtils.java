@@ -70,6 +70,9 @@ import org.knime.core.columnar.cache.CachedColumnReadStore;
 import org.knime.core.columnar.cache.CachedColumnStoreCache;
 import org.knime.core.columnar.cache.SmallColumnStore;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
+import org.knime.core.columnar.cache.heap.HeapCachedColumnReadStore;
+import org.knime.core.columnar.cache.heap.HeapCachedColumnStore;
+import org.knime.core.columnar.cache.heap.HeapCachedColumnStoreCache;
 import org.knime.core.columnar.phantom.PhantomReferenceReadStore;
 import org.knime.core.columnar.phantom.PhantomReferenceStore;
 import org.knime.core.columnar.store.ColumnReadStore;
@@ -112,6 +115,9 @@ public final class ColumnarPreferenceUtils {
 
     // lazily initialized
     private static SmallColumnStoreCache SMALL_TABLE_CACHE;
+
+    // heap cache
+    private static final HeapCachedColumnStoreCache HEAP_CACHE = new HeapCachedColumnStoreCache();
 
     private ColumnarPreferenceUtils() {
     }
@@ -234,6 +240,8 @@ public final class ColumnarPreferenceUtils {
         if (smallTableCache.getMaxSize() > 0) {
             wrapped = new SmallColumnStore(wrapped, smallTableCache);
         }
+
+        wrapped = new HeapCachedColumnStore(wrapped, HEAP_CACHE);
         return PhantomReferenceStore.create(wrapped);
     }
 
@@ -243,6 +251,8 @@ public final class ColumnarPreferenceUtils {
         if (getColumnDataCacheSize() > 0) {
             wrapped = new CachedColumnReadStore(wrapped, getColumnDataCache());
         }
+
+        wrapped = new HeapCachedColumnReadStore(wrapped, HEAP_CACHE);
         return PhantomReferenceReadStore.create(wrapped);
     }
 

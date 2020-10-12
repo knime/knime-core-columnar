@@ -55,7 +55,7 @@ import org.knime.core.columnar.store.ColumnReadStore;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-class ColumnDataUniqueId {
+public class ColumnDataUniqueId {
 
     private final ColumnReadStore m_store;
 
@@ -63,7 +63,7 @@ class ColumnDataUniqueId {
 
     private final int m_chunkIndex;
 
-    ColumnDataUniqueId(final ColumnReadStore store, final int columnIndex, final int chunkIndex) {
+    public ColumnDataUniqueId(final ColumnReadStore store, final int columnIndex, final int chunkIndex) {
         m_store = store;
         m_columnIndex = columnIndex;
         m_chunkIndex = chunkIndex;
