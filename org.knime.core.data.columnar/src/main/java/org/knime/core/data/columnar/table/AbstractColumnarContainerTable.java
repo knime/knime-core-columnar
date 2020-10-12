@@ -43,7 +43,6 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-
 package org.knime.core.data.columnar.table;
 
 import java.io.File;
@@ -56,16 +55,17 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.phantom.CloseableCloser;
 import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.RowCursor;
-import org.knime.core.data.columnar.ColumnarDataTableSpec;
-import org.knime.core.data.columnar.factory.ColumnStoreFactoryRegistry;
-import org.knime.core.data.columnar.mapping.MappedColumnarDataTableSpec;
+import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.container.CloseableRowIterator;
-import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.filter.TableFilter;
+import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -78,155 +78,164 @@ import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.WorkflowDataRepository;
 
 /**
- * TODO
+ * Abstract implementation of an {@link ExtensionTable}. This table is managed by the KNIME framework and allows access
+ * data from within a {@link ColumnStore}.
  *
- * @author Christian Dietz
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @since 4.3
  */
-abstract class AbstractColumnarContainerTable extends ExtensionTable implements ContainerTable {
+abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
-	private static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
-	private static final String CFG_TABLE_SIZE = "tabe_size";
+    private static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
 
-	private final ColumnStoreFactory m_factory;
-	private final ColumnarDataTableSpec m_spec;
-	private final long m_tableId;
-	private final long m_size;
+    private static final String CFG_TABLE_SIZE = "tabe_size";
 
-	private ColumnReadStore m_store;
+    private final ColumnStoreFactory m_factory;
 
-	private final Set<CloseableCloser> m_openCursorCloseables = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final ColumnarValueSchema m_schema;
 
-	AbstractColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
-		final NodeSettingsRO settings = context.getSettings();
-		m_tableId = -1;
-		m_size = settings.getLong(CFG_TABLE_SIZE);
-		m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
-		m_spec = MappedColumnarDataTableSpec.Serializer.load(context.getTableSpec(), settings);
-		m_store = ColumnarPreferenceUtils.wrap(m_factory.createReadStore(m_spec, context.getDataFileRef().getFile()));
-	}
+    private final long m_tableId;
 
-	@Override
-	protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
-			throws IOException, CanceledExecutionException {
-		settings.addLong(CFG_TABLE_SIZE, m_size);
-		settings.addString(CFG_FACTORY_TYPE, m_factory.getClass().getName());
-		// FIXME: remove need to cast spec
-		MappedColumnarDataTableSpec.Serializer.save((MappedColumnarDataTableSpec) m_spec, settings);
-	}
+    private final long m_size;
 
-	public AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
-			final ColumnarDataTableSpec spec, final ColumnReadStore store, final long size) {
-		m_tableId = tableId;
-		m_factory = factory;
-		m_spec = spec;
-		m_store = store;
-		m_size = size;
-	}
+    private final Set<CloseableCloser> m_openCursorCloseables = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-	@Override
-	public DataTableSpec getDataTableSpec() {
-		return m_spec.getSourceSpec();
-	}
+    private ColumnReadStore m_store;
 
-	@Override
-	public int getTableId() {
-		return (int) m_tableId;
-	}
+    @SuppressWarnings("resource")
+    AbstractColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
+        final NodeSettingsRO settings = context.getSettings();
+        m_tableId = -1;
+        m_size = settings.getLong(CFG_TABLE_SIZE);
+        m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
+        m_schema = ColumnarValueSchemaUtils.create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
+        m_store = ColumnarPreferenceUtils.wrap(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile()));
+    }
 
-	@Override
-	public int getRowCount() {
-		return KnowsRowCountTable.checkRowCount(m_size);
-	}
+    @Override
+    protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
+        throws IOException, CanceledExecutionException {
+        settings.addLong(CFG_TABLE_SIZE, m_size);
+        settings.addString(CFG_FACTORY_TYPE, m_factory.getClass().getName());
+        ValueSchema.Serializer.save(m_schema.getSourceSchema(), settings);
+    }
 
-	@Override
-	public void putIntoTableRepository(final WorkflowDataRepository dataRepository) {
-		// TODO only relevant in case of newly created tables?
-		dataRepository.addTable((int) m_tableId, this);
-	}
+    public AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnReadStore store, final long size) {
+        m_tableId = tableId;
+        m_factory = factory;
+        m_schema = schema;
+        m_store = store;
+        m_size = size;
+    }
 
-	@Override
-	public boolean removeFromTableRepository(final WorkflowDataRepository dataRepository) {
-		// TODO only relevant in case of newly created tables?
-		dataRepository.removeTable((int) m_tableId);
-		return true;
-	}
+    @Override
+    public DataTableSpec getDataTableSpec() {
+        return m_schema.getSourceSpec();
+    }
 
-	@Override
-	public long size() {
-		return m_size;
-	}
+    @Override
+    public int getTableId() {
+        return (int)m_tableId;
+    }
 
-	@Override
-	public void clear() {
-		try {
-			for (final CloseableCloser closer : m_openCursorCloseables) {
-				closer.closeCloseableAndLogOutput();
-			}
-			m_openCursorCloseables.clear();
-			if (m_store != null) {
-				m_store.close();
-				m_store = null;
-			}
-		} catch (final Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
+    @Deprecated
+    @Override
+    public int getRowCount() {
+        return KnowsRowCountTable.checkRowCount(m_size);
+    }
 
-	public BufferedDataTable getBufferedDataTable(final ExecutionContext context) {
-		return create(context);
-	}
+    @Override
+    public void putIntoTableRepository(final WorkflowDataRepository dataRepository) {
+        // only relevant in case of newly created tables
+        dataRepository.addTable((int)m_tableId, this);
+    }
 
-	@Override
-	public BufferedDataTable[] getReferenceTables() {
-		return new BufferedDataTable[0];
-	}
+    @Override
+    public boolean removeFromTableRepository(final WorkflowDataRepository dataRepository) {
+        // only relevant in case of newly created tables
+        dataRepository.removeTable((int)m_tableId);
+        return true;
+    }
 
-	@Override
-	public final void ensureOpen() {
-		// Noop. We directly read from workspace and don't copy data over first.
-	}
+    @Override
+    public long size() {
+        return m_size;
+    }
 
-	@Override
-	public RowCursor cursor() {
-		return ColumnarRowCursor.create(m_store, m_spec, 0, m_size - 1, m_openCursorCloseables);
-	}
+    @Override
+    public void clear() {
+        try {
+            for (final CloseableCloser closer : m_openCursorCloseables) {
+                closer.closeCloseableAndLogOutput();
+            }
+            m_openCursorCloseables.clear();
+            if (m_store != null) {
+                m_store.close();
+                m_store = null;
+            }
+        } catch (final Exception e) {
+            // TODO logging
+            throw new IllegalStateException("Exception while clearing ContainerTable.", e);
+        }
+    }
 
-	@Override
-	public final CloseableRowIterator iterator() {
-		return new RowCursorBasedRowIterator(
-				ColumnarRowCursor.create(m_store, m_spec, 0, m_size - 1, m_openCursorCloseables));
-	}
+    public BufferedDataTable getBufferedDataTable(final ExecutionContext context) {
+        return create(context);
+    }
 
-	@Override
-	public RowCursor cursor(final TableFilter filter) {
-		final long fromRowIndex = filter.getFromRowIndex().orElse(0l);
-		final long toRowIndex = filter.getToRowIndex().orElse(m_size - 1);
+    @Override
+    public BufferedDataTable[] getReferenceTables() {
+        return new BufferedDataTable[0];
+    }
 
-		final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
-		if (colIndicesOpt.isPresent()) {
-			return ColumnarRowCursor.create(m_store, m_spec, fromRowIndex, toRowIndex, m_openCursorCloseables,
-					toSortedIntArray(colIndicesOpt.get()));
-		} else {
-			return ColumnarRowCursor.create(m_store, m_spec, fromRowIndex, toRowIndex, m_openCursorCloseables);
-		}
-	}
+    @Override
+    public final void ensureOpen() {
+        // NB: We directly read from workspace and don't copy data to temp for reading. Therefore: Noop.
+    }
 
-	@Override
-	public final CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
-		final long fromRowIndex = filter.getFromRowIndex().orElse(0l);
-		final long toRowIndex = filter.getToRowIndex().orElse(m_size - 1);
+    @Override
+    public RowCursor cursor() {
+        return ColumnarRowCursor.create(m_store, m_schema, 0, m_size - 1, m_openCursorCloseables);
+    }
 
-		final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
-		if (colIndicesOpt.isPresent()) {
-			int[] selection = toSortedIntArray(colIndicesOpt.get());
-			return new FilteredColumnarRowIterator(ColumnarRowCursor.create(m_store, m_spec, fromRowIndex, toRowIndex,
-					m_openCursorCloseables, selection), selection);
-		} else {
+    @Override
+    public RowCursor cursor(final TableFilter filter) {
+        final long fromRowIndex = filter.getFromRowIndex().orElse(0l);
+        final long toRowIndex = filter.getToRowIndex().orElse(m_size - 1);
 
-			return new RowCursorBasedRowIterator(
-					ColumnarRowCursor.create(m_store, m_spec, fromRowIndex, toRowIndex, m_openCursorCloseables));
-		}
-	}
+        final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
+        if (colIndicesOpt.isPresent()) {
+            return ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorCloseables,
+                toSortedIntArray(colIndicesOpt.get()));
+        } else {
+            return ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorCloseables);
+        }
+    }
+
+    @Override
+    @SuppressWarnings("resource")
+    public final CloseableRowIterator iterator() {
+        return new ColumnarRowIterator(
+            ColumnarRowCursor.create(m_store, m_schema, 0, m_size - 1, m_openCursorCloseables));
+    }
+
+    @Override
+    @SuppressWarnings("resource")
+    public final CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
+        final long fromRowIndex = filter.getFromRowIndex().orElse(0l);
+        final long toRowIndex = filter.getToRowIndex().orElse(m_size - 1);
+
+        final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
+        if (colIndicesOpt.isPresent()) {
+            int[] selection = toSortedIntArray(colIndicesOpt.get());
+            return new FilteredColumnarRowIterator(ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex,
+                m_openCursorCloseables, selection), selection);
+        } else {
+            return new ColumnarRowIterator(
+                ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorCloseables));
+        }
+    }
 
 	private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
 	    try {
@@ -244,7 +253,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 	    }
 	}
 
-	private static int[] toSortedIntArray(final Set<Integer> selection) {
-		return selection.stream().sorted().mapToInt((i) -> (i)).toArray();
-	}
+    private static int[] toSortedIntArray(final Set<Integer> selection) {
+        return selection.stream().sorted().mapToInt((i) -> (i)).toArray();
+    }
 }

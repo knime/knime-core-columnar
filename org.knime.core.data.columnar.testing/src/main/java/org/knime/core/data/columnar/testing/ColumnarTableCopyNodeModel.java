@@ -3,17 +3,16 @@ package org.knime.core.data.columnar.testing;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DoubleValue;
-import org.knime.core.data.RowContainerCustomKey;
-import org.knime.core.data.RowContainerFactory;
-import org.knime.core.data.RowCursor;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell;
-import org.knime.core.data.values.DoubleWriteValue;
+import org.knime.core.data.v2.RowContainerCustomKey;
+import org.knime.core.data.v2.RowContainerFactory;
+import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.value.DoubleValueFactory.DoubleWriteValue;
 import org.knime.core.node.BufferedDataContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -57,7 +56,7 @@ public class ColumnarTableCopyNodeModel extends NodeModel {
 			// ### New API:
 			try (final RowCursor readCursor = inData[0].cursor();
 					final RowContainerCustomKey writeCursor = RowContainerFactory.createCustomKey(exec,
-							inData[0].getDataTableSpec(), DataContainerSettings.getDefault(), Collections.emptyMap())) {
+							inData[0].getDataTableSpec(), DataContainerSettings.getDefault())) {
 				// can actually be parallelized later
 				while (readCursor.canPoll()) {
 					readCursor.poll();

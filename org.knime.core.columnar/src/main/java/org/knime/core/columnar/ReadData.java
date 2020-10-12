@@ -52,5 +52,4 @@ package org.knime.core.columnar;
 public interface ReadData extends ReferencedData {
 
     int length();
-
 }

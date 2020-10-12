@@ -43,16 +43,42 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-
 package org.knime.core.data.columnar.domain;
 
+import java.util.Map;
+
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.domain.Domain;
+import org.knime.core.data.DataColumnDomain;
 import org.knime.core.util.DuplicateChecker;
 
-public interface DomainStoreConfig {
+/**
+ * Config object for a {@link DomainColumnStore}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
+interface DomainStoreConfig {
 
-	DomainStoreConfig withMaxPossibleNominalDomainValues(int maxPossibleValues);
+    /**
+     * @param maxPossibleValues number of maximum possible values for nominal domains
+     * @return config with maxPossibleValues set
+     */
+    DomainStoreConfig withMaxPossibleNominalDomainValues(int maxPossibleValues);
 
-	DuplicateChecker createDuplicateChecker();
+    /**
+     * TODO should this really be part of the domain store or a separate store?
+     *
+     * @return the duplicate checker used in this domain store
+     */
+    DuplicateChecker createDuplicateChecker();
 
-	DomainCalculator<?, ?>[] createCalculators();
+    /**
+     * @return map from index to DomainFactory used to calculate domains.
+     */
+    Map<Integer, DomainFactory<? extends ColumnReadData, ? extends Domain>> createMappers();
+
+    /**
+     * @return initial domains
+     */
+    Map<Integer, DataColumnDomain> getInitialDomains();
 }

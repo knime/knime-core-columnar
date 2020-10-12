@@ -47,209 +47,233 @@ package org.knime.core.data.columnar.table;
 
 import java.util.Set;
 
+import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.phantom.CloseableCloser;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.data.DataValue;
-import org.knime.core.data.RowCursor;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.ColumnType;
-import org.knime.core.data.columnar.ColumnarDataTableSpec;
-import org.knime.core.data.columnar.IndexSupplier;
-import org.knime.core.data.values.ReadValue;
-import org.knime.core.data.values.RowKeyReadValue;
+import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.v2.WrappedReadValue;
+import org.knime.core.data.v2.ReadValue;
+import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.RowKeyReadValue;
 
-class ColumnarRowCursor implements RowCursor, IndexSupplier {
+/**
+ * Columnar implementation of {@link RowCursor} for reading data from columnar table backend.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @since 4.3
+ */
+class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
-	// effectively final (set in #create)
-	private CloseableCloser m_closer;
+    // effectively final (set in #create)
+    private CloseableCloser m_closer;
 
-	private final Set<CloseableCloser> m_openCursorCloseables;
+    private final Set<CloseableCloser> m_openCursorCloseables;
 
-	private final ColumnDataReader m_reader;
+    private final ColumnDataReader m_reader;
 
-	private final ColumnarDataTableSpec m_spec;
+    private final int m_maxBatchIndex;
 
-	private final int m_maxBatchIndex;
+    private final int m_lastBatchMaxIndex;
 
-	private final int m_lastBatchMaxIndex;
+    private final int[] m_selection;
 
-	private final int[] m_selection;
+    private final ColumnarValueSchema m_schema;
 
-	private ReadBatch m_currentBatch;
+    private final ColumnarReadValueFactory<ColumnReadData>[] m_factories;
 
-	private ReadValue[] m_currentValues;
+    private ReadBatch m_currentBatch;
 
-	private int m_currentBatchIndex;
+    private ReadValue[] m_currentValues;
 
-	private int m_currentIndex;
+    private int m_currentBatchIndex;
 
-	private int m_currentMaxIndex;
+    private int m_currentIndex;
 
-	static ColumnarRowCursor create(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex,
-			long toRowIndex, Set<CloseableCloser> openCursorCloseables) {
-		return create(store, spec, fromRowIndex, toRowIndex, openCursorCloseables, null);
-	}
+    private int m_currentMaxIndex;
 
-	static ColumnarRowCursor create(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex,
-			long toRowIndex, Set<CloseableCloser> openCursorCloseables, int[] selection) {
-		if (selection != null) {
-			selection = addRowKeyIndexToSelection(selection);
-		}
-		final ColumnarRowCursor cursor = new ColumnarRowCursor(store, spec, fromRowIndex, toRowIndex,
-				openCursorCloseables, selection);
-		cursor.m_closer = new CloseableCloser(cursor);
-		openCursorCloseables.add(cursor.m_closer);
-		return cursor;
-	}
+    static ColumnarRowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema,
+        final long fromRowIndex, final long toRowIndex, final Set<CloseableCloser> openCursorCloseables) {
+        return create(store, schema, fromRowIndex, toRowIndex, openCursorCloseables, null);
+    }
 
-	private ColumnarRowCursor(ColumnReadStore store, ColumnarDataTableSpec spec, long fromRowIndex, long toRowIndex,
-			Set<CloseableCloser> openCursorCloseables, int[] selection) {
-		// TODO check that from fromRowIndex > 0 and <= toRowIndex
-		// check that toRowIndex < table size (which currently cannot be determined)
+    static ColumnarRowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema,
+        final long fromRowIndex, final long toRowIndex, final Set<CloseableCloser> openCursorCloseables,
+        int[] selection) {
+        if (selection != null) {
+            selection = addRowKeyIndexToSelection(selection);
+        }
+        final ColumnarRowCursor cursor =
+            new ColumnarRowCursor(store, schema, fromRowIndex, toRowIndex, openCursorCloseables, selection);
+        cursor.m_closer = new CloseableCloser(cursor);
+        openCursorCloseables.add(cursor.m_closer);
+        return cursor;
+    }
 
-		m_selection = selection;
-		m_reader = store.createReader();
-		m_spec = spec;
-		m_openCursorCloseables = openCursorCloseables;
+    private ColumnarRowCursor(final ColumnReadStore store, final ColumnarValueSchema schema, final long fromRowIndex,
+        final long toRowIndex, final Set<CloseableCloser> openCursorCloseables, final int[] selection) {
+        // TODO check that from fromRowIndex > 0 and <= toRowIndex
+        // check that toRowIndex < table size (which currently cannot be determined)
 
-		// number of chunks
-		final int maxLength;
-		try {
-			maxLength = m_reader.getMaxLength();
-		} catch (final Exception e) {
-			// TODO
-			throw new RuntimeException(e);
-		}
-		if (maxLength < 1) {
-			m_maxBatchIndex = m_lastBatchMaxIndex = m_currentBatchIndex = m_currentIndex = m_currentMaxIndex = -1;
-		} else {
-			m_maxBatchIndex = (int) (toRowIndex / maxLength);
+        m_selection = selection;
+        m_reader = store.createReader();
+        m_schema = schema;
+        m_openCursorCloseables = openCursorCloseables;
 
-			// in the last chunk we only iterate until toRowIndex
-			m_lastBatchMaxIndex = (int) (toRowIndex % maxLength);
+        // initialize ReadValue factories
+        @SuppressWarnings("unchecked")
+        final ColumnarReadValueFactory<ColumnReadData>[] factories =
+            new ColumnarReadValueFactory[m_schema.getNumColumns()];
+        for (int j = 0; j < factories.length; j++) {
+            factories[j] = m_schema.getReadValueFactoryAt(j);
+        }
+        m_factories = factories;
 
-			m_currentBatchIndex = (int) (fromRowIndex / maxLength) - 1;
+        // number of chunks
+        final int maxLength;
+        try {
+            maxLength = m_reader.getMaxLength();
+        } catch (final Exception e) {
+            // TODO
+            throw new RuntimeException(e);
+        }
+        if (maxLength < 1) {
+            m_maxBatchIndex = m_lastBatchMaxIndex = m_currentBatchIndex = m_currentIndex = m_currentMaxIndex = -1;
+        } else {
+            m_maxBatchIndex = (int)(toRowIndex / maxLength);
 
-			// start index
-			m_currentIndex = (int) (fromRowIndex % maxLength) - 1;
+            // in the last chunk we only iterate until toRowIndex
+            m_lastBatchMaxIndex = (int)(toRowIndex % maxLength);
 
-			// read next batch
-			readNextBatch();
-		}
-	}
+            m_currentBatchIndex = (int)(fromRowIndex / maxLength) - 1;
 
-	@Override
-	public boolean poll() {
-		// TODO throw appropriate exception in case canPoll = false but poll() called
-		if (++m_currentIndex > m_currentMaxIndex) {
-			m_currentBatch.release();
-			readNextBatch();
-			m_currentIndex = 0;
-		}
-		return canPoll();
-	}
+            // start index
+            m_currentIndex = (int)(fromRowIndex % maxLength) - 1;
 
-	@Override
-	public boolean canPoll() {
-		return m_currentIndex < m_currentMaxIndex || m_currentBatchIndex < m_maxBatchIndex;
-	}
+            // read next batch
+            readNextBatch();
+        }
+    }
 
-	@Override
-	public RowKeyValue getRowKeyValue() {
-		return (RowKeyReadValue) m_currentValues[0];
-	}
+    @Override
+    public boolean poll() {
+        // TODO throw appropriate exception in case canPoll = false but poll()
+        // called
+        if (++m_currentIndex > m_currentMaxIndex) {
+            m_currentBatch.release();
+            readNextBatch();
+            m_currentIndex = 0;
+        }
+        return canPoll();
+    }
 
-	@Override
-	public int getNumColumns() {
-		return m_spec.getNumColumns() - 1;
-	}
+    @Override
+    public boolean canPoll() {
+        return m_currentIndex < m_currentMaxIndex || m_currentBatchIndex < m_maxBatchIndex;
+    }
 
-	@Override
-	public <V extends DataValue> V getValue(int index) {
-		@SuppressWarnings("unchecked")
-		final V cast = (V) m_currentValues[index + 1];
-		return cast;
-	}
+    @Override
+    public RowKeyValue getRowKeyValue() {
+        return (RowKeyReadValue)m_currentValues[0];
+    }
 
-	@Override
-	public boolean isMissing(int index) {
-		return m_currentBatch.get(index + 1).isMissing(m_currentIndex);
-	}
+    @Override
+    public int getNumColumns() {
+        return m_schema.getNumColumns() - 1;
+    }
 
-	@Override
-	public void close() {
-		try {
-			if (m_currentBatch != null) {
-				m_currentBatch.release();
-				m_currentBatch = null;
-			}
-			m_closer.close();
-			m_openCursorCloseables.remove(m_closer);
-			m_reader.close();
-		} catch (Exception e) {
-			// TODO
-			throw new RuntimeException(e);
-		}
-	}
+    @Override
+    public <V extends DataValue> V getValue(final int index) {
+        /*
+         * TODO performance - instanceof check
+         *
+         * Option 1: bitset to identify DataCellValueFactories
+         * Option 3: Supplier<DataValue>[...] instead if ReadValue[...] and then get().
+         *
+         * Additional (later): dedicated cursor implementations for schemas without DataCellReadValues
+         */
+        final ReadValue value = m_currentValues[index + 1];
+        if (!(value instanceof WrappedReadValue)) {
+            @SuppressWarnings("unchecked")
+            final V cast = (V)value;
+            return cast;
+        } else {
+            @SuppressWarnings("unchecked")
+            final V cast = (V)value.getDataCell();
+            return cast;
+        }
+    }
 
-	@Override
-	public final int getIndex() {
-		return m_currentIndex;
-	}
+    @Override
+    public boolean isMissing(final int index) {
+        return m_currentBatch.get(index + 1).isMissing(m_currentIndex);
+    }
 
-	private void readNextBatch() {
-		try {
-			m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
-		} catch (final Exception e) {
-			// TODO
-			throw new RuntimeException(e);
-		}
-		if (m_selection == null) {
-			m_currentValues = create(m_currentBatch);
-		} else {
-			m_currentValues = create(m_currentBatch, m_selection);
-		}
-		// as soon as we're in the last chunk, we might want to iterate fewer
-		// values.
-		m_currentMaxIndex = m_currentBatchIndex != m_maxBatchIndex ? m_currentBatch.length() - 1 : m_lastBatchMaxIndex;
-	}
+    @Override
+    public void close() {
+        try {
+            if (m_currentBatch != null) {
+                m_currentBatch.release();
+                m_currentBatch = null;
+            }
+            m_closer.close();
+            m_openCursorCloseables.remove(m_closer);
+            m_reader.close();
+        } catch (final Exception e) {
+            // TODO Logging
+            throw new IllegalStateException("Exception while closing RowWriteCursor.", e);
+        }
+    }
 
-	// Expensive for many columns, but only called once per chunk
-	private ReadValue[] create(ReadBatch batch) {
-		final ReadValue[] values = new ReadValue[m_spec.getNumColumns()];
-		for (int i = 0; i < values.length; i++) {
-			@SuppressWarnings("unchecked")
-			final ColumnType<?, ColumnReadData> type = (ColumnType<?, ColumnReadData>) m_spec.getColumnType(i);
-			values[i] = type.createReadValue(batch.get(i), this);
-		}
-		return values;
-	}
+    @Override
+    public final int getIndex() {
+        return m_currentIndex;
+    }
 
-	private final ReadValue[] create(ReadBatch batch, int[] selection) {
-		// TODO Marc Bux: here the assumption is that ColumnDataAccess always has size
-		// of incoming spec with some nulls.
-		final ReadValue[] values = new ReadValue[m_spec.getNumColumns()];
-		for (int i = 0; i < selection.length; i++) {
-			@SuppressWarnings("unchecked")
-			ColumnType<?, ColumnReadData> type = (ColumnType<?, ColumnReadData>) m_spec.getColumnType(selection[i]);
-			values[selection[i]] = type.createReadValue(batch.get(selection[i]), this);
-		}
-		return values;
-	}
+    private void readNextBatch() {
+        try {
+            m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
+            if (m_selection == null) {
+                m_currentValues = create(m_currentBatch);
+            } else {
+                m_currentValues = create(m_currentBatch, m_selection);
+            }
 
-	private static int[] addRowKeyIndexToSelection(int[] selection) {
-		final int[] colIndicesAsInt = new int[selection.length + 1];
-		// add row key as selected column
-		colIndicesAsInt[0] = 0;
-		int i = 1;
-		for (int index : selection) {
-			colIndicesAsInt[i++] = index + 1;
-		}
+            m_currentMaxIndex =
+                m_currentBatchIndex != m_maxBatchIndex ? m_currentBatch.length() - 1 : m_lastBatchMaxIndex;
+        } catch (final Exception e) {
+            throw new IllegalStateException("Problem when reading batch from store.", e);
+        }
+    }
 
-		return colIndicesAsInt;
-	}
+    private ReadValue[] create(final ReadBatch batch) {
+        final ReadValue[] values = new ReadValue[m_schema.getNumColumns()];
+        for (int i = 0; i < values.length; i++) {
+            values[i] = m_factories[i].createReadValue(batch.get(i), this);
+        }
+        return values;
+    }
 
+    private final ReadValue[] create(final ReadBatch batch, final int[] selection) {
+        final ReadValue[] values = new ReadValue[m_schema.getNumColumns()];
+        for (int i = 0; i < selection.length; i++) {
+            values[selection[i]] = m_factories[selection[i]].createReadValue(batch.get(selection[i]), this);
+        }
+        return values;
+    }
+
+    private static int[] addRowKeyIndexToSelection(final int[] selection) {
+        final int[] colIndicesAsInt = new int[selection.length + 1];
+        colIndicesAsInt[0] = 0;
+        int i = 1;
+        for (final int index : selection) {
+            colIndicesAsInt[i++] = index + 1;
+        }
+        return colIndicesAsInt;
+    }
 }

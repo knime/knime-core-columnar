@@ -55,8 +55,9 @@ import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
+import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
 import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
+import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 
@@ -103,14 +104,6 @@ public interface ColumnDataSpec {
         return PeriodDataSpec.INSTANCE;
     }
 
-    public static StringDataSpec dictEncodedStringSpec() {
-        return StringDataSpec.DICT_ENABLED;
-    }
-
-    public static StringDataSpec stringSpec() {
-        return StringDataSpec.DICT_DISABLED;
-    }
-
     public static VarBinaryDataSpec varBinarySpec() {
         return VarBinaryDataSpec.INSTANCE;
     }
@@ -139,12 +132,13 @@ public interface ColumnDataSpec {
 
         R visit(final PeriodDataSpec spec);
 
-        R visit(final StringDataSpec spec);
-
         R visit(final VarBinaryDataSpec spec);
 
         R visit(final VoidDataSpec spec);
 
+        R visit(final ObjectDataSpec<?> spec);
+
+        R visit(final StructDataSpec spec);
     }
 
     <R> R accept(Mapper<R> v);

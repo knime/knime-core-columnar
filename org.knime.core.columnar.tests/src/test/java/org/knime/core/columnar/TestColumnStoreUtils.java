@@ -61,12 +61,12 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.data.access.AccessSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -123,7 +123,7 @@ public final class TestColumnStoreUtils {
             }
 
             @Override
-            public ColumnDataSpec getColumnDataSpec(final int idx) {
+            public AccessSpec getAccessSpecAt(final int idx) {
                 return null;
             }
         };

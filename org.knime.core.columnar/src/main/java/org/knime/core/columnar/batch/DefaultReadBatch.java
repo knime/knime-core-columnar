@@ -125,4 +125,9 @@ public class DefaultReadBatch implements ReadBatch {
         return Arrays.stream(m_data).mapToInt(ReferencedData::sizeOf).sum();
     }
 
+    @Override
+    public int getNumColumns() {
+        return m_data.length;
+    }
+
 }

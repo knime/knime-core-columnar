@@ -50,108 +50,133 @@ import java.util.Iterator;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataType;
-import org.knime.core.data.RowCursor;
+import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.UnmaterializedCell;
 import org.knime.core.data.container.CloseableRowIterator;
-import org.knime.core.data.values.DataCellReadValue;
+import org.knime.core.data.v2.ReadValue;
+import org.knime.core.data.v2.RowCursor;
 
-public class FilteredColumnarRowIterator extends CloseableRowIterator {
+import gnu.trove.map.hash.TIntObjectHashMap;
 
-	private final RowCursor m_cursor;
-	private final int[] m_selection;
+/**
+ * Implementation of a {@link CloseableRowIterator} via delegation to a {@link RowCursor}. Supports column selection.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @since 4.3
+ */
+class FilteredColumnarRowIterator extends CloseableRowIterator {
 
-	public FilteredColumnarRowIterator(RowCursor cursor, int[] selection) {
-		m_cursor = cursor;
-		m_selection = selection;
-	}
+    private final RowCursor m_cursor;
 
-	@Override
-	public boolean hasNext() {
-		return m_cursor.canPoll();
-	}
+    private final int[] m_selection;
 
-	@Override
-	public DataRow next() {
-		m_cursor.poll();
+    // TODO do we need the selection here if we already filtered the cursor itself? See callee of constructor. If not, we can delete this class in favor of reusing RowCursorBasedRowIterator.
+    FilteredColumnarRowIterator(final RowCursor cursor, final int[] selection) {
+        m_cursor = cursor;
+        m_selection = selection;
+    }
 
-		/*
-		 * TODO We don't want to create an entire array of DataCells[] in /* case we
-		 * have very sparse value selections in wide data.
-		 */
-		final DataCell[] cells = new DataCell[m_cursor.getNumColumns()];
+    @Override
+    public boolean hasNext() {
+        return m_cursor.canPoll();
+    }
 
-		// if RowKey exists, m_offset is 1. rowkey is always part of column selection.
-		for (int i = 0; i < m_selection.length; i++) {
-			if (m_cursor.isMissing(m_selection[i])) {
-				cells[m_selection[i]] = DataType.getMissingCell();
-			} else {
-				cells[m_selection[i]] = m_cursor.<DataCellReadValue>getValue(m_selection[i]).getDataCell();
-			}
-		}
-		return new PartialFastTableDataRow(m_cursor.getRowKeyValue().getString(), cells);
-	}
+    @Override
+    public DataRow next() {
+        m_cursor.poll();
 
-	@Override
-	public void close() {
-		try {
-			m_cursor.close();
-		} catch (final Exception e) {
-			// TODO
-			throw new RuntimeException(e);
-		}
-	}
+        /*
+         * We don't want to create an entire array of DataCells[] in case we
+         * have very sparse value selections in wide data.
+         *
+         * TODO implement variant of this cursor which actually creates DataCell[]. This might bring some speed-up. We need to find the right ratio when this makes sense, though.
+         */
 
-	static class PartialFastTableDataRow implements DataRow {
+        final TIntObjectHashMap<DataCell> cells = new TIntObjectHashMap<>(m_selection.length);
 
-		private static final UnmaterializedCell INSTANCE = UnmaterializedCell.getInstance(); // TODO
+        for (int i = 0; i < m_selection.length; i++) {
+            if (m_cursor.isMissing(m_selection[i])) {
+                cells.put(m_selection[i], DataType.getMissingCell());
+            } else {
+                // TODO performance!!
+                final DataValue value = m_cursor.getValue(m_selection[i]);
+                if (value instanceof DataCell) {
+                    cells.put(m_selection[i], (DataCell)value);
+                } else {
+                    cells.put(m_selection[i], ((ReadValue)value).getDataCell());
+                }
+            }
+        }
+        return new PartialFastTableDataRow(m_cursor.getRowKeyValue().getString(), cells, m_cursor.getNumColumns());
+    }
 
-		private final String m_rowKey;
-		private final DataCell[] m_cells;
+    @Override
+    public void close() {
+        try {
+            m_cursor.close();
+        } catch (final Exception e) {
+            // TODO logging
+            throw new IllegalStateException("Exception while closing FilteredColumnarRowIterator.", e);
+        }
+    }
 
-		public PartialFastTableDataRow(final String rowKey, final DataCell[] values) {
-			m_rowKey = rowKey;
-			m_cells = values;
-		}
+    static class PartialFastTableDataRow implements DataRow {
 
-		@Override
-		public Iterator<DataCell> iterator() {
-			return new Iterator<DataCell>() {
-				int idx = 0;
+        private static final UnmaterializedCell INSTANCE = UnmaterializedCell.getInstance(); // TODO
 
-				@Override
-				public boolean hasNext() {
-					return idx < m_cells.length;
-				}
+        private final String m_rowKey;
 
-				@Override
-				public DataCell next() {
-					return getCell(idx++);
-				}
-			};
-		}
+        private final TIntObjectHashMap<DataCell> m_cells;
 
-		@Override
-		public int getNumCells() {
-			return m_cells.length;
-		}
+        private int m_numCells;
 
-		@Override
-		public RowKey getKey() {
-			if (m_rowKey == null) {
-				/* TODO OK Behaviour? */
-				return null;
-			}
-			return new RowKey(m_rowKey);
-		}
+        public PartialFastTableDataRow(final String rowKey, final TIntObjectHashMap<DataCell> values,
+            final int numCells) {
+            m_rowKey = rowKey;
+            m_cells = values;
+            m_numCells = numCells;
+        }
 
-		@Override
-		public DataCell getCell(final int index) {
-			if (m_cells[index] == null) {
-				return INSTANCE;
-			} else {
-				return m_cells[index];
-			}
-		}
-	}
+        @Override
+        public Iterator<DataCell> iterator() {
+            return new Iterator<DataCell>() {
+                int idx = 0;
+
+                @Override
+                public boolean hasNext() {
+                    return idx < m_numCells;
+                }
+
+                @Override
+                public DataCell next() {
+                    return getCell(idx++);
+                }
+            };
+        }
+
+        @Override
+        public int getNumCells() {
+            return m_numCells;
+        }
+
+        @Override
+        public RowKey getKey() {
+            if (m_rowKey == null) {
+                /* TODO OK Behaviour? */
+                return null;
+            }
+            return new RowKey(m_rowKey);
+        }
+
+        @Override
+        public DataCell getCell(final int index) {
+            final DataCell dataCell = m_cells.get(index);
+            if (dataCell == null) {
+                return INSTANCE;
+            } else {
+                return dataCell;
+            }
+        }
+    }
 }

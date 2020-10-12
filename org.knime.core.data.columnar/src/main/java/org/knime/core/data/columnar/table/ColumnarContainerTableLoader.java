@@ -43,30 +43,33 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-
 package org.knime.core.data.columnar.table;
 
 import org.knime.core.node.ExtensionTable.LoadContext;
 import org.knime.core.node.ExtensionTableLoader;
 import org.knime.core.node.InvalidSettingsException;
 
+/**
+ * Extension point for ExtensionTables created for Columnar Table Backend.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @since 4.3
+ */
 public class ColumnarContainerTableLoader implements ExtensionTableLoader {
 
-	@Override
-	public SavedColumnarContainerTable load(final LoadContext context) throws InvalidSettingsException {
-		return new SavedColumnarContainerTable(context);
-	}
+    @Override
+    public SavedColumnarContainerTable load(final LoadContext context) throws InvalidSettingsException {
+        return new SavedColumnarContainerTable(context);
+    }
 
-	static final class SavedColumnarContainerTable extends AbstractColumnarContainerTable {
+    @Override
+    public boolean canLoad(final String type) {
+        return type.equalsIgnoreCase(UnsavedColumnarContainerTable.class.getName());
+    }
 
-		SavedColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
-			super(context);
-		}
-	}
-
-	@Override
-	public boolean canLoad(final String type) {
-		return type.equalsIgnoreCase(UnsavedColumnarContainerTable.class.getName());
-	}
-
+    static final class SavedColumnarContainerTable extends AbstractColumnarContainerTable {
+        SavedColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
+            super(context);
+        }
+    }
 }

@@ -51,5 +51,4 @@ public interface WriteData extends ReferencedData {
     int capacity();
 
     ReadData close(int length);
-
 }

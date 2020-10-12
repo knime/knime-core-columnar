@@ -50,8 +50,7 @@ import org.knime.core.columnar.data.ColumnDataSpec;
 @SuppressWarnings("javadoc")
 public interface ColumnStoreSchema {
 
-    ColumnDataSpec getColumnDataSpec(int index);
-
     int getNumColumns();
 
+    ColumnDataSpec getColumnDataSpec(int index);
 }

@@ -11,7 +11,9 @@ Require-Bundle:
 Export-Package: org.knime.core.columnar,
  org.knime.core.columnar.batch,
  org.knime.core.columnar.cache,
+ org.knime.core.columnar.cache.heap,
  org.knime.core.columnar.data,
+ org.knime.core.columnar.domain,
  org.knime.core.columnar.filter,
  org.knime.core.columnar.phantom,
  org.knime.core.columnar.store

@@ -50,25 +50,45 @@ import java.io.IOException;
 
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.data.columnar.ColumnarDataTableSpec;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeSettingsWO;
 
-public class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
+/**
+ * ColumnarContainerTable which has not yet been saved, i.e. all data is still in-memory or temporarily persisted in the
+ * temp directory.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @since 4.3
+ */
+class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
 
-	private final ColumnStore m_store;
+    private final ColumnStore m_store;
 
-	public UnsavedColumnarContainerTable(final int tableId, //
-			ColumnStoreFactory factory, ColumnarDataTableSpec spec, ColumnStore store, final long size) {
-		super(tableId, factory, spec, store, size);
-		m_store = store;
-	}
+    /**
+     * Constructor for creating a {@link UnsavedColumnarContainerTable}.
+     *
+     * @param tableId the table id used by KNIME
+     * @param factory the column store factory which has been used to create the underlying column store.
+     * @param schema the columnar value schema. 1-to-1 mapping to ColumnStoreSchema of store.
+     * @param store
+     * @param size
+     *
+     *
+     */
+    /* TODO can we avoid passing factory, schema, store and size as individual parameters? they all have
+     *            dependencies to each other. */
+    UnsavedColumnarContainerTable(final int tableId, //
+        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        super(tableId, factory, schema, store, size);
+        m_store = store;
+    }
 
-	@Override
-	protected void saveToFileOverwrite(File f, NodeSettingsWO settings, ExecutionMonitor exec)
-			throws IOException, CanceledExecutionException {
-		super.saveToFileOverwrite(f, settings, exec);
-		m_store.save(f);
-	}
+    @Override
+    protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
+        throws IOException, CanceledExecutionException {
+        super.saveToFileOverwrite(f, settings, exec);
+        m_store.save(f);
+    }
 }

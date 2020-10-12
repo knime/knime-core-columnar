@@ -61,9 +61,9 @@ import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
- * A {@link ColumnReadStore} that reads {@link ColumnWriteData} from a delegate column store and places it in a fixed-size
- * {@link SmallColumnStoreCache LRU cache} in memory for faster subsequent access. The store allows concurrent reading
- * via multiple {@link ColumnDataReader ColumnDataReaders}.
+ * A {@link ColumnReadStore} that reads {@link ColumnWriteData} from a delegate column store and places it in a
+ * fixed-size {@link SmallColumnStoreCache LRU cache} in memory for faster subsequent access. The store allows
+ * concurrent reading via multiple {@link ColumnDataReader ColumnDataReaders}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -72,6 +72,8 @@ public final class CachedColumnReadStore implements ColumnReadStore {
     private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
 
     private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
+
+    private int m_maxLength = -1;
 
     private final class CachedColumnStoreReader implements ColumnDataReader {
 
@@ -122,7 +124,10 @@ public final class CachedColumnReadStore implements ColumnReadStore {
 
         @Override
         public int getMaxLength() throws IOException {
-            return m_delegateReader.getMaxLength();
+            if (m_maxLength == -1) {
+                m_maxLength = m_delegateReader.getMaxLength();
+            }
+            return m_maxLength;
         }
 
         @Override

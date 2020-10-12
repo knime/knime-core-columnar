@@ -56,4 +56,6 @@ public interface ReadBatch extends ReadData {
 
     ColumnReadData get(int index);
 
+    int getNumColumns();
+
 }
