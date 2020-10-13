@@ -92,7 +92,7 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
 
     @Override
     public void setObject(final int index, final T obj) {
-        m_vector.set(index, m_serializer.serialize(obj));
+        m_vector.setSafe(index, m_serializer.serialize(obj));
     }
 
     /**

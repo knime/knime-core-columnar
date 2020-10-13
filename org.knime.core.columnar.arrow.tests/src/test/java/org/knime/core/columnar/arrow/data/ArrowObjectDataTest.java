@@ -56,7 +56,6 @@ import java.util.Random;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 
 /**
  * Test {@link ArrowObjectData}
@@ -69,7 +68,7 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<b
 
     /** Create the test for {@link ArrowObjectData} */
     public ArrowObjectDataTest() {
-        super(new ArrowObjectDataFactory<>(DummySerializer.INSTANCE));
+        super(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
     }
 
     @Override
@@ -115,34 +114,4 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<b
         return bytes;
     }
 
-    /**
-     * Simple serializer implementation which adds one to the bytes on serialization and removes 1 when deserializing
-     * again.
-     **/
-    private final static class DummySerializer implements ObjectDataSerializer<byte[]> {
-
-        private final static DummySerializer INSTANCE = new DummySerializer();
-
-        private DummySerializer() {
-        }
-
-        @Override
-        public byte[] serialize(final byte[] obj) {
-            final byte[] modifiedCopy = obj.clone();
-            for (int i = 0; i < modifiedCopy.length; i++) {
-                modifiedCopy[i]++;
-            }
-            return modifiedCopy;
-        }
-
-        @Override
-        public byte[] deserialize(final byte[] modifiedCopy) {
-            final byte[] obj = modifiedCopy.clone();
-            for (int i = 0; i < obj.length; i++) {
-                obj[i]--;
-            }
-            return obj;
-        }
-
-    }
 }

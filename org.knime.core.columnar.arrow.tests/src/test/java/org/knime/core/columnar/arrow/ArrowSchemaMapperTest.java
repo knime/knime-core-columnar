@@ -52,20 +52,20 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 import org.junit.Test;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowObjectDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowVarCharData.ArrowVarCharDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
+import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
@@ -113,18 +113,12 @@ public final class ArrowSchemaMapperTest {
         testMapSingleSpec(VarBinaryDataSpec.INSTANCE, ArrowVarBinaryDataFactory.INSTANCE);
     }
 
-    /** Test mapping non dict encoded string specs to a {@link ArrowVarCharDataFactory} */
-    @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
-    public void testMapVarCharSpec() {
-        testMapSingleSpec(StringDataSpec.DICT_DISABLED, ArrowVarCharDataFactory.INSTANCE);
-    }
-
-    /** Test mapping dict encoded string specs to a {@link ArrowDictEncodedStringDataFactory} */
+    /** Test mapping dict encoded byte specs to a {@link ArrowDictEncodedObjectDataFactory} */
     @Test
     @SuppressWarnings("static-method") // Tests cannot be static
     public void testMapDictEncodedSpec() {
-        testMapSingleSpec(StringDataSpec.DICT_ENABLED, ArrowDictEncodedStringDataFactory.INSTANCE);
+        testMapSingleSpec(new ObjectDataSpec<>(ArrowObjectDataTest.DummyByteArraySerializer.INSTANCE, true),
+            new ArrowDictEncodedObjectDataFactory<>(ArrowObjectDataTest.DummyByteArraySerializer.INSTANCE));
     }
 
     /** Test mapping void specs to a {@link ArrowVoidDataFactory} */
@@ -159,6 +153,6 @@ public final class ArrowSchemaMapperTest {
         final ColumnStoreSchema schema = ArrowTestUtils.createSchema(spec);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
-        assertSame(expectedFactory, factories[0]);
+        assertEquals(expectedFactory, factories[0]);
     }
 }

@@ -62,6 +62,7 @@ import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 
 /**
@@ -127,6 +128,37 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
      * @return the minimum size that should be allocated by data object to store the data
      */
     protected abstract int getMinSize(int valueCount, int capacity);
+
+    /**
+     * Simple serializer implementation which adds one to the bytes on serialization and removes 1 when deserializing
+     * again.
+     **/
+    protected final static class DummyByteArraySerializer implements ObjectDataSerializer<byte[]> {
+
+        @SuppressWarnings("javadoc")
+        public final static DummyByteArraySerializer INSTANCE = new DummyByteArraySerializer();
+
+        private DummyByteArraySerializer() {
+        }
+
+        @Override
+        public byte[] serialize(final byte[] obj) {
+            final byte[] modifiedCopy = obj.clone();
+            for (int i = 0; i < modifiedCopy.length; i++) {
+                modifiedCopy[i]++;
+            }
+            return modifiedCopy;
+        }
+
+        @Override
+        public byte[] deserialize(final byte[] modifiedCopy) {
+            final byte[] obj = modifiedCopy.clone();
+            for (int i = 0; i < obj.length; i++) {
+                obj[i]--;
+            }
+            return obj;
+        }
+    }
 
     /** Initialize the root allocator before running a test */
     @Before

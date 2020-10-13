@@ -47,6 +47,7 @@ package org.knime.core.columnar.arrow;
 
 import java.util.stream.IntStream;
 
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
@@ -170,6 +171,11 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
 
     @Override
     public ArrowColumnDataFactory visit(final ObjectDataSpec<?> spec) {
-        return new ArrowObjectDataFactory<>(spec.getSerializer());
+        if (!spec.isDictEncoded()) {
+            return new ArrowObjectDataFactory<>(spec.getSerializer());
+        } else {
+            return new ArrowDictEncodedObjectDataFactory<>(spec.getSerializer());
+        }
+    }
     }
 }
