@@ -78,6 +78,10 @@ import org.knime.core.data.v2.WriteValue;
  */
 public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColumnarContainerTable>, ColumnDataIndex {
 
+    private static final String CHUNK_SIZE_PROPERTY = "knime.columnar.chunksize";
+
+    private static final int CHUNK_SIZE = Integer.getInteger(CHUNK_SIZE_PROPERTY, 28_000);
+
     private final ColumnStoreFactory m_storeFactory;
 
     private final DomainColumnStore m_store;
@@ -126,7 +130,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
 
         m_store = new DomainColumnStore(
             ColumnarPreferenceUtils.wrap(m_storeFactory.createWriteStore(schema,
-                DataContainer.createTempFile(".knable"), ColumnarPreferenceUtils.getChunkSize())),
+                DataContainer.createTempFile(".knable"), CHUNK_SIZE)),
             new DefaultDomainStoreConfig(schema, config.getMaxPossibleNominalDomainValues(), config.getRowKeyConfig()));
 
         m_columnDataFactory = m_store.getFactory();
