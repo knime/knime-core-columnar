@@ -70,6 +70,7 @@ import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
 import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
+import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
@@ -177,5 +178,9 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
             return new ArrowDictEncodedObjectDataFactory<>(spec.getSerializer());
         }
     }
+
+    @Override
+    public ArrowColumnDataFactory visit(final StructDataSpec spec) {
+        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
     }
 }
