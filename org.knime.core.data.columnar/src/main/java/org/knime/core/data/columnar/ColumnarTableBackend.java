@@ -135,11 +135,6 @@ public final class ColumnarTableBackend implements TableBackend {
     }
 
     @Override
-    public boolean supports(final DataTableSpec spec) {
-        return true;
-    }
-
-    @Override
     public String getShortName() {
         return "Compact Columnar (Labs)";
     }
