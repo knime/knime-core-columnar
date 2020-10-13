@@ -69,7 +69,10 @@ public final class CachedColumnStoreCache {
         m_cacheSizeBytes = cacheSizeBytes;
     }
 
-    public long getMaxSizeInBytes() {
+    /**
+     * @return maximum size of cache in bytes.
+     */
+    public final long getMaxSizeInBytes() {
         return m_cacheSizeBytes;
     }
 

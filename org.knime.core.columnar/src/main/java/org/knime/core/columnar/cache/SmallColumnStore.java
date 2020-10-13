@@ -102,7 +102,10 @@ public final class SmallColumnStore implements ColumnStore {
             m_cacheSize = cacheSize;
         }
 
-        public long getMaxSize() {
+        /**
+         * @return maximum number of small tables to be managed by cache.
+         */
+        public final long getMaxSize() {
             return m_cacheSize;
         }
 
