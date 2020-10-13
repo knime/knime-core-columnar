@@ -47,14 +47,12 @@ package org.knime.core.columnar.arrow;
 
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowVarCharData.ArrowVarCharDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
@@ -71,7 +69,6 @@ import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
 import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
@@ -159,11 +156,6 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     @Override
     public ArrowColumnDataFactory visit(final PeriodDataSpec spec) {
         throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
-    }
-
-    @Override
-    public ArrowColumnDataFactory visit(final StringDataSpec spec) {
-        return spec.isDictEnabled() ? ArrowDictEncodedStringDataFactory.INSTANCE : ArrowVarCharDataFactory.INSTANCE;
     }
 
     @Override
