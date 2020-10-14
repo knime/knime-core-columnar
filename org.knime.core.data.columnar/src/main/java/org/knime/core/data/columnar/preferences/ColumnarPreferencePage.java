@@ -105,7 +105,7 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
             @Override
             protected void valueChanged() {
                 super.valueChanged();
-                if (getIntValue() > numAvailableProcessors) {
+                if (isValid() && getIntValue() > numAvailableProcessors) {
                     showErrorMessage(String.format(
                         "Number of threads should not be larger than the number of available processors (%d).",
                         numAvailableProcessors));
@@ -135,7 +135,7 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
                 @Override
                 protected void valueChanged() {
                     super.valueChanged();
-                    if (getIntValue() > m_smallTableCacheSizeEditor.getIntValue()) {
+                    if (isValid() && getIntValue() > m_smallTableCacheSizeEditor.getIntValue()) {
                         showErrorMessage(
                             "Maximum small table size should not be larger than the size of the small table cache.");
                     }
@@ -164,8 +164,9 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
     }
 
     private boolean cacheSizeExceeded(final int usablePhysicalMemorySizeMB) {
-        return m_columnDataCacheSizeEditor.getIntValue()
-            + m_smallTableCacheSizeEditor.getIntValue() > usablePhysicalMemorySizeMB;
+        return m_columnDataCacheSizeEditor.isValid() && m_smallTableCacheSizeEditor.isValid()
+            && m_columnDataCacheSizeEditor.getIntValue()
+                + m_smallTableCacheSizeEditor.getIntValue() > usablePhysicalMemorySizeMB;
     }
 
     // code from here on out mostly copied from org.knime.workbench.ui.preferences.HeadlessPreferencePage
