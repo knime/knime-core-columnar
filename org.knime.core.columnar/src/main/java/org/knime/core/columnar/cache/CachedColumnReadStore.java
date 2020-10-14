@@ -168,7 +168,7 @@ public final class CachedColumnReadStore implements ColumnReadStore {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         m_storeClosed = true;
         for (final ColumnDataUniqueId id : m_cachedData) {
             final ColumnReadData removed = m_globalCache.removeRetained(id);
@@ -177,6 +177,8 @@ public final class CachedColumnReadStore implements ColumnReadStore {
             }
         }
         m_cachedData.clear();
+
+        m_delegate.close();
     }
 
 }
