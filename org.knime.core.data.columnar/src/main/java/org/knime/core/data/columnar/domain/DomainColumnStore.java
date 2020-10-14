@@ -241,20 +241,20 @@ public final class DomainColumnStore implements ColumnStore {
                 }
             }
 
-//            if (m_duplicateChecker != null) {
-//                final Future<Void> duplicateCheck;
-//                final ColumnReadData keyChunk = record.get(0);
-//                // Retain for async. duplicate checking. Submitted task will release.
-//                keyChunk.retain();
-//                try {
-//                    duplicateCheck = EXECUTOR.enqueue(new DuplicateCheckTask(keyChunk, m_duplicateChecker));
-//                } catch (final Exception ex) {
-//                    keyChunk.release();
-//                    throw ex;
-//                }
-//                // TODO: list grows indefinitely right now. Clean up every now and then?
-//                m_duplicateChecks.add(duplicateCheck);
-//            }
+            if (m_duplicateChecker != null) {
+                final Future<Void> duplicateCheck;
+                final ColumnReadData keyChunk = record.get(0);
+                // Retain for async. duplicate checking. Submitted task will release.
+                keyChunk.retain();
+                try {
+                    duplicateCheck = EXECUTOR.enqueue(new DuplicateCheckTask(keyChunk, m_duplicateChecker));
+                } catch (final Exception ex) {
+                    keyChunk.release();
+                    throw ex;
+                }
+                // TODO: list grows indefinitely right now. Clean up every now and then?
+                m_duplicateChecks.add(duplicateCheck);
+            }
 
             for (final Entry<Integer, DomainCalculator<?, ?>> entry : m_calculators.entrySet()) {
                 @SuppressWarnings("unchecked")
