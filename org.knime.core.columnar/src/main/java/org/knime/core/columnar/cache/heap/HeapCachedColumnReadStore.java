@@ -89,7 +89,7 @@ public final class HeapCachedColumnReadStore implements ColumnReadStore {
         }
 
         @Override
-        public ReadBatch readRetained(final int index) throws IOException {
+        public ReadBatch readRetained(final int batchIndex) throws IOException {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -97,16 +97,16 @@ public final class HeapCachedColumnReadStore implements ColumnReadStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final ReadBatch batch = m_delegateReader.readRetained(index);
+            final ReadBatch batch = m_delegateReader.readRetained(batchIndex);
             return ColumnSelection.createBatch(m_selection,
-                i -> m_objectData.isSelected(i) ? wrap(batch, index, i) : batch.get(i));
+                i -> m_objectData.isSelected(i) ? wrap(batch, batchIndex, i) : batch.get(i));
         }
 
         @SuppressWarnings("unchecked")
-        private <T> HeapCachedReadData<T> wrap(final ReadBatch batch, final int index, final int i) {
-            final ObjectReadData<T> columnReadData = (ObjectReadData<T>)batch.get(i);
+        private <T> HeapCachedReadData<T> wrap(final ReadBatch batch, final int batchIndex, final int columnIndex) {
+            final ObjectReadData<T> columnReadData = (ObjectReadData<T>)batch.get(columnIndex);
             final AtomicReferenceArray<T> array = (AtomicReferenceArray<T>)m_cache.asMap().computeIfAbsent(
-                new ColumnDataUniqueId(HeapCachedColumnReadStore.this, i, index),
+                new ColumnDataUniqueId(HeapCachedColumnReadStore.this, columnIndex, batchIndex),
                 k -> new AtomicReferenceArray<>(columnReadData.length()));
             return new HeapCachedReadData<>(columnReadData, array);
         }
