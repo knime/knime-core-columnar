@@ -94,7 +94,21 @@ public final class ColumnarPreferenceUtils {
     static final ScopedPreferenceStore COLUMNAR_STORE =
         new ScopedPreferenceStore(InstanceScope.INSTANCE, COLUMNAR_SYMBOLIC_NAME);
 
+    static final String DOMAIN_CALC_NUM_THREADS_KEY = "knime.core.data.columnar.domain-calc-num-threads";
+
+    private static final AtomicLong DOMAIN_CALC_THREAD_COUNT = new AtomicLong();
+
+    // lazily initialized
+    private static ExecutorService DOMAIN_CALC_EXECUTOR;
+
     private static final HeapCachedColumnStoreCache HEAP_CACHE = new HeapCachedColumnStoreCache();
+
+    static final String SERIALIZE_NUM_THREADS_KEY = "knime.core.data.columnar.serialize-num-threads";
+
+    private static final AtomicLong SERIALIZE_THREAD_COUNT = new AtomicLong();
+
+    // lazily initialized
+    private static ExecutorService SERIALIZE_EXECUTOR;
 
     // the size (in MB) of the LRU cache for entire small tables
     static final String SMALL_TABLE_CACHE_SIZE_KEY = "knime.core.data.columnar.small-cache-size";
@@ -165,6 +179,30 @@ public final class ColumnarPreferenceUtils {
 
     static int getNumAvailableProcessors() {
         return Runtime.getRuntime().availableProcessors();
+    }
+
+    static int getDomainCalcNumThreads() {
+        return COLUMNAR_STORE.getInt(DOMAIN_CALC_NUM_THREADS_KEY);
+    }
+
+    public static ExecutorService getDomainCalcExecutor() {
+        if (DOMAIN_CALC_EXECUTOR == null) {
+            DOMAIN_CALC_EXECUTOR = Executors.newFixedThreadPool(getDomainCalcNumThreads(),
+                r -> new Thread(r, "KNIME-DomainCalculator-" + DOMAIN_CALC_THREAD_COUNT.incrementAndGet()));
+        }
+        return DOMAIN_CALC_EXECUTOR;
+    }
+
+    static int getSerializeNumThreads() {
+        return COLUMNAR_STORE.getInt(SERIALIZE_NUM_THREADS_KEY);
+    }
+
+    private static ExecutorService getSerializeExecutor() {
+        if (SERIALIZE_EXECUTOR == null) {
+            SERIALIZE_EXECUTOR = Executors.newFixedThreadPool(getDomainCalcNumThreads(),
+                r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet()));
+        }
+        return SERIALIZE_EXECUTOR;
     }
 
     static int getSmallTableCacheSize() {
@@ -241,7 +279,7 @@ public final class ColumnarPreferenceUtils {
             wrapped = new SmallColumnStore(wrapped, smallTableCache);
         }
 
-        wrapped = new HeapCachedColumnStore(wrapped, HEAP_CACHE);
+        wrapped = new HeapCachedColumnStore(wrapped, HEAP_CACHE, getSerializeExecutor());
         return PhantomReferenceStore.create(wrapped);
     }
 

@@ -48,6 +48,7 @@ package org.knime.core.columnar.cache.heap;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.batch.DefaultReadBatch;
@@ -160,6 +161,8 @@ public final class HeapCachedColumnStore implements ColumnStore {
 
     }
 
+    private final ExecutorService m_executor;
+
     private final ColumnStore m_delegate;
 
     private final HeapCachedColumnReadStore m_readStore;
@@ -179,14 +182,17 @@ public final class HeapCachedColumnStore implements ColumnStore {
     /**
      * @param delegate the delegate to which to write
      * @param cache the in-heap cache for storing object data
+     * @param executor the executor to which to submit asynchronous serialization tasks
      */
-    public HeapCachedColumnStore(final ColumnStore delegate, final HeapCachedColumnStoreCache cache) {
+    public HeapCachedColumnStore(final ColumnStore delegate, final HeapCachedColumnStoreCache cache,
+        final ExecutorService executor) {
         m_delegate = delegate;
         m_objectData = HeapCacheUtils.getObjectDataIndices(delegate.getSchema());
         m_readStore = new HeapCachedColumnReadStore(delegate, cache);
         m_factory = new Factory();
         m_writer = new Writer();
         m_cache = cache.getCache();
+        m_executor = executor;
     }
 
     @Override

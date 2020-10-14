@@ -50,7 +50,9 @@ package org.knime.core.data.columnar.preferences;
 
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMNAR_STORE;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMN_DATA_CACHE_SIZE_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.DOMAIN_CALC_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.PERSIST_NUM_THREADS_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SERIALIZE_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_CACHE_SIZE_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_THRESHOLD_KEY;
 
@@ -61,6 +63,12 @@ public class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer
 
     @Override
     public void initializeDefaultPreferences() {
+
+        COLUMNAR_STORE.setDefault(DOMAIN_CALC_NUM_THREADS_KEY,
+            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
+
+        COLUMNAR_STORE.setDefault(SERIALIZE_NUM_THREADS_KEY,
+            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
 
         COLUMNAR_STORE.setDefault(SMALL_TABLE_CACHE_SIZE_KEY, 32);
 

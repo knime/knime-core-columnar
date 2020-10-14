@@ -55,6 +55,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import org.knime.core.columnar.batch.ReadBatch;
@@ -69,10 +70,8 @@ import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.data.DataColumnDomain;
-import org.knime.core.node.KNIMEConstants;
 import org.knime.core.util.DuplicateChecker;
 import org.knime.core.util.DuplicateKeyException;
-import org.knime.core.util.ThreadPool;
 
 // TODO: make sure everything is closed in case of exceptions, etc.
 // TODO: refactor to core.columnar?
@@ -88,9 +87,7 @@ import org.knime.core.util.ThreadPool;
  */
 public final class DomainColumnStore implements ColumnStore {
 
-    // TODO: should I use ThreadPool or my own executor service?
-    // TODO: how many executors may I block?
-    private static final ThreadPool EXECUTOR = KNIMEConstants.GLOBAL_THREAD_POOL;
+    private final ExecutorService m_executor;
 
     private final ColumnStore m_delegate;
 
@@ -105,12 +102,14 @@ public final class DomainColumnStore implements ColumnStore {
      *
      * @param delegate to read/write data from/to
      * @param config of the store
+     * @param executor the executor to which to submit asynchronous domain calculations and duplicate checks
      */
     @SuppressWarnings("resource")
-    public DomainColumnStore(final ColumnStore delegate, final DomainStoreConfig config) {
+    public DomainColumnStore(final ColumnStore delegate, final DomainStoreConfig config, final ExecutorService executor) {
         m_delegate = delegate;
         m_writer = new DomainColumnDataWriter(delegate.getWriter(), config);
         m_mappers = config.createMappers();
+        m_executor = executor;
     }
 
     @Override
@@ -247,7 +246,7 @@ public final class DomainColumnStore implements ColumnStore {
                 // Retain for async. duplicate checking. Submitted task will release.
                 keyChunk.retain();
                 try {
-                    duplicateCheck = EXECUTOR.enqueue(new DuplicateCheckTask(keyChunk, m_duplicateChecker));
+                    duplicateCheck = m_executor.submit(new DuplicateCheckTask(keyChunk, m_duplicateChecker));
                 } catch (final Exception ex) {
                     keyChunk.release();
                     throw ex;
@@ -268,7 +267,7 @@ public final class DomainColumnStore implements ColumnStore {
                     chunk.retain();
                     try {
                         final Future<Domain> previous = m_domainCalculations.get(index);
-                        merged = EXECUTOR.enqueue(new DomainCalculationTask(previous, chunk, calculator));
+                        merged = m_executor.submit(new DomainCalculationTask(previous, chunk, calculator));
                     } catch (final Exception ex) {
                         chunk.release();
                         throw ex;

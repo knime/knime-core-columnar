@@ -129,9 +129,10 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
         }
 
         m_store = new DomainColumnStore(
-            ColumnarPreferenceUtils.wrap(m_storeFactory.createWriteStore(schema,
-                DataContainer.createTempFile(".knable"), CHUNK_SIZE)),
-            new DefaultDomainStoreConfig(schema, config.getMaxPossibleNominalDomainValues(), config.getRowKeyConfig()));
+            ColumnarPreferenceUtils
+                .wrap(m_storeFactory.createWriteStore(schema, DataContainer.createTempFile(".knable"), CHUNK_SIZE)),
+            new DefaultDomainStoreConfig(schema, config.getMaxPossibleNominalDomainValues(), config.getRowKeyConfig()),
+            ColumnarPreferenceUtils.getDomainCalcExecutor());
 
         m_columnDataFactory = m_store.getFactory();
         m_writer = m_store.getWriter();

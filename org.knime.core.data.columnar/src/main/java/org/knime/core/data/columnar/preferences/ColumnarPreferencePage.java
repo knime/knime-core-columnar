@@ -50,7 +50,9 @@ package org.knime.core.data.columnar.preferences;
 
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMNAR_STORE;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMN_DATA_CACHE_SIZE_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.DOMAIN_CALC_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.PERSIST_NUM_THREADS_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SERIALIZE_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_CACHE_SIZE_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_THRESHOLD_KEY;
 
@@ -74,6 +76,10 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
         s -> String.format("Changes to the %s%nrequire a restart of the workbenck to become effective.%n"
             + "Do you want to restart the workbench now?", s);
 
+    private final int m_domainCalcNumThreads;
+
+    private final int m_serializeNumThreads;
+
     private final int m_smallTableCacheSize;
 
     private final int m_columnDataCacheSize;
@@ -90,6 +96,8 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
 
     public ColumnarPreferencePage() {
         super(GRID);
+        m_domainCalcNumThreads = ColumnarPreferenceUtils.getDomainCalcNumThreads();
+        m_serializeNumThreads = ColumnarPreferenceUtils.getSerializeNumThreads();
         m_smallTableCacheSize = ColumnarPreferenceUtils.getSmallTableCacheSize();
         m_columnDataCacheSize = ColumnarPreferenceUtils.getColumnDataCacheSize();
         m_persistNumThreads = ColumnarPreferenceUtils.getPersistNumThreads();
@@ -107,6 +115,38 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
         final Composite parent = getFieldEditorParent();
         final int numAvailableProcessors = ColumnarPreferenceUtils.getNumAvailableProcessors();
         final int usablePhysicalMemorySizeMB = ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB();
+
+        final IntegerFieldEditor domainCalcNumThreadsEditor = new IntegerFieldEditor(DOMAIN_CALC_NUM_THREADS_KEY,
+            "Number of threads for calculating domains and checking for duplicate row keys", parent) {
+            @Override
+            protected void valueChanged() {
+                super.valueChanged();
+                if (isValid() && getIntValue() > numAvailableProcessors) {
+                    showErrorMessage(String.format(
+                        "Number of threads should not be larger than the number of available processors (%d).",
+                        numAvailableProcessors));
+                }
+
+            }
+        };
+        domainCalcNumThreadsEditor.setValidRange(1, Integer.MAX_VALUE);
+        addField(domainCalcNumThreadsEditor);
+
+        final IntegerFieldEditor serializeNumThreadsEditor = new IntegerFieldEditor(SERIALIZE_NUM_THREADS_KEY,
+            "Number of threads for serializing complex data types", parent) {
+            @Override
+            protected void valueChanged() {
+                super.valueChanged();
+                if (isValid() && getIntValue() > numAvailableProcessors) {
+                    showErrorMessage(String.format(
+                        "Number of threads should not be larger than the number of available processors (%d).",
+                        numAvailableProcessors));
+                }
+
+            }
+        };
+        serializeNumThreadsEditor.setValidRange(1, Integer.MAX_VALUE);
+        addField(serializeNumThreadsEditor);
 
         m_smallTableCacheSizeEditor =
             new IntegerFieldEditor(SMALL_TABLE_CACHE_SIZE_KEY, "Size of small table cache (in MB)", parent) {
@@ -208,6 +248,18 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
         // we have to return here since we do not want to proceed (yet) in case of Apply
         // we only want to proceed in case of OK or cancel
         if (apply) {
+            return;
+        }
+
+        if (m_domainCalcNumThreads != COLUMNAR_STORE.getInt(DOMAIN_CALC_NUM_THREADS_KEY)) {
+            Display.getDefault().asyncExec(
+                () -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("domain calculation thread pool size")));
+            return;
+        }
+
+        if (m_serializeNumThreads != COLUMNAR_STORE.getInt(SERIALIZE_NUM_THREADS_KEY)) {
+            Display.getDefault().asyncExec(
+                () -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("serialization thread pool size")));
             return;
         }
 
