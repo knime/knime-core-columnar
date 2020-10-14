@@ -108,7 +108,8 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final ColumnarDataContainerDelegate delegate =
                 new ColumnarDataContainerDelegate(new ColumnarRowWriteCursor(repository.generateNewID(), columnarSchema,
-                    new ColumnarRowWriteCursorSettings(settings.getInitializeDomain(), settings.getMaxDomainValues())));
+                    new ColumnarRowWriteCursorSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
+                        schema.getRowKeyType())));
             return delegate;
         } catch (IOException ex) {
             // TODO logging
