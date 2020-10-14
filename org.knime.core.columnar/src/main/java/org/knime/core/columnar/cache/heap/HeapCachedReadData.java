@@ -99,8 +99,7 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
 
     @Override
     public T getObject(final int index) {
-        m_data.compareAndSet(index, null, m_delegate.getObject(index));
-        return m_data.get(index);
+        return m_data.updateAndGet(index, o -> o == null ? m_delegate.getObject(index) : o);
     }
 
     AtomicReferenceArray<T> getData() {
