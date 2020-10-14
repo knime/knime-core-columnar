@@ -84,13 +84,17 @@ final class NominalDataValueDomainMapper<D extends DataValue>
 
     @Override
     public DataColumnDomain convert(final NominalObjectDomain<D> domain) {
-        final Set<D> values = domain.getValues();
-        final DataCell[] cells = new DataCell[values.size()];
-        final Iterator<D> iterator = values.iterator();
-        for (int i = cells.length; --i > -1;) {
-            cells[i] = (DataCell)iterator.next();
+        if (domain.isValid()) {
+            final Set<D> values = domain.getValues();
+            final DataCell[] cells = new DataCell[values.size()];
+            final Iterator<D> iterator = values.iterator();
+            for (int i = cells.length; --i > -1;) {
+                cells[i] = (DataCell)iterator.next();
+            }
+            return new DataColumnDomainCreator(cells).createDomain();
+        }else {
+            return new DataColumnDomainCreator().createDomain();
         }
-        return new DataColumnDomainCreator(cells).createDomain();
     }
 
     private static class NominalObjectDomainCalculator<D extends DataValue>

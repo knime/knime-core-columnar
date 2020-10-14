@@ -76,7 +76,7 @@ final class BoundedDataValueDomainMapper<D extends DataValue>
     public DomainCalculator<ColumnReadData, BoundedDataValueDomain<D>>
         createCalculator(final DataColumnDomain initialDomain) {
         final BoundedDataValueDomain<D> domain;
-        if (initialDomain.hasBounds()) {
+        if (initialDomain != null && initialDomain.hasBounds()) {
             @SuppressWarnings("unchecked")
             final D lower = (D)initialDomain.getLowerBound();
             @SuppressWarnings("unchecked")
@@ -153,11 +153,15 @@ final class BoundedDataValueDomainMapper<D extends DataValue>
             @Override
             public BoundedDataValueDomain<D> mergeDomains(final BoundedDataValueDomain<D> original,
                 final BoundedDataValueDomain<D> additional) {
-                return new BoundedDataValueDomain<>(
-                    m_comparator.compare(original.m_lower, additional.m_lower) == -1 ? original.m_lower
-                        : additional.m_lower,
-                    m_comparator.compare(original.m_upper, additional.m_upper) == -1 ? original.m_upper
-                        : additional.m_upper);
+                if (original.m_lower == null || original.m_upper == null) {
+                    return new BoundedDataValueDomain<>(additional.m_lower, additional.m_upper);
+                } else {
+                    return new BoundedDataValueDomain<>(
+                        m_comparator.compare(original.m_lower, additional.m_lower) == -1 ? original.m_lower
+                            : additional.m_lower,
+                        m_comparator.compare(original.m_upper, additional.m_upper) == -1 ? original.m_upper
+                            : additional.m_upper);
+                }
             }
 
             @Override
@@ -198,7 +202,7 @@ final class BoundedDataValueDomainMapper<D extends DataValue>
                 while (cursor.canForward()) {
                     cursor.forward();
                     if (!cursor.isMissing()) {
-                        final D other = cursor.get();
+                        final D other = cursor.copy();
                         if (lower == null) {
                             lower = other;
                             upper = other;
