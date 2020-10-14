@@ -94,30 +94,29 @@ public final class ColumnarPreferenceUtils {
     static final ScopedPreferenceStore COLUMNAR_STORE =
         new ScopedPreferenceStore(InstanceScope.INSTANCE, COLUMNAR_SYMBOLIC_NAME);
 
-    // the size (in MB) up to which a table is considered small
-    static final String SMALL_TABLE_THRESHOLD_KEY = "knime.core.data.columnar.small-threshold";
+    private static final HeapCachedColumnStoreCache HEAP_CACHE = new HeapCachedColumnStoreCache();
 
     // the size (in MB) of the LRU cache for entire small tables
     static final String SMALL_TABLE_CACHE_SIZE_KEY = "knime.core.data.columnar.small-cache-size";
 
-    static final String ASYNC_FLUSH_NUM_THREADS_KEY = "knime.core.data.columnar.flush-num-threads";
-
-    // the size (in MB) of the LRU cache for ColumnData of all tables
-    static final String COLUMN_DATA_CACHE_SIZE_KEY = "knime.core.data.columnar.data-cache-size";
-
-    private static final AtomicLong THREAD_COUNT = new AtomicLong();
-
-    // lazily initialized
-    private static ExecutorService ASYNC_FLUSH_EXECUTOR;
-
-    // lazily initialized
-    private static CachedColumnStoreCache COLUMN_DATA_CACHE;
+    // the size (in MB) up to which a table is considered small
+    static final String SMALL_TABLE_THRESHOLD_KEY = "knime.core.data.columnar.small-threshold";
 
     // lazily initialized
     private static SmallColumnStoreCache SMALL_TABLE_CACHE;
 
-    // heap cache
-    private static final HeapCachedColumnStoreCache HEAP_CACHE = new HeapCachedColumnStoreCache();
+    // the size (in MB) of the LRU cache for ColumnData of all tables
+    static final String COLUMN_DATA_CACHE_SIZE_KEY = "knime.core.data.columnar.data-cache-size";
+
+    // lazily initialized
+    private static CachedColumnStoreCache COLUMN_DATA_CACHE;
+
+    static final String PERSIST_NUM_THREADS_KEY = "knime.core.data.columnar.flush-num-threads";
+
+    private static final AtomicLong PERSIST_THREAD_COUNT = new AtomicLong();
+
+    // lazily initialized
+    private static ExecutorService PERSIST_EXECUTOR;
 
     private ColumnarPreferenceUtils() {
     }
@@ -168,45 +167,12 @@ public final class ColumnarPreferenceUtils {
         return Runtime.getRuntime().availableProcessors();
     }
 
-    private static int getSmallTableThreshold() {
-        return COLUMNAR_STORE.getInt(SMALL_TABLE_THRESHOLD_KEY);
-    }
-
     static int getSmallTableCacheSize() {
         return COLUMNAR_STORE.getInt(SMALL_TABLE_CACHE_SIZE_KEY);
     }
 
-    static int getAsyncFlushNumThreads() {
-        return COLUMNAR_STORE.getInt(ASYNC_FLUSH_NUM_THREADS_KEY);
-    }
-
-    static int getColumnDataCacheSize() {
-        return COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY);
-    }
-
-    private static ExecutorService getAsyncFlushExecutor() {
-        if (ASYNC_FLUSH_EXECUTOR == null) {
-            ASYNC_FLUSH_EXECUTOR = Executors.newFixedThreadPool(getAsyncFlushNumThreads(),
-                r -> new Thread(r, "KNIME-BackgroundColumnStoreWriter-" + THREAD_COUNT.incrementAndGet()));
-        }
-        return ASYNC_FLUSH_EXECUTOR;
-    }
-
-    private static CachedColumnStoreCache getColumnDataCache() {
-        if (COLUMN_DATA_CACHE == null) {
-            final long columnDataCacheSize = (long)getColumnDataCacheSize() << 20;
-            final long totalFreeMemorySize = getTotalFreeMemorySize();
-
-            if (columnDataCacheSize <= totalFreeMemorySize) {
-                COLUMN_DATA_CACHE = new CachedColumnStoreCache(columnDataCacheSize);
-            } else {
-                COLUMN_DATA_CACHE = new CachedColumnStoreCache(0);
-                System.err.println(String.format(
-                    "Column Data Cache is configured to be of size %dB, but only %dB of memory are available.",
-                    columnDataCacheSize, totalFreeMemorySize));
-            }
-        }
-        return COLUMN_DATA_CACHE;
+    private static int getSmallTableThreshold() {
+        return COLUMNAR_STORE.getInt(SMALL_TABLE_THRESHOLD_KEY);
     }
 
     private static SmallColumnStoreCache getSmallTableCache() {
@@ -227,6 +193,39 @@ public final class ColumnarPreferenceUtils {
         return SMALL_TABLE_CACHE;
     }
 
+    static int getColumnDataCacheSize() {
+        return COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY);
+    }
+
+    private static CachedColumnStoreCache getColumnDataCache() {
+        if (COLUMN_DATA_CACHE == null) {
+            final long columnDataCacheSize = (long)getColumnDataCacheSize() << 20;
+            final long totalFreeMemorySize = getTotalFreeMemorySize();
+
+            if (columnDataCacheSize <= totalFreeMemorySize) {
+                COLUMN_DATA_CACHE = new CachedColumnStoreCache(columnDataCacheSize);
+            } else {
+                COLUMN_DATA_CACHE = new CachedColumnStoreCache(0);
+                System.err.println(String.format(
+                    "Column Data Cache is configured to be of size %dB, but only %dB of memory are available.",
+                    columnDataCacheSize, totalFreeMemorySize));
+            }
+        }
+        return COLUMN_DATA_CACHE;
+    }
+
+    static int getPersistNumThreads() {
+        return COLUMNAR_STORE.getInt(PERSIST_NUM_THREADS_KEY);
+    }
+
+    private static ExecutorService getPersistExecutor() {
+        if (PERSIST_EXECUTOR == null) {
+            PERSIST_EXECUTOR = Executors.newFixedThreadPool(getPersistNumThreads(),
+                r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet()));
+        }
+        return PERSIST_EXECUTOR;
+    }
+
     @SuppressWarnings("resource")
     public static ColumnStore wrap(final ColumnStore store) {
 
@@ -236,7 +235,7 @@ public final class ColumnarPreferenceUtils {
         ColumnStore wrapped = store;
 
         if (columnDataCache.getMaxSizeInBytes() > 0) {
-            wrapped = new AsyncFlushCachedColumnStore(wrapped, columnDataCache, getAsyncFlushExecutor());
+            wrapped = new AsyncFlushCachedColumnStore(wrapped, columnDataCache, getPersistExecutor());
         }
         if (smallTableCache.getMaxSize() > 0) {
             wrapped = new SmallColumnStore(wrapped, smallTableCache);

@@ -48,11 +48,13 @@
  */
 package org.knime.core.data.columnar.preferences;
 
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.ASYNC_FLUSH_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMNAR_STORE;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMN_DATA_CACHE_SIZE_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.PERSIST_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_CACHE_SIZE_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_THRESHOLD_KEY;
+
+import java.util.function.UnaryOperator;
 
 import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.preference.IntegerFieldEditor;
@@ -68,23 +70,29 @@ import org.knime.core.ui.util.SWTUtilities;
 @SuppressWarnings("javadoc")
 public class ColumnarPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
-    private final int m_asyncFlushNumThreads;
+    private static final UnaryOperator<String> RESTART_MESSAGE_OPERATOR =
+        s -> String.format("Changes to the %s%nrequire a restart of the workbenck to become effective.%n"
+            + "Do you want to restart the workbench now?", s);
+
+    private final int m_smallTableCacheSize;
 
     private final int m_columnDataCacheSize;
 
-    private final int m_smallTableCacheSize;
+    private final int m_persistNumThreads;
 
     private IntegerFieldEditor m_columnDataCacheSizeEditor;
 
     private IntegerFieldEditor m_smallTableCacheSizeEditor;
 
+    private IntegerFieldEditor m_smallTableThresholdEditor;
+
     private boolean m_apply;
 
     public ColumnarPreferencePage() {
         super(GRID);
-        m_asyncFlushNumThreads = ColumnarPreferenceUtils.getAsyncFlushNumThreads();
-        m_columnDataCacheSize = ColumnarPreferenceUtils.getColumnDataCacheSize();
         m_smallTableCacheSize = ColumnarPreferenceUtils.getSmallTableCacheSize();
+        m_columnDataCacheSize = ColumnarPreferenceUtils.getColumnDataCacheSize();
+        m_persistNumThreads = ColumnarPreferenceUtils.getPersistNumThreads();
     }
 
     @Override
@@ -100,21 +108,39 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
         final int numAvailableProcessors = ColumnarPreferenceUtils.getNumAvailableProcessors();
         final int usablePhysicalMemorySizeMB = ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB();
 
-        final IntegerFieldEditor asyncFlushNumThreadsEditor = new IntegerFieldEditor(ASYNC_FLUSH_NUM_THREADS_KEY,
-            "Number of threads for persisting data to disk", parent) {
-            @Override
-            protected void valueChanged() {
-                super.valueChanged();
-                if (isValid() && getIntValue() > numAvailableProcessors) {
-                    showErrorMessage(String.format(
-                        "Number of threads should not be larger than the number of available processors (%d).",
-                        numAvailableProcessors));
+        m_smallTableCacheSizeEditor =
+            new IntegerFieldEditor(SMALL_TABLE_CACHE_SIZE_KEY, "Size of small table cache (in MB)", parent) {
+                @Override
+                protected void valueChanged() {
+                    super.valueChanged();
+                    if (m_smallTableThresholdEditor.isValid() && isValid()
+                        && m_smallTableThresholdEditor.getIntValue() > getIntValue()) {
+                        showErrorMessage(
+                            "Maximum small table size should not be larger than the size of the small table cache.");
+                    }
+                    if (cacheSizeExceeded(usablePhysicalMemorySizeMB)) {
+                        showErrorMessage(String.format(
+                            "Combined size of caches should not be larger than usable physical memory size (%d).",
+                            usablePhysicalMemorySizeMB));
+                    }
                 }
+            };
+        addField(m_smallTableCacheSizeEditor);
 
-            }
-        };
-        asyncFlushNumThreadsEditor.setValidRange(1, Integer.MAX_VALUE);
-        addField(asyncFlushNumThreadsEditor);
+        m_smallTableThresholdEditor =
+            new IntegerFieldEditor(SMALL_TABLE_THRESHOLD_KEY, "Maximum size of small tables (in MB)", parent) {
+                @Override
+                protected void valueChanged() {
+                    super.valueChanged();
+                    if (isValid() && m_smallTableCacheSizeEditor.isValid()
+                        && getIntValue() > m_smallTableCacheSizeEditor.getIntValue()) {
+                        showErrorMessage(
+                            "Maximum small table size should not be larger than the size of the small table cache.");
+                    }
+                }
+            };
+        m_smallTableThresholdEditor.setValidRange(0, Integer.MAX_VALUE / (1 << 20));
+        addField(m_smallTableThresholdEditor);
 
         m_columnDataCacheSizeEditor =
             new IntegerFieldEditor(COLUMN_DATA_CACHE_SIZE_KEY, "Size of data cache (in MB)", parent) {
@@ -130,37 +156,21 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
             };
         addField(m_columnDataCacheSizeEditor);
 
-        final IntegerFieldEditor smallTableThresholdEditor =
-            new IntegerFieldEditor(SMALL_TABLE_THRESHOLD_KEY, "Maximum size of small tables (in MB)", parent) {
+        final IntegerFieldEditor persistNumThreadsEditor =
+            new IntegerFieldEditor(PERSIST_NUM_THREADS_KEY, "Number of threads for persisting data to disk", parent) {
                 @Override
                 protected void valueChanged() {
                     super.valueChanged();
-                    if (isValid() && getIntValue() > m_smallTableCacheSizeEditor.getIntValue()) {
-                        showErrorMessage(
-                            "Maximum small table size should not be larger than the size of the small table cache.");
-                    }
-                }
-            };
-        smallTableThresholdEditor.setValidRange(0, Integer.MAX_VALUE / (1 << 20));
-        addField(smallTableThresholdEditor);
-
-        m_smallTableCacheSizeEditor =
-            new IntegerFieldEditor(SMALL_TABLE_CACHE_SIZE_KEY, "Size of small table cache (in MB)", parent) {
-                @Override
-                protected void valueChanged() {
-                    super.valueChanged();
-                    if (smallTableThresholdEditor.getIntValue() > getIntValue()) {
-                        showErrorMessage(
-                            "Maximum small table size should not be larger than the size of the small table cache.");
-                    }
-                    if (cacheSizeExceeded(usablePhysicalMemorySizeMB)) {
+                    if (isValid() && getIntValue() > numAvailableProcessors) {
                         showErrorMessage(String.format(
-                            "Combined size of caches should not be larger than usable physical memory size (%d).",
-                            usablePhysicalMemorySizeMB));
+                            "Number of threads should not be larger than the number of available processors (%d).",
+                            numAvailableProcessors));
                     }
+
                 }
             };
-        addField(m_smallTableCacheSizeEditor);
+        persistNumThreadsEditor.setValidRange(1, Integer.MAX_VALUE);
+        addField(persistNumThreadsEditor);
     }
 
     private boolean cacheSizeExceeded(final int usablePhysicalMemorySizeMB) {
@@ -201,27 +211,21 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
             return;
         }
 
-        if (m_columnDataCacheSize != COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY)) {
-            Display.getDefault()
-                .asyncExec(() -> promptRestartWithMessage(
-                    "Changes to the data cache size " + "require a restart of the workbenck to become effective. "
-                        + "Do you want to restart the workbench now?"));
-            return;
-        }
-
         if (m_smallTableCacheSize != COLUMNAR_STORE.getInt(SMALL_TABLE_CACHE_SIZE_KEY)) {
             Display.getDefault()
-                .asyncExec(() -> promptRestartWithMessage("Changes to the small table cache size "
-                    + "require a restart of the workbenck to become effective. "
-                    + "Do you want to restart the workbench now?"));
+                .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("small table cache size")));
             return;
         }
 
-        if (m_asyncFlushNumThreads != COLUMNAR_STORE.getInt(ASYNC_FLUSH_NUM_THREADS_KEY)) {
+        if (m_columnDataCacheSize != COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY)) {
             Display.getDefault()
-                .asyncExec(() -> promptRestartWithMessage("Changes to the table persistence thread pool size "
-                    + "require a restart of the workbenck to become effective.\n"
-                    + "Do you want to restart the workbench now?"));
+                .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("data cache size")));
+            return;
+        }
+
+        if (m_persistNumThreads != COLUMNAR_STORE.getInt(PERSIST_NUM_THREADS_KEY)) {
+            Display.getDefault().asyncExec(
+                () -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("table persistence thread pool size")));
         }
     }
 

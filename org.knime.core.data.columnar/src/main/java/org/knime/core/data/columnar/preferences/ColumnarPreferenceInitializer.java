@@ -48,9 +48,9 @@
  */
 package org.knime.core.data.columnar.preferences;
 
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.ASYNC_FLUSH_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMNAR_STORE;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMN_DATA_CACHE_SIZE_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.PERSIST_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_CACHE_SIZE_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_THRESHOLD_KEY;
 
@@ -61,16 +61,19 @@ public class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer
 
     @Override
     public void initializeDefaultPreferences() {
-        COLUMNAR_STORE.setDefault(SMALL_TABLE_THRESHOLD_KEY, 1);
 
         COLUMNAR_STORE.setDefault(SMALL_TABLE_CACHE_SIZE_KEY, 32);
 
-        COLUMNAR_STORE.setDefault(ASYNC_FLUSH_NUM_THREADS_KEY,
-            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
+        COLUMNAR_STORE.setDefault(SMALL_TABLE_THRESHOLD_KEY, 1);
 
         COLUMNAR_STORE.setDefault(COLUMN_DATA_CACHE_SIZE_KEY,
             Math.min((int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20),
                 Math.max(0, ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB())
                     - ColumnarPreferenceUtils.getSmallTableCacheSize()));
+
+        COLUMNAR_STORE.setDefault(PERSIST_NUM_THREADS_KEY,
+            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
+
     }
+
 }
