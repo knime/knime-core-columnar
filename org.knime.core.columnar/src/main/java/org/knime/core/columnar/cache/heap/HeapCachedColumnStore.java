@@ -143,12 +143,12 @@ public final class HeapCachedColumnStore implements ColumnStore {
                 if (m_objectData.isSelected(i)) {
                     final HeapCachedReadData<?> heapCachedData = (HeapCachedReadData<?>)batch.get(i);
                     m_cache.put(new ColumnDataUniqueId(m_readStore, i, m_numBatches), heapCachedData.getData());
-                    m_numBatches++;
                     data[i] = heapCachedData.getDelegate();
                 } else {
                     data[i] = batch.get(i);
                 }
             }
+            m_numBatches++;
             m_delegateWriter.write(new DefaultReadBatch(data, batch.length()));
         }
 
