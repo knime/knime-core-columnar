@@ -49,42 +49,50 @@
 package org.knime.core.data.columnar.preferences;
 
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMNAR_STORE;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMN_DATA_CACHE_SIZE_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.DOMAIN_CALC_NUM_THREADS_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.HEAP_CACHE_NAME_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.PERSIST_NUM_THREADS_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SERIALIZE_NUM_THREADS_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_CACHE_SIZE_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_THRESHOLD_KEY;
 
 import org.eclipse.core.runtime.preferences.AbstractPreferenceInitializer;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.HeapCache;
 
 @SuppressWarnings("javadoc")
 public class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer {
 
+    static final String USE_DEFAULTS_KEY = "knime.core.data.columnar.use-defaults";
+
+    static final boolean USE_DEFAULTS_DEF = true;
+
+    static final String NUM_THREADS_KEY = "knime.core.data.columnar.num-threads";
+
+    static final int NUM_THREADS_DEF = Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors());
+
+    // the size (in MB) of the LRU cache for entire small tables
+    static final String SMALL_TABLE_CACHE_SIZE_KEY = "knime.core.data.columnar.small-cache-size";
+
+    static final int SMALL_TABLE_CACHE_SIZE_DEF = 32;
+
+    // the size (in MB) up to which a table is considered small
+    static final String SMALL_TABLE_THRESHOLD_KEY = "knime.core.data.columnar.small-threshold";
+
+    static final int SMALL_TABLE_THRESHOLD_DEF = 1;
+
+    static final String HEAP_CACHE_NAME_KEY = "knime.core.data.columnar.heap-cache";
+
+    static final String HEAP_CACHE_NAME_DEF = HeapCache.WEAK.name();
+
+    // the size (in MB) of the LRU cache for ColumnData of all tables
+    static final String COLUMN_DATA_CACHE_SIZE_KEY = "knime.core.data.columnar.data-cache-size";
+
+    static final int COLUMN_DATA_CACHE_SIZE_DEF = Math.min((int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20),
+        Math.max(0, ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB())
+            - ColumnarPreferenceUtils.getSmallTableCacheSize());
+
     @Override
     public void initializeDefaultPreferences() {
-
-        COLUMNAR_STORE.setDefault(DOMAIN_CALC_NUM_THREADS_KEY,
-            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
-
-        COLUMNAR_STORE.setDefault(HEAP_CACHE_NAME_KEY, ColumnarPreferenceUtils.HeapCache.SOFT.name());
-
-        COLUMNAR_STORE.setDefault(SERIALIZE_NUM_THREADS_KEY,
-            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
-
-        COLUMNAR_STORE.setDefault(SMALL_TABLE_CACHE_SIZE_KEY, 32);
-
-        COLUMNAR_STORE.setDefault(SMALL_TABLE_THRESHOLD_KEY, 1);
-
-        COLUMNAR_STORE.setDefault(COLUMN_DATA_CACHE_SIZE_KEY,
-            Math.min((int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20),
-                Math.max(0, ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB())
-                    - ColumnarPreferenceUtils.getSmallTableCacheSize()));
-
-        COLUMNAR_STORE.setDefault(PERSIST_NUM_THREADS_KEY,
-            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
-
+        COLUMNAR_STORE.setDefault(USE_DEFAULTS_KEY, USE_DEFAULTS_DEF);
+        COLUMNAR_STORE.setDefault(NUM_THREADS_KEY, NUM_THREADS_DEF);
+        COLUMNAR_STORE.setDefault(HEAP_CACHE_NAME_KEY, HEAP_CACHE_NAME_DEF);
+        COLUMNAR_STORE.setDefault(SMALL_TABLE_CACHE_SIZE_KEY, SMALL_TABLE_CACHE_SIZE_DEF);
+        COLUMNAR_STORE.setDefault(SMALL_TABLE_THRESHOLD_KEY, SMALL_TABLE_THRESHOLD_DEF);
+        COLUMNAR_STORE.setDefault(COLUMN_DATA_CACHE_SIZE_KEY, COLUMN_DATA_CACHE_SIZE_DEF);
     }
 
 }

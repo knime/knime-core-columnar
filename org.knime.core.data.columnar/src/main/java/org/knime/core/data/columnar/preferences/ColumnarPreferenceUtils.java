@@ -48,6 +48,18 @@
  */
 package org.knime.core.data.columnar.preferences;
 
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.COLUMN_DATA_CACHE_SIZE_DEF;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.COLUMN_DATA_CACHE_SIZE_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.HEAP_CACHE_NAME_DEF;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.HEAP_CACHE_NAME_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.NUM_THREADS_DEF;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.NUM_THREADS_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.SMALL_TABLE_CACHE_SIZE_DEF;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.SMALL_TABLE_CACHE_SIZE_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.SMALL_TABLE_THRESHOLD_DEF;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.SMALL_TABLE_THRESHOLD_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.USE_DEFAULTS_KEY;
+
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryType;
@@ -129,41 +141,24 @@ public final class ColumnarPreferenceUtils {
     static final ScopedPreferenceStore COLUMNAR_STORE =
         new ScopedPreferenceStore(InstanceScope.INSTANCE, COLUMNAR_SYMBOLIC_NAME);
 
-    static final String DOMAIN_CALC_NUM_THREADS_KEY = "knime.core.data.columnar.domain-calc-num-threads";
-
     private static final AtomicLong DOMAIN_CALC_THREAD_COUNT = new AtomicLong();
 
     // lazily initialized
     private static ExecutorService DOMAIN_CALC_EXECUTOR;
 
-    static final String HEAP_CACHE_NAME_KEY = "knime.core.data.columnar.heap-cache";
-
     // lazily initialized
     private static ObjectDataCache HEAP_CACHE;
-
-    static final String SERIALIZE_NUM_THREADS_KEY = "knime.core.data.columnar.serialize-num-threads";
 
     private static final AtomicLong SERIALIZE_THREAD_COUNT = new AtomicLong();
 
     // lazily initialized
     private static ExecutorService SERIALIZE_EXECUTOR;
 
-    // the size (in MB) of the LRU cache for entire small tables
-    static final String SMALL_TABLE_CACHE_SIZE_KEY = "knime.core.data.columnar.small-cache-size";
-
-    // the size (in MB) up to which a table is considered small
-    static final String SMALL_TABLE_THRESHOLD_KEY = "knime.core.data.columnar.small-threshold";
-
     // lazily initialized
     private static SmallColumnStoreCache SMALL_TABLE_CACHE;
 
-    // the size (in MB) of the LRU cache for ColumnData of all tables
-    static final String COLUMN_DATA_CACHE_SIZE_KEY = "knime.core.data.columnar.data-cache-size";
-
     // lazily initialized
     private static CachedColumnStoreCache COLUMN_DATA_CACHE;
-
-    static final String PERSIST_NUM_THREADS_KEY = "knime.core.data.columnar.flush-num-threads";
 
     private static final AtomicLong PERSIST_THREAD_COUNT = new AtomicLong();
 
@@ -219,21 +214,24 @@ public final class ColumnarPreferenceUtils {
         return Runtime.getRuntime().availableProcessors();
     }
 
-    static int getDomainCalcNumThreads() {
-        return COLUMNAR_STORE.getInt(DOMAIN_CALC_NUM_THREADS_KEY);
+    static boolean useDefaults() {
+        return COLUMNAR_STORE.getBoolean(USE_DEFAULTS_KEY);
+    }
+
+    static int getNumThreads() {
+        return useDefaults() ? NUM_THREADS_DEF : COLUMNAR_STORE.getInt(NUM_THREADS_KEY);
     }
 
     public static ExecutorService getDomainCalcExecutor() {
         if (DOMAIN_CALC_EXECUTOR == null) {
-            DOMAIN_CALC_EXECUTOR =
-                ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getDomainCalcNumThreads(),
-                    r -> new Thread(r, "KNIME-DomainCalculator-" + DOMAIN_CALC_THREAD_COUNT.incrementAndGet())));
+            DOMAIN_CALC_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
+                r -> new Thread(r, "KNIME-DomainCalculator-" + DOMAIN_CALC_THREAD_COUNT.incrementAndGet())));
         }
         return DOMAIN_CALC_EXECUTOR;
     }
 
     static String getHeapCacheName() {
-        return COLUMNAR_STORE.getString(HEAP_CACHE_NAME_KEY);
+        return useDefaults() ? HEAP_CACHE_NAME_DEF : COLUMNAR_STORE.getString(HEAP_CACHE_NAME_KEY);
     }
 
     private static ObjectDataCache getHeapCache() {
@@ -243,25 +241,20 @@ public final class ColumnarPreferenceUtils {
         return HEAP_CACHE;
     }
 
-    static int getSerializeNumThreads() {
-        return COLUMNAR_STORE.getInt(SERIALIZE_NUM_THREADS_KEY);
-    }
-
     private static ExecutorService getSerializeExecutor() {
         if (SERIALIZE_EXECUTOR == null) {
-            SERIALIZE_EXECUTOR =
-                ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getDomainCalcNumThreads(),
-                    r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
+            SERIALIZE_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
+                r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
         }
         return SERIALIZE_EXECUTOR;
     }
 
     static int getSmallTableCacheSize() {
-        return COLUMNAR_STORE.getInt(SMALL_TABLE_CACHE_SIZE_KEY);
+        return useDefaults() ? SMALL_TABLE_CACHE_SIZE_DEF : COLUMNAR_STORE.getInt(SMALL_TABLE_CACHE_SIZE_KEY);
     }
 
     private static int getSmallTableThreshold() {
-        return COLUMNAR_STORE.getInt(SMALL_TABLE_THRESHOLD_KEY);
+        return useDefaults() ? SMALL_TABLE_THRESHOLD_DEF : COLUMNAR_STORE.getInt(SMALL_TABLE_THRESHOLD_KEY);
     }
 
     private static SmallColumnStoreCache getSmallTableCache() {
@@ -283,7 +276,7 @@ public final class ColumnarPreferenceUtils {
     }
 
     static int getColumnDataCacheSize() {
-        return COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY);
+        return useDefaults() ? COLUMN_DATA_CACHE_SIZE_DEF : COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY);
     }
 
     private static CachedColumnStoreCache getColumnDataCache() {
@@ -303,15 +296,10 @@ public final class ColumnarPreferenceUtils {
         return COLUMN_DATA_CACHE;
     }
 
-    static int getPersistNumThreads() {
-        return COLUMNAR_STORE.getInt(PERSIST_NUM_THREADS_KEY);
-    }
-
     private static ExecutorService getPersistExecutor() {
         if (PERSIST_EXECUTOR == null) {
-            PERSIST_EXECUTOR =
-                ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getPersistNumThreads(),
-                    r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet())));
+            PERSIST_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
+                r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet())));
         }
         return PERSIST_EXECUTOR;
     }
