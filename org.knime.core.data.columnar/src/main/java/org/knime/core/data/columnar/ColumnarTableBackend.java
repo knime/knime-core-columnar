@@ -88,15 +88,16 @@ public final class ColumnarTableBackend implements TableBackend {
 
     static {
         String d;
-        try (InputStream in = ColumnarTableBackend.class.getResourceAsStream("./description.html")) {
+        try (InputStream in = ColumnarTableBackend.class.getResourceAsStream("description.html")) {
             d = IOUtils.readLines(in, StandardCharsets.UTF_8).stream().collect(Collectors.joining("\n"));
-        } catch (NullPointerException | IOException ioe) {
+        } catch (NullPointerException | IOException ioe) { // NOSONAR
             LOGGER.error("Unable to parse description file", ioe);
             d = "";
         }
         DESCRIPTION = d;
     }
 
+    @SuppressWarnings("resource")
     @Override
     public DataContainerDelegate create(final DataTableSpec spec, final DataContainerSettings settings,
         final IDataRepository repository, final ILocalDataRepository localRepository,
@@ -106,13 +107,11 @@ public final class ColumnarTableBackend implements TableBackend {
                 initFileStoreHandler(fileStoreHandler, repository));
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
-            final ColumnarDataContainerDelegate delegate =
-                new ColumnarDataContainerDelegate(new ColumnarRowWriteCursor(repository.generateNewID(), columnarSchema,
-                    new ColumnarRowWriteCursorSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                        schema.getRowKeyType())));
-            return delegate;
+            ColumnarRowWriteCursorSettings cursorSettings = new ColumnarRowWriteCursorSettings(
+                settings.getInitializeDomain(), settings.getMaxDomainValues(), schema.getRowKeyType());
+            return new ColumnarDataContainerDelegate(
+                new ColumnarRowWriteCursor(repository.generateNewID(), columnarSchema, cursorSettings));
         } catch (IOException ex) {
-            // TODO logging
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", ex);
         }
     }
