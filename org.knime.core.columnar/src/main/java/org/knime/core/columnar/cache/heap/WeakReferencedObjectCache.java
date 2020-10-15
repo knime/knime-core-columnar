@@ -44,47 +44,36 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   2 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   15 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.preferences;
+package org.knime.core.columnar.cache.heap;
 
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMNAR_STORE;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMN_DATA_CACHE_SIZE_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.DOMAIN_CALC_NUM_THREADS_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.HEAP_CACHE_NAME_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.PERSIST_NUM_THREADS_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SERIALIZE_NUM_THREADS_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_CACHE_SIZE_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_THRESHOLD_KEY;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import org.eclipse.core.runtime.preferences.AbstractPreferenceInitializer;
+import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
-@SuppressWarnings("javadoc")
-public class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer {
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+
+/**
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public class WeakReferencedObjectCache implements ObjectDataCache {
+
+    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+
+    /**
+     * Constructor
+     */
+    public WeakReferencedObjectCache() {
+        m_cache = CacheBuilder.newBuilder().weakValues().build();
+    }
 
     @Override
-    public void initializeDefaultPreferences() {
-
-        COLUMNAR_STORE.setDefault(DOMAIN_CALC_NUM_THREADS_KEY,
-            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
-
-        COLUMNAR_STORE.setDefault(HEAP_CACHE_NAME_KEY, ColumnarPreferenceUtils.HeapCache.SOFT.name());
-
-        COLUMNAR_STORE.setDefault(SERIALIZE_NUM_THREADS_KEY,
-            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
-
-        COLUMNAR_STORE.setDefault(SMALL_TABLE_CACHE_SIZE_KEY, 32);
-
-        COLUMNAR_STORE.setDefault(SMALL_TABLE_THRESHOLD_KEY, 1);
-
-        COLUMNAR_STORE.setDefault(COLUMN_DATA_CACHE_SIZE_KEY,
-            Math.min((int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20),
-                Math.max(0, ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB())
-                    - ColumnarPreferenceUtils.getSmallTableCacheSize()));
-
-        COLUMNAR_STORE.setDefault(PERSIST_NUM_THREADS_KEY,
-            Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2));
-
+    public Map<ColumnDataUniqueId, AtomicReferenceArray<?>> getCache() {
+        return m_cache.asMap();
     }
 
 }

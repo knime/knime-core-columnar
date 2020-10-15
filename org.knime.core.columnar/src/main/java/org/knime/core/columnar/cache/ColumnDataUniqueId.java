@@ -99,7 +99,7 @@ public class ColumnDataUniqueId {
         return String.join(",", m_store.toString(), Integer.toString(m_columnIndex), Integer.toString(m_chunkIndex));
     }
 
-    ColumnReadStore getStore() {
+    public ColumnReadStore getStore() {
         return m_store;
     }
 

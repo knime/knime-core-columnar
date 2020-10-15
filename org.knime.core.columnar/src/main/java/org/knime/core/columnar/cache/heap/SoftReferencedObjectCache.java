@@ -44,35 +44,55 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   13 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   15 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.cache.heap;
 
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
 
 /**
- * In heap memory cache.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class HeapCachedColumnStoreCache {
+public class SoftReferencedObjectCache implements ObjectDataCache {
 
     private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
 
     /**
      * Constructor
      */
-    public HeapCachedColumnStoreCache() {
-        m_cache = CacheBuilder.newBuilder().weakValues().build();
+    public SoftReferencedObjectCache() {
+        final RemovalListener<ColumnDataUniqueId, AtomicReferenceArray<?>> removalListener = removalNotification -> {
+            if (removalNotification.wasEvicted()) {
+                final ColumnDataUniqueId ccuid = removalNotification.getKey();
+                @SuppressWarnings("resource")
+                final HeapCachedColumnReadStore store = (HeapCachedColumnReadStore)ccuid.getStore();
+                store.onEviction(ccuid);
+            }
+        };
+
+        m_cache = CacheBuilder.newBuilder().softValues().removalListener(removalListener)
+            .expireAfterAccess(10, TimeUnit.MINUTES).build();
     }
 
-    Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> getCache() {
-        return m_cache;
+    @Override
+    public Map<ColumnDataUniqueId, AtomicReferenceArray<?>> getCache() {
+        return m_cache.asMap();
+    }
+
+    /**
+     * invalidate the cache
+     */
+    public void invalidate() {
+        m_cache.invalidateAll();
     }
 
 }

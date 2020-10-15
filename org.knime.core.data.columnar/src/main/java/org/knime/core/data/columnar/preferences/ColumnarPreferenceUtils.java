@@ -72,17 +72,51 @@ import org.knime.core.columnar.cache.SmallColumnStore;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.cache.heap.HeapCachedColumnReadStore;
 import org.knime.core.columnar.cache.heap.HeapCachedColumnStore;
-import org.knime.core.columnar.cache.heap.HeapCachedColumnStoreCache;
+import org.knime.core.columnar.cache.heap.ObjectDataCache;
+import org.knime.core.columnar.cache.heap.SoftReferencedObjectCache;
+import org.knime.core.columnar.cache.heap.WeakReferencedObjectCache;
 import org.knime.core.columnar.phantom.PhantomReferenceReadStore;
 import org.knime.core.columnar.phantom.PhantomReferenceStore;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.data.columnar.ColumnarTableBackend;
+import org.knime.core.data.util.memory.MemoryAlert;
+import org.knime.core.data.util.memory.MemoryAlertListener;
+import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.util.ThreadUtils;
 import org.osgi.framework.FrameworkUtil;
 
 @SuppressWarnings("javadoc")
 public final class ColumnarPreferenceUtils {
+
+    enum HeapCache {
+
+            WEAK {
+                @Override
+                ObjectDataCache createCache() {
+                    return new WeakReferencedObjectCache();
+                }
+            },
+
+            SOFT {
+                @Override
+                ObjectDataCache createCache() {
+                    final SoftReferencedObjectCache cache = new SoftReferencedObjectCache();
+
+                    MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
+                        @Override
+                        protected boolean memoryAlert(final MemoryAlert alert) {
+                            cache.invalidate();
+                            return false;
+                        }
+                    });
+
+                    return cache;
+                }
+            };
+
+        abstract ObjectDataCache createCache();
+    }
 
     private static final String RESERVED_SIZE_PROPERTY = "knime.columnar.reservedmemorymb";
 
@@ -102,7 +136,10 @@ public final class ColumnarPreferenceUtils {
     // lazily initialized
     private static ExecutorService DOMAIN_CALC_EXECUTOR;
 
-    private static final HeapCachedColumnStoreCache HEAP_CACHE = new HeapCachedColumnStoreCache();
+    static final String HEAP_CACHE_NAME_KEY = "knime.core.data.columnar.heap-cache";
+
+    // lazily initialized
+    private static ObjectDataCache HEAP_CACHE;
 
     static final String SERIALIZE_NUM_THREADS_KEY = "knime.core.data.columnar.serialize-num-threads";
 
@@ -188,10 +225,22 @@ public final class ColumnarPreferenceUtils {
 
     public static ExecutorService getDomainCalcExecutor() {
         if (DOMAIN_CALC_EXECUTOR == null) {
-            DOMAIN_CALC_EXECUTOR = Executors.newFixedThreadPool(getDomainCalcNumThreads(),
-                r -> new Thread(r, "KNIME-DomainCalculator-" + DOMAIN_CALC_THREAD_COUNT.incrementAndGet()));
+            DOMAIN_CALC_EXECUTOR =
+                ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getDomainCalcNumThreads(),
+                    r -> new Thread(r, "KNIME-DomainCalculator-" + DOMAIN_CALC_THREAD_COUNT.incrementAndGet())));
         }
         return DOMAIN_CALC_EXECUTOR;
+    }
+
+    static String getHeapCacheName() {
+        return COLUMNAR_STORE.getString(HEAP_CACHE_NAME_KEY);
+    }
+
+    private static ObjectDataCache getHeapCache() {
+        if (HEAP_CACHE == null) {
+            HEAP_CACHE = HeapCache.valueOf(getHeapCacheName()).createCache();
+        }
+        return HEAP_CACHE;
     }
 
     static int getSerializeNumThreads() {
@@ -200,8 +249,9 @@ public final class ColumnarPreferenceUtils {
 
     private static ExecutorService getSerializeExecutor() {
         if (SERIALIZE_EXECUTOR == null) {
-            SERIALIZE_EXECUTOR = Executors.newFixedThreadPool(getDomainCalcNumThreads(),
-                r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet()));
+            SERIALIZE_EXECUTOR =
+                ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getDomainCalcNumThreads(),
+                    r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
         }
         return SERIALIZE_EXECUTOR;
     }
@@ -281,7 +331,7 @@ public final class ColumnarPreferenceUtils {
             wrapped = new SmallColumnStore(wrapped, smallTableCache);
         }
 
-        wrapped = new HeapCachedColumnStore(wrapped, HEAP_CACHE, getSerializeExecutor());
+        wrapped = new HeapCachedColumnStore(wrapped, getHeapCache(), getSerializeExecutor());
         return PhantomReferenceStore.create(wrapped);
     }
 
@@ -292,7 +342,7 @@ public final class ColumnarPreferenceUtils {
             wrapped = new CachedColumnReadStore(wrapped, getColumnDataCache());
         }
 
-        wrapped = new HeapCachedColumnReadStore(wrapped, HEAP_CACHE);
+        wrapped = new HeapCachedColumnReadStore(wrapped, getHeapCache());
         return PhantomReferenceReadStore.create(wrapped);
     }
 

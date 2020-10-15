@@ -48,6 +48,10 @@ package org.knime.core.columnar.cache.heap;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
@@ -66,8 +70,6 @@ import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
-
-import com.google.common.cache.Cache;
 
 /**
  * {@link ColumnStore} interception {@link ObjectReadData} for in-heap caching of objects.
@@ -142,7 +144,10 @@ public final class HeapCachedColumnStore implements ColumnStore {
             for (int i = 0; i < data.length; i++) {
                 if (m_objectData.isSelected(i)) {
                     final HeapCachedReadData<?> heapCachedData = (HeapCachedReadData<?>)batch.get(i);
-                    m_cache.put(new ColumnDataUniqueId(m_readStore, i, m_numBatches), heapCachedData.getData());
+                    final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
+                    m_cache.put(ccuid, heapCachedData.getData());
+                    m_cachedData.add(ccuid);
+
                     data[i] = heapCachedData.getDelegate();
                 } else {
                     data[i] = batch.get(i);
@@ -173,7 +178,9 @@ public final class HeapCachedColumnStore implements ColumnStore {
 
     private final ColumnSelection m_objectData;
 
-    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+    private final Map<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+
+    private final Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private volatile boolean m_writerClosed;
 
@@ -184,11 +191,11 @@ public final class HeapCachedColumnStore implements ColumnStore {
      * @param cache the in-heap cache for storing object data
      * @param executor the executor to which to submit asynchronous serialization tasks
      */
-    public HeapCachedColumnStore(final ColumnStore delegate, final HeapCachedColumnStoreCache cache,
+    public HeapCachedColumnStore(final ColumnStore delegate, final ObjectDataCache cache,
         final ExecutorService executor) {
         m_delegate = delegate;
         m_objectData = HeapCacheUtils.getObjectDataIndices(delegate.getSchema());
-        m_readStore = new HeapCachedColumnReadStore(delegate, cache);
+        m_readStore = new HeapCachedColumnReadStore(delegate, cache, m_cachedData);
         m_factory = new Factory();
         m_writer = new Writer();
         m_cache = cache.getCache();

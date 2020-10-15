@@ -49,6 +49,10 @@
 package org.knime.core.columnar.cache.heap;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.batch.ReadBatch;
@@ -59,8 +63,6 @@ import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
-
-import com.google.common.cache.Cache;
 
 /**
  * {@link ColumnReadStore} caching {@link ObjectData} as weak references in heap.
@@ -105,9 +107,11 @@ public final class HeapCachedColumnReadStore implements ColumnReadStore {
         @SuppressWarnings("unchecked")
         private <T> HeapCachedReadData<T> wrap(final ReadBatch batch, final int batchIndex, final int columnIndex) {
             final ObjectReadData<T> columnReadData = (ObjectReadData<T>)batch.get(columnIndex);
-            final AtomicReferenceArray<T> array = (AtomicReferenceArray<T>)m_cache.asMap().computeIfAbsent(
-                new ColumnDataUniqueId(HeapCachedColumnReadStore.this, columnIndex, batchIndex),
-                k -> new AtomicReferenceArray<>(columnReadData.length()));
+            final AtomicReferenceArray<T> array = (AtomicReferenceArray<T>)m_cache
+                .computeIfAbsent(new ColumnDataUniqueId(HeapCachedColumnReadStore.this, columnIndex, batchIndex), k -> {
+                    m_cachedData.add(k);
+                    return new AtomicReferenceArray<>(columnReadData.length());
+                });
             return new HeapCachedReadData<>(columnReadData, array);
         }
 
@@ -134,7 +138,9 @@ public final class HeapCachedColumnReadStore implements ColumnReadStore {
 
     private final ColumnSelection m_objectData;
 
-    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+    private final Map<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+
+    private final Set<ColumnDataUniqueId> m_cachedData;
 
     private volatile boolean m_storeClosed;
 
@@ -142,15 +148,22 @@ public final class HeapCachedColumnReadStore implements ColumnReadStore {
      * @param delegate the delegate from which to read
      * @param cache the delegate from which to read object data in case of a cache miss
      */
-    public HeapCachedColumnReadStore(final ColumnReadStore delegate, final HeapCachedColumnStoreCache cache) {
-        this(delegate, HeapCacheUtils.getObjectDataIndices(delegate.getSchema()), cache);
+    public HeapCachedColumnReadStore(final ColumnReadStore delegate, final ObjectDataCache cache) {
+        this(delegate, HeapCacheUtils.getObjectDataIndices(delegate.getSchema()), cache,
+            Collections.newSetFromMap(new ConcurrentHashMap<>()));
+    }
+
+    HeapCachedColumnReadStore(final ColumnReadStore delegate, final ObjectDataCache cache,
+        final Set<ColumnDataUniqueId> cachedData) {
+        this(delegate, HeapCacheUtils.getObjectDataIndices(delegate.getSchema()), cache, cachedData);
     }
 
     HeapCachedColumnReadStore(final ColumnReadStore delegate, final ColumnSelection selection,
-        final HeapCachedColumnStoreCache cache) {
+        final ObjectDataCache cache, final Set<ColumnDataUniqueId> cachedData) {
         m_delegate = delegate;
         m_objectData = selection;
         m_cache = cache.getCache();
+        m_cachedData = cachedData;
     }
 
     @Override
@@ -170,8 +183,14 @@ public final class HeapCachedColumnReadStore implements ColumnReadStore {
     @Override
     public void close() throws IOException {
         m_storeClosed = true;
+        m_cache.keySet().removeAll(m_cachedData);
+        m_cachedData.clear();
 
         m_delegate.close();
+    }
+
+    void onEviction(final ColumnDataUniqueId ccuid) {
+        m_cachedData.remove(ccuid);
     }
 
 }

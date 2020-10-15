@@ -48,9 +48,9 @@
  */
 package org.knime.core.data.columnar.preferences;
 
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMNAR_STORE;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMN_DATA_CACHE_SIZE_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.DOMAIN_CALC_NUM_THREADS_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.HEAP_CACHE_NAME_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.PERSIST_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SERIALIZE_NUM_THREADS_KEY;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.SMALL_TABLE_CACHE_SIZE_KEY;
@@ -58,6 +58,7 @@ import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.S
 
 import java.util.function.UnaryOperator;
 
+import org.eclipse.jface.preference.ComboFieldEditor;
 import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.preference.IntegerFieldEditor;
 import org.eclipse.swt.SWT;
@@ -73,10 +74,12 @@ import org.knime.core.ui.util.SWTUtilities;
 public class ColumnarPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
     private static final UnaryOperator<String> RESTART_MESSAGE_OPERATOR =
-        s -> String.format("Changes to the %s%nrequire a restart of the workbenck to become effective.%n"
+        s -> String.format("Changes to the %s require a restart of the workbenck to become effective.%n"
             + "Do you want to restart the workbench now?", s);
 
     private final int m_domainCalcNumThreads;
+
+    private final String m_heapCacheName;
 
     private final int m_serializeNumThreads;
 
@@ -97,6 +100,7 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
     public ColumnarPreferencePage() {
         super(GRID);
         m_domainCalcNumThreads = ColumnarPreferenceUtils.getDomainCalcNumThreads();
+        m_heapCacheName = ColumnarPreferenceUtils.getHeapCacheName();
         m_serializeNumThreads = ColumnarPreferenceUtils.getSerializeNumThreads();
         m_smallTableCacheSize = ColumnarPreferenceUtils.getSmallTableCacheSize();
         m_columnDataCacheSize = ColumnarPreferenceUtils.getColumnDataCacheSize();
@@ -132,8 +136,15 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
         domainCalcNumThreadsEditor.setValidRange(1, Integer.MAX_VALUE);
         addField(domainCalcNumThreadsEditor);
 
+        final ComboFieldEditor heapCacheName =
+            new ComboFieldEditor(HEAP_CACHE_NAME_KEY, "Caching strategy for complex data",
+                new String[][]{{"Weak-referenced", ColumnarPreferenceUtils.HeapCache.WEAK.name()},
+                    {"Soft-referenced memory-aware", ColumnarPreferenceUtils.HeapCache.SOFT.name()}},
+                parent);
+        addField(heapCacheName);
+
         final IntegerFieldEditor serializeNumThreadsEditor = new IntegerFieldEditor(SERIALIZE_NUM_THREADS_KEY,
-            "Number of threads for serializing complex data types", parent) {
+            "Number of threads for serializing complex data", parent) {
             @Override
             protected void valueChanged() {
                 super.valueChanged();
@@ -251,31 +262,37 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
             return;
         }
 
-        if (m_domainCalcNumThreads != COLUMNAR_STORE.getInt(DOMAIN_CALC_NUM_THREADS_KEY)) {
+        if (m_domainCalcNumThreads != ColumnarPreferenceUtils.getDomainCalcNumThreads()) {
             Display.getDefault().asyncExec(
                 () -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("domain calculation thread pool size")));
             return;
         }
 
-        if (m_serializeNumThreads != COLUMNAR_STORE.getInt(SERIALIZE_NUM_THREADS_KEY)) {
+        if (!m_heapCacheName.equals(ColumnarPreferenceUtils.getHeapCacheName())) {
+            Display.getDefault().asyncExec(
+                () -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("heap cache")));
+            return;
+        }
+
+        if (m_serializeNumThreads != ColumnarPreferenceUtils.getSerializeNumThreads()) {
             Display.getDefault().asyncExec(
                 () -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("serialization thread pool size")));
             return;
         }
 
-        if (m_smallTableCacheSize != COLUMNAR_STORE.getInt(SMALL_TABLE_CACHE_SIZE_KEY)) {
+        if (m_smallTableCacheSize != ColumnarPreferenceUtils.getSmallTableCacheSize()) {
             Display.getDefault()
                 .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("small table cache size")));
             return;
         }
 
-        if (m_columnDataCacheSize != COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY)) {
+        if (m_columnDataCacheSize != ColumnarPreferenceUtils.getColumnDataCacheSize()) {
             Display.getDefault()
                 .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("data cache size")));
             return;
         }
 
-        if (m_persistNumThreads != COLUMNAR_STORE.getInt(PERSIST_NUM_THREADS_KEY)) {
+        if (m_persistNumThreads != ColumnarPreferenceUtils.getPersistNumThreads()) {
             Display.getDefault().asyncExec(
                 () -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("table persistence thread pool size")));
         }
