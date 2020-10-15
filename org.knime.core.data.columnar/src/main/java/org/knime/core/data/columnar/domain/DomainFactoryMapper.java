@@ -139,8 +139,6 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
                 factories.put(i, factory);
             } else {
                 final DataType type = spec.getColumnSpec(i - 1).getType();
-
-                // TODO do we need to consider domains which are both, nominal and bounded?
                 if (type.isCompatible(BoundedValue.class)) {
                     factories.put(i, new BoundedDataValueDomainMapper<DataValue>(
                         new DataValueComparatorDelegator<>(type.getComparator()), m_schema.getReadValueFactoryAt(i)));
@@ -298,33 +296,6 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
                 new LongCell(domain.getUpperBound())).createDomain();
         }
     }
-
-    //    final static class StringDomainFactory implements DomainFactory<StringReadData, StringDomain> {
-    //
-    //        private final int m_maxValues;
-    //
-    //        private StringDomainFactory(final int maxValues) {
-    //            m_maxValues = maxValues;
-    //        }
-    //
-    //        @Override
-    //        public DomainCalculator<StringReadData, StringDomain> createCalculator(final DataColumnDomain domain) {
-    //            if (domain != null) {
-    //                // TODO check order. Same as in KNIME?
-    //                final Set<String> values = domain.getValues().stream().map((c) -> ((StringCell)c).getStringValue())
-    //                    .collect(Collectors.toSet());
-    //                return new StringDomainCalculator(new StringDomain(values), m_maxValues);
-    //            } else {
-    //                return new StringDomainCalculator(m_maxValues);
-    //            }
-    //        }
-    //
-    //        @Override
-    //        public DataColumnDomain convert(final StringDomain domain) {
-    //            final DataCell[] cells = domain.getValues().stream().map((s) -> new StringCell(s)).toArray(DataCell[]::new);
-    //            return new DataColumnDomainCreator(cells).createDomain();
-    //        }
-    //    }
 
     final static class BooleanDomainFactory implements DomainFactory<BooleanReadData, BooleanDomain> {
         @Override

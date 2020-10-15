@@ -93,7 +93,7 @@ class FilteredColumnarRowIterator extends CloseableRowIterator {
          * TODO implement variant of this cursor which actually creates DataCell[]. This might bring some speed-up. We need to find the right ratio when this makes sense, though.
          */
 
-        final TIntObjectHashMap<DataCell> cells = new TIntObjectHashMap<>(m_selection.length);
+        final TIntObjectHashMap<DataCell> cells = new TIntObjectHashMap<>(m_selection.length, 1.0f);
 
         for (int i = 0; i < m_selection.length; i++) {
             if (m_cursor.isMissing(m_selection[i])) {

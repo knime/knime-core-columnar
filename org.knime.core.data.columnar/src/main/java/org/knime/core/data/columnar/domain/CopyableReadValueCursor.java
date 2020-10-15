@@ -50,6 +50,7 @@ import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.v2.ReadValue;
+import org.knime.core.data.v2.WrappedReadValue;
 
 final class CopyableReadValueCursor implements ColumnDataIndex {
 
@@ -61,16 +62,26 @@ final class CopyableReadValueCursor implements ColumnDataIndex {
 
     private final ColumnReadData m_data;
 
+    private final boolean m_isWrapped;
+
     CopyableReadValueCursor(final ColumnarReadValueFactory<ColumnReadData> factory, final ColumnReadData data) {
         m_size = data.length();
         m_value = factory.createReadValue(data, this);
+        m_isWrapped = m_value instanceof WrappedReadValue;
         m_data = data;
     }
 
     public final <D extends DataValue> D get() {
-        @SuppressWarnings("unchecked")
-        final D cast = (D)m_value;
-        return cast;
+        // TODO special class
+        if (!m_isWrapped) {
+            @SuppressWarnings("unchecked")
+            final D cast = (D)m_value;
+            return cast;
+        } else {
+            @SuppressWarnings("unchecked")
+            final D cast = (D)((WrappedReadValue)m_value).unwrap();
+            return cast;
+        }
     }
 
     public final <D extends DataValue> D copy() {
