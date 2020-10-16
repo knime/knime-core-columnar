@@ -71,11 +71,11 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBinaryVector>
     implements ObjectWriteData<T>, ObjectReadData<T> {
 
-    private final ObjectDataSerializer<T> m_serializer;
+    private final ArrowBufIO<T> m_io;
 
     private ArrowObjectData(final VarBinaryVector vector, final ObjectDataSerializer<T> serializer) {
         super(vector);
-        m_serializer = serializer;
+        m_io = new ArrowBufIO<>(vector, serializer);
     }
 
     @Override
@@ -86,13 +86,12 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
 
     @Override
     public T getObject(final int index) {
-        final byte[] bytes = m_vector.get(index);
-        return m_serializer.deserialize(bytes);
+        return m_io.deserialize(index);
     }
 
     @Override
     public void setObject(final int index, final T obj) {
-        m_vector.setSafe(index, m_serializer.serialize(obj));
+        m_io.serialize(index, obj);
     }
 
     /**
@@ -137,5 +136,38 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
         public int getVersion() {
             return CURRENT_VERSION;
         }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((m_serializer == null) ? 0 : m_serializer.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            @SuppressWarnings("unchecked")
+            ArrowObjectDataFactory<T> other = (ArrowObjectDataFactory<T>)obj;
+            if (m_serializer == null) {
+                if (other.m_serializer != null) {
+                    return false;
+                }
+            } else if (!m_serializer.equals(other.m_serializer)) {
+                return false;
+            }
+            return true;
+        }
+
     }
+
 }

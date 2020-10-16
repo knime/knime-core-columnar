@@ -50,7 +50,7 @@ import java.io.IOException;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
@@ -88,26 +88,25 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
 
     private final BiMap<Integer, T> m_invInMemDict;
 
-    private final ObjectDataSerializer<T> m_serializer;
+    private final ArrowBufIO<T> m_io;
 
-    private VarCharVector m_dictionary;
+    private VarBinaryVector m_dictionary;
 
     private int m_runningDictIndex = 0;
 
     /** Create with dictionary available */
-    private ArrowDictEncodedObjectData(final IntVector vector, final VarCharVector dict,
+    private ArrowDictEncodedObjectData(final IntVector vector, final VarBinaryVector dict,
         final ObjectDataSerializer<T> serializer) {
         super(vector);
+        m_io = new ArrowBufIO<T>(dict, serializer);
         m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
         m_invInMemDict = m_inMemDict.inverse();
         for (int i = 0; i < dict.getValueCount(); i++) {
-            final byte[] val = dict.get(i);
-            if (val != null) {
-                m_invInMemDict.put(i, serializer.deserialize(val));
+            if (dict.isSet(i) != 0) {
+                m_invInMemDict.put(i, m_io.deserialize(i));
             }
         }
         m_dictionary = dict;
-        m_serializer = serializer;
     }
 
     @Override
@@ -121,7 +120,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
         m_vector.set(index, dictIndex);
     }
 
-    VarCharVector getDictionary() {
+    VarBinaryVector getDictionary() {
         // newly created dictionary.
         final int numDistinctValues = m_inMemDict.size();
         final int dictValueCount = m_dictionary.getValueCount();
@@ -131,7 +130,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
         }
         // Fill the vector with the encoded values
         for (int i = dictValueCount; i < numDistinctValues; i++) {
-            m_dictionary.setSafe(i, m_serializer.serialize(m_invInMemDict.get(i)));
+            m_io.serialize(i, m_invInMemDict.get(i));
         }
         m_dictionary.setValueCount(numDistinctValues);
         return m_dictionary;
@@ -213,7 +212,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
             final IntVector vector = new IntVector("Indices",
                 new FieldType(false, MinorType.INT.getType(), new DictionaryEncoding(0, false, null)), allocator);
             vector.allocateNew(capacity);
-            final VarCharVector dict = new VarCharVector("Dictionary", allocator);
+            final VarBinaryVector dict = new VarBinaryVector("Dictionary", allocator);
             return new ArrowDictEncodedObjectData<>(vector, dict, m_serializer);
         }
 
@@ -223,7 +222,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
             if (version == CURRENT_VERSION) {
                 final long dictId = vector.getField().getFieldType().getDictionary().getId();
                 @SuppressWarnings("resource") // Dictionary vector closed by data object
-                final VarCharVector dict = (VarCharVector)provider.lookup(dictId).getVector();
+                final VarBinaryVector dict = (VarBinaryVector)provider.lookup(dictId).getVector();
                 return new ArrowDictEncodedObjectData<>((IntVector)vector, dict, m_serializer);
             } else {
                 throw new IOException("Cannot read ArrowDictEncodedObjectData data with version " + version
@@ -241,7 +240,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
         public DictionaryProvider getDictionaries(final ColumnReadData data) {
             @SuppressWarnings("unchecked")
             final ArrowDictEncodedObjectData<T> objData = (ArrowDictEncodedObjectData<T>)data;
-            final VarCharVector vector = objData.getDictionary();
+            final VarBinaryVector vector = objData.getDictionary();
             final Dictionary dictionary = new Dictionary(vector, objData.m_vector.getField().getDictionary());
             return new SingletonDictionaryProvider(dictionary);
         }

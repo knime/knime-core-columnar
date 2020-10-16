@@ -57,7 +57,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.VarBinaryVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 
@@ -127,7 +127,7 @@ public class ArrowDictEncodedObjectDataTest extends AbstractArrowDataTest<ArrowD
 
         // Allocate the dictionary
         @SuppressWarnings({"resource", "unused"}) // Resource handled by data object
-        final VarCharVector dict = d.getDictionary();
+        final VarBinaryVector dict = d.getDictionary();
 
         final int expectedSize = getMinSize(numValues, numValues) // Index vector
             + Arrays.stream(VALUES).mapToInt(v -> v.length).sum() // dictionary data buffer
@@ -152,7 +152,7 @@ public class ArrowDictEncodedObjectDataTest extends AbstractArrowDataTest<ArrowD
 
         // Allocate the dictionary
         @SuppressWarnings({"resource", "unused"}) // Resource handled by data object
-        final VarCharVector dict = d.getDictionary();
+        final VarBinaryVector dict = d.getDictionary();
 
         final String s = d.toString();
         assertNotNull(s);

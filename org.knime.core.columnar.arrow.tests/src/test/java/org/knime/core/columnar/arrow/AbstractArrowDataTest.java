@@ -50,6 +50,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 
@@ -142,17 +144,19 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
         }
 
         @Override
-        public byte[] serialize(final byte[] obj) {
+        public void serialize(final byte[] obj, final DataOutput output) throws IOException {
             final byte[] modifiedCopy = obj.clone();
+            output.writeInt(obj.length);
             for (int i = 0; i < modifiedCopy.length; i++) {
                 modifiedCopy[i]++;
             }
-            return modifiedCopy;
+            output.write(modifiedCopy);
         }
 
         @Override
-        public byte[] deserialize(final byte[] modifiedCopy) {
-            final byte[] obj = modifiedCopy.clone();
+        public byte[] deserialize(final DataInput input) throws IOException {
+            final byte[] obj = new byte[input.readInt()];
+            input.readFully(obj);
             for (int i = 0; i < obj.length; i++) {
                 obj[i]--;
             }
