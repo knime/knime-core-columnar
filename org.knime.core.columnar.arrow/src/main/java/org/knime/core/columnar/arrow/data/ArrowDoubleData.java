@@ -46,12 +46,16 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.Types.MinorType;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 
@@ -87,7 +91,7 @@ public final class ArrowDoubleData extends AbstractFixedWitdthData<Float8Vector>
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowDoubleData} */
     public static final class ArrowDoubleDataFactory extends AbstractFieldVectorDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
 
         /** Singleton instance of {@link ArrowDoubleDataFactory} */
         public static final ArrowDoubleDataFactory INSTANCE = new ArrowDoubleDataFactory();
@@ -97,17 +101,22 @@ public final class ArrowDoubleData extends AbstractFixedWitdthData<Float8Vector>
         }
 
         @Override
-        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
-        public ArrowDoubleData createWrite(final BufferAllocator allocator, final int capacity) {
-            final Float8Vector vector = new Float8Vector("Float8Vector", allocator);
-            vector.allocateNew(capacity);
-            return new ArrowDoubleData(vector);
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            return Field.nullable(name, MinorType.FLOAT8.getType());
+        }
+
+        @Override
+        public ArrowDoubleData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            final Float8Vector v = (Float8Vector)vector;
+            v.allocateNew(capacity);
+            return new ArrowDoubleData(v);
         }
 
         @Override
         public ArrowDoubleData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final int version) throws IOException {
-            if (version == CURRENT_VERSION) {
+            final ArrowColumnDataFactoryVersion version) throws IOException {
+            if (CURRENT_VERSION.equals(version)) {
                 return new ArrowDoubleData((Float8Vector)vector);
             } else {
                 throw new IOException("Cannot read ArrowDoubleData with version " + version + ". Current version: "
@@ -116,7 +125,7 @@ public final class ArrowDoubleData extends AbstractFixedWitdthData<Float8Vector>
         }
 
         @Override
-        public int getVersion() {
+        public ArrowColumnDataFactoryVersion getVersion() {
             return CURRENT_VERSION;
         }
     }

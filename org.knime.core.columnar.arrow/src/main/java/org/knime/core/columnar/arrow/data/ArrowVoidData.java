@@ -49,12 +49,17 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.NullVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.Types.MinorType;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.VoidData.VoidReadData;
 import org.knime.core.columnar.data.VoidData.VoidWriteData;
@@ -100,7 +105,7 @@ public final class ArrowVoidData implements VoidWriteData, VoidReadData {
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVoidData} */
     public static final class ArrowVoidDataFactory implements ArrowColumnDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
 
         /** Singleton instance of {@link ArrowVoidDataFactory} */
         public static final ArrowVoidDataFactory INSTANCE = new ArrowVoidDataFactory();
@@ -110,15 +115,20 @@ public final class ArrowVoidData implements VoidWriteData, VoidReadData {
         }
 
         @Override
-        @SuppressWarnings("resource") // NullVector does not need to be closed
-        public ArrowVoidData createWrite(final BufferAllocator allocator, final int capacity) {
-            return new ArrowVoidData(new NullVector(), capacity);
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            return new Field(name, new FieldType(false, MinorType.NULL.getType(), null), null);
         }
 
         @Override
-        public ArrowVoidData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
-            throws IOException {
-            if (version == CURRENT_VERSION) {
+        public ArrowVoidData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            return new ArrowVoidData((NullVector)vector, capacity);
+        }
+
+        @Override
+        public ArrowVoidData createRead(final FieldVector vector, final DictionaryProvider provider,
+            final ArrowColumnDataFactoryVersion version) throws IOException {
+            if (CURRENT_VERSION.equals(version)) {
                 return new ArrowVoidData((NullVector)vector, vector.getValueCapacity());
             } else {
                 throw new IOException("Cannot read ArrowVoidData with version " + version + ". Current version: "
@@ -137,7 +147,7 @@ public final class ArrowVoidData implements VoidWriteData, VoidReadData {
         }
 
         @Override
-        public int getVersion() {
+        public ArrowColumnDataFactoryVersion getVersion() {
             return CURRENT_VERSION;
         }
     }

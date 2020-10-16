@@ -179,7 +179,7 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
 
                 // Factory versions
                 final String factoryVersions = Arrays.stream(m_factories) //
-                    .map(f -> Integer.toString(f.getVersion())) //
+                    .map(f -> f.getVersion().toString()) //
                     .collect(Collectors.joining(","));
                 metadata.put(ARROW_FACTORY_VERSIONS_KEY, factoryVersions);
 

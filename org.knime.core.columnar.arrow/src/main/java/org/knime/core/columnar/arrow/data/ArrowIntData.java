@@ -46,14 +46,16 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.Types.MinorType;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
 
@@ -88,7 +90,7 @@ public final class ArrowIntData extends AbstractFixedWitdthData<IntVector> imple
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowIntData} */
     public static final class ArrowIntDataFactory extends AbstractFieldVectorDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
 
         /** Singleton instance of {@link ArrowIntDataFactory} */
         public static final ArrowIntDataFactory INSTANCE = new ArrowIntDataFactory();
@@ -98,17 +100,22 @@ public final class ArrowIntData extends AbstractFixedWitdthData<IntVector> imple
         }
 
         @Override
-        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
-        public ColumnWriteData createWrite(final BufferAllocator allocator, final int capacity) {
-            final IntVector vector = new IntVector("IntVector", allocator);
-            vector.allocateNew(capacity);
-            return new ArrowIntData(vector);
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            return Field.nullable(name, MinorType.INT.getType());
         }
 
         @Override
-        public ColumnReadData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
-            throws IOException {
-            if (version == CURRENT_VERSION) {
+        public ArrowIntData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            final IntVector v = (IntVector)vector;
+            v.allocateNew(capacity);
+            return new ArrowIntData(v);
+        }
+
+        @Override
+        public ArrowIntData createRead(final FieldVector vector, final DictionaryProvider provider,
+            final ArrowColumnDataFactoryVersion version) throws IOException {
+            if (CURRENT_VERSION.equals(version)) {
                 return new ArrowIntData((IntVector)vector);
             } else {
                 throw new IOException(
@@ -117,7 +124,7 @@ public final class ArrowIntData extends AbstractFixedWitdthData<IntVector> imple
         }
 
         @Override
-        public int getVersion() {
+        public ArrowColumnDataFactoryVersion getVersion() {
             return CURRENT_VERSION;
         }
     }

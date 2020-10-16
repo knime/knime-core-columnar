@@ -117,7 +117,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
     private Map<Long, DictionaryDescription> m_dictionaryDescriptions;
 
     // Initialized on first #readRetained
-    private int[] m_factoryVersions;
+    private ArrowColumnDataFactoryVersion[] m_factoryVersions;
 
     private boolean m_closed;
 
@@ -227,9 +227,9 @@ class ArrowColumnDataReader implements ColumnDataReader {
             m_factoryVersions = Arrays.stream( //
                 m_reader.getFooter().getMetaData() //
                     .get(ArrowReaderWriterUtils.ARROW_FACTORY_VERSIONS_KEY) //
-                    .split(","))
-                .mapToInt(Integer::valueOf) //
-                .toArray();
+                    .split(",")) //
+                .map(ArrowColumnDataFactoryVersion::version) //
+                .toArray(ArrowColumnDataFactoryVersion[]::new);
         }
     }
 

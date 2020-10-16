@@ -46,32 +46,72 @@
 package org.knime.core.columnar.arrow;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 
 /**
  * An {@link ArrowColumnDataFactory} is used for input and output of a specific Arrow column data type. Can be used to
- * create a new empty instance ({@link #createWrite(BufferAllocator, int)}), wrap vectors and dictionaries that have
- * been read from a file ({@link #createRead(FieldVector, DictionaryProvider, int)}) and get vectors and dictionaries
- * that need to be written to a file.
+ * create a new empty instance ({@link #getField(String, LongSupplier)} and
+ * {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}), wrap vectors and dictionaries that have been
+ * read from a file ({@link #createRead(FieldVector, DictionaryProvider, ArrowColumnDataFactoryVersion)}) and get
+ * vectors and dictionaries that need to be written to a file ({@link #getVector(ColumnReadData)} and
+ * {@link #getDictionaries(ColumnReadData)}).
+ * </p>
+ * The static method {@link #createWrite(ArrowColumnDataFactory, String, BufferAllocator, int)} can be used to create
+ * new {@link ColumnWriteData} in just one step.
+ * </p>
+ * A factor has a {@link ArrowColumnDataFactoryVersion}. Make sure to update the version if
+ * {@link #getVector(ColumnReadData)} or {@link #getDictionaries(ColumnReadData)} change. Implement
+ * {@link #createRead(FieldVector, DictionaryProvider, ArrowColumnDataFactoryVersion)} such that vectors and
+ * dictionaries from all prior versions can be wrapped in an appropriate {@link ColumnReadData} object.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
 public interface ArrowColumnDataFactory {
 
+    // ===================== Creating new ColumnWriteData =====================
+
     /**
+     * Get the Arrow {@link Field} describing the vector of the data object.
+     *
+     * @param name the name of the field
+     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
+     *            from this supplier. Other ids might be used already in the parent data object.
+     * @return the Arrow description for the vector type
+     */
+    Field getField(String name, LongSupplier dictionaryIdSupplier);
+
+    /*
      * Create an empty column data for writing.
      *
      * @param allocator the allocator used for memory allocation
      * @param capacity the capacity of the data
      * @return the {@link ColumnWriteData}
      */
-    ColumnWriteData createWrite(BufferAllocator allocator, int capacity);
+
+    /**
+     * Create an empty column data for writing. TODO(benjamin) remove capacity?
+     *
+     * @param vector the empty vector with the type according to {@link #getField(String, LongSupplier)}.
+     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
+     *            from this supplier. Other ids might be used already in the parent data object. Also take as many
+     *            dictionary ids from the supplier as in {@link #getField(String, LongSupplier)}.
+     * @param allocator the allocator used for memory allocation of dictionary vectors
+     * @param capacity the initial capacity to allocate
+     * @return the {@link ColumnWriteData}
+     */
+    ColumnWriteData createWrite(FieldVector vector, LongSupplier dictionaryIdSupplier, BufferAllocator allocator,
+        int capacity);
+
+    // ===================== Reading ColumnReadData ===========================
 
     /**
      * Wrap the given vector and dictionaries into a column data for reading.
@@ -82,7 +122,10 @@ public interface ArrowColumnDataFactory {
      * @return the {@link ColumnReadData}
      * @throws IOException if the data cannot be loaded with the given version
      */
-    ColumnReadData createRead(FieldVector vector, DictionaryProvider provider, int version) throws IOException;
+    ColumnReadData createRead(FieldVector vector, DictionaryProvider provider, ArrowColumnDataFactoryVersion version)
+        throws IOException;
+
+    // ===================== Getting data for writing =========================
 
     /**
      * @param data a column data holding some values
@@ -97,7 +140,36 @@ public interface ArrowColumnDataFactory {
     DictionaryProvider getDictionaries(ColumnReadData data);
 
     /**
-     * @return the current version used for getting the vectors and dictionaries
+     * @return the current version used for getting the vectors and dictionaries. Not allowed to contain ','.
      */
-    int getVersion();
+    ArrowColumnDataFactoryVersion getVersion();
+
+    // ===================== Utility methods ==================================
+
+    /**
+     * @return a new {@link LongSupplier} counting upwards and starting with 0
+     */
+    public static LongSupplier newDictionaryIdSupplier() {
+        final AtomicLong id = new AtomicLong(0);
+        return id::getAndIncrement;
+    }
+
+    /**
+     * Utility method to create a new instance of {@link ColumnWriteData} with a newly allocated vector. First creates a
+     * field using {@link #getField(String, LongSupplier)}. Then allocates a new vector for this field and creates the
+     * {@link ColumnWriteData} using {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}.
+     *
+     * @param factory the factory to create the column data
+     * @param name the name of the vector
+     * @param allocator the allocator to allocate memory
+     * @param capacity the capacity of the data
+     * @return a new {@link ColumnWriteData} object
+     */
+    @SuppressWarnings("resource") // Vector resource handled by ColumnWriteData
+    public static ColumnWriteData createWrite(final ArrowColumnDataFactory factory, final String name,
+        final BufferAllocator allocator, final int capacity) {
+        final Field field = factory.getField(name, newDictionaryIdSupplier());
+        final FieldVector vector = field.createVector(allocator);
+        return factory.createWrite(vector, newDictionaryIdSupplier(), allocator, capacity);
+    }
 }

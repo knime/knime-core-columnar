@@ -46,12 +46,16 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.Types.MinorType;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
 
@@ -86,7 +90,7 @@ public final class ArrowLongData extends AbstractFixedWitdthData<BigIntVector> i
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowLongData} */
     public static final class ArrowLongDataFactory extends AbstractFieldVectorDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
 
         /** Singleton instance of {@link ArrowLongDataFactory} */
         public static final ArrowLongDataFactory INSTANCE = new ArrowLongDataFactory();
@@ -96,17 +100,22 @@ public final class ArrowLongData extends AbstractFixedWitdthData<BigIntVector> i
         }
 
         @Override
-        @SuppressWarnings("resource") // Vector resource is handled by AbstractFieldVectorData
-        public ArrowLongData createWrite(final BufferAllocator allocator, final int capacity) {
-            final BigIntVector vector = new BigIntVector("IntVector", allocator);
-            vector.allocateNew(capacity);
-            return new ArrowLongData(vector);
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            return Field.nullable(name, MinorType.BIGINT.getType());
         }
 
         @Override
-        public ArrowLongData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
-            throws IOException {
-            if (version == CURRENT_VERSION) {
+        public ArrowLongData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            final BigIntVector v = (BigIntVector)vector;
+            v.allocateNew(capacity);
+            return new ArrowLongData(v);
+        }
+
+        @Override
+        public ArrowLongData createRead(final FieldVector vector, final DictionaryProvider provider,
+            final ArrowColumnDataFactoryVersion version) throws IOException {
+            if (CURRENT_VERSION.equals(version)) {
                 return new ArrowLongData((BigIntVector)vector);
             } else {
                 throw new IOException("Cannot read ArrowLongData with version " + version + ". Current version: "
@@ -115,7 +124,7 @@ public final class ArrowLongData extends AbstractFixedWitdthData<BigIntVector> i
         }
 
         @Override
-        public int getVersion() {
+        public ArrowColumnDataFactoryVersion getVersion() {
             return CURRENT_VERSION;
         }
     }

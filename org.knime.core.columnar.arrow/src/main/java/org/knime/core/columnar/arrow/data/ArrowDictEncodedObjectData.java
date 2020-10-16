@@ -46,6 +46,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
@@ -55,11 +56,12 @@ import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.SingletonDictionaryProvider;
 import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
@@ -74,8 +76,6 @@ import com.google.common.collect.HashBiMap;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @param <T> type of objects
  */
-
-// TODO do we need IntVector?
 public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData<IntVector>
     implements ObjectWriteData<T>, ObjectReadData<T> {
 
@@ -98,7 +98,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
     private ArrowDictEncodedObjectData(final IntVector vector, final VarBinaryVector dict,
         final ObjectDataSerializer<T> serializer) {
         super(vector);
-        m_io = new ArrowBufIO<T>(dict, serializer);
+        m_io = new ArrowBufIO<>(dict, serializer);
         m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
         m_invInMemDict = m_inMemDict.inverse();
         for (int i = 0; i < dict.getValueCount(); i++) {
@@ -195,7 +195,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
      */
     public static final class ArrowDictEncodedObjectDataFactory<T> implements ArrowColumnDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
 
         private final ObjectDataSerializer<T> m_serializer;
 
@@ -207,19 +207,27 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
         }
 
         @Override
-        @SuppressWarnings("resource") // Vector closed by data object
-        public ColumnWriteData createWrite(final BufferAllocator allocator, final int capacity) {
-            final IntVector vector = new IntVector("Indices",
-                new FieldType(false, MinorType.INT.getType(), new DictionaryEncoding(0, false, null)), allocator);
-            vector.allocateNew(capacity);
-            final VarBinaryVector dict = new VarBinaryVector("Dictionary", allocator);
-            return new ArrowDictEncodedObjectData<>(vector, dict, m_serializer);
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            final DictionaryEncoding dictionary = new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);
+            return new Field(name, new FieldType(true, MinorType.INT.getType(), dictionary), null);
         }
 
         @Override
-        public ColumnReadData createRead(final FieldVector vector, final DictionaryProvider provider, final int version)
-            throws IOException {
-            if (version == CURRENT_VERSION) {
+        @SuppressWarnings("resource") // Vector closed by data object
+        public ArrowDictEncodedObjectData<T> createWrite(final FieldVector vector,
+            final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator, final int capacity) {
+            // Remove the dictionary id for this encoding from the supplier
+            dictionaryIdSupplier.getAsLong();
+            final VarBinaryVector dict = new VarBinaryVector("Dictionary", allocator);
+            final IntVector v = (IntVector)vector;
+            v.allocateNew(capacity);
+            return new ArrowDictEncodedObjectData<>(v, dict, m_serializer);
+        }
+
+        @Override
+        public ArrowDictEncodedObjectData<T> createRead(final FieldVector vector, final DictionaryProvider provider,
+            final ArrowColumnDataFactoryVersion version) throws IOException {
+            if (CURRENT_VERSION.equals(version)) {
                 final long dictId = vector.getField().getFieldType().getDictionary().getId();
                 @SuppressWarnings("resource") // Dictionary vector closed by data object
                 final VarBinaryVector dict = (VarBinaryVector)provider.lookup(dictId).getVector();
@@ -231,7 +239,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
         }
 
         @Override
-        public FieldVector getVector(final ColumnReadData data) {
+        public IntVector getVector(final ColumnReadData data) {
             return ((ArrowDictEncodedObjectData<?>)data).m_vector;
         }
 
@@ -246,7 +254,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
         }
 
         @Override
-        public int getVersion() {
+        public ArrowColumnDataFactoryVersion getVersion() {
             return CURRENT_VERSION;
         }
 
