@@ -48,11 +48,16 @@ package org.knime.core.columnar.cache.heap;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.batch.DefaultReadBatch;
@@ -123,6 +128,8 @@ public final class HeapCachedColumnStore implements ColumnStore {
 
         private final ColumnDataWriter m_delegateWriter;
 
+        private Future<Void> m_serializationFuture = CompletableFuture.completedFuture(null);
+
         private int m_numBatches;
 
         private Writer() {
@@ -138,12 +145,16 @@ public final class HeapCachedColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            // TODO wait until flushed.
+            batch.retain();
+
+            waitForPrevBatch();
+            final List<CompletableFuture<?>> futures = new ArrayList<>();
 
             final ColumnReadData[] data = new ColumnReadData[batch.getNumColumns()];
             for (int i = 0; i < data.length; i++) {
                 if (m_objectData.isSelected(i)) {
                     final HeapCachedReadData<?> heapCachedData = (HeapCachedReadData<?>)batch.get(i);
+                    futures.add(CompletableFuture.runAsync(heapCachedData::serialize, m_executor));
                     final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
                     m_cache.put(ccuid, heapCachedData.getData());
                     m_cachedData.add(ccuid);
@@ -153,15 +164,38 @@ public final class HeapCachedColumnStore implements ColumnStore {
                     data[i] = batch.get(i);
                 }
             }
+
+            m_serializationFuture =
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()])).thenRunAsync(() -> {
+                    try {
+                        m_delegateWriter.write(new DefaultReadBatch(data, batch.length()));
+                    } catch (IOException e) {
+                        throw new IllegalStateException(String.format("Failed to write batch %d.", m_numBatches), e);
+                    } finally {
+                        batch.release();
+                    }
+                }, m_executor);
             m_numBatches++;
-            m_delegateWriter.write(new DefaultReadBatch(data, batch.length()));
         }
 
         @Override
         public void close() throws IOException {
             m_writerClosed = true;
 
+            waitForPrevBatch();
             m_delegateWriter.close();
+        }
+
+        private void waitForPrevBatch() {
+            try {
+                m_serializationFuture.get();
+            } catch (InterruptedException e) {
+                // Restore interrupted state...
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while waiting for serialization thread.", e);
+            } catch (ExecutionException e) {
+                throw new IllegalStateException("Failed to asynchronously serialize object data.", e);
+            }
         }
 
     }

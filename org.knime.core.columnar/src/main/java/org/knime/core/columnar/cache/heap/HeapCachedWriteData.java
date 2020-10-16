@@ -96,14 +96,20 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
     @Override
     public void setObject(final int index, final T obj) {
         m_data.set(index, obj);
-
-        // TODO async writing
-        m_delegate.setObject(index, obj);
     }
 
     @Override
     public ObjectReadData<T> close(final int length) {
-        return new HeapCachedReadData<>(m_delegate.close(length), m_data);
+        return new HeapCachedReadData<>(m_delegate.close(length), m_data, this);
+    }
+
+    void serialize() {
+        for (int i = 0; i < m_data.length(); i++) {
+            final T t = m_data.get(i);
+            if (t != null) {
+                m_delegate.setObject(i, t);
+            }
+        }
     }
 
 }

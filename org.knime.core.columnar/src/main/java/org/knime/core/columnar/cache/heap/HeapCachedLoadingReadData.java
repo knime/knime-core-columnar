@@ -43,56 +43,59 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  *
- * History
- *   15 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.cache.heap;
 
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import org.knime.core.columnar.cache.ColumnDataUniqueId;
-
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
+import org.knime.core.columnar.data.ObjectData;
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 
 /**
+ * Wrapper around {@link ObjectData} for in-heap caching.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public class SoftReferencedObjectCache implements ObjectDataCache {
+final class HeapCachedLoadingReadData<T> implements ObjectReadData<T> {
 
-    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+    private final ObjectReadData<T> m_delegate;
 
-    /**
-     * Constructor
-     */
-    public SoftReferencedObjectCache() {
-        final RemovalListener<ColumnDataUniqueId, AtomicReferenceArray<?>> removalListener = removalNotification -> {
-            if (removalNotification.wasEvicted()) {
-                final ColumnDataUniqueId ccuid = removalNotification.getKey();
-                @SuppressWarnings("resource")
-                final HeapCachedColumnReadStore store = (HeapCachedColumnReadStore)ccuid.getStore();
-                store.onEviction(ccuid);
-            }
-        };
+    private final AtomicReferenceArray<T> m_data;
 
-        m_cache = CacheBuilder.newBuilder().softValues().removalListener(removalListener)
-            .expireAfterAccess(60, TimeUnit.SECONDS).build();
+    HeapCachedLoadingReadData(final ObjectReadData<T> delegate, final AtomicReferenceArray<T> data) {
+        m_delegate = delegate;
+        m_data = data;
     }
 
     @Override
-    public Map<ColumnDataUniqueId, AtomicReferenceArray<?>> getCache() {
-        return m_cache.asMap();
+    public boolean isMissing(final int index) {
+        return m_delegate.isMissing(index);
     }
 
-    /**
-     * invalidate the cache
-     */
-    public void invalidate() {
-        m_cache.invalidateAll();
+    @Override
+    public int length() {
+        return m_delegate.length();
+    }
+
+    @Override
+    public void release() {
+        m_delegate.release();
+    }
+
+    @Override
+    public void retain() {
+        m_delegate.retain();
+    }
+
+    @Override
+    public int sizeOf() {
+        return m_delegate.sizeOf();
+    }
+
+    @Override
+    public T getObject(final int index) {
+        return m_data.updateAndGet(index, o -> o == null ? m_delegate.getObject(index) : o);
     }
 
 }

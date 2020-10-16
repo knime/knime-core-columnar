@@ -106,6 +106,8 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             if (m_storeClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
+            
+            batch.retain();
 
             handleDoneFuture();
 
@@ -118,6 +120,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
                 } catch (IOException e) {
                     throw new IllegalStateException(String.format("Failed to write batch %d.", m_numChunks), e);
                 } finally {
+                    batch.release();
                     batchFlushed.countDown();
                 }
             });

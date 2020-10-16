@@ -63,9 +63,12 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
 
     private final AtomicReferenceArray<T> m_data;
 
-    HeapCachedReadData(final ObjectReadData<T> delegate, final AtomicReferenceArray<T> data) {
+    private final HeapCachedWriteData<T> m_writeData;
+
+    HeapCachedReadData(final ObjectReadData<T> delegate, final AtomicReferenceArray<T> data, final HeapCachedWriteData<T> writeData) {
         m_delegate = delegate;
         m_data = data;
+        m_writeData = writeData;
     }
 
     @Override
@@ -93,17 +96,23 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
         return m_delegate.sizeOf();
     }
 
+    @Override
+    public T getObject(final int index) {
+        return m_data.get(index);
+    }
+
     final ObjectReadData<T> getDelegate() {
         return m_delegate;
     }
 
-    @Override
-    public T getObject(final int index) {
-        return m_data.updateAndGet(index, o -> o == null ? m_delegate.getObject(index) : o);
-    }
-
     AtomicReferenceArray<T> getData() {
         return m_data;
+    }
+
+    void serialize() {
+        if (m_writeData != null) {
+            m_writeData.serialize();
+        }
     }
 
 }

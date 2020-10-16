@@ -105,14 +105,14 @@ public final class HeapCachedColumnReadStore implements ColumnReadStore {
         }
 
         @SuppressWarnings("unchecked")
-        private <T> HeapCachedReadData<T> wrap(final ReadBatch batch, final int batchIndex, final int columnIndex) {
+        private <T> HeapCachedLoadingReadData<T> wrap(final ReadBatch batch, final int batchIndex, final int columnIndex) {
             final ObjectReadData<T> columnReadData = (ObjectReadData<T>)batch.get(columnIndex);
             final AtomicReferenceArray<T> array = (AtomicReferenceArray<T>)m_cache
                 .computeIfAbsent(new ColumnDataUniqueId(HeapCachedColumnReadStore.this, columnIndex, batchIndex), k -> {
                     m_cachedData.add(k);
                     return new AtomicReferenceArray<>(columnReadData.length());
                 });
-            return new HeapCachedReadData<>(columnReadData, array);
+            return new HeapCachedLoadingReadData<>(columnReadData, array);
         }
 
         @Override
