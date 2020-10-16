@@ -54,6 +54,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.Random;
 
 import org.apache.arrow.vector.VarBinaryVector;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 
@@ -62,7 +63,7 @@ import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<byte[]>> {
+public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<byte[]>, ArrowObjectData<byte[]>> {
 
     private static final int MAX_LENGTH = 100;
 
@@ -71,12 +72,21 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<b
         super(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
     }
 
-    @Override
-    protected ArrowObjectData<byte[]> cast(final Object o) {
+    private static ArrowObjectData<byte[]> cast(final Object o) {
         assertTrue(o instanceof ArrowObjectData);
         @SuppressWarnings("unchecked")
         final ArrowObjectData<byte[]> cast = (ArrowObjectData<byte[]>)o;
         return cast;
+    }
+
+    @Override
+    protected ArrowObjectData<byte[]> castW(final Object o) {
+        return cast(o);
+    }
+
+    @Override
+    protected ArrowObjectData<byte[]> castR(final Object o) {
+        return cast(o);
     }
 
     @Override
@@ -91,8 +101,8 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<b
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ArrowObjectData<byte[]> data) {
-        final VarBinaryVector v = data.m_vector;
+    protected boolean isReleased(final ReferencedData data) {
+        final VarBinaryVector v = cast(data).m_vector;
         return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
     }
 
@@ -102,9 +112,9 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<b
         for (int i = 0; i < valueCount; i++) {
             numBytes += new Random(i).nextInt(MAX_LENGTH);
         }
-        return numBytes + // data buffer
-            4 * capacity + // offset buffer
-            (int)Math.ceil(capacity / 8); // validity buffer
+        return numBytes // data buffer
+            + 4 * capacity // offset buffer
+            + (int)Math.ceil(capacity / 8.0); // validity buffer
     }
 
     private static byte[] valueFor(final int seed) {

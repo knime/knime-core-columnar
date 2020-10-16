@@ -55,7 +55,9 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.UUID;
+import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
@@ -70,6 +72,7 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -435,33 +438,39 @@ public final class ArrowTestUtils {
     /** A factory for creating, reading and writing {@link SimpleData}. */
     public static final class SimpleDataFactory implements ArrowColumnDataFactory {
 
-        private final int m_version;
+        private final ArrowColumnDataFactoryVersion m_version;
 
         /** Create a factory for {@link SimpleData}. */
         public SimpleDataFactory() {
-            this(0);
+            this(ArrowColumnDataFactoryVersion.version(0));
         }
 
         /**
          * Create a factory for {@link SimpleData} with the given version. Checks the given version on
-         * {@link #createRead(FieldVector, DictionaryProvider, int)}.
+         * {@link #createRead(FieldVector, DictionaryProvider, ArrowColumnDataFactoryVersion)}.
          *
          * @param version the version
          */
-        public SimpleDataFactory(final int version) {
+        public SimpleDataFactory(final ArrowColumnDataFactoryVersion version) {
             m_version = version;
         }
 
         @Override
-        @SuppressWarnings("resource")
-        public ColumnWriteData createWrite(final BufferAllocator allocator, final int capacity) {
-            final IntVector vector = new IntVector("IntVector", allocator);
-            vector.allocateNew(capacity);
-            return new SimpleData(vector);
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            return Field.nullable(name, MinorType.INT.getType());
         }
 
         @Override
-        public ColumnReadData createRead(final FieldVector vector, final DictionaryProvider provider, final int version) {
+        public SimpleData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            final IntVector v = (IntVector)vector;
+            v.allocateNew(capacity);
+            return new SimpleData(v);
+        }
+
+        @Override
+        public SimpleData createRead(final FieldVector vector, final DictionaryProvider provider,
+            final ArrowColumnDataFactoryVersion version) {
             assertEquals(m_version, version);
             assertTrue(vector instanceof IntVector);
             return new SimpleData((IntVector)vector);
@@ -478,7 +487,7 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public int getVersion() {
+        public ArrowColumnDataFactoryVersion getVersion() {
             return m_version;
         }
     }
@@ -486,20 +495,30 @@ public final class ArrowTestUtils {
     /** A factory for creating, reading and writing {@link DictionaryEncodedData}. */
     public static final class DictionaryEncodedDataFactory implements ArrowColumnDataFactory {
 
-        @Override
-        @SuppressWarnings("resource")
-        public ColumnWriteData createWrite(final BufferAllocator allocator, final int capacity) {
-            final DictionaryEncoding encoding = new DictionaryEncoding(0, false, null);
-            final IntVector intVector =
-                new IntVector("IntVector", new FieldType(true, MinorType.INT.getType(), encoding), allocator);
-            final BigIntVector dictionaryVector = new BigIntVector("BigInt", allocator);
-            final Dictionary dictionary = new Dictionary(dictionaryVector, encoding);
-            intVector.allocateNew(capacity);
-            return new DictionaryEncodedData(intVector, dictionary);
+        private static final DictionaryEncoding encoding(final long id) {
+            return new DictionaryEncoding(id, false, null);
         }
 
         @Override
-        public ColumnReadData createRead(final FieldVector vector, final DictionaryProvider provider, final int version) {
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            final DictionaryEncoding dictionary = encoding(dictionaryIdSupplier.getAsLong());
+            return new Field(name, new FieldType(true, MinorType.INT.getType(), dictionary), null);
+        }
+
+        @Override
+        @SuppressWarnings("resource")
+        public DictionaryEncodedData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            final IntVector v = (IntVector)vector;
+            final BigIntVector dictionaryVector = new BigIntVector("BigInt", allocator);
+            final Dictionary dictionary = new Dictionary(dictionaryVector, encoding(dictionaryIdSupplier.getAsLong()));
+            v.allocateNew(capacity);
+            return new DictionaryEncodedData(v, dictionary);
+        }
+
+        @Override
+        public DictionaryEncodedData createRead(final FieldVector vector, final DictionaryProvider provider,
+            final ArrowColumnDataFactoryVersion version) {
             assertTrue(vector instanceof IntVector);
             final Dictionary dictionary = provider.lookup(vector.getField().getDictionary().getId());
             assertNotNull(dictionary);
@@ -518,43 +537,84 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public int getVersion() {
-            return 0;
+        public ArrowColumnDataFactoryVersion getVersion() {
+            return ArrowColumnDataFactoryVersion.version(0);
         }
     }
 
     /** A factory for creating, reading and writing {@link ComplexData} */
     public static final class ComplexDataFactory implements ArrowColumnDataFactory {
 
-        @Override
-        @SuppressWarnings("resource")
-        public ColumnWriteData createWrite(final BufferAllocator allocator, final int capacity) {
-            // Dictionary B:
-            final DictionaryEncoding encodingB = new DictionaryEncoding(0, false, null);
-            final StructVector dictVectorB =
-                new StructVector("DictB", allocator, new FieldType(true, MinorType.STRUCT.getType(), null), null);
-            final Dictionary dictionaryB = new Dictionary(dictVectorB, encodingB);
+        private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
+            return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);
+        }
 
-            // Dictionary E:
-            final DictionaryEncoding encodingE = new DictionaryEncoding(1, false, null);
-            final VarBinaryVector dictVectorE = new VarBinaryVector("DictE", allocator);
-            final Dictionary dictionaryE = new Dictionary(dictVectorE, encodingE);
+        private static Field field(final String name, final MinorType type) {
+            return Field.nullable(name, type.getType());
+        }
 
-            // Dictionary G:
-            final DictionaryEncoding encodingG = new DictionaryEncoding(2, false, null);
-            final VarBinaryVector dictVectorG = new VarBinaryVector("DictG", allocator);
-            final Dictionary dictionaryG = new Dictionary(dictVectorG, encodingG);
+        private static Field field(final String name, final DictionaryEncoding encoding) {
+            return new Field(name, new FieldType(true, MinorType.INT.getType(), encoding), null);
+        }
 
-            // Vector
-            final StructVector vector = new StructVector("StructVector", allocator,
-                new FieldType(true, MinorType.STRUCT.getType(), null), null);
-
-            // Construct the data
-            return new ComplexData(vector, dictionaryB, dictionaryE, dictionaryG);
+        private static Field field(final String name, final MinorType type, final Field... children) {
+            return new Field(name, new FieldType(true, type.getType(), null), Arrays.asList(children));
         }
 
         @Override
-        public ColumnReadData createRead(final FieldVector vector, final DictionaryProvider provider, final int version) {
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            final DictionaryEncoding encodingB = encoding(dictionaryIdSupplier);
+            final DictionaryEncoding encodingE = encoding(dictionaryIdSupplier);
+            // Id for dictionary G. We cannot create the field yet because it is a child of a dictionary
+            dictionaryIdSupplier.getAsLong();
+
+            // Most inner fields
+            final Field a = field("a", MinorType.BIGINT);
+            final Field f = field("f", MinorType.BIT);
+            final Field cChild = field("cChild", MinorType.INT);
+
+            // Dictionary index vectors
+            final Field b = field("b", encodingB);
+            final Field e = field("e", encodingE);
+
+            // Complex vectors
+            final Field c = field("c", MinorType.LIST, cChild);
+            final Field d = field("d", MinorType.STRUCT, e, f);
+
+            // The final struct vector
+            return field(name, MinorType.STRUCT, a, b, c, d);
+        }
+
+        @Override
+        @SuppressWarnings("resource")
+        public ComplexData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            final StructVector v = (StructVector)vector;
+
+            // Encodings
+            final DictionaryEncoding encodingB = encoding(dictionaryIdSupplier);
+            final DictionaryEncoding encodingE = encoding(dictionaryIdSupplier);
+            final DictionaryEncoding encodingG = encoding(dictionaryIdSupplier);
+
+            // Vectors
+            final Field dictVectorG = field("DictG", MinorType.VARBINARY);
+            final Field dictVectorE = field("DictE", MinorType.VARBINARY);
+
+            final Field h = field("h", MinorType.INT);
+            final Field g = field("g", encodingG);
+            final Field dictVectorB = field("DictB", MinorType.STRUCT, g, h);
+
+            // Dictionaries
+            final Dictionary dictionaryB = new Dictionary(dictVectorB.createVector(allocator), encodingB);
+            final Dictionary dictionaryE = new Dictionary(dictVectorE.createVector(allocator), encodingE);
+            final Dictionary dictionaryG = new Dictionary(dictVectorG.createVector(allocator), encodingG);
+
+            return new ComplexData(v, dictionaryB, dictionaryE, dictionaryG);
+        }
+
+        @Override
+        public ComplexData createRead(final FieldVector vector, final DictionaryProvider provider,
+            final ArrowColumnDataFactoryVersion version) {
             assertTrue(vector instanceof StructVector);
             return new ComplexData((StructVector)vector, provider);
         }
@@ -571,8 +631,8 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public int getVersion() {
-            return 0;
+        public ArrowColumnDataFactoryVersion getVersion() {
+            return ArrowColumnDataFactoryVersion.version(0);
         }
     }
 

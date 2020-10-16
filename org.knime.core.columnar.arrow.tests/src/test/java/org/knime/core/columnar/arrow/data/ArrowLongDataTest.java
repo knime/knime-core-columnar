@@ -54,6 +54,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.Random;
 
 import org.apache.arrow.vector.BigIntVector;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 
@@ -63,17 +64,26 @@ import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowLongDataTest extends AbstractArrowDataTest<ArrowLongData> {
+public class ArrowLongDataTest extends AbstractArrowDataTest<ArrowLongData, ArrowLongData> {
 
     /** Create the test for {@link ArrowLongData} */
     public ArrowLongDataTest() {
         super(ArrowLongDataFactory.INSTANCE);
     }
 
-    @Override
-    protected ArrowLongData cast(final Object o) {
+    private static ArrowLongData cast(final Object o) {
         assertTrue(o instanceof ArrowLongData);
         return (ArrowLongData)o;
+    }
+
+    @Override
+    protected ArrowLongData castW(final Object o) {
+        return cast(o);
+    }
+
+    @Override
+    protected ArrowLongData castR(final Object o) {
+        return cast(o);
     }
 
     @Override
@@ -88,15 +98,15 @@ public class ArrowLongDataTest extends AbstractArrowDataTest<ArrowLongData> {
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ArrowLongData data) {
-        final BigIntVector v = data.m_vector;
+    protected boolean isReleased(final ReferencedData data) {
+        final BigIntVector v = cast(data).m_vector;
         return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
     }
 
     @Override
     protected int getMinSize(final int valueCount, final int capacity) {
-        return 8 * capacity + // 8 bytes per value for data
-            (int)Math.ceil(capacity / 8); // 1 bit per value for validity buffer
+        return 8 * capacity // 8 bytes per value for data
+            + (int)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 
     private static long valueFor(final int seed) {

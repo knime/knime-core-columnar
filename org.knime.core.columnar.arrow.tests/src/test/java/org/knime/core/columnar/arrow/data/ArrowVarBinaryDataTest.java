@@ -54,6 +54,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.Random;
 
 import org.apache.arrow.vector.VarBinaryVector;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 
@@ -63,7 +64,7 @@ import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataF
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinaryData> {
+public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinaryData, ArrowVarBinaryData> {
 
     private static final int MAX_LENGTH = 100;
 
@@ -72,10 +73,19 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
         super(ArrowVarBinaryDataFactory.INSTANCE);
     }
 
-    @Override
-    protected ArrowVarBinaryData cast(final Object o) {
+    private static ArrowVarBinaryData cast(final Object o) {
         assertTrue(o instanceof ArrowVarBinaryData);
         return (ArrowVarBinaryData)o;
+    }
+
+    @Override
+    protected ArrowVarBinaryData castW(final Object o) {
+        return cast(o);
+    }
+
+    @Override
+    protected ArrowVarBinaryData castR(final Object o) {
+        return cast(o);
     }
 
     @Override
@@ -90,8 +100,8 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ArrowVarBinaryData data) {
-        VarBinaryVector v = data.m_vector;
+    protected boolean isReleased(final ReferencedData data) {
+        VarBinaryVector v = cast(data).m_vector;
         return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
     }
 
@@ -101,9 +111,9 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
         for (int i = 0; i < valueCount; i++) {
             numBytes += new Random(i).nextInt(MAX_LENGTH);
         }
-        return numBytes + // data buffer
-            4 * capacity + // offset buffer
-            (int)Math.ceil(capacity / 8); // validity buffer
+        return numBytes // data buffer
+            + 4 * capacity // offset buffer
+            + (int)Math.ceil(capacity / 8.0); // validity buffer
     }
 
     private static byte[] valueFor(final int seed) {

@@ -52,12 +52,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 import org.junit.Test;
+import org.knime.core.columnar.arrow.AbstractArrowDataTest.DummyByteArraySerializer;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowObjectDataTest;
+import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.data.ColumnDataSpec;
@@ -66,6 +68,7 @@ import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
+import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
@@ -76,61 +79,80 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowSchemaMapperTest {
+public class ArrowSchemaMapperTest {
 
     /** Test mapping double specs to a {@link ArrowDoubleDataFactory} */
     @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
     public void testMapDoubleSpec() {
         testMapSingleSpec(DoubleDataSpec.INSTANCE, ArrowDoubleDataFactory.INSTANCE);
     }
 
     /** Test mapping int specs to a {@link ArrowIntDataFactory} */
     @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
     public void testMapIntSpec() {
         testMapSingleSpec(IntDataSpec.INSTANCE, ArrowIntDataFactory.INSTANCE);
     }
 
     /** Test mapping long specs to a {@link ArrowLongDataFactory} */
     @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
     public void testMapLongSpec() {
         testMapSingleSpec(LongDataSpec.INSTANCE, ArrowLongDataFactory.INSTANCE);
     }
 
     /** Test mapping float specs to a {@link ArrowFloatDataFactory} */
     @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
     public void testMapFloatSpec() {
         testMapSingleSpec(FloatDataSpec.INSTANCE, ArrowFloatDataFactory.INSTANCE);
     }
 
     /** Test mapping var binary specs to a {@link ArrowVarBinaryDataFactory} */
     @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
     public void testMapVarBinarySpec() {
         testMapSingleSpec(VarBinaryDataSpec.INSTANCE, ArrowVarBinaryDataFactory.INSTANCE);
     }
 
+    /** Test mapping object specs to a {@link ArrowObjectDataFactory} */
+    @Test
+    public void testMapObjectSpec() {
+        testMapSingleSpec(new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
+            new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
+    }
+
     /** Test mapping dict encoded byte specs to a {@link ArrowDictEncodedObjectDataFactory} */
     @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
     public void testMapDictEncodedSpec() {
-        testMapSingleSpec(new ObjectDataSpec<>(ArrowObjectDataTest.DummyByteArraySerializer.INSTANCE, true),
-            new ArrowDictEncodedObjectDataFactory<>(ArrowObjectDataTest.DummyByteArraySerializer.INSTANCE));
+        testMapSingleSpec(new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true),
+            new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
     }
 
     /** Test mapping void specs to a {@link ArrowVoidDataFactory} */
     @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
     public void testMapVoidSpec() {
         testMapSingleSpec(VoidDataSpec.INSTANCE, ArrowVoidDataFactory.INSTANCE);
     }
 
+    /** Test mapping void specs to a {@link ArrowStructDataFactory} */
+    @Test
+    public void testMapStructSpec() {
+        // Simple
+        testMapSingleSpec(new StructDataSpec(DoubleDataSpec.INSTANCE, IntDataSpec.INSTANCE),
+            new ArrowStructDataFactory(ArrowDoubleDataFactory.INSTANCE, ArrowIntDataFactory.INSTANCE));
+
+        // Complex
+        testMapSingleSpec(
+            new StructDataSpec(new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), IntDataSpec.INSTANCE,
+                new StructDataSpec(new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
+                    new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true))),
+            new ArrowStructDataFactory(new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
+                ArrowIntDataFactory.INSTANCE,
+                new ArrowStructDataFactory(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
+                    new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE))));
+    }
+
+    // TODO test for other specs when implemented
+
     /** Test mapping multiple columns of different specs. */
     @Test
-    @SuppressWarnings("static-method") // Tests cannot be static
     public void testMappingMultipleColumns() {
         final ColumnStoreSchema schema = ArrowTestUtils.createSchema( //
             DoubleDataSpec.INSTANCE, //
@@ -145,8 +167,6 @@ public final class ArrowSchemaMapperTest {
         assertSame(ArrowDoubleDataFactory.INSTANCE, factories[2]);
         assertSame(ArrowIntDataFactory.INSTANCE, factories[3]);
     }
-
-    // TODO test for other specs when implemented
 
     /** Test mapping a single column of the given spec. */
     private static void testMapSingleSpec(final ColumnDataSpec spec, final ArrowColumnDataFactory expectedFactory) {

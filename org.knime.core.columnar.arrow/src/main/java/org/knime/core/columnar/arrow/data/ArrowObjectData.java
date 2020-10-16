@@ -49,6 +49,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -69,7 +70,6 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
  * No caching, just serialization.
  *
  * @param <T> type of object
- *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
 public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBinaryVector>
@@ -102,8 +102,7 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
      * Implementation of {@link ArrowColumnDataFactory} for {@link ArrowObjectData}
      *
      * @param <T> type of object
-     *
-     **/
+     */
     public static final class ArrowObjectDataFactory<T> extends AbstractFieldVectorDataFactory {
 
         private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
@@ -147,36 +146,17 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
         }
 
         @Override
-        public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + ((m_serializer == null) ? 0 : m_serializer.hashCode());
-            return result;
+        public boolean equals(final Object obj) {
+            if (!(obj instanceof ArrowObjectDataFactory)) {
+                return false;
+            }
+            final ArrowObjectDataFactory<?> o = (ArrowObjectDataFactory<?>)obj;
+            return Objects.equals(m_serializer, o.m_serializer);
         }
 
         @Override
-        public boolean equals(final Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            @SuppressWarnings("unchecked")
-            ArrowObjectDataFactory<T> other = (ArrowObjectDataFactory<T>)obj;
-            if (m_serializer == null) {
-                if (other.m_serializer != null) {
-                    return false;
-                }
-            } else if (!m_serializer.equals(other.m_serializer)) {
-                return false;
-            }
-            return true;
+        public int hashCode() {
+            return Objects.hash(m_serializer);
         }
-
     }
-
 }

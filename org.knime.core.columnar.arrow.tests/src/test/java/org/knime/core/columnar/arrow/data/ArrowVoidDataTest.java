@@ -50,6 +50,7 @@ package org.knime.core.columnar.arrow.data;
 
 import static org.junit.Assert.assertTrue;
 
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 
@@ -59,17 +60,26 @@ import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData> {
+public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData, ArrowVoidData> {
 
     /** Create the test for {@link ArrowVoidData} */
     public ArrowVoidDataTest() {
         super(ArrowVoidDataFactory.INSTANCE);
     }
 
-    @Override
-    protected ArrowVoidData cast(final Object o) {
+    private static ArrowVoidData cast(final Object o) {
         assertTrue(o instanceof ArrowVoidData);
         return (ArrowVoidData)o;
+    }
+
+    @Override
+    protected ArrowVoidData castW(final Object o) {
+        return cast(o);
+    }
+
+    @Override
+    protected ArrowVoidData castR(final Object o) {
+        return cast(o);
     }
 
     @Override
@@ -83,7 +93,7 @@ public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData> {
     }
 
     @Override
-    protected boolean isReleased(final ArrowVoidData data) {
+    protected boolean isReleased(final ReferencedData data) {
         return false;
     }
 

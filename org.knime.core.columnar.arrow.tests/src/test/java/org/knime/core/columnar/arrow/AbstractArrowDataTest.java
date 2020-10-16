@@ -54,12 +54,14 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 
 import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -70,11 +72,12 @@ import org.knime.core.columnar.filter.DefaultColumnSelection;
 /**
  * Abstract test for simple Arrow {@link ColumnReadData}, {@link ColumnWriteData} implementations.
  *
- * @param <C> type of the data implementation
+ * @param <W> type of the {@link ColumnWriteData} implementation
+ * @param <R> type of the {@link ColumnReadData} implementation
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnReadData> {
+public abstract class AbstractArrowDataTest<W extends ColumnWriteData, R extends ColumnReadData> {
 
     /** The factory of the data implementation */
     protected final ArrowColumnDataFactory m_factory;
@@ -92,12 +95,20 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
     }
 
     /**
-     * Check if the object is of class C an cast.
+     * Check if the object is of class W an cast.
      *
      * @param o an object
      * @return the cast object
      */
-    protected abstract C cast(Object o);
+    protected abstract W castW(Object o);
+
+    /**
+     * Check if the object is of class R an cast.
+     *
+     * @param o an object
+     * @return the cast object
+     */
+    protected abstract R castR(Object o);
 
     /**
      * Set the value at the given index using the seed.
@@ -106,7 +117,7 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
      * @param index the index
      * @param seed the seed
      */
-    protected abstract void setValue(C data, int index, int seed);
+    protected abstract void setValue(W data, int index, int seed);
 
     /**
      * Check the value at the given index using the seed. Should be the same as set in
@@ -116,13 +127,13 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
      * @param index the index
      * @param seed the seed
      */
-    protected abstract void checkValue(C data, int index, int seed);
+    protected abstract void checkValue(R data, int index, int seed);
 
     /**
      * @param data the data object
      * @return if the data object has been released
      */
-    protected abstract boolean isReleased(C data);
+    protected abstract boolean isReleased(ReferencedData data);
 
     /**
      * @param valueCount the count of values added to the data (with seeds 0..(valueCount-1))
@@ -134,11 +145,11 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
     /**
      * Simple serializer implementation which adds one to the bytes on serialization and removes 1 when deserializing
      * again.
-     **/
-    protected final static class DummyByteArraySerializer implements ObjectDataSerializer<byte[]> {
+     */
+    protected static final class DummyByteArraySerializer implements ObjectDataSerializer<byte[]> {
 
         @SuppressWarnings("javadoc")
-        public final static DummyByteArraySerializer INSTANCE = new DummyByteArraySerializer();
+        public static final DummyByteArraySerializer INSTANCE = new DummyByteArraySerializer();
 
         private DummyByteArraySerializer() {
         }
@@ -167,8 +178,9 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
     /** Initialize the root allocator before running a test */
     @Before
     public void before() {
-        m_alloc = new RootAllocator(AllocationListener.NOOP, Long.MAX_VALUE, requestSize -> (requestSize + 1) / 2 * 2);
-        //        m_alloc = new RootAllocator();
+        final int segmentSize = 4;
+        m_alloc = new RootAllocator(AllocationListener.NOOP, Long.MAX_VALUE,
+            requestSize -> (requestSize + (segmentSize - 1)) / segmentSize * segmentSize);
     }
 
     /** Close the root allocator after running a test */
@@ -177,77 +189,101 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
         m_alloc.close();
     }
 
+    /**
+     * Create a ColumnWriteData using the saved factory.
+     *
+     * @param numValues the number of values to allocate
+     * @return the {@link ColumnWriteData}
+     */
+    protected W createWrite(final int numValues) {
+        return castW(ArrowColumnDataFactory.createWrite(m_factory, "0", m_alloc, numValues));
+    }
+
     /** Test allocating some memory and setting and getting some values */
     @Test
     public void testAlloc() {
         int numValues = 64;
-        final C writeData = cast(m_factory.createWrite(m_alloc, numValues));
+        final W writeData = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
             setValue(writeData, i, i);
         }
-        final C readData = cast(writeData.close(numValues));
-        // assertEquals(numValues, readData.length());
+        final R readData = castR(writeData.close(numValues));
         for (int i = 0; i < numValues; i++) {
             checkValue(readData, i, i);
         }
         readData.release();
     }
 
-    /** Test {@link C#capacity()} */
+    /** Test {@link W#capacity()} */
     @Test
     public void testCapacity() {
-        C data = cast(m_factory.createWrite(m_alloc, 12));
+        W data = createWrite(12);
         assertTrue(data.capacity() >= 12);
         data.release();
 
-        data = cast(m_factory.createWrite(m_alloc, 16000));
+        data = createWrite(16000);
         assertTrue(data.capacity() >= 16000);
         data.release();
 
-        data = cast(m_factory.createWrite(m_alloc, 68));
+        data = createWrite(68);
         assertTrue(data.capacity() >= 68);
         data.release();
     }
 
-    /** Test {@link C#retain()} and {@link C#release()} */
+    /** Test #retain() and #release() for W and R */
     @Test
     public void testReferenceCounting() {
         int numValues = 8;
-        final C wd = cast(m_factory.createWrite(m_alloc, numValues));
+        final W wd = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
             setValue(wd, i, i);
         }
+        final R rd = castR(wd.close(numValues));
 
+        // NB: wd and rd can be the same object but this test must still succeed
         assertFalse(isReleased(wd));
+        assertFalse(isReleased(rd));
 
         // Increase reference counter
         wd.retain();
+        rd.retain();
         assertFalse(isReleased(wd));
+        assertFalse(isReleased(rd));
 
         // On reference should still be there
         wd.release();
+        rd.release();
         assertFalse(isReleased(wd));
+        assertFalse(isReleased(rd));
 
         // All references should be gone
         wd.release();
+        rd.release();
         assertTrue(isReleased(wd));
+        assertTrue(isReleased(rd));
     }
 
-    /** Test {@link C#toString()} */
+    /** Test {@link W#toString()} and {@link R#toString()} */
     @Test
     public void testToString() {
-        final C d = cast(m_factory.createWrite(m_alloc, 1));
-        final String s = d.toString();
-        assertNotNull(s);
-        assertFalse(s.isEmpty());
-        d.release();
+        final W wd = createWrite(1);
+        final String ws = wd.toString();
+        assertNotNull(ws);
+        assertFalse(ws.isEmpty());
+
+        final R rd = castR(wd.close(1));
+        final String rs = rd.toString();
+        assertNotNull(rs);
+        assertFalse(rs.isEmpty());
+
+        wd.release();
     }
 
     /** Test setting some values to missing */
     @Test
     public void testMissing() {
         int numValues = 64;
-        final C writeData = cast(m_factory.createWrite(m_alloc, numValues));
+        final W writeData = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
             if (i % 13 == 0) {
                 writeData.setMissing(i);
@@ -255,8 +291,7 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
                 setValue(writeData, i, i);
             }
         }
-        final C readData = cast(writeData.close(numValues));
-        // assertEquals(numValues, readData.length());
+        final R readData = castR(writeData.close(numValues));
         for (int i = 0; i < numValues; i++) {
             if (i % 13 == 0) {
                 assertTrue(readData.isMissing(i));
@@ -268,36 +303,36 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
         readData.release();
     }
 
-    /** Test {@link C#sizeOf()} */
+    /** Test {@link W#sizeOf()} and {@link R#sizeOf()} */
     @Test
     public void testSizeOf() {
         final int numValues = 8213;
-        final C d = cast(m_factory.createWrite(m_alloc, numValues));
+        final W wd = createWrite(numValues);
         int minSize = getMinSize(0, numValues);
-        assertTrue("Size to small. Got " + d.sizeOf() + ", expected >= " + minSize, d.sizeOf() >= minSize);
+        assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
         for (int i = 0; i < numValues; i++) {
-            setValue(d, i, i);
+            setValue(wd, i, i);
             minSize = getMinSize(i, numValues);
-            assertTrue("Size to small. Got " + d.sizeOf() + ", expected >= " + minSize, d.sizeOf() >= minSize);
+            assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
         }
-        d.close(numValues);
+        final R rd = castR(wd.close(numValues));
         minSize = getMinSize(numValues, numValues);
-        assertTrue("Size to small. Got " + d.sizeOf() + ", expected >= " + minSize, d.sizeOf() >= minSize);
-        d.release();
+        assertTrue("Size to small. Got " + rd.sizeOf() + ", expected >= " + minSize, rd.sizeOf() >= minSize);
+        wd.release();
     }
 
-    /** Test {@link C#length()} */
+    /** Test {@link R#length()} */
     @Test
     public void testLength() {
         // Test with length = capacity
-        C writeData = cast(m_factory.createWrite(m_alloc, 13));
-        C readData = cast(writeData.close(13));
+        W writeData = createWrite(13);
+        R readData = castR(writeData.close(13));
         assertEquals(13, readData.length());
         readData.release();
 
         // Test with length != capacity
-        writeData = cast(m_factory.createWrite(m_alloc, 64));
-        readData = cast(writeData.close(7));
+        writeData = createWrite(64);
+        readData = castR(writeData.close(7));
         assertEquals(7, readData.length());
         readData.release();
     }
@@ -311,11 +346,11 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
     public void testWriteRead() throws IOException {
         // Fill the data with values
         int numValues = 64;
-        C d = cast(m_factory.createWrite(m_alloc, numValues));
+        final W dw = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
-            setValue(d, i, i);
+            setValue(dw, i, i);
         }
-        d = cast(d.close(numValues));
+        R d = castR(dw.close(numValues));
         ReadBatch batch = new DefaultReadBatch(new ColumnReadData[]{d}, numValues);
 
         // Write
@@ -334,14 +369,14 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
             assertEquals(numValues, batch.length());
             assertEquals(numValues, batch.get(0).length());
             assertEquals(numValues, batch.get(0).length());
-            d = cast(batch.get(0));
+            d = castR(batch.get(0));
 
             for (int i = 0; i < numValues; i++) {
                 checkValue(d, i, i);
             }
             batch.release();
         }
-        tmp.delete();
+        Files.delete(tmp.toPath());
     }
 
     /**
@@ -353,15 +388,15 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
     public void testWriteReadMissing() throws IOException {
         // Fill the data with values
         int numValues = 64;
-        C d = cast(m_factory.createWrite(m_alloc, numValues));
+        final W dw = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
             if (i % 13 == 0) {
-                d.setMissing(i);
+                dw.setMissing(i);
             } else {
-                setValue(d, i, i);
+                setValue(dw, i, i);
             }
         }
-        d = cast(d.close(numValues));
+        R d = castR(dw.close(numValues));
         ReadBatch batch = new DefaultReadBatch(new ColumnReadData[]{d}, numValues);
 
         // Write
@@ -380,7 +415,7 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
             assertEquals(numValues, batch.length());
             assertEquals(numValues, batch.get(0).length());
             assertEquals(numValues, batch.get(0).length());
-            d = cast(batch.get(0));
+            d = castR(batch.get(0));
 
             for (int i = 0; i < numValues; i++) {
                 if (i % 13 == 0) {
@@ -392,6 +427,6 @@ public abstract class AbstractArrowDataTest<C extends ColumnWriteData & ColumnRe
             }
             batch.release();
         }
-        tmp.delete();
+        Files.delete(tmp.toPath());
     }
 }

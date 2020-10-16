@@ -57,7 +57,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VarBinaryVector;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 
@@ -67,7 +67,8 @@ import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEn
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowDictEncodedObjectDataTest extends AbstractArrowDataTest<ArrowDictEncodedObjectData<byte[]>> {
+public class ArrowDictEncodedObjectDataTest
+    extends AbstractArrowDataTest<ArrowDictEncodedObjectData<byte[]>, ArrowDictEncodedObjectData<byte[]>> {
 
     private static final int NUM_DISTINCT = 23;
 
@@ -81,10 +82,19 @@ public class ArrowDictEncodedObjectDataTest extends AbstractArrowDataTest<ArrowD
     }
 
     @SuppressWarnings("unchecked")
-    @Override
-    protected ArrowDictEncodedObjectData<byte[]> cast(final Object o) {
+    private static ArrowDictEncodedObjectData<byte[]> cast(final Object o) {
         assertTrue(o instanceof ArrowDictEncodedObjectData);
         return (ArrowDictEncodedObjectData<byte[]>)o;
+    }
+
+    @Override
+    protected ArrowDictEncodedObjectData<byte[]> castW(final Object o) {
+        return cast(o);
+    }
+
+    @Override
+    protected ArrowDictEncodedObjectData<byte[]> castR(final Object o) {
+        return cast(o);
     }
 
     @Override
@@ -99,9 +109,9 @@ public class ArrowDictEncodedObjectDataTest extends AbstractArrowDataTest<ArrowD
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ArrowDictEncodedObjectData<byte[]> data) {
+    protected boolean isReleased(final ReferencedData data) {
         // TODO check for the dictionary??
-        final IntVector v = data.m_vector;
+        final IntVector v = cast(data).m_vector;
         return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
     }
 
@@ -109,50 +119,50 @@ public class ArrowDictEncodedObjectDataTest extends AbstractArrowDataTest<ArrowD
     protected int getMinSize(final int valueCount, final int capacity) {
         // NB: The dictionary is not allocated
         return 4 * capacity // 4 bytes per value for data
-            + (int)Math.ceil(capacity / 8); // 1 bit per value for validity buffer
+            + (int)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 
     @Override
+    @SuppressWarnings({"resource"}) // Resource handled by data object
     public void testSizeOf() {
         // Super method does not allocate memory for dictionary
         super.testSizeOf();
 
         // Write each value of the dictionary
         final int numValues = NUM_DISTINCT;
-        final ArrowDictEncodedObjectData<byte[]> d = cast(m_factory.createWrite(m_alloc, numValues));
+        final ArrowDictEncodedObjectData<byte[]> d = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
             d.setObject(i, VALUES[i]);
         }
         d.close(numValues);
 
         // Allocate the dictionary
-        @SuppressWarnings({"resource", "unused"}) // Resource handled by data object
-        final VarBinaryVector dict = d.getDictionary();
+        d.getDictionary();
 
         final int expectedSize = getMinSize(numValues, numValues) // Index vector
             + Arrays.stream(VALUES).mapToInt(v -> v.length).sum() // dictionary data buffer
             + 4 * numValues // dictionary offset buffer
-            + (int)Math.ceil(numValues / 8); // dictionary validity buffer
+            + (int)Math.ceil(numValues / 8.0); // dictionary validity buffer
         assertTrue("Size to small. Got " + d.sizeOf() + ", expected >= " + expectedSize, d.sizeOf() >= expectedSize);
         d.release();
     }
 
     @Override
+    @SuppressWarnings("resource")
     public void testToString() {
         // Super method does not test with allocated dictionary
         super.testToString();
 
         // Write each value of the dictionary
         final int numValues = NUM_DISTINCT;
-        final ArrowDictEncodedObjectData<byte[]> d = cast(m_factory.createWrite(m_alloc, numValues));
+        final ArrowDictEncodedObjectData<byte[]> d = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
             d.setObject(i, VALUES[i]);
         }
         d.close(numValues);
 
         // Allocate the dictionary
-        @SuppressWarnings({"resource", "unused"}) // Resource handled by data object
-        final VarBinaryVector dict = d.getDictionary();
+        d.getDictionary();
 
         final String s = d.toString();
         assertNotNull(s);
@@ -161,10 +171,7 @@ public class ArrowDictEncodedObjectDataTest extends AbstractArrowDataTest<ArrowD
     }
 
     private static byte[] valueFor(final int seed) {
-        final Random random = new Random(seed);
-        final byte[] bytes = new byte[random.nextInt(MAX_LENGTH)];
-        random.nextBytes(bytes);
-        return bytes;
+        return VALUES[new Random(seed).nextInt(NUM_DISTINCT)];
     }
 
     private static byte[][] createValues() {

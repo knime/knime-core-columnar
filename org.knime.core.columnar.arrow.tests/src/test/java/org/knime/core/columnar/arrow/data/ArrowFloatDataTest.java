@@ -52,6 +52,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.apache.arrow.vector.Float4Vector;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 
@@ -61,17 +62,26 @@ import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatData> {
+public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatData, ArrowFloatData> {
 
     /** Create the test for {@link ArrowFloatData} */
     public ArrowFloatDataTest() {
         super(ArrowFloatDataFactory.INSTANCE);
     }
 
-    @Override
-    protected ArrowFloatData cast(final Object o) {
+    private static ArrowFloatData cast(final Object o) {
         assertTrue(o instanceof ArrowFloatData);
         return (ArrowFloatData)o;
+    }
+
+    @Override
+    protected ArrowFloatData castW(final Object o) {
+        return cast(o);
+    }
+
+    @Override
+    protected ArrowFloatData castR(final Object o) {
+        return cast(o);
     }
 
     @Override
@@ -86,14 +96,14 @@ public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatData> {
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ArrowFloatData data) {
-        final Float4Vector v = data.m_vector;
+    protected boolean isReleased(final ReferencedData data) {
+        final Float4Vector v = cast(data).m_vector;
         return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
     }
 
     @Override
     protected int getMinSize(final int valueCount, final int capacity) {
-        return 4 * capacity + // 4 bytes per value for data
-            (int)Math.ceil(capacity / 8); // 1 bit per value for validity buffer
+        return 4 * capacity // 4 bytes per value for data
+            + (int)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }

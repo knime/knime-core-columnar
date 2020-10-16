@@ -46,6 +46,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -259,33 +260,17 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
         }
 
         @Override
-        public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + ((m_serializer == null) ? 0 : m_serializer.hashCode());
-            return result;
+        public boolean equals(final Object obj) {
+            if (!(obj instanceof ArrowDictEncodedObjectDataFactory)) {
+                return false;
+            }
+            final ArrowDictEncodedObjectDataFactory<?> o = (ArrowDictEncodedObjectDataFactory<?>)obj;
+            return Objects.equals(m_serializer, o.m_serializer);
         }
 
         @Override
-        public boolean equals(final Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            ArrowDictEncodedObjectDataFactory<?> other = (ArrowDictEncodedObjectDataFactory<?>)obj;
-            if (m_serializer == null) {
-                if (other.m_serializer != null) {
-                    return false;
-                }
-            } else if (!m_serializer.equals(other.m_serializer)) {
-                return false;
-            }
-            return true;
+        public int hashCode() {
+            return Objects.hash(m_serializer);
         }
     }
 }

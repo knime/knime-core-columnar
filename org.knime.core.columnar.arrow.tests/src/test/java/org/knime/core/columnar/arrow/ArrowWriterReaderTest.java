@@ -63,6 +63,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.RootAllocator;
@@ -77,6 +78,7 @@ import org.apache.arrow.vector.complex.impl.UnionListWriter;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -261,11 +263,11 @@ public class ArrowWriterReaderTest {
         final SimpleDataChecker dataChecker = new SimpleDataChecker(false);
 
         // Create the data
-        final SimpleData data1 = (SimpleData)factories[0].createWrite(m_alloc, 64);
+        final SimpleData data1 = createWrite(factories[0], 64);
         dataChecker.fillData(data1, 0, 64, 0);
         final ReadBatch batch1 = new DefaultReadBatch(new ColumnReadData[]{data1}, 64);
 
-        final SimpleData data2 = (SimpleData)factories[0].createWrite(m_alloc, 64);
+        final SimpleData data2 = createWrite(factories[0], 64);
         dataChecker.fillData(data2, 0, 13, 1);
         final ReadBatch batch2 = new DefaultReadBatch(new ColumnReadData[]{data2}, 13);
 
@@ -319,7 +321,7 @@ public class ArrowWriterReaderTest {
         for (int b = 0; b < numBatches; b++) {
             final ColumnReadData[] data1 = new ColumnReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
-                final ColumnWriteData d = factories[c].createWrite(m_alloc, capacity);
+                final ColumnWriteData d = createWrite(factories[c], capacity);
                 data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * c);
             }
             batches[b] = new DefaultReadBatch(data1, dataCount);
@@ -367,7 +369,7 @@ public class ArrowWriterReaderTest {
         for (int b = 0; b < numBatches; b++) {
             final ColumnReadData[] data1 = new ColumnReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
-                final ColumnWriteData d = factories[c].createWrite(m_alloc, capacity);
+                final ColumnWriteData d = createWrite(factories[c], capacity);
                 data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * (c + 1));
             }
             batches[b] = new DefaultReadBatch(data1, dataCount);
@@ -425,7 +427,7 @@ public class ArrowWriterReaderTest {
         for (int b = 0; b < numBatches; b++) {
             final ColumnReadData[] data1 = new ColumnReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
-                final ColumnWriteData d = factories[c].createWrite(m_alloc, capacity);
+                final ColumnWriteData d = createWrite(factories[c], capacity);
                 data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * (c + 1));
             }
             batches[b] = new DefaultReadBatch(data1, dataCount);
@@ -470,7 +472,21 @@ public class ArrowWriterReaderTest {
      */
     @Test
     public void testFactoryVersionReadWrite() throws IOException {
-        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory(5)};
+        final ArrowColumnDataFactory[] factories =
+            new ArrowColumnDataFactory[]{new SimpleDataFactory(ArrowColumnDataFactoryVersion.version(15))};
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false));
+    }
+
+    /**
+     * Test writing and reading one column one batch of simple integer data with a given version
+     *
+     * @throws IOException
+     */
+    @Test
+    public void testFactoryComplexVersionReadWrite() throws IOException {
+        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory(
+            ArrowColumnDataFactoryVersion.version(1, ArrowColumnDataFactoryVersion.version(2, ArrowColumnDataFactoryVersion.version(3), ArrowColumnDataFactoryVersion.version(4)),
+                ArrowColumnDataFactoryVersion.version(6), ArrowColumnDataFactoryVersion.version(17, ArrowColumnDataFactoryVersion.version(7))))};
         testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false));
     }
 
@@ -479,6 +495,7 @@ public class ArrowWriterReaderTest {
      *
      * @throws IOException
      */
+    @Test
     public void testReadWriteDifferentTypes() throws IOException {
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory(),
             new SimpleDataFactory(), new DictionaryEncodedDataFactory(), new ComplexDataFactory()};
@@ -512,7 +529,7 @@ public class ArrowWriterReaderTest {
         for (int b = 0; b < numBatches; b++) {
             final ColumnReadData[] data1 = new ColumnReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
-                final ColumnWriteData d = factories[c].createWrite(m_alloc, capacity);
+                final ColumnWriteData d = createWrite(factories[c], capacity);
                 data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * c);
             }
             batches[b] = new DefaultReadBatch(data1, dataCount);
@@ -541,6 +558,17 @@ public class ArrowWriterReaderTest {
             }
         }
         assertEquals(0, m_alloc.getAllocatedMemory());
+    }
+
+    /** Create a {@link ColumnWriteData} with the given factory */
+    @SuppressWarnings({"unchecked", "resource"})
+    private final <T extends ColumnWriteData> T createWrite(final ArrowColumnDataFactory factory, final int numValues) {
+        final long firstDictId = new Random().nextInt(1000);
+        final AtomicLong dictId1 = new AtomicLong(firstDictId);
+        final AtomicLong dictId2 = new AtomicLong(firstDictId);
+        final Field field = factory.getField("0", dictId1::getAndIncrement);
+        final FieldVector vector = field.createVector(m_alloc);
+        return (T)factory.createWrite(vector, dictId2::getAndIncrement, m_alloc, numValues);
     }
 
     private static final class SimpleDataChecker implements DataChecker {
