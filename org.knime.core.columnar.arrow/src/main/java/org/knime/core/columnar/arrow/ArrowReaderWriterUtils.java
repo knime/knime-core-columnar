@@ -49,6 +49,7 @@
 package org.knime.core.columnar.arrow;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -100,6 +101,35 @@ public final class ArrowReaderWriterUtils {
             } else {
                 return null;
             }
+        }
+    }
+
+    /**
+     * A dictionary provider holding a list of dictionary providers. On {@link #lookup(long)} the lookup is performed on
+     * the children dictionary providers until the id is found.
+     */
+    public static final class NestedDictionaryProvider implements DictionaryProvider {
+
+        private final List<DictionaryProvider> m_providers;
+
+        /**
+         * Create a dictionary provider with the given children
+         *
+         * @param providers the providers to lookup the ids
+         */
+        public NestedDictionaryProvider(final List<DictionaryProvider> providers) {
+            m_providers = providers;
+        }
+
+        @Override
+        public Dictionary lookup(final long id) {
+            for (int i = 0; i < m_providers.size(); i++) {
+                final Dictionary dictionary = m_providers.get(i).lookup(id);
+                if (dictionary != null) {
+                    return dictionary;
+                }
+            }
+            return null;
         }
     }
 }

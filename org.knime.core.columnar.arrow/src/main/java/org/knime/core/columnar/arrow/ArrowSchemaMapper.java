@@ -53,10 +53,12 @@ import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
+import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnDataSpec.Mapper;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
@@ -101,8 +103,19 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     static ArrowColumnDataFactory[] map(final ColumnStoreSchema schema) {
         return IntStream.range(0, schema.getNumColumns()) //
             .mapToObj(schema::getColumnDataSpec) //
-            .map(spec -> spec.accept(INSTANCE)) //
+            .map(ArrowSchemaMapper::map) //
             .toArray(ArrowColumnDataFactory[]::new);
+    }
+
+    /**
+     * Map a single {@link ColumnDataSpec} to the according {@link ArrowColumnDataFactory}. The factory can be used to
+     * create, read or write the Arrow implementation of {@link ColumnReadData} and {@link ColumnWriteData}.
+     *
+     * @param spec the spec of the column
+     * @return the factory
+     */
+    static ArrowColumnDataFactory map(final ColumnDataSpec spec) {
+        return spec.accept(INSTANCE);
     }
 
     @Override
@@ -180,7 +193,12 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final StructDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    public ArrowStructDataFactory visit(final StructDataSpec spec) {
+        final ColumnDataSpec[] innerSpecs = spec.getInner();
+        final ArrowColumnDataFactory[] innerFactories = new ArrowColumnDataFactory[innerSpecs.length];
+        for (int i = 0; i < innerSpecs.length; i++) {
+            innerFactories[i] = ArrowSchemaMapper.map(innerSpecs[i]);
+        }
+        return new ArrowStructDataFactory(innerFactories);
     }
 }
