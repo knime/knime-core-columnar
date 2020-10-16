@@ -45,6 +45,10 @@
  */
 package org.knime.core.data.columnar.schema;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
 import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
@@ -52,12 +56,12 @@ import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectAccessSpec;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectReadAccess;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectSerializer;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectWriteAccess;
+import org.knime.core.data.v2.access.ReadAccess;
+import org.knime.core.data.v2.access.WriteAccess;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link ColumnReadData} / {@link ColumnWriteData} as {@link ReadAccess}
@@ -96,20 +100,20 @@ final class ColumnarObjectValueFactory<T> implements ColumnarValueFactory<Object
 
     private static final class DefaultObjectDataSerializer<T> implements ObjectDataSerializer<T> {
 
-        private ObjectSerializer<T> m_serializer;
+        private final ObjectSerializer<T> m_serializer;
 
         public DefaultObjectDataSerializer(final ObjectSerializer<T> serializer) {
             m_serializer = serializer;
         }
 
         @Override
-        public byte[] serialize(final T obj) {
-            return m_serializer.serialize(obj);
+        public void serialize(final T obj, final DataOutput output) throws IOException {
+            m_serializer.serialize(obj, output);
         }
 
         @Override
-        public T deserialize(final byte[] bytes) {
-            return m_serializer.deserialize(bytes);
+        public T deserialize(final DataInput input) throws IOException {
+            return m_serializer.deserialize(input);
         }
 
     }

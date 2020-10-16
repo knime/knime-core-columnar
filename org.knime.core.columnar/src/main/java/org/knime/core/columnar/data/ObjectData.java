@@ -48,6 +48,10 @@
  */
 package org.knime.core.columnar.data;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
 @SuppressWarnings("javadoc")
 public final class ObjectData {
 
@@ -80,9 +84,9 @@ public final class ObjectData {
     }
 
     public interface ObjectDataSerializer<T> {
-        byte[] serialize(T obj);
+        void serialize(T obj, DataOutput output) throws IOException;
 
-        T deserialize(byte[] bytes);
+        T deserialize(DataInput input) throws IOException;
     }
 
     public interface ObjectReadData<T> extends ColumnReadData {
