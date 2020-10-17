@@ -48,7 +48,6 @@ package org.knime.core.data.columnar.schema;
 import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.access.ReadAccess;
 
@@ -65,12 +64,13 @@ final class DefaultReadValueFactory<R extends ColumnReadData, RA extends ReadAcc
     }
 
     @Override
-    public ReadValue createReadValue(final R data, final ColumnDataIndex index) {
-        return m_delegate.createReadValue(m_factory.createReadAccess(data, index));
+    public ColumnarValueSupplier createReadValue(final R data, final ColumnDataIndex index) {
+        return new DefaultColumnarValueSupplier(m_delegate.createReadValue(m_factory.createReadAccess(data, index)));
     }
 
     @Override
     public ColumnDataSpec getColumnDataSpec() {
         return m_factory.getColumnDataSpec();
     }
+
 }

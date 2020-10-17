@@ -57,8 +57,7 @@ import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.v2.WrappedReadValue;
-import org.knime.core.data.v2.ReadValue;
+import org.knime.core.data.columnar.schema.ColumnarValueSupplier;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyReadValue;
 
@@ -89,7 +88,7 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
     private ReadBatch m_currentBatch;
 
-    private ReadValue[] m_currentValues;
+    private ColumnarValueSupplier[] m_currentValues;
 
     private int m_currentBatchIndex;
 
@@ -179,7 +178,7 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
     @Override
     public RowKeyValue getRowKeyValue() {
-        return (RowKeyReadValue)m_currentValues[0];
+        return (RowKeyReadValue)m_currentValues[0].getDataValue();
     }
 
     @Override
@@ -189,24 +188,9 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
     @Override
     public <V extends DataValue> V getValue(final int index) {
-        /*
-         * TODO performance - instanceof check
-         *
-         * Option 1: bitset to identify DataCellValueFactories
-         * Option 3: Supplier<DataValue>[...] instead if ReadValue[...] and then get().
-         *
-         * Additional (later): dedicated cursor implementations for schemas without DataCellReadValues
-         */
-        final ReadValue value = m_currentValues[index + 1];
-        if (!(value instanceof WrappedReadValue)) {
-            @SuppressWarnings("unchecked")
-            final V cast = (V)value;
-            return cast;
-        } else {
-            @SuppressWarnings("unchecked")
-            final V cast = (V)value.getDataCell();
-            return cast;
-        }
+        @SuppressWarnings("unchecked")
+        final V cast = (V)m_currentValues[index + 1].getDataValue();
+        return cast;
     }
 
     @Override
@@ -252,16 +236,16 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
         }
     }
 
-    private ReadValue[] create(final ReadBatch batch) {
-        final ReadValue[] values = new ReadValue[m_schema.getNumColumns()];
+    private ColumnarValueSupplier[] create(final ReadBatch batch) {
+        final ColumnarValueSupplier[] values = new ColumnarValueSupplier[m_schema.getNumColumns()];
         for (int i = 0; i < values.length; i++) {
             values[i] = m_factories[i].createReadValue(batch.get(i), this);
         }
         return values;
     }
 
-    private final ReadValue[] create(final ReadBatch batch, final int[] selection) {
-        final ReadValue[] values = new ReadValue[m_schema.getNumColumns()];
+    private final ColumnarValueSupplier[] create(final ReadBatch batch, final int[] selection) {
+        final ColumnarValueSupplier[] values = new ColumnarValueSupplier[m_schema.getNumColumns()];
         for (int i = 0; i < selection.length; i++) {
             values[selection[i]] = m_factories[selection[i]].createReadValue(batch.get(selection[i]), this);
         }

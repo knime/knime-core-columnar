@@ -42,68 +42,26 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 8, 2020 (dietzc): created
  */
-package org.knime.core.data.columnar.domain;
+package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.data.DataCell;
 import org.knime.core.data.DataValue;
-import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
-import org.knime.core.data.columnar.schema.ColumnarValueSupplier;
-import org.knime.core.data.v2.ReadValue;
 
-final class CopyableReadValueCursor implements ColumnDataIndex {
+/**
+ * Supplier for {@link DataValue}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
+public interface ColumnarValueSupplier {
 
-    private int m_index = -1;
-
-    private final int m_size;
-
-    private final ColumnarValueSupplier m_value;
-
-    private final ColumnReadData m_data;
-
-
-    CopyableReadValueCursor(final ColumnarReadValueFactory<ColumnReadData> factory, final ColumnReadData data) {
-        m_size = data.length();
-        m_value = factory.createReadValue(data, this);
-        m_data = data;
-    }
-
-    public final <D extends DataValue> D get() {
-        @SuppressWarnings("unchecked")
-        final D cast = (D)m_value.getDataValue();
-        return cast;
-    }
-
-    public final <D extends DataValue> D copy() {
-        final DataValue value = get();
-        if (!(value instanceof DataCell)) {
-            @SuppressWarnings("unchecked")
-            final D cast = (D)((ReadValue)value).getDataCell();
-            return cast;
-        } else {
-            @SuppressWarnings("unchecked")
-            final D cast = (D)value;
-            return cast;
-        }
-    }
-
-    @Override
-    public int getIndex() {
-        return m_index;
-    }
-
-    public final boolean canForward() {
-        return m_index < m_size;
-    }
-
-    public final void forward() {
-        m_index++;
-    }
-
-    public boolean isMissing() {
-        return m_data.isMissing(m_index);
-    }
-
+    /**
+     * Get the {@link DataValue} representation of the value.
+     *
+     * @return a {@link DataValue} instance. No guarantee about whether or not the returned {@link DataValue} is
+     *         immutable or not.
+     */
+    public DataValue getDataValue();
 }

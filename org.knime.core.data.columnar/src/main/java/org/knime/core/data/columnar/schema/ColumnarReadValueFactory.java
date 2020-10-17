@@ -48,6 +48,7 @@ package org.knime.core.data.columnar.schema;
 import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.data.DataValue;
 import org.knime.core.data.v2.ReadValue;
 import org.omg.CORBA.portable.ValueFactory;
 
@@ -63,15 +64,16 @@ import org.omg.CORBA.portable.ValueFactory;
 public interface ColumnarReadValueFactory<R extends ColumnReadData> {
 
     /**
-     * Create a new {@link ReadValue}. Note, the content of the read value is mutable, i.e. changes with the provided
-     * {@link ColumnDataIndex}.
+     * Create a new {@link ColumnarValueSupplier}. Note, the content of the read value is mutable, i.e. changes with the
+     * provided {@link ColumnDataIndex}.
      *
      * @param data the underlying {@link ColumnReadData}
      * @param index pointer to position in {@link ColumnReadData}
      *
-     * @return a {@link ReadValue} representing the value at the {@link ColumnDataIndex} in the {@link ColumnReadData}.
+     * @return DataValueSupplier supplying a {@link DataValue} representing the value at the {@link ColumnDataIndex} in
+     *         the {@link ColumnReadData}.
      */
-    ReadValue createReadValue(R data, ColumnDataIndex index);
+    ColumnarValueSupplier createReadValue(R data, ColumnDataIndex index);
 
     /**
      * @return spec of the column data.
