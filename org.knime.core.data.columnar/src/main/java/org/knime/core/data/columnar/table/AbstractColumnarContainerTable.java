@@ -108,7 +108,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         m_tableId = -1;
         m_size = settings.getLong(CFG_TABLE_SIZE);
         m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
-        m_schema = ColumnarValueSchemaUtils.create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
+        m_schema = ColumnarValueSchemaUtils
+            .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
         m_store = ColumnarPreferenceUtils.wrap(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile()));
     }
 
@@ -228,30 +229,30 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
         final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
         if (colIndicesOpt.isPresent()) {
-            int[] selection = toSortedIntArray(colIndicesOpt.get());
-            return new FilteredColumnarRowIterator(ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex,
-                m_openCursorCloseables, selection), selection);
+            final int[] selection = toSortedIntArray(colIndicesOpt.get());
+            return FilteredColumnarRowIterator.create(ColumnarRowCursor.create(m_store, m_schema, fromRowIndex,
+                toRowIndex, m_openCursorCloseables, selection), selection);
         } else {
             return new ColumnarRowIterator(
                 ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorCloseables));
         }
     }
 
-	private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
-	    try {
-	        ColumnStoreFactory factory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
-	        if (!Objects.equals(factory.getClass().getName(), type)) {
-	            throw new InvalidSettingsException(
-	                String.format("Class of column store factory not as expected (installed: %s, requested: %s)",
-	                    factory.getClass().getName(), type));
-	        }
-	        return factory;
-	    } catch (InvalidSettingsException e) {
-	        throw e;
-	    } catch (Exception e) {
-	        throw new InvalidSettingsException("Unable to instantiate object of type: " + type, e);
-	    }
-	}
+    private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
+        try {
+            ColumnStoreFactory factory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+            if (!Objects.equals(factory.getClass().getName(), type)) {
+                throw new InvalidSettingsException(
+                    String.format("Class of column store factory not as expected (installed: %s, requested: %s)",
+                        factory.getClass().getName(), type));
+            }
+            return factory;
+        } catch (InvalidSettingsException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new InvalidSettingsException("Unable to instantiate object of type: " + type, e);
+        }
+    }
 
     private static int[] toSortedIntArray(final Set<Integer> selection) {
         return selection.stream().sorted().mapToInt((i) -> (i)).toArray();
