@@ -80,6 +80,11 @@ public class DefaultReadBatch implements ReadBatch {
     }
 
     @Override
+    public ColumnReadData getUnsafe(final int index) {
+        return m_data[index];
+    }
+
+    @Override
     public ColumnReadData get(final int colIndex) {
         if (colIndex < 0) {
             throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", colIndex));

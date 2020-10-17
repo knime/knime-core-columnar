@@ -211,7 +211,8 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
     @Override
     public boolean isMissing(final int index) {
-        return m_currentBatch.get(index + 1).isMissing(m_currentIndex);
+        // TODO CD - store currentData.
+        return m_currentBatch.getUnsafe(index + 1).isMissing(m_currentIndex);
     }
 
     @Override
