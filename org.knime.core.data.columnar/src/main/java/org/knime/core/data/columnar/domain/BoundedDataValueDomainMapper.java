@@ -208,9 +208,9 @@ final class BoundedDataValueDomainMapper<D extends DataValue>
                             upper = other;
                         } else {
                             if (m_comparator.compare(other, lower) < 0) {
-                                lower = cursor.copy();
+                                lower = other;
                             } else if (m_comparator.compare(other, upper) > 0) {
-                                upper = cursor.copy();
+                                upper = other;
                             }
                         }
                     }
