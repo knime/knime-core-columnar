@@ -74,21 +74,25 @@ import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
  */
 final class ArrowBufIO<T> {
 
-    private final StringEncoder m_encoder;
+    private static ThreadLocal<StringEncoder> ENCODER_FACTORY = new ThreadLocal<StringEncoder>() {
+        @Override
+        protected StringEncoder initialValue() {
+            return new StringEncoder();
+        }
+    };
 
     private final ObjectDataSerializer<T> m_serializer;
 
     private final VarBinaryVector m_vector;
 
     ArrowBufIO(final VarBinaryVector vector, final ObjectDataSerializer<T> serializer) {
-        m_encoder = new StringEncoder();
         m_serializer = serializer;
         m_vector = vector;
     }
 
     final T deserialize(final int index) {
         try {
-            final ArrowBufDataInput buf = new ArrowBufDataInput(m_vector, index, m_encoder);
+            final ArrowBufDataInput buf = new ArrowBufDataInput(m_vector, index, ENCODER_FACTORY.get());
             final T deserialize = m_serializer.deserialize(buf);
             return deserialize;
         } catch (IOException ex) {
@@ -104,7 +108,7 @@ final class ArrowBufIO<T> {
             final int startOffset = m_vector.getStartOffset(index);
             final long before = m_vector.getDataBuffer().writerIndex();
             // TODO Static encoder instance?
-            final ArrowBufDataOutput output = new ArrowBufDataOutput(m_vector, new StringEncoder());
+            final ArrowBufDataOutput output = new ArrowBufDataOutput(m_vector, ENCODER_FACTORY.get());
             m_serializer.serialize(obj, output);
             final int length = (int)(m_vector.getDataBuffer().writerIndex() - before);
             m_vector.getOffsetBuffer().setInt((index + 1) * BaseVariableWidthVector.OFFSET_WIDTH, startOffset + length);
