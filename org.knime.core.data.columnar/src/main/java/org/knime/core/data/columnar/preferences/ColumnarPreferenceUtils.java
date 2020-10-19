@@ -78,6 +78,7 @@ import org.knime.core.columnar.phantom.PhantomReferenceStore;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.data.columnar.ColumnarTableBackend;
+import org.knime.core.util.ThreadUtils;
 import org.osgi.framework.FrameworkUtil;
 
 @SuppressWarnings("javadoc")
@@ -258,8 +259,9 @@ public final class ColumnarPreferenceUtils {
 
     private static ExecutorService getPersistExecutor() {
         if (PERSIST_EXECUTOR == null) {
-            PERSIST_EXECUTOR = Executors.newFixedThreadPool(getPersistNumThreads(),
-                r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet()));
+            PERSIST_EXECUTOR =
+                ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getPersistNumThreads(),
+                    r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet())));
         }
         return PERSIST_EXECUTOR;
     }
