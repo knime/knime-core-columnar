@@ -80,9 +80,12 @@ import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.store.ColumnDataWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The ArrowColumnDataWriter writes batches of columns to an Arrow file.
@@ -91,6 +94,8 @@ import org.knime.core.columnar.store.ColumnDataWriter;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
 class ArrowColumnDataWriter implements ColumnDataWriter {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ArrowColumnDataWriter.class);
 
     private final File m_file;
 
@@ -180,6 +185,10 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
 
                 m_writer.writeFooter(metadata);
                 m_writer.close();
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Closing file {} ({})", m_file.getAbsolutePath(),
+                        FileUtils.byteCountToDisplaySize(FileUtils.sizeOf(m_file)));
+                }
             }
             m_closed = true;
         }
