@@ -46,6 +46,7 @@
  */
 package org.knime.core.columnar.cache.heap;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.data.ObjectData;
@@ -59,13 +60,16 @@ import org.knime.core.columnar.data.ObjectData.ObjectReadData;
  */
 final class HeapCachedReadData<T> implements ObjectReadData<T> {
 
-    private final ObjectReadData<T> m_delegate;
+    private final AtomicInteger m_refCounter = new AtomicInteger(1);
 
-    private final AtomicReferenceArray<T> m_data;
+    private final ObjectReadData<T> m_delegate;
 
     private final HeapCachedWriteData<T> m_writeData;
 
-    HeapCachedReadData(final ObjectReadData<T> delegate, final AtomicReferenceArray<T> data, final HeapCachedWriteData<T> writeData) {
+    private AtomicReferenceArray<T> m_data;
+
+    HeapCachedReadData(final ObjectReadData<T> delegate, final AtomicReferenceArray<T> data,
+        final HeapCachedWriteData<T> writeData) {
         m_delegate = delegate;
         m_data = data;
         m_writeData = writeData;
@@ -82,13 +86,17 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
     }
 
     @Override
-    public void release() {
-        m_delegate.release();
+    public void retain() {
+        m_refCounter.getAndIncrement();
+        m_writeData.retain();
     }
 
     @Override
-    public void retain() {
-        m_delegate.retain();
+    public void release() {
+        if (m_refCounter.decrementAndGet() == 0) {
+            m_data = null;
+        }
+        m_writeData.release();
     }
 
     @Override
