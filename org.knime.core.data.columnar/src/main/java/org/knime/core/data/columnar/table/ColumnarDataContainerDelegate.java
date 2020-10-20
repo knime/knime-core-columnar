@@ -86,6 +86,7 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
         m_spec = cursor.getSchema().getSourceSpec();
         m_numColumns = m_spec.getNumColumns();
         m_isCustomRowKey = cursor.getSchema().getRowKeyType() == RowKeyType.CUSTOM;
+
     }
 
     @Override
@@ -114,13 +115,15 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
                 "Cell count in row " + row.getKey().toString() + " is not equal to length of column names array: "
                     + row.getNumCells() + " vs. " + m_spec.getNumColumns());
         }
+
         if (m_isCustomRowKey) {
             m_delegate.<CustomRowKeyWriteValue> getWriteValue(-1).setRowKey(row.getKey());
         }
+
         for (int i = 0; i < m_numColumns; i++) {
             final DataCell cell = row.getCell(i);
             if (!cell.isMissing()) {
-                m_delegate.<WriteValue<DataCell>> getWriteValue(i).setValue(row.getCell(i));
+                m_delegate.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
             } else {
                 m_delegate.setMissing(i);
             }

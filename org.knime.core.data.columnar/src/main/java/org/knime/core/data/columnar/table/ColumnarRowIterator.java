@@ -62,7 +62,9 @@ import org.knime.core.data.v2.RowCursor;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public class ColumnarRowIterator extends CloseableRowIterator {
+public final class ColumnarRowIterator extends CloseableRowIterator {
+
+    private static final DataCell INSTANCE = DataType.getMissingCell();
 
     private final RowCursor m_cursor;
 
@@ -84,7 +86,7 @@ public class ColumnarRowIterator extends CloseableRowIterator {
         final DataCell[] cells = new DataCell[m_numValues];
         for (int i = 0; i < m_numValues; i++) {
             if (m_cursor.isMissing(i)) {
-                cells[i] = DataType.getMissingCell();
+                cells[i] = INSTANCE;
             } else {
 
                 // TODO performance!!
