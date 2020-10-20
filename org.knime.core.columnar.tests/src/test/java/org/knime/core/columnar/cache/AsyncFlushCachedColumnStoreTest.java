@@ -150,6 +150,7 @@ public class AsyncFlushCachedColumnStoreTest {
     }
 
     private static void checkUnflushed(final TestTable table, final TestColumnStore delegate) throws IOException {
+        assertEquals(3, checkRefs(table));
         assertFalse(tableInStore(delegate, table));
     }
 
@@ -166,12 +167,10 @@ public class AsyncFlushCachedColumnStoreTest {
 
             final CountDownLatch latch = delayFlush(store);
             writeTable(store, table);
-            checkCached(table);
             checkUnflushed(table, delegate);
 
             try (final TestTable reassembledTable = readAndCompareTable(store, table)) {
             }
-            checkCached(table);
             checkUnflushed(table, delegate);
 
             waitForFlush(store, latch);
@@ -189,7 +188,6 @@ public class AsyncFlushCachedColumnStoreTest {
 
             final CountDownLatch latch = delayFlush(store);
             writeTable(store, table);
-            checkCached(table);
             checkUnflushed(table, delegate);
 
             waitForFlush(store, latch);
@@ -212,11 +210,9 @@ public class AsyncFlushCachedColumnStoreTest {
 
             final CountDownLatch latch = delayFlush(store);
             writeTable(store, table);
-            checkCached(table);
             checkUnflushed(table, delegate);
 
             readTwiceAndCompareTable(store);
-            checkCached(table);
             checkUnflushed(table, delegate);
 
             waitForFlush(store, latch);
@@ -235,12 +231,10 @@ public class AsyncFlushCachedColumnStoreTest {
 
             final CountDownLatch latch = delayFlush(store);
             writeTable(store, table);
-            checkCached(table);
             checkUnflushed(table, delegate);
 
             try (final TestTable reassembledTable = readSelectionAndCompareTable(store, table, 0)) {
             }
-            checkCached(table);
             checkUnflushed(table, delegate);
 
             waitForFlush(store, latch);
@@ -262,7 +256,6 @@ public class AsyncFlushCachedColumnStoreTest {
 
             final CountDownLatch latch1 = delayFlush(store1);
             writeTable(store1, table1);
-            checkCached(table1);
             checkUnflushed(table1, delegate1);
 
             waitForFlush(store1, latch1);
@@ -272,7 +265,6 @@ public class AsyncFlushCachedColumnStoreTest {
             final CountDownLatch latch2 = delayFlush(store2);
             writeTable(store2, table2); // evict table1
             checkUncached(table1);
-            checkCached(table2);
 
             waitForFlush(store2, latch2);
             checkUncached(table1);
@@ -312,7 +304,6 @@ public class AsyncFlushCachedColumnStoreTest {
 
             final CountDownLatch flushLatch1 = delayFlush(store1);
             writeTable(store1, table1);
-            checkCached(table1);
             checkUnflushed(table1, delegate1);
             checkCacheSize(cache, 1);
 
@@ -357,14 +348,12 @@ public class AsyncFlushCachedColumnStoreTest {
             final CountDownLatch flushLatch3 = delayFlush(store3);
 
             writeTable(store2, table2); // cache & queue flush of table2
-            checkCached(table2);
             checkUnflushed(table2, delegate2);
             checkCacheSize(cache, 2);
 
             writeTable(store3, table3); // cache & queue flush of table3, evicting table1
             checkUncached(table1);
             checkFlushed(table1, delegate1);
-            checkCached(table3);
             checkUnflushed(table3, delegate3);
             checkCacheSize(cache, 2);
 
@@ -405,7 +394,6 @@ public class AsyncFlushCachedColumnStoreTest {
             final CountDownLatch flushLatch3 = delayFlush(store3);
 
             writeTable(store2, table2); // cache & queue flush of table2
-            checkCached(table2);
             checkUnflushed(table2, delegate2);
             checkCacheSize(cache, 2);
             try (final TestTable reassembledTable1 = readAndCompareTable(store1, table1)) {
@@ -438,7 +426,6 @@ public class AsyncFlushCachedColumnStoreTest {
                 final TestTable table = generateDefaultTable(delegate)) {
 
             writeTable(store, table);
-            checkCached(table);
             store.waitForAndHandleFuture(); // wait for flush of table
             checkCacheSize(cache, 1);
             checkCached(table);
