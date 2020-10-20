@@ -62,7 +62,7 @@ public class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer
 
     static final String NUM_THREADS_KEY = "knime.core.data.columnar.num-threads";
 
-    static final int NUM_THREADS_DEF = Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors());
+    static final int NUM_THREADS_DEF = Math.max(1, ColumnarPreferenceUtils.getNumAvailableProcessors() / 2);
 
     // the size (in MB) of the LRU cache for entire small tables
     static final String SMALL_TABLE_CACHE_SIZE_KEY = "knime.core.data.columnar.small-cache-size";

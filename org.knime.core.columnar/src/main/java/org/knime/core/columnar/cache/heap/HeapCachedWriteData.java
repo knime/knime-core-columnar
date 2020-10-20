@@ -70,7 +70,6 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
     @Override
     public void setMissing(final int index) {
-        m_delegate.setMissing(index);
     }
 
     @Override
@@ -108,7 +107,9 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
             final T t = m_data.get(i);
             if (t != null) {
                 m_delegate.setObject(i, t);
-            }
+            }/* else {
+                m_delegate.setMissing(i);
+            }*/
         }
     }
 

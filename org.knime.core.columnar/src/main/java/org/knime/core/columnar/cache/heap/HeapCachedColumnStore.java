@@ -180,9 +180,8 @@ public final class HeapCachedColumnStore implements ColumnStore {
 
         @Override
         public void close() throws IOException {
-            m_writerClosed = true;
-
             waitForPrevBatch();
+            m_writerClosed = true;
             m_delegateWriter.close();
         }
 

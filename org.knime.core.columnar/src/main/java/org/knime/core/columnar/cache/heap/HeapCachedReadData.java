@@ -73,7 +73,7 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
 
     @Override
     public boolean isMissing(final int index) {
-        return m_delegate.isMissing(index);
+        return m_data.get(index) == null;
     }
 
     @Override
@@ -110,9 +110,7 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
     }
 
     void serialize() {
-        if (m_writeData != null) {
-            m_writeData.serialize();
-        }
+        m_writeData.serialize();
     }
 
 }
