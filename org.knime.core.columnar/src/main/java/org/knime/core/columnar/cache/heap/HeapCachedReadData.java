@@ -118,7 +118,7 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
     }
 
     void serialize() {
-        m_writeData.serialize();
+        m_writeData.serialize(m_delegate.length());
     }
 
 }

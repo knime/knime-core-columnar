@@ -109,8 +109,8 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
         return new HeapCachedReadData<>(m_delegate.close(length), m_data, this);
     }
 
-    void serialize() {
-        for (int i = 0; i < m_data.length(); i++) {
+    void serialize(final int numValues) {
+        for (int i = 0; i < numValues; i++) {
             final T t = m_data.get(i);
             if (t != null) {
                 m_delegate.setObject(i, t);
