@@ -42,20 +42,58 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 20, 2020 (dietzc): created
  */
+package org.knime.core.data.columnar.domain;
 
-package org.knime.core.columnar.domain;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.domain.DomainCalculator;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
+import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.data.meta.DataColumnMetaDataCreator;
 
 /**
- * Interface for domains.
+ * Calculates metadata on
  *
+ * @author Chrsitian Dietz, KNIME GmbH Konstanz, Germany
  * @since 4.3
  */
-public interface Domain {
+class MetadataDomainCalculator<R extends ColumnReadData> implements DomainCalculator<R, DataColumnMetaData[]> {
 
-    /**
-     * @return {@code true} if the domain is valid, that is it has either min/max bounds or comprises more than zero
-     *         nominal values.
-     */
-    boolean isValid();
+    private final DataColumnMetaDataCreator<DataColumnMetaData>[] m_creators;
+
+    private final ColumnarReadValueFactory<ColumnReadData> m_factory;
+
+    public MetadataDomainCalculator(final DataColumnMetaDataCreator<DataColumnMetaData>[] creators,
+        final ColumnarReadValueFactory<ColumnReadData> factory) {
+        m_creators = creators;
+        m_factory = factory;
+    }
+
+    @Override
+    public void update(final R data) {
+        final CopyableReadValueCursor cursor = new CopyableReadValueCursor(m_factory, data);
+        while (cursor.canForward()) {
+            cursor.forward();
+            if (!cursor.isMissing()) {
+                final DataCell cell = cursor.copy();
+                for (final DataColumnMetaDataCreator<?> creator : m_creators) {
+                    creator.update(cell);
+                }
+            }
+        }
+    }
+
+    @Override
+    public DataColumnMetaData[] getDomain() {
+        final DataColumnMetaData[] results = new DataColumnMetaData[m_creators.length];
+        for (int i = 0; i < results.length; i++) {
+            results[i] = m_creators[i].create();
+        }
+        return results;
+    }
+
 }

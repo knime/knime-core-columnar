@@ -61,7 +61,6 @@ import java.util.concurrent.Future;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.domain.Domain;
 import org.knime.core.columnar.domain.DomainCalculator;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -70,12 +69,11 @@ import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.util.DuplicateChecker;
 import org.knime.core.util.DuplicateKeyException;
 
 // TODO: make sure everything is closed in case of exceptions, etc.
-// TODO: refactor to core.columnar?
-// TODO: re-integrate changes of marc bux made in bug fix (should be done - please check CD.)
 // TODO: Split duplicate checking from domain calculation - reusing async calc code.
 // TODO: tickets bug / domain metadata.
 
@@ -93,7 +91,10 @@ public final class DomainColumnStore implements ColumnStore {
 
     private final DomainColumnDataWriter m_writer;
 
-    private final Map<Integer, DomainFactory<? extends ColumnReadData, ? extends Domain>> m_mappers;
+    /* Not final as initialized lazily */
+    private volatile Map<Integer, DomainCalculator<?, DataColumnDomain>> m_domainCalculators;
+
+    private volatile Map<Integer, DomainCalculator<?, DataColumnMetaData[]>> m_metadataCalculators;
 
     private volatile boolean m_storeClosed;
 
@@ -105,10 +106,10 @@ public final class DomainColumnStore implements ColumnStore {
      * @param executor the executor to which to submit asynchronous domain calculations and duplicate checks
      */
     @SuppressWarnings("resource")
-    public DomainColumnStore(final ColumnStore delegate, final DomainStoreConfig config, final ExecutorService executor) {
+    public DomainColumnStore(final ColumnStore delegate, final DomainStoreConfig config,
+        final ExecutorService executor) {
         m_delegate = delegate;
         m_writer = new DomainColumnDataWriter(delegate.getWriter(), config);
-        m_mappers = config.createMappers();
         m_executor = executor;
     }
 
@@ -128,23 +129,27 @@ public final class DomainColumnStore implements ColumnStore {
      * @param colIndex the columnIndex
      * @return the resulting domain
      */
-    public final DataColumnDomain getResultDomain(final int colIndex) {
-        try {
-            @SuppressWarnings("unchecked")
-            final DomainFactory<? extends ColumnReadData, Domain> cast =
-                (DomainFactory<? extends ColumnReadData, Domain>)m_mappers.get(colIndex);
-            // TODO API
-            final Future<Domain> future = m_writer.m_domainCalculations.get(colIndex);
-            if (future != null) {
-                return cast.convert(future.get());
-            } else {
-                return null;
-            }
-        } catch (final InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Domain calculation has been interrupted.", ex);
-        } catch (final ExecutionException ex) {
-            throw new IllegalStateException(ex.getCause());
+    public final DataColumnDomain getDomains(final int colIndex) {
+        final DomainCalculator<?, DataColumnDomain> calculator = m_domainCalculators.get(colIndex);
+        if (calculator != null) {
+            return calculator.getDomain();
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Get the resulting DataColumnMetadata
+     *
+     * @param colIndex the columnIndex
+     * @return the resulting domain
+     */
+    public final DataColumnMetaData[] getDomainMetadata(final int colIndex) {
+        final DomainCalculator<?, DataColumnMetaData[]> calculator = m_metadataCalculators.get(colIndex);
+        if (calculator != null) {
+            return calculator.getDomain();
+        } else {
+            return null;
         }
     }
 
@@ -176,7 +181,7 @@ public final class DomainColumnStore implements ColumnStore {
      *
      * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
      */
-    // TODO make static?
+    // TODO can we make this static?
     public final class DomainColumnDataWriter implements ColumnDataWriter {
 
         private final ColumnDataWriter m_delegateWriter;
@@ -185,17 +190,10 @@ public final class DomainColumnStore implements ColumnStore {
 
         private final List<Future<Void>> m_duplicateChecks = new ArrayList<>();
 
-        private final Map<Integer, Future<Domain>> m_domainCalculations = new HashMap<>();
+        private final Map<Integer, Future<Void>> m_futures = new HashMap<>();
 
         /* Set in {@link #setMaxPossibleValues(int)}. */
         private DomainStoreConfig m_config;
-
-        /* Depends on m_config */
-        @SuppressWarnings("hiding")
-        private Map<Integer, DomainFactory<? extends ColumnReadData, ? extends Domain>> m_mappers;
-
-        /* Not final as initialized lazily */
-        private Map<Integer, DomainCalculator<?, ?>> m_calculators;
 
         /**
          * @param delegate the delegate {@link ColumnDataWriter}.
@@ -212,10 +210,10 @@ public final class DomainColumnStore implements ColumnStore {
          * reasons. <br>
          * May only be called before the first call to {@link #write(ReadBatch)}.
          *
-         * @param maxPossibleValues maximum number of possible values for nominal domainsl
+         * @param maxPossibleValues maximum number of possible values for nominal domains
          */
         public void setMaxPossibleValues(final int maxPossibleValues) {
-            if (m_mappers != null) {
+            if (m_domainCalculators != null) {
                 throw new IllegalStateException(
                     "The maximum number of possible values for a nominal domain may only be set "
                         + "before any values were written.");
@@ -223,20 +221,24 @@ public final class DomainColumnStore implements ColumnStore {
             m_config = m_config.withMaxPossibleNominalDomainValues(maxPossibleValues);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public void write(final ReadBatch record) throws IOException {
-            if (m_calculators == null) {
+            if (m_domainCalculators == null) {
                 // needs to happen here because of setMaxPossibleValues
-                m_mappers = m_config.createMappers();
-                m_calculators = new HashMap<>();
-                final Map<Integer, DataColumnDomain> initialDomains = m_config.getInitialDomains();
-                for (final Entry<Integer, DomainFactory<?, ?>> entry : m_mappers.entrySet()) {
-                    @SuppressWarnings("unchecked")
-                    final DomainCalculator<?, Domain> cast = (DomainCalculator<?, Domain>)entry.getValue()
-                        .createCalculator(initialDomains.get(entry.getKey()));
-                    m_calculators.put(entry.getKey(), cast);
-                    m_domainCalculations.put(entry.getKey(),
-                        CompletableFuture.completedFuture(cast.createInitialDomain()));
+                m_domainCalculators = m_config.createDomainCalculators();
+                m_metadataCalculators = m_config.createMetadataCalculators();
+
+                for (final Entry<Integer, DomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators
+                    .entrySet()) {
+                    m_futures.put(entry.getKey(), CompletableFuture.completedFuture(null));
+                }
+
+                for (final Entry<Integer, DomainCalculator<?, DataColumnMetaData[]>> entry : m_metadataCalculators
+                    .entrySet()) {
+                    if (m_futures.get(entry.getKey()) == null) {
+                        m_futures.put(entry.getKey(), CompletableFuture.completedFuture(null));
+                    }
                 }
             }
 
@@ -255,28 +257,38 @@ public final class DomainColumnStore implements ColumnStore {
                 m_duplicateChecks.add(duplicateCheck);
             }
 
-            for (final Entry<Integer, DomainCalculator<?, ?>> entry : m_calculators.entrySet()) {
-                @SuppressWarnings("unchecked")
-                final DomainCalculator<ColumnReadData, Domain> calculator =
-                    (DomainCalculator<ColumnReadData, Domain>)entry.getValue();
-                if (calculator != null) {
-                    final int index = entry.getKey();
-                    final Future<Domain> merged;
-                    final ColumnReadData chunk = record.get(index);
-                    // Retain for async. domain computation. Submitted task will release.
-                    chunk.retain();
-                    try {
-                        final Future<Domain> previous = m_domainCalculations.get(index);
-                        merged = m_executor.submit(new DomainCalculationTask(previous, chunk, calculator));
-                    } catch (final Exception ex) {
-                        chunk.release();
-                        throw ex;
-                    }
-                    m_domainCalculations.put(index, merged);
-                }
+            // Append all domain calculators
+            for (final Entry<Integer, DomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators.entrySet()) {
+                final DomainCalculator<ColumnReadData, ?> calculator =
+                    (DomainCalculator<ColumnReadData, ?>)entry.getValue();
+                m_futures.put(entry.getKey(),
+                    append(record.get(entry.getKey()), m_futures.get(entry.getKey()), calculator));
+            }
+
+            // Append all metadata mappers
+            for (final Entry<Integer, DomainCalculator<?, DataColumnMetaData[]>> entry : m_metadataCalculators
+                .entrySet()) {
+                final DomainCalculator<ColumnReadData, ?> calculator =
+                    (DomainCalculator<ColumnReadData, ?>)entry.getValue();
+                m_futures.put(entry.getKey(),
+                    append(record.get(entry.getKey()), m_futures.get(entry.getKey()), calculator));
             }
 
             m_delegateWriter.write(record);
+        }
+
+        private Future<Void> append(final ColumnReadData chunk, final Future<Void> previous,
+            final DomainCalculator<ColumnReadData, ?> calculator) {
+            final Future<Void> current;
+            // Retain for async. domain computation. Submitted task will release.
+            chunk.retain();
+            try {
+                current = m_executor.submit(new DomainCalculationTask(previous, chunk, calculator));
+            } catch (final Exception ex) {
+                chunk.release();
+                throw ex;
+            }
+            return current;
         }
 
         @Override
@@ -290,7 +302,7 @@ public final class DomainColumnStore implements ColumnStore {
                 if (m_duplicateChecker != null) {
                     m_duplicateChecker.checkForDuplicates();
                 }
-                for (final Future<Domain> domainCalculations : m_domainCalculations.values()) {
+                for (final Future<Void> domainCalculations : m_futures.values()) {
                     domainCalculations.get();
                 }
             } catch (final InterruptedException e) {
@@ -339,42 +351,34 @@ public final class DomainColumnStore implements ColumnStore {
             }
         }
 
-        private final class DomainCalculationTask implements Callable<Domain> {
+        private final class DomainCalculationTask implements Callable<Void> {
 
-            private final Future<Domain> m_previous;
+            private final Future<Void> m_previous;
 
             private final ColumnReadData m_chunk;
 
-            private final DomainCalculator<ColumnReadData, Domain> m_calculator;
+            private final DomainCalculator<ColumnReadData, ?> m_calculator;
 
-            public DomainCalculationTask(final Future<Domain> previous, final ColumnReadData chunk,
-                final DomainCalculator<ColumnReadData, Domain> calculator) {
+            public DomainCalculationTask(final Future<Void> previous, final ColumnReadData chunk,
+                final DomainCalculator<ColumnReadData, ?> calculator) {
                 m_previous = previous;
                 m_chunk = chunk;
                 m_calculator = calculator;
             }
 
             @Override
-            public Domain call() throws InterruptedException, ExecutionException {
-                final Domain previous = m_previous.get();
+            public Void call() throws InterruptedException, ExecutionException {
+                // wait for prev
+                m_previous.get();
                 if (m_storeClosed) {
-                    return previous;
+                    return null;
                 }
-                final Domain merged;
-                if (previous.isValid()) {
-                    final Domain current;
-                    try {
-                        current = m_calculator.calculateDomain(m_chunk);
-                    } finally {
-                        m_chunk.release();
-                    }
-                    merged = m_calculator.mergeDomains(previous, current);
-                } else {
-                    // No need to put any more effort into an already invalid domain.
+                try {
+                    m_calculator.update(m_chunk);
+                } finally {
                     m_chunk.release();
-                    merged = previous;
                 }
-                return merged;
+                return null;
             }
         }
     }

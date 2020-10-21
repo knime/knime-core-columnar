@@ -66,6 +66,7 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.schema.ColumnarWriteValueFactory;
 import org.knime.core.data.container.DataContainer;
+import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 
@@ -131,7 +132,8 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
         m_store = new DomainColumnStore(
             ColumnarPreferenceUtils
                 .wrap(m_storeFactory.createWriteStore(schema, DataContainer.createTempFile(".knable"), CHUNK_SIZE)),
-            new DefaultDomainStoreConfig(schema, config.getMaxPossibleNominalDomainValues(), config.getRowKeyConfig()),
+            new DefaultDomainStoreConfig(schema, config.getMaxPossibleNominalDomainValues(), config.getRowKeyConfig(),
+                config.isInitializeDomains()),
             ColumnarPreferenceUtils.getDomainCalcExecutor());
 
         m_columnDataFactory = m_store.getFactory();
@@ -186,16 +188,21 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
             m_writer.close();
 
             final Map<Integer, DataColumnDomain> domains = new HashMap<>();
+            final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
             final int numColumns = m_schema.getNumColumns();
             for (int i = 1; i < numColumns; i++) {
-                final DataColumnDomain resultDomain = m_store.getResultDomain(i);
+                final DataColumnDomain resultDomain = m_store.getDomains(i);
                 if (resultDomain != null) {
                     domains.put(i, resultDomain);
+                }
+                final DataColumnMetaData[] resultMetadata = m_store.getDomainMetadata(i);
+                if (resultMetadata != null) {
+                    metadata.put(i, resultMetadata);
                 }
             }
 
             m_table = new UnsavedColumnarContainerTable(m_tableId, m_storeFactory,
-                ColumnarValueSchemaUtils.updateSource(m_schema, domains), m_store, m_size);
+                ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_size);
         }
         return m_table;
     }

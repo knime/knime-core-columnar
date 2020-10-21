@@ -57,6 +57,7 @@ import org.knime.core.data.DataColumnDomain;
  * @since 4.3
  */
 interface DomainFactory<R extends ColumnReadData, D extends Domain> {
+
     DomainCalculator<R, ? extends D> createCalculator(DataColumnDomain initial);
 
     DataColumnDomain convert(D domain);

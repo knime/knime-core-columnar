@@ -53,6 +53,7 @@ import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.data.v2.access.AccessSpec;
 
@@ -89,22 +90,34 @@ public final class ColumnarValueSchemaUtils {
      * domains provided in the {@link Map}.
      *
      * @param source the source {@link DataTableSpec}
-     * @param domains the domains used for update.
+     * @param domainMap the domains used for update.
+     * @param metadataMap the columnar metadata used to update
      *
      * @return the updated {@link ColumnarValueSchema}
      */
     public static final ColumnarValueSchema updateSource(final ColumnarValueSchema source,
-        final Map<Integer, DataColumnDomain> domains) {
+        final Map<Integer, DataColumnDomain> domainMap, final Map<Integer, DataColumnMetaData[]> metadataMap) {
         final DataColumnSpec[] result = new DataColumnSpec[source.getNumColumns() - 1];
         for (int i = 0; i < result.length; i++) {
             final DataColumnSpec colSpec = source.getSourceSpec().getColumnSpec(i);
-            final DataColumnDomain domain = domains.get(i + 1);
-            if (domain != null) {
-                final DataColumnSpecCreator creator = new DataColumnSpecCreator(colSpec);
-                creator.setDomain(domain);
-                result[i] = creator.createSpec();
-            } else {
+            final DataColumnDomain domain = domainMap.get(i + 1);
+            final DataColumnMetaData[] metadata = metadataMap.get(i + 1);
+
+            if (domain == null && metadata == null) {
                 result[i] = colSpec;
+            } else {
+                final DataColumnSpecCreator creator = new DataColumnSpecCreator(colSpec);
+                if (domain != null) {
+                    creator.setDomain(domain);
+                }
+
+                if (metadata != null) {
+                    for (final DataColumnMetaData element : metadata) {
+                        creator.addMetaData(element, true);
+                    }
+                }
+
+                result[i] = creator.createSpec();
             }
         }
         return new UpdatedColumnarValueSchema(new DataTableSpec(result), source);

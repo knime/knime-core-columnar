@@ -126,10 +126,14 @@ public final class BooleanDomain extends AbstractNominalDomain<Boolean> implemen
         /**
          * Create new {@link BooleanDomainCalculator} with no initial domain
          *
-         * @param init the initial domain
+         * @param initialDomain the initial domain
          */
-        public BooleanDomainCalculator(final BooleanDomain init) {
-            m_values = new HashSet<>(init.getValues());
+        public BooleanDomainCalculator(final BooleanDomain initialDomain) {
+            if (initialDomain.isValid()) {
+                m_values = new HashSet<>(initialDomain.getValues());
+            } else {
+                m_values = new HashSet<>();
+            }
         }
 
         @Override

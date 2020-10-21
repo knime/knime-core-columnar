@@ -11,9 +11,6 @@ import org.knime.core.columnar.data.IntData.IntReadData;
  */
 public final class IntDomain implements BoundedDomain<Integer> {
 
-    /** Empty int domain **/
-    private static final IntDomain EMPTY = new IntDomain(Integer.MAX_VALUE, Integer.MIN_VALUE);
-
     private final int m_lower;
 
     private final int m_upper;
@@ -56,15 +53,14 @@ public final class IntDomain implements BoundedDomain<Integer> {
      */
     public static final class IntDomainCalculator implements DomainCalculator<IntReadData, IntDomain> {
 
-        private int m_lower;
+        private int m_lower = Integer.MAX_VALUE;
 
-        private int m_upper;
+        private int m_upper = Integer.MIN_VALUE;
 
         /**
          * Create calculator without initialization.
          */
         public IntDomainCalculator() {
-            this(EMPTY);
         }
 
         /**
@@ -73,8 +69,10 @@ public final class IntDomain implements BoundedDomain<Integer> {
          * @param initialDomain the initial domain
          */
         public IntDomainCalculator(final IntDomain initialDomain) {
-            m_lower = initialDomain.getLowerBound();
-            m_upper = initialDomain.getUpperBound();
+            if (initialDomain.isValid()) {
+                m_lower = initialDomain.getLowerBound();
+                m_upper = initialDomain.getUpperBound();
+            }
         }
 
         @Override

@@ -11,8 +11,6 @@ import org.knime.core.columnar.data.DoubleData.DoubleReadData;
  */
 public final class DoubleDomain implements BoundedDomain<Double> {
 
-    private static final DoubleDomain EMPTY = new DoubleDomain(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
-
     private final double m_lower;
 
     private final double m_upper;
@@ -55,15 +53,14 @@ public final class DoubleDomain implements BoundedDomain<Double> {
      */
     public static final class DoubleDomainCalculator implements DomainCalculator<DoubleReadData, DoubleDomain> {
 
-        private double m_lower;
+        private double m_lower = Double.POSITIVE_INFINITY;
 
-        private double m_upper;
+        private double m_upper = Double.NEGATIVE_INFINITY;
 
         /**
          * Create calculator without initialization.
          */
         public DoubleDomainCalculator() {
-            this(EMPTY);
         }
 
         /**
@@ -72,8 +69,10 @@ public final class DoubleDomain implements BoundedDomain<Double> {
          * @param initialDomain the initial domain
          */
         public DoubleDomainCalculator(final DoubleDomain initialDomain) {
-            m_lower = initialDomain.getLowerBound();
-            m_upper = initialDomain.getUpperBound();
+            if (initialDomain.isValid()) {
+                m_lower = initialDomain.getLowerBound();
+                m_upper = initialDomain.getUpperBound();
+            }
         }
 
         @Override

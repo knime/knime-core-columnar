@@ -59,17 +59,17 @@ import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValue;
-import org.knime.core.data.columnar.domain.NominalDataValueDomainMapper.NominalObjectDomain;
+import org.knime.core.data.columnar.domain.NominalDataValueDomainFactory.NominalObjectDomain;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 
-final class NominalDataValueDomainMapper<D extends DataValue>
+final class NominalDataValueDomainFactory<D extends DataValue>
     implements DomainFactory<ColumnReadData, NominalObjectDomain<D>> {
 
     private final int m_maxValues;
 
     private final ColumnarReadValueFactory<ColumnReadData> m_factory;
 
-    public NominalDataValueDomainMapper(final int maxValues, final ColumnarReadValueFactory<ColumnReadData> factory) {
+    public NominalDataValueDomainFactory(final int maxValues, final ColumnarReadValueFactory<ColumnReadData> factory) {
         m_maxValues = maxValues;
         m_factory = factory;
     }
@@ -93,8 +93,9 @@ final class NominalDataValueDomainMapper<D extends DataValue>
             final Set<D> values = domain.getValues();
             final DataCell[] cells = new DataCell[values.size()];
             final Iterator<D> iterator = values.iterator();
-            for (int i = cells.length; --i > -1;) {
-                cells[i] = (DataCell)iterator.next();
+            int i = 0;
+            while (iterator.hasNext()) {
+                cells[i++] = (DataCell)iterator.next();
             }
             return new DataColumnDomainCreator(cells).createDomain();
         } else {

@@ -54,17 +54,17 @@ import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValue;
-import org.knime.core.data.columnar.domain.BoundedDataValueDomainMapper.BoundedDataValueDomain;
+import org.knime.core.data.columnar.domain.BoundedDataValueDomainFactory.BoundedDataValueDomain;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 
-final class BoundedDataValueDomainMapper<D extends DataValue>
+final class BoundedDataValueDomainFactory<D extends DataValue>
     implements DomainFactory<ColumnReadData, BoundedDataValueDomain<D>> {
 
     private final Comparator<D> m_comparator;
 
     private final ColumnarReadValueFactory<ColumnReadData> m_factory;
 
-    public BoundedDataValueDomainMapper( //
+    public BoundedDataValueDomainFactory( //
         final Comparator<D> comparator, final ColumnarReadValueFactory<ColumnReadData> factory) {
         m_comparator = comparator;
         m_factory = factory;

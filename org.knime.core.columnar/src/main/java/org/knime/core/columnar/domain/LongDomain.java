@@ -10,9 +10,6 @@ import org.knime.core.columnar.data.LongData.LongReadData;
  */
 public final class LongDomain implements BoundedDomain<Long> {
 
-    /** Empty long domain **/
-    private static final LongDomain EMPTY = new LongDomain(Long.MAX_VALUE, Long.MIN_VALUE);
-
     private final long m_lower;
 
     private final long m_upper;
@@ -55,15 +52,14 @@ public final class LongDomain implements BoundedDomain<Long> {
      */
     public static final class LongDomainCalculator implements DomainCalculator<LongReadData, LongDomain> {
 
-        private long m_lower;
+        private long m_lower = Long.MAX_VALUE;
 
-        private long m_upper;
+        private long m_upper = Long.MIN_VALUE;
 
         /**
          * Create calculator without initialization.
          */
         public LongDomainCalculator() {
-            this(EMPTY);
         }
 
         /**
@@ -72,8 +68,10 @@ public final class LongDomain implements BoundedDomain<Long> {
          * @param initialDomain the initial domain
          */
         public LongDomainCalculator(final LongDomain initialDomain) {
-            m_lower = initialDomain.getLowerBound();
-            m_upper = initialDomain.getUpperBound();
+            if (initialDomain.isValid()) {
+                m_lower = initialDomain.getLowerBound();
+                m_upper = initialDomain.getUpperBound();
+            }
         }
 
         @Override
