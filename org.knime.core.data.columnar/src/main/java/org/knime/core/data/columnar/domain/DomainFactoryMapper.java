@@ -45,8 +45,6 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -55,7 +53,6 @@ import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
 import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DurationData.DurationDataSpec;
@@ -74,7 +71,6 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.domain.BooleanDomain;
 import org.knime.core.columnar.domain.BooleanDomain.BooleanDomainCalculator;
-import org.knime.core.columnar.domain.Domain;
 import org.knime.core.columnar.domain.DomainCalculator;
 import org.knime.core.columnar.domain.DoubleDomain;
 import org.knime.core.columnar.domain.DoubleDomain.DoubleDomainCalculator;
@@ -83,36 +79,25 @@ import org.knime.core.columnar.domain.IntDomain.IntDomainCalculator;
 import org.knime.core.columnar.domain.LongDomain;
 import org.knime.core.columnar.domain.LongDomain.LongDomainCalculator;
 import org.knime.core.data.BooleanValue;
-import org.knime.core.data.BoundedValue;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.DataType;
-import org.knime.core.data.DataValue;
-import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.DoubleValue;
 import org.knime.core.data.IntValue;
 import org.knime.core.data.LongValue;
-import org.knime.core.data.NominalValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.LongCell;
 
 /**
- * Utility class to map ColumnDataSpecs to domains.
+ * Utility class to map ColumnDataSpecs to DomainFactories.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz
- *
- * @since 4.3
  */
 final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?, ?>> {
 
-    private final ColumnarValueSchema m_schema;
-
-    private final int m_maxValues;
+    final static DomainFactoryMapper INSTANCE = new DomainFactoryMapper();
 
     /**
      * Creates a new DomainMapper
@@ -120,35 +105,7 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
      * @param schema to derive DomainFactory from
      * @param maxValues maximum number of values of a nominal domain
      */
-    public DomainFactoryMapper(final ColumnarValueSchema schema, final int maxValues) {
-        m_schema = schema;
-        m_maxValues = maxValues;
-    }
-
-    /**
-     * @return mapping from column index to DomainFactory, in case column has an associated DomainFactory.
-     */
-    public final Map<Integer, DomainFactory<? extends ColumnReadData, ? extends Domain>> createDomainFactories() {
-        final int length = m_schema.getNumColumns();
-        final Map<Integer, DomainFactory<?, ?>> factories = new HashMap<>();
-        final DataTableSpec spec = m_schema.getSourceSpec();
-
-        for (int i = 1; i < length; i++) {
-            final DomainFactory<?, ?> factory = m_schema.getColumnDataSpec(i).accept(this);
-            if (factory != null) {
-                factories.put(i, factory);
-            } else {
-                final DataType type = spec.getColumnSpec(i - 1).getType();
-                if (type.isCompatible(BoundedValue.class)) {
-                    factories.put(i, new BoundedDataValueDomainMapper<DataValue>(
-                        new DataValueComparatorDelegator<>(type.getComparator()), m_schema.getReadValueFactoryAt(i)));
-                } else if (type.isCompatible(NominalValue.class)) {
-                    factories.put(i,
-                        new NominalDataValueDomainMapper<>(m_maxValues, m_schema.getReadValueFactoryAt(i)));
-                }
-            }
-        }
-        return factories;
+    private DomainFactoryMapper() {
     }
 
     /*
@@ -241,7 +198,7 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
     final static class DoubleDomainFactory implements DomainFactory<DoubleReadData, DoubleDomain> {
         @Override
         public DomainCalculator<DoubleReadData, DoubleDomain> createCalculator(final DataColumnDomain domain) {
-            if (domain != null) {
+            if (domain.hasBounds()) {
                 return new DoubleDomainCalculator(
                     new DoubleDomain(((DoubleValue)domain.getLowerBound()).getDoubleValue(), //
                         ((DoubleValue)domain.getUpperBound()).getDoubleValue()));
@@ -252,15 +209,19 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
 
         @Override
         public DataColumnDomain convert(final DoubleDomain domain) {
-            return new DataColumnDomainCreator(new DoubleCell(domain.getLowerBound()),
-                new DoubleCell(domain.getUpperBound())).createDomain();
+            if (domain.hasLowerBound() && domain.hasUpperBound()) {
+                return new DataColumnDomainCreator(new DoubleCell(domain.getLowerBound()),
+                    new DoubleCell(domain.getUpperBound())).createDomain();
+            } else {
+                return new DataColumnDomainCreator().createDomain();
+            }
         }
     }
 
     final static class IntDomainFactory implements DomainFactory<IntReadData, IntDomain> {
         @Override
         public DomainCalculator<IntReadData, IntDomain> createCalculator(final DataColumnDomain domain) {
-            if (domain != null) {
+            if (domain.hasBounds()) {
                 return new IntDomainCalculator(new IntDomain(((IntValue)domain.getLowerBound()).getIntValue(), //
                     ((IntValue)domain.getUpperBound()).getIntValue()));
             } else {
@@ -282,7 +243,7 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
     final static class LongDomainFactory implements DomainFactory<LongReadData, LongDomain> {
         @Override
         public DomainCalculator<LongReadData, LongDomain> createCalculator(final DataColumnDomain domain) {
-            if (domain != null) {
+            if (domain.hasBounds()) {
                 return new LongDomainCalculator(new LongDomain(((LongValue)domain.getLowerBound()).getLongValue(), //
                     ((LongValue)domain.getUpperBound()).getLongValue()));
             } else {
@@ -292,15 +253,19 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
 
         @Override
         public DataColumnDomain convert(final LongDomain domain) {
-            return new DataColumnDomainCreator(new LongCell(domain.getLowerBound()),
-                new LongCell(domain.getUpperBound())).createDomain();
+            if (domain.isValid()) {
+                return new DataColumnDomainCreator(new LongCell(domain.getLowerBound()),
+                    new LongCell(domain.getUpperBound())).createDomain();
+            } else {
+                return new DataColumnDomainCreator().createDomain();
+            }
         }
     }
 
     final static class BooleanDomainFactory implements DomainFactory<BooleanReadData, BooleanDomain> {
         @Override
         public DomainCalculator<BooleanReadData, BooleanDomain> createCalculator(final DataColumnDomain domain) {
-            if (domain != null) {
+            if (domain.hasValues()) {
                 final Set<Boolean> initial = Stream.of(domain.getValues())
                     .map((d) -> ((BooleanValue)d).getBooleanValue()).collect(Collectors.toSet());
                 return new BooleanDomainCalculator(new BooleanDomain(initial));
@@ -311,7 +276,7 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
 
         @Override
         public DataColumnDomain convert(final BooleanDomain domain) {
-            if (domain.getValues().size() > 0) {
+            if (domain.isValid()) {
                 final DataCell[] cells = domain.getValues().stream()
                     .map((b) -> b ? BooleanCell.TRUE : BooleanCell.FALSE).toArray(DataCell[]::new);
                 return new DataColumnDomainCreator(cells).createDomain();

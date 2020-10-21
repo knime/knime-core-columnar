@@ -50,13 +50,11 @@ import java.util.Comparator;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.domain.BoundedDomain;
 import org.knime.core.columnar.domain.DomainCalculator;
-import org.knime.core.columnar.domain.DomainMerger;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.domain.BoundedDataValueDomainMapper.BoundedDataValueDomain;
-import org.knime.core.data.columnar.domain.BoundedDataValueDomainMapper.BoundedDataValueDomain.BoundedDataValueDomainCalculator;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 
 final class BoundedDataValueDomainMapper<D extends DataValue>
@@ -136,93 +134,62 @@ final class BoundedDataValueDomainMapper<D extends DataValue>
             final BoundedDataValueDomain<D> empty = (BoundedDataValueDomain<D>)EMPTY;
             return empty;
         }
+    }
 
-        private static final class BoundedObjectDomainMerger<D extends DataValue>
-            implements DomainMerger<BoundedDataValueDomain<D>> {
+    final static class BoundedDataValueDomainCalculator<D extends DataValue>
+        implements DomainCalculator<ColumnReadData, BoundedDataValueDomain<D>> {
 
-            private final BoundedDataValueDomain<D> m_initialDomain;
+        private final Comparator<D> m_comparator;
 
-            private final Comparator<D> m_comparator;
+        private final ColumnarReadValueFactory<ColumnReadData> m_factory;
 
-            public BoundedObjectDomainMerger(final BoundedDataValueDomain<D> initialDomain,
-                final Comparator<D> comparator) {
-                m_comparator = comparator;
-                m_initialDomain = initialDomain;
-            }
+        private D m_lower;
 
-            @Override
-            public BoundedDataValueDomain<D> mergeDomains(final BoundedDataValueDomain<D> original,
-                final BoundedDataValueDomain<D> additional) {
-                if (original.m_lower == null || original.m_upper == null) {
-                    return new BoundedDataValueDomain<>(additional.m_lower, additional.m_upper);
-                } else {
-                    return new BoundedDataValueDomain<>(
-                        m_comparator.compare(original.m_lower, additional.m_lower) == -1 ? original.m_lower
-                            : additional.m_lower,
-                        m_comparator.compare(original.m_upper, additional.m_upper) == -1 ? original.m_upper
-                            : additional.m_upper);
-                }
-            }
+        private D m_upper;
 
-            @Override
-            public BoundedDataValueDomain<D> createInitialDomain() {
-                return m_initialDomain;
-            }
+        public BoundedDataValueDomainCalculator(final Comparator<D> comparator,
+            final ColumnarReadValueFactory<ColumnReadData> factory) {
+            this(BoundedDataValueDomain.empty(), comparator, factory);
         }
 
-        public final static class BoundedDataValueDomainCalculator<D extends DataValue>
-            implements DomainCalculator<ColumnReadData, BoundedDataValueDomain<D>> {
+        public BoundedDataValueDomainCalculator(final BoundedDataValueDomain<D> initial, //
+            final Comparator<D> comparator, final ColumnarReadValueFactory<ColumnReadData> factory) {
+            m_comparator = comparator;
+            m_factory = factory;
+            m_lower = initial.getLowerBound();
+            m_upper = initial.getUpperBound();
+        }
 
-            private final BoundedObjectDomainMerger<D> m_merger;
+        @Override
+        public void update(final ColumnReadData data) {
 
-            private final Comparator<D> m_comparator;
+            m_lower = null;
+            m_upper = null;
 
-            private final ColumnarReadValueFactory<ColumnReadData> m_factory;
+            CopyableReadValueCursor cursor = new CopyableReadValueCursor(m_factory, data);
 
-            public BoundedDataValueDomainCalculator(final BoundedDataValueDomain<D> initial, //
-                final Comparator<D> comparator, final ColumnarReadValueFactory<ColumnReadData> factory) {
-                m_merger = new BoundedObjectDomainMerger<>(initial, comparator);
-                m_comparator = comparator;
-                m_factory = factory;
-            }
-
-            @Override
-            public BoundedDataValueDomain<D> createInitialDomain() {
-                return m_merger.createInitialDomain();
-            }
-
-            @Override
-            public BoundedDataValueDomain<D> calculateDomain(final ColumnReadData data) {
-
-                D lower = null;
-                D upper = null;
-
-                CopyableReadValueCursor cursor = new CopyableReadValueCursor(m_factory, data);
-
-                while (cursor.canForward()) {
-                    cursor.forward();
-                    if (!cursor.isMissing()) {
-                        final D other = cursor.copy();
-                        if (lower == null) {
-                            lower = other;
-                            upper = other;
-                        } else {
-                            if (m_comparator.compare(other, lower) < 0) {
-                                lower = other;
-                            } else if (m_comparator.compare(other, upper) > 0) {
-                                upper = other;
-                            }
+            while (cursor.canForward()) {
+                cursor.forward();
+                if (!cursor.isMissing()) {
+                    @SuppressWarnings("unchecked")
+                    final D other = (D)cursor.copy();
+                    if (m_lower == null) {
+                        m_lower = other;
+                        m_upper = other;
+                    } else {
+                        if (m_comparator.compare(other, m_lower) < 0) {
+                            m_lower = other;
+                        } else if (m_comparator.compare(other, m_upper) > 0) {
+                            m_upper = other;
                         }
                     }
                 }
-                return new BoundedDataValueDomain<D>(lower, upper);
             }
+        }
 
-            @Override
-            public BoundedDataValueDomain<D> mergeDomains(final BoundedDataValueDomain<D> original,
-                final BoundedDataValueDomain<D> additional) {
-                return m_merger.mergeDomains(original, additional);
-            }
+        @Override
+        public BoundedDataValueDomain<D> getDomain() {
+            return new BoundedDataValueDomain<>(m_lower, m_upper);
         }
     }
 }

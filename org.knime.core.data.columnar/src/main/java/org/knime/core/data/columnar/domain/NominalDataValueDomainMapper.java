@@ -48,7 +48,6 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -61,7 +60,6 @@ import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.domain.NominalDataValueDomainMapper.NominalObjectDomain;
-import org.knime.core.data.columnar.domain.NominalDataValueDomainMapper.NominalObjectDomain.NominalObjectDomainMerger;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 
 final class NominalDataValueDomainMapper<D extends DataValue>
@@ -79,7 +77,14 @@ final class NominalDataValueDomainMapper<D extends DataValue>
     @Override
     public DomainCalculator<ColumnReadData, ? extends NominalObjectDomain<D>>
         createCalculator(final DataColumnDomain initial) {
-        return new NominalObjectDomainCalculator<>(initial, m_maxValues, m_factory);
+        if (initial.hasValues()) {
+            @SuppressWarnings("unchecked")
+            final NominalObjectDomain<D> domain = new NominalObjectDomain<D>((Set<D>)initial.getValues());
+            return new NominalObjectDomainCalculator<>(domain, m_maxValues, m_factory);
+        } else {
+            return new NominalObjectDomainCalculator<>(m_maxValues, m_factory);
+        }
+
     }
 
     @Override
@@ -92,69 +97,68 @@ final class NominalDataValueDomainMapper<D extends DataValue>
                 cells[i] = (DataCell)iterator.next();
             }
             return new DataColumnDomainCreator(cells).createDomain();
-        }else {
+        } else {
             return new DataColumnDomainCreator().createDomain();
         }
     }
 
-    private static class NominalObjectDomainCalculator<D extends DataValue>
+    final static class NominalObjectDomainCalculator<D extends DataValue>
         implements DomainCalculator<ColumnReadData, NominalObjectDomain<D>> {
 
         private final int m_numMaxValues;
 
-        private final NominalObjectDomainMerger<D> m_merger;
-
         private final ColumnarReadValueFactory<ColumnReadData> m_factory;
 
-        NominalObjectDomainCalculator(final DataColumnDomain domain, final int numMaxValues,
+        private Set<D> m_values;
+
+        NominalObjectDomainCalculator(final int numMaxValues, final ColumnarReadValueFactory<ColumnReadData> factory) {
+            this(NominalObjectDomain.empty(), numMaxValues, factory);
+        }
+
+        NominalObjectDomainCalculator(final NominalObjectDomain<D> initial, final int numMaxValues,
             final ColumnarReadValueFactory<ColumnReadData> factory) {
             m_numMaxValues = numMaxValues;
             m_factory = factory;
 
-            final Set<D> castedValues = new HashSet<>();
-            if (domain != null) {
-                for (final DataCell cell : domain.getValues()) {
-                    @SuppressWarnings("unchecked")
-                    final D cast = (D)cell;
-                    castedValues.add(cast);
+            m_values = new LinkedHashSet<>();
+            if (initial != null) {
+                for (final D cell : initial.getValues()) {
+                    m_values.add(cell);
                 }
             }
-            m_merger = new NominalObjectDomainMerger<D>(new NominalObjectDomain<>(castedValues), numMaxValues);
         }
 
         @Override
-        public NominalObjectDomain<D> calculateDomain(final ColumnReadData data) {
-            CopyableReadValueCursor cursor = new CopyableReadValueCursor(m_factory, data);
-            Set<D> values = new LinkedHashSet<>();
+        public void update(final ColumnReadData data) {
+            if (m_values == null) {
+                return;
+            }
+            final CopyableReadValueCursor cursor = new CopyableReadValueCursor(m_factory, data);
 
             while (cursor.canForward()) {
                 cursor.forward();
                 if (!cursor.isMissing()) {
                     // TODO can we avoid the copy here but still get backwards compatible results?
-                    values.add(cursor.copy());
-                    if (values.size() > m_numMaxValues) {
+                    @SuppressWarnings("unchecked")
+                    final D cast = (D)cursor.copy();
+                    m_values.add(cast);
+                    if (m_values.size() > m_numMaxValues) {
                         // Null indicates that domain could not be computed due to excessive
                         // distinct elements. Computed domain will be marked invalid.
-                        values = null;
+                        m_values = null;
                         break;
                     }
                 }
             }
-            return new NominalObjectDomain<>(values);
         }
 
         @Override
-        public NominalObjectDomain<D> createInitialDomain() {
-            return m_merger.createInitialDomain();
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public NominalObjectDomain<D> mergeDomains(final NominalObjectDomain<D> original,
-            final NominalObjectDomain<D> additional) {
-            return m_merger.mergeDomains(original, additional);
+        public NominalObjectDomain<D> getDomain() {
+            if (m_values != null) {
+                return new NominalObjectDomain<>(m_values);
+            } else {
+                return new NominalObjectDomain<>();
+            }
         }
     }
 
@@ -174,19 +178,6 @@ final class NominalDataValueDomainMapper<D extends DataValue>
             @SuppressWarnings("unchecked")
             final NominalObjectDomain<D> empty = (NominalObjectDomain<D>)EMPTY;
             return empty;
-        }
-
-        static final class NominalObjectDomainMerger<D extends DataValue>
-            extends AbstractNominalDomainMerger<D, NominalObjectDomain<D>> {
-
-            public NominalObjectDomainMerger(final NominalObjectDomain<D> initialDomain, final int numMaxValues) {
-                super(initialDomain != null ? initialDomain : NominalObjectDomain.empty(), numMaxValues);
-            }
-
-            @Override
-            protected NominalObjectDomain<D> createMergedDomain(final Set<D> mergedValues) {
-                return new NominalObjectDomain<>(mergedValues);
-            }
         }
     }
 }

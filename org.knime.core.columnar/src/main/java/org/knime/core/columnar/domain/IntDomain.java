@@ -12,7 +12,7 @@ import org.knime.core.columnar.data.IntData.IntReadData;
 public final class IntDomain implements BoundedDomain<Integer> {
 
     /** Empty int domain **/
-    public static final IntDomain EMPTY = new IntDomain(Integer.MAX_VALUE, Integer.MIN_VALUE);
+    private static final IntDomain EMPTY = new IntDomain(Integer.MAX_VALUE, Integer.MIN_VALUE);
 
     private final int m_lower;
 
@@ -49,32 +49,22 @@ public final class IntDomain implements BoundedDomain<Integer> {
         return hasUpperBound() ? m_upper : null;
     }
 
-    private static final class IntDomainMerger extends AbstractDomainMerger<IntDomain> {
-
-        public IntDomainMerger(final IntDomain initialDomain) {
-            super(initialDomain != null ? initialDomain : IntDomain.EMPTY);
-        }
-
-        @Override
-        public IntDomain mergeDomains(final IntDomain original, final IntDomain additional) {
-            return new IntDomain( //
-                Math.min(original.m_lower, additional.m_lower), //
-                Math.max(original.m_upper, additional.m_upper));
-        }
-    }
-
     /**
      * Calculates the domain of {@link IntReadData}
      *
      * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
      */
-    public static final class IntDomainCalculator extends AbstractDomainCalculator<IntReadData, IntDomain> {
+    public static final class IntDomainCalculator implements DomainCalculator<IntReadData, IntDomain> {
+
+        private int m_lower;
+
+        private int m_upper;
 
         /**
          * Create calculator without initialization.
          */
         public IntDomainCalculator() {
-            this(null);
+            this(EMPTY);
         }
 
         /**
@@ -83,25 +73,28 @@ public final class IntDomain implements BoundedDomain<Integer> {
          * @param initialDomain the initial domain
          */
         public IntDomainCalculator(final IntDomain initialDomain) {
-            super(new IntDomainMerger(initialDomain));
+            m_lower = initialDomain.getLowerBound();
+            m_upper = initialDomain.getUpperBound();
         }
 
         @Override
-        public IntDomain calculateDomain(final IntReadData data) {
-            int lower = Integer.MAX_VALUE;
-            int upper = Integer.MIN_VALUE;
+        public void update(final IntReadData data) {
             for (int i = 0; i < data.length(); i++) {
                 if (!data.isMissing(i)) {
                     final int curr = data.getInt(i);
-                    if (curr < lower) {
-                        lower = curr;
+                    if (curr < m_lower) {
+                        m_lower = curr;
                     }
-                    if (curr > upper) {
-                        upper = curr;
+                    if (curr > m_upper) {
+                        m_upper = curr;
                     }
                 }
             }
-            return new IntDomain(lower, upper);
+        }
+
+        @Override
+        public IntDomain getDomain() {
+            return new IntDomain(m_lower, m_upper);
         }
     }
 }

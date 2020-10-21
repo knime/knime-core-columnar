@@ -50,31 +50,24 @@ import org.knime.core.columnar.data.ColumnReadData;
 
 /**
  *
+ * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @param <C> type of the {@link ColumnReadData} from which the domain is extracted
  * @param <D> the created domain
  */
-public interface DomainCalculator<C extends ColumnReadData, D extends Domain> {
-
-    /**
-     * @return the initial domain.
-     */
-    D createInitialDomain();
+public interface DomainCalculator<C extends ColumnReadData, D> {
 
     /**
      * Calculates the domain for the given data object.
      *
      * @param data for which domain is calculated
-     * @return the resulting domain
      */
-    D calculateDomain(C data);
+    void update(C data);
 
     /**
-     * Merges two domains.
+     * The current domain of the calculator. Subsequent calls to update have no effect on the returned domai.
      *
-     * @param original one domain
-     * @param additional the other
-     * @return merged domains
+     * @return a copy of the current domain
      */
-    D mergeDomains(D original, D additional);
+    D getDomain();
 }

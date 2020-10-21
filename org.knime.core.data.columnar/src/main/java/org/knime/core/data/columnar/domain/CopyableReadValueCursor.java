@@ -63,7 +63,6 @@ final class CopyableReadValueCursor implements ColumnDataIndex {
 
     private final ColumnReadData m_data;
 
-
     CopyableReadValueCursor(final ColumnarReadValueFactory<ColumnReadData> factory, final ColumnReadData data) {
         m_size = data.length();
         m_value = factory.createReadValue(data, this);
@@ -76,15 +75,13 @@ final class CopyableReadValueCursor implements ColumnDataIndex {
         return cast;
     }
 
-    public final <D extends DataValue> D copy() {
+    public final DataCell copy() {
         final DataValue value = get();
         if (!(value instanceof DataCell)) {
-            @SuppressWarnings("unchecked")
-            final D cast = (D)((ReadValue)value).getDataCell();
+            final DataCell cast = ((ReadValue)value).getDataCell();
             return cast;
         } else {
-            @SuppressWarnings("unchecked")
-            final D cast = (D)value;
+            final DataCell cast = (DataCell)value;
             return cast;
         }
     }

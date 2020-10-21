@@ -49,7 +49,6 @@
 package org.knime.core.columnar.domain;
 
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -74,72 +73,19 @@ public abstract class AbstractNominalDomain<T> implements NominalDomain<T> {
     }
 
     /**
-     * @param values The set of nominal values described by this domain. Can be {@code null} in which case this domain
-     *            will be {@link #isValid() invalid}. An empty set will create a valid, empty domain (however, in this
-     *            case, using {@link #AbstractNominalDomain()} should be preferred instead to avoid object creation).
+     * @param values The set of nominal values described by this domain.
      */
     public AbstractNominalDomain(final Set<T> values) {
-        m_values = values != null ? Collections.unmodifiableSet(values) : null;
+        m_values = values;
     }
 
     @Override
     public boolean isValid() {
-        return m_values != null;
+        return !m_values.isEmpty();
     }
 
     @Override
     public Set<T> getValues() {
         return m_values;
-    }
-
-    /**
-     * Abstract implementation of {@link DomainMerger} with {@link NominalDomain}.
-     *
-     * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
-     * @param <T> type of elements
-     * @param <D> type of domain
-     * @since 4.3
-     */
-    public abstract static class AbstractNominalDomainMerger<T, D extends NominalDomain<T>>
-        extends AbstractDomainMerger<D> {
-
-        /**
-         * Direct access on maximum number of values
-         **/
-        protected final int m_numMaxValues;
-
-        /**
-         *
-         * @param initialDomain the initial domain. Can be <source>null</source>F.
-         * @param numMaxValues maximum number of values of a nominal domain.
-         */
-        protected AbstractNominalDomainMerger(final D initialDomain, final int numMaxValues) {
-            super(initialDomain);
-            m_numMaxValues = numMaxValues;
-        }
-
-        @Override
-        public D mergeDomains(final D original, final D additional) {
-            Set<T> union;
-            if (original.isValid() && additional.isValid()) {
-                // Preserve order
-                union = new LinkedHashSet<>(original.getValues());
-                union.addAll(additional.getValues());
-                if (union.size() > m_numMaxValues) {
-                    // Null indicates that domain could not be computed due to excessive
-                    // distinct elements. Merged domain will be marked invalid.
-                    union = null;
-                }
-            } else {
-                union = null;
-            }
-            return createMergedDomain(union);
-        }
-
-        /**
-         * @param mergedValues merge Set<T> with current domain.
-         * @return the merged domain
-         */
-        protected abstract D createMergedDomain(Set<T> mergedValues);
     }
 }

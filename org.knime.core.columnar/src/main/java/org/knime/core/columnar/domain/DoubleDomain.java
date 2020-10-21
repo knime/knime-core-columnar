@@ -11,8 +11,7 @@ import org.knime.core.columnar.data.DoubleData.DoubleReadData;
  */
 public final class DoubleDomain implements BoundedDomain<Double> {
 
-    /** Empty double domain **/
-    public static final DoubleDomain EMPTY = new DoubleDomain(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+    private static final DoubleDomain EMPTY = new DoubleDomain(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
 
     private final double m_lower;
 
@@ -54,13 +53,17 @@ public final class DoubleDomain implements BoundedDomain<Double> {
      *
      * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
      */
-    public static final class DoubleDomainCalculator extends AbstractDomainCalculator<DoubleReadData, DoubleDomain> {
+    public static final class DoubleDomainCalculator implements DomainCalculator<DoubleReadData, DoubleDomain> {
+
+        private double m_lower;
+
+        private double m_upper;
 
         /**
          * Create calculator without initialization.
          */
         public DoubleDomainCalculator() {
-            this(null);
+            this(EMPTY);
         }
 
         /**
@@ -69,40 +72,28 @@ public final class DoubleDomain implements BoundedDomain<Double> {
          * @param initialDomain the initial domain
          */
         public DoubleDomainCalculator(final DoubleDomain initialDomain) {
-            super(new DoubleDomainMerger(initialDomain));
+            m_lower = initialDomain.getLowerBound();
+            m_upper = initialDomain.getUpperBound();
         }
 
         @Override
-        public DoubleDomain calculateDomain(final DoubleReadData data) {
-            double lower = Double.POSITIVE_INFINITY;
-            double upper = Double.NEGATIVE_INFINITY;
+        public void update(final DoubleReadData data) {
             for (int i = 0; i < data.length(); i++) {
                 if (!data.isMissing(i)) {
                     final double curr = data.getDouble(i);
-                    if (curr < lower) {
-                        lower = curr;
+                    if (curr < m_lower) {
+                        m_lower = curr;
                     }
-                    if (curr > upper) {
-                        upper = curr;
+                    if (curr > m_upper) {
+                        m_upper = curr;
                     }
                 }
             }
-            return new DoubleDomain(lower, upper);
-        }
-    }
-
-    private static final class DoubleDomainMerger extends AbstractDomainMerger<DoubleDomain> {
-
-        public DoubleDomainMerger(final DoubleDomain initialDomain) {
-            super(initialDomain != null ? initialDomain : DoubleDomain.EMPTY);
         }
 
         @Override
-        public DoubleDomain mergeDomains(final DoubleDomain original, final DoubleDomain additional) {
-            return new DoubleDomain( //
-                Math.min(original.m_lower, additional.m_lower), //
-                Math.max(original.m_upper, additional.m_upper));
+        public DoubleDomain getDomain() {
+            return new DoubleDomain(m_lower, m_upper);
         }
     }
-
 }

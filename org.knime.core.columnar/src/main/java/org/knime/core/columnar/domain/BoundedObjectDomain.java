@@ -58,7 +58,7 @@ import org.knime.core.columnar.data.ObjectData.ObjectReadData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @param <T> type of objects
  */
-public class BoundedObjectDomain<T> implements BoundedDomain<T> {
+public final class BoundedObjectDomain<T> implements BoundedDomain<T> {
 
     private static final BoundedObjectDomain<?> EMPTY = new BoundedObjectDomain<>();
 
@@ -119,7 +119,9 @@ public class BoundedObjectDomain<T> implements BoundedDomain<T> {
     public final static class BoundedDomainCalculator<T>
         implements DomainCalculator<ObjectReadData<T>, BoundedObjectDomain<T>> {
 
-        private final BoundedObjectDomainMerger<T> m_merger;
+        private T m_lower;
+
+        private T m_upper;
 
         private final Comparator<T> m_comparator;
 
@@ -140,64 +142,35 @@ public class BoundedObjectDomain<T> implements BoundedDomain<T> {
          */
         public BoundedDomainCalculator(final BoundedObjectDomain<T> initial, //
             final Comparator<T> comparator) {
-            m_merger = new BoundedObjectDomainMerger<>(initial, comparator);
             m_comparator = comparator;
         }
 
         @Override
-        public BoundedObjectDomain<T> createInitialDomain() {
-            return m_merger.createInitialDomain();
-        }
-
-        @Override
-        public BoundedObjectDomain<T> calculateDomain(final ObjectReadData<T> data) {
-
-            T lower = null;
-            T upper = null;
-
+        public void update(final ObjectReadData<T> data) {
+            m_lower = null;
+            m_upper = null;
             final int length = data.length();
             for (int i = 0; i < length; ++i) {
                 if (!data.isMissing(i++)) {
                     final T other = data.getObject(i);
-                    if (lower == null) {
-                        lower = other;
-                        upper = other;
+                    if (m_lower == null) {
+                        m_lower = other;
+                        m_upper = other;
                     } else {
-                        if (m_comparator.compare(other, lower) == -1) {
-                            lower = other;
-                        } else if (m_comparator.compare(other, upper) > 0) {
-                            upper = other;
+                        if (m_comparator.compare(other, m_lower) == -1) {
+                            m_lower = other;
+                        } else if (m_comparator.compare(other, m_upper) > 0) {
+                            m_upper = other;
                         }
                     }
                 }
             }
-            return new BoundedObjectDomain<>(lower, upper);
         }
 
         @Override
-        public BoundedObjectDomain<T> mergeDomains(final BoundedObjectDomain<T> original,
-            final BoundedObjectDomain<T> additional) {
-            return m_merger.mergeDomains(original, additional);
-        }
-    }
-
-    private static final class BoundedObjectDomainMerger<T> extends AbstractDomainMerger<BoundedObjectDomain<T>> {
-
-        private final Comparator<T> m_comparator;
-
-        public BoundedObjectDomainMerger(final BoundedObjectDomain<T> initialDomain, final Comparator<T> comparator) {
-            super(initialDomain != null ? initialDomain : BoundedObjectDomain.empty());
-            m_comparator = comparator;
+        public BoundedObjectDomain<T> getDomain() {
+            return new BoundedObjectDomain<>(m_lower, m_upper);
         }
 
-        @Override
-        public BoundedObjectDomain<T> mergeDomains(final BoundedObjectDomain<T> original,
-            final BoundedObjectDomain<T> additional) {
-            return new BoundedObjectDomain<>(
-                m_comparator.compare(original.m_lower, additional.m_lower) == -1 ? original.m_lower
-                    : additional.m_lower,
-                m_comparator.compare(original.m_upper, additional.m_upper) == -1 ? original.m_upper
-                    : additional.m_upper);
-        }
     }
 }

@@ -107,55 +107,50 @@ public final class BooleanDomain extends AbstractNominalDomain<Boolean> implemen
         }
     }
 
-    static final class BooleanDomainMerger extends AbstractDomainMerger<BooleanDomain> {
-
-        public BooleanDomainMerger(final BooleanDomain initialDomain) {
-            super(initialDomain != null ? initialDomain : BooleanDomain.EMPTY);
-        }
-
-        @Override
-        public BooleanDomain mergeDomains(final BooleanDomain original, final BooleanDomain additional) {
-            final Set<Boolean> merged = new HashSet<>(additional.m_values);
-            merged.addAll(original.m_values);
-            return new BooleanDomain(merged);
-        }
-    }
-
     /**
      * Calculates a new {@link BooleanDomain}.
      *
      * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
      */
-    public static final class BooleanDomainCalculator extends AbstractDomainCalculator<BooleanReadData, BooleanDomain> {
+    public static final class BooleanDomainCalculator implements DomainCalculator<BooleanReadData, BooleanDomain> {
+
+        private final Set<Boolean> m_values;
 
         /**
          * Create new {@link BooleanDomainCalculator} with no initial domain
          */
         public BooleanDomainCalculator() {
-            this(null);
+            m_values = new HashSet<>();
         }
 
         /**
-         * Create a new {@link BooleanDomainCalculator} with initial domain.
+         * Create new {@link BooleanDomainCalculator} with no initial domain
          *
-         * @param initialDomain the initial domain
+         * @param init the initial domain
          */
-        public BooleanDomainCalculator(final BooleanDomain initialDomain) {
-            super(new BooleanDomainMerger(initialDomain));
+        public BooleanDomainCalculator(final BooleanDomain init) {
+            m_values = new HashSet<>(init.getValues());
         }
 
         @Override
-        public BooleanDomain calculateDomain(final BooleanReadData data) {
-            final Set<Boolean> values = new HashSet<>();
-            for (int i = 0; i < data.length(); i++) {
-                if (!data.isMissing(i)) {
-                    values.add(data.getBoolean(i));
-                }
-                if (values.size() == 2) {
-                    break;
+        public final void update(final BooleanReadData data) {
+            if (m_values.size() == 2) {
+                return;
+            } else {
+                for (int i = 0; i < data.length(); i++) {
+                    if (!data.isMissing(i)) {
+                        m_values.add(data.getBoolean(i));
+                    }
+                    if (m_values.size() == 2) {
+                        break;
+                    }
                 }
             }
-            return new BooleanDomain(values);
+        }
+
+        @Override
+        public BooleanDomain getDomain() {
+            return new BooleanDomain(m_values);
         }
     }
 }
