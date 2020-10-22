@@ -187,6 +187,13 @@ public final class ArrowTestUtils {
         }
 
         @Override
+        public void expand(final int minimumCapacity) {
+            while (m_vector.getValueCapacity() < minimumCapacity) {
+                m_vector.reAlloc();
+            }
+        }
+
+        @Override
         public void setMissing(final int index) {
             m_vector.setNull(index);
         }
@@ -258,6 +265,13 @@ public final class ArrowTestUtils {
         @Override
         public int capacity() {
             return m_vector.getValueCapacity();
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            while (m_vector.getValueCapacity() < minimumCapacity) {
+                m_vector.reAlloc();
+            }
         }
 
         @Override
@@ -416,6 +430,13 @@ public final class ArrowTestUtils {
         @Override
         public int capacity() {
             return m_vector.getValueCapacity();
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            while (m_vector.getValueCapacity() < minimumCapacity) {
+                m_vector.reAlloc();
+            }
         }
 
         @Override

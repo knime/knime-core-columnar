@@ -72,7 +72,7 @@ import org.knime.core.columnar.data.VoidData.VoidWriteData;
  */
 public final class ArrowVoidData implements VoidWriteData, VoidReadData {
 
-    private final int m_capacity;
+    private int m_capacity;
 
     private final NullVector m_vector;
 
@@ -89,6 +89,11 @@ public final class ArrowVoidData implements VoidWriteData, VoidReadData {
     @Override
     public int sizeOf() {
         return 0;
+    }
+
+    @Override
+    public void expand(final int minimumCapacity) {
+        m_capacity = minimumCapacity;
     }
 
     @Override

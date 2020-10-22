@@ -230,6 +230,38 @@ public abstract class AbstractArrowDataTest<W extends ColumnWriteData, R extends
         data.release();
     }
 
+    /** Test {@link W#expand(int)} */
+    @Test
+    public void testExpand() {
+        int size1 = 12;
+        int size2 = 33;
+
+        // Allocate
+        W data = createWrite(size1);
+        assertTrue(data.capacity() >= size1);
+
+        // Write some data
+        for (int i = 0; i < size1; i++) {
+            setValue(data, i, i);
+        }
+
+        // Expand
+        data.expand(size2);
+        assertTrue(data.capacity() >= size2);
+
+        // Write some more data
+        for (int i = size1; i < size2; i++) {
+            setValue(data, i, i);
+        }
+
+        // Check values written before and after expand
+        final R readData = castR(data.close(size2));
+        for (int i = 0; i < size2; i++) {
+            checkValue(readData, i, i);
+        }
+        data.release();
+    }
+
     /** Test #retain() and #release() for W and R */
     @Test
     public void testReferenceCounting() {

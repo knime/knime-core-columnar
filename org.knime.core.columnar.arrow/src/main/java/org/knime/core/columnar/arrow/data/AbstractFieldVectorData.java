@@ -98,6 +98,13 @@ abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractRe
         return m_vector.toString();
     }
 
+    @Override
+    public void expand(final int minimumCapacity) {
+        while (m_vector.getValueCapacity() < minimumCapacity) {
+            m_vector.reAlloc();
+        }
+    }
+
     /**
      * An abstract implementation of {@link ArrowColumnDataFactory} for data extending AbstractFieldVectorData and
      * having no dictionaries.

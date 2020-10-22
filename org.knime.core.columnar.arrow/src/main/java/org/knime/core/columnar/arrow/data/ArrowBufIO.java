@@ -106,11 +106,11 @@ final class ArrowBufIO<T> {
             m_vector.fillEmpties(index);
             BitVectorHelper.setBit(m_vector.getValidityBuffer(), index);
             final int startOffset = m_vector.getStartOffset(index);
-            final long before = m_vector.getDataBuffer().writerIndex();
+            m_vector.getDataBuffer().writerIndex(startOffset);
             // TODO Static encoder instance?
             final ArrowBufDataOutput output = new ArrowBufDataOutput(m_vector, ENCODER_FACTORY.get());
             m_serializer.serialize(obj, output);
-            final int length = (int)(m_vector.getDataBuffer().writerIndex() - before);
+            final int length = (int)(m_vector.getDataBuffer().writerIndex() - startOffset);
             m_vector.getOffsetBuffer().setInt((index + 1) * BaseVariableWidthVector.OFFSET_WIDTH, startOffset + length);
             m_vector.setLastSet(index);
         } catch (IOException ex) {

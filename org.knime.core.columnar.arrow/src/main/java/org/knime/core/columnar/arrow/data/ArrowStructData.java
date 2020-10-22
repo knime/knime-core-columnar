@@ -122,6 +122,13 @@ public final class ArrowStructData {
         }
 
         @Override
+        public void expand(final int minimumCapacity) {
+            while (m_vector.getValueCapacity() < minimumCapacity) {
+                m_vector.reAlloc();
+            }
+        }
+
+        @Override
         @SuppressWarnings("resource") // Validity buffer and child vectors closed by m_vector
         public StructReadData close(final int length) {
             final int numChildren = m_children.length;
@@ -168,6 +175,7 @@ public final class ArrowStructData {
         public String toString() {
             return ArrowStructData.toString(m_vector);
         }
+
     }
 
     /** Arrow implementation of {@link StructReadData}. */
