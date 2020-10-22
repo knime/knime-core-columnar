@@ -134,12 +134,9 @@ public final class DomainColumnStore implements ColumnStore {
             final DomainCalculator<?, DataColumnDomain> calculator = m_domainCalculators.get(colIndex);
             if (calculator != null) {
                 return calculator.getDomain();
-            } else {
-                return null;
             }
-        } else {
-            return null;
         }
+        return null;
     }
 
     /**
@@ -153,12 +150,9 @@ public final class DomainColumnStore implements ColumnStore {
             final DomainCalculator<?, DataColumnMetaData[]> calculator = m_metadataCalculators.get(colIndex);
             if (calculator != null) {
                 return calculator.getDomain();
-            } else {
-                return null;
             }
-        } else {
-            return null;
         }
+        return null;
     }
 
     @Override
