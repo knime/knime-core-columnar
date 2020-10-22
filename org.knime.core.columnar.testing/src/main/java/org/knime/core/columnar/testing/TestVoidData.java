@@ -93,6 +93,11 @@ final class TestVoidData extends AbstractTestData implements VoidWriteData, Void
     }
 
     @Override
+    public void expand(final int minimumCapacity) {
+        m_capacity = minimumCapacity;
+    }
+
+    @Override
     public int sizeOf() {
         return 0;
     }

@@ -100,6 +100,11 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
     }
 
     @Override
+    public void expand(final int minimumCapacity) {
+        m_delegate.expand(minimumCapacity);
+    }
+
+    @Override
     public void setObject(final int index, final T obj) {
         m_data.set(index, obj);
     }

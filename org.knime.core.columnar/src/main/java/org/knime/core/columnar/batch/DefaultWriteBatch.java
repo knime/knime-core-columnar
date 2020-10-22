@@ -64,7 +64,7 @@ public class DefaultWriteBatch implements WriteBatch {
 
     private final ColumnWriteData[] m_data;
 
-    private final int m_capacity;
+    private int m_capacity;
 
     public DefaultWriteBatch(final ColumnWriteData[] data, final int capacity) {
         Objects.requireNonNull(data, () -> "Column data must not be null.");
@@ -110,6 +110,14 @@ public class DefaultWriteBatch implements WriteBatch {
     @Override
     public int capacity() {
         return m_capacity;
+    }
+
+    @Override
+    public void expand(final int minimumCapacity) {
+        for (final ColumnWriteData data : m_data) {
+            data.expand(minimumCapacity);
+        }
+        m_capacity = minimumCapacity;
     }
 
     @Override

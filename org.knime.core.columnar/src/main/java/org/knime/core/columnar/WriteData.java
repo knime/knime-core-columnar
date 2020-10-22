@@ -48,6 +48,8 @@ package org.knime.core.columnar;
 @SuppressWarnings("javadoc")
 public interface WriteData extends ReferencedData {
 
+    void expand(int minimumCapacity);
+
     int capacity();
 
     ReadData close(int length);

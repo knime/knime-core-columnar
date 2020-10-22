@@ -101,6 +101,14 @@ public final class TestDoubleData extends AbstractTestData implements DoubleWrit
     }
 
     @Override
+    public void expand(final int minimumCapacity) {
+        final Double[] expanded = new Double[minimumCapacity];
+        System.arraycopy(m_values, 0, expanded, 0, m_capacity);
+        m_values = expanded;
+        m_capacity = minimumCapacity;
+    }
+
+    @Override
     public DoubleReadData close(final int length) {
         m_numValues = length;
         return this;
