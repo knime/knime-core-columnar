@@ -3,18 +3,17 @@ package org.knime.core.data.columnar.testing;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Random;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.RowKey;
-import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.v2.RowContainerCustomKey;
-import org.knime.core.data.v2.RowContainerFactory;
-import org.knime.core.data.v2.value.DoubleValueFactory.DoubleWriteValue;
+import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.BufferedDataContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -71,10 +70,11 @@ public class ColumnarTableSourceNodeModel extends NodeModel {
         final long startTime = System.currentTimeMillis();
         BufferedDataTable bdt;
 
+        final Random r = new Random(1);
+
         if (arrow) {
             // TODO close etc.
-            try (final RowContainerCustomKey cursor =
-                RowContainerFactory.createCustomKey(exec, m_spec, DataContainerSettings.getDefault())) {
+            try (final RowContainerCustomKey cursor = exec.createRowContainer(m_spec)) {
                 final int nrCols = m_nrColsModel.getIntValue();
                 final long nrRows = m_nrRowsModel.getLongValue();
                 // TODO if duplicate row key checking fails - handle it.
@@ -87,7 +87,7 @@ public class ColumnarTableSourceNodeModel extends NodeModel {
                     //					}
                     cursor.setRowKey(key);
                     for (int j = 0; j < nrCols; j++) {
-                        cursor.<DoubleWriteValue> getWriteValue(j).setDoubleValue(Math.random());
+                        cursor.<WriteValue<DoubleCell>> getWriteValue(j).setValue(new DoubleCell(r.nextDouble()));
                     }
                     cursor.push();
                 }
@@ -99,7 +99,7 @@ public class ColumnarTableSourceNodeModel extends NodeModel {
             final DataCell[] cells = new DataCell[m_nrColsModel.getIntValue()];
             for (long i = 0L, size = m_nrRowsModel.getLongValue(); i < size; i++) {
                 for (int j = 0; j < cells.length; j++) {
-                    cells[j] = new DoubleCell(Math.random());
+                    cells[j] = new DoubleCell(r.nextDouble());
                 }
                 final RowKey key = RowKey.createRowKey(i);
                 //			if ((i + 1) % 10000 == 0) {
