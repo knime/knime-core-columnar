@@ -164,9 +164,6 @@ final class BoundedDataValueDomainFactory<D extends DataValue>
         @Override
         public void update(final ColumnReadData data) {
 
-            m_lower = null;
-            m_upper = null;
-
             CopyableReadValueCursor cursor = new CopyableReadValueCursor(m_factory, data);
 
             while (cursor.canForward()) {
