@@ -279,7 +279,11 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
             if (domain.isValid()) {
                 final DataCell[] cells = domain.getValues().stream()
                     .map((b) -> b ? BooleanCell.TRUE : BooleanCell.FALSE).toArray(DataCell[]::new);
-                return new DataColumnDomainCreator(cells).createDomain();
+                if (cells.length == 1) {
+                    return new DataColumnDomainCreator(cells, cells[0], cells[0]).createDomain();
+                } else {
+                    return new DataColumnDomainCreator(cells, cells[0], cells[1]).createDomain();
+                }
             } else {
                 return new DataColumnDomainCreator().createDomain();
             }
