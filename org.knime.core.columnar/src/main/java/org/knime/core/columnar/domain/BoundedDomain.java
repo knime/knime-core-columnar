@@ -57,7 +57,7 @@ public interface BoundedDomain<T> extends Domain {
      */
     @Override
     default boolean isValid() {
-        return true;
+        return hasLowerBound() && hasUpperBound();
     }
 
     /**
