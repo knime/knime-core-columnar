@@ -51,6 +51,7 @@ import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.DurationData.DurationDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
+import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
@@ -139,6 +140,8 @@ public interface ColumnDataSpec {
         R visit(final ObjectDataSpec<?> spec);
 
         R visit(final StructDataSpec spec);
+
+        R visit(final ListDataSpec listDataSpec);
     }
 
     <R> R accept(Mapper<R> v);

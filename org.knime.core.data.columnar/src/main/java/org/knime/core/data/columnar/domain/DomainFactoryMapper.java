@@ -59,6 +59,7 @@ import org.knime.core.columnar.data.DurationData.DurationDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
 import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
@@ -192,6 +193,11 @@ final class DomainFactoryMapper implements ColumnDataSpec.Mapper<DomainFactory<?
 
     @Override
     public DomainFactory<?, ?> visit(final StructDataSpec spec) {
+        return null;
+    }
+
+    @Override
+    public DomainFactory<?, ?> visit(final ListDataSpec listDataSpec) {
         return null;
     }
 

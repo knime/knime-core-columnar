@@ -55,6 +55,7 @@ import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.DurationData.DurationDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
+import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
@@ -152,4 +153,8 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
         throw new UnsupportedOperationException("Not yet implemented.");
     }
 
+    @Override
+    public TestDataFactory visit(final ListDataSpec listDataSpec) {
+        throw new UnsupportedOperationException("Not yet implemented.");
+    }
 }
