@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.v2.RowContainer;
-import org.knime.core.data.v2.RowContainerCustomKey;
+import org.knime.core.data.v2.CustomKeyRowContainer;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.value.CustomRowKeyValueFactory.CustomRowKeyWriteValue;
@@ -18,7 +18,7 @@ import org.knime.core.node.ExtensionTable;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public final class ColumnarRowContainerCustomKey implements RowContainerCustomKey {
+public final class CustomKeyColumnarRowContainer implements CustomKeyRowContainer {
 
     private final RowWriteCursor<? extends ExtensionTable> m_container;
 
@@ -28,7 +28,7 @@ public final class ColumnarRowContainerCustomKey implements RowContainerCustomKe
      * @param context context used to create the {@link RowContainer}
      * @param cursor underlying {@link RowWriteCursor}
      */
-    public ColumnarRowContainerCustomKey(final ExecutionContext context,
+    public CustomKeyColumnarRowContainer(final ExecutionContext context,
         final RowWriteCursor<? extends ExtensionTable> cursor) {
         m_context = context;
         m_container = cursor;

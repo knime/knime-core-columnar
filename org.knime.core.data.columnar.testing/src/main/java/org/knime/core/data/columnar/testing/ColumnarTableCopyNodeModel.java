@@ -8,7 +8,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DoubleValue;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell;
-import org.knime.core.data.v2.RowContainerCustomKey;
+import org.knime.core.data.v2.CustomKeyRowContainer;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.value.DoubleValueFactory.DoubleWriteValue;
 import org.knime.core.node.BufferedDataContainer;
@@ -53,7 +53,7 @@ public class ColumnarTableCopyNodeModel extends NodeModel {
 
             // ### New API:
             try (final RowCursor readCursor = inData[0].cursor();
-                    final RowContainerCustomKey writeCursor = exec.createRowContainer(inData[0].getDataTableSpec())) {
+                    final CustomKeyRowContainer writeCursor = exec.createRowContainer(inData[0].getDataTableSpec())) {
                 // can actually be parallelized later
                 while (readCursor.canPoll()) {
                     readCursor.poll();

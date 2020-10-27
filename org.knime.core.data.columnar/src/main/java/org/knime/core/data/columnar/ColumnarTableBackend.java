@@ -58,7 +58,7 @@ import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarDataContainerDelegate;
-import org.knime.core.data.columnar.table.ColumnarRowContainerCustomKey;
+import org.knime.core.data.columnar.table.CustomKeyColumnarRowContainer;
 import org.knime.core.data.columnar.table.ColumnarRowWriteCursor;
 import org.knime.core.data.columnar.table.ColumnarRowWriteCursorSettings;
 import org.knime.core.data.container.DataContainerDelegate;
@@ -66,7 +66,7 @@ import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.container.ILocalDataRepository;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
-import org.knime.core.data.v2.RowContainerCustomKey;
+import org.knime.core.data.v2.CustomKeyRowContainer;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.ExecutionContext;
@@ -118,7 +118,7 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     @SuppressWarnings("resource")
-    public RowContainerCustomKey create(final ExecutionContext context, final DataTableSpec spec,
+    public CustomKeyRowContainer create(final ExecutionContext context, final DataTableSpec spec,
         final DataContainerSettings settings, final IDataRepository repository, final IWriteFileStoreHandler handler) {
         try {
             final ValueSchema schema =
@@ -127,7 +127,7 @@ public final class ColumnarTableBackend implements TableBackend {
                 new ColumnarRowWriteCursor(-1, ColumnarValueSchemaUtils.create(schema),
                     new ColumnarRowWriteCursorSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
                         RowKeyType.CUSTOM));
-            return new ColumnarRowContainerCustomKey(context, cursor);
+            return new CustomKeyColumnarRowContainer(context, cursor);
         } catch (IOException e) {
             // TODO logging
             throw new IllegalStateException("Exception while creating ColumnarRowWriteCursor.", e);

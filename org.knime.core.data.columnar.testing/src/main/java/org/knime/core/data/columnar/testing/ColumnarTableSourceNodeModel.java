@@ -12,7 +12,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell;
-import org.knime.core.data.v2.RowContainerCustomKey;
+import org.knime.core.data.v2.CustomKeyRowContainer;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.BufferedDataContainer;
 import org.knime.core.node.BufferedDataTable;
@@ -74,7 +74,7 @@ public class ColumnarTableSourceNodeModel extends NodeModel {
 
         if (arrow) {
             // TODO close etc.
-            try (final RowContainerCustomKey cursor = exec.createRowContainer(m_spec)) {
+            try (final CustomKeyRowContainer cursor = exec.createRowContainer(m_spec)) {
                 final int nrCols = m_nrColsModel.getIntValue();
                 final long nrRows = m_nrRowsModel.getLongValue();
                 // TODO if duplicate row key checking fails - handle it.
