@@ -86,7 +86,6 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
         m_spec = cursor.getSchema().getSourceSpec();
         m_numColumns = m_spec.getNumColumns();
         m_isCustomRowKey = cursor.getSchema().getRowKeyType() == RowKeyType.CUSTOM;
-
     }
 
     @Override

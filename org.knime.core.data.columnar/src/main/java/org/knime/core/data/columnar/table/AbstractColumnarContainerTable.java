@@ -53,7 +53,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.knime.core.columnar.phantom.CloseableCloser;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -86,9 +85,10 @@ import org.knime.core.node.workflow.WorkflowDataRepository;
  */
 abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
-    private static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
+    static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
 
-    private static final String CFG_TABLE_SIZE = "tabe_size";
+    // TODO fix typo?
+    static final String CFG_TABLE_SIZE = "tabe_size";
 
     private final ColumnStoreFactory m_factory;
 
@@ -98,7 +98,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final long m_size;
 
-    private final Set<CloseableCloser> m_openCursorCloseables = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Finalizer<?>> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private ColumnReadStore m_store;
 
@@ -166,11 +166,11 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     @Override
     public void clear() {
+        for (final Finalizer<?> closer : m_openCursorFinalizers) {
+            closer.releaseResourcesAndLogOutput();
+        }
+        m_openCursorFinalizers.clear();
         try {
-            for (final CloseableCloser closer : m_openCursorCloseables) {
-                closer.closeCloseableAndLogOutput();
-            }
-            m_openCursorCloseables.clear();
             if (m_store != null) {
                 m_store.close();
                 m_store = null;
@@ -197,7 +197,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     @Override
     public RowCursor cursor() {
-        return ColumnarRowCursor.create(m_store, m_schema, 0, m_size - 1, m_openCursorCloseables);
+        return ColumnarRowCursor.create(m_store, m_schema, 0, m_size - 1, m_openCursorFinalizers);
     }
 
     @Override
@@ -207,10 +207,10 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
         final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
         if (colIndicesOpt.isPresent()) {
-            return ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorCloseables,
+            return ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers,
                 toSortedIntArray(colIndicesOpt.get()));
         } else {
-            return ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorCloseables);
+            return ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers);
         }
     }
 
@@ -218,7 +218,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     @SuppressWarnings("resource")
     public final CloseableRowIterator iterator() {
         return new ColumnarRowIterator(
-            ColumnarRowCursor.create(m_store, m_schema, 0, m_size - 1, m_openCursorCloseables));
+            ColumnarRowCursor.create(m_store, m_schema, 0, m_size - 1, m_openCursorFinalizers));
     }
 
     @Override
@@ -231,10 +231,10 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         if (colIndicesOpt.isPresent()) {
             final int[] selection = toSortedIntArray(colIndicesOpt.get());
             return FilteredColumnarRowIterator.create(ColumnarRowCursor.create(m_store, m_schema, fromRowIndex,
-                toRowIndex, m_openCursorCloseables, selection), selection);
+                toRowIndex, m_openCursorFinalizers, selection), selection);
         } else {
             return new ColumnarRowIterator(
-                ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorCloseables));
+                ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers));
         }
     }
 
@@ -257,4 +257,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     private static int[] toSortedIntArray(final Set<Integer> selection) {
         return selection.stream().sorted().mapToInt((i) -> (i)).toArray();
     }
+
+    ColumnReadStore getStore() {
+        return m_store;
+    }
+
 }

@@ -45,6 +45,8 @@
  */
 package org.knime.core.data.columnar.table;
 
+import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.ExtensionTable.LoadContext;
 import org.knime.core.node.ExtensionTableLoader;
 import org.knime.core.node.InvalidSettingsException;
@@ -57,9 +59,12 @@ import org.knime.core.node.InvalidSettingsException;
  */
 public class ColumnarContainerTableLoader implements ExtensionTableLoader {
 
+    @SuppressWarnings("resource")
     @Override
-    public SavedColumnarContainerTable load(final LoadContext context) throws InvalidSettingsException {
-        return new SavedColumnarContainerTable(context);
+    public ExtensionTable load(final LoadContext context) throws InvalidSettingsException {
+        final SavedColumnarContainerTable table = new SavedColumnarContainerTable(context);
+        table.m_storeCloser = Finalizer.create(table, table.getStore());
+        return table;
     }
 
     @Override
@@ -67,9 +72,20 @@ public class ColumnarContainerTableLoader implements ExtensionTableLoader {
         return type.equalsIgnoreCase(UnsavedColumnarContainerTable.class.getName());
     }
 
-    static final class SavedColumnarContainerTable extends AbstractColumnarContainerTable {
+    private static final class SavedColumnarContainerTable extends AbstractColumnarContainerTable {
+
+        // effectively final
+        private Finalizer<ColumnReadStore> m_storeCloser;
+
         SavedColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
             super(context);
         }
+
+        @Override
+        public void clear() {
+            m_storeCloser.close();
+            super.clear();
+        }
+
     }
 }

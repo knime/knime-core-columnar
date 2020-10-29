@@ -50,7 +50,6 @@ import java.util.Set;
 import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.phantom.CloseableCloser;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.data.DataValue;
@@ -65,14 +64,10 @@ import org.knime.core.data.v2.RowKeyReadValue;
  * Columnar implementation of {@link RowCursor} for reading data from columnar table backend.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @since 4.3
  */
 class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
-
-    // effectively final (set in #create)
-    private CloseableCloser m_closer;
-
-    private final Set<CloseableCloser> m_openCursorCloseables;
 
     private final ColumnDataReader m_reader;
 
@@ -86,7 +81,14 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
     private final ColumnarReadValueFactory<ColumnReadData>[] m_factories;
 
+    private final Set<Finalizer<?>> m_openCursorFinalizers;
+
+    // effectively final (set in the static factory method)
+    private Finalizer<ColumnDataReader> m_readerCloser;
+
     private ReadBatch m_currentBatch;
+
+    private Finalizer<ReadBatch> m_currentBatchReleaser;
 
     private ColumnarValueSupplier[] m_currentValues;
 
@@ -97,32 +99,29 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     private int m_currentMaxIndex;
 
     static ColumnarRowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema,
-        final long fromRowIndex, final long toRowIndex, final Set<CloseableCloser> openCursorCloseables) {
-        return create(store, schema, fromRowIndex, toRowIndex, openCursorCloseables, null);
+        final long fromRowIndex, final long toRowIndex, final Set<Finalizer<?>> openCursorFinalizers) {
+        return create(store, schema, fromRowIndex, toRowIndex, openCursorFinalizers, null);
     }
 
     static ColumnarRowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema,
-        final long fromRowIndex, final long toRowIndex, final Set<CloseableCloser> openCursorCloseables,
-        int[] selection) {
-        if (selection != null) {
-            selection = addRowKeyIndexToSelection(selection);
-        }
+        final long fromRowIndex, final long toRowIndex, final Set<Finalizer<?>> openCursorFinalizers,
+        final int[] selection) {
         final ColumnarRowCursor cursor =
-            new ColumnarRowCursor(store, schema, fromRowIndex, toRowIndex, openCursorCloseables, selection);
-        cursor.m_closer = new CloseableCloser(cursor);
-        openCursorCloseables.add(cursor.m_closer);
+            new ColumnarRowCursor(store, schema, fromRowIndex, toRowIndex, selection, openCursorFinalizers);
+        cursor.m_readerCloser = Finalizer.create(cursor, cursor.m_reader);
+        openCursorFinalizers.add(cursor.m_readerCloser);
         return cursor;
     }
 
     private ColumnarRowCursor(final ColumnReadStore store, final ColumnarValueSchema schema, final long fromRowIndex,
-        final long toRowIndex, final Set<CloseableCloser> openCursorCloseables, final int[] selection) {
+        final long toRowIndex, final int[] selection, final Set<Finalizer<?>> openCursorFinalizers) {
         // TODO check that from fromRowIndex > 0 and <= toRowIndex
         // check that toRowIndex < table size (which currently cannot be determined)
 
-        m_selection = selection;
+        m_selection = selection != null ? addRowKeyIndexToSelection(selection) : null;
         m_reader = store.createReader();
         m_schema = schema;
-        m_openCursorCloseables = openCursorCloseables;
+        m_openCursorFinalizers = openCursorFinalizers;
 
         // initialize ReadValue factories
         @SuppressWarnings("unchecked")
@@ -164,6 +163,8 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
         // TODO throw appropriate exception in case canPoll = false but poll()
         // called
         if (++m_currentIndex > m_currentMaxIndex) {
+            m_currentBatchReleaser.close();
+            m_openCursorFinalizers.remove(m_currentBatchReleaser);
             m_currentBatch.release();
             readNextBatch();
             m_currentIndex = 0;
@@ -203,11 +204,14 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     public void close() {
         try {
             if (m_currentBatch != null) {
+                m_currentBatchReleaser.close();
+                m_openCursorFinalizers.remove(m_currentBatchReleaser);
                 m_currentBatch.release();
                 m_currentBatch = null;
             }
-            m_closer.close();
-            m_openCursorCloseables.remove(m_closer);
+
+            m_readerCloser.close();
+            m_openCursorFinalizers.remove(m_readerCloser);
             m_reader.close();
         } catch (final Exception e) {
             // TODO Logging
@@ -223,6 +227,8 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     private void readNextBatch() {
         try {
             m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
+            m_currentBatchReleaser = Finalizer.create(this, m_currentBatch, ReadBatch::release, "release");
+            m_openCursorFinalizers.add(m_currentBatchReleaser);
             if (m_selection == null) {
                 m_currentValues = create(m_currentBatch);
             } else {

@@ -87,8 +87,6 @@ import org.knime.core.columnar.cache.heap.HeapCachedColumnStore;
 import org.knime.core.columnar.cache.heap.ObjectDataCache;
 import org.knime.core.columnar.cache.heap.SoftReferencedObjectCache;
 import org.knime.core.columnar.cache.heap.WeakReferencedObjectCache;
-import org.knime.core.columnar.phantom.PhantomReferenceReadStore;
-import org.knime.core.columnar.phantom.PhantomReferenceStore;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.data.columnar.ColumnarTableBackend;
@@ -319,8 +317,7 @@ public final class ColumnarPreferenceUtils {
             wrapped = new SmallColumnStore(wrapped, smallTableCache);
         }
 
-        wrapped = new HeapCachedColumnStore(wrapped, getHeapCache(), getSerializeExecutor());
-        return PhantomReferenceStore.create(wrapped);
+        return new HeapCachedColumnStore(wrapped, getHeapCache(), getSerializeExecutor());
     }
 
     @SuppressWarnings("resource")
@@ -330,8 +327,7 @@ public final class ColumnarPreferenceUtils {
             wrapped = new CachedColumnReadStore(wrapped, getColumnDataCache());
         }
 
-        wrapped = new HeapCachedColumnReadStore(wrapped, getHeapCache());
-        return PhantomReferenceReadStore.create(wrapped);
+        return new HeapCachedColumnReadStore(wrapped, getHeapCache());
     }
 
 }

@@ -48,6 +48,7 @@ package org.knime.core.data.columnar.table;
 import java.io.File;
 import java.io.IOException;
 
+import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
@@ -66,6 +67,17 @@ class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
 
     private final ColumnStore m_store;
 
+    // effectively final
+    private Finalizer<ColumnReadStore> m_storeCloser;
+
+    static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        final UnsavedColumnarContainerTable table =
+            new UnsavedColumnarContainerTable(tableId, factory, schema, store, size);
+        table.m_storeCloser = Finalizer.create(table, table.m_store);
+        return table;
+    }
+
     /**
      * Constructor for creating a {@link UnsavedColumnarContainerTable}.
      *
@@ -79,7 +91,7 @@ class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
      */
     /* TODO can we avoid passing factory, schema, store and size as individual parameters? they all have
      *            dependencies to each other. */
-    UnsavedColumnarContainerTable(final int tableId, //
+    private UnsavedColumnarContainerTable(final int tableId, //
         final ColumnStoreFactory factory, final ColumnarValueSchema schema, final ColumnStore store, final long size) {
         super(tableId, factory, schema, store, size);
         m_store = store;
@@ -91,4 +103,11 @@ class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
         super.saveToFileOverwrite(f, settings, exec);
         m_store.save(f);
     }
+
+    @Override
+    public void clear() {
+        m_storeCloser.close();
+        super.clear();
+    }
+
 }

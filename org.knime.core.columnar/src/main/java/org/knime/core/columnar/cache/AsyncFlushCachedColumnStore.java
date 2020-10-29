@@ -55,6 +55,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -90,6 +91,28 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
     private static final CountDownLatch DUMMY = new CountDownLatch(0);
 
+    private class AsyncFlushCachedColumnStoreFactory implements ColumnDataFactory {
+
+        private final ColumnDataFactory m_delegateFactory;
+
+        AsyncFlushCachedColumnStoreFactory() {
+            m_delegateFactory = m_delegate.getFactory();
+        }
+
+        @Override
+        public WriteBatch create() {
+            if (m_writerClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+            }
+            if (m_storeClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
+
+            return m_delegateFactory.create();
+        }
+
+    }
+
     private final class AsyncFlushCachedColumnStoreWriter implements ColumnDataWriter {
 
         private final ColumnDataWriter m_delegateWriter;
@@ -106,7 +129,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             if (m_storeClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
-            
+
             batch.retain();
 
             handleDoneFuture();
@@ -290,7 +313,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
     public AsyncFlushCachedColumnStore(final ColumnStore delegate, final CachedColumnStoreCache cache,
         final ExecutorService executor) {
         m_delegate = delegate;
-        m_factory = delegate.getFactory();
+        m_factory = new AsyncFlushCachedColumnStoreFactory();
         m_writer = new AsyncFlushCachedColumnStoreWriter();
         m_globalCache = cache.getCache();
         m_executor = executor;

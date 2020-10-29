@@ -58,9 +58,9 @@ import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarDataContainerDelegate;
-import org.knime.core.data.columnar.table.CustomKeyColumnarRowContainer;
 import org.knime.core.data.columnar.table.ColumnarRowWriteCursor;
 import org.knime.core.data.columnar.table.ColumnarRowWriteCursorSettings;
+import org.knime.core.data.columnar.table.CustomKeyColumnarRowContainer;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.container.ILocalDataRepository;
@@ -107,10 +107,10 @@ public final class ColumnarTableBackend implements TableBackend {
                 initFileStoreHandler(fileStoreHandler, repository));
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
-            ColumnarRowWriteCursorSettings cursorSettings = new ColumnarRowWriteCursorSettings(
+            final ColumnarRowWriteCursorSettings cursorSettings = new ColumnarRowWriteCursorSettings(
                 settings.getInitializeDomain(), settings.getMaxDomainValues(), schema.getRowKeyType());
             return new ColumnarDataContainerDelegate(
-                new ColumnarRowWriteCursor(repository.generateNewID(), columnarSchema, cursorSettings));
+                ColumnarRowWriteCursor.create(repository.generateNewID(), columnarSchema, cursorSettings));
         } catch (IOException ex) {
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", ex);
         }
@@ -123,11 +123,10 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final ValueSchema schema =
                 ValueSchema.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
-            final ColumnarRowWriteCursor cursor =
-                new ColumnarRowWriteCursor(-1, ColumnarValueSchemaUtils.create(schema),
-                    new ColumnarRowWriteCursorSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                        RowKeyType.CUSTOM));
-            return new CustomKeyColumnarRowContainer(context, cursor);
+            final ColumnarRowWriteCursorSettings cursorSettings = new ColumnarRowWriteCursorSettings(
+                settings.getInitializeDomain(), settings.getMaxDomainValues(), RowKeyType.CUSTOM);
+            return new CustomKeyColumnarRowContainer(context,
+                ColumnarRowWriteCursor.create(-1, ColumnarValueSchemaUtils.create(schema), cursorSettings));
         } catch (IOException e) {
             // TODO logging
             throw new IllegalStateException("Exception while creating ColumnarRowWriteCursor.", e);

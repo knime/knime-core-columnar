@@ -54,6 +54,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -163,6 +164,28 @@ public final class SmallColumnStore implements ColumnStore {
     }
 
     private static final String ERROR_MESSAGE_ON_FLUSH = "Error while flushing small table.";
+
+    private class SmallColumnStoreFactory implements ColumnDataFactory {
+
+        private final ColumnDataFactory m_delegateFactory;
+
+        SmallColumnStoreFactory() {
+            m_delegateFactory = m_delegate.getFactory();
+        }
+
+        @Override
+        public WriteBatch create() {
+            if (m_writerClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+            }
+            if (m_storeClosed) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
+
+            return m_delegateFactory.create();
+        }
+
+    }
 
     private final class SmallColumnStoreWriter implements ColumnDataWriter {
 
@@ -285,7 +308,7 @@ public final class SmallColumnStore implements ColumnStore {
      */
     public SmallColumnStore(final ColumnStore delegate, final SmallColumnStoreCache cache) {
         m_delegate = delegate;
-        m_factory = delegate.getFactory();
+        m_factory = new SmallColumnStoreFactory();
         m_globalCache = cache.m_cache;
         m_smallTableThreshold = cache.m_smallTableThreshold;
         m_writer = new SmallColumnStoreWriter();
@@ -377,6 +400,7 @@ public final class SmallColumnStore implements ColumnStore {
         if (removed != null) {
             removed.release();
         }
+        // TODO: true for other stores as well: shouldn't we close the m_writer here? (and write a test for it)
         m_delegate.close();
     }
 

@@ -55,6 +55,7 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.store.ColumnDataFactory;
+import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
@@ -69,19 +70,21 @@ import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.node.ExtensionTable;
 
 /**
  * Columnar implementation of {@link RowWriteCursor}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @since 4.3
  */
-public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColumnarContainerTable>, ColumnDataIndex {
+public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTable>, ColumnDataIndex {
 
     private static final String CHUNK_SIZE_PROPERTY = "knime.columnar.chunksize";
 
-    private static final int CHUNK_SIZE = Integer.getInteger(CHUNK_SIZE_PROPERTY, 28_000);
+    static final int CHUNK_SIZE = Integer.getInteger(CHUNK_SIZE_PROPERTY, 28_000);
 
     private final ColumnStoreFactory m_storeFactory;
 
@@ -93,11 +96,14 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
 
     private final int m_tableId;
 
+    // effectively final
+    private Finalizer<ColumnReadStore> m_storeCloser;
+
     private WriteValue<?>[] m_values;
 
     private WriteBatch m_currentData;
 
-    private UnsavedColumnarContainerTable m_table;
+    private ExtensionTable m_table;
 
     private long m_currentDataMaxIndex;
 
@@ -116,19 +122,31 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
      * @param config
      * @throws IOException
      */
-    // TODO consider moving store creation out of cursor (why should the cursor care?)
-    @SuppressWarnings("resource")
-    public ColumnarRowWriteCursor(final int tableId, final ColumnarValueSchema schema,
+    public static ColumnarRowWriteCursor create(final int tableId, final ColumnarValueSchema schema,
         final ColumnarRowWriteCursorSettings config) throws IOException {
-        m_tableId = tableId;
-        m_schema = schema;
         try {
-            m_storeFactory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+            return create(tableId, ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton(), schema,
+                config);
         } catch (Exception ex) {
             // TODO logging
             throw new IOException("Can't determine column store backend", ex);
         }
+    }
 
+    static ColumnarRowWriteCursor create(final int tableId, final ColumnStoreFactory storeFactory,
+        final ColumnarValueSchema schema, final ColumnarRowWriteCursorSettings config) throws IOException {
+        final ColumnarRowWriteCursor cursor = new ColumnarRowWriteCursor(tableId, storeFactory, schema, config);
+        cursor.m_storeCloser = Finalizer.create(cursor, cursor.m_store);
+        return cursor;
+    }
+
+    // TODO consider moving store creation out of cursor (why should the cursor care?)
+    @SuppressWarnings("resource")
+    private ColumnarRowWriteCursor(final int tableId, final ColumnStoreFactory storeFactory, final ColumnarValueSchema schema,
+        final ColumnarRowWriteCursorSettings config) throws IOException {
+        m_tableId = tableId;
+        m_schema = schema;
+        m_storeFactory = storeFactory;
         m_store = new DomainColumnStore(
             ColumnarPreferenceUtils
                 .wrap(m_storeFactory.createWriteStore(schema, DataContainer.createTempFile(".knable"), CHUNK_SIZE)),
@@ -182,7 +200,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
     }
 
     @Override
-    public UnsavedColumnarContainerTable finish() throws IOException {
+    public ExtensionTable finish() throws IOException {
         if (m_table == null) {
             releaseCurrentData(m_index);
             m_writer.close();
@@ -201,25 +219,27 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
                 }
             }
 
-            m_table = new UnsavedColumnarContainerTable(m_tableId, m_storeFactory,
+            m_table = UnsavedColumnarContainerTable.create(m_tableId, m_storeFactory,
                 ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_size);
+            // from here on out, the m_table will handle the closing of the store
+            m_storeCloser.close();
         }
         return m_table;
     }
 
     @Override
     public void close() {
-        // in case m_table was not created, we have to destroy the store. otherwise
-        // the
-        // m_table has a handle on the store and therefore the store shouldn't be
-        // destroyed.
+        // in case m_table was not created, we have to destroy the store. otherwise the
+        // m_table has a handle on the store and therefore the store shouldn't be destroyed.
         try {
             if (m_table == null) {
                 if (m_currentData != null) {
                     m_currentData.release();
                     m_currentData = null;
                 }
-                // closing the store includes closing the writer (but will make sure duplicate checks and domain calculations are halted)
+                m_storeCloser.close();
+                // closing the store includes closing the writer
+                // (but will make sure duplicate checks and domain calculations are halted)
                 m_store.close();
             }
         } catch (final Exception e) {
@@ -268,7 +288,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<UnsavedColum
         return values;
     }
 
-    private void releaseCurrentData(final int numValues) {
+    void releaseCurrentData(final int numValues) {
         if (m_currentData != null) {
             final ReadBatch readBatch = m_currentData.close(numValues);
             try {
