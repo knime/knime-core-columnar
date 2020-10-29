@@ -53,6 +53,7 @@ import org.knime.core.data.v2.access.BooleanAccess.BooleanAccessSpec;
 import org.knime.core.data.v2.access.ByteArrayAccess.ByteArrayAccessSpec;
 import org.knime.core.data.v2.access.DoubleAccess.DoubleAccessSpec;
 import org.knime.core.data.v2.access.IntAccess.IntAccessSpec;
+import org.knime.core.data.v2.access.ListAccess.ListAccessSpec;
 import org.knime.core.data.v2.access.LongAccess.LongAccessSpec;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectAccessSpec;
 import org.knime.core.data.v2.access.StructAccess.StructAccessSpec;
@@ -112,4 +113,8 @@ class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFact
         throw new UnsupportedOperationException("nyi");
     }
 
+    @Override
+    public ColumnarAccessFactory<?, ?, ?, ?> visit(final ListAccessSpec<?, ?> spec) {
+        return new ColumnarListAccessFactory<>(spec);
+    }
 }
