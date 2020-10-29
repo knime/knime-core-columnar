@@ -42,31 +42,75 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   29 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.testing;
 
-import java.io.File;
-
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreSchema;
-import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.columnar.data.VoidData.VoidReadData;
+import org.knime.core.columnar.data.VoidData.VoidWriteData;
 
 /**
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class TestColumnStoreFactory implements ColumnStoreFactory {
+final class TestVoidData extends AbstractTestData implements VoidWriteData, VoidReadData {
 
-    @Override
-    public ColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int chunkCapacity) {
-        return TestColumnStore.create(schema, chunkCapacity);
+    static final class TestVoidDataFactory implements TestDataFactory {
+
+        static final TestVoidDataFactory INSTANCE = new TestVoidDataFactory();
+
+        private TestVoidDataFactory() {
+        }
+
+        @Override
+        public TestVoidData createWriteData(final int capacity) {
+            return new TestVoidData(capacity);
+        }
+
+        @Override
+        public TestVoidData createReadData(final Object data) {
+            return new TestVoidData((Integer)data);
+        }
+
+    }
+
+    private int m_capacity;
+
+    private int m_numValues;
+
+    TestVoidData(final int capacity) {
+        m_capacity = capacity;
+    }
+
+    TestVoidData(final Integer numValues) {
+        m_numValues = numValues;
     }
 
     @Override
-    public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final File file) {
-        throw new UnsupportedOperationException("not implemented");
+    public int capacity() {
+        return m_capacity;
+    }
+
+    @Override
+    public int sizeOf() {
+        return 0;
+    }
+
+    @Override
+    public int length() {
+        return m_numValues;
+    }
+
+    @Override
+    public VoidReadData close(final int length) {
+        m_numValues = length;
+        return this;
+    }
+
+    @Override
+    public Object get() {
+        return Integer.valueOf(m_numValues);
     }
 
 }

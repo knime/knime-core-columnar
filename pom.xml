@@ -22,6 +22,7 @@
 
 	<modules>
 		<module>org.knime.core.columnar</module>
+		<module>org.knime.core.columnar.testing</module>
 		<module>org.knime.core.columnar.tests</module>
 		<module>org.knime.core.data.columnar</module>
 		<module>org.knime.core.data.columnar.tests</module>

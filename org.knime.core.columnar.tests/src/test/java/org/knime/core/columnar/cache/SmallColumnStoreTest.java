@@ -53,6 +53,7 @@ import static org.knime.core.columnar.TestColumnStoreUtils.checkRefs;
 import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTestColumnStore;
 import static org.knime.core.columnar.TestColumnStoreUtils.generateDoubleSizedDefaultTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.generateEmptyTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readSelectionAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTable;
@@ -62,19 +63,20 @@ import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
 import java.io.IOException;
 
 import org.junit.Test;
-import org.knime.core.columnar.TestColumnStore;
 import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.testing.ColumnarTest;
+import org.knime.core.columnar.testing.TestColumnStore;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class SmallColumnStoreTest {
+public class SmallColumnStoreTest extends ColumnarTest {
 
     private static SmallColumnStoreCache generateCache() {
         return new SmallColumnStoreCache(DEF_SIZE_OF_TABLE, DEF_SIZE_OF_TABLE);
@@ -412,7 +414,7 @@ public class SmallColumnStoreTest {
     public void exceptionOnWriteAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestTable table = generateEmptyTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 store.close();
                 writeTable(store, table);
@@ -434,7 +436,7 @@ public class SmallColumnStoreTest {
     public void exceptionOnSaveAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestTable table = generateEmptyTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -458,7 +460,7 @@ public class SmallColumnStoreTest {
     public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestTable table = generateEmptyTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -487,7 +489,7 @@ public class SmallColumnStoreTest {
     public void exceptionOnReadAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestTable table = generateEmptyTable(delegate)) {
             try (ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }

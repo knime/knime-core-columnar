@@ -42,31 +42,19 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   29 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar;
-
-import java.io.File;
-
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreSchema;
-import org.knime.core.columnar.testing.TestColumnStore;
+package org.knime.core.columnar.testing;
 
 /**
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class TestColumnStoreFactory implements ColumnStoreFactory {
+interface TestDataFactory {
 
-    @Override
-    public ColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int chunkCapacity) {
-        return TestColumnStore.create(schema, chunkCapacity);
-    }
+    AbstractTestData createWriteData(int capacity);
 
-    @Override
-    public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final File file) {
-        throw new UnsupportedOperationException("not implemented");
-    }
+    AbstractTestData createReadData(Object data);
 
 }

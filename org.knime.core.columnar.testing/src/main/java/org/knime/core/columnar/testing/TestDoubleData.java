@@ -42,19 +42,98 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   1 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar;
+package org.knime.core.columnar.testing;
 
-import org.junit.Test;
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 
-public class VoidTest {
+/**
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public final class TestDoubleData extends AbstractTestData implements DoubleWriteData, DoubleReadData {
 
-    @Test
-    public void test() {
+    static final class TestDoubleDataFactory implements TestDataFactory {
 
+        static final TestDoubleDataFactory INSTANCE = new TestDoubleDataFactory();
+
+        private TestDoubleDataFactory() {
+        }
+
+        @Override
+        public TestDoubleData createWriteData(final int capacity) {
+            return new TestDoubleData(capacity);
+        }
+
+        @Override
+        public TestDoubleData createReadData(final Object data) {
+            return new TestDoubleData((Double[])data);
+        }
+
+    }
+
+    private int m_capacity;
+
+    private Double[] m_values;
+
+    private int m_numValues;
+
+    TestDoubleData(final int capacity) {
+        m_capacity = capacity;
+        m_values = new Double[capacity];
+    }
+
+    TestDoubleData(final Double[] doubles) {
+        m_capacity = doubles.length;
+        m_values = doubles;
+        m_numValues = doubles.length;
+    }
+
+    @Override
+    public int capacity() {
+        return m_capacity;
+    }
+
+    @Override
+    public int sizeOf() {
+        return m_numValues;
+    }
+
+    @Override
+    public DoubleReadData close(final int length) {
+        m_numValues = length;
+        return this;
+    }
+
+    @Override
+    public int length() {
+        return m_numValues;
+    }
+
+    @Override
+    public synchronized void setMissing(final int index) {
+        m_values[index] = null;
+    }
+
+    @Override
+    public synchronized boolean isMissing(final int index) {
+        return m_values[index] == null;
+    }
+
+    @Override
+    public synchronized double getDouble(final int index) {
+        return m_values[index];
+    }
+
+    @Override
+    public synchronized void setDouble(final int index, final double val) {
+        m_values[index] = val;
+    }
+
+    @Override
+    public Double[] get() {
+        return m_values;
     }
 
 }

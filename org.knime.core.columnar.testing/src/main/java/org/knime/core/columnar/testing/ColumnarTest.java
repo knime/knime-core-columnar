@@ -42,31 +42,38 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   29 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar;
+package org.knime.core.columnar.testing;
 
-import java.io.File;
+import static org.junit.Assert.assertEquals;
 
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreSchema;
-import org.knime.core.columnar.testing.TestColumnStore;
+import java.io.Closeable;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Set;
+
+import org.junit.After;
+import org.junit.Before;
 
 /**
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class TestColumnStoreFactory implements ColumnStoreFactory {
+@SuppressWarnings("javadoc")
+public abstract class ColumnarTest {
 
-    @Override
-    public ColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int chunkCapacity) {
-        return TestColumnStore.create(schema, chunkCapacity);
+    static final Set<Closeable> OPEN_CLOSEABLES = Collections.newSetFromMap(new HashMap<>());
+
+    @Before
+    public void setup() {
+        OPEN_CLOSEABLES.clear();
     }
 
-    @Override
-    public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final File file) {
-        throw new UnsupportedOperationException("not implemented");
+    @After
+    public void tearDown() {
+        assertEquals("Unclosed Closeables.", OPEN_CLOSEABLES.size(), 0);
     }
 
 }

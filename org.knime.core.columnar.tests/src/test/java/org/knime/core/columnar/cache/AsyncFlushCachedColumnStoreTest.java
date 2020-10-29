@@ -55,6 +55,7 @@ import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_TABLE;
 import static org.knime.core.columnar.TestColumnStoreUtils.checkRefs;
 import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTestColumnStore;
+import static org.knime.core.columnar.TestColumnStoreUtils.generateEmptyTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readSelectionAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTable;
@@ -69,18 +70,19 @@ import java.util.concurrent.Executors;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
-import org.knime.core.columnar.TestColumnStore;
 import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
 import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.testing.ColumnarTest;
+import org.knime.core.columnar.testing.TestColumnStore;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class AsyncFlushCachedColumnStoreTest {
+public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
 
@@ -562,7 +564,7 @@ public class AsyncFlushCachedColumnStoreTest {
     public void exceptionOnWriteAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestTable table = generateEmptyTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 store.close();
                 writeTable(store, table);
@@ -584,7 +586,7 @@ public class AsyncFlushCachedColumnStoreTest {
     public void exceptionOnSaveAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestTable table = generateEmptyTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -608,7 +610,7 @@ public class AsyncFlushCachedColumnStoreTest {
     public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestTable table = generateEmptyTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -637,7 +639,7 @@ public class AsyncFlushCachedColumnStoreTest {
     public void exceptionOnReadAfterStoreClose() throws Exception {
         try (final ColumnStore delegate = generateDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestTable table = generateEmptyTable(delegate)) {
             try (ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
