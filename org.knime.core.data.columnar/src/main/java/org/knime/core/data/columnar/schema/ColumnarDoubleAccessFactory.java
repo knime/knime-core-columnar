@@ -46,16 +46,16 @@
 package org.knime.core.data.columnar.schema;
 
 import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
-import org.knime.core.columnar.data.BooleanData.BooleanReadData;
-import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
-import org.knime.core.data.BooleanValue;
+import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.data.DataCell;
-import org.knime.core.data.def.BooleanCell;
-import org.knime.core.data.v2.access.BooleanAccess.BooleanReadAccess;
-import org.knime.core.data.v2.access.BooleanAccess.BooleanWriteAccess;
+import org.knime.core.data.DoubleValue;
+import org.knime.core.data.def.DoubleCell;
+import org.knime.core.data.v2.access.DoubleAccess.DoubleReadAccess;
+import org.knime.core.data.v2.access.DoubleAccess.DoubleWriteAccess;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
@@ -66,39 +66,40 @@ import org.knime.core.data.v2.access.WriteAccess;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ColumnarBooleanValueFactory implements ColumnarValueFactory<BooleanReadData, //
-        BooleanReadAccess, BooleanWriteData, BooleanWriteAccess> {
+final class ColumnarDoubleAccessFactory
+    implements ColumnarAccessFactory<DoubleReadData, DoubleReadAccess, DoubleWriteData, DoubleWriteAccess> {
 
-    public final static ColumnarBooleanValueFactory INSTANCE = new ColumnarBooleanValueFactory();
+    /** Instance **/
+    public static final ColumnarDoubleAccessFactory INSTANCE = new ColumnarDoubleAccessFactory();
 
-    private ColumnarBooleanValueFactory() {
+    private ColumnarDoubleAccessFactory() {
     }
 
     @Override
-    public BooleanReadAccess createReadAccess(final BooleanReadData data, final ColumnDataIndex index) {
-        return new DefaultBooleanReadAccess(data, index);
+    public DoubleDataSpec getColumnDataSpec() {
+        return DoubleDataSpec.INSTANCE;
     }
 
     @Override
-    public BooleanWriteAccess createWriteAccess(final BooleanWriteData data, final ColumnDataIndex index) {
-        return new DefaultBooleanWriteAccess(data, index);
+    public DoubleReadAccess createReadAccess(final DoubleReadData data, final ColumnDataIndex index) {
+        return new DefaultDoubleReadAccess(data, index);
     }
 
     @Override
-    public BooleanDataSpec getColumnDataSpec() {
-        return BooleanDataSpec.INSTANCE;
+    public DoubleWriteAccess createWriteAccess(final DoubleWriteData data, final ColumnDataIndex index) {
+        return new DefaultDoubleWriteAccess(data, index);
     }
 
-    private static final class DefaultBooleanReadAccess extends AbstractAccess<BooleanReadData>
-        implements BooleanReadAccess {
+    private static final class DefaultDoubleReadAccess extends AbstractAccess<DoubleReadData>
+        implements DoubleReadAccess {
 
-        public DefaultBooleanReadAccess(final BooleanReadData data, final ColumnDataIndex index) {
+        public DefaultDoubleReadAccess(final DoubleReadData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
         @Override
-        public boolean getBooleanValue() {
-            return m_data.getBoolean(m_index.getIndex());
+        public double getDoubleValue() {
+            return m_data.getDouble(m_index.getIndex());
         }
 
         @Override
@@ -107,23 +108,13 @@ final class ColumnarBooleanValueFactory implements ColumnarValueFactory<BooleanR
         }
 
         @Override
-        public double getDoubleValue() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
-        }
-
-        @Override
-        public long getLongValue() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
-        }
-
-        @Override
-        public int getIntValue() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
+        public DataCell getDataCell() {
+            return new DoubleCell(m_data.getDouble(m_index.getIndex()));
         }
 
         @Override
         public double getRealValue() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
+            return m_data.getDouble(m_index.getIndex());
         }
 
         @Override
@@ -133,50 +124,45 @@ final class ColumnarBooleanValueFactory implements ColumnarValueFactory<BooleanR
 
         @Override
         public double getMinSupport() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
+            return m_data.getDouble(m_index.getIndex());
         }
 
         @Override
         public double getCore() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
+            return m_data.getDouble(m_index.getIndex());
         }
 
         @Override
         public double getMaxSupport() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
+            return m_data.getDouble(m_index.getIndex());
         }
 
         @Override
         public double getMinCore() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
+            return m_data.getDouble(m_index.getIndex());
         }
 
         @Override
         public double getMaxCore() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
+            return m_data.getDouble(m_index.getIndex());
         }
 
         @Override
         public double getCenterOfGravity() {
-            return m_data.getBoolean(m_index.getIndex()) ? 1 : 0;
-        }
-
-        @Override
-        public DataCell getDataCell() {
-            return m_data.getBoolean(m_index.getIndex()) ? BooleanCell.TRUE : BooleanCell.FALSE;
+            return m_data.getDouble(m_index.getIndex());
         }
     }
 
-    private static final class DefaultBooleanWriteAccess extends AbstractAccess<BooleanWriteData>
-        implements BooleanWriteAccess {
+    private static final class DefaultDoubleWriteAccess extends AbstractAccess<DoubleWriteData>
+        implements DoubleWriteAccess {
 
-        public DefaultBooleanWriteAccess(final BooleanWriteData data, final ColumnDataIndex index) {
+        public DefaultDoubleWriteAccess(final DoubleWriteData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
         @Override
-        public void setBooleanValue(final boolean value) {
-            m_data.setBoolean(m_index.getIndex(), value);
+        public void setDoubleValue(final double value) {
+            m_data.setDouble(m_index.getIndex(), value);
         }
 
         @Override
@@ -185,8 +171,9 @@ final class ColumnarBooleanValueFactory implements ColumnarValueFactory<BooleanR
         }
 
         @Override
-        public void setValue(final BooleanValue value) {
-            m_data.setMissing(m_index.getIndex());
+        public void setValue(final DoubleValue value) {
+            m_data.setDouble(m_index.getIndex(), value.getDoubleValue());
+
         }
     }
 }

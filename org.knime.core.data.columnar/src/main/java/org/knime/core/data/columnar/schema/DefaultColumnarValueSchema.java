@@ -58,13 +58,13 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ValueSchema m_source;
 
-    private final ColumnarValueFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] m_factories;
+    private final ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] m_factories;
 
-    public DefaultColumnarValueSchema(final ValueSchema source, final ColumnarValueFactory<?, ?, ?, ?>[] factories) {
+    public DefaultColumnarValueSchema(final ValueSchema source, final ColumnarAccessFactory<?, ?, ?, ?>[] factories) {
         m_source = source;
         @SuppressWarnings("unchecked")
-        final ColumnarValueFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] cast =
-            (ColumnarValueFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[])factories;
+        final ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] cast =
+            (ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[])factories;
         m_factories = cast;
     }
 
@@ -76,8 +76,8 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     @Override
     public <C extends ColumnWriteData> ColumnarWriteValueFactory<C> getWriteValueFactoryAt(final int index) {
         @SuppressWarnings("unchecked")
-        final ColumnarValueFactory<ColumnReadData, ReadAccess, C, WriteAccess> factory =
-            (ColumnarValueFactory<ColumnReadData, ReadAccess, C, WriteAccess>)m_factories[index];
+        final ColumnarAccessFactory<ColumnReadData, ReadAccess, C, WriteAccess> factory =
+            (ColumnarAccessFactory<ColumnReadData, ReadAccess, C, WriteAccess>)m_factories[index];
         return new DefaultWriteValueFactory<>(factory, m_source.getFactoryAt(index));
     }
 

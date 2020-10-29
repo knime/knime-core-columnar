@@ -64,20 +64,20 @@ import org.knime.core.data.v2.access.StructAccess.StructWriteAccess;
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-public class ColumnarStructValueFactory
-    implements ColumnarValueFactory<StructReadData, StructReadAccess, StructWriteData, StructWriteAccess> {
+public class ColumnarStructAccessFactory
+    implements ColumnarAccessFactory<StructReadData, StructReadAccess, StructWriteData, StructWriteAccess> {
 
-    private final ColumnarValueFactory<?, ?, ?, ?>[] m_inner;
+    private final ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;
 
     private final ColumnDataSpec m_spec;
 
     /**
      * @param inner the specs of the inner elements
      */
-    public ColumnarStructValueFactory(final AccessSpec<?, ?>... inner) {
+    public ColumnarStructAccessFactory(final AccessSpec<?, ?>... inner) {
         // TODO we could do that without streaming in one loop..:
-        m_inner = Stream.of(inner).map(spec -> spec.accept(ColumnarValueFactoryMapper.INSTANCE)) //
-            .toArray(ColumnarValueFactory<?, ?, ?, ?>[]::new);
+        m_inner = Stream.of(inner).map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
+            .toArray(ColumnarAccessFactory<?, ?, ?, ?>[]::new);
         m_spec =
             new StructDataSpec(Stream.of(m_inner).map((i) -> i.getColumnDataSpec()).toArray(ColumnDataSpec[]::new));
 
@@ -104,9 +104,9 @@ public class ColumnarStructValueFactory
 
         private final StructReadData m_data;
 
-        private final ColumnarValueFactory<?, ?, ?, ?>[] m_inner;
+        private final ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;
 
-        private DefaultStructReadAccess(final StructReadData data, final ColumnarValueFactory<?, ?, ?, ?>[] inner,
+        private DefaultStructReadAccess(final StructReadData data, final ColumnarAccessFactory<?, ?, ?, ?>[] inner,
             final ColumnDataIndex index) {
             m_index = index;
             m_data = data;
@@ -130,11 +130,11 @@ public class ColumnarStructValueFactory
 
         private final ColumnDataIndex m_index;
 
-        private ColumnarValueFactory<?, ?, ?, ?>[] m_inner;
+        private ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;
 
         private final StructWriteData m_data;
 
-        private DefaultStructWriteAccess(final StructWriteData data, final ColumnarValueFactory<?, ?, ?, ?>[] inner,
+        private DefaultStructWriteAccess(final StructWriteData data, final ColumnarAccessFactory<?, ?, ?, ?>[] inner,
             final ColumnDataIndex index) {
             m_index = index;
             m_data = data;

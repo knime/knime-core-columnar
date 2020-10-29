@@ -59,7 +59,7 @@ import org.knime.core.data.v2.access.WriteAccess;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-interface ColumnarValueFactory<R extends ColumnReadData, RA extends ReadAccess, W extends ColumnWriteData, WA extends WriteAccess> {
+interface ColumnarAccessFactory<R extends ColumnReadData, RA extends ReadAccess, W extends ColumnWriteData, WA extends WriteAccess> {
 
     /**
      * Creates an access on a {@link ColumnWriteData}. The actual value of the created access depends on

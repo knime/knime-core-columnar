@@ -54,11 +54,11 @@ import org.knime.core.data.v2.access.WriteAccess;
 final class DefaultWriteValueFactory<W extends ColumnWriteData, WA extends WriteAccess>
     implements ColumnarWriteValueFactory<W> {
 
-    private final ColumnarValueFactory<?, ?, W, WA> m_factory;
+    private final ColumnarAccessFactory<?, ?, W, WA> m_factory;
 
     private final ValueFactory<?, WA> m_delegate;
 
-    DefaultWriteValueFactory(final ColumnarValueFactory<?, ?, W, WA> factory, final ValueFactory<?, WA> delegate) {
+    DefaultWriteValueFactory(final ColumnarAccessFactory<?, ?, W, WA> factory, final ValueFactory<?, WA> delegate) {
         m_factory = factory;
         m_delegate = delegate;
     }

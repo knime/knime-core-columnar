@@ -79,10 +79,10 @@ public final class ColumnarValueSchemaUtils {
      * @throws IllegalArgumentException thrown if {@link AccessSpec} can't be translated to {@link ColumnDataSpec}.
      */
     public static final ColumnarValueSchema create(final ValueSchema source) throws IllegalArgumentException {
-        final ColumnarValueFactory<?, ?, ?, ?>[] factories = IntStream.range(0, source.getNumColumns()) //
+        final ColumnarAccessFactory<?, ?, ?, ?>[] factories = IntStream.range(0, source.getNumColumns()) //
             .mapToObj(source::getAccessSpecAt) //
-            .map(spec -> spec.accept(ColumnarValueFactoryMapper.INSTANCE)) //
-            .toArray(ColumnarValueFactory<?, ?, ?, ?>[]::new);
+            .map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
+            .toArray(ColumnarAccessFactory<?, ?, ?, ?>[]::new);
         return new DefaultColumnarValueSchema(source, factories);
     }
 

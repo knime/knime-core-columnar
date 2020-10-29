@@ -55,11 +55,11 @@ import org.knime.core.data.v2.access.ReadAccess;
 final class DefaultReadValueFactory<R extends ColumnReadData, RA extends ReadAccess>
     implements ColumnarReadValueFactory<R> {
 
-    private final ColumnarValueFactory<R, RA, ?, ?> m_factory;
+    private final ColumnarAccessFactory<R, RA, ?, ?> m_factory;
 
     private final ValueFactory<RA, ?> m_delegate;
 
-    DefaultReadValueFactory(final ColumnarValueFactory<R, RA, ?, ?> factory, final ValueFactory<RA, ?> delegate) {
+    DefaultReadValueFactory(final ColumnarAccessFactory<R, RA, ?, ?> factory, final ValueFactory<RA, ?> delegate) {
         m_factory = factory;
         m_delegate = delegate;
     }

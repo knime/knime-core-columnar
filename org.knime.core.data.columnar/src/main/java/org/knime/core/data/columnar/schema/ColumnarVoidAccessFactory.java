@@ -44,72 +44,64 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 8, 2020 (dietzc): created
+ *   Oct 12, 2020 (dietzc): created
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.data.v2.access.AccessSpec.AccessSpecMapper;
-import org.knime.core.data.v2.access.BooleanAccess.BooleanAccessSpec;
-import org.knime.core.data.v2.access.ByteArrayAccess.ByteArrayAccessSpec;
-import org.knime.core.data.v2.access.DoubleAccess.DoubleAccessSpec;
-import org.knime.core.data.v2.access.IntAccess.IntAccessSpec;
-import org.knime.core.data.v2.access.LongAccess.LongAccessSpec;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectAccessSpec;
-import org.knime.core.data.v2.access.StructAccess.StructAccessSpec;
-import org.knime.core.data.v2.access.VoidAccess.VoidAccessSpec;
+import org.knime.core.columnar.ColumnDataIndex;
+import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.VoidData.VoidDataSpec;
+import org.knime.core.columnar.data.VoidData.VoidReadData;
+import org.knime.core.columnar.data.VoidData.VoidWriteData;
+import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidReadAccess;
+import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidWriteAccess;
+import org.knime.core.data.v2.access.ReadAccess;
+import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * Mapping AccessSpec to ColumnarValueFactory.
+ * VoidValueFactory to create VoidData.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
  */
-class ColumnarValueFactoryMapper implements AccessSpecMapper<ColumnarValueFactory<?, ?, ?, ?>> {
+class ColumnarVoidAccessFactory
+    implements ColumnarAccessFactory<VoidReadData, VoidReadAccess, VoidWriteData, VoidWriteAccess> {
 
-    public final static ColumnarValueFactoryMapper INSTANCE = new ColumnarValueFactoryMapper();
+    /** Singleton instance on Void **/
+    static final ColumnarVoidAccessFactory INSTANCE = new ColumnarVoidAccessFactory();
 
-    private ColumnarValueFactoryMapper() {
+    private ColumnarVoidAccessFactory() {
     }
 
     @Override
-    public ColumnarValueFactory<?, ?, ?, ?> visit(final StructAccessSpec spec) {
-        return new ColumnarStructValueFactory(spec.getInnerSpecs());
+    public VoidWriteAccess createWriteAccess(final VoidWriteData data, final ColumnDataIndex index) {
+        return VoidWriteAccess.WRITE_ACCESS_INSTANCE;
     }
 
     @Override
-    public ColumnarValueFactory<?, ?, ?, ?> visit(final ObjectAccessSpec<?> spec) {
-        return new ColumnarObjectValueFactory<>(spec);
+    public VoidReadAccess createReadAccess(final VoidReadData data, final ColumnDataIndex index) {
+        return VoidReadAccess.READ_ACCESS_INSTANCE;
     }
 
     @Override
-    public ColumnarValueFactory<?, ?, ?, ?> visit(final BooleanAccessSpec spec) {
-        return ColumnarBooleanValueFactory.INSTANCE;
+    public ColumnDataSpec getColumnDataSpec() {
+        return VoidDataSpec.INSTANCE;
     }
 
-    @Override
-    public ColumnarValueFactory<?, ?, ?, ?> visit(final DoubleAccessSpec spec) {
-        return ColumnarDoubleValueFactory.INSTANCE;
+    static final class VoidReadAccess implements ReadAccess {
+        private final static VoidReadAccess READ_ACCESS_INSTANCE = new VoidReadAccess();
+
+        @Override
+        public boolean isMissing() {
+            return true;
+        }
     }
 
-    @Override
-    public ColumnarValueFactory<?, ?, ?, ?> visit(final IntAccessSpec spec) {
-        return ColumnarIntValueFactory.INSTANCE;
-    }
+    static final class VoidWriteAccess implements WriteAccess {
+        private final static VoidWriteAccess WRITE_ACCESS_INSTANCE = new VoidWriteAccess();
 
-    @Override
-    public ColumnarValueFactory<?, ?, ?, ?> visit(final LongAccessSpec spec) {
-        return ColumnarLongValueFactory.INSTANCE;
-    }
-
-    @Override
-    public ColumnarValueFactory<?, ?, ?, ?> visit(final VoidAccessSpec spec) {
-        return ColumnarVoidValueFactory.INSTANCE;
-    }
-
-    @Override
-    public ColumnarValueFactory<?, ?, ?, ?> visit(final ByteArrayAccessSpec spec) {
-        // TODO
-        throw new UnsupportedOperationException("nyi");
+        @Override
+        public void setMissing() {
+        }
     }
 
 }

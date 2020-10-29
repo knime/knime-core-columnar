@@ -45,21 +45,17 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
 import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectAccessSpec;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectReadAccess;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectSerializer;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectWriteAccess;
+import org.knime.core.columnar.data.LongData.LongDataSpec;
+import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.LongValue;
+import org.knime.core.data.def.LongCell;
+import org.knime.core.data.v2.access.LongAccess.LongReadAccess;
+import org.knime.core.data.v2.access.LongAccess.LongWriteAccess;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
@@ -70,93 +66,118 @@ import org.knime.core.data.v2.access.WriteAccess;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ColumnarObjectValueFactory<T> implements ColumnarValueFactory<ObjectReadData<T>, //
-        ObjectReadAccess<T>, ObjectWriteData<T>, ObjectWriteAccess<T>> {
+final class ColumnarLongAccessFactory
+    implements ColumnarAccessFactory<LongReadData, LongReadAccess, LongWriteData, LongWriteAccess> {
 
-    private final ObjectDataSpec<T> m_spec;
+    /** Instance **/
+    public static final ColumnarLongAccessFactory INSTANCE = new ColumnarLongAccessFactory();
 
-    public ColumnarObjectValueFactory(final ObjectAccessSpec<T> spec) {
-        m_spec = wrap(spec);
-    }
-
-    private ObjectDataSpec<T> wrap(final ObjectAccessSpec<T> spec) {
-        return new ObjectDataSpec<>(new DefaultObjectDataSerializer<>(spec.getSerializer()), spec.isDictEncoded());
+    private ColumnarLongAccessFactory() {
     }
 
     @Override
-    public final ObjectDataSpec<T> getColumnDataSpec() {
-        return m_spec;
+    public LongDataSpec getColumnDataSpec() {
+        return LongDataSpec.INSTANCE;
     }
 
     @Override
-    public final ObjectWriteAccess<T> createWriteAccess(final ObjectWriteData<T> data, final ColumnDataIndex index) {
-        return new ColumnarObjectWriteAccess<T>(data, index);
+    public LongReadAccess createReadAccess(final LongReadData data, final ColumnDataIndex index) {
+        return new DefaultLongReadAccess(data, index);
     }
 
     @Override
-    public final ObjectReadAccess<T> createReadAccess(final ObjectReadData<T> data, final ColumnDataIndex index) {
-        return new ColumnarObjectReadAccess<T>(data, index);
+    public LongWriteAccess createWriteAccess(final LongWriteData data, final ColumnDataIndex index) {
+        return new DefaultLongWriteAccess(data, index);
     }
 
-    private static final class DefaultObjectDataSerializer<T> implements ObjectDataSerializer<T> {
+    private static final class DefaultLongReadAccess extends AbstractAccess<LongReadData> implements LongReadAccess {
 
-        private final ObjectSerializer<T> m_serializer;
-
-        public DefaultObjectDataSerializer(final ObjectSerializer<T> serializer) {
-            m_serializer = serializer;
+        public DefaultLongReadAccess(final LongReadData data, final ColumnDataIndex index) {
+            super(data, index);
         }
 
         @Override
-        public void serialize(final T obj, final DataOutput output) throws IOException {
-            m_serializer.serialize(obj, output);
-        }
-
-        @Override
-        public T deserialize(final DataInput input) throws IOException {
-            return m_serializer.deserialize(input);
-        }
-
-    }
-
-    private static final class ColumnarObjectReadAccess<T> implements ObjectReadAccess<T> {
-        private final ColumnDataIndex m_index;
-
-        private final ObjectReadData<T> m_data;
-
-        public ColumnarObjectReadAccess(final ObjectReadData<T> data, final ColumnDataIndex index) {
-            m_data = data;
-            m_index = index;
-        }
-
-        @Override
-        public T getObject() {
-            return m_data.getObject(m_index.getIndex());
+        public long getLongValue() {
+            return m_data.getLong(m_index.getIndex());
         }
 
         @Override
         public boolean isMissing() {
             return m_data.isMissing(m_index.getIndex());
         }
-    }
 
-    private static final class ColumnarObjectWriteAccess<T> implements ObjectWriteAccess<T> {
-        private final ColumnDataIndex m_index;
-
-        private final ObjectWriteData<T> m_data;
-
-        public ColumnarObjectWriteAccess(final ObjectWriteData<T> data, final ColumnDataIndex index) {
-            m_data = data;
-            m_index = index;
+        @Override
+        public double getDoubleValue() {
+            return m_data.getLong(m_index.getIndex());
         }
 
         @Override
-        public void setObject(final T object) {
-            m_data.setObject(m_index.getIndex(), object);
+        public DataCell getDataCell() {
+            return new LongCell(m_data.getLong(m_index.getIndex()));
+        }
+
+        @Override
+        public double getRealValue() {
+            return m_data.getLong(m_index.getIndex());
+        }
+
+        @Override
+        public double getImaginaryValue() {
+            return 0;
+        }
+
+        @Override
+        public double getMinSupport() {
+            return m_data.getLong(m_index.getIndex());
+        }
+
+        @Override
+        public double getCore() {
+            return m_data.getLong(m_index.getIndex());
+        }
+
+        @Override
+        public double getMaxSupport() {
+            return m_data.getLong(m_index.getIndex());
+        }
+
+        @Override
+        public double getMinCore() {
+            return m_data.getLong(m_index.getIndex());
+        }
+
+        @Override
+        public double getMaxCore() {
+            return m_data.getLong(m_index.getIndex());
+        }
+
+        @Override
+        public double getCenterOfGravity() {
+            return m_data.getLong(m_index.getIndex());
+        }
+    }
+
+    private static final class DefaultLongWriteAccess extends AbstractAccess<LongWriteData> implements LongWriteAccess {
+
+        public DefaultLongWriteAccess(final LongWriteData data, final ColumnDataIndex index) {
+            super(data, index);
+        }
+
+        @Override
+        public void setLongValue(final long value) {
+            m_data.setLong(m_index.getIndex(), value);
         }
 
         @Override
         public void setMissing() {
             m_data.setMissing(m_index.getIndex());
         }
+
+        @Override
+        public void setValue(final LongValue value) {
+            m_data.setLong(m_index.getIndex(), value.getLongValue());
+        }
+
     }
+
 }
