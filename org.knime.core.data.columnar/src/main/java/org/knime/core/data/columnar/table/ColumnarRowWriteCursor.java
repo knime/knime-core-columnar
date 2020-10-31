@@ -120,6 +120,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
      * @param tableId table id used by KNIME
      * @param schema
      * @param config
+     * @return the cursor
      * @throws IOException
      */
     public static ColumnarRowWriteCursor create(final int tableId, final ColumnarValueSchema schema,
