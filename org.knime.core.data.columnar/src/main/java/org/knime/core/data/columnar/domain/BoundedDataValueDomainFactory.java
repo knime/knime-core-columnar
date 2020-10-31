@@ -171,8 +171,9 @@ final class BoundedDataValueDomainFactory<D extends DataValue>
                 if (!cursor.isMissing()) {
                     final D other = cursor.get();
                     if (m_lower == null) {
-                        m_lower = other;
-                        m_upper = other;
+                        final D cast = (D)cursor.copy();
+                        m_lower = cast;
+                        m_upper = m_lower;
                     } else {
                         if (m_comparator.compare(other, m_lower) < 0) {
                             final D cast = (D)cursor.copy();
