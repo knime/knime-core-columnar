@@ -3,8 +3,8 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.CustomKeyRowContainer;
+import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.value.CustomRowKeyValueFactory.CustomRowKeyWriteValue;
@@ -51,7 +51,7 @@ public final class CustomKeyColumnarRowContainer implements CustomKeyRowContaine
 
     @Override
     public <W extends WriteValue<?>> W getWriteValue(final int index) {
-        return m_container.getWriteValue(index);
+        return m_container.<W> getWriteValue(index);
     }
 
     @Override
