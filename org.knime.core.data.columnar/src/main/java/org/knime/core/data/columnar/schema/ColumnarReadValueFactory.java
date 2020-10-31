@@ -73,7 +73,7 @@ public interface ColumnarReadValueFactory<R extends ColumnReadData> {
      * @return DataValueSupplier supplying a {@link DataValue} representing the value at the {@link ColumnDataIndex} in
      *         the {@link ColumnReadData}.
      */
-    ColumnarValueSupplier createReadValue(R data, ColumnDataIndex index);
+    ReadValue createReadValue(R data, ColumnDataIndex index);
 
     /**
      * @return spec of the column data.

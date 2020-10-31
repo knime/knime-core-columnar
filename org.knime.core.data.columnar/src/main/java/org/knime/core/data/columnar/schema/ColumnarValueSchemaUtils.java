@@ -54,6 +54,7 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.data.v2.access.AccessSpec;
 
@@ -121,5 +122,17 @@ public final class ColumnarValueSchemaUtils {
             }
         }
         return new UpdatedColumnarValueSchema(new DataTableSpec(result), source);
+    }
+
+    /**
+     * Wraps a {@link ReadValue} as a ColumnarValueSupplier.
+     *
+     * @param value to wrap
+     * @return wrapped value
+     *
+     * @since 4.3
+     */
+    public static final ColumnarValueSupplier wrap(final ReadValue value) {
+        return new DefaultColumnarValueSupplier(value);
     }
 }

@@ -50,6 +50,7 @@ import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
+import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSupplier;
 import org.knime.core.data.v2.ReadValue;
 
@@ -65,7 +66,7 @@ final class CopyableReadValueCursor implements ColumnDataIndex {
 
     CopyableReadValueCursor(final ColumnarReadValueFactory<ColumnReadData> factory, final ColumnReadData data) {
         m_size = data.length();
-        m_value = factory.createReadValue(data, this);
+        m_value = ColumnarValueSchemaUtils.wrap(factory.createReadValue(data, this));
         m_data = data;
     }
 

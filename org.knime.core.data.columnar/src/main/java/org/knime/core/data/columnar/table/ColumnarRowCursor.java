@@ -56,6 +56,7 @@ import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSupplier;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyReadValue;
@@ -245,7 +246,7 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     private ColumnarValueSupplier[] create(final ReadBatch batch) {
         final ColumnarValueSupplier[] values = new ColumnarValueSupplier[m_schema.getNumColumns()];
         for (int i = 0; i < values.length; i++) {
-            values[i] = m_factories[i].createReadValue(batch.get(i), this);
+            values[i] = ColumnarValueSchemaUtils.wrap(m_factories[i].createReadValue(batch.get(i), this));
         }
         return values;
     }
@@ -253,7 +254,8 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     private final ColumnarValueSupplier[] create(final ReadBatch batch, final int[] selection) {
         final ColumnarValueSupplier[] values = new ColumnarValueSupplier[m_schema.getNumColumns()];
         for (int i = 0; i < selection.length; i++) {
-            values[selection[i]] = m_factories[selection[i]].createReadValue(batch.get(selection[i]), this);
+            values[selection[i]] =
+                ColumnarValueSchemaUtils.wrap(m_factories[selection[i]].createReadValue(batch.get(selection[i]), this));
         }
         return values;
     }
