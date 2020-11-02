@@ -44,48 +44,76 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 30, 2020 (marcel): created
+ *   Oct 31, 2020 (dietzc): created
  */
-package org.knime.core.columnar.domain;
+package org.knime.core.data.columnar.domain;
 
-import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * Abstract implementation of {@link NominalDomain}
- *
- * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
- * @param <T> type of elements in domain
- * @since 4.3
- */
-public abstract class AbstractNominalDomain<T> implements NominalDomain<T> {
+import org.knime.core.columnar.ColumnDataIndex;
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.DataColumnDomainCreator;
+import org.knime.core.data.StringValue;
+import org.knime.core.data.def.StringCell;
 
-    /**
-     * Direct access on values of domain
-     */
-    protected final Set<T> m_values;
+final class ColumnarStringDomainCalculator
+    implements ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain>, ColumnDataIndex {
 
-    /**
-     * Create with empty initialization
-     */
-    protected AbstractNominalDomain() {
-        m_values = Collections.emptySet();
-    }
+    private final int m_maxNumValues;
 
-    /**
-     * @param values The set of nominal values described by this domain.
-     */
-    public AbstractNominalDomain(final Set<T> values) {
-        m_values = values;
+    private Set<String> m_values;
+
+    private int m_index;
+
+    public ColumnarStringDomainCalculator(final int maxNumvalues) {
+        m_maxNumValues = maxNumvalues;
+        m_values = new LinkedHashSet<>();
     }
 
     @Override
-    public boolean isValid() {
-        return !m_values.isEmpty();
+    public void update(final ObjectReadData<String> data) {
+        if (m_values == null) {
+            return;
+        }
+        final int length = data.length();
+        for (int i = 0; i < length; i++) {
+            if (!data.isMissing(i)) {
+                m_index = i;
+                m_values.add(data.getObject(i));
+
+                if (m_values.size() > m_maxNumValues) {
+                    m_values = null;
+                    return;
+                }
+            }
+        }
     }
 
     @Override
-    public Set<T> getValues() {
-        return m_values;
+    public DataColumnDomain getDomain() {
+        return m_values == null ? null
+            : new DataColumnDomainCreator(m_values.stream().map((s) -> new StringCell(s)).toArray(StringCell[]::new))
+                .createDomain();
+    }
+
+    @Override
+    public int getIndex() {
+        return m_index;
+    }
+
+    @Override
+    public void update(final DataColumnDomain domain) {
+        if (domain.hasValues()) {
+            for (DataCell cell : domain.getValues()) {
+                m_values.add(((StringValue)cell).getStringValue());
+                if (m_values.size() > m_maxNumValues) {
+                    m_values = null;
+                    return;
+                }
+            }
+        }
     }
 }

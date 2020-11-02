@@ -42,20 +42,61 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- */
-
-package org.knime.core.columnar.domain;
-
-/**
- * Interface for domains.
  *
- * @since 4.3
+ * History
+ *   Oct 31, 2020 (dietzc): created
  */
-public interface Domain {
+package org.knime.core.data.columnar.domain;
 
-    /**
-     * @return {@code true} if the domain is valid, that is it has either min/max bounds or comprises more than zero
-     *         nominal values.
-     */
-    boolean isValid();
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.DataColumnDomainCreator;
+import org.knime.core.data.DoubleValue;
+import org.knime.core.data.def.DoubleCell;
+
+final class ColumnarDoubleDomainCalculator implements ColumnarDomainCalculator<DoubleReadData, DataColumnDomain> {
+
+    private double m_lower = Double.POSITIVE_INFINITY;
+
+    private double m_upper = Double.NEGATIVE_INFINITY;
+
+    @Override
+    public final void update(final DoubleReadData data) {
+        final int length = data.length();
+        for (int i = 0; i < length; i++) {
+            if (!data.isMissing(i)) {
+                final double curr = data.getDouble(i);
+                if (m_lower > curr) {
+                    m_lower = curr;
+                }
+                if (m_upper < curr) {
+                    m_upper = curr;
+                }
+            }
+        }
+    }
+
+    @Override
+    public DataColumnDomain getDomain() {
+        if (m_lower > m_upper) {
+            return new DataColumnDomainCreator().createDomain();
+        } else {
+            return new DataColumnDomainCreator(new DoubleCell(m_lower), new DoubleCell(m_upper)).createDomain();
+        }
+    }
+
+    @Override
+    public void update(final DataColumnDomain domain) {
+        if (domain.hasBounds()) {
+            final double lower = ((DoubleValue)domain.getLowerBound()).getDoubleValue();
+            if (m_lower > lower) {
+                m_lower = lower;
+            }
+
+            final double upper = ((DoubleValue)domain.getUpperBound()).getDoubleValue();
+            if (m_upper < upper) {
+                m_upper = upper;
+            }
+        }
+    }
 }

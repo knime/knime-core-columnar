@@ -42,45 +42,18 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 31, 2020 (dietzc): created
  */
+package org.knime.core.data.columnar.domain;
 
-package org.knime.core.columnar.domain;
+import org.knime.core.columnar.data.ColumnReadData;
 
-/**
- * @param <T>
- * @since 4.3
- */
-public interface BoundedDomain<T> extends Domain {
+interface ColumnarDomainCalculator<C extends ColumnReadData, D> {
+    void update(C data);
 
-    /**
-     * The default implementation of {@link BoundedDomain} always returns {@code true}.
-     */
-    @Override
-    default boolean isValid() {
-        return hasLowerBound() && hasUpperBound();
-    }
+    void update(D domain);
 
-    /**
-     * @return {@code true} if there is a lower bound, that is, the values described by this domain are bounded from
-     *         below. Returns {@code false} otherwise.
-     */
-    boolean hasLowerBound();
-
-    /**
-     * @return The lower bound of the values that this domain describes. Returns {@code null} if there is no lower
-     *         bound, that is, the values described by this domain are not bounded from below.
-     */
-    T getLowerBound();
-
-    /**
-     * @return {@code true} if there is an upper bound, that is, the values described by this domain are bounded from
-     *         above. Returns {@code false} otherwise.
-     */
-    boolean hasUpperBound();
-
-    /**
-     * @return The upper bound of the values that this domain describes. Returns {@code null} if there is no upper
-     *         bound, that is, the values described by this domain are not bounded from above.
-     */
-    T getUpperBound();
+    D getDomain();
 }

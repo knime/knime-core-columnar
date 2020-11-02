@@ -42,23 +42,61 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 31, 2020 (dietzc): created
  */
 package org.knime.core.data.columnar.domain;
 
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.domain.Domain;
-import org.knime.core.columnar.domain.DomainCalculator;
+import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.DataColumnDomainCreator;
+import org.knime.core.data.IntValue;
+import org.knime.core.data.def.IntCell;
 
-/**
- * A mapper between KNIME's {@link DataColumnDomain}s and the columnar {@link Domain}.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
- */
-interface DomainFactory<R extends ColumnReadData, D extends Domain> {
+final class ColumnarIntDomainCalculator implements ColumnarDomainCalculator<IntReadData, DataColumnDomain> {
 
-    DomainCalculator<R, ? extends D> createCalculator(DataColumnDomain initial);
+    private int m_lower = Integer.MAX_VALUE;
 
-    DataColumnDomain convert(D domain);
+    private int m_upper = Integer.MIN_VALUE;
+
+    @Override
+    public final void update(final IntReadData data) {
+        final int length = data.length();
+        for (int i = 0; i < length; i++) {
+            if (!data.isMissing(i)) {
+                final int curr = data.getInt(i);
+                if (m_lower > curr) {
+                    m_lower = curr;
+                }
+                if (m_upper < curr) {
+                    m_upper = curr;
+                }
+            }
+        }
+    }
+
+    @Override
+    public DataColumnDomain getDomain() {
+        if (m_lower > m_upper) {
+            return new DataColumnDomainCreator().createDomain();
+        } else {
+            return new DataColumnDomainCreator(new IntCell(m_lower), new IntCell(m_upper)).createDomain();
+        }
+    }
+
+    @Override
+    public void update(final DataColumnDomain domain) {
+        if (domain.hasBounds()) {
+            final int lower = ((IntValue)domain.getLowerBound()).getIntValue();
+            if (m_lower > lower) {
+                m_lower = lower;
+            }
+
+            final int upper = ((IntValue)domain.getUpperBound()).getIntValue();
+            if (m_upper < upper) {
+                m_upper = upper;
+            }
+        }
+    }
 }

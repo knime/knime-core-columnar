@@ -48,20 +48,23 @@ package org.knime.core.data.columnar.domain;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.domain.Domain;
-import org.knime.core.columnar.domain.DomainCalculator;
 import org.knime.core.data.BoundedValue;
 import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.DataValue;
 import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.NominalValue;
+import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.def.BooleanCell;
+import org.knime.core.data.def.DoubleCell;
+import org.knime.core.data.def.IntCell;
+import org.knime.core.data.def.LongCell;
+import org.knime.core.data.def.StringCell;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.meta.DataColumnMetaDataCreator;
 import org.knime.core.data.meta.DataColumnMetaDataRegistry;
@@ -76,6 +79,9 @@ import org.knime.core.util.DuplicateChecker;
  */
 public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
+    // factory for native domain calculators
+    private final Map<DataType, Supplier<ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>>> m_nativeDomainCalculators;
+
     private final ColumnarValueSchema m_schema;
 
     private final RowKeyType m_rowKeyConfig;
@@ -84,9 +90,9 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     private final boolean m_initDomains;
 
-    private Map<Integer, DomainCalculator<? extends ColumnReadData, DataColumnMetaData[]>> m_metadataCalculators;
+    private Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnMetaData[]>> m_metadataCalculators;
 
-    private Map<Integer, DomainCalculator<? extends ColumnReadData, DataColumnDomain>> m_domainCalculators;
+    private Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>> m_domainCalculators;
 
     /**
      * Create a new {@link DefaultDomainStoreConfig}
@@ -102,6 +108,18 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
         m_initDomains = initializeDomains;
         m_rowKeyConfig = rowKeyConfig;
         m_maxNumValues = maxPossibleNominalDomainValues;
+        m_nativeDomainCalculators = new HashMap<>();
+
+        initNativeDomainCalculators();
+    }
+
+    private void initNativeDomainCalculators() {
+        // TODO Provide extension point for expert users.
+        m_nativeDomainCalculators.put(DoubleCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
+        m_nativeDomainCalculators.put(IntCell.TYPE, () -> new ColumnarIntDomainCalculator());
+        m_nativeDomainCalculators.put(LongCell.TYPE, () -> new ColumnarLongDomainCalculator());
+        m_nativeDomainCalculators.put(BooleanCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
+        m_nativeDomainCalculators.put(StringCell.TYPE, () -> new ColumnarStringDomainCalculator(m_maxNumValues));
     }
 
     // to make java happy
@@ -134,48 +152,45 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     // also initializes with incoming DataTableSpec
     @Override
-    public Map<Integer, DomainCalculator<? extends ColumnReadData, DataColumnDomain>> createDomainCalculators() {
+    public Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>>
+        createDomainCalculators() {
         if (m_domainCalculators == null) {
             final int length = m_schema.getNumColumns();
-            m_domainCalculators = new HashMap<>();
             final DataTableSpec spec = m_schema.getSourceSpec();
-
+            m_domainCalculators = new HashMap<>();
             for (int i = 1; i < length; i++) {
-                final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
+                final ColumnarReadValueFactory<ColumnReadData> readValueFactory = m_schema.getReadValueFactoryAt(i);
+                final DataType type = spec.getColumnSpec(i - 1).getType();
 
-                // try to find the factory
-                DomainFactory<?, ?> factory = m_schema.getColumnDataSpec(i).accept(DomainFactoryMapper.INSTANCE);
-                if (factory == null) {
-                    final DataType type = spec.getColumnSpec(i - 1).getType();
-                    if (type.isCompatible(BoundedValue.class)) {
-                        factory = new BoundedDataValueDomainFactory<DataValue>(
-                            new DataValueComparatorDelegator<>(type.getComparator()),
-                            m_schema.getReadValueFactoryAt(i));
-                    } else if (type.isCompatible(NominalValue.class)) {
-                        factory =
-                            new NominalDataValueDomainFactory<>(m_maxNumValues, m_schema.getReadValueFactoryAt(i));
-                    }
+                final ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain> calculator;
+                if (m_nativeDomainCalculators.containsKey(type)) {
+                    calculator = m_nativeDomainCalculators.get(type).get();
+                } else if (type.isCompatible(NominalValue.class)) {
+                    calculator = new ColumnarNominalDomainCalculator<ColumnReadData>(readValueFactory, m_maxNumValues);
+                } else if (type.isCompatible(BoundedValue.class)) {
+                    calculator = new ColumnarBoundedDomainCalculator<>(readValueFactory,
+                        new DataValueComparatorDelegator<>(type.getComparator()));
+                } else {
+                    calculator = null;
                 }
 
-                // we did all we could to find the right factory
-                if (factory != null) {
-                    final DataColumnDomain domain;
-                    if (m_initDomains) {
-                        domain = colSpec.getDomain();
-                    } else {
-                        domain = new DataColumnDomainCreator().createDomain();
-                    }
-                    m_domainCalculators.put(i, new ConvertingDomainCalculator<>(factory, domain));
+                if (calculator != null) {
+                    calculator.update(spec.getColumnSpec(i - 1).getDomain());
+                    m_domainCalculators.put(i, calculator);
                 }
+
+                // TODO what if type is compatible to both?
             }
         }
-
         return m_domainCalculators;
+
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public Map<Integer, DomainCalculator<? extends ColumnReadData, DataColumnMetaData[]>> createMetadataCalculators() {
+    public Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnMetaData[]>>
+
+        createMetadataCalculators() {
         if (m_metadataCalculators == null) {
             m_metadataCalculators = new HashMap<>();
             final int length = m_schema.getNumColumns();
@@ -189,7 +204,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                         metadataCreators
                             .forEach(m -> colSpec.getMetaDataOfType(m.getMetaDataClass()).ifPresent(o -> merge(m, o)));
                         m_metadataCalculators.put(i,
-                            new MetadataDomainCalculator<>(
+                            new ColumnarMetadataDomainCalculator<>(
                                 metadataCreators.toArray(new DataColumnMetaDataCreator[metadataCreators.size()]),
                                 m_schema.getReadValueFactoryAt(i)));
                     }
@@ -197,28 +212,5 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
             }
         }
         return m_metadataCalculators;
-    }
-
-    private static final class ConvertingDomainCalculator<C extends ColumnReadData, D extends Domain>
-        implements DomainCalculator<C, DataColumnDomain> {
-
-        private final DomainCalculator<C, ? extends D> m_calculator;
-
-        private final DomainFactory<C, D> m_factory;
-
-        private ConvertingDomainCalculator(final DomainFactory<C, D> factory, final DataColumnDomain initial) {
-            m_calculator = factory.createCalculator(initial);
-            m_factory = factory;
-        }
-
-        @Override
-        public void update(final C data) {
-            m_calculator.update(data);
-        }
-
-        @Override
-        public DataColumnDomain getDomain() {
-            return m_factory.convert(m_calculator.getDomain());
-        }
     }
 }

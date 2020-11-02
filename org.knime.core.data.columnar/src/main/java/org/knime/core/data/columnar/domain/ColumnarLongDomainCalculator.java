@@ -18,9 +18,9 @@
  *
  *  Additional permission under GNU GPL version 3 section 7:
  *
- *  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+ *  KNIME longeroperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
  *  Hence, KNIME and ECLIPSE are both independent programs and are not
- *  derived from each other. Should, however, the interpretation of the
+ *  derived from each other. Should, however, the longerpretation of the
  *  GNU GPL Version 3 ("License") under any applicable laws result in
  *  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
  *  you the additional permission to use and propagate KNIME together with
@@ -31,54 +31,72 @@
  *
  *  Additional permission relating to nodes for KNIME that extend the Node
  *  Extension (and in particular that are based on subclasses of NodeModel,
- *  NodeDialog, and NodeView) and that only interoperate with KNIME through
+ *  NodeDialog, and NodeView) and that only longeroperate with KNIME through
  *  standard APIs ("Nodes"):
  *  Nodes are deemed to be separate and independent programs and to not be
  *  covered works.  Notwithstanding anything to the contrary in the
  *  License, the License does not apply to Nodes, you are not required to
  *  license Nodes under the License, and you are granted a license to
  *  prepare and propagate Nodes, in each case even if such Nodes are
- *  propagated with or for interoperation with KNIME.  The owner of a Node
+ *  propagated with or for longeroperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
- *  when such Node is propagated with or for interoperation with KNIME.
+ *  when such Node is propagated with or for longeroperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 31, 2020 (dietzc): created
  */
 package org.knime.core.data.columnar.domain;
 
-import java.util.Map;
-
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.meta.DataColumnMetaData;
-import org.knime.core.util.DuplicateChecker;
+import org.knime.core.data.DataColumnDomainCreator;
+import org.knime.core.data.LongValue;
+import org.knime.core.data.def.LongCell;
 
-/**
- * Config object for a {@link DomainColumnStore}.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-interface DomainStoreConfig {
+final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<LongReadData, DataColumnDomain> {
 
-    /**
-     * @param maxPossibleValues number of maximum possible values for nominal domains
-     * @return config with maxPossibleValues set
-     */
-    DomainStoreConfig withMaxPossibleNominalDomainValues(int maxPossibleValues);
+    private long m_lower = Long.MAX_VALUE;
 
-    /**
-     * TODO should this really be part of the domain store or a separate store?
-     *
-     * @return the duplicate checker used in this domain store
-     */
-    DuplicateChecker createDuplicateChecker();
+    private long m_upper = Long.MIN_VALUE;
 
-    /**
-     * @return map from index to DomainFactory used to calculate domains.
-     */
-    Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>> createDomainCalculators();
+    @Override
+    public final void update(final LongReadData data) {
+        final int length = data.length();
+        for (int i = 0; i < length; i++) {
+            if (!data.isMissing(i)) {
+                final long curr = data.getLong(i);
+                if (m_lower > curr) {
+                    m_lower = curr;
+                }
+                if (m_upper < curr) {
+                    m_upper = curr;
+                }
+            }
+        }
+    }
 
-    /**
-     * @return map from index to DomainFactory used to calculate metadata.
-     */
-    Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnMetaData[]>> createMetadataCalculators();
+    @Override
+    public DataColumnDomain getDomain() {
+        if (m_lower > m_upper) {
+            return new DataColumnDomainCreator().createDomain();
+        } else {
+            return new DataColumnDomainCreator(new LongCell(m_lower), new LongCell(m_upper)).createDomain();
+        }
+    }
+
+    @Override
+    public void update(final DataColumnDomain domain) {
+        if (domain.hasBounds()) {
+            final long lower = ((LongValue)domain.getLowerBound()).getLongValue();
+            if (m_lower > lower) {
+                m_lower = lower;
+            }
+
+            final long upper = ((LongValue)domain.getUpperBound()).getLongValue();
+            if (m_upper < upper) {
+                m_upper = upper;
+            }
+        }
+    }
 }

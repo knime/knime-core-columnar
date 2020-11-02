@@ -42,49 +42,63 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 31, 2020 (dietzc): created
  */
 package org.knime.core.data.columnar.domain;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.data.DataCell;
-import org.knime.core.data.DataValue;
+import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSupplier;
 import org.knime.core.data.v2.ReadValue;
 
-final class CopyableReadValueCursor implements ColumnDataIndex {
+final class ColumnarNominalDomainCalculator<C extends ColumnReadData>
+    implements ColumnarDomainCalculator<C, DataColumnDomain>, ColumnDataIndex {
 
-    private int m_index = -1;
+    private final ColumnarReadValueFactory<C> m_factory;
 
-    private final int m_size;
+    private final int m_maxNumValues;
 
-    private final ColumnarValueSupplier m_value;
+    private Set<DataCell> m_values;
 
-    private final ColumnReadData m_data;
+    private int m_index;
 
-    CopyableReadValueCursor(final ColumnarReadValueFactory<ColumnReadData> factory, final ColumnReadData data) {
-        m_size = data.length();
-        m_value = ColumnarValueSchemaUtils.wrap(factory.createReadValue(data, this));
-        m_data = data;
+    public ColumnarNominalDomainCalculator(final ColumnarReadValueFactory<C> factory, final int maxNumvalues) {
+        m_factory = factory;
+        m_maxNumValues = maxNumvalues;
+        m_values = new LinkedHashSet<>();
     }
 
-    public final <D extends DataValue> D get() {
-        @SuppressWarnings("unchecked")
-        final D cast = (D)m_value.getDataValue();
-        return cast;
-    }
-
-    public final DataCell copy() {
-        final DataValue value = get();
-        if (!(value instanceof DataCell)) {
-            final DataCell cast = ((ReadValue)value).getDataCell();
-            return cast;
-        } else {
-            final DataCell cast = (DataCell)value;
-            return cast;
+    @Override
+    public void update(final C data) {
+        if (m_values == null) {
+            return;
         }
+        final ReadValue value = m_factory.createReadValue(data, this);
+        final int length = data.length();
+        for (int i = 0; i < length; i++) {
+            if (!data.isMissing(i)) {
+                m_index = i;
+                m_values.add(value.getDataCell());
+
+                if (m_values.size() > m_maxNumValues) {
+                    m_values = null;
+                    return;
+                }
+            }
+        }
+    }
+
+    @Override
+    public DataColumnDomain getDomain() {
+        return m_values == null ? null : new DataColumnDomainCreator(m_values).createDomain();
     }
 
     @Override
@@ -92,16 +106,14 @@ final class CopyableReadValueCursor implements ColumnDataIndex {
         return m_index;
     }
 
-    public final boolean canForward() {
-        return m_index < m_size;
+    @Override
+    public void update(final DataColumnDomain domain) {
+        if (domain.hasValues()) {
+            m_values.addAll(domain.getValues());
+            if (m_values.size() > m_maxNumValues) {
+                m_values = null;
+                return;
+            }
+        }
     }
-
-    public final void forward() {
-        m_index++;
-    }
-
-    public boolean isMissing() {
-        return m_data.isMissing(m_index);
-    }
-
 }

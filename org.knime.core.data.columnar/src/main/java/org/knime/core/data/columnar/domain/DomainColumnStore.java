@@ -61,7 +61,6 @@ import java.util.concurrent.Future;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.domain.DomainCalculator;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnDataReader;
@@ -92,9 +91,9 @@ public final class DomainColumnStore implements ColumnStore {
     private final DomainColumnDataWriter m_writer;
 
     /* Not final as initialized lazily */
-    private volatile Map<Integer, DomainCalculator<?, DataColumnDomain>> m_domainCalculators;
+    private volatile Map<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> m_domainCalculators;
 
-    private volatile Map<Integer, DomainCalculator<?, DataColumnMetaData[]>> m_metadataCalculators;
+    private volatile Map<Integer, ColumnarDomainCalculator<?, DataColumnMetaData[]>> m_metadataCalculators;
 
     private volatile boolean m_storeClosed;
 
@@ -131,7 +130,7 @@ public final class DomainColumnStore implements ColumnStore {
      */
     public final DataColumnDomain getDomains(final int colIndex) {
         if (m_domainCalculators != null) {
-            final DomainCalculator<?, DataColumnDomain> calculator = m_domainCalculators.get(colIndex);
+            final ColumnarDomainCalculator<?, DataColumnDomain> calculator = m_domainCalculators.get(colIndex);
             if (calculator != null) {
                 return calculator.getDomain();
             }
@@ -147,7 +146,7 @@ public final class DomainColumnStore implements ColumnStore {
      */
     public final DataColumnMetaData[] getDomainMetadata(final int colIndex) {
         if (m_metadataCalculators != null) {
-            final DomainCalculator<?, DataColumnMetaData[]> calculator = m_metadataCalculators.get(colIndex);
+            final ColumnarDomainCalculator<?, DataColumnMetaData[]> calculator = m_metadataCalculators.get(colIndex);
             if (calculator != null) {
                 return calculator.getDomain();
             }
@@ -231,12 +230,12 @@ public final class DomainColumnStore implements ColumnStore {
                 m_domainCalculators = m_config.createDomainCalculators();
                 m_metadataCalculators = m_config.createMetadataCalculators();
 
-                for (final Entry<Integer, DomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators
+                for (final Entry<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators
                     .entrySet()) {
                     m_futures.put(entry.getKey(), CompletableFuture.completedFuture(null));
                 }
 
-                for (final Entry<Integer, DomainCalculator<?, DataColumnMetaData[]>> entry : m_metadataCalculators
+                for (final Entry<Integer, ColumnarDomainCalculator<?, DataColumnMetaData[]>> entry : m_metadataCalculators
                     .entrySet()) {
                     if (m_futures.get(entry.getKey()) == null) {
                         m_futures.put(entry.getKey(), CompletableFuture.completedFuture(null));
@@ -260,18 +259,18 @@ public final class DomainColumnStore implements ColumnStore {
             }
 
             // Append all domain calculators
-            for (final Entry<Integer, DomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators.entrySet()) {
-                final DomainCalculator<ColumnReadData, ?> calculator =
-                    (DomainCalculator<ColumnReadData, ?>)entry.getValue();
+            for (final Entry<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators.entrySet()) {
+                final ColumnarDomainCalculator<ColumnReadData, ?> calculator =
+                    (ColumnarDomainCalculator<ColumnReadData, ?>)entry.getValue();
                 m_futures.put(entry.getKey(),
                     append(record.get(entry.getKey()), m_futures.get(entry.getKey()), calculator));
             }
 
             // Append all metadata mappers
-            for (final Entry<Integer, DomainCalculator<?, DataColumnMetaData[]>> entry : m_metadataCalculators
+            for (final Entry<Integer, ColumnarDomainCalculator<?, DataColumnMetaData[]>> entry : m_metadataCalculators
                 .entrySet()) {
-                final DomainCalculator<ColumnReadData, ?> calculator =
-                    (DomainCalculator<ColumnReadData, ?>)entry.getValue();
+                final ColumnarDomainCalculator<ColumnReadData, ?> calculator =
+                    (ColumnarDomainCalculator<ColumnReadData, ?>)entry.getValue();
                 m_futures.put(entry.getKey(),
                     append(record.get(entry.getKey()), m_futures.get(entry.getKey()), calculator));
             }
@@ -280,7 +279,7 @@ public final class DomainColumnStore implements ColumnStore {
         }
 
         private Future<Void> append(final ColumnReadData chunk, final Future<Void> previous,
-            final DomainCalculator<ColumnReadData, ?> calculator) {
+            final ColumnarDomainCalculator<ColumnReadData, ?> calculator) {
             final Future<Void> current;
             // Retain for async. domain computation. Submitted task will release.
             chunk.retain();
@@ -359,10 +358,10 @@ public final class DomainColumnStore implements ColumnStore {
 
             private final ColumnReadData m_chunk;
 
-            private final DomainCalculator<ColumnReadData, ?> m_calculator;
+            private final ColumnarDomainCalculator<ColumnReadData, ?> m_calculator;
 
             public DomainCalculationTask(final Future<Void> previous, final ColumnReadData chunk,
-                final DomainCalculator<ColumnReadData, ?> calculator) {
+                final ColumnarDomainCalculator<ColumnReadData, ?> calculator) {
                 m_previous = previous;
                 m_chunk = chunk;
                 m_calculator = calculator;

@@ -44,56 +44,94 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 20, 2020 (dietzc): created
+ *   Oct 31, 2020 (dietzc): created
  */
 package org.knime.core.data.columnar.domain;
 
+import java.util.Comparator;
+
+import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.domain.DomainCalculator;
 import org.knime.core.data.DataCell;
+import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.DataColumnDomainCreator;
+import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
-import org.knime.core.data.meta.DataColumnMetaData;
-import org.knime.core.data.meta.DataColumnMetaDataCreator;
+import org.knime.core.data.v2.ReadValue;
 
-/**
- * Calculates metadata on
- *
- * @author Chrsitian Dietz, KNIME GmbH Konstanz, Germany
- * @since 4.3
- */
-class MetadataDomainCalculator<R extends ColumnReadData> implements DomainCalculator<R, DataColumnMetaData[]> {
+final class ColumnarBoundedDomainCalculator<C extends ColumnReadData>
+    implements ColumnarDomainCalculator<C, DataColumnDomain>, ColumnDataIndex {
 
-    private final DataColumnMetaDataCreator<DataColumnMetaData>[] m_creators;
+    private final ColumnarReadValueFactory<C> m_factory;
 
-    private final ColumnarReadValueFactory<ColumnReadData> m_factory;
+    private final Comparator<DataValue> m_comparator;
 
-    public MetadataDomainCalculator(final DataColumnMetaDataCreator<DataColumnMetaData>[] creators,
-        final ColumnarReadValueFactory<ColumnReadData> factory) {
-        m_creators = creators;
+    private DataCell m_lower;
+
+    private DataCell m_upper;
+
+    private int m_index;
+
+    public ColumnarBoundedDomainCalculator(final ColumnarReadValueFactory<C> factory,
+        final Comparator<DataValue> delegate) {
         m_factory = factory;
+        m_comparator = delegate;
     }
 
     @Override
-    public void update(final R data) {
-        final CopyableReadValueCursor cursor = new CopyableReadValueCursor(m_factory, data);
-        while (cursor.canForward()) {
-            cursor.forward();
-            if (!cursor.isMissing()) {
-                final DataCell cell = cursor.copy();
-                for (final DataColumnMetaDataCreator<?> creator : m_creators) {
-                    creator.update(cell);
+    public final void update(final C data) {
+        final ReadValue value = m_factory.createReadValue(data, this);
+        final int length = data.length();
+        for (int i = 0; i < length; i++) {
+            if (!data.isMissing(i)) {
+                m_index = i;
+                if (m_lower == null) {
+                    m_lower = value.getDataCell();
+                    m_upper = m_lower;
+                } else {
+                    if (m_comparator.compare(value, m_lower) < 0) {
+                        m_lower = value.getDataCell();
+                    }
+
+                    if (m_comparator.compare(value, m_upper) > 0) {
+                        m_upper = value.getDataCell();
+                    }
                 }
             }
         }
     }
 
     @Override
-    public DataColumnMetaData[] getDomain() {
-        final DataColumnMetaData[] results = new DataColumnMetaData[m_creators.length];
-        for (int i = 0; i < results.length; i++) {
-            results[i] = m_creators[i].create();
+    public DataColumnDomain getDomain() {
+        if (m_lower == null) {
+            return new DataColumnDomainCreator().createDomain();
+        } else {
+            return new DataColumnDomainCreator(m_lower, m_upper).createDomain();
         }
-        return results;
     }
 
+    @Override
+    public int getIndex() {
+        return m_index;
+    }
+
+    @Override
+    public void update(final DataColumnDomain domain) {
+        if (domain.hasBounds()) {
+            final DataCell lower = domain.getLowerBound();
+            final DataCell upper = domain.getUpperBound();
+            if (m_lower == null) {
+                m_lower = lower;
+                m_upper = upper;
+            } else {
+                if (m_comparator.compare(lower, m_lower) < 0) {
+                    m_lower = domain.getLowerBound();
+                }
+
+                if (m_comparator.compare(upper, m_upper) > 0) {
+                    m_upper = domain.getUpperBound();
+                }
+            }
+        }
+    }
 }

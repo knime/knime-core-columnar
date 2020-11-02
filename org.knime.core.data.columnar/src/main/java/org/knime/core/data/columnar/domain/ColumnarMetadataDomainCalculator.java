@@ -42,32 +42,77 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- */
-
-package org.knime.core.columnar.domain;
-
-import org.knime.core.columnar.data.ColumnReadData;
-
-/**
  *
- * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @param <C> type of the {@link ColumnReadData} from which the domain is extracted
- * @param <D> the created domain
+ * History
+ *   Oct 20, 2020 (dietzc): created
  */
-public interface DomainCalculator<C extends ColumnReadData, D> {
+package org.knime.core.data.columnar.domain;
 
-    /**
-     * Calculates the domain for the given data object.
-     *
-     * @param data for which domain is calculated
-     */
-    void update(C data);
+import org.knime.core.columnar.ColumnDataIndex;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
+import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.data.meta.DataColumnMetaDataCreator;
+import org.knime.core.data.v2.ReadValue;
 
-    /**
-     * The current domain of the calculator. Subsequent calls to update have no effect on the returned domai.
-     *
-     * @return a copy of the current domain
-     */
-    D getDomain();
+/*
+ * Calculates metadata
+ *
+ * @author Christian Dietz, KNIME GmbH Konstanz, Germany
+ */
+class ColumnarMetadataDomainCalculator<R extends ColumnReadData>
+    implements ColumnarDomainCalculator<R, DataColumnMetaData[]> {
+
+    private final DataColumnMetaDataCreator<DataColumnMetaData>[] m_creators;
+
+    private final ColumnarReadValueFactory<ColumnReadData> m_factory;
+
+    public ColumnarMetadataDomainCalculator(final DataColumnMetaDataCreator<DataColumnMetaData>[] creators,
+        final ColumnarReadValueFactory<ColumnReadData> factory) {
+        m_creators = creators;
+        m_factory = factory;
+    }
+
+    @Override
+    public void update(final R data) {
+        final DummyIndex index = new DummyIndex();
+        final ReadValue value = m_factory.createReadValue(data, index);
+        final int length = data.length();
+        for (int i = 0; i < length; i++) {
+            if (!data.isMissing(i)) {
+                index.index = i;
+                final DataCell cell = value.getDataCell();
+                for (final DataColumnMetaDataCreator<?> creator : m_creators) {
+                    creator.update(cell);
+                }
+            }
+        }
+    }
+
+    private static final class DummyIndex implements ColumnDataIndex {
+        public int index = 0;
+
+        @Override
+        public int getIndex() {
+            return index;
+        }
+    }
+
+    @Override
+    public DataColumnMetaData[] getDomain() {
+        final DataColumnMetaData[] results = new DataColumnMetaData[m_creators.length];
+        for (int i = 0; i < results.length; i++) {
+            results[i] = m_creators[i].create();
+        }
+        return results;
+    }
+
+    @Override
+    public void update(final DataColumnMetaData[] domain) {
+        assert (domain.length == m_creators.length);
+        for (int j = 0; j < domain.length; j++) {
+            m_creators[j].merge(domain[j++]);
+        }
+    }
 }
