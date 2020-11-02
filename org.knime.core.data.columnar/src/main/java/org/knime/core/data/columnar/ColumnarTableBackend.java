@@ -135,7 +135,7 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public String getShortName() {
-        return "Columnar (Labs)";
+        return "Columnar Storage (Labs)";
     }
 
     @Override

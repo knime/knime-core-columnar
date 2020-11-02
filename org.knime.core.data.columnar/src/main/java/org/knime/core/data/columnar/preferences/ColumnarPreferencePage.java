@@ -115,8 +115,8 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
     @Override
     public void init(final IWorkbench workbench) {
         setPreferenceStore(ColumnarPreferenceUtils.COLUMNAR_STORE);
-        setDescription("Various advanced configuration options for storing data of workflows "
-            + "that are configured to use the columnar data storage.");
+        setDescription("Advanced configuration options for storing data of workflows "
+            + "that are configured to use the columnar table backend:");
     }
 
     @Override
@@ -188,18 +188,18 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
             };
         addField(m_smallTableCacheSizeEditor);
 
-        m_smallTableThresholdEditor =
-            new IntegerFieldEditor(SMALL_TABLE_THRESHOLD_KEY, "Maximum size of small tables (in MB)", parent) {
-                @Override
-                protected void valueChanged() {
-                    super.valueChanged();
-                    if (isValid() && m_smallTableCacheSizeEditor.isValid()
-                        && getIntValue() > m_smallTableCacheSizeEditor.getIntValue()) {
-                        showErrorMessage(
-                            "Maximum small table size should not be larger than the size of the small table cache.");
-                    }
+        m_smallTableThresholdEditor = new IntegerFieldEditor(SMALL_TABLE_THRESHOLD_KEY,
+            "Size up to which table is considered small (in MB)", parent) {
+            @Override
+            protected void valueChanged() {
+                super.valueChanged();
+                if (isValid() && m_smallTableCacheSizeEditor.isValid()
+                    && getIntValue() > m_smallTableCacheSizeEditor.getIntValue()) {
+                    showErrorMessage(
+                        "Maximum small table size should not be larger than the size of the small table cache.");
                 }
-            };
+            }
+        };
         m_smallTableThresholdEditor.setValidRange(0, Integer.MAX_VALUE / (1 << 20));
         addField(m_smallTableThresholdEditor);
 

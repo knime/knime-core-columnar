@@ -26,7 +26,7 @@
             category="org.knime.workbench.ui.preferences.tablebackend"
             class="org.knime.core.data.columnar.preferences.ColumnarPreferencePage"
             id="org.knime.core.data.columnar"
-            name="Columnar (Labs)">
+            name="Columnar Storage (Labs)">
       </page>
    </extension>
 </plugin>
