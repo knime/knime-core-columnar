@@ -51,7 +51,6 @@ package org.knime.core.data.columnar.table;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createColumnarRowWriteCursor;
 import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createUnsavedColumnarContainerTable;
 
 import java.lang.ref.WeakReference;
@@ -72,20 +71,20 @@ import org.knime.core.node.ExtensionTable;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class FinalizerTest extends ColumnarTest {
+public class ResourceLeakDetectorTest extends ColumnarTest {
 
     @Override
     @Before
     public void setup() {
-        Finalizer.OPEN_FINALIZERS.clear();
+        ResourceLeakDetector.getInstance().clear();
         System.gc(); // NOSONAR
-        Finalizer.poll();
+        ResourceLeakDetector.getInstance().poll();
     }
 
     @Override
     @After
     public void tearDown() {
-        Finalizer.poll();
+        ResourceLeakDetector.getInstance().poll();
         checkNoOpenFinalizers();
     }
 
@@ -93,42 +92,38 @@ public class FinalizerTest extends ColumnarTest {
     public Timeout m_globalTimeout = Timeout.seconds(120);
 
     private static void checkOpenFinalizers(final int numOpenFinalizers) {
-        assertEquals(numOpenFinalizers, Finalizer.OPEN_FINALIZERS.size());
+        ResourceLeakDetector.getInstance().poll();
+        assertEquals(numOpenFinalizers, ResourceLeakDetector.getInstance().getNumOpenFinalizers());
     }
 
     private static void checkNoOpenFinalizers() {
-        assertTrue("There are enqueued finalizers of delegates.", Finalizer.ENQUEUED_FINALIZERS.poll() == null);
-        assertTrue("There are open references on finalizers of delegates.", Finalizer.OPEN_FINALIZERS.isEmpty());
+        ResourceLeakDetector.getInstance().poll();
+        assertTrue("There are open references on finalizers of delegates.",
+            ResourceLeakDetector.getInstance().getNumOpenFinalizers() == 0);
     }
 
-    private static void testCloseUnclosedCloseableOnGC(final Supplier<AutoCloseable> supplier,
-        final int newFinalizers) {
-        final int numOpenFinalizers = Finalizer.OPEN_FINALIZERS.size();
+    private static void testCloseUnclosedCloseableOnGC(final Supplier<AutoCloseable> supplier) {
+        final int numOpenFinalizers = ResourceLeakDetector.getInstance().getNumOpenFinalizers();
         @SuppressWarnings("resource")
         AutoCloseable closeable = supplier.get(); // NOSONAR
-        checkOpenFinalizers(numOpenFinalizers + newFinalizers);
+        checkOpenFinalizers(numOpenFinalizers + 1);
 
         closeable = null;
         final WeakReference<AutoCloseable> ref = new WeakReference<>(closeable);
         System.gc(); // NOSONAR
         await().until(() -> ref.get() == null);
 
-        Finalizer.poll();
         checkOpenFinalizers(numOpenFinalizers);
     }
 
     @Test
     public void testColumnarRowWriteCursorReleaseResourcesOnGC() {
-        testCloseUnclosedCloseableOnGC(() -> {
-            ColumnarRowWriteCursor cursor = createColumnarRowWriteCursor();
-            cursor.releaseCurrentData(0);
-            return cursor;
-        }, 1);
+        testCloseUnclosedCloseableOnGC(ColumnarTableTestUtils::createColumnarRowWriteCursor);
     }
 
     @Test
     public void testUnsavedColumnarContainerTableReleaseResourcesOnGC() {
-        testCloseUnclosedCloseableOnGC(() -> createUnsavedColumnarContainerTable(0), 1);
+        testCloseUnclosedCloseableOnGC(() -> createUnsavedColumnarContainerTable(0));
     }
 
     // TODO
@@ -139,84 +134,84 @@ public class FinalizerTest extends ColumnarTest {
     @Test
     public void testCloseUnclosedEmptyIteratorOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
-            testCloseUnclosedCloseableOnGC(table::iterator, 1);
+            testCloseUnclosedCloseableOnGC(table::iterator);
         }
     }
 
     @Test
     public void testCloseUnclosedShortIteratorOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
-            testCloseUnclosedCloseableOnGC(table::iterator, 2);
+            testCloseUnclosedCloseableOnGC(table::iterator);
         }
     }
 
     @Test
     public void testCloseUnclosedLongIteratorOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(ColumnarRowWriteCursor.CHUNK_SIZE + 1)) {
-            testCloseUnclosedCloseableOnGC(table::iterator, 2);
+            testCloseUnclosedCloseableOnGC(table::iterator);
         }
     }
 
     @Test
     public void testCloseUnclosedEmptyIteratorWithFilterOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
-            testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()), 1);
+            testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()));
         }
     }
 
     @Test
     public void testCloseUnclosedShortIteratorWithFilterOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
-            testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()), 2);
+            testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()));
         }
     }
 
     @Test
     public void testCloseUnclosedLongIteratorWithFilterOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(ColumnarRowWriteCursor.CHUNK_SIZE + 1)) {
-            testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()), 2);
+            testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()));
         }
     }
 
     @Test
     public void testCloseUnclosedEmptyCursorOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
-            testCloseUnclosedCloseableOnGC(table::cursor, 1);
+            testCloseUnclosedCloseableOnGC(table::cursor);
         }
     }
 
     @Test
     public void testCloseUnclosedShortCursorOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
-            testCloseUnclosedCloseableOnGC(table::cursor, 2);
+            testCloseUnclosedCloseableOnGC(table::cursor);
         }
     }
 
     @Test
     public void testCloseUnclosedLongCursorOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(ColumnarRowWriteCursor.CHUNK_SIZE + 1)) {
-            testCloseUnclosedCloseableOnGC(table::cursor, 2);
+            testCloseUnclosedCloseableOnGC(table::cursor);
         }
     }
 
     @Test
     public void testCloseUnclosedEmptyCursorWithFilterOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
-            testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()), 1);
+            testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()));
         }
     }
 
     @Test
     public void testCloseUnclosedShortCursorWithFilterOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
-            testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()), 2);
+            testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()));
         }
     }
 
     @Test
     public void testCloseUnclosedLongCursorWithFilterOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(ColumnarRowWriteCursor.CHUNK_SIZE + 1)) {
-            testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()), 2);
+            testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()));
         }
     }
 

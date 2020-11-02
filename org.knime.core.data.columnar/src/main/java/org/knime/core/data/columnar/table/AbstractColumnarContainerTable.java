@@ -61,6 +61,7 @@ import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -98,7 +99,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final long m_size;
 
-    private final Set<Finalizer<?>> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private ColumnReadStore m_store;
 
@@ -166,7 +167,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     @Override
     public void clear() {
-        for (final Finalizer<?> closer : m_openCursorFinalizers) {
+        for (final Finalizer closer : m_openCursorFinalizers) {
             closer.releaseResourcesAndLogOutput();
         }
         m_openCursorFinalizers.clear();

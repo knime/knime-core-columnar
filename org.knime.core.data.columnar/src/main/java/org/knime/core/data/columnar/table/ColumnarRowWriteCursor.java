@@ -55,7 +55,6 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
@@ -66,6 +65,8 @@ import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.schema.ColumnarWriteValueFactory;
+import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
+import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowWriteCursor;
@@ -90,18 +91,23 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
 
     private final DomainColumnStore m_store;
 
+    private final ResourceWithRelease m_storeRelease;
+
     private final ColumnDataFactory m_columnDataFactory;
 
     private final DomainColumnDataWriter m_writer;
 
     private final int m_tableId;
 
-    // effectively final
-    private Finalizer<ColumnReadStore> m_storeCloser;
+    private final ColumnarValueSchema m_schema;
+
+    private final ColumnarWriteValueFactory<ColumnWriteData>[] m_factories;
+
+    private Finalizer m_finalizer;
 
     private WriteValue<?>[] m_values;
 
-    private WriteBatch m_currentData;
+    private WriteBatch m_currentBatch;
 
     private ExtensionTable m_table;
 
@@ -110,10 +116,6 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
     private int m_index = 0;
 
     private long m_size = 0;
-
-    private final ColumnarValueSchema m_schema;
-
-    private final ColumnarWriteValueFactory<ColumnWriteData>[] m_factories;
 
     /**
      *
@@ -137,7 +139,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
     static ColumnarRowWriteCursor create(final int tableId, final ColumnStoreFactory storeFactory,
         final ColumnarValueSchema schema, final ColumnarRowWriteCursorSettings config) throws IOException {
         final ColumnarRowWriteCursor cursor = new ColumnarRowWriteCursor(tableId, storeFactory, schema, config);
-        cursor.m_storeCloser = Finalizer.create(cursor, cursor.m_store);
+        cursor.switchToNextData();
         return cursor;
     }
 
@@ -154,6 +156,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
             new DefaultDomainStoreConfig(schema, config.getMaxPossibleNominalDomainValues(), config.getRowKeyConfig(),
                 config.isInitializeDomains()),
             ColumnarPreferenceUtils.getDomainCalcExecutor());
+        m_storeRelease = new ResourceWithRelease(m_store);
 
         m_columnDataFactory = m_store.getFactory();
         m_writer = m_store.getWriter();
@@ -165,7 +168,6 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
             factories[i] = m_schema.getWriteValueFactoryAt(i);
         }
         m_factories = factories;
-        switchToNextData();
     }
 
     /**
@@ -197,7 +199,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
 
     @Override
     public void setMissing(final int index) {
-        m_currentData.get(index + 1).setMissing(m_index);
+        m_currentBatch.get(index + 1).setMissing(m_index);
     }
 
     @Override
@@ -222,8 +224,6 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
 
             m_table = UnsavedColumnarContainerTable.create(m_tableId, m_storeFactory,
                 ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_size);
-            // from here on out, the m_table will handle the closing of the store
-            m_storeCloser.close();
         }
         return m_table;
     }
@@ -234,11 +234,11 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
         // m_table has a handle on the store and therefore the store shouldn't be destroyed.
         try {
             if (m_table == null) {
-                if (m_currentData != null) {
-                    m_currentData.release();
-                    m_currentData = null;
+                m_finalizer.close();
+                if (m_currentBatch != null) {
+                    m_currentBatch.release();
+                    m_currentBatch = null;
                 }
-                m_storeCloser.close();
                 // closing the store includes closing the writer
                 // (but will make sure duplicate checks and domain calculations are halted)
                 m_store.close();
@@ -271,10 +271,12 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
         releaseCurrentData(m_index);
 
         // TODO can we preload data?
-        m_currentData = m_columnDataFactory.create();
-        m_values = create(m_currentData);
+        m_currentBatch = m_columnDataFactory.create();
+        m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this,
+            new ResourceWithRelease(m_currentBatch, WriteBatch::release), m_storeRelease);
+        m_values = create(m_currentBatch);
 
-        m_currentDataMaxIndex = m_currentData.capacity() - 1l;
+        m_currentDataMaxIndex = m_currentBatch.capacity() - 1l;
         m_index = 0;
     }
 
@@ -290,8 +292,9 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
     }
 
     void releaseCurrentData(final int numValues) {
-        if (m_currentData != null) {
-            final ReadBatch readBatch = m_currentData.close(numValues);
+        if (m_currentBatch != null) {
+            m_finalizer.close();
+            final ReadBatch readBatch = m_currentBatch.close(numValues);
             try {
                 m_writer.write(readBatch);
             } catch (final IOException e) {
@@ -299,7 +302,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
                 throw new IllegalStateException("Problem occurred when writing column data.", e);
             }
             readBatch.release();
-            m_currentData = null;
+            m_currentBatch = null;
             m_size += numValues;
         }
     }

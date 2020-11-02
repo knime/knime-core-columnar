@@ -56,6 +56,8 @@ import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
+import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyReadValue;
@@ -71,6 +73,8 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
     private final ColumnDataReader m_reader;
 
+    private final ResourceWithRelease m_readerRelease;
+
     private final int m_maxBatchIndex;
 
     private final int m_lastBatchMaxIndex;
@@ -81,14 +85,11 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
     private final ColumnarReadValueFactory<ColumnReadData>[] m_factories;
 
-    private final Set<Finalizer<?>> m_openCursorFinalizers;
+    private final Set<Finalizer> m_openCursorFinalizers;
 
-    // effectively final (set in the static factory method)
-    private Finalizer<ColumnDataReader> m_readerCloser;
+    private Finalizer m_finalizer;
 
     private ReadBatch m_currentBatch;
-
-    private Finalizer<ReadBatch> m_currentBatchReleaser;
 
     private ReadValue[] m_currentValues;
 
@@ -99,27 +100,33 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     private int m_currentMaxIndex;
 
     static ColumnarRowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema,
-        final long fromRowIndex, final long toRowIndex, final Set<Finalizer<?>> openCursorFinalizers) {
+        final long fromRowIndex, final long toRowIndex, final Set<Finalizer> openCursorFinalizers) {
         return create(store, schema, fromRowIndex, toRowIndex, openCursorFinalizers, null);
     }
 
     static ColumnarRowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema,
-        final long fromRowIndex, final long toRowIndex, final Set<Finalizer<?>> openCursorFinalizers,
+        final long fromRowIndex, final long toRowIndex, final Set<Finalizer> openCursorFinalizers,
         final int[] selection) {
         final ColumnarRowCursor cursor =
             new ColumnarRowCursor(store, schema, fromRowIndex, toRowIndex, selection, openCursorFinalizers);
-        cursor.m_readerCloser = Finalizer.create(cursor, cursor.m_reader);
-        openCursorFinalizers.add(cursor.m_readerCloser);
+        if (cursor.m_maxBatchIndex > -1) {
+            // read next batch
+            cursor.readNextBatch();
+        } else {
+            cursor.m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(cursor, cursor.m_readerRelease);
+            openCursorFinalizers.add(cursor.m_finalizer);
+        }
         return cursor;
     }
 
     private ColumnarRowCursor(final ColumnReadStore store, final ColumnarValueSchema schema, final long fromRowIndex,
-        final long toRowIndex, final int[] selection, final Set<Finalizer<?>> openCursorFinalizers) {
+        final long toRowIndex, final int[] selection, final Set<Finalizer> openCursorFinalizers) {
         // TODO check that from fromRowIndex > 0 and <= toRowIndex
         // check that toRowIndex < table size (which currently cannot be determined)
 
         m_selection = selection != null ? addRowKeyIndexToSelection(selection) : null;
         m_reader = store.createReader();
+        m_readerRelease = new ResourceWithRelease(m_reader);
         m_schema = schema;
         m_openCursorFinalizers = openCursorFinalizers;
 
@@ -152,9 +159,6 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
             // start index
             m_currentIndex = (int)(fromRowIndex % maxLength) - 1;
-
-            // read next batch
-            readNextBatch();
         }
     }
 
@@ -163,9 +167,9 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
         // TODO throw appropriate exception in case canPoll = false but poll()
         // called
         if (++m_currentIndex > m_currentMaxIndex) {
-            m_currentBatchReleaser.close();
-            m_openCursorFinalizers.remove(m_currentBatchReleaser);
             m_currentBatch.release();
+            m_finalizer.close();
+            m_openCursorFinalizers.remove(m_finalizer);
             readNextBatch();
             m_currentIndex = 0;
         }
@@ -204,14 +208,12 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     public void close() {
         try {
             if (m_currentBatch != null) {
-                m_currentBatchReleaser.close();
-                m_openCursorFinalizers.remove(m_currentBatchReleaser);
                 m_currentBatch.release();
                 m_currentBatch = null;
             }
 
-            m_readerCloser.close();
-            m_openCursorFinalizers.remove(m_readerCloser);
+            m_finalizer.close();
+            m_openCursorFinalizers.remove(m_finalizer);
             m_reader.close();
         } catch (final Exception e) {
             // TODO Logging
@@ -227,8 +229,9 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     private void readNextBatch() {
         try {
             m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
-            m_currentBatchReleaser = Finalizer.create(this, m_currentBatch, ReadBatch::release, "release");
-            m_openCursorFinalizers.add(m_currentBatchReleaser);
+            m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this,
+                new ResourceWithRelease(m_currentBatch, ReadBatch::release), m_readerRelease);
+            m_openCursorFinalizers.add(m_finalizer);
             if (m_selection == null) {
                 m_currentValues = create(m_currentBatch);
             } else {

@@ -48,10 +48,10 @@ package org.knime.core.data.columnar.table;
 import java.io.File;
 import java.io.IOException;
 
-import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeSettingsWO;
@@ -68,13 +68,13 @@ class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
     private final ColumnStore m_store;
 
     // effectively final
-    private Finalizer<ColumnReadStore> m_storeCloser;
+    private Finalizer m_storeCloser;
 
     static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
         final ColumnarValueSchema schema, final ColumnStore store, final long size) {
         final UnsavedColumnarContainerTable table =
             new UnsavedColumnarContainerTable(tableId, factory, schema, store, size);
-        table.m_storeCloser = Finalizer.create(table, table.m_store);
+        table.m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(table, table.m_store);
         return table;
     }
 
