@@ -64,7 +64,7 @@ import org.omg.CORBA.portable.ValueFactory;
 public interface ColumnarReadValueFactory<R extends ColumnReadData> {
 
     /**
-     * Create a new {@link ColumnarValueSupplier}. Note, the content of the read value is mutable, i.e. changes with the
+     * Create a new {@link ReadValue}. Note, the content of the read value is mutable, i.e. changes with the
      * provided {@link ColumnDataIndex}.
      *
      * @param data the underlying {@link ColumnReadData}

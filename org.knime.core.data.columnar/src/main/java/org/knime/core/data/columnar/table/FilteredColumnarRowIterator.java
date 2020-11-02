@@ -117,11 +117,7 @@ class FilteredColumnarRowIterator {
                 } else {
                     // TODO performance!!
                     final DataValue value = m_cursor.getValue(m_selection[i]);
-                    if (value instanceof DataCell) {
-                        cells.put(m_selection[i], (DataCell)value);
-                    } else {
-                        cells.put(m_selection[i], ((ReadValue)value).getDataCell());
-                    }
+                    cells.put(m_selection[i], ((ReadValue)value).getDataCell());
                 }
             }
             return new HashMapDataRow(m_cursor.getRowKeyValue().getString(), cells, m_cursor.getNumColumns());
@@ -213,11 +209,7 @@ class FilteredColumnarRowIterator {
                 } else {
                     // TODO performance!!
                     final DataValue value = m_cursor.getValue(m_selection[i]);
-                    if (value instanceof DataCell) {
-                        cells[m_selection[i]] = (DataCell)value;
-                    } else {
-                        cells[m_selection[i]] = ((ReadValue)value).getDataCell();
-                    }
+                    cells[m_selection[i]] = ((ReadValue)value).getDataCell();
                 }
             }
             return new ArrayDataRow(m_cursor.getRowKeyValue().getString(), cells);
@@ -313,11 +305,7 @@ class FilteredColumnarRowIterator {
                 cell = DataType.getMissingCell();
             } else {
                 final DataValue value = m_cursor.getValue(m_colIdx);
-                if (value instanceof DataCell) {
-                    cell = (DataCell)value;
-                } else {
-                    cell = ((ReadValue)value).getDataCell();
-                }
+                cell = ((ReadValue)value).getDataCell();
             }
             return new SingleCellDataRow(m_cursor.getRowKeyValue().getString(), cell, m_colIdx,
                 m_cursor.getNumColumns());

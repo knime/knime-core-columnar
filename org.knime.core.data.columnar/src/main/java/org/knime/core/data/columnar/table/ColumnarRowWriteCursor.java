@@ -143,8 +143,8 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
 
     // TODO consider moving store creation out of cursor (why should the cursor care?)
     @SuppressWarnings("resource")
-    private ColumnarRowWriteCursor(final int tableId, final ColumnStoreFactory storeFactory, final ColumnarValueSchema schema,
-        final ColumnarRowWriteCursorSettings config) throws IOException {
+    private ColumnarRowWriteCursor(final int tableId, final ColumnStoreFactory storeFactory,
+        final ColumnarValueSchema schema, final ColumnarRowWriteCursorSettings config) throws IOException {
         m_tableId = tableId;
         m_schema = schema;
         m_storeFactory = storeFactory;

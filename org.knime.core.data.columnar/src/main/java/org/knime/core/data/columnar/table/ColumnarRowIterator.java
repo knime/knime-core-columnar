@@ -88,14 +88,8 @@ public final class ColumnarRowIterator extends CloseableRowIterator {
             if (m_cursor.isMissing(i)) {
                 cells[i] = INSTANCE;
             } else {
-
-                // TODO performance!!
                 final DataValue value = m_cursor.getValue(i);
-                if (value instanceof DataCell) {
-                    cells[i] = (DataCell)value;
-                } else {
-                    cells[i] = ((ReadValue)value).getDataCell();
-                }
+                cells[i] = ((ReadValue)value).getDataCell();
             }
         }
 
