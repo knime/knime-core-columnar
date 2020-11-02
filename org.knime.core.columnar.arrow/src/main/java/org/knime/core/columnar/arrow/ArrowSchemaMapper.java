@@ -51,6 +51,7 @@ import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEn
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
@@ -66,6 +67,7 @@ import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.DurationData.DurationDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
+import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
@@ -200,5 +202,11 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
             innerFactories[i] = ArrowSchemaMapper.map(innerSpecs[i]);
         }
         return new ArrowStructDataFactory(innerFactories);
+    }
+
+    @Override
+    public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec) {
+        final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner());
+        return new ArrowListDataFactory(inner);
     }
 }

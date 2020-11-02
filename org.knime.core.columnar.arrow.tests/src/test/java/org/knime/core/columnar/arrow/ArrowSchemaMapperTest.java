@@ -57,6 +57,7 @@ import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEn
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
@@ -66,6 +67,7 @@ import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
+import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
@@ -147,6 +149,22 @@ public class ArrowSchemaMapperTest {
                 ArrowIntDataFactory.INSTANCE,
                 new ArrowStructDataFactory(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
                     new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE))));
+    }
+
+    /** Test mapping list specs to a {@link ArrowListDataFactory} */
+    @Test
+    public void testMapListSpec() {
+        // Simple
+        testMapSingleSpec(new ListDataSpec(DoubleDataSpec.INSTANCE),
+            new ArrowListDataFactory(ArrowDoubleDataFactory.INSTANCE));
+
+        // Complex
+        testMapSingleSpec(
+            new ListDataSpec(new ListDataSpec(new StructDataSpec(
+                new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), DoubleDataSpec.INSTANCE))),
+            new ArrowListDataFactory(new ArrowListDataFactory(
+                new ArrowStructDataFactory(new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
+                    ArrowDoubleDataFactory.INSTANCE))));
     }
 
     // TODO test for other specs when implemented
