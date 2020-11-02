@@ -62,6 +62,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.arrow.data.ArrowReadData;
+import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -77,7 +79,7 @@ import org.knime.core.columnar.filter.DefaultColumnSelection;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public abstract class AbstractArrowDataTest<W extends ColumnWriteData, R extends ColumnReadData> {
+public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends ArrowReadData> {
 
     /** The factory of the data implementation */
     protected final ArrowColumnDataFactory m_factory;
@@ -121,7 +123,7 @@ public abstract class AbstractArrowDataTest<W extends ColumnWriteData, R extends
 
     /**
      * Check the value at the given index using the seed. Should be the same as set in
-     * {@link #setValue(ColumnWriteData, int, int)}.
+     * {@link #setValue(ArrowWriteData, int, int)}.
      *
      * @param data the data object
      * @param index the index
@@ -260,6 +262,45 @@ public abstract class AbstractArrowDataTest<W extends ColumnWriteData, R extends
             checkValue(readData, i, i);
         }
         data.release();
+    }
+
+    /** Test reading and writing of sliced data */
+    @Test
+    public void testSlice() {
+        final int numValues = 32;
+        final int sliceStart = 5;
+        final int sliceLength = 10;
+
+        final W writeData = createWrite(numValues);
+        // Write into a slice
+        writeData.slice(sliceStart, sliceLength);
+        for (int i = 0; i < sliceLength; i++) {
+            setValue(writeData, i, i);
+        }
+
+        // Read everything
+        final R readData = castR(writeData.close(numValues));
+        for (int i = 0; i < numValues; i++) {
+            if (i >= sliceStart && i < sliceStart + sliceLength) {
+                // Inside the written slice
+                assertFalse(readData.isMissing(i));
+                checkValue(readData, i, i - sliceStart);
+            } else {
+                // Outside the written slice
+                assertTrue(readData.isMissing(i));
+            }
+        }
+
+        // Read only the slice
+        readData.slice(sliceStart, sliceLength);
+        assertEquals(sliceLength, readData.length());
+        for (int i = 0; i < sliceLength; i++) {
+            assertFalse(readData.isMissing(i));
+            checkValue(readData, i, i);
+        }
+
+        writeData.release();
+        readData.release();
     }
 
     /** Test #retain() and #release() for W and R */

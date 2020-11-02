@@ -74,17 +74,17 @@ public final class ArrowFloatData extends AbstractFixedWitdthData<Float4Vector>
 
     @Override
     public float getFloat(final int index) {
-        return m_vector.get(index);
+        return m_vector.get(m_offset + index);
     }
 
     @Override
     public void setFloat(final int index, final float value) {
-        m_vector.set(index, value);
+        m_vector.set(m_offset + index, value);
     }
 
     @Override
-    public FloatReadData close(final int length) {
-        m_vector.setValueCount(length);
+    public ArrowFloatData close(final int length) {
+        closeWithLength(length);
         return this;
     }
 

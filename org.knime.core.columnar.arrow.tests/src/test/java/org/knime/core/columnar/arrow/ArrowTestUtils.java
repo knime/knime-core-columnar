@@ -74,6 +74,8 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
+import org.knime.core.columnar.arrow.data.ArrowReadData;
+import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
@@ -145,7 +147,7 @@ public final class ArrowTestUtils {
      * {@link IntVector} which can be accessed by {@link #getVector()}. Use the {@link SimpleDataFactory} to create new
      * instances.
      */
-    public static final class SimpleData implements ColumnReadData, ColumnWriteData {
+    public static final class SimpleData implements ArrowWriteData, ArrowReadData {
 
         private final IntVector m_vector;
 
@@ -199,7 +201,7 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public ColumnReadData close(final int length) {
+        public SimpleData close(final int length) {
             m_vector.setValueCount(length);
             return this;
         }
@@ -208,6 +210,11 @@ public final class ArrowTestUtils {
         public boolean isMissing(final int index) {
             return m_vector.isNull(index);
         }
+
+        @Override
+        public void slice(final int start, final int length) {
+            // Cannot be sliced. Not important for reading/writing
+        }
     }
 
     /**
@@ -215,7 +222,7 @@ public final class ArrowTestUtils {
      * index vector which can be accessed with {@link #getVector()} and a dictionary which can be accessed with
      * {@link #getDictionary()}. Use {@link DictionaryEncodedDataFactory} to create new instances.
      */
-    public static final class DictionaryEncodedData implements ColumnReadData, ColumnWriteData {
+    public static final class DictionaryEncodedData implements ArrowReadData, ArrowWriteData {
 
         private final IntVector m_vector;
 
@@ -280,7 +287,7 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public ColumnReadData close(final int length) {
+        public DictionaryEncodedData close(final int length) {
             m_vector.setValueCount(length);
             return this;
         }
@@ -288,6 +295,11 @@ public final class ArrowTestUtils {
         @Override
         public boolean isMissing(final int index) {
             return m_vector.isNull(index);
+        }
+
+        @Override
+        public void slice(final int start, final int length) {
+            // Cannot be sliced. Not important for reading/writing
         }
     }
 
@@ -298,7 +310,7 @@ public final class ArrowTestUtils {
      * ArrowType: <code>Struct&lt;a:BigInt, b:Int, c:List&lt;Int&gt;, d:Struct&lt;e:Int, f:Bit&gt;&gt;</code> </br>
      * Dictionaries: <code>b:Struct&lt;g:Int, h:Int&gt;, g:VarBinary, e:VarBinary</code>
      */
-    public static final class ComplexData implements ColumnReadData, ColumnWriteData {
+    public static final class ComplexData implements ArrowReadData, ArrowWriteData {
 
         private final StructVector m_vector;
 
@@ -450,9 +462,14 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public ColumnReadData close(final int length) {
+        public ComplexData close(final int length) {
             m_vector.setValueCount(length);
             return this;
+        }
+
+        @Override
+        public void slice(final int start, final int length) {
+            // Cannot be sliced. Not important for reading/writing
         }
     }
 

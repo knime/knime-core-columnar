@@ -45,24 +45,32 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.util.ValueVectorUtility;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 
 /**
- * Abstract implementation of {@link ColumnReadData} and {@link ColumnWriteData} using Arrow.
+ * Abstract implementation of {@link ColumnReadData} and {@link ColumnWriteData} using Arrow. Make sure to call
+ * <code>#closeWithLength(int)</code> on {@link ColumnWriteData#close(int)}.
  *
  * @param <F> Type of the field vector holding the data.
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractReferenceData
-    implements ColumnReadData, ColumnWriteData {
+    implements ArrowReadData, ArrowWriteData {
 
     /** The Arrow {@link FieldVector} holding the data */
     protected final F m_vector;
+
+    protected int m_offset;
+
+    protected int m_length;
 
     /**
      * Create by wrapping the given vector. Can be an empty vector or a vector already containing data.
@@ -71,11 +79,20 @@ abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractRe
      */
     AbstractFieldVectorData(final F vector) {
         m_vector = vector;
+        m_offset = 0;
+        m_length = vector.getValueCount();
     }
 
     @Override
     public boolean isMissing(final int index) {
-        return m_vector.isNull(index);
+        return m_vector.isNull(index + m_offset);
+    }
+
+    @Override
+    public void setMissing(final int index) {
+        @SuppressWarnings("resource") // Validity buffer handled by vector
+        final ArrowBuf validityBuffer = m_vector.getValidityBuffer();
+        BitVectorHelper.unsetBit(validityBuffer, m_offset + index);
     }
 
     @Override
@@ -85,7 +102,7 @@ abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractRe
 
     @Override
     public int length() {
-        return m_vector.getValueCount();
+        return m_length;
     }
 
     @Override
@@ -95,7 +112,7 @@ abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractRe
 
     @Override
     public String toString() {
-        return m_vector.toString();
+        return ValueVectorUtility.getToString(m_vector, m_offset, m_offset + m_length);
     }
 
     @Override
@@ -103,6 +120,23 @@ abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractRe
         while (m_vector.getValueCapacity() < minimumCapacity) {
             m_vector.reAlloc();
         }
+    }
+
+    @Override
+    public void slice(final int start, final int length) {
+        m_offset = start;
+        m_length = length;
+    }
+
+    /**
+     * Call on {@link ColumnWriteData#close(int)} to set the length of this data and the value count of the vector.
+     *
+     * @param length the amount of values in the vector
+     */
+    protected void closeWithLength(final int length) {
+        m_offset = 0;
+        m_length = length;
+        m_vector.setValueCount(length);
     }
 
     /**

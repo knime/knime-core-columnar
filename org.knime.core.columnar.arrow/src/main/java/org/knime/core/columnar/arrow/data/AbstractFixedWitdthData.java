@@ -66,12 +66,4 @@ abstract class AbstractFixedWitdthData<F extends BaseFixedWidthVector> extends A
     public int sizeOf() {
         return (int)(m_vector.getDataBuffer().capacity() + m_vector.getValidityBuffer().capacity());
     }
-
-    @Override
-    public void setMissing(final int index) {
-        // TODO does it make a huge difference to access the validity buffer directly?
-        // #setNull checks if the index is save
-        // BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
-        m_vector.setNull(index);
-    }
 }

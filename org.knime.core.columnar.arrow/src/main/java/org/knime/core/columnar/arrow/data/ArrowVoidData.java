@@ -70,15 +70,18 @@ import org.knime.core.columnar.data.VoidData.VoidWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowVoidData implements VoidWriteData, VoidReadData {
+public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidReadData, ArrowReadData {
 
     private int m_capacity;
 
     private final NullVector m_vector;
 
+    private int m_length;
+
     private ArrowVoidData(final NullVector vector, final int capacity) {
         m_vector = vector;
         m_capacity = capacity;
+        m_length = vector.getValueCount();
     }
 
     @Override
@@ -97,14 +100,31 @@ public final class ArrowVoidData implements VoidWriteData, VoidReadData {
     }
 
     @Override
-    public VoidReadData close(final int length) {
+    public ArrowVoidData close(final int length) {
         m_vector.setValueCount(length);
+        m_length = length;
         return this;
     }
 
     @Override
     public int length() {
-        return m_vector.getValueCount();
+        return m_length;
+    }
+
+    @Override
+    public void release() {
+        // Nothing to release
+    }
+
+    @Override
+    public void retain() {
+        // Nothing to retain
+    }
+
+    @Override
+    public void slice(final int start, final int length) {
+        // The vector has no data: We don't need to remember the offset
+        m_length = length;
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVoidData} */

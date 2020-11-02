@@ -83,19 +83,19 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
     }
 
     @Override
-    public ObjectReadData<T> close(final int length) {
-        m_vector.setValueCount(length);
+    public ArrowObjectData<T> close(final int length) {
+        closeWithLength(length);
         return this;
     }
 
     @Override
     public T getObject(final int index) {
-        return m_io.deserialize(index);
+        return m_io.deserialize(m_offset + index);
     }
 
     @Override
     public void setObject(final int index, final T obj) {
-        m_io.serialize(index, obj);
+        m_io.serialize(m_offset + index, obj);
     }
 
     /**

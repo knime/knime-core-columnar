@@ -74,17 +74,17 @@ public final class ArrowDoubleData extends AbstractFixedWitdthData<Float8Vector>
 
     @Override
     public double getDouble(final int index) {
-        return m_vector.get(index);
+        return m_vector.get(m_offset + index);
     }
 
     @Override
     public void setDouble(final int index, final double value) {
-        m_vector.set(index, value);
+        m_vector.set(m_offset + index, value);
     }
 
     @Override
-    public DoubleReadData close(final int length) {
-        m_vector.setValueCount(length);
+    public ArrowDoubleData close(final int length) {
+        closeWithLength(length);
         return this;
     }
 

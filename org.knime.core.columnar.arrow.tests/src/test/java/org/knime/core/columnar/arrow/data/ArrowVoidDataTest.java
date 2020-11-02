@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.ReferencedData;
@@ -100,6 +101,21 @@ public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData, Arro
     @Override
     protected int getMinSize(final int valueCount, final int capacity) {
         return 0;
+    }
+
+    @Override
+    public void testSlice() {
+        final int numValues = 32;
+        final int sliceStart = 5;
+        final int sliceLength = 10;
+
+        final ArrowVoidData writeData = createWrite(numValues);
+        final ArrowVoidData readData = castR(writeData.close(numValues));
+        readData.slice(sliceStart, sliceLength);
+        assertEquals(sliceLength, readData.length());
+
+        writeData.release();
+        readData.release();
     }
 
     @Override

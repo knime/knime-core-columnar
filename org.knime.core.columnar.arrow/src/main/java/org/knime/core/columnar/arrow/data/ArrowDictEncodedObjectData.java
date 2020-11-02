@@ -112,13 +112,13 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
 
     @Override
     public T getObject(final int index) {
-        return m_invInMemDict.get(m_vector.get(index));
+        return m_invInMemDict.get(m_vector.get(m_offset + index));
     }
 
     @Override
     public synchronized void setObject(final int index, final T value) {
         final Integer dictIndex = m_inMemDict.computeIfAbsent(value, k -> m_runningDictIndex++);
-        m_vector.set(index, dictIndex);
+        m_vector.set(m_offset + index, dictIndex);
     }
 
     VarBinaryVector getDictionary() {
@@ -138,31 +138,19 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
     }
 
     @Override
-    public void setMissing(final int index) {
-        // TODO we can speed things likely up directly accessing validity buffer
-        // BitVectorHelper.unsetBit(m_vector.getValidityBuffer(), index);
-        m_vector.setNull(index);
-    }
-
-    @Override
-    public boolean isMissing(final int index) {
-        return m_vector.isNull(index);
-    }
-
-    @Override
     public int capacity() {
         return m_vector.getValueCapacity();
     }
 
     @Override
-    public ObjectReadData<T> close(final int length) {
-        m_vector.setValueCount(length);
+    public ArrowDictEncodedObjectData<T> close(final int length) {
+        closeWithLength(length);
         return this;
     }
 
     @Override
     public int length() {
-        return m_vector.getValueCount();
+        return m_length;
     }
 
     @Override

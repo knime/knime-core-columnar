@@ -74,17 +74,17 @@ public final class ArrowVarBinaryData extends AbstractVariableWitdthData<VarBina
 
     @Override
     public byte[] getBytes(final int index) {
-        return m_vector.get(index);
+        return m_vector.get(m_offset + index);
     }
 
     @Override
     public void setBytes(final int index, final byte[] value) {
-        m_vector.setSafe(index, value);
+        m_vector.setSafe(m_offset + index, value);
     }
 
     @Override
-    public VarBinaryReadData close(final int length) {
-        m_vector.setValueCount(length);
+    public ArrowVarBinaryData close(final int length) {
+        closeWithLength(length);
         return this;
     }
 

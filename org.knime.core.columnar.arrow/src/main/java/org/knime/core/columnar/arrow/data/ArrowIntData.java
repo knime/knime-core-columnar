@@ -73,17 +73,17 @@ public final class ArrowIntData extends AbstractFixedWitdthData<IntVector> imple
 
     @Override
     public int getInt(final int index) {
-        return m_vector.get(index);
+        return m_vector.get(m_offset + index);
     }
 
     @Override
     public void setInt(final int index, final int value) {
-        m_vector.set(index, value);
+        m_vector.set(m_offset + index, value);
     }
 
     @Override
-    public IntReadData close(final int length) {
-        m_vector.setValueCount(length);
+    public ArrowIntData close(final int length) {
+        closeWithLength(length);
         return this;
     }
 

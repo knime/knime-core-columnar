@@ -73,17 +73,17 @@ public final class ArrowLongData extends AbstractFixedWitdthData<BigIntVector> i
 
     @Override
     public long getLong(final int index) {
-        return m_vector.get(index);
+        return m_vector.get(m_offset + index);
     }
 
     @Override
     public void setLong(final int index, final long value) {
-        m_vector.set(index, value);
+        m_vector.set(m_offset + index, value);
     }
 
     @Override
-    public LongReadData close(final int length) {
-        m_vector.setValueCount(length);
+    public ArrowLongData close(final int length) {
+        closeWithLength(length);
         return this;
     }
 

@@ -63,6 +63,7 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.ArrowType.Struct;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.arrow.vector.util.ValueVectorUtility;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
@@ -83,16 +84,20 @@ public final class ArrowStructData {
     }
 
     /** Arrow implementation of {@link StructWriteData}. */
-    public static final class ArrowStructWriteData extends AbstractReferenceData implements StructWriteData {
+    public static final class ArrowStructWriteData extends AbstractReferenceData
+        implements StructWriteData, ArrowWriteData {
 
         // Package private for testing only
         final StructVector m_vector;
 
-        private final ColumnWriteData[] m_children;
+        private final ArrowWriteData[] m_children;
 
-        private ArrowStructWriteData(final StructVector vector, final ColumnWriteData... children) {
+        private int m_offset;
+
+        private ArrowStructWriteData(final StructVector vector, final ArrowWriteData... children) {
             m_vector = vector;
             m_children = children;
+            m_offset = 0;
         }
 
         @Override
@@ -100,7 +105,7 @@ public final class ArrowStructData {
             // NB: We don't need to call m_vector.setNull because it is always null until #close
             // Set all children to missing
             for (final ColumnWriteData child : m_children) {
-                child.setMissing(index);
+                child.setMissing(m_offset + index);
             }
         }
 
@@ -129,12 +134,20 @@ public final class ArrowStructData {
         }
 
         @Override
+        public void slice(final int start, final int length) {
+            m_offset = start;
+            for (final ArrowWriteData child : m_children) {
+                child.slice(start, length);
+            }
+        }
+
+        @Override
         @SuppressWarnings("resource") // Validity buffer and child vectors closed by m_vector
-        public StructReadData close(final int length) {
+        public ArrowStructReadData close(final int length) {
             final int numChildren = m_children.length;
 
             // Close the children
-            final ColumnReadData[] readChildren = new ColumnReadData[numChildren];
+            final ArrowReadData[] readChildren = new ArrowReadData[numChildren];
             for (int i = 0; i < numChildren; i++) {
                 readChildren[i] = m_children[i].close(length);
             }
@@ -173,32 +186,38 @@ public final class ArrowStructData {
 
         @Override
         public String toString() {
-            return ArrowStructData.toString(m_vector);
+            return ArrowStructData.toString(m_vector, m_offset, m_vector.getValueCount());
         }
-
     }
 
     /** Arrow implementation of {@link StructReadData}. */
-    public static final class ArrowStructReadData extends AbstractReferenceData implements StructReadData {
+    public static final class ArrowStructReadData extends AbstractReferenceData
+        implements StructReadData, ArrowReadData {
 
         // Package private for testing only
         final StructVector m_vector;
 
-        private final ColumnReadData[] m_children;
+        private final ArrowReadData[] m_children;
 
-        private ArrowStructReadData(final StructVector vector, final ColumnReadData... children) {
+        private int m_offset;
+
+        private int m_length;
+
+        private ArrowStructReadData(final StructVector vector, final ArrowReadData... children) {
             m_vector = vector;
             m_children = children;
+            m_offset = 0;
+            m_length = m_vector.getValueCount();
         }
 
         @Override
         public boolean isMissing(final int index) {
-            return m_vector.isNull(index);
+            return m_vector.isNull(m_offset + index);
         }
 
         @Override
         public int length() {
-            return m_vector.getValueCount();
+            return m_length;
         }
 
         @Override
@@ -214,13 +233,22 @@ public final class ArrowStructData {
         }
 
         @Override
+        public void slice(final int start, final int length) {
+            m_offset = start;
+            m_length = length;
+            for (final ArrowReadData child : m_children) {
+                child.slice(start, length);
+            }
+        }
+
+        @Override
         protected void closeResources() {
             ArrowStructData.closeResources(m_vector, m_children);
         }
 
         @Override
         public String toString() {
-            return ArrowStructData.toString(m_vector);
+            return ArrowStructData.toString(m_vector, m_offset, m_offset + m_length);
         }
     }
 
@@ -233,8 +261,8 @@ public final class ArrowStructData {
         return size;
     }
 
-    private static String toString(final StructVector vector) {
-        return vector.toString();
+    private static String toString(final StructVector vector, final int start, final int end) {
+        return ValueVectorUtility.getToString(vector, start, end);
     }
 
     private static void closeResources(final StructVector vector, final ReferencedData[] children) {
@@ -284,7 +312,7 @@ public final class ArrowStructData {
             final BufferAllocator allocator, final int capacity) {
             final StructVector v = (StructVector)vector;
             // Children
-            final ColumnWriteData[] children = new ColumnWriteData[m_inner.length];
+            final ArrowWriteData[] children = new ArrowWriteData[m_inner.length];
             for (int i = 0; i < children.length; i++) {
                 @SuppressWarnings("resource") // Child vector closed with struct vector
                 final FieldVector childVector = v.getChild(childNameAtIndex(i));
@@ -302,7 +330,7 @@ public final class ArrowStructData {
                 final StructVector v = (StructVector)vector;
 
                 // Children
-                final ColumnReadData[] children = new ColumnReadData[m_inner.length];
+                final ArrowReadData[] children = new ArrowReadData[m_inner.length];
                 for (int i = 0; i < children.length; i++) {
                     @SuppressWarnings("resource") // Child vector closed with struct vector
                     final FieldVector childVector = v.getChild(childNameAtIndex(i));

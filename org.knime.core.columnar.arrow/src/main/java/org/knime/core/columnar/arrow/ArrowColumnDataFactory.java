@@ -53,6 +53,8 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.knime.core.columnar.arrow.data.ArrowReadData;
+import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 
@@ -89,14 +91,6 @@ public interface ArrowColumnDataFactory {
      */
     Field getField(String name, LongSupplier dictionaryIdSupplier);
 
-    /*
-     * Create an empty column data for writing.
-     *
-     * @param allocator the allocator used for memory allocation
-     * @param capacity the capacity of the data
-     * @return the {@link ColumnWriteData}
-     */
-
     /**
      * Create an empty column data for writing. TODO(benjamin) remove capacity?
      *
@@ -108,7 +102,7 @@ public interface ArrowColumnDataFactory {
      * @param capacity the initial capacity to allocate
      * @return the {@link ColumnWriteData}
      */
-    ColumnWriteData createWrite(FieldVector vector, LongSupplier dictionaryIdSupplier, BufferAllocator allocator,
+    ArrowWriteData createWrite(FieldVector vector, LongSupplier dictionaryIdSupplier, BufferAllocator allocator,
         int capacity);
 
     // ===================== Reading ColumnReadData ===========================
@@ -122,7 +116,7 @@ public interface ArrowColumnDataFactory {
      * @return the {@link ColumnReadData}
      * @throws IOException if the data cannot be loaded with the given version
      */
-    ColumnReadData createRead(FieldVector vector, DictionaryProvider provider, ArrowColumnDataFactoryVersion version)
+    ArrowReadData createRead(FieldVector vector, DictionaryProvider provider, ArrowColumnDataFactoryVersion version)
         throws IOException;
 
     // ===================== Getting data for writing =========================

@@ -42,29 +42,35 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 30, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.apache.arrow.vector.BaseVariableWidthVector;
+import org.knime.core.columnar.data.ColumnWriteData;
 
 /**
- * An abstract implementation of Arrow data which uses a {@link BaseVariableWidthVector} for data storage. Handles
- * #sizeOf() and #setMissing(int).
+ * Arrow implementation of {@link ColumnWriteData}. Can be sliced with {@link #slice(int, int)}.
  *
- * @param <F> Type of the field vector holding the data.
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractVariableWitdthData<F extends BaseVariableWidthVector> extends AbstractFieldVectorData<F> {
+public interface ArrowWriteData extends ColumnWriteData {
 
-    AbstractVariableWitdthData(final F vector) {
-        super(vector);
-    }
+    /**
+     * Slice the this object to the given start and length. Note that this only affects what data is returned when
+     * accessing the data with an index. This does not effect {@link #capacity()} and {@link #expand(int)}.
+     *
+     * @param start the first index of the slice
+     * @param length the length of the slice
+     */
+    void slice(int start, int length);
 
+    /**
+     * {@inheritDoc}
+     *
+     * Note: The returned {@link ArrowReadData} is not sliced.
+     */
     @Override
-    @SuppressWarnings("resource") // Buffers handled by vector
-    public int sizeOf() {
-        return (int)(m_vector.getDataBuffer().capacity() + m_vector.getValidityBuffer().capacity()
-            + m_vector.getOffsetBuffer().capacity());
-    }
+    ArrowReadData close(int length);
 }
