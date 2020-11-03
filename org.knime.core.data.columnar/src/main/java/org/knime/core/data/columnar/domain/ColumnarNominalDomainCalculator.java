@@ -98,7 +98,8 @@ final class ColumnarNominalDomainCalculator<C extends ColumnReadData>
 
     @Override
     public DataColumnDomain getDomain() {
-        return m_values == null ? null : new DataColumnDomainCreator(m_values).createDomain();
+        return m_values == null ? new DataColumnDomainCreator().createDomain()
+            : new DataColumnDomainCreator(m_values).createDomain();
     }
 
     @Override

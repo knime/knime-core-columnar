@@ -94,7 +94,7 @@ final class ColumnarStringDomainCalculator
 
     @Override
     public DataColumnDomain getDomain() {
-        return m_values == null ? null
+        return m_values == null ? new DataColumnDomainCreator().createDomain()
             : new DataColumnDomainCreator(m_values.stream().map((s) -> new StringCell(s)).toArray(StringCell[]::new))
                 .createDomain();
     }

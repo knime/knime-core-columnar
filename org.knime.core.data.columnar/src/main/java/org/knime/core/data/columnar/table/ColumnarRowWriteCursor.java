@@ -212,14 +212,8 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
             final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
             final int numColumns = m_schema.getNumColumns();
             for (int i = 1; i < numColumns; i++) {
-                final DataColumnDomain resultDomain = m_store.getDomains(i);
-                if (resultDomain != null) {
-                    domains.put(i, resultDomain);
-                }
-                final DataColumnMetaData[] resultMetadata = m_store.getDomainMetadata(i);
-                if (resultMetadata != null) {
-                    metadata.put(i, resultMetadata);
-                }
+                domains.put(i, m_store.getDomains(i));
+                metadata.put(i, m_store.getDomainMetadata(i));
             }
 
             m_table = UnsavedColumnarContainerTable.create(m_tableId, m_storeFactory,
