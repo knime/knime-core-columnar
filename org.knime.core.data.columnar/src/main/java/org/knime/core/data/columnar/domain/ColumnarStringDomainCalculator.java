@@ -107,11 +107,13 @@ final class ColumnarStringDomainCalculator
     @Override
     public void update(final DataColumnDomain domain) {
         if (domain.hasValues()) {
-            for (DataCell cell : domain.getValues()) {
-                m_values.add(((StringValue)cell).getStringValue());
-                if (m_values.size() > m_maxNumValues) {
-                    m_values = null;
-                    return;
+            for (final DataCell cell : domain.getValues()) {
+                if (!cell.isMissing()) {
+                    m_values.add(((StringValue)cell).getStringValue());
+                    if (m_values.size() > m_maxNumValues) {
+                        m_values = null;
+                        return;
+                    }
                 }
             }
         }
