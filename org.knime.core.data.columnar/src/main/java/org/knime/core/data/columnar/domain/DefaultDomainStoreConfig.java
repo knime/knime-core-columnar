@@ -117,7 +117,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
         m_nativeDomainCalculators.put(DoubleCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
         m_nativeDomainCalculators.put(IntCell.TYPE, () -> new ColumnarIntDomainCalculator());
         m_nativeDomainCalculators.put(LongCell.TYPE, () -> new ColumnarLongDomainCalculator());
-//        m_nativeDomainCalculators.put(BooleanCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
+        //        m_nativeDomainCalculators.put(BooleanCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
         m_nativeDomainCalculators.put(StringCell.TYPE, () -> new ColumnarStringDomainCalculator(m_maxNumValues));
     }
 
@@ -162,23 +162,30 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                 final DataType type = spec.getColumnSpec(i - 1).getType();
 
                 final ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain> calculator;
+                // check for native (=faster) implementations
                 if (m_nativeDomainCalculators.containsKey(type)) {
                     calculator = m_nativeDomainCalculators.get(type).get();
-                } else if (type.isCompatible(NominalValue.class)) {
-                    calculator = new ColumnarNominalDomainCalculator<ColumnReadData>(readValueFactory, m_maxNumValues);
-                } else if (type.isCompatible(BoundedValue.class)) {
-                    calculator = new ColumnarBoundedDomainCalculator<>(readValueFactory,
-                        new DataValueComparatorDelegator<>(type.getComparator()));
                 } else {
-                    calculator = null;
+                    // use our fallback implementations
+                    final boolean isNominal = type.isCompatible(NominalValue.class);
+                    final boolean isBounded = type.isCompatible(BoundedValue.class);
+                    if (isNominal && isBounded) {
+                        calculator = new ColumnarCombinedDomainCalculator<>(readValueFactory,
+                            new DataValueComparatorDelegator<>(type.getComparator()), m_maxNumValues);
+                    } else if (isNominal) {
+                        calculator = new ColumnarNominalDomainCalculator<>(readValueFactory, m_maxNumValues);
+                    } else if (isBounded) {
+                        calculator = new ColumnarBoundedDomainCalculator<>(readValueFactory,
+                            new DataValueComparatorDelegator<>(type.getComparator()));
+                    } else {
+                        calculator = null;
+                    }
                 }
 
                 if (calculator != null) {
                     calculator.update(spec.getColumnSpec(i - 1).getDomain());
                     m_domainCalculators.put(i, calculator);
                 }
-
-                // TODO what if type is compatible to both?
             }
         }
         return m_domainCalculators;
