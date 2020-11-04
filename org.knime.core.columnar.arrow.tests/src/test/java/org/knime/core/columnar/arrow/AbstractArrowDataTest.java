@@ -55,6 +55,13 @@ import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.RootAllocator;
@@ -301,6 +308,60 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
 
         writeData.release();
         readData.release();
+    }
+
+    /**
+     * Test reading different indices in R at the same time.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testSynchronousRead() throws Exception {
+        final int numValues = 64;
+        final int nThreads = 32;
+
+        final W writeData = createWrite(numValues);
+        for (int i = 0; i < numValues; i++) {
+            setValue(writeData, i, i);
+        }
+
+        // Create the tasks to check the read data
+        final R readData = castR(writeData.close(numValues));
+        final List<CheckReadDataCallable> checkTasks = IntStream.range(0, nThreads)
+            .mapToObj(i -> new CheckReadDataCallable(readData, i, numValues)).collect(Collectors.toList());
+
+        // Run the tasks in parallel
+        final ExecutorService pool = Executors.newFixedThreadPool(nThreads);
+        final List<Future<Void>> futures = pool.invokeAll(checkTasks);
+        for (final Future<Void> f : futures) {
+            f.get();
+        }
+
+        writeData.release();
+        readData.release();
+    }
+
+    private final class CheckReadDataCallable implements Callable<Void> {
+
+        private final R m_readData;
+
+        private final int m_startIndex;
+
+        private final int m_numValues;
+
+        public CheckReadDataCallable(final R readData, final int startIndex, final int numValues) {
+            m_readData = readData;
+            m_startIndex = startIndex;
+            m_numValues = numValues;
+        }
+
+        @Override
+        public Void call() {
+            for (int i = m_startIndex; i < m_numValues; i++) {
+                checkValue(m_readData, i, i);
+            }
+            return null;
+        }
     }
 
     /** Test #retain() and #release() for W and R */
