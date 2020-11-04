@@ -65,39 +65,81 @@ import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowDoubleData extends AbstractFixedWitdthData<Float8Vector>
-    implements DoubleWriteData, DoubleReadData {
+public final class ArrowDoubleData {
 
-    private ArrowDoubleData(final Float8Vector vector) {
-        super(vector);
+    private ArrowDoubleData() {
     }
 
-    @Override
-    public double getDouble(final int index) {
-        return m_vector.get(m_offset + index);
+    /** Arrow implementation of {@link DoubleWriteData}. */
+    public static final class ArrowDoubleWriteData extends AbstractArrowWriteData<Float8Vector>
+        implements DoubleWriteData {
+
+        private ArrowDoubleWriteData(final Float8Vector vector) {
+            super(vector);
+        }
+
+        private ArrowDoubleWriteData(final Float8Vector vector, final int offset) {
+            super(vector, offset);
+        }
+
+        @Override
+        public void setDouble(final int index, final double val) {
+            m_vector.set(m_offset + index, val);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new ArrowDoubleWriteData(m_vector, m_offset + start);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Resource closed by ReadData
+        public ArrowDoubleReadData close(final int length) {
+            return new ArrowDoubleReadData(closeWithLength(length));
+        }
     }
 
-    @Override
-    public void setDouble(final int index, final double value) {
-        m_vector.set(m_offset + index, value);
-    }
+    /** Arrow implementation of {@link DoubleReadData}. */
+    public static final class ArrowDoubleReadData extends AbstractArrowReadData<Float8Vector>
+        implements DoubleReadData {
 
-    @Override
-    public ArrowDoubleData close(final int length) {
-        closeWithLength(length);
-        return this;
+        private ArrowDoubleReadData(final Float8Vector vector) {
+            super(vector);
+        }
+
+        private ArrowDoubleReadData(final Float8Vector vector, final int offset, final int length) {
+            super(vector, offset, length);
+        }
+
+        @Override
+        public double getDouble(final int index) {
+            return m_vector.get(m_offset + index);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowDoubleReadData(m_vector, m_offset + start, length);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowDoubleData} */
-    public static final class ArrowDoubleDataFactory extends AbstractFieldVectorDataFactory {
-
-        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
+    public static final class ArrowDoubleDataFactory extends AbstractArrowColumnDataFactory {
 
         /** Singleton instance of {@link ArrowDoubleDataFactory} */
         public static final ArrowDoubleDataFactory INSTANCE = new ArrowDoubleDataFactory();
 
         private ArrowDoubleDataFactory() {
-            // Singleton
+            super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
@@ -106,27 +148,22 @@ public final class ArrowDoubleData extends AbstractFixedWitdthData<Float8Vector>
         }
 
         @Override
-        public ArrowDoubleData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowDoubleWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final Float8Vector v = (Float8Vector)vector;
             v.allocateNew(capacity);
-            return new ArrowDoubleData(v);
+            return new ArrowDoubleWriteData(v);
         }
 
         @Override
-        public ArrowDoubleData createRead(final FieldVector vector, final DictionaryProvider provider,
+        public ArrowDoubleReadData createRead(final FieldVector vector, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (CURRENT_VERSION.equals(version)) {
-                return new ArrowDoubleData((Float8Vector)vector);
+            if (m_version.equals(version)) {
+                return new ArrowDoubleReadData((Float8Vector)vector);
             } else {
-                throw new IOException("Cannot read ArrowDoubleData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
+                throw new IOException(
+                    "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return CURRENT_VERSION;
         }
     }
 }

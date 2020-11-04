@@ -57,9 +57,10 @@ import java.util.Arrays;
 import java.util.Random;
 
 import org.apache.arrow.vector.IntVector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectReadData;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectWriteData;
 
 /**
  * Test {@link ArrowDictEncodedObjectData}.
@@ -68,7 +69,7 @@ import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEn
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public class ArrowDictEncodedObjectDataTest
-    extends AbstractArrowDataTest<ArrowDictEncodedObjectData<byte[]>, ArrowDictEncodedObjectData<byte[]>> {
+    extends AbstractArrowDataTest<ArrowDictEncodedObjectWriteData<byte[]>, ArrowDictEncodedObjectReadData<byte[]>> {
 
     private static final int NUM_DISTINCT = 23;
 
@@ -81,37 +82,40 @@ public class ArrowDictEncodedObjectDataTest
         super(new ArrowDictEncodedObjectDataFactory<byte[]>(DummyByteArraySerializer.INSTANCE));
     }
 
+    @Override
     @SuppressWarnings("unchecked")
-    private static ArrowDictEncodedObjectData<byte[]> cast(final Object o) {
-        assertTrue(o instanceof ArrowDictEncodedObjectData);
-        return (ArrowDictEncodedObjectData<byte[]>)o;
+    protected ArrowDictEncodedObjectWriteData<byte[]> castW(final Object o) {
+        assertTrue(o instanceof ArrowDictEncodedObjectWriteData);
+        return (ArrowDictEncodedObjectWriteData<byte[]>)o;
     }
 
     @Override
-    protected ArrowDictEncodedObjectData<byte[]> castW(final Object o) {
-        return cast(o);
+    @SuppressWarnings("unchecked")
+    protected ArrowDictEncodedObjectReadData<byte[]> castR(final Object o) {
+        assertTrue(o instanceof ArrowDictEncodedObjectReadData);
+        return (ArrowDictEncodedObjectReadData<byte[]>)o;
     }
 
     @Override
-    protected ArrowDictEncodedObjectData<byte[]> castR(final Object o) {
-        return cast(o);
-    }
-
-    @Override
-    protected void setValue(final ArrowDictEncodedObjectData<byte[]> data, final int index, final int seed) {
+    protected void setValue(final ArrowDictEncodedObjectWriteData<byte[]> data, final int index, final int seed) {
         data.setObject(index, valueFor(seed));
     }
 
     @Override
-    protected void checkValue(final ArrowDictEncodedObjectData<byte[]> data, final int index, final int seed) {
+    protected void checkValue(final ArrowDictEncodedObjectReadData<byte[]> data, final int index, final int seed) {
         assertArrayEquals(valueFor(seed), data.getObject(index));
     }
 
     @Override
+    protected boolean isReleasedW(final ArrowDictEncodedObjectWriteData<byte[]> data) {
+        return data.m_vector == null;
+    }
+
+    @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ReferencedData data) {
+    protected boolean isReleasedR(final ArrowDictEncodedObjectReadData<byte[]> data) {
         // TODO check for the dictionary??
-        final IntVector v = cast(data).m_vector;
+        final IntVector v = castR(data).m_vector;
         return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
     }
 
@@ -130,21 +134,23 @@ public class ArrowDictEncodedObjectDataTest
 
         // Write each value of the dictionary
         final int numValues = NUM_DISTINCT;
-        final ArrowDictEncodedObjectData<byte[]> d = createWrite(numValues);
+        final ArrowDictEncodedObjectWriteData<byte[]> writeData = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
-            d.setObject(i, VALUES[i]);
+            writeData.setObject(i, VALUES[i]);
         }
-        d.close(numValues);
+        final ArrowDictEncodedObjectReadData<byte[]> readData = writeData.close(numValues);
 
         // Allocate the dictionary
-        d.getDictionary();
+        readData.getDictionary();
 
         final int expectedSize = getMinSize(numValues, numValues) // Index vector
             + Arrays.stream(VALUES).mapToInt(v -> v.length).sum() // dictionary data buffer
             + 4 * numValues // dictionary offset buffer
             + (int)Math.ceil(numValues / 8.0); // dictionary validity buffer
-        assertTrue("Size to small. Got " + d.sizeOf() + ", expected >= " + expectedSize, d.sizeOf() >= expectedSize);
-        d.release();
+        assertTrue("Size to small. Got " + readData.sizeOf() + ", expected >= " + expectedSize,
+            readData.sizeOf() >= expectedSize);
+
+        readData.release();
     }
 
     @Override
@@ -155,19 +161,25 @@ public class ArrowDictEncodedObjectDataTest
 
         // Write each value of the dictionary
         final int numValues = NUM_DISTINCT;
-        final ArrowDictEncodedObjectData<byte[]> d = createWrite(numValues);
+        final ArrowDictEncodedObjectWriteData<byte[]> writeData = createWrite(numValues);
         for (int i = 0; i < numValues; i++) {
-            d.setObject(i, VALUES[i]);
+            writeData.setObject(i, VALUES[i]);
         }
-        d.close(numValues);
 
-        // Allocate the dictionary
-        d.getDictionary();
-
-        final String s = d.toString();
+        String s = writeData.toString();
         assertNotNull(s);
         assertFalse(s.isEmpty());
-        d.release();
+
+        final ArrowDictEncodedObjectReadData<byte[]> readData = writeData.close(numValues);
+
+        // Fill the dictionary
+        readData.getDictionary();
+
+        s = readData.toString();
+        assertNotNull(s);
+        assertFalse(s.isEmpty());
+
+        readData.release();
     }
 
     private static byte[] valueFor(final int seed) {

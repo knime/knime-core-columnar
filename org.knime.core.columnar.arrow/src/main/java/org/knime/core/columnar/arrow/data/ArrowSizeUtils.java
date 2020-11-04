@@ -44,67 +44,59 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 30, 2020 (benjamin): created
+ *   Nov 4, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongReadData;
-import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongWriteData;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.complex.ListVector;
+import org.apache.arrow.vector.complex.StructVector;
 
 /**
- * Test {@link ArrowLongData}
+ * Utility class for calculating the size of vectors in memory.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowLongDataTest extends AbstractArrowDataTest<ArrowLongWriteData, ArrowLongReadData> {
+final class ArrowSizeUtils {
 
-    /** Create the test for {@link ArrowLongData} */
-    public ArrowLongDataTest() {
-        super(ArrowLongDataFactory.INSTANCE);
+    private ArrowSizeUtils() {
+        // Utility class
     }
 
-    @Override
-    protected ArrowLongWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowLongWriteData);
-        return (ArrowLongWriteData)o;
-    }
-
-    @Override
-    protected ArrowLongReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowLongReadData);
-        return (ArrowLongReadData)o;
-    }
-
-    @Override
-    protected void setValue(final ArrowLongWriteData data, final int index, final int seed) {
-        data.setLong(index, seed);
-    }
-
-    @Override
-    protected void checkValue(final ArrowLongReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getLong(index), 0);
-    }
-
-    @Override
-    protected boolean isReleasedW(final ArrowLongWriteData data) {
-        return data.m_vector == null;
-    }
-
-    @Override
+    /**
+     * @param vector with fixed width data (Having a data buffer and a validity buffer)
+     * @return size of the vector in memory
+     */
     @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowLongReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+    static int sizeOfFixedWidth(final FieldVector vector) {
+        return (int)(vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity());
     }
 
-    @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
-        return 8 * capacity // 8 bytes per value for data
-            + (int)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    /**
+     * @param vector with variable width data (Having a data buffer, a validity buffer, and an offset buffer)
+     * @return size of the vector in memory
+     */
+    @SuppressWarnings("resource")
+    static int sizeOfVariableWidth(final FieldVector vector) {
+        return (int)(vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity()
+            + vector.getOffsetBuffer().capacity());
+    }
+
+    /**
+     * @param vector a list vector
+     * @return size of the vector in memory (not including children)
+     */
+    @SuppressWarnings("resource")
+    static int sizeOfList(final ListVector vector) {
+        return (int)(vector.getValidityBuffer().capacity() + vector.getOffsetBuffer().capacity());
+    }
+
+    /**
+     * @param vector a struct vector
+     * @return size of the vector in memory (not including children)
+     */
+    @SuppressWarnings("resource")
+    static int sizeOfStruct(final StructVector vector) {
+        return (int)(vector.getValidityBuffer().capacity());
     }
 }

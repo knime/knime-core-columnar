@@ -65,38 +65,79 @@ import org.knime.core.columnar.data.LongData.LongWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowLongData extends AbstractFixedWitdthData<BigIntVector> implements LongWriteData, LongReadData {
+public final class ArrowLongData {
 
-    private ArrowLongData(final BigIntVector vector) {
-        super(vector);
+    private ArrowLongData() {
     }
 
-    @Override
-    public long getLong(final int index) {
-        return m_vector.get(m_offset + index);
+    /** Arrow implementation of {@link LongWriteData}. */
+    public static final class ArrowLongWriteData extends AbstractArrowWriteData<BigIntVector> implements LongWriteData {
+
+        private ArrowLongWriteData(final BigIntVector vector) {
+            super(vector);
+        }
+
+        private ArrowLongWriteData(final BigIntVector vector, final int offset) {
+            super(vector, offset);
+        }
+
+        @Override
+        public void setLong(final int index, final long val) {
+            m_vector.set(m_offset + index, val);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new ArrowLongWriteData(m_vector, m_offset + start);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Resource closed by ReadData
+        public ArrowLongReadData close(final int length) {
+            return new ArrowLongReadData(closeWithLength(length));
+        }
     }
 
-    @Override
-    public void setLong(final int index, final long value) {
-        m_vector.set(m_offset + index, value);
-    }
+    /** Arrow implementation of {@link LongReadData}. */
+    public static final class ArrowLongReadData extends AbstractArrowReadData<BigIntVector> implements LongReadData {
 
-    @Override
-    public ArrowLongData close(final int length) {
-        closeWithLength(length);
-        return this;
+        private ArrowLongReadData(final BigIntVector vector) {
+            super(vector);
+        }
+
+        private ArrowLongReadData(final BigIntVector vector, final int offset, final int length) {
+            super(vector, offset, length);
+        }
+
+        @Override
+        public long getLong(final int index) {
+            return m_vector.get(m_offset + index);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowLongReadData(m_vector, m_offset + start, length);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowLongData} */
-    public static final class ArrowLongDataFactory extends AbstractFieldVectorDataFactory {
-
-        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
+    public static final class ArrowLongDataFactory extends AbstractArrowColumnDataFactory {
 
         /** Singleton instance of {@link ArrowLongDataFactory} */
         public static final ArrowLongDataFactory INSTANCE = new ArrowLongDataFactory();
 
         private ArrowLongDataFactory() {
-            // Singleton
+            super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
@@ -105,27 +146,22 @@ public final class ArrowLongData extends AbstractFixedWitdthData<BigIntVector> i
         }
 
         @Override
-        public ArrowLongData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowLongWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final BigIntVector v = (BigIntVector)vector;
             v.allocateNew(capacity);
-            return new ArrowLongData(v);
+            return new ArrowLongWriteData(v);
         }
 
         @Override
-        public ArrowLongData createRead(final FieldVector vector, final DictionaryProvider provider,
+        public ArrowLongReadData createRead(final FieldVector vector, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (CURRENT_VERSION.equals(version)) {
-                return new ArrowLongData((BigIntVector)vector);
+            if (m_version.equals(version)) {
+                return new ArrowLongReadData((BigIntVector)vector);
             } else {
-                throw new IOException("Cannot read ArrowLongData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
+                throw new IOException(
+                    "Cannot read ArrowLongData with version " + version + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return CURRENT_VERSION;
         }
     }
 }

@@ -58,9 +58,16 @@ import org.knime.core.columnar.ReferencedData;
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public abstract class AbstractReferenceData implements ReferencedData {
+abstract class AbstractReferencedData implements ReferencedData {
 
     private final AtomicInteger m_refCounter = new AtomicInteger(1);
+
+    /**
+     * @return the current amount of references
+     */
+    protected int getReferenceCount() {
+        return m_refCounter.get();
+    }
 
     @Override
     public void release() {

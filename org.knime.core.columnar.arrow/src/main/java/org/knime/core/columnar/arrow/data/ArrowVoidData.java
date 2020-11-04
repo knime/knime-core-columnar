@@ -76,12 +76,18 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
 
     private final NullVector m_vector;
 
-    private int m_length;
+    private final int m_length;
 
     private ArrowVoidData(final NullVector vector, final int capacity) {
         m_vector = vector;
         m_capacity = capacity;
         m_length = vector.getValueCount();
+    }
+
+    private ArrowVoidData(final NullVector vector, final int capacity, final int length) {
+        m_vector = vector;
+        m_capacity = capacity;
+        m_length = length;
     }
 
     @Override
@@ -102,8 +108,7 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
     @Override
     public ArrowVoidData close(final int length) {
         m_vector.setValueCount(length);
-        m_length = length;
-        return this;
+        return new ArrowVoidData(m_vector, m_capacity);
     }
 
     @Override
@@ -122,9 +127,13 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
     }
 
     @Override
-    public void slice(final int start, final int length) {
-        // The vector has no data: We don't need to remember the offset
-        m_length = length;
+    public ArrowWriteData slice(final int start) {
+        return new ArrowVoidData(m_vector, m_capacity);
+    }
+
+    @Override
+    public ArrowVoidData slice(final int start, final int length) {
+        return new ArrowVoidData(m_vector, m_capacity, length);
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVoidData} */

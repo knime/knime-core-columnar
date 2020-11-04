@@ -68,7 +68,6 @@ import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.batch.DefaultReadBatch;
@@ -142,7 +141,13 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
      * @param data the data object
      * @return if the data object has been released
      */
-    protected abstract boolean isReleased(ReferencedData data);
+    protected abstract boolean isReleasedW(W data);
+
+    /**
+     * @param data the data object
+     * @return if the data object has been released
+     */
+    protected abstract boolean isReleasedR(R data);
 
     /**
      * @param valueCount the count of values added to the data (with seeds 0..(valueCount-1))
@@ -268,7 +273,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         for (int i = 0; i < size2; i++) {
             checkValue(readData, i, i);
         }
-        data.release();
+        readData.release();
     }
 
     /** Test reading and writing of sliced data */
@@ -280,9 +285,9 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
 
         final W writeData = createWrite(numValues);
         // Write into a slice
-        writeData.slice(sliceStart, sliceLength);
+        final W slicedWrite = castW(writeData.slice(sliceStart));
         for (int i = 0; i < sliceLength; i++) {
-            setValue(writeData, i, i);
+            setValue(slicedWrite, i, i);
         }
 
         // Read everything
@@ -299,14 +304,13 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         }
 
         // Read only the slice
-        readData.slice(sliceStart, sliceLength);
-        assertEquals(sliceLength, readData.length());
+        final R slicedRead = castR(readData.slice(sliceStart, sliceLength));
+        assertEquals(sliceLength, slicedRead.length());
         for (int i = 0; i < sliceLength; i++) {
-            assertFalse(readData.isMissing(i));
-            checkValue(readData, i, i);
+            assertFalse(slicedRead.isMissing(i));
+            checkValue(slicedRead, i, i);
         }
 
-        writeData.release();
         readData.release();
     }
 
@@ -337,7 +341,6 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             f.get();
         }
 
-        writeData.release();
         readData.release();
     }
 
@@ -372,29 +375,37 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         for (int i = 0; i < numValues; i++) {
             setValue(wd, i, i);
         }
-        final R rd = castR(wd.close(numValues));
+        // wd: Reference count should be 1
+        assertFalse(isReleasedW(wd));
 
-        // NB: wd and rd can be the same object but this test must still succeed
-        assertFalse(isReleased(wd));
-        assertFalse(isReleased(rd));
-
-        // Increase reference counter
         wd.retain();
+        // wd: Reference count should be 2
+        assertFalse(isReleasedW(wd));
+
+        wd.release();
+        // wd: Reference count should be 1
+        assertFalse(isReleasedW(wd));
+
+        final R rd = castR(wd.close(numValues));
+        // wd: Should be released now because close passes the resources to rd
+        assertTrue(isReleasedW(wd));
+
+        // NB: Releasing wd again should have no effect on rd
+        wd.release();
+        // rd: Reference count should be 1
+        assertFalse(isReleasedR(rd));
+
         rd.retain();
-        assertFalse(isReleased(wd));
-        assertFalse(isReleased(rd));
+        // rd: Reference count should be 2
+        assertFalse(isReleasedR(rd));
 
-        // On reference should still be there
-        wd.release();
         rd.release();
-        assertFalse(isReleased(wd));
-        assertFalse(isReleased(rd));
+        // rd: Reference count should be 1
+        assertFalse(isReleasedR(rd));
 
-        // All references should be gone
-        wd.release();
         rd.release();
-        assertTrue(isReleased(wd));
-        assertTrue(isReleased(rd));
+        // rd: should be released
+        assertTrue(isReleasedR(rd));
     }
 
     /** Test {@link W#toString()} and {@link R#toString()} */
@@ -410,7 +421,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         assertNotNull(rs);
         assertFalse(rs.isEmpty());
 
-        wd.release();
+        rd.release();
     }
 
     /** Test setting some values to missing */
@@ -452,7 +463,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         final R rd = castR(wd.close(numValues));
         minSize = getMinSize(numValues, numValues);
         assertTrue("Size to small. Got " + rd.sizeOf() + ", expected >= " + minSize, rd.sizeOf() >= minSize);
-        wd.release();
+        rd.release();
     }
 
     /** Test {@link R#length()} */

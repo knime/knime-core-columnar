@@ -51,10 +51,10 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import org.apache.arrow.vector.Float8Vector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleReadData;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleWriteData;
 
 /**
  * Test {@link ArrowDoubleData}
@@ -62,43 +62,44 @@ import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleData, ArrowDoubleData> {
+public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleWriteData, ArrowDoubleReadData> {
 
     /** Create the test for {@link ArrowDoubleData} */
     public ArrowDoubleDataTest() {
         super(ArrowDoubleDataFactory.INSTANCE);
     }
 
-    private static ArrowDoubleData cast(final Object o) {
-        assertTrue(o instanceof ArrowDoubleData);
-        return (ArrowDoubleData)o;
+    @Override
+    protected ArrowDoubleWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowDoubleWriteData);
+        return (ArrowDoubleWriteData)o;
     }
 
     @Override
-    protected ArrowDoubleData castW(final Object o) {
-        return cast(o);
+    protected ArrowDoubleReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowDoubleReadData);
+        return (ArrowDoubleReadData)o;
     }
 
     @Override
-    protected ArrowDoubleData castR(final Object o) {
-        return cast(o);
-    }
-
-    @Override
-    protected void setValue(final ArrowDoubleData data, final int index, final int seed) {
+    protected void setValue(final ArrowDoubleWriteData data, final int index, final int seed) {
         data.setDouble(index, seed);
     }
 
     @Override
-    protected void checkValue(final ArrowDoubleData data, final int index, final int seed) {
+    protected void checkValue(final ArrowDoubleReadData data, final int index, final int seed) {
         assertEquals(seed, data.getDouble(index), 0);
     }
 
     @Override
+    protected boolean isReleasedW(final ArrowDoubleWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ReferencedData data) {
-        final Float8Vector v = cast(data).m_vector;
-        return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
+    protected boolean isReleasedR(final ArrowDoubleReadData data) {
+        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
     }
 
     @Override
@@ -106,5 +107,4 @@ public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleData, 
         return 8 * capacity // 8 bytes per value for data
             + (int)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
-
 }

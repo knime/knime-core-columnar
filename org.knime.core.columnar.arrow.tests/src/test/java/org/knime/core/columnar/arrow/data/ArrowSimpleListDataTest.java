@@ -55,9 +55,10 @@ import java.util.Random;
 
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.complex.ListVector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListReadData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListWriteData;
@@ -98,7 +99,7 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
 
         final Random random = new Random(seed);
         final int size = random.nextInt(MAX_LENGTH);
-        final ArrowIntData inner = data.getWriteData(index, size);
+        final ArrowIntWriteData inner = data.getWriteData(index, size);
         for (int i = 0; i < size; i++) {
             inner.setInt(i, random.nextInt());
         }
@@ -106,7 +107,7 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
 
     @Override
     protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
-        final ArrowIntData element = data.getReadData(index);
+        final ArrowIntReadData element = data.getReadData(index);
         if (seed == 1) {
             assertEquals(0, element.length());
             return;
@@ -122,19 +123,17 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
     }
 
     @Override
+    protected boolean isReleasedW(final ArrowListWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
     @SuppressWarnings("resource")
-    protected boolean isReleased(final ReferencedData data) {
-        final ListVector listVector;
-        final IntVector intVector;
-        if (data instanceof ArrowListWriteData) {
-            final ArrowListWriteData d = castW(data);
-            listVector = d.m_vector;
-            intVector = ((ArrowIntData)d.m_data).m_vector;
-        } else {
-            final ArrowListReadData d = castR(data);
-            listVector = d.m_vector;
-            intVector = ((ArrowIntData)d.m_data).m_vector;
-        }
+    protected boolean isReleasedR(final ArrowListReadData data) {
+        final ArrowListReadData d = castR(data);
+        final ListVector listVector = d.m_vector;
+        final IntVector intVector = ((ArrowIntReadData)d.m_data).m_vector;
+
         final boolean intReleased = intVector.getDataBuffer().capacity() == 0 //
             && intVector.getValidityBuffer().capacity() == 0;
         return listVector.getOffsetBuffer().capacity() == 0 //

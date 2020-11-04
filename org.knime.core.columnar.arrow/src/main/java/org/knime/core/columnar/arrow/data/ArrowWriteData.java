@@ -51,20 +51,20 @@ package org.knime.core.columnar.arrow.data;
 import org.knime.core.columnar.data.ColumnWriteData;
 
 /**
- * Arrow implementation of {@link ColumnWriteData}. Can be sliced with {@link #slice(int, int)}.
+ * Arrow implementation of {@link ColumnWriteData}. Can be sliced with {@link #slice(int)}.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public interface ArrowWriteData extends ColumnWriteData {
 
     /**
-     * Slice the this object to the given start and length. Note that this only affects what data is returned when
-     * accessing the data with an index. This does not effect {@link #capacity()} and {@link #expand(int)}.
+     * Slice the this object to the given start. Note that this only affects what data is returned when accessing the
+     * data with an index. This does not effect {@link #capacity()} and {@link #expand(int)}.
      *
      * @param start the first index of the slice
-     * @param length the length of the slice
+     * @return the sliced data
      */
-    void slice(int start, int length);
+    ArrowWriteData slice(int start);
 
     /**
      * {@inheritDoc}

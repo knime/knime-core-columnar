@@ -42,50 +42,76 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 4, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.util.ValueVectorUtility;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.WriteData;
 
 /**
- * Abstract implementation of {@link ColumnReadData} and {@link ColumnWriteData} using Arrow. Make sure to call
- * <code>#closeWithLength(int)</code> on {@link ColumnWriteData#close(int)}.
+ * Abstract implementation of {@link ArrowWriteData}. Holds a {@link FieldVector} of type F in {@link #m_vector} and an
+ * offset for the indices in {@link #m_offset}. Takes care of reference counting and closes the vector when all
+ * references are gone.
  *
- * @param <F> Type of the field vector holding the data.
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * Call {@link #closeWithLength(int)} to close the {@link WriteData}.
+ *
+ * Overwrite {@link #closeResources()} to close additional resources (make sure to call the super method).
+ *
+ * @param <F> the type of the {@link FieldVector}
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractReferenceData
-    implements ArrowReadData, ArrowWriteData {
+@SuppressWarnings("javadoc")
+abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractReferencedData implements ArrowWriteData {
 
-    /** The Arrow {@link FieldVector} holding the data */
-    protected final F m_vector;
+    /** The vector. Use {@link #m_offset} when accessing vector data. */
+    protected F m_vector;
 
-    protected int m_offset;
-
-    protected int m_length;
+    /** An offset describing where the values of this object start in the vector. */
+    protected final int m_offset;
 
     /**
-     * Create by wrapping the given vector. Can be an empty vector or a vector already containing data.
+     * Create an abstract {@link ArrowWriteData} with the given vector and an offset of 0.
      *
-     * @param vector the vector holding the data
+     * @param vector the vector
      */
-    AbstractFieldVectorData(final F vector) {
+    public AbstractArrowWriteData(final F vector) {
         m_vector = vector;
         m_offset = 0;
-        m_length = vector.getValueCount();
     }
 
-    @Override
-    public boolean isMissing(final int index) {
-        return m_vector.isNull(index + m_offset);
+    /**
+     * Create an abstract {@link ArrowWriteData} with the given vector and offset.
+     *
+     * @param vector the vector
+     * @param offset the offset
+     */
+    public AbstractArrowWriteData(final F vector, final int offset) {
+        m_vector = vector;
+        m_offset = offset;
+    }
+
+    /**
+     * Closes the {@link WriteData}. Sets the value count of the vector, checks the reference count of this object, sets
+     * {@link #m_vector} to <code>null</code> and returns the vector.
+     *
+     * @param length the value count
+     * @return the vector with the set value count
+     */
+    protected F closeWithLength(final int length) {
+        m_vector.setValueCount(length);
+        final F vector = m_vector;
+        m_vector = null;
+        // TODO(benjamin) is this needed
+        if (getReferenceCount() != 1) {
+            throw new IllegalStateException("Closed with outstanding references");
+        }
+        return vector;
     }
 
     @Override
@@ -96,26 +122,6 @@ abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractRe
     }
 
     @Override
-    public int capacity() {
-        return m_vector.getValueCapacity();
-    }
-
-    @Override
-    public int length() {
-        return m_length;
-    }
-
-    @Override
-    protected void closeResources() {
-        m_vector.close();
-    }
-
-    @Override
-    public String toString() {
-        return ValueVectorUtility.getToString(m_vector, m_offset, m_offset + m_length);
-    }
-
-    @Override
     public void expand(final int minimumCapacity) {
         while (m_vector.getValueCapacity() < minimumCapacity) {
             m_vector.reAlloc();
@@ -123,36 +129,19 @@ abstract class AbstractFieldVectorData<F extends FieldVector> extends AbstractRe
     }
 
     @Override
-    public void slice(final int start, final int length) {
-        m_offset = start;
-        m_length = length;
+    public int capacity() {
+        return m_vector.getValueCapacity();
     }
 
-    /**
-     * Call on {@link ColumnWriteData#close(int)} to set the length of this data and the value count of the vector.
-     *
-     * @param length the amount of values in the vector
-     */
-    protected void closeWithLength(final int length) {
-        m_offset = 0;
-        m_length = length;
-        m_vector.setValueCount(length);
+    @Override
+    protected void closeResources() {
+        if (m_vector != null) {
+            m_vector.close();
+        }
     }
 
-    /**
-     * An abstract implementation of {@link ArrowColumnDataFactory} for data extending AbstractFieldVectorData and
-     * having no dictionaries.
-     */
-    protected abstract static class AbstractFieldVectorDataFactory implements ArrowColumnDataFactory {
-
-        @Override
-        public FieldVector getVector(final ColumnReadData data) {
-            return ((AbstractFieldVectorData<?>)data).m_vector;
-        }
-
-        @Override
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
-            return null;
-        }
+    @Override
+    public String toString() {
+        return ValueVectorUtility.getToString(m_vector, m_offset, m_vector.getValueCount());
     }
 }

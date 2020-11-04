@@ -51,7 +51,6 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 
@@ -94,7 +93,12 @@ public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData, Arro
     }
 
     @Override
-    protected boolean isReleased(final ReferencedData data) {
+    protected boolean isReleasedR(final ArrowVoidData data) {
+        return false;
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowVoidData data) {
         return false;
     }
 
@@ -111,8 +115,8 @@ public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData, Arro
 
         final ArrowVoidData writeData = createWrite(numValues);
         final ArrowVoidData readData = castR(writeData.close(numValues));
-        readData.slice(sliceStart, sliceLength);
-        assertEquals(sliceLength, readData.length());
+        final ArrowVoidData slicedData = readData.slice(sliceStart, sliceLength);
+        assertEquals(sliceLength, slicedData.length());
 
         writeData.release();
         readData.release();

@@ -56,11 +56,16 @@ import java.util.Random;
 
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.complex.StructVector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectReadData;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectWriteData;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectReadData;
+import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
@@ -115,15 +120,15 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
     @Override
     protected void setValue(final ArrowStructWriteData data, final int index, final int seed) {
         final ObjectWriteData<byte[]> data0 = data.getWriteDataAt(0);
-        assertTrue(data0 instanceof ArrowDictEncodedObjectData);
+        assertTrue(data0 instanceof ArrowDictEncodedObjectWriteData);
         final IntWriteData data1 = data.getWriteDataAt(1);
-        assertTrue(data1 instanceof ArrowIntData);
+        assertTrue(data1 instanceof ArrowIntWriteData);
         final StructWriteData data2 = data.getWriteDataAt(2);
         assertTrue(data2 instanceof ArrowStructWriteData);
         final ObjectWriteData<byte[]> data20 = data2.getWriteDataAt(0);
-        assertTrue(data20 instanceof ArrowObjectData);
+        assertTrue(data20 instanceof ArrowObjectWriteData);
         final ObjectWriteData<byte[]> data21 = data2.getWriteDataAt(1);
-        assertTrue(data21 instanceof ArrowDictEncodedObjectData);
+        assertTrue(data21 instanceof ArrowDictEncodedObjectWriteData);
 
         data0.setObject(index, valueFor0(seed));
         data1.setInt(index, seed);
@@ -134,15 +139,15 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
     @Override
     protected void checkValue(final ArrowStructReadData data, final int index, final int seed) {
         final ObjectReadData<byte[]> data0 = data.getReadDataAt(0);
-        assertTrue(data0 instanceof ArrowDictEncodedObjectData);
+        assertTrue(data0 instanceof ArrowDictEncodedObjectReadData);
         final IntReadData data1 = data.getReadDataAt(1);
-        assertTrue(data1 instanceof ArrowIntData);
+        assertTrue(data1 instanceof ArrowIntReadData);
         final StructReadData data2 = data.getReadDataAt(2);
         assertTrue(data2 instanceof ArrowStructReadData);
         final ObjectReadData<byte[]> data20 = data2.getReadDataAt(0);
-        assertTrue(data20 instanceof ArrowObjectData);
+        assertTrue(data20 instanceof ArrowObjectReadData);
         final ObjectReadData<byte[]> data21 = data2.getReadDataAt(1);
-        assertTrue(data21 instanceof ArrowDictEncodedObjectData);
+        assertTrue(data21 instanceof ArrowDictEncodedObjectReadData);
 
         assertArrayEquals(valueFor0(seed), data0.getObject(index));
         assertEquals(seed, data1.getInt(index));
@@ -151,29 +156,22 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
     }
 
     @Override
+    protected boolean isReleasedW(final ArrowStructWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
     @SuppressWarnings("resource")
-    protected boolean isReleased(final ReferencedData data) {
+    protected boolean isReleasedR(final ArrowStructReadData data) {
+        final ArrowStructReadData d = castR(data);
+        final ArrowStructReadData d2 = d.getReadDataAt(2);
+        final ArrowObjectReadData<byte[]> d20 = d2.getReadDataAt(0);
+
         // We just check the validity buffer of this data, of the inner struct
         // and of the 2nd level object data
-        final StructVector vector;
-        final StructVector vector2;
-        final VarBinaryVector vector20;
-        if (data instanceof ArrowStructWriteData) {
-            final ArrowStructWriteData d = castW(data);
-            final ArrowStructWriteData d2 = d.getWriteDataAt(2);
-            final ArrowObjectData<byte[]> d20 = d2.getWriteDataAt(0);
-
-            vector = d.m_vector;
-            vector2 = d2.m_vector;
-            vector20 = d20.m_vector;
-        } else {
-            final ArrowStructReadData d = castR(data);
-            final ArrowStructReadData d2 = d.getReadDataAt(2);
-            final ArrowObjectData<byte[]> d20 = d2.getReadDataAt(0);
-            vector = d.m_vector;
-            vector2 = d2.m_vector;
-            vector20 = d20.m_vector;
-        }
+        final StructVector vector = d.m_vector;
+        final StructVector vector2 = d2.m_vector;
+        final VarBinaryVector vector20 = d20.m_vector;
 
         return vector.getValidityBuffer().capacity() == 0 && vector2.getValidityBuffer().capacity() == 0
             && vector20.getValidityBuffer().capacity() == 0;

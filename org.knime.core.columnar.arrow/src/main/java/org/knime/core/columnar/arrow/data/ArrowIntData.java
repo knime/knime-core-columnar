@@ -65,38 +65,79 @@ import org.knime.core.columnar.data.IntData.IntWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowIntData extends AbstractFixedWitdthData<IntVector> implements IntWriteData, IntReadData {
+public final class ArrowIntData {
 
-    private ArrowIntData(final IntVector vector) {
-        super(vector);
+    private ArrowIntData() {
     }
 
-    @Override
-    public int getInt(final int index) {
-        return m_vector.get(m_offset + index);
+    /** Arrow implementation of {@link IntWriteData}. */
+    public static final class ArrowIntWriteData extends AbstractArrowWriteData<IntVector> implements IntWriteData {
+
+        private ArrowIntWriteData(final IntVector vector) {
+            super(vector);
+        }
+
+        private ArrowIntWriteData(final IntVector vector, final int offset) {
+            super(vector, offset);
+        }
+
+        @Override
+        public void setInt(final int index, final int val) {
+            m_vector.set(m_offset + index, val);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new ArrowIntWriteData(m_vector, m_offset + start);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Resource closed by ReadData
+        public ArrowIntReadData close(final int length) {
+            return new ArrowIntReadData(closeWithLength(length));
+        }
     }
 
-    @Override
-    public void setInt(final int index, final int value) {
-        m_vector.set(m_offset + index, value);
-    }
+    /** Arrow implementation of {@link IntReadData}. */
+    public static final class ArrowIntReadData extends AbstractArrowReadData<IntVector> implements IntReadData {
 
-    @Override
-    public ArrowIntData close(final int length) {
-        closeWithLength(length);
-        return this;
+        private ArrowIntReadData(final IntVector vector) {
+            super(vector);
+        }
+
+        private ArrowIntReadData(final IntVector vector, final int offset, final int length) {
+            super(vector, offset, length);
+        }
+
+        @Override
+        public int getInt(final int index) {
+            return m_vector.get(m_offset + index);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowIntReadData(m_vector, m_offset + start, length);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowIntData} */
-    public static final class ArrowIntDataFactory extends AbstractFieldVectorDataFactory {
-
-        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
+    public static final class ArrowIntDataFactory extends AbstractArrowColumnDataFactory {
 
         /** Singleton instance of {@link ArrowIntDataFactory} */
         public static final ArrowIntDataFactory INSTANCE = new ArrowIntDataFactory();
 
         private ArrowIntDataFactory() {
-            // Singleton
+            super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
@@ -105,27 +146,22 @@ public final class ArrowIntData extends AbstractFixedWitdthData<IntVector> imple
         }
 
         @Override
-        public ArrowIntData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowIntWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final IntVector v = (IntVector)vector;
             v.allocateNew(capacity);
-            return new ArrowIntData(v);
+            return new ArrowIntWriteData(v);
         }
 
         @Override
-        public ArrowIntData createRead(final FieldVector vector, final DictionaryProvider provider,
+        public ArrowIntReadData createRead(final FieldVector vector, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (CURRENT_VERSION.equals(version)) {
-                return new ArrowIntData((IntVector)vector);
+            if (m_version.equals(version)) {
+                return new ArrowIntReadData((IntVector)vector);
             } else {
                 throw new IOException(
-                    "Cannot read ArrowIntData with version " + version + ". Current version: " + CURRENT_VERSION + ".");
+                    "Cannot read ArrowIntData with version " + version + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return CURRENT_VERSION;
         }
     }
 }

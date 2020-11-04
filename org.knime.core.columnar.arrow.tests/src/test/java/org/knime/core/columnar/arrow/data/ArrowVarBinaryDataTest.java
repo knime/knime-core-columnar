@@ -53,10 +53,10 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.VarBinaryVector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
 
 /**
  * Test {@link ArrowVarBinaryData}
@@ -64,7 +64,7 @@ import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataF
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinaryData, ArrowVarBinaryData> {
+public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinaryWriteData, ArrowVarBinaryReadData> {
 
     private static final int MAX_LENGTH = 100;
 
@@ -73,36 +73,37 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
         super(ArrowVarBinaryDataFactory.INSTANCE);
     }
 
-    private static ArrowVarBinaryData cast(final Object o) {
-        assertTrue(o instanceof ArrowVarBinaryData);
-        return (ArrowVarBinaryData)o;
+    @Override
+    protected ArrowVarBinaryWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowVarBinaryWriteData);
+        return (ArrowVarBinaryWriteData)o;
     }
 
     @Override
-    protected ArrowVarBinaryData castW(final Object o) {
-        return cast(o);
+    protected ArrowVarBinaryReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowVarBinaryReadData);
+        return (ArrowVarBinaryReadData)o;
     }
 
     @Override
-    protected ArrowVarBinaryData castR(final Object o) {
-        return cast(o);
-    }
-
-    @Override
-    protected void setValue(final ArrowVarBinaryData data, final int index, final int seed) {
+    protected void setValue(final ArrowVarBinaryWriteData data, final int index, final int seed) {
         data.setBytes(index, valueFor(seed));
     }
 
     @Override
-    protected void checkValue(final ArrowVarBinaryData data, final int index, final int seed) {
+    protected void checkValue(final ArrowVarBinaryReadData data, final int index, final int seed) {
         assertArrayEquals(valueFor(seed), data.getBytes(index));
     }
 
     @Override
+    protected boolean isReleasedW(final ArrowVarBinaryWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ReferencedData data) {
-        VarBinaryVector v = cast(data).m_vector;
-        return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
+    protected boolean isReleasedR(final ArrowVarBinaryReadData data) {
+        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
     }
 
     @Override

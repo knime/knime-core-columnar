@@ -53,17 +53,18 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.VarBinaryVector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectReadData;
+import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectWriteData;
 
 /**
  * Test {@link ArrowObjectData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<byte[]>, ArrowObjectData<byte[]>> {
+public class ArrowObjectDataTest
+    extends AbstractArrowDataTest<ArrowObjectWriteData<byte[]>, ArrowObjectReadData<byte[]>> {
 
     private static final int MAX_LENGTH = 100;
 
@@ -72,38 +73,40 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowObjectData<b
         super(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
     }
 
-    private static ArrowObjectData<byte[]> cast(final Object o) {
-        assertTrue(o instanceof ArrowObjectData);
-        @SuppressWarnings("unchecked")
-        final ArrowObjectData<byte[]> cast = (ArrowObjectData<byte[]>)o;
-        return cast;
+    @Override
+    @SuppressWarnings("unchecked")
+    protected ArrowObjectWriteData<byte[]> castW(final Object o) {
+        assertTrue(o instanceof ArrowObjectWriteData);
+        return (ArrowObjectWriteData<byte[]>)o;
     }
 
     @Override
-    protected ArrowObjectData<byte[]> castW(final Object o) {
-        return cast(o);
+    @SuppressWarnings("unchecked")
+    protected ArrowObjectReadData<byte[]> castR(final Object o) {
+        assertTrue(o instanceof ArrowObjectReadData);
+        return (ArrowObjectReadData<byte[]>)o;
     }
 
     @Override
-    protected ArrowObjectData<byte[]> castR(final Object o) {
-        return cast(o);
-    }
-
-    @Override
-    protected void setValue(final ArrowObjectData<byte[]> data, final int index, final int seed) {
+    protected void setValue(final ArrowObjectWriteData<byte[]> data, final int index, final int seed) {
         data.setObject(index, valueFor(seed));
     }
 
     @Override
-    protected void checkValue(final ArrowObjectData<byte[]> data, final int index, final int seed) {
+    protected void checkValue(final ArrowObjectReadData<byte[]> data, final int index, final int seed) {
         assertArrayEquals(valueFor(seed), data.getObject(index));
     }
 
     @Override
-    @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ReferencedData data) {
-        final VarBinaryVector v = cast(data).m_vector;
-        return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
+    protected boolean isReleasedW(final ArrowObjectWriteData<byte[]> data) {
+        return data.m_vector == null;
+    }
+
+    @Override
+    @SuppressWarnings("resource")
+    protected boolean isReleasedR(final ArrowObjectReadData<byte[]> data) {
+        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0
+            && data.m_vector.getOffsetBuffer().capacity() == 0;
     }
 
     @Override

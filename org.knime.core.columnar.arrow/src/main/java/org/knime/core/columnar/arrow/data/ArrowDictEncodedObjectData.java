@@ -75,106 +75,181 @@ import com.google.common.collect.HashBiMap;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
- * @param <T> type of objects
  */
-public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData<IntVector>
-    implements ObjectWriteData<T>, ObjectReadData<T> {
+public final class ArrowDictEncodedObjectData {
+
+    private ArrowDictEncodedObjectData() {
+    }
 
     private static final long INIT_BYTES_PER_ENTRY = 256;
 
     // TODO Make configurable?
     private static final int INIT_DICT_SIZE = 128;
 
-    private final BiMap<T, Integer> m_inMemDict;
+    /** Helper class which holds a dictionary in a Map and can write it to a VarBinaryVector */
+    private static final class InMemoryDictEncoding<T> {
 
-    private final BiMap<Integer, T> m_invInMemDict;
+        private int m_runningDictIndex = 0;
 
-    private final ArrowBufIO<T> m_io;
+        private final BiMap<T, Integer> m_inMemDict;
 
-    private VarBinaryVector m_dictionary;
+        private final BiMap<Integer, T> m_invInMemDict;
 
-    private int m_runningDictIndex = 0;
+        private final ArrowBufIO<T> m_io;
 
-    /** Create with dictionary available */
-    private ArrowDictEncodedObjectData(final IntVector vector, final VarBinaryVector dict,
-        final ObjectDataSerializer<T> serializer) {
-        super(vector);
-        m_io = new ArrowBufIO<>(dict, serializer);
-        m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
-        m_invInMemDict = m_inMemDict.inverse();
-        for (int i = 0; i < dict.getValueCount(); i++) {
-            if (dict.isSet(i) != 0) {
-                m_invInMemDict.put(i, m_io.deserialize(i));
+        private final VarBinaryVector m_vector;
+
+        private InMemoryDictEncoding(final VarBinaryVector vector, final ArrowBufIO<T> io) {
+            m_vector = vector;
+            m_io = io;
+            m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
+            m_invInMemDict = m_inMemDict.inverse();
+            for (int i = 0; i < vector.getValueCount(); i++) {
+                if (vector.isSet(i) != 0) {
+                    m_invInMemDict.put(i, m_io.deserialize(i));
+                }
             }
         }
-        m_dictionary = dict;
-    }
 
-    @Override
-    public T getObject(final int index) {
-        return m_invInMemDict.get(m_vector.get(m_offset + index));
-    }
-
-    @Override
-    public synchronized void setObject(final int index, final T value) {
-        final Integer dictIndex = m_inMemDict.computeIfAbsent(value, k -> m_runningDictIndex++);
-        m_vector.set(m_offset + index, dictIndex);
-    }
-
-    VarBinaryVector getDictionary() {
-        // newly created dictionary.
-        final int numDistinctValues = m_inMemDict.size();
-        final int dictValueCount = m_dictionary.getValueCount();
-        if (dictValueCount == 0) {
-            // Allocated new memory for all distinct values
-            m_dictionary.allocateNew(INIT_BYTES_PER_ENTRY * numDistinctValues, numDistinctValues);
+        private T get(final int id) {
+            return m_invInMemDict.get(id);
         }
-        // Fill the vector with the encoded values
-        for (int i = dictValueCount; i < numDistinctValues; i++) {
-            m_io.serialize(i, m_invInMemDict.get(i));
+
+        private Integer set(final T value) {
+            return m_inMemDict.computeIfAbsent(value, k -> m_runningDictIndex++);
         }
-        m_dictionary.setValueCount(numDistinctValues);
-        return m_dictionary;
+
+        private VarBinaryVector getDictionaryVector() {
+            final int numDistinctValues = m_inMemDict.size();
+            final int dictValueCount = m_vector.getValueCount();
+            if (dictValueCount == 0) {
+                // Allocated new memory for all distinct values
+                m_vector.allocateNew(INIT_BYTES_PER_ENTRY * numDistinctValues, numDistinctValues);
+            }
+            // Fill the vector with the encoded values
+            for (int i = dictValueCount; i < numDistinctValues; i++) {
+                m_io.serialize(i, m_invInMemDict.get(i));
+            }
+            m_vector.setValueCount(numDistinctValues);
+            return m_vector;
+        }
     }
 
-    @Override
-    public int capacity() {
-        return m_vector.getValueCapacity();
+    /**
+     * Arrow implementation of {@link ObjectWriteData}.
+     *
+     * @param <T> type of objects
+     */
+    public static final class ArrowDictEncodedObjectWriteData<T> extends AbstractArrowWriteData<IntVector>
+        implements ObjectWriteData<T> {
+
+        private InMemoryDictEncoding<T> m_dict;
+
+        private ArrowDictEncodedObjectWriteData(final IntVector vector, final VarBinaryVector dict,
+            final ArrowBufIO<T> io) {
+            super(vector);
+            m_dict = new InMemoryDictEncoding<>(dict, io);
+        }
+
+        private ArrowDictEncodedObjectWriteData(final IntVector vector, final int offset,
+            final InMemoryDictEncoding<T> dict) {
+            super(vector, offset);
+            m_dict = dict;
+        }
+
+        @Override
+        public void setObject(final int index, final T obj) {
+            m_vector.set(m_offset + index, m_dict.set(obj));
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowDictEncodedObjectData.sizeOf(m_vector, m_dict.m_vector);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new ArrowDictEncodedObjectWriteData<T>(m_vector, m_offset + start, m_dict);
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Resource closed by ReadData
+        public ArrowDictEncodedObjectReadData<T> close(final int length) {
+            return new ArrowDictEncodedObjectReadData<>(closeWithLength(length), m_dict);
+        }
+
+        @Override
+        protected void closeResources() {
+            super.closeResources();
+            m_dict.m_vector.close();
+        }
+
+        @Override
+        public String toString() {
+            return super.toString() + " -> " + m_dict.m_vector.toString();
+        }
     }
 
-    @Override
-    public ArrowDictEncodedObjectData<T> close(final int length) {
-        closeWithLength(length);
-        return this;
+    /**
+     * Arrow implementation of {@link ObjectReadData}.
+     *
+     * @param <T> type of objects
+     */
+    public static final class ArrowDictEncodedObjectReadData<T> extends AbstractArrowReadData<IntVector>
+        implements ObjectReadData<T> {
+
+        private final InMemoryDictEncoding<T> m_dict;
+
+        private ArrowDictEncodedObjectReadData(final IntVector vector, final VarBinaryVector dict,
+            final ArrowBufIO<T> io) {
+            super(vector);
+            m_dict = new InMemoryDictEncoding<>(dict, io);
+        }
+
+        private ArrowDictEncodedObjectReadData(final IntVector vector, final InMemoryDictEncoding<T> dict) {
+            super(vector);
+            m_dict = dict;
+        }
+
+        private ArrowDictEncodedObjectReadData(final IntVector vector, final int offset, final int length,
+            final InMemoryDictEncoding<T> dict) {
+            super(vector, offset, length);
+            m_dict = dict;
+        }
+
+        VarBinaryVector getDictionary() {
+            return m_dict.getDictionaryVector();
+        }
+
+        @Override
+        public T getObject(final int index) {
+            return m_dict.get(m_vector.get(m_offset + index));
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowDictEncodedObjectData.sizeOf(m_vector, m_dict.m_vector);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowDictEncodedObjectReadData<>(m_vector, m_offset + start, length, m_dict);
+        }
+
+        @Override
+        protected void closeResources() {
+            super.closeResources();
+            m_dict.m_vector.close();
+        }
+
+        @Override
+        public String toString() {
+            return super.toString() + " -> " + m_dict.m_vector.toString();
+        }
     }
 
-    @Override
-    public int length() {
-        return m_length;
-    }
-
-    @Override
-    protected void closeResources() {
-        super.closeResources();
-        m_dictionary.close();
-    }
-
-    @Override
-    @SuppressWarnings("resource") // Buffers handled by vector
-    public int sizeOf() {
-        return (int)(m_vector.getDataBuffer().capacity() // Index vector
-            + m_vector.getValidityBuffer().capacity() //
-            + m_dictionary.getDataBuffer().capacity() // Dictionary vector
-            + m_dictionary.getValidityBuffer().capacity() //
-            + m_dictionary.getOffsetBuffer().capacity());
-    }
-
-    @Override
-    public String toString() {
-        final String s = super.toString();
-        return new StringBuilder(s) //
-            .append(" -> ").append(m_dictionary.toString()) //
-            .toString();
+    private static int sizeOf(final IntVector vector, final VarBinaryVector dict) {
+        return ArrowSizeUtils.sizeOfFixedWidth(vector) + ArrowSizeUtils.sizeOfVariableWidth(dict);
     }
 
     /**
@@ -182,9 +257,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
      *
      * @param <T> type of object
      */
-    public static final class ArrowDictEncodedObjectDataFactory<T> implements ArrowColumnDataFactory {
-
-        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
+    public static final class ArrowDictEncodedObjectDataFactory<T> extends AbstractArrowColumnDataFactory {
 
         private final ObjectDataSerializer<T> m_serializer;
 
@@ -192,6 +265,7 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
          * @param serializer for serialization
          */
         public ArrowDictEncodedObjectDataFactory(final ObjectDataSerializer<T> serializer) {
+            super(ArrowColumnDataFactoryVersion.version(0));
             m_serializer = serializer;
         }
 
@@ -203,48 +277,39 @@ public final class ArrowDictEncodedObjectData<T> extends AbstractFieldVectorData
 
         @Override
         @SuppressWarnings("resource") // Vector closed by data object
-        public ArrowDictEncodedObjectData<T> createWrite(final FieldVector vector,
+        public ArrowDictEncodedObjectWriteData<T> createWrite(final FieldVector vector,
             final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator, final int capacity) {
             // Remove the dictionary id for this encoding from the supplier
             dictionaryIdSupplier.getAsLong();
             final VarBinaryVector dict = new VarBinaryVector("Dictionary", allocator);
             final IntVector v = (IntVector)vector;
             v.allocateNew(capacity);
-            return new ArrowDictEncodedObjectData<>(v, dict, m_serializer);
+            return new ArrowDictEncodedObjectWriteData<>(v, dict, new ArrowBufIO<>(dict, m_serializer));
         }
 
         @Override
-        public ArrowDictEncodedObjectData<T> createRead(final FieldVector vector, final DictionaryProvider provider,
+        public ArrowDictEncodedObjectReadData<T> createRead(final FieldVector vector, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (CURRENT_VERSION.equals(version)) {
+            if (m_version.equals(version)) {
                 final long dictId = vector.getField().getFieldType().getDictionary().getId();
                 @SuppressWarnings("resource") // Dictionary vector closed by data object
                 final VarBinaryVector dict = (VarBinaryVector)provider.lookup(dictId).getVector();
-                return new ArrowDictEncodedObjectData<>((IntVector)vector, dict, m_serializer);
+                return new ArrowDictEncodedObjectReadData<>((IntVector)vector, dict,
+                    new ArrowBufIO<>(dict, m_serializer));
             } else {
                 throw new IOException("Cannot read ArrowDictEncodedObjectData data with version " + version
-                    + ". Current version: " + CURRENT_VERSION + ".");
+                    + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public IntVector getVector(final ColumnReadData data) {
-            return ((ArrowDictEncodedObjectData<?>)data).m_vector;
         }
 
         @Override
         @SuppressWarnings("resource") // Dictionary vector closed by data object
         public DictionaryProvider getDictionaries(final ColumnReadData data) {
             @SuppressWarnings("unchecked")
-            final ArrowDictEncodedObjectData<T> objData = (ArrowDictEncodedObjectData<T>)data;
+            final ArrowDictEncodedObjectReadData<T> objData = (ArrowDictEncodedObjectReadData<T>)data;
             final VarBinaryVector vector = objData.getDictionary();
             final Dictionary dictionary = new Dictionary(vector, objData.m_vector.getField().getDictionary());
             return new SingletonDictionaryProvider(dictionary);
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return CURRENT_VERSION;
         }
 
         @Override

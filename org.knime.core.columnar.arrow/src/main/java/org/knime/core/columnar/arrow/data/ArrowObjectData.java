@@ -69,33 +69,91 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
  *
  * No caching, just serialization.
  *
- * @param <T> type of object
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBinaryVector>
-    implements ObjectWriteData<T>, ObjectReadData<T> {
+public final class ArrowObjectData {
 
-    private final ArrowBufIO<T> m_io;
-
-    private ArrowObjectData(final VarBinaryVector vector, final ObjectDataSerializer<T> serializer) {
-        super(vector);
-        m_io = new ArrowBufIO<>(vector, serializer);
+    private ArrowObjectData() {
     }
 
-    @Override
-    public ArrowObjectData<T> close(final int length) {
-        closeWithLength(length);
-        return this;
+    /**
+     * Arrow implementation of {@link ObjectWriteData}.
+     *
+     * @param <T> type of object
+     */
+    public static final class ArrowObjectWriteData<T> extends AbstractArrowWriteData<VarBinaryVector>
+        implements ObjectWriteData<T> {
+
+        private final ArrowBufIO<T> m_io;
+
+        private ArrowObjectWriteData(final VarBinaryVector vector, final ArrowBufIO<T> io) {
+            super(vector);
+            m_io = io;
+        }
+
+        private ArrowObjectWriteData(final VarBinaryVector vector, final int offset, final ArrowBufIO<T> io) {
+            super(vector, offset);
+            m_io = io;
+        }
+
+        @Override
+        public void setObject(final int index, final T obj) {
+            m_io.serialize(m_offset + index, obj);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new ArrowObjectWriteData<>(m_vector, m_offset + start, m_io);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Resource closed by ReadData
+        public ArrowObjectReadData<T> close(final int length) {
+            return new ArrowObjectReadData<>(closeWithLength(length), m_io);
+        }
     }
 
-    @Override
-    public T getObject(final int index) {
-        return m_io.deserialize(m_offset + index);
-    }
+    /**
+     * Arrow implementation of {@link ObjectReadData}.
+     *
+     * @param <T> type of object
+     */
+    public static final class ArrowObjectReadData<T> extends AbstractArrowReadData<VarBinaryVector>
+        implements ObjectReadData<T> {
 
-    @Override
-    public void setObject(final int index, final T obj) {
-        m_io.serialize(m_offset + index, obj);
+        private final ArrowBufIO<T> m_io;
+
+        private ArrowObjectReadData(final VarBinaryVector vector, final ArrowBufIO<T> io) {
+            super(vector);
+            m_io = io;
+        }
+
+        private ArrowObjectReadData(final VarBinaryVector vector, final int offset, final int length,
+            final ArrowBufIO<T> io) {
+            super(vector, offset, length);
+            m_io = io;
+        }
+
+        @Override
+        public T getObject(final int index) {
+            return m_io.deserialize(m_offset + index);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowObjectReadData<>(m_vector, m_offset + start, length, m_io);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+        }
     }
 
     /**
@@ -103,9 +161,7 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
      *
      * @param <T> type of object
      */
-    public static final class ArrowObjectDataFactory<T> extends AbstractFieldVectorDataFactory {
-
-        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
+    public static final class ArrowObjectDataFactory<T> extends AbstractArrowColumnDataFactory {
 
         private final ObjectDataSerializer<T> m_serializer;
 
@@ -113,6 +169,7 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
          * @param serializer to convert from T to byte[] and vice-versa.
          */
         public ArrowObjectDataFactory(final ObjectDataSerializer<T> serializer) {
+            super(ArrowColumnDataFactoryVersion.version(0));
             m_serializer = serializer;
         }
 
@@ -122,27 +179,23 @@ public final class ArrowObjectData<T> extends AbstractVariableWitdthData<VarBina
         }
 
         @Override
-        public ArrowObjectData<T> createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowObjectWriteData<T> createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final VarBinaryVector v = (VarBinaryVector)vector;
             v.allocateNew(capacity);
-            return new ArrowObjectData<>(v, m_serializer);
+            return new ArrowObjectWriteData<>(v, new ArrowBufIO<>(v, m_serializer));
         }
 
         @Override
-        public ArrowObjectData<T> createRead(final FieldVector vector, final DictionaryProvider provider,
+        public ArrowObjectReadData<T> createRead(final FieldVector vector, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (CURRENT_VERSION.equals(version)) {
-                return new ArrowObjectData<>((VarBinaryVector)vector, m_serializer);
+            if (m_version.equals(version)) {
+                final VarBinaryVector v = (VarBinaryVector)vector;
+                return new ArrowObjectReadData<>(v, new ArrowBufIO<>(v, m_serializer));
             } else {
-                throw new IOException("Cannot read ArrowVarBinaryData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
+                throw new IOException(
+                    "Cannot read ArrowObjectData with version " + version + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return CURRENT_VERSION;
         }
 
         @Override

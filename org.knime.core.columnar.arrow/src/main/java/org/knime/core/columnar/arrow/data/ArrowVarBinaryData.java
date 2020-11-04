@@ -65,39 +65,81 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowVarBinaryData extends AbstractVariableWitdthData<VarBinaryVector>
-    implements VarBinaryWriteData, VarBinaryReadData {
+public final class ArrowVarBinaryData {
 
-    private ArrowVarBinaryData(final VarBinaryVector vector) {
-        super(vector);
+    private ArrowVarBinaryData() {
     }
 
-    @Override
-    public byte[] getBytes(final int index) {
-        return m_vector.get(m_offset + index);
+    /** Arrow implementation of {@link VarBinaryWriteData}. */
+    public static final class ArrowVarBinaryWriteData extends AbstractArrowWriteData<VarBinaryVector>
+        implements VarBinaryWriteData {
+
+        private ArrowVarBinaryWriteData(final VarBinaryVector vector) {
+            super(vector);
+        }
+
+        private ArrowVarBinaryWriteData(final VarBinaryVector vector, final int offset) {
+            super(vector, offset);
+        }
+
+        @Override
+        public void setBytes(final int index, final byte[] val) {
+            m_vector.setSafe(m_offset + index, val);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new ArrowVarBinaryWriteData(m_vector, m_offset + start);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Resource closed by ReadData
+        public ArrowVarBinaryReadData close(final int length) {
+            return new ArrowVarBinaryReadData(closeWithLength(length));
+        }
     }
 
-    @Override
-    public void setBytes(final int index, final byte[] value) {
-        m_vector.setSafe(m_offset + index, value);
-    }
+    /** Arrow implementation of {@link VarBinaryReadData}. */
+    public static final class ArrowVarBinaryReadData extends AbstractArrowReadData<VarBinaryVector>
+        implements VarBinaryReadData {
 
-    @Override
-    public ArrowVarBinaryData close(final int length) {
-        closeWithLength(length);
-        return this;
+        private ArrowVarBinaryReadData(final VarBinaryVector vector) {
+            super(vector);
+        }
+
+        private ArrowVarBinaryReadData(final VarBinaryVector vector, final int offset, final int length) {
+            super(vector, offset, length);
+        }
+
+        @Override
+        public byte[] getBytes(final int index) {
+            return m_vector.get(m_offset + index);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowVarBinaryReadData(m_vector, m_offset + start, length);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+        }
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
-    public static final class ArrowVarBinaryDataFactory extends AbstractFieldVectorDataFactory {
-
-        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
+    public static final class ArrowVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
 
         /** Singleton instance of {@link ArrowVarBinaryDataFactory} */
         public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
 
         private ArrowVarBinaryDataFactory() {
-            // Singleton
+            super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
@@ -106,27 +148,22 @@ public final class ArrowVarBinaryData extends AbstractVariableWitdthData<VarBina
         }
 
         @Override
-        public ArrowVarBinaryData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowVarBinaryWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final VarBinaryVector v = (VarBinaryVector)vector;
             v.allocateNew(capacity);
-            return new ArrowVarBinaryData(v);
+            return new ArrowVarBinaryWriteData(v);
         }
 
         @Override
-        public ArrowVarBinaryData createRead(final FieldVector vector, final DictionaryProvider provider,
+        public ArrowVarBinaryReadData createRead(final FieldVector vector, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (CURRENT_VERSION.equals(version)) {
-                return new ArrowVarBinaryData((VarBinaryVector)vector);
+            if (m_version.equals(version)) {
+                return new ArrowVarBinaryReadData((VarBinaryVector)vector);
             } else {
-                throw new IOException("Cannot read ArrowVarBinaryData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
+                throw new IOException(
+                    "Cannot read ArrowVarBinaryData with version " + version + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return CURRENT_VERSION;
         }
     }
 }

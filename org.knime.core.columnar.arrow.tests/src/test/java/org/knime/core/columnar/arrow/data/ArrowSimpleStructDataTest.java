@@ -51,11 +51,16 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import org.apache.arrow.vector.Float8Vector;
+import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.complex.StructVector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleReadData;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleWriteData;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
@@ -91,9 +96,9 @@ public class ArrowSimpleStructDataTest extends AbstractArrowDataTest<ArrowStruct
     @Override
     protected void setValue(final ArrowStructWriteData data, final int index, final int seed) {
         final DoubleWriteData doubleData = data.getWriteDataAt(0);
-        assertTrue(doubleData instanceof ArrowDoubleData);
+        assertTrue(doubleData instanceof ArrowDoubleWriteData);
         final IntWriteData intData = data.getWriteDataAt(1);
-        assertTrue(intData instanceof ArrowIntData);
+        assertTrue(intData instanceof ArrowIntWriteData);
         doubleData.setDouble(index, seed / 2.0);
         intData.setInt(index, seed * 2);
     }
@@ -101,35 +106,31 @@ public class ArrowSimpleStructDataTest extends AbstractArrowDataTest<ArrowStruct
     @Override
     protected void checkValue(final ArrowStructReadData data, final int index, final int seed) {
         final DoubleReadData doubleData = data.getReadDataAt(0);
-        assertTrue(doubleData instanceof ArrowDoubleData);
+        assertTrue(doubleData instanceof ArrowDoubleReadData);
         final IntReadData intData = data.getReadDataAt(1);
-        assertTrue(intData instanceof ArrowIntData);
+        assertTrue(intData instanceof ArrowIntReadData);
         assertEquals(seed / 2.0, doubleData.getDouble(index), 0);
         assertEquals(seed * 2, intData.getInt(index));
     }
 
     @Override
-    @SuppressWarnings("resource")
-    protected boolean isReleased(final ReferencedData data) {
-        final StructVector vector;
-        final ArrowDoubleData doubleData;
-        final ArrowIntData intData;
-        if (data instanceof ArrowStructWriteData) {
-            final ArrowStructWriteData d = castW(data);
-            doubleData = d.getWriteDataAt(0);
-            intData = d.getWriteDataAt(1);
-            vector = d.m_vector;
-        } else {
-            final ArrowStructReadData d = castR(data);
-            doubleData = d.getReadDataAt(0);
-            intData = d.getReadDataAt(1);
-            vector = d.m_vector;
-        }
+    protected boolean isReleasedW(final ArrowStructWriteData data) {
+        return data.m_vector == null;
+        // TODO(benjamin) check inner data
+    }
 
-        boolean doubleReleased = doubleData.m_vector.getDataBuffer().capacity() == 0 //
-            && doubleData.m_vector.getValidityBuffer().capacity() == 0;
-        boolean intReleased = intData.m_vector.getDataBuffer().capacity() == 0 //
-            && intData.m_vector.getValidityBuffer().capacity() == 0;
+    @Override
+    @SuppressWarnings("resource")
+    protected boolean isReleasedR(final ArrowStructReadData data) {
+        final ArrowStructReadData d = castR(data);
+        final Float8Vector doubleVector = ((ArrowDoubleReadData)d.getReadDataAt(0)).m_vector;
+        final IntVector intVector = ((ArrowIntReadData)d.getReadDataAt(1)).m_vector;
+        final StructVector vector = d.m_vector;
+
+        boolean doubleReleased = doubleVector.getDataBuffer().capacity() == 0 //
+            && doubleVector.getValidityBuffer().capacity() == 0;
+        boolean intReleased = intVector.getDataBuffer().capacity() == 0 //
+            && intVector.getValidityBuffer().capacity() == 0;
         return vector.getValidityBuffer().capacity() == 0 && doubleReleased && intReleased;
     }
 

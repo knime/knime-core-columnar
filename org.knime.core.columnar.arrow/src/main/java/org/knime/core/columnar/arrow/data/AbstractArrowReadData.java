@@ -42,29 +42,77 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 4, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.apache.arrow.vector.BaseVariableWidthVector;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.util.ValueVectorUtility;
 
 /**
- * An abstract implementation of Arrow data which uses a {@link BaseVariableWidthVector} for data storage. Handles
- * #sizeOf() and #setMissing(int).
+ * Abstract implementation of {@link ArrowReadData}. Holds a {@link FieldVector} of type F in {@link #m_vector} and an
+ * offset ({@link #m_offset}) and length ({@link #m_length}) for the indices to use in this vector.
  *
- * @param <F> Type of the field vector holding the data.
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * Overwrite {@link #closeResources()} to close additional resources (make sure to call the super method).
+ *
+ * @param <F> the type of the {@link FieldVector}
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractVariableWitdthData<F extends BaseVariableWidthVector> extends AbstractFieldVectorData<F> {
+@SuppressWarnings("javadoc")
+abstract class AbstractArrowReadData<F extends FieldVector> extends AbstractReferencedData implements ArrowReadData {
 
-    AbstractVariableWitdthData(final F vector) {
-        super(vector);
+    /** The vector. Use {@link #m_offset} when accessing vector data. */
+    protected final F m_vector;
+
+    /** An offset describing where the values of this object start in the vector. */
+    protected final int m_offset;
+
+    /** The length of the data */
+    protected final int m_length;
+
+    /**
+     * Create an abstract {@link ArrowReadData} with the given vector, an offset of 0 and the length of the vector.
+     *
+     * @param vector the vector
+     */
+    public AbstractArrowReadData(final F vector) {
+        m_vector = vector;
+        m_offset = 0;
+        m_length = vector.getValueCount();
+    }
+
+    /**
+     * Create an abstract {@link ArrowReadData} with the given vector.
+     *
+     * @param vector the vector
+     * @param offset the offset
+     * @param length the length of this data
+     */
+    public AbstractArrowReadData(final F vector, final int offset, final int length) {
+        m_vector = vector;
+        m_offset = offset;
+        m_length = length;
     }
 
     @Override
-    @SuppressWarnings("resource") // Buffers handled by vector
-    public int sizeOf() {
-        return (int)(m_vector.getDataBuffer().capacity() + m_vector.getValidityBuffer().capacity()
-            + m_vector.getOffsetBuffer().capacity());
+    public boolean isMissing(final int index) {
+        return m_vector.isNull(m_offset + index);
+    }
+
+    @Override
+    public int length() {
+        return m_length;
+    }
+
+    @Override
+    protected void closeResources() {
+        m_vector.close();
+    }
+
+    @Override
+    public String toString() {
+        return ValueVectorUtility.getToString(m_vector, m_offset, m_offset + m_length);
     }
 }

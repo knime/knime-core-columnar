@@ -62,6 +62,7 @@ public interface ArrowReadData extends ColumnReadData {
      *
      * @param start the first index of the slice
      * @param length the length of the slice
+     * @return the sliced data
      */
-    void slice(int start, int length);
+    ArrowReadData slice(int start, int length);
 }

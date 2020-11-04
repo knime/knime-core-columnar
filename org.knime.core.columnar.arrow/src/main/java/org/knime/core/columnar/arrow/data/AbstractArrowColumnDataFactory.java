@@ -42,28 +42,53 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 4, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.apache.arrow.vector.BaseFixedWidthVector;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.data.ColumnReadData;
 
 /**
- * An abstract implementation of Arrow data which uses a {@link BaseFixedWidthVector} for data storage. Handles
- * #sizeOf() and #setMissing(int).
+ * Abstract implementation of {@link ArrowColumnDataFactory} for {@link ArrowReadData} which extend
+ * {@link AbstractArrowReadData}. Holds the current version.
  *
- * @param <F> Type of the field vector holding the data.
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * Overwrite {@link #getDictionaries(ColumnReadData)} if the data object contains dictionaries.
+ *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractFixedWitdthData<F extends BaseFixedWidthVector> extends AbstractFieldVectorData<F> {
+@SuppressWarnings("javadoc")
+abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory {
 
-    AbstractFixedWitdthData(final F vector) {
-        super(vector);
+    /** The current version */
+    protected final ArrowColumnDataFactoryVersion m_version;
+
+    /**
+     * Create a new abstract {@link ArrowColumnDataFactory}.
+     *
+     * @param version the current version
+     */
+    public AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
+        m_version = version;
     }
 
     @Override
-    @SuppressWarnings("resource") // Buffers handled by vector
-    public int sizeOf() {
-        return (int)(m_vector.getDataBuffer().capacity() + m_vector.getValidityBuffer().capacity());
+    public FieldVector getVector(final ColumnReadData data) {
+        return ((AbstractArrowReadData<?>)data).m_vector;
+    }
+
+    @Override
+    public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        return null;
+    }
+
+    @Override
+    public ArrowColumnDataFactoryVersion getVersion() {
+        return m_version;
     }
 }

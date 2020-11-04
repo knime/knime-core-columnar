@@ -51,10 +51,10 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import org.apache.arrow.vector.IntVector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
 
 /**
  * Test {@link ArrowIntData}
@@ -62,43 +62,44 @@ import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowIntDataTest extends AbstractArrowDataTest<ArrowIntData, ArrowIntData> {
+public class ArrowIntDataTest extends AbstractArrowDataTest<ArrowIntWriteData, ArrowIntReadData> {
 
     /** Create the test for {@link ArrowIntData} */
     public ArrowIntDataTest() {
         super(ArrowIntDataFactory.INSTANCE);
     }
 
-    private static ArrowIntData cast(final Object o) {
-        assertTrue(o instanceof ArrowIntData);
-        return (ArrowIntData)o;
+    @Override
+    protected ArrowIntWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowIntWriteData);
+        return (ArrowIntWriteData)o;
     }
 
     @Override
-    protected ArrowIntData castW(final Object o) {
-        return cast(o);
+    protected ArrowIntReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowIntReadData);
+        return (ArrowIntReadData)o;
     }
 
     @Override
-    protected ArrowIntData castR(final Object o) {
-        return cast(o);
-    }
-
-    @Override
-    protected void setValue(final ArrowIntData data, final int index, final int seed) {
+    protected void setValue(final ArrowIntWriteData data, final int index, final int seed) {
         data.setInt(index, seed);
     }
 
     @Override
-    protected void checkValue(final ArrowIntData data, final int index, final int seed) {
+    protected void checkValue(final ArrowIntReadData data, final int index, final int seed) {
         assertEquals(seed, data.getInt(index));
     }
 
     @Override
+    protected boolean isReleasedW(final ArrowIntWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
     @SuppressWarnings("resource")
-    protected boolean isReleased(final ReferencedData data) {
-        final IntVector v = cast(data).m_vector;
-        return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
+    protected boolean isReleasedR(final ArrowIntReadData data) {
+        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
     }
 
     @Override

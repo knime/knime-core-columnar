@@ -63,7 +63,6 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.ArrowType.Struct;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.apache.arrow.vector.util.ValueVectorUtility;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
@@ -84,20 +83,19 @@ public final class ArrowStructData {
     }
 
     /** Arrow implementation of {@link StructWriteData}. */
-    public static final class ArrowStructWriteData extends AbstractReferenceData
-        implements StructWriteData, ArrowWriteData {
-
-        // Package private for testing only
-        final StructVector m_vector;
+    public static final class ArrowStructWriteData extends AbstractArrowWriteData<StructVector>
+        implements StructWriteData {
 
         private final ArrowWriteData[] m_children;
 
-        private int m_offset;
-
         private ArrowStructWriteData(final StructVector vector, final ArrowWriteData... children) {
-            m_vector = vector;
+            super(vector);
             m_children = children;
-            m_offset = 0;
+        }
+
+        private ArrowStructWriteData(final StructVector vector, final int offset, final ArrowWriteData... children) {
+            super(vector, offset);
+            m_children = children;
         }
 
         @Override
@@ -107,11 +105,6 @@ public final class ArrowStructData {
             for (final ColumnWriteData child : m_children) {
                 child.setMissing(m_offset + index);
             }
-        }
-
-        @Override
-        public int capacity() {
-            return m_vector.getValueCapacity();
         }
 
         @Override
@@ -127,22 +120,16 @@ public final class ArrowStructData {
         }
 
         @Override
-        public void expand(final int minimumCapacity) {
-            while (m_vector.getValueCapacity() < minimumCapacity) {
-                m_vector.reAlloc();
+        public ArrowStructWriteData slice(final int start) {
+            final ArrowWriteData[] slicedChildren = new ArrowWriteData[m_children.length];
+            for (int i = 0; i < m_children.length; i++) {
+                slicedChildren[i] = m_children[i].slice(start);
             }
+            return new ArrowStructWriteData(m_vector, m_offset + start, slicedChildren);
         }
 
         @Override
-        public void slice(final int start, final int length) {
-            m_offset = start;
-            for (final ArrowWriteData child : m_children) {
-                child.slice(start, length);
-            }
-        }
-
-        @Override
-        @SuppressWarnings("resource") // Validity buffer and child vectors closed by m_vector
+        @SuppressWarnings("resource") // Validity buffer and child vectors closed by m_vector, vector closed by ReadData
         public ArrowStructReadData close(final int length) {
             final int numChildren = m_children.length;
 
@@ -175,49 +162,30 @@ public final class ArrowStructData {
                 validityBuffer.setInt(bufferPosition, validity);
             }
 
-            m_vector.setValueCount(length);
-            return new ArrowStructReadData(m_vector, readChildren);
+            return new ArrowStructReadData(closeWithLength(length), readChildren);
         }
 
         @Override
         protected void closeResources() {
             ArrowStructData.closeResources(m_vector, m_children);
         }
-
-        @Override
-        public String toString() {
-            return ArrowStructData.toString(m_vector, m_offset, m_vector.getValueCount());
-        }
     }
 
     /** Arrow implementation of {@link StructReadData}. */
-    public static final class ArrowStructReadData extends AbstractReferenceData
-        implements StructReadData, ArrowReadData {
-
-        // Package private for testing only
-        final StructVector m_vector;
+    public static final class ArrowStructReadData extends AbstractArrowReadData<StructVector>
+        implements StructReadData {
 
         private final ArrowReadData[] m_children;
 
-        private int m_offset;
-
-        private int m_length;
-
         private ArrowStructReadData(final StructVector vector, final ArrowReadData... children) {
-            m_vector = vector;
+            super(vector);
             m_children = children;
-            m_offset = 0;
-            m_length = m_vector.getValueCount();
         }
 
-        @Override
-        public boolean isMissing(final int index) {
-            return m_vector.isNull(m_offset + index);
-        }
-
-        @Override
-        public int length() {
-            return m_length;
+        private ArrowStructReadData(final StructVector vector, final int offset, final int length,
+            final ArrowReadData... children) {
+            super(vector, offset, length);
+            m_children = children;
         }
 
         @Override
@@ -233,42 +201,34 @@ public final class ArrowStructData {
         }
 
         @Override
-        public void slice(final int start, final int length) {
-            m_offset = start;
-            m_length = length;
-            for (final ArrowReadData child : m_children) {
-                child.slice(start, length);
+        public ArrowStructReadData slice(final int start, final int length) {
+            final ArrowReadData[] slicedChildren = new ArrowReadData[m_children.length];
+            for (int i = 0; i < m_children.length; i++) {
+                slicedChildren[i] = m_children[i].slice(start, length);
             }
+            return new ArrowStructReadData(m_vector, m_offset + start, length, slicedChildren);
         }
 
         @Override
         protected void closeResources() {
             ArrowStructData.closeResources(m_vector, m_children);
         }
-
-        @Override
-        public String toString() {
-            return ArrowStructData.toString(m_vector, m_offset, m_offset + m_length);
-        }
     }
 
     private static int sizeOf(final StructVector vector, final ReferencedData[] children) {
-        @SuppressWarnings("resource") // Validity buffer handled by vector
-        int size = (int)vector.getValidityBuffer().capacity();
+        int size = ArrowSizeUtils.sizeOfStruct(vector);
         for (final ReferencedData c : children) {
             size += c.sizeOf();
         }
         return size;
     }
 
-    private static String toString(final StructVector vector, final int start, final int end) {
-        return ValueVectorUtility.getToString(vector, start, end);
-    }
-
     private static void closeResources(final StructVector vector, final ReferencedData[] children) {
-        vector.close();
-        for (final ReferencedData c : children) {
-            c.release();
+        if (vector != null) {
+            vector.close();
+            for (final ReferencedData c : children) {
+                c.release();
+            }
         }
     }
 
@@ -276,13 +236,19 @@ public final class ArrowStructData {
      * Implementation of {@link ArrowColumnDataFactory} for {@link ArrowStructReadData} and
      * {@link ArrowStructWriteData}.
      */
-    public static final class ArrowStructDataFactory implements ArrowColumnDataFactory {
+    public static final class ArrowStructDataFactory extends AbstractArrowColumnDataFactory {
 
         private static final int CURRENT_VERSION = 0;
 
         private final ArrowColumnDataFactory[] m_inner;
 
-        private final ArrowColumnDataFactoryVersion m_version;
+        private static ArrowColumnDataFactoryVersion[] getVersions(final ArrowColumnDataFactory[] factories) {
+            final ArrowColumnDataFactoryVersion[] versions = new ArrowColumnDataFactoryVersion[factories.length];
+            for (int i = 0; i < factories.length; i++) {
+                versions[i] = factories[i].getVersion();
+            }
+            return versions;
+        }
 
         /**
          * Create a new factory for Arrow struct data.
@@ -290,12 +256,8 @@ public final class ArrowStructData {
          * @param inner factories to create the inner types
          */
         public ArrowStructDataFactory(final ArrowColumnDataFactory... inner) {
+            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, getVersions(inner)));
             m_inner = inner;
-            final ArrowColumnDataFactoryVersion[] innerVersions = new ArrowColumnDataFactoryVersion[inner.length];
-            for (int i = 0; i < inner.length; i++) {
-                innerVersions[i] = inner[i].getVersion();
-            }
-            m_version = ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, innerVersions);
         }
 
         @Override
@@ -345,11 +307,6 @@ public final class ArrowStructData {
         }
 
         @Override
-        public StructVector getVector(final ColumnReadData data) {
-            return ((ArrowStructReadData)data).m_vector;
-        }
-
-        @Override
         public DictionaryProvider getDictionaries(final ColumnReadData data) {
             final ArrowStructReadData d = (ArrowStructReadData)data;
             final List<DictionaryProvider> providers = new ArrayList<>();
@@ -360,11 +317,6 @@ public final class ArrowStructData {
                 }
             }
             return new NestedDictionaryProvider(providers);
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return m_version;
         }
 
         @Override

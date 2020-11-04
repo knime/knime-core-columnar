@@ -51,10 +51,10 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import org.apache.arrow.vector.Float4Vector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatReadData;
+import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatWriteData;
 
 /**
  * Test {@link ArrowFloatData}.
@@ -62,43 +62,44 @@ import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatData, ArrowFloatData> {
+public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatWriteData, ArrowFloatReadData> {
 
     /** Create the test for {@link ArrowFloatData} */
     public ArrowFloatDataTest() {
         super(ArrowFloatDataFactory.INSTANCE);
     }
 
-    private static ArrowFloatData cast(final Object o) {
-        assertTrue(o instanceof ArrowFloatData);
-        return (ArrowFloatData)o;
+    @Override
+    protected ArrowFloatWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowFloatWriteData);
+        return (ArrowFloatWriteData)o;
     }
 
     @Override
-    protected ArrowFloatData castW(final Object o) {
-        return cast(o);
+    protected ArrowFloatReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowFloatReadData);
+        return (ArrowFloatReadData)o;
     }
 
     @Override
-    protected ArrowFloatData castR(final Object o) {
-        return cast(o);
-    }
-
-    @Override
-    protected void setValue(final ArrowFloatData data, final int index, final int seed) {
+    protected void setValue(final ArrowFloatWriteData data, final int index, final int seed) {
         data.setFloat(index, seed);
     }
 
     @Override
-    protected void checkValue(final ArrowFloatData data, final int index, final int seed) {
+    protected void checkValue(final ArrowFloatReadData data, final int index, final int seed) {
         assertEquals(seed, data.getFloat(index), 0);
     }
 
     @Override
+    protected boolean isReleasedW(final ArrowFloatWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleased(final ReferencedData data) {
-        final Float4Vector v = cast(data).m_vector;
-        return v.getDataBuffer().capacity() == 0 && v.getValidityBuffer().capacity() == 0;
+    protected boolean isReleasedR(final ArrowFloatReadData data) {
+        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
     }
 
     @Override

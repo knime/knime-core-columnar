@@ -212,8 +212,15 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public void slice(final int start, final int length) {
+        public ArrowReadData slice(final int start, final int length) {
             // Cannot be sliced. Not important for reading/writing
+            return null;
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            // Cannot be sliced. Not important for reading/writing
+            return null;
         }
     }
 
@@ -298,8 +305,15 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public void slice(final int start, final int length) {
+        public ArrowReadData slice(final int start, final int length) {
             // Cannot be sliced. Not important for reading/writing
+            return null;
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            // Cannot be sliced. Not important for reading/writing
+            return null;
         }
     }
 
@@ -468,8 +482,15 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public void slice(final int start, final int length) {
+        public ArrowReadData slice(final int start, final int length) {
             // Cannot be sliced. Not important for reading/writing
+            return null;
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            // Cannot be sliced. Not important for reading/writing
+            return null;
         }
     }
 

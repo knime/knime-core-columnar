@@ -55,9 +55,10 @@ import java.util.Random;
 
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.complex.ListVector;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListReadData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListWriteData;
@@ -103,7 +104,7 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
         final int[] size2 = getInnerSizes(random, size1);
         final ArrowListWriteData inner1 = data.getWriteData(index, size1);
         for (int i = 0; i < size1; i++) {
-            final ArrowIntData inner2 = inner1.getWriteData(i, size2[i]);
+            final ArrowIntWriteData inner2 = inner1.getWriteData(i, size2[i]);
             for (int j = 0; j < size2[i]; j++) {
                 inner2.setInt(j, random.nextInt());
             }
@@ -124,7 +125,7 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
         assertEquals(size1, inner1.length());
 
         for (int i = 0; i < size1; i++) {
-            final ArrowIntData inner2 = inner1.getReadData(i);
+            final ArrowIntReadData inner2 = inner1.getReadData(i);
             assertEquals(size2[i], inner2.length());
             for (int j = 0; j < size2[i]; j++) {
                 assertEquals(random.nextInt(), inner2.getInt(j));
@@ -133,24 +134,19 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
     }
 
     @Override
+    protected boolean isReleasedW(final ArrowListWriteData data) {
+        return data.m_vector == null;
+        // TODO(benjamin) check inner data
+    }
+
+    @Override
     @SuppressWarnings("resource")
-    protected boolean isReleased(final ReferencedData data) {
-        final ListVector listVector1;
-        final ListVector listVector2;
-        final IntVector intVector;
-        if (data instanceof ArrowListWriteData) {
-            final ArrowListWriteData d1 = castW(data);
-            final ArrowListWriteData d2 = (ArrowListWriteData)d1.m_data;
-            listVector1 = d1.m_vector;
-            listVector2 = d2.m_vector;
-            intVector = ((ArrowIntData)d2.m_data).m_vector;
-        } else {
-            final ArrowListReadData d1 = castR(data);
-            final ArrowListReadData d2 = (ArrowListReadData)d1.m_data;
-            listVector1 = d1.m_vector;
-            listVector2 = d2.m_vector;
-            intVector = ((ArrowIntData)d2.m_data).m_vector;
-        }
+    protected boolean isReleasedR(final ArrowListReadData data) {
+        final ArrowListReadData d1 = castR(data);
+        final ArrowListReadData d2 = (ArrowListReadData)d1.m_data;
+        final ListVector listVector1 = d1.m_vector;
+        final ListVector listVector2 = d2.m_vector;
+        final IntVector intVector = ((ArrowIntReadData)d2.m_data).m_vector;
 
         final boolean list1Released = listVector1.getOffsetBuffer().capacity() == 0 //
             && listVector1.getValidityBuffer().capacity() == 0;

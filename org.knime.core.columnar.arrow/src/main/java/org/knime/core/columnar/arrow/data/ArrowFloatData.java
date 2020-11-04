@@ -65,39 +65,80 @@ import org.knime.core.columnar.data.FloatData.FloatWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowFloatData extends AbstractFixedWitdthData<Float4Vector>
-    implements FloatWriteData, FloatReadData {
+public final class ArrowFloatData {
 
-    private ArrowFloatData(final Float4Vector vector) {
-        super(vector);
+    private ArrowFloatData() {
     }
 
-    @Override
-    public float getFloat(final int index) {
-        return m_vector.get(m_offset + index);
+    /** Arrow implementation of {@link FloatWriteData}. */
+    public static final class ArrowFloatWriteData extends AbstractArrowWriteData<Float4Vector>
+        implements FloatWriteData {
+
+        private ArrowFloatWriteData(final Float4Vector vector) {
+            super(vector);
+        }
+
+        private ArrowFloatWriteData(final Float4Vector vector, final int offset) {
+            super(vector, offset);
+        }
+
+        @Override
+        public void setFloat(final int index, final float val) {
+            m_vector.set(m_offset + index, val);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new ArrowFloatWriteData(m_vector, m_offset + start);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
+
+        @Override
+        @SuppressWarnings("resource") // Resource closed by ReadData
+        public ArrowFloatReadData close(final int length) {
+            return new ArrowFloatReadData(closeWithLength(length));
+        }
     }
 
-    @Override
-    public void setFloat(final int index, final float value) {
-        m_vector.set(m_offset + index, value);
-    }
+    /** Arrow implementation of {@link FloatReadData}. */
+    public static final class ArrowFloatReadData extends AbstractArrowReadData<Float4Vector> implements FloatReadData {
 
-    @Override
-    public ArrowFloatData close(final int length) {
-        closeWithLength(length);
-        return this;
+        private ArrowFloatReadData(final Float4Vector vector) {
+            super(vector);
+        }
+
+        private ArrowFloatReadData(final Float4Vector vector, final int offset, final int length) {
+            super(vector, offset, length);
+        }
+
+        @Override
+        public float getFloat(final int index) {
+            return m_vector.get(m_offset + index);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowFloatReadData(m_vector, m_offset + start, length);
+        }
+
+        @Override
+        public int sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowFloatData} */
-    public static final class ArrowFloatDataFactory extends AbstractFieldVectorDataFactory {
-
-        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
+    public static final class ArrowFloatDataFactory extends AbstractArrowColumnDataFactory {
 
         /** Singleton instance of {@link ArrowFloatDataFactory} */
         public static final ArrowFloatDataFactory INSTANCE = new ArrowFloatDataFactory();
 
         private ArrowFloatDataFactory() {
-            // Singleton
+            super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
@@ -106,27 +147,22 @@ public final class ArrowFloatData extends AbstractFixedWitdthData<Float4Vector>
         }
 
         @Override
-        public ArrowFloatData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowFloatWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final Float4Vector v = (Float4Vector)vector;
             v.allocateNew(capacity);
-            return new ArrowFloatData(v);
+            return new ArrowFloatWriteData(v);
         }
 
         @Override
-        public ArrowFloatData createRead(final FieldVector vector, final DictionaryProvider provider,
+        public ArrowFloatReadData createRead(final FieldVector vector, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (CURRENT_VERSION.equals(version)) {
-                return new ArrowFloatData((Float4Vector)vector);
+            if (m_version.equals(version)) {
+                return new ArrowFloatReadData((Float4Vector)vector);
             } else {
-                throw new IOException("Cannot read ArrowFloatData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
+                throw new IOException(
+                    "Cannot read ArrowFloatData with version " + version + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return CURRENT_VERSION;
         }
     }
 }
