@@ -56,6 +56,7 @@ import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.domain.DefaultDomainStoreConfig;
@@ -85,7 +86,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
 
     private static final String CHUNK_SIZE_PROPERTY = "knime.columnar.chunksize";
 
-    static final int CHUNK_SIZE = Integer.getInteger(CHUNK_SIZE_PROPERTY, 28_000);
+    static final int CHUNK_SIZE = Integer.getInteger(CHUNK_SIZE_PROPERTY, 31000);
 
     private final ColumnStoreFactory m_storeFactory;
 
@@ -151,8 +152,8 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
         m_schema = schema;
         m_storeFactory = storeFactory;
         m_store = new DomainColumnStore(
-            ColumnarPreferenceUtils
-                .wrap(m_storeFactory.createWriteStore(schema, DataContainer.createTempFile(".knable"), CHUNK_SIZE)),
+            ColumnarPreferenceUtils.wrap(m_storeFactory.createWriteStore(schema,
+                DataContainer.createTempFile(".knable"), calculateChunkSize(schema, CHUNK_SIZE))),
             new DefaultDomainStoreConfig(schema, config.getMaxPossibleNominalDomainValues(), config.getRowKeyConfig(),
                 config.isInitializeDomains()),
             ColumnarPreferenceUtils.getDomainCalcExecutor());
@@ -169,6 +170,7 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
         }
         m_factories = factories;
     }
+
 
     /**
      * Only to be used by ColumnarDataContainerDelegate#setMaxPossibleValues(int) for backward compatibility reasons.
@@ -261,7 +263,24 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
         return m_schema;
     }
 
-    private void switchToNextData() {
+
+    private final void releaseCurrentData(final int numValues) {
+        if (m_currentBatch != null) {
+            m_finalizer.close();
+            final ReadBatch readBatch = m_currentBatch.close(numValues);
+            try {
+                m_writer.write(readBatch);
+            } catch (final IOException e) {
+                // TODO logging
+                throw new IllegalStateException("Problem occurred when writing column data.", e);
+            }
+            readBatch.release();
+            m_currentBatch = null;
+            m_size += numValues;
+        }
+    }
+
+    private final void switchToNextData() {
         releaseCurrentData(m_index);
 
         // TODO can we preload data?
@@ -285,20 +304,23 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
         return values;
     }
 
-    void releaseCurrentData(final int numValues) {
-        if (m_currentBatch != null) {
-            m_finalizer.close();
-            final ReadBatch readBatch = m_currentBatch.close(numValues);
-            try {
-                m_writer.write(readBatch);
-            } catch (final IOException e) {
-                // TODO logging
-                throw new IllegalStateException("Problem occurred when writing column data.", e);
-            }
-            readBatch.release();
-            m_currentBatch = null;
-            m_size += numValues;
-        }
+    /*
+     * Simple heuristic to take wide-data into account when determining initial batch size.
+     *
+     * TODO Adaptable chunk-sizes with better size estimates derived from initial batches or historic data will benefit performance.
+     */
+    private static int calculateChunkSize(final ColumnStoreSchema schema, final int maxChunkSize) {
+        // Conservative estimate of 64MB in case many tables are written simultaneously
+        final long targetBatchSizeInBytes = 64 * 1024 * 1024;
+
+        /*
+         *  32 bytes is pessimistic estimate for primitive types and moderate estimate for object types in KNIME
+         */
+        final long rowEstimate = Math.max(1, 32 * schema.getNumColumns());
+
+        // TODO select next closest (lower) power of two.
+        return (int)Math.max(1, Math.min(targetBatchSizeInBytes / rowEstimate, maxChunkSize));
     }
+
 
 }
