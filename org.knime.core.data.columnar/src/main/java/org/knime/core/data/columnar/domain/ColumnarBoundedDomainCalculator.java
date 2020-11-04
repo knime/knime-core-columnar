@@ -49,6 +49,8 @@
 package org.knime.core.data.columnar.domain;
 
 import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -71,6 +73,9 @@ final class ColumnarBoundedDomainCalculator<C extends ColumnReadData>
     private DataCell m_upper;
 
     private int m_index;
+
+    // ignored during update with IntReadData, but used in case domain was initialized with possible values
+    private final Set<DataCell> m_values = new LinkedHashSet<>();
 
     public ColumnarBoundedDomainCalculator(final ColumnarReadValueFactory<C> factory,
         final Comparator<DataValue> delegate) {
@@ -104,9 +109,9 @@ final class ColumnarBoundedDomainCalculator<C extends ColumnReadData>
     @Override
     public DataColumnDomain getDomain() {
         if (m_lower == null) {
-            return new DataColumnDomainCreator().createDomain();
+            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values).createDomain();
         } else {
-            return new DataColumnDomainCreator(m_lower, m_upper).createDomain();
+            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values, m_lower, m_upper).createDomain();
         }
     }
 
@@ -132,6 +137,10 @@ final class ColumnarBoundedDomainCalculator<C extends ColumnReadData>
                     m_upper = domain.getUpperBound();
                 }
             }
+        }
+
+        if (domain.hasValues()) {
+            m_values.addAll(domain.getValues());
         }
     }
 }

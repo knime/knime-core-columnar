@@ -48,7 +48,11 @@
  */
 package org.knime.core.data.columnar.domain;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.LongValue;
@@ -59,6 +63,9 @@ final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<Lon
     private long m_lower = Long.MAX_VALUE;
 
     private long m_upper = Long.MIN_VALUE;
+
+    // ignored during update with IntReadData, but used in case domain was initialized with possible values
+    private final Set<DataCell> m_values = new LinkedHashSet<>();
 
     @Override
     public final void update(final LongReadData data) {
@@ -79,9 +86,10 @@ final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<Lon
     @Override
     public DataColumnDomain getDomain() {
         if (m_lower > m_upper) {
-            return new DataColumnDomainCreator().createDomain();
+            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values).createDomain();
         } else {
-            return new DataColumnDomainCreator(new LongCell(m_lower), new LongCell(m_upper)).createDomain();
+            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values, new LongCell(m_lower),
+                new LongCell(m_upper)).createDomain();
         }
     }
 
@@ -97,6 +105,10 @@ final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<Lon
             if (m_upper < upper) {
                 m_upper = upper;
             }
+        }
+
+        if (domain.hasValues()) {
+            m_values.addAll(domain.getValues());
         }
     }
 }
