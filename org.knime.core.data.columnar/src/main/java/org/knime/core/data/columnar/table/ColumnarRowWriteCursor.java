@@ -73,6 +73,7 @@ import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.ExtensionTable;
+import org.knime.core.util.DuplicateKeyException;
 
 /**
  * Columnar implementation of {@link RowWriteCursor}.
@@ -171,7 +172,6 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
         m_factories = factories;
     }
 
-
     /**
      * Only to be used by ColumnarDataContainerDelegate#setMaxPossibleValues(int) for backward compatibility reasons.
      *
@@ -239,6 +239,8 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
                 // (but will make sure duplicate checks and domain calculations are halted)
                 m_store.close();
             }
+        } catch (DuplicateKeyException e) {
+            throw new DuplicateKeyException("Encountered duplicate row ID \"" + e.getKey() + "\"", e.getKey());
         } catch (final Exception e) {
             // TODO logging
             // TODO ignore exception?
@@ -262,7 +264,6 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
     final ColumnarValueSchema getSchema() {
         return m_schema;
     }
-
 
     private final void releaseCurrentData(final int numValues) {
         if (m_currentBatch != null) {
@@ -321,6 +322,5 @@ public final class ColumnarRowWriteCursor implements RowWriteCursor<ExtensionTab
         // TODO select next closest (lower) power of two.
         return (int)Math.max(1, Math.min(targetBatchSizeInBytes / rowEstimate, maxChunkSize));
     }
-
 
 }

@@ -310,9 +310,11 @@ public final class DomainColumnStore implements ColumnStore {
                 Thread.currentThread().interrupt();
                 throw new IOException(e);
             } catch (final ExecutionException e) {
-                throw new IOException(e.getCause());
-            } catch (final DuplicateKeyException e) {
-                throw new IOException(e);
+                if (e.getCause() instanceof DuplicateKeyException) {
+                    throw (DuplicateKeyException)e.getCause();
+                } else {
+                    throw new IOException(e.getCause());
+                }
             } finally {
                 if (m_duplicateChecker != null) {
                     m_duplicateChecker.clear();

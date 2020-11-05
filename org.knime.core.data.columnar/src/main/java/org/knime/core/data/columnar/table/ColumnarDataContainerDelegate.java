@@ -56,6 +56,8 @@ import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.value.CustomRowKeyValueFactory.CustomRowKeyWriteValue;
+import org.knime.core.node.NodeLogger;
+import org.knime.core.util.DuplicateKeyException;
 
 /**
  * Columnar implementation of {@link DataContainerDelegate}.
@@ -64,6 +66,8 @@ import org.knime.core.data.v2.value.CustomRowKeyValueFactory.CustomRowKeyWriteVa
  * @since 4.3
  */
 public final class ColumnarDataContainerDelegate implements DataContainerDelegate {
+
+    private final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarDataContainerDelegate.class);
 
     private final ColumnarRowWriteCursor m_delegate;
 
@@ -144,8 +148,10 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
         try {
             m_containerTable = m_delegate.finish();
             m_delegate.close();
-        } catch (final Exception e) {
-            throw new IllegalStateException(e);
+        } catch (DuplicateKeyException ex) {
+            throw ex;
+        } catch (IOException ex) {
+            throw new IllegalStateException(ex);
         }
     }
 
@@ -156,8 +162,9 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
         } else {
             try {
                 m_delegate.close();
-            } catch (final Exception ex) {
-                throw new IllegalStateException("Exception thrown while cleaning delegate table.", ex);
+            } catch (Exception e) {
+                // NB: best effort for clearing
+                LOGGER.debug("Exception while clearing ColumnarDataContainer. ", e);
             }
         }
     }
