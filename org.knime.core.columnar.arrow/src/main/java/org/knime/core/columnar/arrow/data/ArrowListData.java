@@ -53,8 +53,10 @@ import java.util.Collections;
 import java.util.Objects;
 import java.util.function.LongSupplier;
 
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.complex.BaseRepeatedValueVector;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
@@ -124,8 +126,16 @@ public final class ArrowListData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowListReadData close(final int length) {
-            final int lastEndIndex = m_vector.getElementEndIndex(length - 1);
-            final ArrowReadData readData = m_data.close(lastEndIndex + 1);
+            final ArrowBuf offsetBuffer = m_vector.getOffsetBuffer();
+            final long nextToSet = m_vector.getLastSet() + 1L;
+
+            // Fill to the end
+            final int dataLength = offsetBuffer.getInt(nextToSet * BaseRepeatedValueVector.OFFSET_WIDTH);
+            for (long i = nextToSet + 1; i < length - 1; i++) {
+                offsetBuffer.setInt(i * BaseRepeatedValueVector.OFFSET_WIDTH, dataLength);
+            }
+
+            final ArrowReadData readData = m_data.close(dataLength);
             return new ArrowListReadData(closeWithLength(length), readData);
         }
 
