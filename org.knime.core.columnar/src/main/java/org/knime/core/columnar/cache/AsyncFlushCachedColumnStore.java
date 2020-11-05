@@ -274,7 +274,10 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
     private final Evictor<ColumnDataUniqueId, ColumnReadData> m_evictor = (k, c) -> {
         try {
-            m_cachedData.remove(k).await();
+            final CountDownLatch latch = m_cachedData.remove(k);
+            if (latch != null) {
+                latch.await();
+            }
         } catch (InterruptedException e) {
             // Restore interrupted state...
             Thread.currentThread().interrupt();
