@@ -123,6 +123,10 @@ public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData, Arro
     }
 
     @Override
+    public void testSliceOfSlice() { // NOSONAR
+    }
+
+    @Override
     public void testReferenceCounting() { // NOSONAR
         // The void vector is holding no data so we don't care about releasing it
     }

@@ -314,6 +314,48 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         readData.release();
     }
 
+    /** Test slice of slice and writing of sliced data */
+    @Test
+    public void testSliceOfSlice() {
+        final int numValues = 32;
+        final int slice1Start = 5;
+        final int slice2Start = 3;
+        final int sliceLength = 5;
+
+        final W writeData = createWrite(numValues);
+        final W slicedWrite1 = castW(writeData.slice(slice1Start));
+        final W slicedWrite2 = castW(slicedWrite1.slice(slice2Start));
+
+        // Write into a slice
+        for (int i = 0; i < sliceLength; i++) {
+            setValue(slicedWrite2, i, i);
+        }
+
+        // Read everything
+        final R readData = castR(writeData.close(numValues));
+        for (int i = 0; i < numValues; i++) {
+            if (i >= slice1Start + slice2Start && i < slice1Start + slice2Start + sliceLength) {
+                // Inside the written slice
+                assertFalse(readData.isMissing(i));
+                checkValue(readData, i, i - slice1Start - slice2Start);
+            } else {
+                // Outside the written slice
+                assertTrue(readData.isMissing(i));
+            }
+        }
+
+        // Read only the slice
+        final R slicedRead1 = castR(readData.slice(slice1Start, 10));
+        final R slicedRead2 = castR(slicedRead1.slice(slice2Start, sliceLength));
+        assertEquals(sliceLength, slicedRead2.length());
+        for (int i = 0; i < sliceLength; i++) {
+            assertFalse(slicedRead2.isMissing(i));
+            checkValue(slicedRead2, i, i);
+        }
+
+        readData.release();
+    }
+
     /**
      * Test reading different indices in R at the same time.
      *
