@@ -193,8 +193,8 @@ class ArrowColumnDataReader implements ColumnDataReader {
             for (final ArrowDictionaryBatch batch : batches) {
                 // Create the vector for this dictionary
                 final long id = batch.getDictionaryId();
-                if (m_dictionaryDescriptions.containsKey(id)) {
-                    final DictionaryDescription description = m_dictionaryDescriptions.get(id);
+                final DictionaryDescription description = m_dictionaryDescriptions.get(id);
+                if (description != null) {
                     @SuppressWarnings("resource") // Resource handled by caller
                     final FieldVector vector = description.m_field.createVector(m_allocator);
 
@@ -246,7 +246,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
         if (m_reader == null) {
             initializeReader();
         }
-        return Integer.valueOf(m_reader.getFooter().getMetaData().get(ARROW_CHUNK_SIZE_KEY));
+        return Integer.parseInt(m_reader.getFooter().getMetaData().get(ARROW_CHUNK_SIZE_KEY));
     }
 
     @Override
@@ -294,7 +294,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
             }
 
             // The type of this field
-            type = Optional.ofNullable(encoding.getIndexType()).orElse(new ArrowType.Int(32, true));
+            type = Optional.ofNullable(encoding.getIndexType()).orElseGet(() -> new ArrowType.Int(32, true));
 
             // Dictionary encoded vectors have no children (The children belong to the dictionary type)
             mappedChildren = null;
