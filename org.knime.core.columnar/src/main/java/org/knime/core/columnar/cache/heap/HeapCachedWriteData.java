@@ -64,6 +64,8 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
     private final ObjectWriteData<T> m_delegate;
 
+    private HeapCachedReadData<T> m_readData;
+
     private AtomicReferenceArray<T> m_data;
 
     HeapCachedWriteData(final ObjectWriteData<T> delegate) {
@@ -82,12 +84,14 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
     @Override
     public void retain() {
+        checkClosed();
         m_refCounter.getAndIncrement();
         m_delegate.retain();
     }
 
     @Override
     public void release() {
+        checkClosed();
         if (m_refCounter.decrementAndGet() == 0) {
             m_data = null;
         }
@@ -101,6 +105,7 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
     @Override
     public void expand(final int minimumCapacity) {
+        checkClosed();
         m_delegate.expand(minimumCapacity);
     }
 
@@ -111,18 +116,15 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
     @Override
     public ObjectReadData<T> close(final int length) {
-        return new HeapCachedReadData<>(m_delegate.close(length), m_data, this);
+        if (m_readData == null) {
+            m_readData = new HeapCachedReadData<>(m_delegate, length, m_data);
+        }
+        return m_readData;
     }
 
-    void serialize(final int numValues) {
-        for (int i = 0; i < numValues; i++) {
-            final T t = m_data.get(i);
-            if (t != null) {
-                m_delegate.setObject(i, t);
-            } /* else {
-                 m_delegate.setMissing(i);
-              }*/
+    private void checkClosed() {
+        if (m_readData != null) {
+            throw new IllegalStateException("HeapCachedWriteData has already been closed.");
         }
     }
-
 }

@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.data.ObjectData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
 /**
  * Wrapper around {@link ObjectData} for in-heap caching.
@@ -62,17 +63,16 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
 
     private final AtomicInteger m_refCounter = new AtomicInteger(1);
 
-    private final ObjectReadData<T> m_delegate;
+    private final ObjectWriteData<T> m_delegate;
 
-    private final HeapCachedWriteData<T> m_writeData;
+    private final int m_length;
 
     private AtomicReferenceArray<T> m_data;
 
-    HeapCachedReadData(final ObjectReadData<T> delegate, final AtomicReferenceArray<T> data,
-        final HeapCachedWriteData<T> writeData) {
+    HeapCachedReadData(final ObjectWriteData<T> delegate, final int length, final AtomicReferenceArray<T> data) {
         m_delegate = delegate;
+        m_length = length;
         m_data = data;
-        m_writeData = writeData;
     }
 
     @Override
@@ -82,13 +82,13 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
 
     @Override
     public int length() {
-        return m_delegate.length();
+        return m_length;
     }
 
     @Override
     public void retain() {
         m_refCounter.getAndIncrement();
-        m_writeData.retain();
+        m_delegate.retain();
     }
 
     @Override
@@ -96,7 +96,7 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
         if (m_refCounter.decrementAndGet() == 0) {
             m_data = null;
         }
-        m_writeData.release();
+        m_delegate.release();
     }
 
     @Override
@@ -109,16 +109,18 @@ final class HeapCachedReadData<T> implements ObjectReadData<T> {
         return m_data.get(index);
     }
 
-    final ObjectReadData<T> getDelegate() {
-        return m_delegate;
-    }
-
     AtomicReferenceArray<T> getData() {
         return m_data;
     }
 
-    void serialize() {
-        m_writeData.serialize(m_delegate.length());
+    ObjectReadData<T> serialize() {
+        for (int i = 0; i < m_length; i++) {
+            final T t = m_data.get(i);
+            if (t != null) {
+                m_delegate.setObject(i, t);
+            }
+        }
+        return m_delegate.close(m_length);
     }
 
 }

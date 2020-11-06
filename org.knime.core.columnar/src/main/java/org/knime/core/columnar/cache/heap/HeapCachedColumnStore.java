@@ -154,12 +154,12 @@ public final class HeapCachedColumnStore implements ColumnStore {
             for (int i = 0; i < data.length; i++) {
                 if (m_objectData.isSelected(i)) {
                     final HeapCachedReadData<?> heapCachedData = (HeapCachedReadData<?>)batch.get(i);
-                    futures.add(CompletableFuture.runAsync(heapCachedData::serialize, m_executor));
+                    final int finalI = i;
+                    futures
+                        .add(CompletableFuture.runAsync(() -> data[finalI] = heapCachedData.serialize(), m_executor));
                     final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
                     m_cache.put(ccuid, heapCachedData.getData());
                     m_cachedData.add(ccuid);
-
-                    data[i] = heapCachedData.getDelegate();
                 } else {
                     data[i] = batch.get(i);
                 }
