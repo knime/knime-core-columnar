@@ -46,30 +46,29 @@
  */
 package org.knime.core.columnar.cache.heap;
 
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
 /**
- * Wrapper around {@link ObjectWriteData} for in heap caching.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
+final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectReadData<T> {
 
-    private final AtomicInteger m_refCounter = new AtomicInteger(1);
+    private final ObjectWriteData<T> m_writeDelegate;
 
-    private final ObjectWriteData<T> m_delegate;
+    private final AtomicReferenceArray<T> m_data;
 
-    private HeapCachedReadData<T> m_readData;
+    private ObjectReadData<T> m_readDelegate;
 
-    private AtomicReferenceArray<T> m_data;
+    private int m_length = - 1;
 
-    HeapCachedWriteData(final ObjectWriteData<T> delegate) {
-        m_delegate = delegate;
+ // reference difference between close and serialize
+    private int m_refDiff = 0;
+
+    HeapCachedWriteReadData(final ObjectWriteData<T> delegate) {
+        m_writeDelegate = delegate;
         m_data = new AtomicReferenceArray<>(delegate.capacity());
     }
 
@@ -78,35 +77,51 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
     }
 
     @Override
+    public boolean isMissing(final int index) {
+        return m_data.get(index) == null;
+    }
+
+    @Override
     public int capacity() {
-        return m_delegate.capacity();
+        return m_writeDelegate.capacity();
     }
 
     @Override
-    public void retain() {
+    public int length() {
         checkClosed();
-        m_refCounter.getAndIncrement();
-        m_delegate.retain();
+        return m_length;
     }
 
     @Override
-    public void release() {
-        checkClosed();
-        if (m_refCounter.decrementAndGet() == 0) {
-            m_data = null;
+    public synchronized void retain() {
+        if (!isClosed()) {
+            m_writeDelegate.retain();
+        } else if (isSerialized()) {
+            m_readDelegate.retain();
+        } else {
+            m_refDiff++;
         }
-        m_delegate.release();
     }
 
     @Override
-    public int sizeOf() {
-        return m_delegate.sizeOf();
+    public synchronized void release() {
+        if (!isClosed()) {
+            m_writeDelegate.release();
+        } else if (isSerialized()) {
+            m_readDelegate.release();
+        } else {
+            m_refDiff--;
+        }
+    }
+
+    @Override
+    public synchronized int sizeOf() {
+        return m_readDelegate != null ? m_readDelegate.sizeOf() : m_writeDelegate.sizeOf();
     }
 
     @Override
     public void expand(final int minimumCapacity) {
-        checkClosed();
-        m_delegate.expand(minimumCapacity);
+        m_writeDelegate.expand(minimumCapacity);
     }
 
     @Override
@@ -115,16 +130,54 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
     }
 
     @Override
-    public ObjectReadData<T> close(final int length) {
-        if (m_readData == null) {
-            m_readData = new HeapCachedReadData<>(m_delegate, length, m_data);
+    public T getObject(final int index) {
+        return m_data.get(index);
+    }
+
+    AtomicReferenceArray<T> getData() {
+        return m_data;
+    }
+
+    @Override
+    public synchronized ObjectReadData<T> close(final int length) {
+        m_length = length;
+        return this;
+    }
+
+    private boolean isClosed() {
+        return m_length != -1;
+    }
+
+    synchronized void serialize() {
+        checkClosed();
+        if (!isSerialized()) {
+            for (int i = 0; i < m_length; i++) {
+                final T t = m_data.get(i);
+                if (t != null) {
+                    m_writeDelegate.setObject(i, t);
+                }
+            }
+            m_readDelegate = m_writeDelegate.close(m_length);
+            for (int i = 0; i < m_refDiff; i++) {
+                m_readDelegate.retain();
+            }
         }
-        return m_readData;
+    }
+
+    private boolean isSerialized() {
+        return m_readDelegate != null;
+    }
+
+    ObjectReadData<?> getDelegate() {
+        if (!isSerialized()) {
+            throw new IllegalStateException("Data has not been serialized.");
+        }
+        return m_readDelegate;
     }
 
     private void checkClosed() {
-        if (m_readData != null) {
-            throw new IllegalStateException("HeapCachedWriteData has already been closed.");
+        if (!isClosed()) {
+            throw new IllegalStateException("Data has not been closed.");
         }
     }
 }

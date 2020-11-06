@@ -114,7 +114,7 @@ public final class HeapCachedColumnStore implements ColumnStore {
             for (int i = 0; i < data.length; i++) {
                 if (m_objectData.isSelected(i)) {
                     final ObjectWriteData<?> columnWriteData = (ObjectWriteData<?>)batch.get(i);
-                    data[i] = new HeapCachedWriteData<>(columnWriteData);
+                    data[i] = new HeapCachedWriteReadData<>(columnWriteData);
                 } else {
                     data[i] = batch.get(i);
                 }
@@ -150,24 +150,27 @@ public final class HeapCachedColumnStore implements ColumnStore {
             waitForPrevBatch();
             final List<CompletableFuture<?>> futures = new ArrayList<>();
 
-            final ColumnReadData[] data = new ColumnReadData[batch.getNumColumns()];
-            for (int i = 0; i < data.length; i++) {
+            for (int i = 0; i < batch.getNumColumns(); i++) {
                 if (m_objectData.isSelected(i)) {
-                    final HeapCachedReadData<?> heapCachedData = (HeapCachedReadData<?>)batch.get(i);
-                    final int finalI = i;
-                    futures
-                        .add(CompletableFuture.runAsync(() -> data[finalI] = heapCachedData.serialize(), m_executor));
+                    final HeapCachedWriteReadData<?> heapCachedData = (HeapCachedWriteReadData<?>)batch.get(i);
+                    futures.add(CompletableFuture.runAsync(heapCachedData::serialize, m_executor));
                     final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
                     m_cache.put(ccuid, heapCachedData.getData());
                     m_cachedData.add(ccuid);
-                } else {
-                    data[i] = batch.get(i);
                 }
             }
 
             m_serializationFuture =
-                CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()])).thenRunAsync(() -> {
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()])).thenRunAsync(() -> { // NOSONAR
                     try {
+                        final ColumnReadData[] data = new ColumnReadData[batch.getNumColumns()];
+                        for (int i = 0; i < data.length; i++) {
+                            if (m_objectData.isSelected(i)) {
+                                data[i] = ((HeapCachedWriteReadData<?>)batch.get(i)).getDelegate();
+                            } else {
+                                data[i] = batch.get(i);
+                            }
+                        }
                         m_delegateWriter.write(new DefaultReadBatch(data, batch.length()));
                     } catch (IOException e) {
                         throw new IllegalStateException(String.format("Failed to write batch %d.", m_numBatches), e);
