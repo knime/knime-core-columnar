@@ -54,7 +54,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.VarBinaryVector;
+import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
@@ -138,7 +138,7 @@ public class ArrowObjectListDataTest extends AbstractArrowDataTest<ArrowListWrit
         final ArrowListReadData d = castR(data);
         final ListVector listVector = d.m_vector;
         @SuppressWarnings("unchecked")
-        final VarBinaryVector bVector = ((ArrowObjectReadData<byte[]>)d.m_data).m_vector;
+        final LargeVarBinaryVector bVector = ((ArrowObjectReadData<byte[]>)d.m_data).m_vector;
 
         final boolean bReleased = bVector.getDataBuffer().capacity() == 0 //
             && bVector.getValidityBuffer().capacity() == 0 //

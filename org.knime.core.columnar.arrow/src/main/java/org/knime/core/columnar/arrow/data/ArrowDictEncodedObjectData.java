@@ -52,7 +52,7 @@ import java.util.function.LongSupplier;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VarBinaryVector;
+import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
@@ -86,7 +86,7 @@ public final class ArrowDictEncodedObjectData {
     // TODO Make configurable?
     private static final int INIT_DICT_SIZE = 128;
 
-    /** Helper class which holds a dictionary in a Map and can write it to a VarBinaryVector */
+    /** Helper class which holds a dictionary in a Map and can write it to a LargeVarBinaryVector */
     private static final class InMemoryDictEncoding<T> {
 
         private int m_runningDictIndex = 0;
@@ -97,9 +97,9 @@ public final class ArrowDictEncodedObjectData {
 
         private final ArrowBufIO<T> m_io;
 
-        private final VarBinaryVector m_vector;
+        private final LargeVarBinaryVector m_vector;
 
-        private InMemoryDictEncoding(final VarBinaryVector vector, final ArrowBufIO<T> io) {
+        private InMemoryDictEncoding(final LargeVarBinaryVector vector, final ArrowBufIO<T> io) {
             m_vector = vector;
             m_io = io;
             m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
@@ -119,7 +119,7 @@ public final class ArrowDictEncodedObjectData {
             return m_inMemDict.computeIfAbsent(value, k -> m_runningDictIndex++);
         }
 
-        private VarBinaryVector getDictionaryVector() {
+        private LargeVarBinaryVector getDictionaryVector() {
             final int numDistinctValues = m_inMemDict.size();
             final int dictValueCount = m_vector.getValueCount();
             if (dictValueCount == 0) {
@@ -145,7 +145,7 @@ public final class ArrowDictEncodedObjectData {
 
         private InMemoryDictEncoding<T> m_dict;
 
-        private ArrowDictEncodedObjectWriteData(final IntVector vector, final VarBinaryVector dict,
+        private ArrowDictEncodedObjectWriteData(final IntVector vector, final LargeVarBinaryVector dict,
             final ArrowBufIO<T> io) {
             super(vector);
             m_dict = new InMemoryDictEncoding<>(dict, io);
@@ -200,7 +200,7 @@ public final class ArrowDictEncodedObjectData {
 
         private final InMemoryDictEncoding<T> m_dict;
 
-        private ArrowDictEncodedObjectReadData(final IntVector vector, final VarBinaryVector dict,
+        private ArrowDictEncodedObjectReadData(final IntVector vector, final LargeVarBinaryVector dict,
             final ArrowBufIO<T> io) {
             super(vector);
             m_dict = new InMemoryDictEncoding<>(dict, io);
@@ -217,7 +217,7 @@ public final class ArrowDictEncodedObjectData {
             m_dict = dict;
         }
 
-        VarBinaryVector getDictionary() {
+        LargeVarBinaryVector getDictionary() {
             return m_dict.getDictionaryVector();
         }
 
@@ -248,7 +248,7 @@ public final class ArrowDictEncodedObjectData {
         }
     }
 
-    private static int sizeOf(final IntVector vector, final VarBinaryVector dict) {
+    private static int sizeOf(final IntVector vector, final LargeVarBinaryVector dict) {
         return ArrowSizeUtils.sizeOfFixedWidth(vector) + ArrowSizeUtils.sizeOfVariableWidth(dict);
     }
 
@@ -281,7 +281,7 @@ public final class ArrowDictEncodedObjectData {
             final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator, final int capacity) {
             // Remove the dictionary id for this encoding from the supplier
             dictionaryIdSupplier.getAsLong();
-            final VarBinaryVector dict = new VarBinaryVector("Dictionary", allocator);
+            final LargeVarBinaryVector dict = new LargeVarBinaryVector("Dictionary", allocator);
             final IntVector v = (IntVector)vector;
             v.allocateNew(capacity);
             return new ArrowDictEncodedObjectWriteData<>(v, dict, new ArrowBufIO<>(dict, m_serializer));
@@ -293,7 +293,7 @@ public final class ArrowDictEncodedObjectData {
             if (m_version.equals(version)) {
                 final long dictId = vector.getField().getFieldType().getDictionary().getId();
                 @SuppressWarnings("resource") // Dictionary vector closed by data object
-                final VarBinaryVector dict = (VarBinaryVector)provider.lookup(dictId).getVector();
+                final LargeVarBinaryVector dict = (LargeVarBinaryVector)provider.lookup(dictId).getVector();
                 return new ArrowDictEncodedObjectReadData<>((IntVector)vector, dict,
                     new ArrowBufIO<>(dict, m_serializer));
             } else {
@@ -307,7 +307,7 @@ public final class ArrowDictEncodedObjectData {
         public DictionaryProvider getDictionaries(final ColumnReadData data) {
             @SuppressWarnings("unchecked")
             final ArrowDictEncodedObjectReadData<T> objData = (ArrowDictEncodedObjectReadData<T>)data;
-            final VarBinaryVector vector = objData.getDictionary();
+            final LargeVarBinaryVector vector = objData.getDictionary();
             final Dictionary dictionary = new Dictionary(vector, objData.m_vector.getField().getDictionary());
             return new SingletonDictionaryProvider(dictionary);
         }

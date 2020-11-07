@@ -60,62 +60,84 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.vector.BaseVariableWidthVector;
+import org.apache.arrow.vector.BaseLargeVariableWidthVector;
 import org.apache.arrow.vector.BitVectorHelper;
-import org.apache.arrow.vector.VarBinaryVector;
+import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 
 /**
  * Serializes and deserializes an object of type <T> to a {@link DataOutput} / {@link DataInput}. The {@link DataOutput}
- * / {@link DataInput} are directly writing into the value buffer of the {@link VarBinaryVector} with zero copy.
+ * / {@link DataInput} are directly writing into the value buffer of the {@link LargeVarBinaryVector} with zero copy.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
 final class ArrowBufIO<T> {
 
-    private static ThreadLocal<StringEncoder> ENCODER_FACTORY = new ThreadLocal<StringEncoder>() {
-        @Override
-        protected StringEncoder initialValue() {
-            return new StringEncoder();
-        }
-    };
+    private static ThreadLocal<StringEncoder> ENCODER_FACTORY = ThreadLocal.withInitial(StringEncoder::new);
+
+    private static final int OFFSET_WIDTH = BaseLargeVariableWidthVector.OFFSET_WIDTH;
 
     private final ObjectDataSerializer<T> m_serializer;
 
-    private final VarBinaryVector m_vector;
+    private final LargeVarBinaryVector m_vector;
 
-    ArrowBufIO(final VarBinaryVector vector, final ObjectDataSerializer<T> serializer) {
+    ArrowBufIO(final LargeVarBinaryVector vector, final ObjectDataSerializer<T> serializer) {
         m_serializer = serializer;
         m_vector = vector;
     }
 
+    @SuppressWarnings("resource") // Buffers closed by the vector
     final T deserialize(final int index) {
         try {
-            final ArrowBufDataInput buf = new ArrowBufDataInput(m_vector, index, ENCODER_FACTORY.get());
-            final T deserialize = m_serializer.deserialize(buf);
-            return deserialize;
-        } catch (IOException ex) {
+            // Get the offset for this index
+            final long bufferIndex = getOffset(m_vector, index);
+
+            // Deserialize from the data buffer
+            final ArrowBufDataInput buf =
+                new ArrowBufDataInput(m_vector.getDataBuffer(), bufferIndex, ENCODER_FACTORY.get());
+            return m_serializer.deserialize(buf);
+        } catch (final IOException ex) {
+            // TODO should the deserialize method just throw the IOException?
             throw new IllegalStateException("Error during deserialization", ex);
         }
     }
 
-    @SuppressWarnings("resource")
+    @SuppressWarnings("resource") // Buffers closed by the vector
     final void serialize(final int index, final T obj) {
         try {
-            m_vector.fillEmpties(index);
+            // Set the value to not null
             BitVectorHelper.setBit(m_vector.getValidityBuffer(), index);
-            final int startOffset = m_vector.getStartOffset(index);
+
+            // Get the start of the the new value
+            m_vector.fillEmpties(index);
+            final long startOffset = getOffset(m_vector, index);
             m_vector.getDataBuffer().writerIndex(startOffset);
-            // TODO Static encoder instance?
-            final ArrowBufDataOutput output = new ArrowBufDataOutput(m_vector, ENCODER_FACTORY.get());
-            m_serializer.serialize(obj, output);
-            final int length = (int)(m_vector.getDataBuffer().writerIndex() - startOffset);
-            m_vector.getOffsetBuffer().setInt((index + 1) * BaseVariableWidthVector.OFFSET_WIDTH, startOffset + length);
+
+            // Serialize the value to the data buffer
+            m_serializer.serialize(obj, new ArrowBufDataOutput(m_vector, ENCODER_FACTORY.get()));
+
+            // Set the offset for the next element
+            final long nextOffset = m_vector.getDataBuffer().writerIndex();
+            setOffset(m_vector, index + 1, nextOffset);
+
+            // Update the lastSet value of the vector
             m_vector.setLastSet(index);
-        } catch (IOException ex) {
+        } catch (final IOException ex) {
+            // TODO should the serialize method just throw the IOException?
             throw new IllegalStateException("Error during serialization", ex);
         }
+    }
+
+    @SuppressWarnings("resource")
+    private static long getOffset(final LargeVarBinaryVector vector, final int index) {
+        return vector.getOffsetBuffer().getLong((long)index * OFFSET_WIDTH);
+    }
+
+    @SuppressWarnings("resource")
+    private static void setOffset(final LargeVarBinaryVector vector, final int index, final long offset) {
+        vector.getOffsetBuffer().setLong((long)index * OFFSET_WIDTH, offset);
     }
 
     private static final class ArrowBufDataInput implements DataInput {
@@ -124,12 +146,12 @@ final class ArrowBufIO<T> {
 
         private final StringEncoder m_encoder;
 
-        private int m_bufferIndex;
+        private long m_bufferIndex;
 
-        public ArrowBufDataInput(final VarBinaryVector vector, final int index, final StringEncoder encoder) {
+        public ArrowBufDataInput(final ArrowBuf buffer, final long index, final StringEncoder encoder) {
+            m_buffer = buffer;
+            m_bufferIndex = index;
             m_encoder = encoder;
-            m_buffer = vector.getDataBuffer();
-            m_bufferIndex = vector.getStartOffset(index);
         }
 
         @Override
@@ -146,7 +168,8 @@ final class ArrowBufIO<T> {
 
         @Override
         public int skipBytes(final int n) throws IOException {
-            return m_bufferIndex += n;
+            m_bufferIndex += n;
+            return n;
 
         }
 
@@ -166,6 +189,7 @@ final class ArrowBufIO<T> {
 
         @Override
         public int readUnsignedByte() throws IOException {
+            // TODO this implementation is wrong! Make unsigned
             final byte out = m_buffer.getByte(m_bufferIndex);
             m_bufferIndex += Byte.BYTES;
             return out;
@@ -181,6 +205,7 @@ final class ArrowBufIO<T> {
 
         @Override
         public int readUnsignedShort() throws IOException {
+            // TODO this implementation is wrong! Make unsigned
             final short out = m_buffer.getShort(m_bufferIndex);
             m_bufferIndex += Short.BYTES;
             return out;
@@ -223,6 +248,7 @@ final class ArrowBufIO<T> {
 
         @Override
         public String readLine() throws IOException {
+            // TODO implement: Loop byte by byte and make sure not to overflow the buffer
             throw new UnsupportedOperationException("NYI.");
         }
 
@@ -234,51 +260,6 @@ final class ArrowBufIO<T> {
         }
     }
 
-    /**
-     * A helper class for data implementations that need to encode and decode Strings.
-     *
-     * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
-     * @since 4.3
-     */
-    private static class StringEncoder {
-
-        private final CharsetDecoder m_decoder = StandardCharsets.UTF_8.newDecoder()
-            .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
-
-        private final CharsetEncoder m_encoder = StandardCharsets.UTF_8.newEncoder()
-            .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
-
-        final String decode(final ByteBuffer buffer) {
-            try {
-                synchronized (m_decoder) {
-                    return m_decoder.decode(buffer).toString();
-                }
-            } catch (final CharacterCodingException e) {
-                // This cannot happen because the CodingErrorAction is not REPORT
-                throw new IllegalStateException(e);
-            }
-        }
-
-        final String decode(final byte[] bytes) {
-            return decode(ByteBuffer.wrap(bytes));
-        }
-
-        ByteBuffer encode(final CharBuffer values) {
-            try {
-                synchronized (m_encoder) {
-                    return m_encoder.encode(values);
-                }
-            } catch (final CharacterCodingException e) {
-                // This cannot happen because the CodingErrorAction is not REPORT
-                throw new IllegalStateException(e);
-            }
-        }
-
-        ByteBuffer encode(final String value) {
-            return encode(CharBuffer.wrap(value));
-        }
-    }
-
     private static final class ArrowBufDataOutput implements DataOutput {
 
         private ArrowBuf m_buffer;
@@ -287,9 +268,9 @@ final class ArrowBufIO<T> {
 
         private long m_capacity;
 
-        private VarBinaryVector m_vector;
+        private LargeVarBinaryVector m_vector;
 
-        private ArrowBufDataOutput(final VarBinaryVector vector, final StringEncoder encoder) {
+        private ArrowBufDataOutput(final LargeVarBinaryVector vector, final StringEncoder encoder) {
             m_encoder = encoder;
             m_buffer = vector.getDataBuffer();
             m_vector = vector;
@@ -404,4 +385,48 @@ final class ArrowBufIO<T> {
         }
     }
 
+    /**
+     * A helper class for data implementations that need to encode and decode Strings.
+     *
+     * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+     * @since 4.3
+     */
+    private static class StringEncoder {
+
+        private final CharsetDecoder m_decoder = StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
+
+        private final CharsetEncoder m_encoder = StandardCharsets.UTF_8.newEncoder()
+            .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
+
+        final String decode(final ByteBuffer buffer) {
+            try {
+                synchronized (m_decoder) {
+                    return m_decoder.decode(buffer).toString();
+                }
+            } catch (final CharacterCodingException e) {
+                // This cannot happen because the CodingErrorAction is not REPORT
+                throw new IllegalStateException(e);
+            }
+        }
+
+        final String decode(final byte[] bytes) {
+            return decode(ByteBuffer.wrap(bytes));
+        }
+
+        ByteBuffer encode(final CharBuffer values) {
+            try {
+                synchronized (m_encoder) {
+                    return m_encoder.encode(values);
+                }
+            } catch (final CharacterCodingException e) {
+                // This cannot happen because the CodingErrorAction is not REPORT
+                throw new IllegalStateException(e);
+            }
+        }
+
+        ByteBuffer encode(final String value) {
+            return encode(CharBuffer.wrap(value));
+        }
+    }
 }

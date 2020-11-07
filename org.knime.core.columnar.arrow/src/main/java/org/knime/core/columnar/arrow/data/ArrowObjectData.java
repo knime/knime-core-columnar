@@ -54,7 +54,7 @@ import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VarBinaryVector;
+import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -82,17 +82,17 @@ public final class ArrowObjectData {
      *
      * @param <T> type of object
      */
-    public static final class ArrowObjectWriteData<T> extends AbstractArrowWriteData<VarBinaryVector>
+    public static final class ArrowObjectWriteData<T> extends AbstractArrowWriteData<LargeVarBinaryVector>
         implements ObjectWriteData<T> {
 
         private final ArrowBufIO<T> m_io;
 
-        private ArrowObjectWriteData(final VarBinaryVector vector, final ArrowBufIO<T> io) {
+        private ArrowObjectWriteData(final LargeVarBinaryVector vector, final ArrowBufIO<T> io) {
             super(vector);
             m_io = io;
         }
 
-        private ArrowObjectWriteData(final VarBinaryVector vector, final int offset, final ArrowBufIO<T> io) {
+        private ArrowObjectWriteData(final LargeVarBinaryVector vector, final int offset, final ArrowBufIO<T> io) {
             super(vector, offset);
             m_io = io;
         }
@@ -124,17 +124,17 @@ public final class ArrowObjectData {
      *
      * @param <T> type of object
      */
-    public static final class ArrowObjectReadData<T> extends AbstractArrowReadData<VarBinaryVector>
+    public static final class ArrowObjectReadData<T> extends AbstractArrowReadData<LargeVarBinaryVector>
         implements ObjectReadData<T> {
 
         private final ArrowBufIO<T> m_io;
 
-        private ArrowObjectReadData(final VarBinaryVector vector, final ArrowBufIO<T> io) {
+        private ArrowObjectReadData(final LargeVarBinaryVector vector, final ArrowBufIO<T> io) {
             super(vector);
             m_io = io;
         }
 
-        private ArrowObjectReadData(final VarBinaryVector vector, final int offset, final int length,
+        private ArrowObjectReadData(final LargeVarBinaryVector vector, final int offset, final int length,
             final ArrowBufIO<T> io) {
             super(vector, offset, length);
             m_io = io;
@@ -175,13 +175,13 @@ public final class ArrowObjectData {
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.VARBINARY.getType());
+            return Field.nullable(name, MinorType.LARGEVARBINARY.getType());
         }
 
         @Override
         public ArrowObjectWriteData<T> createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            final VarBinaryVector v = (VarBinaryVector)vector;
+            final LargeVarBinaryVector v = (LargeVarBinaryVector)vector;
             v.allocateNew(capacity);
             return new ArrowObjectWriteData<>(v, new ArrowBufIO<>(v, m_serializer));
         }
@@ -190,7 +190,7 @@ public final class ArrowObjectData {
         public ArrowObjectReadData<T> createRead(final FieldVector vector, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                final VarBinaryVector v = (VarBinaryVector)vector;
+                final LargeVarBinaryVector v = (LargeVarBinaryVector)vector;
                 return new ArrowObjectReadData<>(v, new ArrowBufIO<>(v, m_serializer));
             } else {
                 throw new IOException(
