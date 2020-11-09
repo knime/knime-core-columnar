@@ -88,14 +88,16 @@ public final class DomainColumnStore implements ColumnStore {
 
     private final ColumnStore m_delegate;
 
-    private final DomainColumnDataWriter m_writer;
-
     /* Not final as initialized lazily */
     private volatile Map<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> m_domainCalculators;
 
     private volatile Map<Integer, ColumnarDomainCalculator<?, DataColumnMetaData[]>> m_metadataCalculators;
 
     private volatile boolean m_storeClosed;
+
+    private DomainStoreConfig m_config;
+
+    private DomainColumnDataWriter m_writer;
 
     /**
      * Create a new DomainColumnStore.
@@ -104,11 +106,10 @@ public final class DomainColumnStore implements ColumnStore {
      * @param config of the store
      * @param executor the executor to which to submit asynchronous domain calculations and duplicate checks
      */
-    @SuppressWarnings("resource")
     public DomainColumnStore(final ColumnStore delegate, final DomainStoreConfig config,
         final ExecutorService executor) {
         m_delegate = delegate;
-        m_writer = new DomainColumnDataWriter(delegate.getWriter(), config);
+        m_config = config;
         m_executor = executor;
     }
 
@@ -117,8 +118,12 @@ public final class DomainColumnStore implements ColumnStore {
         return m_delegate.getFactory();
     }
 
+    @SuppressWarnings("resource")
     @Override
     public DomainColumnDataWriter getWriter() {
+        if (m_writer == null) {
+            m_writer = new DomainColumnDataWriter(m_delegate.getWriter());
+        }
         return m_writer;
     }
 
@@ -154,6 +159,22 @@ public final class DomainColumnStore implements ColumnStore {
         return null;
     }
 
+    /**
+     * Only to be used by {@code ColumnarRowWriteCursor.setMaxPossibleValues(int)} for backward compatibility reasons.
+     * <br>
+     * May only be called before the first to {@link #getWriter()}.
+     *
+     * @param maxPossibleValues maximum number of possible values for nominal domains
+     */
+    public void setMaxPossibleValues(final int maxPossibleValues) {
+        if (m_writer != null) {
+            throw new IllegalStateException(
+                "The maximum number of possible values for a nominal domain may only be set "
+                    + "before any values were written.");
+        }
+        m_config = m_config.withMaxPossibleNominalDomainValues(maxPossibleValues);
+    }
+
     @Override
     public void save(final File f) throws IOException {
         m_delegate.save(f);
@@ -172,8 +193,9 @@ public final class DomainColumnStore implements ColumnStore {
     @Override
     public void close() throws IOException {
         m_storeClosed = true;
-
-        m_writer.close();
+        if (m_writer != null) {
+            m_writer.close();
+        }
         m_delegate.close();
     }
 
@@ -193,33 +215,13 @@ public final class DomainColumnStore implements ColumnStore {
 
         private final Map<Integer, Future<Void>> m_futures = new HashMap<>();
 
-        /* Set in {@link #setMaxPossibleValues(int)}. */
-        private DomainStoreConfig m_config;
-
         /**
          * @param delegate the delegate {@link ColumnDataWriter}.
          * @param config config of store
          */
-        DomainColumnDataWriter(final ColumnDataWriter delegate, final DomainStoreConfig config) {
+        DomainColumnDataWriter(final ColumnDataWriter delegate) {
             m_delegateWriter = delegate;
-            m_config = config;
-            m_duplicateChecker = config.createDuplicateChecker();
-        }
-
-        /**
-         * Only to be used by {@code ColumnarRowWriteCursor.setMaxPossibleValues(int)} for backward compatibility
-         * reasons. <br>
-         * May only be called before the first call to {@link #write(ReadBatch)}.
-         *
-         * @param maxPossibleValues maximum number of possible values for nominal domains
-         */
-        public void setMaxPossibleValues(final int maxPossibleValues) {
-            if (m_domainCalculators != null) {
-                throw new IllegalStateException(
-                    "The maximum number of possible values for a nominal domain may only be set "
-                        + "before any values were written.");
-            }
-            m_config = m_config.withMaxPossibleNominalDomainValues(maxPossibleValues);
+            m_duplicateChecker = m_config.createDuplicateChecker();
         }
 
         @SuppressWarnings("unchecked")
@@ -259,7 +261,8 @@ public final class DomainColumnStore implements ColumnStore {
             }
 
             // Append all domain calculators
-            for (final Entry<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators.entrySet()) {
+            for (final Entry<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators
+                .entrySet()) {
                 final ColumnarDomainCalculator<ColumnReadData, ?> calculator =
                     (ColumnarDomainCalculator<ColumnReadData, ?>)entry.getValue();
                 m_futures.put(entry.getKey(),

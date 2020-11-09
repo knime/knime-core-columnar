@@ -45,6 +45,8 @@
  */
 package org.knime.core.columnar.testing;
 
+import static org.junit.Assert.assertEquals;
+
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 
@@ -111,6 +113,7 @@ public final class TestDoubleData extends AbstractTestData implements DoubleWrit
     @Override
     public DoubleReadData close(final int length) {
         m_numValues = length;
+        assertEquals("Reference count on close not 1.", 1, getRefs());
         return this;
     }
 

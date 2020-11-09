@@ -112,7 +112,7 @@ public final class TestColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            final Object[] data = new Object[batch.length()];
+            final Object[] data = new Object[batch.getNumColumns()];
             for (int i = 0; i < data.length; i++) {
                 final AbstractTestData testData = (AbstractTestData)batch.get(i);
                 data[i] = testData.get();

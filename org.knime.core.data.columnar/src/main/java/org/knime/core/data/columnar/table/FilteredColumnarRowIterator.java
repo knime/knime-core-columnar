@@ -57,6 +57,7 @@ import org.knime.core.data.UnmaterializedCell;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.RowRead;
 
 /**
  * Factory for {@link CloseableRowIterator}s supporting column selection.
@@ -103,24 +104,24 @@ class FilteredColumnarRowIterator {
 
         @Override
         public boolean hasNext() {
-            return m_cursor.canPoll();
+            return m_cursor.canForward();
         }
 
         @Override
         public DataRow next() {
-            m_cursor.poll();
+            final RowRead access = m_cursor.forward();
 
             final HashMap<Integer, DataCell> cells = new HashMap<>(m_selection.length, 1.0f);
             for (int i = 0; i < m_selection.length; i++) {
-                if (m_cursor.isMissing(m_selection[i])) {
+                if (access.isMissing(m_selection[i])) {
                     cells.put(m_selection[i], DataType.getMissingCell());
                 } else {
                     // TODO performance!!
-                    final DataValue value = m_cursor.getValue(m_selection[i]);
+                    final DataValue value = access.getValue(m_selection[i]);
                     cells.put(m_selection[i], ((ReadValue)value).getDataCell());
                 }
             }
-            return new HashMapDataRow(m_cursor.getRowKeyValue().getString(), cells, m_cursor.getNumColumns());
+            return new HashMapDataRow(access.getRowKey().getString(), cells, m_cursor.getNumColumns());
         }
 
         @Override
@@ -200,24 +201,24 @@ class FilteredColumnarRowIterator {
 
         @Override
         public DataRow next() {
-            m_cursor.poll();
+            final RowRead access = m_cursor.forward();
 
             final DataCell[] cells = new DataCell[m_cursor.getNumColumns()];
             for (int i = 0; i < m_selection.length; i++) {
-                if (m_cursor.isMissing(m_selection[i])) {
+                if (access.isMissing(m_selection[i])) {
                     cells[m_selection[i]] = DataType.getMissingCell();
                 } else {
                     // TODO performance!!
-                    final DataValue value = m_cursor.getValue(m_selection[i]);
+                    final DataValue value = access.getValue(m_selection[i]);
                     cells[m_selection[i]] = ((ReadValue)value).getDataCell();
                 }
             }
-            return new ArrayDataRow(m_cursor.getRowKeyValue().getString(), cells);
+            return new ArrayDataRow(access.getRowKey().getString(), cells);
         }
 
         @Override
         public boolean hasNext() {
-            return m_cursor.canPoll();
+            return m_cursor.canForward();
         }
 
         @Override
@@ -293,22 +294,21 @@ class FilteredColumnarRowIterator {
 
         @Override
         public boolean hasNext() {
-            return m_cursor.canPoll();
+            return m_cursor.canForward();
         }
 
         @Override
         public DataRow next() {
-            m_cursor.poll();
+            final RowRead access = m_cursor.forward();
 
             final DataCell cell;
-            if (m_cursor.isMissing(m_colIdx)) {
+            if (access.isMissing(m_colIdx)) {
                 cell = DataType.getMissingCell();
             } else {
-                final DataValue value = m_cursor.getValue(m_colIdx);
+                final DataValue value = access.getValue(m_colIdx);
                 cell = ((ReadValue)value).getDataCell();
             }
-            return new SingleCellDataRow(m_cursor.getRowKeyValue().getString(), cell, m_colIdx,
-                m_cursor.getNumColumns());
+            return new SingleCellDataRow(access.getRowKey().getString(), cell, m_colIdx, m_cursor.getNumColumns());
         }
 
         @Override

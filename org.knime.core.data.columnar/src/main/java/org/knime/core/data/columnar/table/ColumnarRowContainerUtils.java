@@ -44,53 +44,56 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 6, 2020 (dietzc): created
+ *   Nov 8, 2020 (dietzc): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.data.columnar.table;
 
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.ValueSchema;
+import java.io.IOException;
 
-final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
+import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.container.DataContainerDelegate;
+import org.knime.core.data.v2.RowContainer;
+import org.knime.core.node.ExecutionContext;
 
-    private final DataTableSpec m_updatedSpec;
+/**
+ * Utility class to create {@link DataContainerDelegate}s and {@link RowContainer}s.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @since 4.3
+ */
+public final class ColumnarRowContainerUtils {
 
-    private final ColumnarValueSchema m_delegate;
-
-    public UpdatedColumnarValueSchema(final DataTableSpec spec, final ColumnarValueSchema delegate) {
-        m_updatedSpec = spec;
-        m_delegate = delegate;
+    private ColumnarRowContainerUtils() {
     }
 
-    @Override
-    public int getNumColumns() {
-        return m_delegate.getNumColumns();
+    static RowContainer create(final int tableId, final ColumnStoreFactory storeFactory,
+        final ColumnarValueSchema schema, final ColumnarRowContainerSettings settings) throws Exception {
+        return createInternal(null, tableId, storeFactory, schema, settings);
     }
 
-    @Override
-    public ColumnDataSpec getColumnDataSpec(final int index) {
-        return m_delegate.getColumnDataSpec(index);
+    @SuppressWarnings({"javadoc"})
+    public static RowContainer create(final ExecutionContext context, final int tableId,
+        final ColumnarValueSchema schema, final ColumnarRowContainerSettings settings) throws Exception {
+        return createInternal(context, tableId, schema, settings);
     }
 
-    @Override
-    public DataTableSpec getSourceSpec() {
-        return m_updatedSpec;
+    @SuppressWarnings({"javadoc", "resource"})
+    public static DataContainerDelegate create(final int tableId, final ColumnarValueSchema schema,
+        final ColumnarRowContainerSettings config) throws Exception {
+        return new ColumnarDataContainerDelegate(schema.getSourceSpec(), createInternal(null, tableId, schema, config));
     }
 
-    @Override
-    public ValueSchema getSourceSchema() {
-        // TODO also update DataTableSpec of ValueSchema?
-        return m_delegate.getSourceSchema();
+    private static ColumnarRowContainer createInternal(final ExecutionContext context, final int tableId,
+        final ColumnarValueSchema schema, final ColumnarRowContainerSettings config) throws Exception {
+        return createInternal(context, tableId, ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton(),
+            schema, config);
     }
 
-    @Override
-    public ColumnarReadValueFactory<?>[] getReadValueFactories() {
-        return m_delegate.getReadValueFactories();
-    }
-
-    @Override
-    public ColumnarWriteValueFactory<?>[] getWriteValueFactories() {
-        return m_delegate.getWriteValueFactories();
+    private static ColumnarRowContainer createInternal(final ExecutionContext context, final int tableId,
+        final ColumnStoreFactory storeFactory, final ColumnarValueSchema schema,
+        final ColumnarRowContainerSettings config) throws IOException {
+        return ColumnarRowContainer.create(context, tableId, schema, storeFactory, config);
     }
 }

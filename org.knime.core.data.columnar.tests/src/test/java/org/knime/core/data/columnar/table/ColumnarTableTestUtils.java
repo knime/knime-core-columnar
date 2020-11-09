@@ -49,7 +49,6 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.File;
-import java.io.IOException;
 
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
@@ -62,7 +61,6 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.ValueSchema;
-import org.knime.core.node.ExtensionTable;
 
 final class ColumnarTableTestUtils {
 
@@ -88,29 +86,36 @@ final class ColumnarTableTestUtils {
     private ColumnarTableTestUtils() {
     }
 
-    static ColumnarRowWriteCursor createColumnarRowWriteCursor() {
+    static int getChunkSize() {
+        return ChunkSizeUtils.calculateChunkSize(createSchema());
+    }
+
+    static ColumnarValueSchema createSchema() {
         final DataTableSpec spec = new DataTableSpec();
         final ValueSchema valueSchema =
             ValueSchema.create(spec, RowKeyType.NOKEY, NotInWorkflowWriteFileStoreHandler.create());
-        final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(valueSchema);
-        final ColumnarRowWriteCursorSettings settings = new ColumnarRowWriteCursorSettings(false, 0, RowKeyType.NOKEY);
+        return ColumnarValueSchemaUtils.create(valueSchema);
+    }
+
+    static ColumnarRowContainer createColumnarRowContainer() {
+        final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(false, 0, false);
         try {
-            return ColumnarRowWriteCursor.create(-1, TestColumnStoreFactory.INSTANCE, columnarSchema, settings);
-        } catch (IOException e) {
-            throw new RuntimeException("Exception when trying to create ColumnarRowWriteCursor." , e);
+            return (ColumnarRowContainer)ColumnarRowContainerUtils.create(-1, TestColumnStoreFactory.INSTANCE,
+                createSchema(), settings);
+        } catch (Exception e) {
+            throw new RuntimeException("Exception when trying to create RowContainer.", e);
         }
     }
 
-    static ExtensionTable createUnsavedColumnarContainerTable(final int size) {
-        try (final ColumnarRowWriteCursor cursor = createColumnarRowWriteCursor()) {
+    static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int size) {
+        try (final ColumnarRowContainer container = createColumnarRowContainer();
+                final ColumnarRowWriteCursor cursor = container.createCursor()) {
             for (int i = 0; i < size; i++) {
-                cursor.push();
+                cursor.forward();
             }
-            try {
-                return cursor.finish();
-            } catch (IOException e) {
-                throw new RuntimeException("Exception when trying to finish ColumnarRowWriteCursor." , e);
-            }
+            return (UnsavedColumnarContainerTable)container.finishInternal();
+        } catch (Exception e) {
+            throw new RuntimeException("Exception when trying to create UnsavedColumnarContainerTable.", e);
         }
     }
 

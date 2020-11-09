@@ -45,11 +45,13 @@
  */
 package org.knime.core.data.columnar.schema;
 
+import java.util.stream.Stream;
+
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
@@ -60,12 +62,30 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] m_factories;
 
-    public DefaultColumnarValueSchema(final ValueSchema source, final ColumnarAccessFactory<?, ?, ?, ?>[] factories) {
+    private final ColumnarWriteValueFactory<?>[] m_writeFactories;
+
+    private final ColumnarReadValueFactory<?>[] m_readFactories;
+
+    public DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
         @SuppressWarnings("unchecked")
-        final ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] cast =
-            (ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[])factories;
-        m_factories = cast;
+        final ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] factories =
+            Stream.of(source.getValueFactories()) //
+                .map(s -> s.getSpec())//
+                .map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
+                .toArray(ColumnarAccessFactory[]::new);
+        m_factories = factories;
+
+        m_writeFactories = new ColumnarWriteValueFactory[m_factories.length];
+        m_readFactories = new ColumnarReadValueFactory[m_factories.length];
+        final ValueFactory<?, ?>[] sourceFactories = source.getValueFactories();
+        for (int i = 0; i < sourceFactories.length; i++) {
+            @SuppressWarnings("unchecked")
+            final ValueFactory<ReadAccess, WriteAccess> sourceFactory =
+                (ValueFactory<ReadAccess, WriteAccess>)sourceFactories[i];
+            m_writeFactories[i] = new DefaultWriteValueFactory<>(m_factories[i], sourceFactory);
+            m_readFactories[i] = new DefaultReadValueFactory<>(m_factories[i], sourceFactory);
+        }
     }
 
     @Override
@@ -74,22 +94,13 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public <C extends ColumnWriteData> ColumnarWriteValueFactory<C> getWriteValueFactoryAt(final int index) {
-        @SuppressWarnings("unchecked")
-        final ColumnarAccessFactory<ColumnReadData, ReadAccess, C, WriteAccess> factory =
-            (ColumnarAccessFactory<ColumnReadData, ReadAccess, C, WriteAccess>)m_factories[index];
-        return new DefaultWriteValueFactory<>(factory, m_source.getFactoryAt(index));
+    public ColumnarWriteValueFactory<?>[] getWriteValueFactories() {
+        return m_writeFactories;
     }
 
     @Override
-    public ColumnarReadValueFactory<ColumnReadData> getReadValueFactoryAt(final int index) {
-        return new DefaultReadValueFactory<ColumnReadData, ReadAccess>(m_factories[index],
-            m_source.getFactoryAt(index));
-    }
-
-    @Override
-    public int getNumColumns() {
-        return m_source.getNumColumns();
+    public ColumnarReadValueFactory<?>[] getReadValueFactories() {
+        return m_readFactories;
     }
 
     @Override
@@ -103,7 +114,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public RowKeyType getRowKeyType() {
-        return m_source.getRowKeyType();
+    public int getNumColumns() {
+        return m_factories.length;
     }
 }

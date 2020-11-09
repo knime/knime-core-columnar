@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.testing;
 
+import static org.junit.Assert.assertEquals;
+
 import org.knime.core.columnar.data.VoidData.VoidReadData;
 import org.knime.core.columnar.data.VoidData.VoidWriteData;
 
@@ -110,6 +112,7 @@ final class TestVoidData extends AbstractTestData implements VoidWriteData, Void
     @Override
     public VoidReadData close(final int length) {
         m_numValues = length;
+        assertEquals("Reference count on close not 1.", 1, getRefs());
         return this;
     }
 

@@ -55,6 +55,7 @@ import org.knime.core.data.RowKey;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.RowRead;
 
 /**
  * Implementation of a {@link CloseableRowIterator} via delegation to a {@link RowCursor}.
@@ -77,23 +78,23 @@ public final class ColumnarRowIterator extends CloseableRowIterator {
 
     @Override
     public boolean hasNext() {
-        return m_cursor.canPoll();
+        return m_cursor.canForward();
     }
 
     @Override
     public DataRow next() {
-        m_cursor.poll();
         final DataCell[] cells = new DataCell[m_numValues];
+        final RowRead access = m_cursor.forward();
         for (int i = 0; i < m_numValues; i++) {
-            if (m_cursor.isMissing(i)) {
+            if (access.isMissing(i)) {
                 cells[i] = INSTANCE;
             } else {
-                final DataValue value = m_cursor.getValue(i);
+                final DataValue value = access.getValue(i);
                 cells[i] = ((ReadValue)value).getDataCell();
             }
         }
 
-        return new ColumnStoreTableDataRow(m_cursor.getRowKeyValue().getString(), cells);
+        return new ColumnStoreTableDataRow(access.getRowKey().getString(), cells);
     }
 
     @Override

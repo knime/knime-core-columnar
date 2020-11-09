@@ -46,7 +46,6 @@
 package org.knime.core.data.columnar.schema;
 
 import java.util.Map;
-import java.util.stream.IntStream;
 
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.data.DataColumnDomain;
@@ -78,11 +77,7 @@ public final class ColumnarValueSchemaUtils {
      * @throws IllegalArgumentException thrown if {@link AccessSpec} can't be translated to {@link ColumnDataSpec}.
      */
     public static final ColumnarValueSchema create(final ValueSchema source) throws IllegalArgumentException {
-        final ColumnarAccessFactory<?, ?, ?, ?>[] factories = IntStream.range(0, source.getNumColumns()) //
-            .mapToObj(source::getAccessSpecAt) //
-            .map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
-            .toArray(ColumnarAccessFactory<?, ?, ?, ?>[]::new);
-        return new DefaultColumnarValueSchema(source, factories);
+        return new DefaultColumnarValueSchema(source);
     }
 
     /**

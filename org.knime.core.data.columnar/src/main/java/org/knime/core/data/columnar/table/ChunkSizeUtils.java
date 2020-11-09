@@ -44,53 +44,37 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 6, 2020 (dietzc): created
+ *   Nov 9, 2020 (dietzc): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.data.columnar.table;
 
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.columnar.store.ColumnStoreSchema;
 
-final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
+final class ChunkSizeUtils {
+    private static final String CHUNK_SIZE_PROPERTY = "knime.columnar.chunksize";
 
-    private final DataTableSpec m_updatedSpec;
+    private static final int CHUNK_SIZE = Integer.getInteger(CHUNK_SIZE_PROPERTY, 31000);
 
-    private final ColumnarValueSchema m_delegate;
-
-    public UpdatedColumnarValueSchema(final DataTableSpec spec, final ColumnarValueSchema delegate) {
-        m_updatedSpec = spec;
-        m_delegate = delegate;
+    private ChunkSizeUtils() {
     }
 
-    @Override
-    public int getNumColumns() {
-        return m_delegate.getNumColumns();
+    /*
+     * Simple heuristic to take wide-data into account when determining initial batch size.
+     *
+     * TODO Adaptable chunk-sizes with better size estimates derived from initial batches or historic data will benefit performance.
+     * TODO better initial estimates
+     */
+    static int calculateChunkSize(final ColumnStoreSchema schema) {
+        // Conservative estimate of 64MB in case many tables are written simultaneously
+        final long targetBatchSizeInBytes = 64 * 1024 * 1024;
+
+        /*
+         *  32 bytes is pessimistic estimate for primitive types and moderate estimate for object types in KNIME
+         */
+        final long rowEstimate = Math.max(1, 32 * schema.getNumColumns());
+
+        // TODO select next closest (lower) power of two.
+        return (int)Math.max(1, Math.min(targetBatchSizeInBytes / rowEstimate, CHUNK_SIZE));
     }
 
-    @Override
-    public ColumnDataSpec getColumnDataSpec(final int index) {
-        return m_delegate.getColumnDataSpec(index);
-    }
-
-    @Override
-    public DataTableSpec getSourceSpec() {
-        return m_updatedSpec;
-    }
-
-    @Override
-    public ValueSchema getSourceSchema() {
-        // TODO also update DataTableSpec of ValueSchema?
-        return m_delegate.getSourceSchema();
-    }
-
-    @Override
-    public ColumnarReadValueFactory<?>[] getReadValueFactories() {
-        return m_delegate.getReadValueFactories();
-    }
-
-    @Override
-    public ColumnarWriteValueFactory<?>[] getWriteValueFactories() {
-        return m_delegate.getWriteValueFactories();
-    }
 }

@@ -88,8 +88,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
 
-    // TODO fix typo?
-    static final String CFG_TABLE_SIZE = "tabe_size";
+    private static final String CFG_TABLE_SIZE = "table_size";
 
     private final ColumnStoreFactory m_factory;
 
@@ -101,7 +100,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    private ColumnReadStore m_store;
+    private final ColumnReadStore m_store;
 
     @SuppressWarnings("resource")
     AbstractColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
@@ -172,12 +171,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         }
         m_openCursorFinalizers.clear();
         try {
-            if (m_store != null) {
-                m_store.close();
-                m_store = null;
-            }
-        } catch (final Exception e) {
-            // TODO logging
+            m_store.close();
+        } catch (final IOException e) {
             throw new IllegalStateException("Exception while clearing ContainerTable.", e);
         }
     }
@@ -239,6 +234,11 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         }
     }
 
+    // TODO can we avoid this method somehow?
+    final ColumnReadStore getStore() {
+        return m_store;
+    }
+
     private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
         try {
             ColumnStoreFactory factory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
@@ -258,9 +258,4 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     private static int[] toSortedIntArray(final Set<Integer> selection) {
         return selection.stream().sorted().mapToInt((i) -> (i)).toArray();
     }
-
-    ColumnReadStore getStore() {
-        return m_store;
-    }
-
 }

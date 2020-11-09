@@ -47,49 +47,38 @@ package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
 
-import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
-import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.Cursor;
+import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.WriteValue;
-import org.knime.core.data.v2.value.CustomRowKeyValueFactory.CustomRowKeyWriteValue;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.util.DuplicateKeyException;
 
-/**
- * Columnar implementation of {@link DataContainerDelegate}.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
- */
-public final class ColumnarDataContainerDelegate implements DataContainerDelegate {
+final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarDataContainerDelegate.class);
 
-    private final ColumnarRowWriteCursor m_delegate;
+    private final Cursor<RowWrite> m_delegateCursor;
 
     private final DataTableSpec m_spec;
 
-    private final boolean m_isCustomRowKey;
-
     private final int m_numColumns;
+
+    private final ColumnarRowContainer m_delegateContainer;
 
     private long m_size;
 
     private ContainerTable m_containerTable;
 
-    /**
-     * @param cursor the delegate. writes into a {@link ColumnStore}.
-     * @throws IOException
-     */
-    public ColumnarDataContainerDelegate(final ColumnarRowWriteCursor cursor) throws IOException {
-        m_delegate = cursor;
-        m_spec = cursor.getSchema().getSourceSpec();
+    ColumnarDataContainerDelegate(final DataTableSpec spec, final ColumnarRowContainer container) {
+        m_delegateContainer = container;
+        m_delegateCursor = container.createCursor();
+        m_spec = spec;
         m_numColumns = m_spec.getNumColumns();
-        m_isCustomRowKey = cursor.getSchema().getRowKeyType() == RowKeyType.CUSTOM;
     }
 
     @Override
@@ -108,7 +97,7 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
     @Deprecated
     @Override
     public void setMaxPossibleValues(final int maxPossibleValues) {
-        m_delegate.setMaxPossibleValues(maxPossibleValues);
+        m_delegateContainer.setMaxPossibleValues(maxPossibleValues);
     }
 
     @Override
@@ -119,19 +108,19 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
                     + row.getNumCells() + " vs. " + m_spec.getNumColumns());
         }
 
-        if (m_isCustomRowKey) {
-            m_delegate.<CustomRowKeyWriteValue> getWriteValue(-1).setRowKey(row.getKey());
-        }
+        // TODO we could avoid this method call for cases where we know RowWrite is always the same
+        final RowWrite rowWrite = m_delegateCursor.forward();
 
+        // TODO in case of no key, this method call is not required.
+        rowWrite.setRowKey(row.getKey());
         for (int i = 0; i < m_numColumns; i++) {
             final DataCell cell = row.getCell(i);
             if (!cell.isMissing()) {
-                m_delegate.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
+                rowWrite.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
             } else {
-                m_delegate.setMissing(i);
+                rowWrite.setMissing(i);
             }
         }
-        m_delegate.push();
         m_size++;
     }
 
@@ -146,8 +135,8 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
     @Override
     public void close() {
         try {
-            m_containerTable = m_delegate.finish();
-            m_delegate.close();
+            m_containerTable = m_delegateContainer.finishInternal();
+            m_delegateCursor.close();
         } catch (DuplicateKeyException ex) {
             throw ex;
         } catch (IOException ex) {
@@ -161,7 +150,8 @@ public final class ColumnarDataContainerDelegate implements DataContainerDelegat
             m_containerTable.clear();
         } else {
             try {
-                m_delegate.close();
+                m_delegateCursor.close();
+                m_delegateContainer.close();
             } catch (Exception e) {
                 // NB: best effort for clearing
                 LOGGER.debug("Exception while clearing ColumnarDataContainer. ", e);

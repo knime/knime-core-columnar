@@ -61,6 +61,7 @@ import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelea
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyReadValue;
+import org.knime.core.data.v2.RowRead;
 
 /**
  * Columnar implementation of {@link RowCursor} for reading data from columnar table backend.
@@ -69,7 +70,7 @@ import org.knime.core.data.v2.RowKeyReadValue;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @since 4.3
  */
-class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
+final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
 
     private final ColumnDataReader m_reader;
 
@@ -83,7 +84,7 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
 
     private final ColumnarValueSchema m_schema;
 
-    private final ColumnarReadValueFactory<ColumnReadData>[] m_factories;
+    private final ColumnarReadValueFactory<?>[] m_factories;
 
     private final Set<Finalizer> m_openCursorFinalizers;
 
@@ -129,15 +130,7 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
         m_readerRelease = new ResourceWithRelease(m_reader);
         m_schema = schema;
         m_openCursorFinalizers = openCursorFinalizers;
-
-        // initialize ReadValue factories
-        @SuppressWarnings("unchecked")
-        final ColumnarReadValueFactory<ColumnReadData>[] factories =
-            new ColumnarReadValueFactory[m_schema.getNumColumns()];
-        for (int j = 0; j < factories.length; j++) {
-            factories[j] = m_schema.getReadValueFactoryAt(j);
-        }
-        m_factories = factories;
+        m_factories = m_schema.getReadValueFactories();
 
         // number of chunks
         final int maxLength;
@@ -163,7 +156,7 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     }
 
     @Override
-    public boolean poll() {
+    public RowRead forward() {
         // TODO throw appropriate exception in case canPoll = false but poll()
         // called
         if (++m_currentIndex > m_currentMaxIndex) {
@@ -173,16 +166,16 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
             readNextBatch();
             m_currentIndex = 0;
         }
-        return canPoll();
+        return this;
     }
 
     @Override
-    public boolean canPoll() {
+    public boolean canForward() {
         return m_currentIndex < m_currentMaxIndex || m_currentBatchIndex < m_maxBatchIndex;
     }
 
     @Override
-    public RowKeyValue getRowKeyValue() {
+    public RowKeyValue getRowKey() {
         return (RowKeyReadValue)m_currentValues[0];
     }
 
@@ -207,14 +200,15 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     @Override
     public void close() {
         try {
-            if (m_currentBatch != null) {
-                m_currentBatch.release();
-                m_currentBatch = null;
+            // Finalizer could have already been closed in AbstractColumnarContainerTable::clear
+            if (!m_finalizer.isClosed()) {
+                m_finalizer.close();
+                if (m_currentBatch != null) {
+                    m_currentBatch.release();
+                }
+                m_openCursorFinalizers.remove(m_finalizer);
+                m_reader.close();
             }
-
-            m_finalizer.close();
-            m_openCursorFinalizers.remove(m_finalizer);
-            m_reader.close();
         } catch (final Exception e) {
             // TODO Logging
             throw new IllegalStateException("Exception while closing RowWriteCursor.", e);
@@ -248,7 +242,10 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     private ReadValue[] create(final ReadBatch batch) {
         final ReadValue[] values = new ReadValue[m_schema.getNumColumns()];
         for (int i = 0; i < values.length; i++) {
-            values[i] = m_factories[i].createReadValue(batch.get(i), this);
+            @SuppressWarnings("unchecked")
+            final ColumnarReadValueFactory<ColumnReadData> cast =
+                ((ColumnarReadValueFactory<ColumnReadData>)m_factories[i]);
+            values[i] = cast.createReadValue(batch.get(i), this);
         }
         return values;
     }
@@ -256,7 +253,10 @@ class ColumnarRowCursor implements RowCursor, ColumnDataIndex {
     private final ReadValue[] create(final ReadBatch batch, final int[] selection) {
         final ReadValue[] values = new ReadValue[m_schema.getNumColumns()];
         for (int i = 0; i < selection.length; i++) {
-            values[selection[i]] = m_factories[selection[i]].createReadValue(batch.get(selection[i]), this);
+            @SuppressWarnings("unchecked")
+            final ColumnarReadValueFactory<ColumnReadData> cast =
+                ((ColumnarReadValueFactory<ColumnReadData>)m_factories[selection[i]]);
+            values[selection[i]] = cast.createReadValue(batch.get(selection[i]), this);
         }
         return values;
     }

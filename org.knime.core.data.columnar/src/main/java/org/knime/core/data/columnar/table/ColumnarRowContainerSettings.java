@@ -46,48 +46,34 @@
 package org.knime.core.data.columnar.table;
 
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.RowWriteCursor;
+import org.knime.core.data.v2.RowContainer;
 
 /**
- * Settings for {@link RowWriteCursor}
+ * {@link RowContainer} settings
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
- *
  * @since 4.3
  */
-public final class ColumnarRowWriteCursorSettings {
+/* TODO interface required? */
+public final class ColumnarRowContainerSettings {
 
     private final boolean m_initializeDomains;
 
     private final int m_maxPossibleNominalDomainValues;
 
-    private final RowKeyType m_rowKeyConfig;
+    private final boolean m_checkDuplicateRowKeys;
 
     /**
      * @param initializeDomains if <source>true</source> domains will be initialized domain values provided through
      *            incoming {@link DataTableSpec}.
      * @param maxPossibleNominalDomainValues maximum number of values for nominal domains.
-     * @param rowKeyConfig type of rowkey.
+     * @param checkDuplicateRowKeys TODO
      */
-    public ColumnarRowWriteCursorSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
-        final RowKeyType rowKeyConfig) {
+    public ColumnarRowContainerSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
+        final boolean checkDuplicateRowKeys) {
         m_initializeDomains = initializeDomains;
+        m_checkDuplicateRowKeys = checkDuplicateRowKeys;
         m_maxPossibleNominalDomainValues = maxPossibleNominalDomainValues;
-        m_rowKeyConfig = rowKeyConfig;
-    }
-
-    /**
-     * @param initializeDomains if <source>true</source> domains will be initialized domain values provided through
-     *            incoming {@link DataTableSpec}.
-     * @param maxPossibleNominalDomainValues maximum number of values for nominal domains.
-     */
-    public ColumnarRowWriteCursorSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues) {
-        this(initializeDomains, maxPossibleNominalDomainValues, RowKeyType.CUSTOM);
-    }
-
-    ColumnarRowWriteCursorSettings withRowKeyConfig(final RowKeyType rowKeyConfig) {
-        return new ColumnarRowWriteCursorSettings(m_initializeDomains, m_maxPossibleNominalDomainValues, rowKeyConfig);
     }
 
     boolean isInitializeDomains() {
@@ -98,7 +84,8 @@ public final class ColumnarRowWriteCursorSettings {
         return m_maxPossibleNominalDomainValues;
     }
 
-    RowKeyType getRowKeyConfig() {
-        return m_rowKeyConfig;
+    boolean checkDuplicateRowKeys() {
+        return m_checkDuplicateRowKeys;
     }
+
 }

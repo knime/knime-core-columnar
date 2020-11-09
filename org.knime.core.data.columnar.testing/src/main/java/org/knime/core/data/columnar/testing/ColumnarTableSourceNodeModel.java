@@ -12,8 +12,10 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell;
-import org.knime.core.data.v2.CustomKeyRowContainer;
-import org.knime.core.data.v2.WriteValue;
+import org.knime.core.data.v2.Cursor;
+import org.knime.core.data.v2.RowContainer;
+import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.value.DoubleValueFactory.DoubleWriteValue;
 import org.knime.core.node.BufferedDataContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -74,24 +76,18 @@ public class ColumnarTableSourceNodeModel extends NodeModel {
 
         if (arrow) {
             // TODO close etc.
-            try (final CustomKeyRowContainer cursor = exec.createRowContainer(m_spec)) {
-                final int nrCols = m_nrColsModel.getIntValue();
-                final long nrRows = m_nrRowsModel.getLongValue();
-                // TODO if duplicate row key checking fails - handle it.
+            final int nrCols = m_nrColsModel.getIntValue();
+            final long nrRows = m_nrRowsModel.getLongValue();
+            try (final RowContainer container = exec.createRowContainer(m_spec);
+                    final Cursor<RowWrite> cursor = container.createCursor()) {
                 for (long i = 0; i < nrRows; i++) {
-                    final String key = "Row" + i;
-                    //					if ((i + 1) % 10000 == 0) {
-                    //						final long iFinal = i;
-                    //						exec.setProgress((double) i / nrRows, () -> String.format("Row %,d/%,d (\"%s\")", iFinal, nrRows, key));
-                    //						exec.checkCanceled();
-                    //					}
-                    cursor.setRowKey(key);
+                    final RowWrite row = cursor.forward();
+                    row.setRowKey("Row" + i);
                     for (int j = 0; j < nrCols; j++) {
-                        cursor.<WriteValue<DoubleCell>> getWriteValue(j).setValue(new DoubleCell(r.nextDouble()));
+                        row.<DoubleWriteValue> getWriteValue(j).setDoubleValue(r.nextDouble());
                     }
-                    cursor.push();
                 }
-                bdt = cursor.finish();
+                bdt = container.finish();
             }
         } else {
             // OLD API

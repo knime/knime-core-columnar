@@ -197,8 +197,9 @@ final class ResourceLeakDetector {
         m_openFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     }
 
-    Finalizer createFinalizer(final Object referent, final AutoCloseable closeable) {
-        return createFinalizer(referent, new ResourceWithRelease(closeable));
+    Finalizer createFinalizer(final Object referent, final AutoCloseable... closeables) {
+        return createFinalizer(referent,
+            Arrays.stream(closeables).map(ResourceWithRelease::new).toArray(ResourceWithRelease[]::new));
     }
 
     /**

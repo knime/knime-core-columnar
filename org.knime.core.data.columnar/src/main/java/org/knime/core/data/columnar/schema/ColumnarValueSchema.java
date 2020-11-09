@@ -45,11 +45,8 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.ValueSchema;
 
 /**
@@ -68,22 +65,20 @@ public interface ColumnarValueSchema extends ColumnStoreSchema {
     /**
      * Create a {@link ColumnarReadValueFactory} given the spec at the provided column index.
      *
-     * @param <C> type of {@link ColumnReadData}.
      * @param colIndex the column index.
      *
      * @return factory to create read values.
      */
-    <C extends ColumnReadData> ColumnarReadValueFactory<C> getReadValueFactoryAt(int colIndex);
+    ColumnarReadValueFactory<?>[] getReadValueFactories();
 
     /**
      * Create a {@link ColumnarWriteValueFactory} given the spec at the provided column index.
      *
-     * @param <C> type of {@link ColumnWriteData}.
      * @param colIndex the column index.
      *
      * @return factory to create write values.
      */
-    <C extends ColumnWriteData> ColumnarWriteValueFactory<C> getWriteValueFactoryAt(int colIndex);
+    ColumnarWriteValueFactory<?>[] getWriteValueFactories();
 
     /**
      * TODO get rid of this method, for reasons stated below.
@@ -94,10 +89,5 @@ public interface ColumnarValueSchema extends ColumnStoreSchema {
      * @return the wrapped {@link ValueSchema}.
      */
     ValueSchema getSourceSchema();
-
-    /**
-     * @return the rowkey type
-     */
-    RowKeyType getRowKeyType();
 
 }

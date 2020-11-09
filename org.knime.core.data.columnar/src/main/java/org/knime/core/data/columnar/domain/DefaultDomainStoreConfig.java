@@ -67,7 +67,6 @@ import org.knime.core.data.def.StringCell;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.meta.DataColumnMetaDataCreator;
 import org.knime.core.data.meta.DataColumnMetaDataRegistry;
-import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.util.DuplicateChecker;
 
 /**
@@ -83,11 +82,11 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     private final ColumnarValueSchema m_schema;
 
-    private final RowKeyType m_rowKeyConfig;
-
     private final int m_maxNumValues;
 
     private final boolean m_initDomains;
+
+    private final boolean m_checkForDuplicates;
 
     private Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnMetaData[]>> m_metadataCalculators;
 
@@ -98,14 +97,14 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
      *
      * @param schema the schema used to determine the column configuration.
      * @param maxPossibleNominalDomainValues
-     * @param rowKeyConfig
+     * @param checkForDuplicates <source>true</source> if row key should be checked for duplicates
      * @param initializeDomains <source>true</source> if incoming domains/metadata should be used for initialization.
      */
     public DefaultDomainStoreConfig(final ColumnarValueSchema schema, final int maxPossibleNominalDomainValues,
-        final RowKeyType rowKeyConfig, final boolean initializeDomains) {
+        final boolean checkForDuplicates, final boolean initializeDomains) {
         m_schema = schema;
         m_initDomains = initializeDomains;
-        m_rowKeyConfig = rowKeyConfig;
+        m_checkForDuplicates = checkForDuplicates;
         m_maxNumValues = maxPossibleNominalDomainValues;
         m_nativeDomainCalculators = new HashMap<>();
 
@@ -130,23 +129,12 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     @Override
     public DomainStoreConfig withMaxPossibleNominalDomainValues(final int maxPossibleValues) {
-        return new DefaultDomainStoreConfig(m_schema, maxPossibleValues, m_rowKeyConfig, m_initDomains);
+        return new DefaultDomainStoreConfig(m_schema, maxPossibleValues, m_checkForDuplicates, m_initDomains);
     }
 
     @Override
     public DuplicateChecker createDuplicateChecker() {
-        final DuplicateChecker duplicateChecker;
-        switch (m_rowKeyConfig) {
-            case CUSTOM:
-                duplicateChecker = new DuplicateChecker();
-                break;
-            case NOKEY:
-                duplicateChecker = null;
-                break;
-            default:
-                throw new IllegalStateException("Unknown row key type: " + m_rowKeyConfig.name());
-        }
-        return duplicateChecker;
+        return m_checkForDuplicates ? new DuplicateChecker() : null;
     }
 
     // also initializes with incoming DataTableSpec
@@ -157,8 +145,8 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
             final int length = m_schema.getNumColumns();
             final DataTableSpec spec = m_schema.getSourceSpec();
             m_domainCalculators = new HashMap<>();
+            final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
             for (int i = 1; i < length; i++) {
-                final ColumnarReadValueFactory<ColumnReadData> readValueFactory = m_schema.getReadValueFactoryAt(i);
                 final DataType type = spec.getColumnSpec(i - 1).getType();
 
                 final ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain> calculator;
@@ -170,12 +158,12 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                     final boolean isNominal = type.isCompatible(NominalValue.class);
                     final boolean isBounded = type.isCompatible(BoundedValue.class);
                     if (isNominal && isBounded) {
-                        calculator = new ColumnarCombinedDomainCalculator<>(readValueFactory,
+                        calculator = new ColumnarCombinedDomainCalculator<>(factories[i],
                             new DataValueComparatorDelegator<>(type.getComparator()), m_maxNumValues);
                     } else if (isNominal) {
-                        calculator = new ColumnarNominalDomainCalculator<>(readValueFactory, m_maxNumValues);
+                        calculator = new ColumnarNominalDomainCalculator<>(factories[i], m_maxNumValues);
                     } else if (isBounded) {
-                        calculator = new ColumnarBoundedDomainCalculator<>(readValueFactory,
+                        calculator = new ColumnarBoundedDomainCalculator<>(factories[i],
                             new DataValueComparatorDelegator<>(type.getComparator()));
                     } else {
                         calculator = null;
@@ -201,6 +189,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
             m_metadataCalculators = new HashMap<>();
             final int length = m_schema.getNumColumns();
             final DataTableSpec spec = m_schema.getSourceSpec();
+            final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
             for (int i = 1; i < length; i++) {
                 final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
                 final Collection<DataColumnMetaDataCreator<?>> metadataCreators =
@@ -212,7 +201,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                         m_metadataCalculators.put(i,
                             new ColumnarMetadataDomainCalculator<>(
                                 metadataCreators.toArray(new DataColumnMetaDataCreator[metadataCreators.size()]),
-                                m_schema.getReadValueFactoryAt(i)));
+                                (ColumnarReadValueFactory<ColumnReadData>)factories[i]));
                     }
                 }
             }
