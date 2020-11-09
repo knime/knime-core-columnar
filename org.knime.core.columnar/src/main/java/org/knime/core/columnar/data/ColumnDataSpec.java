@@ -61,6 +61,7 @@ import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 
 @SuppressWarnings("javadoc")
 public interface ColumnDataSpec {
@@ -142,6 +143,8 @@ public interface ColumnDataSpec {
         R visit(final StructDataSpec spec);
 
         R visit(final ListDataSpec listDataSpec);
+
+        R visit(final ZonedDateTimeDataSpec spec);
     }
 
     <R> R accept(Mapper<R> v);

@@ -65,6 +65,7 @@ import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 import org.knime.core.columnar.testing.TestDoubleData.TestDoubleDataFactory;
 import org.knime.core.columnar.testing.TestVoidData.TestVoidDataFactory;
 
@@ -155,6 +156,11 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final ListDataSpec listDataSpec) {
+        throw new UnsupportedOperationException("Not yet implemented.");
+    }
+
+    @Override
+    public TestDataFactory visit(final ZonedDateTimeDataSpec spec) {
         throw new UnsupportedOperationException("Not yet implemented.");
     }
 }
