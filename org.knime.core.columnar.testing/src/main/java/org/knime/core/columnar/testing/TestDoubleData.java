@@ -96,7 +96,7 @@ public final class TestDoubleData extends AbstractTestData implements DoubleWrit
     }
 
     @Override
-    public int sizeOf() {
+    public long sizeOf() {
         return m_numValues;
     }
 

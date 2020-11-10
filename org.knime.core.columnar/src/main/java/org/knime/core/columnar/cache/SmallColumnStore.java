@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -119,7 +120,7 @@ public final class SmallColumnStore implements ColumnStore {
 
         private final List<ReadBatch> m_batches = Collections.synchronizedList(new ArrayList<>());
 
-        private final AtomicInteger m_sizeOf = new AtomicInteger();
+        private final AtomicLong m_sizeOf = new AtomicLong();
 
         private final AtomicInteger m_maxDataCapacity = new AtomicInteger();
 
@@ -149,7 +150,7 @@ public final class SmallColumnStore implements ColumnStore {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return m_sizeOf.get();
         }
 

@@ -63,6 +63,6 @@ public interface ReferencedData {
      *
      * @return size of chunk in bytes
      */
-    int sizeOf();
+    long sizeOf();
 
 }

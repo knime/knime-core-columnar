@@ -115,7 +115,7 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
     }
 
     @Override
-    public synchronized int sizeOf() {
+    public synchronized long sizeOf() {
         return m_readDelegate != null ? m_readDelegate.sizeOf() : m_writeDelegate.sizeOf();
     }
 

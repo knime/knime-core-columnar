@@ -126,8 +126,8 @@ public class DefaultReadBatch implements ReadBatch {
     }
 
     @Override
-    public int sizeOf() {
-        return Arrays.stream(m_data).mapToInt(ReferencedData::sizeOf).sum();
+    public long sizeOf() {
+        return Arrays.stream(m_data).mapToLong(ReferencedData::sizeOf).sum();
     }
 
     @Override

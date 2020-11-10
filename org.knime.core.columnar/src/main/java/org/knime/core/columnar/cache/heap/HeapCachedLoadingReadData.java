@@ -96,7 +96,7 @@ final class HeapCachedLoadingReadData<T> implements ObjectReadData<T> {
     }
 
     @Override
-    public int sizeOf() {
+    public long sizeOf() {
         return m_delegate.sizeOf();
     }
 

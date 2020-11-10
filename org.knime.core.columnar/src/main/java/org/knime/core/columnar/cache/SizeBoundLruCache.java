@@ -48,6 +48,8 @@ package org.knime.core.columnar.cache;
 import java.util.Map;
 
 import org.knime.core.columnar.ReferencedData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -81,7 +83,16 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
     SizeBoundLruCache(final long maxSize) {
 
         final Weigher<K, DataWithEvictor<K, D>> weigher =
-            (k, dataWithEvictor) -> Math.max(1, dataWithEvictor.m_data.sizeOf());
+            (k, dataWithEvictor) -> {
+                final long size = dataWithEvictor.m_data.sizeOf();
+                if (size > Integer.MAX_VALUE) {
+                    final Logger logger = LoggerFactory.getLogger(getClass());
+                    logger.error(
+                        String.format("Size of data (%d) is larger than maximum (%d).", size, Integer.MAX_VALUE));
+                    return Integer.MAX_VALUE;
+                }
+                return Math.max(1, (int)size);
+            };
 
         final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
             if (removalNotification.wasEvicted()) {

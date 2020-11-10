@@ -98,7 +98,7 @@ final class TestVoidData extends AbstractTestData implements VoidWriteData, Void
     }
 
     @Override
-    public int sizeOf() {
+    public long sizeOf() {
         return 0;
     }
 
