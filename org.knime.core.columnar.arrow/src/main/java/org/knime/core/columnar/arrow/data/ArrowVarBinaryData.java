@@ -93,7 +93,7 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
         }
 
@@ -127,7 +127,7 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
         }
     }

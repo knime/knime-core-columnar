@@ -178,7 +178,7 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             // Does not matter for this test data
             return 100;
         }
@@ -271,7 +271,7 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             // Does not matter for this test data
             return 100;
         }
@@ -448,7 +448,7 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             // Does not matter for this test data
             return 100;
         }

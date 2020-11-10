@@ -96,7 +96,7 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
     }
 
     @Override
-    public int sizeOf() {
+    public long sizeOf() {
         return 0;
     }
 

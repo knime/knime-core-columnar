@@ -92,7 +92,7 @@ public final class ArrowIntData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
         }
 
@@ -125,7 +125,7 @@ public final class ArrowIntData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
         }
     }

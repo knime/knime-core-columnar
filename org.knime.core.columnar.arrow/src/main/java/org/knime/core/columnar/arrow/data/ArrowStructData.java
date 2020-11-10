@@ -108,7 +108,7 @@ public final class ArrowStructData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowStructData.sizeOf(m_vector, m_children);
         }
 
@@ -189,7 +189,7 @@ public final class ArrowStructData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowStructData.sizeOf(m_vector, m_children);
         }
 

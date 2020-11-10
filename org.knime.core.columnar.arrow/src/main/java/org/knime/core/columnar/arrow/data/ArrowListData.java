@@ -114,7 +114,7 @@ public final class ArrowListData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowSizeUtils.sizeOfList(m_vector) + m_data.sizeOf();
         }
 
@@ -164,7 +164,7 @@ public final class ArrowListData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowSizeUtils.sizeOfList(m_vector) + m_data.sizeOf();
         }
 

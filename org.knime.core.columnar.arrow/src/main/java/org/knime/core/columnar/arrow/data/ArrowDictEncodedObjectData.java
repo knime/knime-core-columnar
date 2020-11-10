@@ -163,7 +163,7 @@ public final class ArrowDictEncodedObjectData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowDictEncodedObjectData.sizeOf(m_vector, m_dict.m_vector);
         }
 
@@ -227,7 +227,7 @@ public final class ArrowDictEncodedObjectData {
         }
 
         @Override
-        public int sizeOf() {
+        public long sizeOf() {
             return ArrowDictEncodedObjectData.sizeOf(m_vector, m_dict.m_vector);
         }
 
