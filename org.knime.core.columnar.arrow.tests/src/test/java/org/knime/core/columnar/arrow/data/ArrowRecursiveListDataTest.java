@@ -158,15 +158,15 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
-        return (int)Math.ceil(capacity / 8.0) // Validity buffer
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return (long)Math.ceil(capacity / 8.0) // Validity buffer
             + (capacity + 1) * 4 // Offset buffer
             + getInnerMinSize(valueCount);
     }
 
-    private static int getInnerMinSize(final int valueCount) {
-        int inner1Count = 0;
-        int inner2Count = 0;
+    private static long getInnerMinSize(final int valueCount) {
+        long inner1Count = 0;
+        long inner2Count = 0;
         for (int i = 0; i < valueCount; i++) {
             if (i != 1) {
                 final Random random = new Random(i);
@@ -177,8 +177,8 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
                 }
             }
         }
-        return (int)Math.ceil(inner1Count / 8.0) // Inner1: validity buffer
-            + (int)Math.ceil(inner2Count / 8.0) // Inner2: validity buffer
+        return (long)Math.ceil(inner1Count / 8.0) // Inner1: validity buffer
+            + (long)Math.ceil(inner2Count / 8.0) // Inner2: validity buffer
             + (inner1Count + 1) * 4 // Inner1: Offset buffer
             + inner2Count * 4; // Inner2: data buffer
     }

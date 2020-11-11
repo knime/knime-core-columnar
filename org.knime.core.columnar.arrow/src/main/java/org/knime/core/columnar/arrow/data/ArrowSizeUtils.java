@@ -68,8 +68,8 @@ final class ArrowSizeUtils {
      * @return size of the vector in memory
      */
     @SuppressWarnings("resource")
-    static int sizeOfFixedWidth(final FieldVector vector) {
-        return (int)(vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity());
+    static long sizeOfFixedWidth(final FieldVector vector) {
+        return vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity();
     }
 
     /**
@@ -77,9 +77,9 @@ final class ArrowSizeUtils {
      * @return size of the vector in memory
      */
     @SuppressWarnings("resource")
-    static int sizeOfVariableWidth(final FieldVector vector) {
-        return (int)(vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity()
-            + vector.getOffsetBuffer().capacity());
+    static long sizeOfVariableWidth(final FieldVector vector) {
+        return vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity()
+            + vector.getOffsetBuffer().capacity();
     }
 
     /**
@@ -87,8 +87,8 @@ final class ArrowSizeUtils {
      * @return size of the vector in memory (not including children)
      */
     @SuppressWarnings("resource")
-    static int sizeOfList(final ListVector vector) {
-        return (int)(vector.getValidityBuffer().capacity() + vector.getOffsetBuffer().capacity());
+    static long sizeOfList(final ListVector vector) {
+        return vector.getValidityBuffer().capacity() + vector.getOffsetBuffer().capacity();
     }
 
     /**
@@ -96,7 +96,7 @@ final class ArrowSizeUtils {
      * @return size of the vector in memory (not including children)
      */
     @SuppressWarnings("resource")
-    static int sizeOfStruct(final StructVector vector) {
-        return (int)(vector.getValidityBuffer().capacity());
+    static long sizeOfStruct(final StructVector vector) {
+        return vector.getValidityBuffer().capacity();
     }
 }

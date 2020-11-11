@@ -107,14 +107,14 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
-        int numBytes = 0;
+    protected long getMinSize(final int valueCount, final int capacity) {
+        long numBytes = 0;
         for (int i = 0; i < valueCount; i++) {
             numBytes += new Random(i).nextInt(MAX_LENGTH);
         }
         return numBytes // data buffer
             + 4 * capacity // offset buffer
-            + (int)Math.ceil(capacity / 8.0); // validity buffer
+            + (long)Math.ceil(capacity / 8.0); // validity buffer
     }
 
     private static byte[] valueFor(final int seed) {

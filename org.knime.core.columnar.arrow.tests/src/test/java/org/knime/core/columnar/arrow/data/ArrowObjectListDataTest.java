@@ -154,7 +154,7 @@ public class ArrowObjectListDataTest extends AbstractArrowDataTest<ArrowListWrit
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
+    protected long getMinSize(final int valueCount, final int capacity) {
         // Not tested here
         return 0;
     }

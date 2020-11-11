@@ -178,7 +178,7 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
+    protected long getMinSize(final int valueCount, final int capacity) {
         // Number of bytes for the object data
         int numBytesObjectData = 0;
         for (int i = 0; i < valueCount; i++) {
@@ -186,7 +186,7 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
         }
 
         // NB: The dictionary is not allocated
-        return 6 * (int)Math.ceil(capacity / 8.0) // Validity buffers
+        return 6 * (long)Math.ceil(capacity / 8.0) // Validity buffers
             + capacity * 4 // Dictionary encoded data
             + capacity * 4 // Integer data
             + (capacity + 1) * 4 + numBytesObjectData // Object data (offset array + data)

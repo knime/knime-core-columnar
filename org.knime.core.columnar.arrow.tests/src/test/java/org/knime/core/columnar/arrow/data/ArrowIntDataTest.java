@@ -103,8 +103,8 @@ public class ArrowIntDataTest extends AbstractArrowDataTest<ArrowIntWriteData, A
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
+    protected long getMinSize(final int valueCount, final int capacity) {
         return 4 * capacity // 4 bytes per value for data
-            + (int)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }

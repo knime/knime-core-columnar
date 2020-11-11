@@ -154,7 +154,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
      * @param capacity the total capacity of the data
      * @return the minimum size that should be allocated by data object to store the data
      */
-    protected abstract int getMinSize(int valueCount, int capacity);
+    protected abstract long getMinSize(int valueCount, int capacity);
 
     /**
      * Simple serializer implementation which adds one to the bytes on serialization and removes 1 when deserializing
@@ -495,7 +495,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     public void testSizeOf() {
         final int numValues = 8213;
         final W wd = createWrite(numValues);
-        int minSize = getMinSize(0, numValues);
+        long minSize = getMinSize(0, numValues);
         assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
         for (int i = 0; i < numValues; i++) {
             setValue(wd, i, i);

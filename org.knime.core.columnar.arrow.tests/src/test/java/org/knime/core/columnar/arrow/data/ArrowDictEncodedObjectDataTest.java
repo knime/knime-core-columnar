@@ -120,10 +120,10 @@ public class ArrowDictEncodedObjectDataTest
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
+    protected long getMinSize(final int valueCount, final int capacity) {
         // NB: The dictionary is not allocated
         return 4 * capacity // 4 bytes per value for data
-            + (int)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 
     @Override
@@ -143,10 +143,10 @@ public class ArrowDictEncodedObjectDataTest
         // Allocate the dictionary
         readData.getDictionary();
 
-        final int expectedSize = getMinSize(numValues, numValues) // Index vector
+        final long expectedSize = getMinSize(numValues, numValues) // Index vector
             + Arrays.stream(VALUES).mapToInt(v -> v.length).sum() // dictionary data buffer
             + 4 * numValues // dictionary offset buffer
-            + (int)Math.ceil(numValues / 8.0); // dictionary validity buffer
+            + (long)Math.ceil(numValues / 8.0); // dictionary validity buffer
         assertTrue("Size to small. Got " + readData.sizeOf() + ", expected >= " + expectedSize,
             readData.sizeOf() >= expectedSize);
 

@@ -103,7 +103,7 @@ public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData, Arro
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
+    protected long getMinSize(final int valueCount, final int capacity) {
         return 0;
     }
 

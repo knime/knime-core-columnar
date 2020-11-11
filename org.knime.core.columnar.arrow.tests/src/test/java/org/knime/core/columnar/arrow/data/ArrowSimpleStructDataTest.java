@@ -135,8 +135,8 @@ public class ArrowSimpleStructDataTest extends AbstractArrowDataTest<ArrowStruct
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
-        return 3 * (int)Math.ceil(capacity / 8.0) // Validity buffers of Stuct, Double and Integer
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return 3 * (long)Math.ceil(capacity / 8.0) // Validity buffers of Stuct, Double and Integer
             + capacity * 8 // Double: Data buffer
             + capacity * 4; // Integer: Data buffer
     }

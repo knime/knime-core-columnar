@@ -215,8 +215,8 @@ public final class ArrowStructData {
         }
     }
 
-    private static int sizeOf(final StructVector vector, final ReferencedData[] children) {
-        int size = ArrowSizeUtils.sizeOfStruct(vector);
+    private static long sizeOf(final StructVector vector, final ReferencedData[] children) {
+        long size = ArrowSizeUtils.sizeOfStruct(vector);
         for (final ReferencedData c : children) {
             size += c.sizeOf();
         }

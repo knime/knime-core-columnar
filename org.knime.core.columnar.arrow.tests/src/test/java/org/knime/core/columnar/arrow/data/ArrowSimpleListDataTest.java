@@ -142,16 +142,16 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
     }
 
     @Override
-    protected int getMinSize(final int valueCount, final int capacity) {
-        final int innerValueCount = getInnerValueCount(valueCount);
-        return (int)Math.ceil(capacity / 8.0) // Validity buffer
-            + (int)Math.ceil(innerValueCount / 8.0) // Inner: validity buffer
+    protected long getMinSize(final int valueCount, final int capacity) {
+        final long innerValueCount = getInnerValueCount(valueCount);
+        return (long)Math.ceil(capacity / 8.0) // Validity buffer
+            + (long)Math.ceil(innerValueCount / 8.0) // Inner: validity buffer
             + (capacity + 1) * 4 // Offset buffer
             + innerValueCount * 4; // Inner: data buffer
     }
 
-    private static int getInnerValueCount(final int valueCount) {
-        int c = 0;
+    private static long getInnerValueCount(final int valueCount) {
+        long c = 0;
         for (int i = 0; i < valueCount; i++) {
             c += i == 1 ? 0 : new Random(i).nextInt(MAX_LENGTH);
         }
