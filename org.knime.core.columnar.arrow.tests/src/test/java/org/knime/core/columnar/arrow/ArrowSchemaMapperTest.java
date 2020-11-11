@@ -57,11 +57,16 @@ import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFacto
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDurationData.ArrowDurationDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLocalDateData.ArrowLocalDateDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLocalDateTimeData.ArrowLocalDateTimeDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
@@ -69,11 +74,16 @@ import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
+import org.knime.core.columnar.data.DurationData.DurationDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
 import org.knime.core.columnar.data.ListData.ListDataSpec;
+import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
+import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
+import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
+import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
@@ -147,6 +157,36 @@ public class ArrowSchemaMapperTest {
     @Test
     public void testMapVoidSpec() {
         testMapSingleSpec(VoidDataSpec.INSTANCE, ArrowVoidDataFactory.INSTANCE);
+    }
+
+    /** Test mapping LocalTime specs to a {@link ArrowLocalTimeDataFactory} */
+    @Test
+    public void testMapLocalTimeSpec() {
+        testMapSingleSpec(LocalTimeDataSpec.INSTANCE, ArrowLocalTimeDataFactory.INSTANCE);
+    }
+
+    /** Test mapping LocalDate specs to a {@link ArrowLocalDateDataFactory} */
+    @Test
+    public void testMapLocalDateSpec() {
+        testMapSingleSpec(LocalDateDataSpec.INSTANCE, ArrowLocalDateDataFactory.INSTANCE);
+    }
+
+    /** Test mapping Period specs to a {@link ArrowPeriodDataFactory} */
+    @Test
+    public void testMapPeriodSpec() {
+        testMapSingleSpec(PeriodDataSpec.INSTANCE, ArrowPeriodDataFactory.INSTANCE);
+    }
+
+    /** Test mapping Duration specs to a {@link ArrowDurationDataFactory} */
+    @Test
+    public void testMapDurationSpec() {
+        testMapSingleSpec(DurationDataSpec.INSTANCE, ArrowDurationDataFactory.INSTANCE);
+    }
+
+    /** Test mapping LocalDateTime specs to a {@link ArrowLocalDateTimeDataFactory} */
+    @Test
+    public void testMapLocalDateTimeSpec() {
+        testMapSingleSpec(LocalDateTimeDataSpec.INSTANCE, ArrowLocalDateTimeDataFactory.INSTANCE);
     }
 
     /** Test mapping void specs to a {@link ArrowStructDataFactory} */

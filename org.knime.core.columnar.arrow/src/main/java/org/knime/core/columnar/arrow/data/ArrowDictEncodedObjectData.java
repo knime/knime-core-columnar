@@ -67,9 +67,6 @@ import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-
 /**
  * Arrow implementation of {@link ObjectReadData} and {@link ObjectWriteData} using a dictionary.
  *
@@ -81,59 +78,8 @@ public final class ArrowDictEncodedObjectData {
     private ArrowDictEncodedObjectData() {
     }
 
-    private static final long INIT_BYTES_PER_ENTRY = 256;
-
     // TODO Make configurable?
     private static final int INIT_DICT_SIZE = 128;
-
-    /** Helper class which holds a dictionary in a Map and can write it to a LargeVarBinaryVector */
-    private static final class InMemoryDictEncoding<T> {
-
-        private int m_runningDictIndex = 0;
-
-        private final BiMap<T, Integer> m_inMemDict;
-
-        private final BiMap<Integer, T> m_invInMemDict;
-
-        private final ArrowBufIO<T> m_io;
-
-        private final LargeVarBinaryVector m_vector;
-
-        private InMemoryDictEncoding(final LargeVarBinaryVector vector, final ArrowBufIO<T> io) {
-            m_vector = vector;
-            m_io = io;
-            m_inMemDict = HashBiMap.create(INIT_DICT_SIZE);
-            m_invInMemDict = m_inMemDict.inverse();
-            for (int i = 0; i < vector.getValueCount(); i++) {
-                if (vector.isSet(i) != 0) {
-                    m_invInMemDict.put(i, m_io.deserialize(i));
-                }
-            }
-        }
-
-        private T get(final int id) {
-            return m_invInMemDict.get(id);
-        }
-
-        private Integer set(final T value) {
-            return m_inMemDict.computeIfAbsent(value, k -> m_runningDictIndex++);
-        }
-
-        private LargeVarBinaryVector getDictionaryVector() {
-            final int numDistinctValues = m_inMemDict.size();
-            final int dictValueCount = m_vector.getValueCount();
-            if (dictValueCount == 0) {
-                // Allocated new memory for all distinct values
-                m_vector.allocateNew(INIT_BYTES_PER_ENTRY * numDistinctValues, numDistinctValues);
-            }
-            // Fill the vector with the encoded values
-            for (int i = dictValueCount; i < numDistinctValues; i++) {
-                m_io.serialize(i, m_invInMemDict.get(i));
-            }
-            m_vector.setValueCount(numDistinctValues);
-            return m_vector;
-        }
-    }
 
     /**
      * Arrow implementation of {@link ObjectWriteData}.
@@ -148,7 +94,7 @@ public final class ArrowDictEncodedObjectData {
         private ArrowDictEncodedObjectWriteData(final IntVector vector, final LargeVarBinaryVector dict,
             final ArrowBufIO<T> io) {
             super(vector);
-            m_dict = new InMemoryDictEncoding<>(dict, io);
+            m_dict = new InMemoryDictEncoding<>(dict, io, INIT_DICT_SIZE);
         }
 
         private ArrowDictEncodedObjectWriteData(final IntVector vector, final int offset,
@@ -164,12 +110,12 @@ public final class ArrowDictEncodedObjectData {
 
         @Override
         public long sizeOf() {
-            return ArrowDictEncodedObjectData.sizeOf(m_vector, m_dict.m_vector);
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector) + m_dict.sizeOf();
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowDictEncodedObjectWriteData<T>(m_vector, m_offset + start, m_dict);
+            return new ArrowDictEncodedObjectWriteData<>(m_vector, m_offset + start, m_dict);
         }
 
         @Override
@@ -181,12 +127,12 @@ public final class ArrowDictEncodedObjectData {
         @Override
         protected void closeResources() {
             super.closeResources();
-            m_dict.m_vector.close();
+            m_dict.closeVector();
         }
 
         @Override
         public String toString() {
-            return super.toString() + " -> " + m_dict.m_vector.toString();
+            return super.toString() + " -> " + m_dict.toString();
         }
     }
 
@@ -202,8 +148,7 @@ public final class ArrowDictEncodedObjectData {
 
         private ArrowDictEncodedObjectReadData(final IntVector vector, final LargeVarBinaryVector dict,
             final ArrowBufIO<T> io) {
-            super(vector);
-            m_dict = new InMemoryDictEncoding<>(dict, io);
+            this(vector, new InMemoryDictEncoding<>(dict, io, INIT_DICT_SIZE));
         }
 
         private ArrowDictEncodedObjectReadData(final IntVector vector, final InMemoryDictEncoding<T> dict) {
@@ -228,7 +173,7 @@ public final class ArrowDictEncodedObjectData {
 
         @Override
         public long sizeOf() {
-            return ArrowDictEncodedObjectData.sizeOf(m_vector, m_dict.m_vector);
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector) + m_dict.sizeOf();
         }
 
         @Override
@@ -239,17 +184,13 @@ public final class ArrowDictEncodedObjectData {
         @Override
         protected void closeResources() {
             super.closeResources();
-            m_dict.m_vector.close();
+            m_dict.closeVector();
         }
 
         @Override
         public String toString() {
-            return super.toString() + " -> " + m_dict.m_vector.toString();
+            return super.toString() + " -> " + m_dict.toString();
         }
-    }
-
-    private static int sizeOf(final IntVector vector, final LargeVarBinaryVector dict) {
-        return ArrowSizeUtils.sizeOfFixedWidth(vector) + ArrowSizeUtils.sizeOfVariableWidth(dict);
     }
 
     /**

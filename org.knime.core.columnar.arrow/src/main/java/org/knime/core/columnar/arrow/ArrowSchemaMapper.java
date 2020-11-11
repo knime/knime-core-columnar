@@ -51,14 +51,20 @@ import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFacto
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDurationData.ArrowDurationDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLocalDateData.ArrowLocalDateDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLocalDateTimeData.ArrowLocalDateTimeDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
 import org.knime.core.columnar.data.ColumnDataSpec;
@@ -79,6 +85,7 @@ import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
@@ -138,8 +145,8 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final DurationDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    public ArrowDurationDataFactory visit(final DurationDataSpec spec) {
+        return ArrowDurationDataFactory.INSTANCE;
     }
 
     @Override
@@ -153,18 +160,18 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final LocalDateDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    public ArrowLocalDateDataFactory visit(final LocalDateDataSpec spec) {
+        return ArrowLocalDateDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final LocalDateTimeDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    public ArrowLocalDateTimeDataFactory visit(final LocalDateTimeDataSpec spec) {
+        return ArrowLocalDateTimeDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final LocalTimeDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    public ArrowLocalTimeDataFactory visit(final LocalTimeDataSpec spec) {
+        return ArrowLocalTimeDataFactory.INSTANCE;
     }
 
     @Override
@@ -173,8 +180,8 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final PeriodDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    public ArrowPeriodDataFactory visit(final PeriodDataSpec spec) {
+        return ArrowPeriodDataFactory.INSTANCE;
     }
 
     @Override
@@ -210,5 +217,10 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec) {
         final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner());
         return new ArrowListDataFactory(inner);
+    }
+
+    @Override
+    public ArrowZonedDateTimeDataFactory visit(final ZonedDateTimeDataSpec spec) {
+        return ArrowZonedDateTimeDataFactory.INSTANCE;
     }
 }
