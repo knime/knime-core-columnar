@@ -53,6 +53,8 @@ import static org.junit.Assert.assertSame;
 
 import org.junit.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest.DummyByteArraySerializer;
+import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
@@ -63,6 +65,8 @@ import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
+import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
+import org.knime.core.columnar.data.ByteData.ByteDataSpec;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
@@ -105,6 +109,18 @@ public class ArrowSchemaMapperTest {
     @Test
     public void testMapFloatSpec() {
         testMapSingleSpec(FloatDataSpec.INSTANCE, ArrowFloatDataFactory.INSTANCE);
+    }
+
+    /** Test mapping boolean specs to a {@link ArrowBooleanDataFactory} */
+    @Test
+    public void testMapBooleanSpec() {
+        testMapSingleSpec(BooleanDataSpec.INSTANCE, ArrowBooleanDataFactory.INSTANCE);
+    }
+
+    /** Test mapping byte specs to a {@link ArrowByteDataFactory} */
+    @Test
+    public void testMapByteSpec() {
+        testMapSingleSpec(ByteDataSpec.INSTANCE, ArrowByteDataFactory.INSTANCE);
     }
 
     /** Test mapping var binary specs to a {@link ArrowVarBinaryDataFactory} */

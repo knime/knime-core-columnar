@@ -47,6 +47,8 @@ package org.knime.core.columnar.arrow;
 
 import java.util.stream.IntStream;
 
+import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
@@ -121,13 +123,13 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final BooleanDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    public ArrowBooleanDataFactory visit(final BooleanDataSpec spec) {
+        return ArrowBooleanDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final ByteDataSpec spec) {
-        throw new IllegalArgumentException("ColumnDataSpec " + spec.getClass().getName() + " not supported.");
+    public ArrowByteDataFactory visit(final ByteDataSpec spec) {
+        return ArrowByteDataFactory.INSTANCE;
     }
 
     @Override
