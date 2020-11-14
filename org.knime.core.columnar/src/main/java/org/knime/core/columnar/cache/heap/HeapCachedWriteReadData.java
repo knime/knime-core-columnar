@@ -58,13 +58,13 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     private final ObjectWriteData<T> m_writeDelegate;
 
-    private final AtomicReferenceArray<T> m_data;
+    private AtomicReferenceArray<T> m_data;
 
     private ObjectReadData<T> m_readDelegate;
 
-    private int m_length = - 1;
+    private int m_length = -1;
 
- // reference difference between close and serialize
+    // reference difference between close and serialize
     private int m_refDiff = 0;
 
     HeapCachedWriteReadData(final ObjectWriteData<T> delegate) {
@@ -121,7 +121,15 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     @Override
     public void expand(final int minimumCapacity) {
+        // TODO do we need synchronization here?
         m_writeDelegate.expand(minimumCapacity);
+
+        // TODO efficiency
+        final AtomicReferenceArray<T> expanded = new AtomicReferenceArray<>(m_writeDelegate.capacity());
+        for (int i = 0; i < m_data.length(); i++) {
+            expanded.set(i, m_data.get(i));
+        }
+        m_data = expanded;
     }
 
     @Override
@@ -131,10 +139,12 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     @Override
     public T getObject(final int index) {
+        // TODO MarcB what if m_data.get(index) returns null?
         return m_data.get(index);
     }
 
     AtomicReferenceArray<T> getData() {
+        // TODO sync required?
         return m_data;
     }
 
