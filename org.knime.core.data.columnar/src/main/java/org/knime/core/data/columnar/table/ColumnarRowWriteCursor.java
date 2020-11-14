@@ -71,7 +71,11 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private final ColumnarWriteValueFactory<?>[] m_factories;
 
-    private WriteValue<?>[] m_values;
+    private final int m_maxCapacity = Integer.getInteger("knime.columnar.chunksize", (int)Math.pow(2, 15) - 750); // subtract 750 to make arrow happy (and not exceed 2^15)
+
+    private final long m_maxSizeInBytes = 1024 * 1024 * 128;
+
+    private final WriteValue<?>[] m_values;
 
     private RowKeyWriteValue m_rowKeyValue;
 
@@ -85,10 +89,14 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private ColumnWriteData[] m_currentData;
 
+    private boolean m_adjusting;
+
     ColumnarRowWriteCursor(final ColumnStore store, final ColumnarWriteValueFactory<?>[] factories) throws IOException {
         m_columnDataFactory = store.getFactory();
         m_writer = store.getWriter();
         m_factories = factories;
+        m_adjusting = true;
+        m_values = new WriteValue[m_factories.length];
 
         switchToNextData();
         m_currentIndex = -1;
@@ -187,26 +195,61 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
     }
 
     private final void switchToNextData() {
-        writeCurrentBatch(m_currentIndex > -1 ? m_currentIndex : 0);
+        /* TODO smarter logic possible. We need, however, keep in mind, that arrow
+         * tries to allocate in power of 2 sizes, i.e. if we allocate a double vector with 17 entries,
+         * arrow will allocate a bigger vector. The sizeOf method of arrow will return the size of the bigger vector
+         * and not the size of the actual written data which will lead to bad chunkSize estimates in the code below.
+         */
+        if (m_adjusting && m_currentBatch != null) {
+            final long sizeInBytes = m_currentBatch.sizeOf();
+            final double factor = m_maxSizeInBytes / sizeInBytes;
+            final long newCapacity = Math.min(m_maxCapacity, (long)(m_currentBatch.capacity() * factor));
+            if (factor > 1 && m_currentBatch.capacity() != newCapacity) {
+                m_currentBatch.expand((int)newCapacity);
+                m_currentMaxIndex = m_currentBatch.capacity() - 1;
+                return;
+            } else {
+                m_adjusting = false;
+            }
+        }
+
+        // minimum chunk size is 2.
+        final int chunkSize = m_currentBatch == null ? 2 : m_currentBatch.capacity();
+        writeCurrentBatch(m_currentIndex);
 
         // TODO adjust batch size on the fly (expand).
         // TODO can we preload data?
-        m_currentBatch = m_columnDataFactory.create();
+        m_currentBatch = m_columnDataFactory.create(chunkSize);
         m_currentData = m_currentBatch.getUnsafe();
-        m_values = create(m_currentBatch);
+        updateWriteValues(m_currentBatch);
         m_currentMaxIndex = m_currentBatch.capacity() - 1l;
     }
 
-    private WriteValue<?>[] create(final WriteBatch batch) {
-        final WriteValue<?>[] values = new WriteValue<?>[m_factories.length];
-        for (int i = 0; i < values.length; i++) {
+    /**
+     *
+     * @param val A long value.
+     * @return The closest power of two of that value.
+     */
+    private static long lowerPowerOfTwo(final long val) {
+        if (val == 0 || val == 1) {
+            return val + 1;
+        }
+        long highestBit = Long.highestOneBit(val);
+        if (highestBit == val) {
+            return val / 2;
+        } else {
+            return highestBit << 1 / 2;
+        }
+    }
+
+    private void updateWriteValues(final WriteBatch batch) {
+        for (int i = 0; i < m_values.length; i++) {
             @SuppressWarnings("unchecked")
             final ColumnarWriteValueFactory<ColumnWriteData> cast =
                 ((ColumnarWriteValueFactory<ColumnWriteData>)m_factories[i]);
-            values[i] = cast.createWriteValue(batch.get(i), this);
+            m_values[i] = cast.createWriteValue(batch.get(i), this);
         }
-        m_rowKeyValue = (RowKeyWriteValue)values[0];
-        return values;
+        m_rowKeyValue = (RowKeyWriteValue)m_values[0];
     }
 
 }
