@@ -82,8 +82,9 @@ public class DefaultWriteBatch implements WriteBatch {
             throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", colIndex));
         }
         if (colIndex >= m_data.length) {
-            throw new IndexOutOfBoundsException(String.format(
-                "Column index %d larger then the column store's largest column index (%d).", colIndex, m_data.length-1));
+            throw new IndexOutOfBoundsException(
+                String.format("Column index %d larger then the column store's largest column index (%d).", colIndex,
+                    m_data.length - 1));
         }
         return m_data[colIndex];
     }
@@ -114,22 +115,24 @@ public class DefaultWriteBatch implements WriteBatch {
 
     @Override
     public void expand(final int minimumCapacity) {
+        int newCapacity = Integer.MAX_VALUE;
         for (final ColumnWriteData data : m_data) {
             data.expand(minimumCapacity);
+            newCapacity = Math.min(newCapacity, data.capacity());
         }
-        m_capacity = minimumCapacity;
+        m_capacity = newCapacity;
     }
 
     @Override
     public ReadBatch close(final int length) {
-    	if (length < 0) {
+        if (length < 0) {
             throw new IllegalArgumentException("Length must be non-negative.");
         }
         if (length > m_capacity) {
             throw new IllegalArgumentException("Length must not be larger than capacity.");
         }
 
-    	final ColumnReadData[] data = new ColumnReadData[m_data.length];
+        final ColumnReadData[] data = new ColumnReadData[m_data.length];
         int capacity = 0;
         for (int i = 0; i < m_data.length; i++) {
             data[i] = m_data[i].close(length);

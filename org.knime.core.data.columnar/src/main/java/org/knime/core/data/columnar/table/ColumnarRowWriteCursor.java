@@ -204,7 +204,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
             final long sizeInBytes = m_currentBatch.sizeOf();
             final double factor = m_maxSizeInBytes / sizeInBytes;
             final long newCapacity = Math.min(m_maxCapacity, (long)(m_currentBatch.capacity() * factor));
-            if (factor > 1 && m_currentBatch.capacity() != newCapacity) {
+            if (factor > 1 && m_currentBatch.capacity() <= newCapacity) {
                 m_currentBatch.expand((int)newCapacity);
                 m_currentMaxIndex = m_currentBatch.capacity() - 1;
                 return;
@@ -223,23 +223,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
         m_currentData = m_currentBatch.getUnsafe();
         updateWriteValues(m_currentBatch);
         m_currentMaxIndex = m_currentBatch.capacity() - 1l;
-    }
-
-    /**
-     *
-     * @param val A long value.
-     * @return The closest power of two of that value.
-     */
-    private static long lowerPowerOfTwo(final long val) {
-        if (val == 0 || val == 1) {
-            return val + 1;
-        }
-        long highestBit = Long.highestOneBit(val);
-        if (highestBit == val) {
-            return val / 2;
-        } else {
-            return highestBit << 1 / 2;
-        }
     }
 
     private void updateWriteValues(final WriteBatch batch) {
