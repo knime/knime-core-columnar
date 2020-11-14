@@ -67,6 +67,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.junit.Test;
+import org.knime.core.columnar.TestColumnStoreUtils;
 import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -394,7 +395,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
             final ColumnDataFactory factory = store.getFactory();
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
-            factory.create();
+            factory.create(TestColumnStoreUtils.DEF_SIZE_OF_DATA);
         }
     }
 
@@ -404,7 +405,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             final ColumnDataFactory factory = store.getFactory();
             store.close();
-            factory.create();
+            factory.create(TestColumnStoreUtils.DEF_SIZE_OF_DATA);
         }
     }
 

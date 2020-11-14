@@ -83,7 +83,7 @@ public final class TestColumnStore implements ColumnStore {
     final class TestColumnDataFactory implements ColumnDataFactory {
 
         @Override
-        public WriteBatch create() {
+        public WriteBatch create(final int chunkSize) {
             if (m_writerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -94,16 +94,18 @@ public final class TestColumnStore implements ColumnStore {
             waitForLatch();
             final ColumnWriteData[] data = new ColumnWriteData[m_schema.getNumColumns()];
             for (int i = 0; i < m_factories.length; i++) {
-                final AbstractTestData testData = m_factories[i].createWriteData(m_maxDataCapacity);
+                final AbstractTestData testData = m_factories[i].createWriteData(chunkSize);
                 data[i] = testData;
                 m_tracker.add(testData);
             }
-            return new DefaultWriteBatch(data, m_maxDataCapacity);
+            return new DefaultWriteBatch(data, chunkSize);
         }
 
     }
 
     final class TestColumnDataWriter implements ColumnDataWriter {
+
+        private int m_maxDataLength;
 
         @Override
         public void write(final ReadBatch batch) throws IOException {
@@ -120,7 +122,11 @@ public final class TestColumnStore implements ColumnStore {
                 final AbstractTestData testData = (AbstractTestData)batch.get(i);
                 data[i] = testData.get();
             }
-
+            if (m_batches.size() == 0) {
+                m_maxDataLength = batch.length();
+            } else if (m_maxDataLength != batch.length()) {
+                throw new IllegalStateException("All written batches must have same length.");
+            }
             m_batches.add(data);
         }
 
@@ -136,10 +142,13 @@ public final class TestColumnStore implements ColumnStore {
 
         private final ColumnSelection m_selection;
 
+        private final int m_maxDataCapacity;
+
         private boolean m_readerClosed;
 
-        TestColumnDataReader(final ColumnSelection selection) {
+        TestColumnDataReader(final ColumnSelection selection, final int maxCapacity) {
             m_selection = selection;
+            m_maxDataCapacity = maxCapacity;
         }
 
         @Override
@@ -182,8 +191,6 @@ public final class TestColumnStore implements ColumnStore {
 
     private final TestDataFactory[] m_factories;
 
-    private final int m_maxDataCapacity;
-
     private final ColumnDataFactory m_factory = new TestColumnDataFactory();
 
     private final TestColumnDataWriter m_writer = new TestColumnDataWriter();
@@ -200,20 +207,19 @@ public final class TestColumnStore implements ColumnStore {
 
     private CountDownLatch m_latch;
 
-    public static TestColumnStore create(final ColumnStoreSchema schema, final int maxDataCapacity) {
-        final TestColumnStore store = new TestColumnStore(schema, maxDataCapacity);
+    public static TestColumnStore create(final ColumnStoreSchema schema) {
+        final TestColumnStore store = new TestColumnStore(schema);
         ColumnarTest.OPEN_CLOSEABLES.add(store);
         ColumnarTest.OPEN_CLOSEABLES.add(store.m_writer);
         return store;
     }
 
-    private TestColumnStore(final ColumnStoreSchema schema, final int maxDataCapacity) {
+    private TestColumnStore(final ColumnStoreSchema schema) {
         m_schema = schema;
         m_factories = IntStream.range(0, schema.getNumColumns()) //
             .mapToObj(schema::getColumnDataSpec) //
             .map(s -> s.accept(TestSchemaMapper.INSTANCE)) //
             .toArray(TestDataFactory[]::new);
-        m_maxDataCapacity = maxDataCapacity;
     }
 
     public void blockOnCreateWriteRead(final CountDownLatch latch) {
@@ -276,7 +282,7 @@ public final class TestColumnStore implements ColumnStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        final TestColumnDataReader reader = new TestColumnDataReader(selection);
+        final TestColumnDataReader reader = new TestColumnDataReader(selection, m_writer.m_maxDataLength);
         ColumnarTest.OPEN_CLOSEABLES.add(reader);
         return reader;
     }

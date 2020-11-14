@@ -91,8 +91,8 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
         }
 
         @Override
-        protected WriteBatch createInternal() {
-            final WriteBatch batch = super.createInternal();
+        protected WriteBatch createInternal(final int chunkSize) {
+            final WriteBatch batch = super.createInternal(chunkSize);
             final ColumnWriteData[] data = new ColumnWriteData[getSchema().getNumColumns()];
 
             for (int i = 0; i < data.length; i++) {

@@ -503,7 +503,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
             final ColumnDataFactory factory = store.getFactory();
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
-            factory.create();
+            factory.create(DEF_SIZE_OF_DATA);
         }
     }
 
@@ -513,7 +513,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
                 final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             final ColumnDataFactory factory = store.getFactory();
             store.close();
-            factory.create();
+            factory.create(DEF_SIZE_OF_DATA);
         }
     }
 

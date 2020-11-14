@@ -99,7 +99,7 @@ public abstract class DelegatingColumnStore implements ColumnStore {
         }
 
         @Override
-        public final WriteBatch create() {
+        public final WriteBatch create(final int chunkSize) {
             if (m_writerClosed.get()) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -107,16 +107,17 @@ public abstract class DelegatingColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
-            return createInternal();
+            return createInternal(chunkSize);
         }
 
         /**
-         * Calls {@link ColumnDataFactory#create() create} on the delegate factory.
+         * Calls {@link ColumnDataFactory#create(int) create} on the delegate factory.
          *
+         * @param chunkSize see {@link ColumnDataFactory#create(int)}
          * @return the result of the delegated operation
          */
-        protected WriteBatch createInternal() {
-            return initAndGetDelegate().create();
+        protected WriteBatch createInternal(final int chunkSize) {
+            return initAndGetDelegate().create(chunkSize);
         }
 
         /**

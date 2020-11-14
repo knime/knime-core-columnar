@@ -72,8 +72,8 @@ final class ColumnarTableTestUtils {
         }
 
         @Override
-        public ColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int minChunkSize) {
-            return TestColumnStore.create(schema, minChunkSize);
+        public ColumnStore createWriteStore(final ColumnStoreSchema schema, final File file) {
+            return TestColumnStore.create(schema);
         }
 
         @Override
@@ -87,7 +87,7 @@ final class ColumnarTableTestUtils {
     }
 
     static int getChunkSize() {
-        return ChunkSizeUtils.calculateChunkSize(createSchema());
+        return 16;
     }
 
     static ColumnarValueSchema createSchema() {

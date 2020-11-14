@@ -68,7 +68,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     public void testPutGet() throws Exception {
 
         final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(1);
-        try (final TestColumnStore store = TestColumnStore.create(createSchema(1), 1);
+        try (final TestColumnStore store = TestColumnStore.create(createSchema(1));
                 final TestTable table = createTable(store, 1)) {
             final TestDoubleData data = table.getBatch(0)[0];
 
@@ -95,7 +95,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     public void testPutEvictLoadGet() throws Exception {
 
         final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(1);
-        try (final TestColumnStore store = TestColumnStore.create(createSchema(2), 1);
+        try (final TestColumnStore store = TestColumnStore.create(createSchema(2));
                 final TestTable table = createTable(store, 1)) {
             final TestDoubleData[] batch = table.getBatch(0);
 
@@ -130,7 +130,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     public void testPutRemove() throws Exception {
 
         final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(1);
-        try (final TestColumnStore store = TestColumnStore.create(createSchema(1), 1);
+        try (final TestColumnStore store = TestColumnStore.create(createSchema(1));
                 final TestTable table = createTable(store, 1)) {
             final TestDoubleData data = table.getBatch(0)[0];
 
@@ -152,7 +152,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testLru() throws Exception {
         final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(2);
-        try (final TestColumnStore store = TestColumnStore.create(createSchema(3), 1);
+        try (final TestColumnStore store = TestColumnStore.create(createSchema(3));
                 final TestTable table = createTable(store, 1)) {
             final TestDoubleData[] batch = table.getBatch(0);
 

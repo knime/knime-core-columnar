@@ -50,6 +50,6 @@ import org.knime.core.columnar.batch.WriteBatch;
 @SuppressWarnings("javadoc")
 public interface ColumnDataFactory {
 
-    WriteBatch create();
+    WriteBatch create(int chunkSize);
 
 }

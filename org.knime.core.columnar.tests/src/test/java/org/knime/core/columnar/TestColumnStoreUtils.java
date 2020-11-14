@@ -138,11 +138,11 @@ public final class TestColumnStoreUtils {
     }
 
     public static TestColumnStore generateDefaultTestColumnStore() {
-        return TestColumnStore.create(generateDefaultSchema(), DEF_SIZE_OF_DATA);
+        return TestColumnStore.create(generateDefaultSchema());
     }
 
     private static TestDoubleData[] createBatch(final ColumnStore store) {
-        final WriteBatch batch = store.getFactory().create();
+        final WriteBatch batch = store.getFactory().create(DEF_SIZE_OF_DATA);
         final TestDoubleData[] data = new TestDoubleData[store.getSchema().getNumColumns()];
 
         for (int i = 0; i < store.getSchema().getNumColumns(); i++) {

@@ -61,7 +61,7 @@ public interface ColumnStoreFactory {
      * @param minChunkSize the size of one chunk.
      * @return a {@link ColumnStore} with the given schema.
      */
-    ColumnStore createWriteStore(ColumnStoreSchema schema, File file, int minChunkSize);
+    ColumnStore createWriteStore(ColumnStoreSchema schema, File file);
 
     /**
      * Creates a new {@link ColumnReadStore}, reading data from the provided file.

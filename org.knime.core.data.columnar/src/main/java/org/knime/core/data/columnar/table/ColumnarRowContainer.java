@@ -108,8 +108,8 @@ final class ColumnarRowContainer implements RowContainer {
         m_storeFactory = storeFactory;
 
         m_store = new DomainColumnStore(
-            ColumnarPreferenceUtils.wrap(m_storeFactory.createWriteStore(schema,
-                DataContainer.createTempFile(".knable"), ChunkSizeUtils.calculateChunkSize(schema))),
+            ColumnarPreferenceUtils
+                .wrap(m_storeFactory.createWriteStore(schema, DataContainer.createTempFile(".knable"))),
             new DefaultDomainStoreConfig(schema, settings.getMaxPossibleNominalDomainValues(),
                 settings.checkDuplicateRowKeys(), settings.isInitializeDomains()),
             ColumnarPreferenceUtils.getDomainCalcExecutor());
