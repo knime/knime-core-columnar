@@ -99,14 +99,14 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
 
     private final File m_file;
 
-    private final int m_chunkSize;
-
     /** Factories used to get the vectors and dicts from the columns */
     private final ArrowColumnDataFactory[] m_factories;
 
     private boolean m_firstWrite;
 
     private boolean m_closed;
+
+    private int m_chunkSize;
 
     // Initialized on first #write
     private ArrowWriter m_writer;
@@ -119,9 +119,8 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    ArrowColumnDataWriter(final File file, final int chunkSize, final ArrowColumnDataFactory[] factories) {
+    ArrowColumnDataWriter(final File file, final ArrowColumnDataFactory[] factories) {
         m_file = file;
-        m_chunkSize = chunkSize;
         m_factories = factories;
         m_firstWrite = true;
         m_closed = false;
@@ -156,6 +155,7 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
 
         // If this is the first call we need to create the writer and write the schema to the file
         if (m_firstWrite) {
+            m_chunkSize = batch.length();
             m_firstWrite = false;
             final Schema schema = new Schema(fields, Collections.emptyMap());
             m_writer = new ArrowWriter(m_file, schema);

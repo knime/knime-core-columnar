@@ -272,7 +272,7 @@ public class ArrowWriterReaderTest {
         final ReadBatch batch2 = new DefaultReadBatch(new ColumnReadData[]{data2}, 13);
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, 64, factories)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
             writer.write(batch1);
             writer.write(batch2);
         }
@@ -328,7 +328,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, capacity, factories)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -378,7 +378,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, capacity, factories)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -436,7 +436,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, capacity, factories)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -541,7 +541,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, capacity, factories)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }

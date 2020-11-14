@@ -146,11 +146,11 @@ public class ArrowColumnStoreTest {
         Files.delete(readFile.toPath());
 
         // Use the write store to write some data
-        try (final ColumnStore writeStore = factory.createWriteStore(schema, writeFile, chunkSize)) {
+        try (final ColumnStore writeStore = factory.createWriteStore(schema, writeFile)) {
             assertEquals(schema, writeStore.getSchema());
 
             // Create a batch
-            final WriteBatch writeBatch = writeStore.getFactory().create();
+            final WriteBatch writeBatch = writeStore.getFactory().create(chunkSize);
             final DoubleWriteData data = (DoubleWriteData)writeBatch.get(0);
             for (int i = 0; i < chunkSize; i++) {
                 data.setDouble(i, i);

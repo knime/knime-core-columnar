@@ -92,12 +92,12 @@ public class ArrowMemoryTest {
                 final ColumnStoreSchema schema = ArrowTestUtils.createWideSchema(DoubleDataSpec.INSTANCE, numColumns);
 
                 try (final ColumnStore store =
-                    factory.createWriteStore(schema, ArrowTestUtils.createTmpKNIMEArrowFile(), chunkSize)) {
+                    factory.createWriteStore(schema, ArrowTestUtils.createTmpKNIMEArrowFile())) {
 
                     storeData(numChunks, chunkSize, numColumns, store);
 
                     try (final ColumnStore copyStore =
-                        factory.createWriteStore(schema, ArrowTestUtils.createTmpKNIMEArrowFile(), chunkSize)) {
+                        factory.createWriteStore(schema, ArrowTestUtils.createTmpKNIMEArrowFile())) {
 
                         copyData(numChunks, store, copyStore);
                     }
@@ -113,7 +113,7 @@ public class ArrowMemoryTest {
         // let's store some data
         try (final ColumnDataWriter writer = store.getWriter()) {
             for (int c = 0; c < numChunks; c++) {
-                final WriteBatch batch = store.getFactory().create();
+                final WriteBatch batch = store.getFactory().create(chunkSize);
                 for (int i = 0; i < numColumns; i++) {
                     final ColumnWriteData data = batch.get(i);
                     for (int j = 0; j < chunkSize; j++) {

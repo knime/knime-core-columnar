@@ -97,10 +97,10 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowColumnStore createWriteStore(final ColumnStoreSchema schema, final File file, final int chunkSize) {
+    public ArrowColumnStore createWriteStore(final ColumnStoreSchema schema, final File file) {
         final BufferAllocator allocator =
             m_allocator.newChildAllocator("ArrowColumnStore", m_initReservation, m_maxAllocation);
-        return new ArrowColumnStore(schema, file, allocator, chunkSize);
+        return new ArrowColumnStore(schema, file, allocator);
     }
 
     @Override

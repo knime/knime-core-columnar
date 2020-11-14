@@ -71,24 +71,20 @@ final class ArrowColumnStore implements ColumnStore {
 
     private final ArrowColumnReadStore m_delegate;
 
-    private final int m_chunkSize;
-
     private final ArrowColumnDataFactory[] m_factories;
 
     private final BufferAllocator m_allocator;
 
-    ArrowColumnStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator,
-        final int chunkSize) {
+    ArrowColumnStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator) {
         m_factories = ArrowSchemaMapper.map(schema);
         m_file = file;
         m_allocator = allocator;
-        m_chunkSize = chunkSize;
         m_delegate = new ArrowColumnReadStore(schema, file, allocator);
     }
 
     @Override
     public ColumnDataWriter getWriter() {
-        return new ArrowColumnDataWriter(m_file, m_chunkSize, m_factories);
+        return new ArrowColumnDataWriter(m_file, m_factories);
     }
 
     @Override
@@ -98,13 +94,13 @@ final class ArrowColumnStore implements ColumnStore {
 
     @Override
     public ColumnDataFactory getFactory() {
-        return () -> {
+        return (chunkSize) -> {
             final ColumnWriteData[] chunk = new ColumnWriteData[m_factories.length];
             for (int i = 0; i < m_factories.length; i++) {
                 chunk[i] =
-                    ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, m_chunkSize);
+                    ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, chunkSize);
             }
-            return new DefaultWriteBatch(chunk, m_chunkSize);
+            return new DefaultWriteBatch(chunk, chunkSize);
         };
     }
 

@@ -558,7 +558,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, numValues, factories)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, factories)) {
             writer.write(batch);
             batch.release();
         }
@@ -603,7 +603,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, numValues, factories)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, factories)) {
             writer.write(batch);
             batch.release();
         }
