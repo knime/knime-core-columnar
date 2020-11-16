@@ -58,6 +58,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
 
@@ -101,7 +102,9 @@ public final class ArrowLocalTimeData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowLocalTimeReadData close(final int length) {
-            return new ArrowLocalTimeReadData(closeWithLength(length));
+            final TimeNanoVector vector = closeWithLength(length);
+            return new ArrowLocalTimeReadData(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
@@ -109,12 +112,13 @@ public final class ArrowLocalTimeData {
     public static final class ArrowLocalTimeReadData extends AbstractArrowReadData<TimeNanoVector>
         implements LocalTimeReadData {
 
-        private ArrowLocalTimeReadData(final TimeNanoVector vector) {
-            super(vector);
+        private ArrowLocalTimeReadData(final TimeNanoVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
         }
 
-        private ArrowLocalTimeReadData(final TimeNanoVector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowLocalTimeReadData(final TimeNanoVector vector, final MissingValues missingValues, final int offset,
+            final int length) {
+            super(vector, missingValues, offset, length);
         }
 
         @Override
@@ -124,7 +128,7 @@ public final class ArrowLocalTimeData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowLocalTimeReadData(m_vector, m_offset + start, length);
+            return new ArrowLocalTimeReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -157,10 +161,11 @@ public final class ArrowLocalTimeData {
         }
 
         @Override
-        public ArrowLocalTimeReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowLocalTimeReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowLocalTimeReadData((TimeNanoVector)vector);
+                return new ArrowLocalTimeReadData((TimeNanoVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowLocalTimeData with version " + version + ". Current version: " + m_version + ".");

@@ -67,6 +67,7 @@ import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.NestedDictionaryProvider;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
@@ -162,7 +163,8 @@ public final class ArrowStructData {
                 validityBuffer.setInt(bufferPosition, validity);
             }
 
-            return new ArrowStructReadData(closeWithLength(length), readChildren);
+            return new ArrowStructReadData(closeWithLength(length),
+                MissingValues.forValidityBuffer(validityBuffer, length), readChildren);
         }
 
         @Override
@@ -177,14 +179,15 @@ public final class ArrowStructData {
 
         private final ArrowReadData[] m_children;
 
-        private ArrowStructReadData(final StructVector vector, final ArrowReadData... children) {
-            super(vector);
+        private ArrowStructReadData(final StructVector vector, final MissingValues missingValues,
+            final ArrowReadData... children) {
+            super(vector, missingValues);
             m_children = children;
         }
 
-        private ArrowStructReadData(final StructVector vector, final int offset, final int length,
-            final ArrowReadData... children) {
-            super(vector, offset, length);
+        private ArrowStructReadData(final StructVector vector, final MissingValues missingValues, final int offset,
+            final int length, final ArrowReadData... children) {
+            super(vector, missingValues, offset, length);
             m_children = children;
         }
 
@@ -206,7 +209,7 @@ public final class ArrowStructData {
             for (int i = 0; i < m_children.length; i++) {
                 slicedChildren[i] = m_children[i].slice(start, length);
             }
-            return new ArrowStructReadData(m_vector, m_offset + start, length, slicedChildren);
+            return new ArrowStructReadData(m_vector, m_missingValues, m_offset + start, length, slicedChildren);
         }
 
         @Override
@@ -286,8 +289,8 @@ public final class ArrowStructData {
         }
 
         @Override
-        public ArrowStructReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowStructReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (version.getVersion() == CURRENT_VERSION) {
                 final StructVector v = (StructVector)vector;
 
@@ -296,10 +299,12 @@ public final class ArrowStructData {
                 for (int i = 0; i < children.length; i++) {
                     @SuppressWarnings("resource") // Child vector closed with struct vector
                     final FieldVector childVector = v.getChild(childNameAtIndex(i));
-                    children[i] = m_inner[i].createRead(childVector, provider, version.getChildVersion(i));
+                    children[i] =
+                        m_inner[i].createRead(childVector, nullCount.getChild(i), provider, version.getChildVersion(i));
                 }
 
-                return new ArrowStructReadData(v, children);
+                return new ArrowStructReadData(v,
+                    MissingValues.forNullCount(nullCount.getNullCount(), v.getValueCount()), children);
             } else {
                 throw new IOException("Cannot read ArrowStructData with version " + version.getVersion()
                     + ". Current version: " + CURRENT_VERSION + ".");

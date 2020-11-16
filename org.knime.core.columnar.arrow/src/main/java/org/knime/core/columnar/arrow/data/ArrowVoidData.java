@@ -160,8 +160,8 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
         }
 
         @Override
-        public ArrowVoidData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowVoidData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (CURRENT_VERSION.equals(version)) {
                 return new ArrowVoidData((NullVector)vector, vector.getValueCapacity());
             } else {

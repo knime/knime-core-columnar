@@ -85,6 +85,7 @@ import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory.ArrowVectorNullCount;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -138,7 +139,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
         }
 
         // Read the data
-        final FieldVector[] vectors = readVectors(index);
+        final FieldVectorAndNullCount[] vectors = readVectors(index);
         final DictionaryProvider dictionaries = readDictionaries(index);
 
         // Create the ColumnData
@@ -147,7 +148,8 @@ class ArrowColumnDataReader implements ColumnDataReader {
         int length = 0;
         for (int i = 0; i < numColumns; i++) {
             if (m_columnSelection.isSelected(i)) {
-                data[i] = m_factories[i].createRead(vectors[i], dictionaries, m_factoryVersions[i]);
+                data[i] = m_factories[i].createRead(vectors[i].m_vector, vectors[i].m_nullCount, dictionaries,
+                    m_factoryVersions[i]);
                 length = Math.max(length, data[i].length());
             }
         }
@@ -155,7 +157,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
     }
 
     /** Read the vectors at the given batch index using the reader */
-    private FieldVector[] readVectors(final int index) throws IOException {
+    private FieldVectorAndNullCount[] readVectors(final int index) throws IOException {
         try (final ArrowRecordBatch recordBatch = m_reader.readRecordBatch(index)) {
 
             // The data from the record batch
@@ -164,14 +166,14 @@ class ArrowColumnDataReader implements ColumnDataReader {
 
             // Loop over the schema and load the data into new vectors
             final List<Field> fields = m_schema.getFields();
-            final FieldVector[] vectors = new FieldVector[fields.size()];
+            final FieldVectorAndNullCount[] vectors = new FieldVectorAndNullCount[fields.size()];
             for (int i = 0; i < fields.size(); i++) {
                 final Field field = fields.get(i);
                 if (m_columnSelection.isSelected(i)) {
                     @SuppressWarnings("resource") // Resource handled by caller
                     final FieldVector vector = field.createVector(m_allocator);
-                    loadVector(vector, nodes, buffers);
-                    vectors[i] = vector;
+                    final ArrowVectorNullCount nullCount = loadVector(vector, nodes, buffers);
+                    vectors[i] = new FieldVectorAndNullCount(vector, nullCount);
                 } else {
                     skipVector(field, nodes, buffers);
                 }
@@ -327,7 +329,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
     }
 
     /** Load the given vector from the next nodes and buffers */
-    private static void loadVector(final FieldVector vector, final Iterator<ArrowFieldNode> nodes,
+    private static ArrowVectorNullCount loadVector(final FieldVector vector, final Iterator<ArrowFieldNode> nodes,
         final Iterator<ArrowBuf> buffers) {
         final Field field = vector.getField();
         // Load the buffers of this vector
@@ -341,14 +343,16 @@ class ArrowColumnDataReader implements ColumnDataReader {
 
         // Load the buffers for the children
         final List<Field> children = field.getChildren();
+        final ArrowVectorNullCount[] childrenNullCount = new ArrowVectorNullCount[children.size()];
         if (!children.isEmpty()) {
             final List<FieldVector> childrenVectors = vector.getChildrenFromFields();
             for (int i = 0; i < children.size(); i++) {
                 @SuppressWarnings("resource") // Resource handled by the parent which is handled by the created ColumnData
                 final FieldVector cv = childrenVectors.get(i);
-                loadVector(cv, nodes, buffers);
+                childrenNullCount[i] = loadVector(cv, nodes, buffers);
             }
         }
+        return new ArrowVectorNullCount(fieldNode.getNullCount(), childrenNullCount);
     }
 
     /** Skip the given vector from the next nodes and buffers */
@@ -536,6 +540,19 @@ class ArrowColumnDataReader implements ColumnDataReader {
         private DictionaryDescription(final Field field, final DictionaryEncoding encoding) {
             m_field = field;
             m_encoding = encoding;
+        }
+    }
+
+    /** Structure holding a {@link FieldVector vector} and a {@link ArrowVectorNullCount} for this vector. */
+    private static final class FieldVectorAndNullCount {
+
+        private final FieldVector m_vector;
+
+        private final ArrowVectorNullCount m_nullCount;
+
+        private FieldVectorAndNullCount(final FieldVector vector, final ArrowVectorNullCount nullCount) {
+            m_vector = vector;
+            m_nullCount = nullCount;
         }
     }
 }

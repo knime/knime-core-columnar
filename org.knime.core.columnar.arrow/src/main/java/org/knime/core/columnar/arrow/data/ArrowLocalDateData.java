@@ -58,6 +58,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.LocalDateData.LocalDateReadData;
 import org.knime.core.columnar.data.LocalDateData.LocalDateWriteData;
 
@@ -101,7 +102,9 @@ public final class ArrowLocalDateData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowLocalDateReadData close(final int length) {
-            return new ArrowLocalDateReadData(closeWithLength(length));
+            final BigIntVector vector = closeWithLength(length);
+            return new ArrowLocalDateReadData(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
@@ -109,12 +112,13 @@ public final class ArrowLocalDateData {
     public static final class ArrowLocalDateReadData extends AbstractArrowReadData<BigIntVector>
         implements LocalDateReadData {
 
-        private ArrowLocalDateReadData(final BigIntVector vector) {
-            super(vector);
+        private ArrowLocalDateReadData(final BigIntVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
         }
 
-        private ArrowLocalDateReadData(final BigIntVector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowLocalDateReadData(final BigIntVector vector, final MissingValues missingValues, final int offset,
+            final int length) {
+            super(vector, missingValues, offset, length);
         }
 
         @Override
@@ -124,7 +128,7 @@ public final class ArrowLocalDateData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowLocalDateReadData(m_vector, m_offset + start, length);
+            return new ArrowLocalDateReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -157,10 +161,11 @@ public final class ArrowLocalDateData {
         }
 
         @Override
-        public ArrowLocalDateReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowLocalDateReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowLocalDateReadData((BigIntVector)vector);
+                return new ArrowLocalDateReadData((BigIntVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowLocalDateData with version " + version + ". Current version: " + m_version + ".");

@@ -50,6 +50,7 @@ package org.knime.core.columnar.arrow;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -506,7 +507,7 @@ public final class ArrowTestUtils {
 
         /**
          * Create a factory for {@link SimpleData} with the given version. Checks the given version on
-         * {@link #createRead(FieldVector, DictionaryProvider, ArrowColumnDataFactoryVersion)}.
+         * {@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)}.
          *
          * @param version the version
          */
@@ -528,10 +529,12 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public SimpleData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) {
+        public SimpleData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) {
             assertEquals(m_version, version);
             assertTrue(vector instanceof IntVector);
+            assertEquals(vector.getNullCount(), nullCount.getNullCount());
+            assertThrows(ArrayIndexOutOfBoundsException.class, () -> nullCount.getChild(0));
             return new SimpleData((IntVector)vector);
         }
 
@@ -576,11 +579,13 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public DictionaryEncodedData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) {
+        public DictionaryEncodedData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) {
             assertTrue(vector instanceof IntVector);
             final Dictionary dictionary = provider.lookup(vector.getField().getDictionary().getId());
             assertNotNull(dictionary);
+            assertEquals(vector.getNullCount(), nullCount.getNullCount());
+            assertThrows(ArrayIndexOutOfBoundsException.class, () -> nullCount.getChild(0));
             return new DictionaryEncodedData((IntVector)vector, dictionary);
         }
 
@@ -672,10 +677,32 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public ComplexData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) {
+        public ComplexData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) {
             assertTrue(vector instanceof StructVector);
-            return new ComplexData((StructVector)vector, provider);
+            final StructVector v = (StructVector)vector;
+            checkNullCounts(nullCount, v);
+            return new ComplexData(v, provider);
+        }
+
+        @SuppressWarnings("resource")
+        private static void checkNullCounts(final ArrowVectorNullCount nullCount, final StructVector v) {
+            assertEquals(v.getNullCount(), nullCount.getNullCount());
+            final FieldVector a = v.getChild("a");
+            final FieldVector b = v.getChild("b");
+            final ListVector c = (ListVector)v.getChild("c");
+            final StructVector d = (StructVector)v.getChild("d");
+            final ArrowVectorNullCount nullCountA = nullCount.getChild(0);
+            final ArrowVectorNullCount nullCountB = nullCount.getChild(1);
+            final ArrowVectorNullCount nullCountC = nullCount.getChild(2);
+            final ArrowVectorNullCount nullCountD = nullCount.getChild(3);
+            assertEquals(a.getNullCount(), nullCountA.getNullCount());
+            assertEquals(b.getNullCount(), nullCountB.getNullCount());
+            assertEquals(c.getNullCount(), nullCountC.getNullCount());
+            assertEquals(c.getDataVector().getNullCount(), nullCountC.getChild(0).getNullCount());
+            assertEquals(d.getNullCount(), nullCountD.getNullCount());
+            assertEquals(d.getChild("e").getNullCount(), nullCountD.getChild(0).getNullCount());
+            assertEquals(d.getChild("f").getNullCount(), nullCountD.getChild(1).getNullCount());
         }
 
         @Override

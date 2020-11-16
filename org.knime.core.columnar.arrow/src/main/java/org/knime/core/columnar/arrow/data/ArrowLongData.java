@@ -56,6 +56,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
 
@@ -99,19 +100,21 @@ public final class ArrowLongData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowLongReadData close(final int length) {
-            return new ArrowLongReadData(closeWithLength(length));
+            final BigIntVector vector = closeWithLength(length);
+            return new ArrowLongReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
     /** Arrow implementation of {@link LongReadData}. */
     public static final class ArrowLongReadData extends AbstractArrowReadData<BigIntVector> implements LongReadData {
 
-        private ArrowLongReadData(final BigIntVector vector) {
-            super(vector);
+        private ArrowLongReadData(final BigIntVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
         }
 
-        private ArrowLongReadData(final BigIntVector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowLongReadData(final BigIntVector vector, final MissingValues missingValues, final int offset,
+            final int length) {
+            super(vector, missingValues, offset, length);
         }
 
         @Override
@@ -121,7 +124,7 @@ public final class ArrowLongData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowLongReadData(m_vector, m_offset + start, length);
+            return new ArrowLongReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -154,10 +157,11 @@ public final class ArrowLongData {
         }
 
         @Override
-        public ArrowLongReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowLongReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowLongReadData((BigIntVector)vector);
+                return new ArrowLongReadData((BigIntVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowLongData with version " + version + ". Current version: " + m_version + ".");

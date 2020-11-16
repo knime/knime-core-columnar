@@ -56,6 +56,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 
@@ -100,19 +101,22 @@ public final class ArrowBooleanData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowBooleanReadData close(final int length) {
-            return new ArrowBooleanReadData(closeWithLength(length));
+            final BitVector vector = closeWithLength(length);
+            return new ArrowBooleanReadData(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
     /** Arrow implementation of {@link BooleanReadData}. */
     public static final class ArrowBooleanReadData extends AbstractArrowReadData<BitVector> implements BooleanReadData {
 
-        private ArrowBooleanReadData(final BitVector vector) {
-            super(vector);
+        private ArrowBooleanReadData(final BitVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
         }
 
-        private ArrowBooleanReadData(final BitVector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowBooleanReadData(final BitVector vector, final MissingValues missingValues, final int offset,
+            final int length) {
+            super(vector, missingValues, offset, length);
         }
 
         @Override
@@ -122,7 +126,7 @@ public final class ArrowBooleanData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowBooleanReadData(m_vector, m_offset + start, length);
+            return new ArrowBooleanReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -155,10 +159,11 @@ public final class ArrowBooleanData {
         }
 
         @Override
-        public ArrowBooleanReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowBooleanReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowBooleanReadData((BitVector)vector);
+                return new ArrowBooleanReadData((BitVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowBooleanData with version " + version + ". Current version: " + m_version + ".");

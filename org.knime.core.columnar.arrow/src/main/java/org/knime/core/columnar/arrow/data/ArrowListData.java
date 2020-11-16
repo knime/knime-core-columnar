@@ -64,6 +64,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.data.ListData.ListReadData;
@@ -136,7 +137,9 @@ public final class ArrowListData {
             }
 
             final ArrowReadData readData = m_data.close(dataLength);
-            return new ArrowListReadData(closeWithLength(length), readData);
+            final ListVector vector = closeWithLength(length);
+            return new ArrowListReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length),
+                readData);
         }
 
         @Override
@@ -152,14 +155,15 @@ public final class ArrowListData {
         // Package private for testing only
         final ArrowReadData m_data;
 
-        private ArrowListReadData(final ListVector vector, final ArrowReadData data) {
-            super(vector);
+        private ArrowListReadData(final ListVector vector, final MissingValues missingValues,
+            final ArrowReadData data) {
+            super(vector, missingValues);
             m_data = data;
         }
 
-        private ArrowListReadData(final ListVector vector, final ArrowReadData data, final int offset,
-            final int length) {
-            super(vector, offset, length);
+        private ArrowListReadData(final ListVector vector, final MissingValues missingValues, final ArrowReadData data,
+            final int offset, final int length) {
+            super(vector, missingValues, offset, length);
             m_data = data;
         }
 
@@ -170,7 +174,7 @@ public final class ArrowListData {
 
         @Override
         public ArrowListReadData slice(final int start, final int length) {
-            return new ArrowListReadData(m_vector, m_data, m_offset + start, length);
+            return new ArrowListReadData(m_vector, m_missingValues, m_data, m_offset + start, length);
         }
 
         @Override
@@ -234,16 +238,18 @@ public final class ArrowListData {
 
         @Override
         @SuppressWarnings("resource") // Data vector closed with list vector
-        public ArrowListReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowListReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (version.getVersion() == CURRENT_VERSION) {
                 final ListVector v = (ListVector)vector;
 
                 // Data vector
                 final FieldVector dataVector = v.getDataVector();
-                final ArrowReadData data = m_inner.createRead(dataVector, provider, version.getChildVersion(0));
+                final ArrowReadData data =
+                    m_inner.createRead(dataVector, nullCount.getChild(0), provider, version.getChildVersion(0));
 
-                return new ArrowListReadData(v, data);
+                return new ArrowListReadData(v, MissingValues.forNullCount(nullCount.getNullCount(), v.getValueCount()),
+                    data);
             } else {
                 throw new IOException("Cannot read ArrowListData with version " + version.getVersion()
                     + ". Current version: " + CURRENT_VERSION + ".");

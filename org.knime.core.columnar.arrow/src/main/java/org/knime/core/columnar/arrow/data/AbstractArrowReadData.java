@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.util.ValueVectorUtility;
 
@@ -72,33 +74,90 @@ abstract class AbstractArrowReadData<F extends FieldVector> extends AbstractRefe
     /** The length of the data */
     protected final int m_length;
 
+    protected final MissingValues m_missingValues;
+
+    /**
+     * Notes if all, no, or some values are missing. If unknown, {@link #SOME_MISSING} can be used.
+     */
+    public enum MissingValues {
+            /** All values are missing */
+            ALL_MISSING,
+            /** No values are missing */
+            NO_MISSING,
+            /** Some values are missing */
+            SOME_MISSING;
+
+        /**
+         * Find if all, no or some values are missing by checking the given validity buffer.
+         *
+         * @param buffer the validity buffer
+         * @param valueCount the number of values of the vector
+         * @return {@link #ALL_MISSING} if all values are missing, {@link #NO_MISSING} if no values are missing, and
+         *         {@link #SOME_MISSING} if some values are missing
+         */
+        public static MissingValues forValidityBuffer(final ArrowBuf buffer, final int valueCount) {
+            // NB: We never loop twice over the validity buffer
+            // If ALL_MISSING the first check will return false after the first bits read
+            // If SOME_MISSING at least one check will return false after the first bits read
+            if (BitVectorHelper.checkAllBitsEqualTo(buffer, valueCount, true)) {
+                return NO_MISSING;
+            } else if (BitVectorHelper.checkAllBitsEqualTo(buffer, valueCount, false)) {
+                return ALL_MISSING;
+            } else {
+                return SOME_MISSING;
+            }
+        }
+
+        /**
+         * Find if all, no or some values are missing by comparing the null count to the value count.
+         *
+         * @param nullCount the number of missing values
+         * @param valueCount the number of values of the vector
+         * @return {@link #ALL_MISSING} if all values are missing, {@link #NO_MISSING} if no values are missing, and
+         *         {@link #SOME_MISSING} if some values are missing
+         */
+        public static MissingValues forNullCount(final int nullCount, final int valueCount) {
+            if (nullCount == 0) {
+                return NO_MISSING;
+            } else if (nullCount >= valueCount) {
+                return ALL_MISSING;
+            } else {
+                return SOME_MISSING;
+            }
+        }
+    }
+
     /**
      * Create an abstract {@link ArrowReadData} with the given vector, an offset of 0 and the length of the vector.
      *
      * @param vector the vector
+     * @param missingValues if all, no or some values are missing
      */
-    public AbstractArrowReadData(final F vector) {
-        m_vector = vector;
-        m_offset = 0;
-        m_length = vector.getValueCount();
+    public AbstractArrowReadData(final F vector, final MissingValues missingValues) {
+        this(vector, missingValues, 0, vector.getValueCount());
     }
 
     /**
      * Create an abstract {@link ArrowReadData} with the given vector.
      *
+     *
      * @param vector the vector
+     * @param missingValues if all, no or some values are missing
      * @param offset the offset
      * @param length the length of this data
      */
-    public AbstractArrowReadData(final F vector, final int offset, final int length) {
+    public AbstractArrowReadData(final F vector, final MissingValues missingValues, final int offset,
+        final int length) {
         m_vector = vector;
         m_offset = offset;
         m_length = length;
+        m_missingValues = missingValues;
     }
 
     @Override
     public boolean isMissing(final int index) {
-        return m_vector.isNull(m_offset + index);
+        return m_missingValues == MissingValues.ALL_MISSING
+            || (m_missingValues == MissingValues.SOME_MISSING && m_vector.isNull(m_offset + index));
     }
 
     @Override

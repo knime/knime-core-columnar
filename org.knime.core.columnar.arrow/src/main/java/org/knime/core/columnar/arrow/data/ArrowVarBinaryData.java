@@ -56,6 +56,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 
@@ -100,7 +101,9 @@ public final class ArrowVarBinaryData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowVarBinaryReadData close(final int length) {
-            return new ArrowVarBinaryReadData(closeWithLength(length));
+            final LargeVarBinaryVector vector = closeWithLength(length);
+            return new ArrowVarBinaryReadData(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
@@ -108,12 +111,13 @@ public final class ArrowVarBinaryData {
     public static final class ArrowVarBinaryReadData extends AbstractArrowReadData<LargeVarBinaryVector>
         implements VarBinaryReadData {
 
-        private ArrowVarBinaryReadData(final LargeVarBinaryVector vector) {
-            super(vector);
+        private ArrowVarBinaryReadData(final LargeVarBinaryVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
         }
 
-        private ArrowVarBinaryReadData(final LargeVarBinaryVector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowVarBinaryReadData(final LargeVarBinaryVector vector, final MissingValues missingValues,
+            final int offset, final int length) {
+            super(vector, missingValues, offset, length);
         }
 
         @Override
@@ -123,7 +127,7 @@ public final class ArrowVarBinaryData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowVarBinaryReadData(m_vector, m_offset + start, length);
+            return new ArrowVarBinaryReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -156,10 +160,11 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
-        public ArrowVarBinaryReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowVarBinaryReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowVarBinaryReadData((LargeVarBinaryVector)vector);
+                return new ArrowVarBinaryReadData((LargeVarBinaryVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowVarBinaryData with version " + version + ". Current version: " + m_version + ".");

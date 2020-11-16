@@ -58,11 +58,14 @@ import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
 
+import com.google.common.base.Preconditions;
+
 /**
  * An {@link ArrowColumnDataFactory} is used for input and output of a specific Arrow column data type. Can be used to
  * create a new empty instance ({@link #getField(String, LongSupplier)} and
  * {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}), wrap vectors and dictionaries that have been
- * read from a file ({@link #createRead(FieldVector, DictionaryProvider, ArrowColumnDataFactoryVersion)}) and get
+ * read from a file
+ * ({@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)}) and get
  * vectors and dictionaries that need to be written to a file ({@link #getVector(ColumnReadData)} and
  * {@link #getDictionaries(ColumnReadData)}).
  * </p>
@@ -71,8 +74,8 @@ import org.knime.core.columnar.data.ColumnWriteData;
  * </p>
  * A factor has a {@link ArrowColumnDataFactoryVersion}. Make sure to update the version if
  * {@link #getVector(ColumnReadData)} or {@link #getDictionaries(ColumnReadData)} change. Implement
- * {@link #createRead(FieldVector, DictionaryProvider, ArrowColumnDataFactoryVersion)} such that vectors and
- * dictionaries from all prior versions can be wrapped in an appropriate {@link ColumnReadData} object.
+ * {@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)} such that
+ * vectors and dictionaries from all prior versions can be wrapped in an appropriate {@link ColumnReadData} object.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -92,7 +95,7 @@ public interface ArrowColumnDataFactory {
     Field getField(String name, LongSupplier dictionaryIdSupplier);
 
     /**
-     * Create an empty column data for writing. TODO(benjamin) remove capacity?
+     * Create an empty column data for writing.
      *
      * @param vector the empty vector with the type according to {@link #getField(String, LongSupplier)}.
      * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
@@ -111,13 +114,14 @@ public interface ArrowColumnDataFactory {
      * Wrap the given vector and dictionaries into a column data for reading.
      *
      * @param vector the vector holding some data
+     * @param nullCount the null count of this vector (and its children)
      * @param provider a dictionary provider holding dictionaries that can be used
      * @param version the version the vector and dictionaries were written with
      * @return the {@link ColumnReadData}
      * @throws IOException if the data cannot be loaded with the given version
      */
-    ArrowReadData createRead(FieldVector vector, DictionaryProvider provider, ArrowColumnDataFactoryVersion version)
-        throws IOException;
+    ArrowReadData createRead(FieldVector vector, ArrowVectorNullCount nullCount, DictionaryProvider provider,
+        ArrowColumnDataFactoryVersion version) throws IOException;
 
     // ===================== Getting data for writing =========================
 
@@ -165,5 +169,38 @@ public interface ArrowColumnDataFactory {
         final Field field = factory.getField(name, newDictionaryIdSupplier());
         final FieldVector vector = field.createVector(allocator);
         return factory.createWrite(vector, newDictionaryIdSupplier(), allocator, capacity);
+    }
+
+    /** A class holding the null count for a vector and its children. */
+    public static final class ArrowVectorNullCount {
+
+        private int m_nullCount;
+
+        private ArrowVectorNullCount[] m_children;
+
+        /**
+         * Create a {@link ArrowVectorNullCount} with the given null count for the vector and its children.
+         *
+         * @param nullCount the null count of the vector
+         * @param children the {@link ArrowVectorNullCount null counts} for the child vectors
+         */
+        ArrowVectorNullCount(final int nullCount, final ArrowVectorNullCount[] children) {
+            Preconditions.checkNotNull(children);
+            m_nullCount = nullCount;
+            m_children = children;
+        }
+
+        /** @return the null count for the vector */
+        public int getNullCount() {
+            return m_nullCount;
+        }
+
+        /**
+         * @param index the index of the child
+         * @return the null count for the child vector
+         */
+        public ArrowVectorNullCount getChild(final int index) {
+            return m_children[index];
+        }
     }
 }

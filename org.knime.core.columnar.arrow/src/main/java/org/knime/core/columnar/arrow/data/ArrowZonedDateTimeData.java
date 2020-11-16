@@ -74,6 +74,7 @@ import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.SingletonDictionaryProvider;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
@@ -194,7 +195,9 @@ public final class ArrowZonedDateTimeData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowZonedDateTimeReadData close(final int length) {
-            return new ArrowZonedDateTimeReadData(closeWithLength(length), m_dict);
+            final StructVector vector = closeWithLength(length);
+            return new ArrowZonedDateTimeReadData(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length), m_dict);
         }
 
         @Override
@@ -222,12 +225,14 @@ public final class ArrowZonedDateTimeData {
 
         private final InMemoryDictEncoding<ZoneId> m_dict;
 
-        private ArrowZonedDateTimeReadData(final StructVector vector, final LargeVarBinaryVector dict) {
-            this(vector, getInMemoryDict(dict));
+        private ArrowZonedDateTimeReadData(final StructVector vector, final MissingValues missingValues,
+            final LargeVarBinaryVector dict) {
+            this(vector, missingValues, getInMemoryDict(dict));
         }
 
-        private ArrowZonedDateTimeReadData(final StructVector vector, final InMemoryDictEncoding<ZoneId> dict) {
-            super(vector);
+        private ArrowZonedDateTimeReadData(final StructVector vector, final MissingValues missingValues,
+            final InMemoryDictEncoding<ZoneId> dict) {
+            super(vector, missingValues);
             m_epochDayVector = getEpochDayVector(vector);
             m_nanoOfDayVector = getNanoOfDayVector(vector);
             m_zoneOffsetVector = getZoneOffsetVector(vector);
@@ -235,9 +240,9 @@ public final class ArrowZonedDateTimeData {
             m_dict = dict;
         }
 
-        private ArrowZonedDateTimeReadData(final StructVector vector, final int offset, final int length,
-            final InMemoryDictEncoding<ZoneId> dict) {
-            super(vector, offset, length);
+        private ArrowZonedDateTimeReadData(final StructVector vector, final MissingValues missingValues,
+            final int offset, final int length, final InMemoryDictEncoding<ZoneId> dict) {
+            super(vector, missingValues, offset, length);
             m_epochDayVector = getEpochDayVector(vector);
             m_nanoOfDayVector = getNanoOfDayVector(vector);
             m_zoneOffsetVector = getZoneOffsetVector(vector);
@@ -258,7 +263,7 @@ public final class ArrowZonedDateTimeData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowZonedDateTimeReadData(m_vector, m_offset + start, length, m_dict);
+            return new ArrowZonedDateTimeReadData(m_vector, m_missingValues, m_offset + start, length, m_dict);
         }
 
         @Override
@@ -322,13 +327,14 @@ public final class ArrowZonedDateTimeData {
 
         @Override
         @SuppressWarnings("resource") // Dictionary vector closed by data object
-        public ArrowZonedDateTimeReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowZonedDateTimeReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
                 final StructVector v = (StructVector)vector;
                 final long dictId = getZoneIdVector(v).getField().getFieldType().getDictionary().getId();
                 final LargeVarBinaryVector dict = (LargeVarBinaryVector)provider.lookup(dictId).getVector();
-                return new ArrowZonedDateTimeReadData(v, dict);
+                return new ArrowZonedDateTimeReadData(v,
+                    MissingValues.forNullCount(nullCount.getNullCount(), v.getValueCount()), dict);
             } else {
                 throw new IOException("Cannot read ArrowZonedDateTimeData with version " + version
                     + ". Current version: " + m_version + ".");

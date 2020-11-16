@@ -56,6 +56,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 
@@ -100,7 +101,8 @@ public final class ArrowDoubleData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowDoubleReadData close(final int length) {
-            return new ArrowDoubleReadData(closeWithLength(length));
+            final Float8Vector vector = closeWithLength(length);
+            return new ArrowDoubleReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
@@ -108,12 +110,13 @@ public final class ArrowDoubleData {
     public static final class ArrowDoubleReadData extends AbstractArrowReadData<Float8Vector>
         implements DoubleReadData {
 
-        private ArrowDoubleReadData(final Float8Vector vector) {
-            super(vector);
+        private ArrowDoubleReadData(final Float8Vector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
         }
 
-        private ArrowDoubleReadData(final Float8Vector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowDoubleReadData(final Float8Vector vector, final MissingValues missingValues, final int offset,
+            final int length) {
+            super(vector, missingValues, offset, length);
         }
 
         @Override
@@ -123,7 +126,7 @@ public final class ArrowDoubleData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowDoubleReadData(m_vector, m_offset + start, length);
+            return new ArrowDoubleReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -156,10 +159,11 @@ public final class ArrowDoubleData {
         }
 
         @Override
-        public ArrowDoubleReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowDoubleReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowDoubleReadData((Float8Vector)vector);
+                return new ArrowDoubleReadData((Float8Vector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");

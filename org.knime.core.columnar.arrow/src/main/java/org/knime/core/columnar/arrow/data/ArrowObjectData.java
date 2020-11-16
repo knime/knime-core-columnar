@@ -60,6 +60,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
@@ -115,7 +116,9 @@ public final class ArrowObjectData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowObjectReadData<T> close(final int length) {
-            return new ArrowObjectReadData<>(closeWithLength(length), m_io);
+            final LargeVarBinaryVector vector = closeWithLength(length);
+            return new ArrowObjectReadData<>(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length), m_io);
         }
     }
 
@@ -129,14 +132,15 @@ public final class ArrowObjectData {
 
         private final ArrowBufIO<T> m_io;
 
-        private ArrowObjectReadData(final LargeVarBinaryVector vector, final ArrowBufIO<T> io) {
-            super(vector);
+        private ArrowObjectReadData(final LargeVarBinaryVector vector, final MissingValues missingValues,
+            final ArrowBufIO<T> io) {
+            super(vector, missingValues);
             m_io = io;
         }
 
-        private ArrowObjectReadData(final LargeVarBinaryVector vector, final int offset, final int length,
-            final ArrowBufIO<T> io) {
-            super(vector, offset, length);
+        private ArrowObjectReadData(final LargeVarBinaryVector vector, final MissingValues missingValues,
+            final int offset, final int length, final ArrowBufIO<T> io) {
+            super(vector, missingValues, offset, length);
             m_io = io;
         }
 
@@ -147,7 +151,7 @@ public final class ArrowObjectData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowObjectReadData<>(m_vector, m_offset + start, length, m_io);
+            return new ArrowObjectReadData<>(m_vector, m_missingValues, m_offset + start, length, m_io);
         }
 
         @Override
@@ -187,11 +191,13 @@ public final class ArrowObjectData {
         }
 
         @Override
-        public ArrowObjectReadData<T> createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowObjectReadData<T> createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
                 final LargeVarBinaryVector v = (LargeVarBinaryVector)vector;
-                return new ArrowObjectReadData<>(v, new ArrowBufIO<>(v, m_serializer));
+                return new ArrowObjectReadData<>(v,
+                    MissingValues.forNullCount(nullCount.getNullCount(), v.getValueCount()),
+                    new ArrowBufIO<>(v, m_serializer));
             } else {
                 throw new IOException(
                     "Cannot read ArrowObjectData with version " + version + ". Current version: " + m_version + ".");

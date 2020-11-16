@@ -60,6 +60,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.PeriodData.PeriodReadData;
 import org.knime.core.columnar.data.PeriodData.PeriodWriteData;
 
@@ -139,7 +140,8 @@ public final class ArrowPeriodData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowPeriodReadData close(final int length) {
-            return new ArrowPeriodReadData(closeWithLength(length));
+            final StructVector vector = closeWithLength(length);
+            return new ArrowPeriodReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
@@ -156,15 +158,16 @@ public final class ArrowPeriodData {
         // Package private for testing only
         final IntVector m_daysVector;
 
-        private ArrowPeriodReadData(final StructVector vector) {
-            super(vector);
+        private ArrowPeriodReadData(final StructVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
             m_yearsVector = getYearsVector(vector);
             m_monthsVector = getMonthsVector(vector);
             m_daysVector = getDaysVector(vector);
         }
 
-        private ArrowPeriodReadData(final StructVector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowPeriodReadData(final StructVector vector, final MissingValues missingValues, final int offset,
+            final int length) {
+            super(vector, missingValues, offset, length);
             m_yearsVector = getYearsVector(vector);
             m_monthsVector = getMonthsVector(vector);
             m_daysVector = getDaysVector(vector);
@@ -180,7 +183,7 @@ public final class ArrowPeriodData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowPeriodReadData(m_vector, m_offset + start, length);
+            return new ArrowPeriodReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -224,10 +227,11 @@ public final class ArrowPeriodData {
         }
 
         @Override
-        public ArrowPeriodReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowPeriodReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowPeriodReadData((StructVector)vector);
+                return new ArrowPeriodReadData((StructVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowPeriodData with version " + version + ". Current version: " + m_version + ".");

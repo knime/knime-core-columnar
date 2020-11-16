@@ -65,6 +65,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.DurationData.DurationReadData;
 import org.knime.core.columnar.data.DurationData.DurationWriteData;
 
@@ -132,7 +133,9 @@ public final class ArrowDurationData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowDurationReadData close(final int length) {
-            return new ArrowDurationReadData(closeWithLength(length));
+            final StructVector vector = closeWithLength(length);
+            return new ArrowDurationReadData(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
@@ -146,14 +149,15 @@ public final class ArrowDurationData {
         // Package private for testing only
         final IntVector m_nanosVector;
 
-        private ArrowDurationReadData(final StructVector vector) {
-            super(vector);
+        private ArrowDurationReadData(final StructVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
             m_secondsVector = getSecondsVector(vector);
             m_nanosVector = getNanosVector(vector);
         }
 
-        private ArrowDurationReadData(final StructVector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowDurationReadData(final StructVector vector, final MissingValues missingValues, final int offset,
+            final int length) {
+            super(vector, missingValues, offset, length);
             m_secondsVector = getSecondsVector(vector);
             m_nanosVector = getNanosVector(vector);
         }
@@ -172,7 +176,7 @@ public final class ArrowDurationData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowDurationReadData(m_vector, m_offset + start, length);
+            return new ArrowDurationReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -215,10 +219,11 @@ public final class ArrowDurationData {
         }
 
         @Override
-        public ArrowDurationReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowDurationReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowDurationReadData((StructVector)vector);
+                return new ArrowDurationReadData((StructVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowDurationData with version " + version + ". Current version: " + m_version + ".");

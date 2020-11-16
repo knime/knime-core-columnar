@@ -490,6 +490,21 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         readData.release();
     }
 
+    /** Test setting all values to missing */
+    @Test
+    public void testAllMissing() {
+        int numValues = 17;
+        final W writeData = createWrite(numValues);
+        for (int i = 0; i < numValues; i++) {
+            writeData.setMissing(i);
+        }
+        final R readData = castR(writeData.close(numValues));
+        for (int i = 0; i < numValues; i++) {
+            assertTrue(readData.isMissing(i));
+        }
+        readData.release();
+    }
+
     /** Test {@link W#sizeOf()} and {@link R#sizeOf()} */
     @Test
     public void testSizeOf() {
@@ -555,7 +570,6 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             batch = reader.readRetained(0);
             assertEquals(numValues, batch.length());
             assertEquals(numValues, batch.get(0).length());
-            assertEquals(numValues, batch.get(0).length());
             d = castR(batch.get(0));
 
             for (int i = 0; i < numValues; i++) {
@@ -601,7 +615,6 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             batch = reader.readRetained(0);
             assertEquals(numValues, batch.length());
             assertEquals(numValues, batch.get(0).length());
-            assertEquals(numValues, batch.get(0).length());
             d = castR(batch.get(0));
 
             for (int i = 0; i < numValues; i++) {
@@ -611,6 +624,47 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
                     assertFalse(d.isMissing(i));
                     checkValue(d, i, i);
                 }
+            }
+            batch.release();
+        }
+        Files.delete(tmp.toPath());
+    }
+
+    /**
+     * Test writing and reading some data with only missing values
+     *
+     * @throws IOException if writing or reading fails
+     */
+    @Test
+    public void testWriteReadAllMissing() throws IOException {
+        // Fill the data with values
+        int numValues = 17;
+        final W dw = createWrite(numValues);
+        for (int i = 0; i < numValues; i++) {
+            dw.setMissing(i);
+        }
+        R d = castR(dw.close(numValues));
+        ReadBatch batch = new DefaultReadBatch(new ColumnReadData[]{d}, numValues);
+
+        // Write
+        final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
+        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, numValues, factories)) {
+            writer.write(batch);
+            batch.release();
+        }
+
+        // Read
+        try (final ArrowColumnDataReader reader =
+            new ArrowColumnDataReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
+
+            batch = reader.readRetained(0);
+            assertEquals(numValues, batch.length());
+            assertEquals(numValues, batch.get(0).length());
+            d = castR(batch.get(0));
+
+            for (int i = 0; i < numValues; i++) {
+                assertTrue(d.isMissing(i));
             }
             batch.release();
         }

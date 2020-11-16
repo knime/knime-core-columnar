@@ -56,6 +56,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
 
@@ -99,19 +100,21 @@ public final class ArrowIntData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowIntReadData close(final int length) {
-            return new ArrowIntReadData(closeWithLength(length));
+            final IntVector vector = closeWithLength(length);
+            return new ArrowIntReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
     /** Arrow implementation of {@link IntReadData}. */
     public static final class ArrowIntReadData extends AbstractArrowReadData<IntVector> implements IntReadData {
 
-        private ArrowIntReadData(final IntVector vector) {
-            super(vector);
+        private ArrowIntReadData(final IntVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
         }
 
-        private ArrowIntReadData(final IntVector vector, final int offset, final int length) {
-            super(vector, offset, length);
+        private ArrowIntReadData(final IntVector vector, final MissingValues missingValues, final int offset,
+            final int length) {
+            super(vector, missingValues, offset, length);
         }
 
         @Override
@@ -121,7 +124,7 @@ public final class ArrowIntData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowIntReadData(m_vector, m_offset + start, length);
+            return new ArrowIntReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -154,10 +157,11 @@ public final class ArrowIntData {
         }
 
         @Override
-        public ArrowIntReadData createRead(final FieldVector vector, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
+        public ArrowIntReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowIntReadData((IntVector)vector);
+                return new ArrowIntReadData((IntVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
                     "Cannot read ArrowIntData with version " + version + ". Current version: " + m_version + ".");

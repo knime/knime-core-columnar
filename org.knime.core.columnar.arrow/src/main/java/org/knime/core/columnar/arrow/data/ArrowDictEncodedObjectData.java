@@ -62,6 +62,7 @@ import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.SingletonDictionaryProvider;
+import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
@@ -121,7 +122,9 @@ public final class ArrowDictEncodedObjectData {
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowDictEncodedObjectReadData<T> close(final int length) {
-            return new ArrowDictEncodedObjectReadData<>(closeWithLength(length), m_dict);
+            final IntVector vector = closeWithLength(length);
+            return new ArrowDictEncodedObjectReadData<>(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length), m_dict);
         }
 
         @Override
@@ -146,19 +149,20 @@ public final class ArrowDictEncodedObjectData {
 
         private final InMemoryDictEncoding<T> m_dict;
 
-        private ArrowDictEncodedObjectReadData(final IntVector vector, final LargeVarBinaryVector dict,
-            final ArrowBufIO<T> io) {
-            this(vector, new InMemoryDictEncoding<>(dict, io, INIT_DICT_SIZE));
+        private ArrowDictEncodedObjectReadData(final IntVector vector, final MissingValues missingValues,
+            final LargeVarBinaryVector dict, final ArrowBufIO<T> io) {
+            this(vector, missingValues, new InMemoryDictEncoding<>(dict, io, INIT_DICT_SIZE));
         }
 
-        private ArrowDictEncodedObjectReadData(final IntVector vector, final InMemoryDictEncoding<T> dict) {
-            super(vector);
+        private ArrowDictEncodedObjectReadData(final IntVector vector, final MissingValues missingValues,
+            final InMemoryDictEncoding<T> dict) {
+            super(vector, missingValues);
             m_dict = dict;
         }
 
-        private ArrowDictEncodedObjectReadData(final IntVector vector, final int offset, final int length,
-            final InMemoryDictEncoding<T> dict) {
-            super(vector, offset, length);
+        private ArrowDictEncodedObjectReadData(final IntVector vector, final MissingValues missingValues,
+            final int offset, final int length, final InMemoryDictEncoding<T> dict) {
+            super(vector, missingValues, offset, length);
             m_dict = dict;
         }
 
@@ -178,7 +182,7 @@ public final class ArrowDictEncodedObjectData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowDictEncodedObjectReadData<>(m_vector, m_offset + start, length, m_dict);
+            return new ArrowDictEncodedObjectReadData<>(m_vector, m_missingValues, m_offset + start, length, m_dict);
         }
 
         @Override
@@ -229,13 +233,15 @@ public final class ArrowDictEncodedObjectData {
         }
 
         @Override
-        public ArrowDictEncodedObjectReadData<T> createRead(final FieldVector vector, final DictionaryProvider provider,
+        public ArrowDictEncodedObjectReadData<T> createRead(final FieldVector vector,
+            final ArrowVectorNullCount nullCount, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
                 final long dictId = vector.getField().getFieldType().getDictionary().getId();
                 @SuppressWarnings("resource") // Dictionary vector closed by data object
                 final LargeVarBinaryVector dict = (LargeVarBinaryVector)provider.lookup(dictId).getVector();
-                return new ArrowDictEncodedObjectReadData<>((IntVector)vector, dict,
+                return new ArrowDictEncodedObjectReadData<>((IntVector)vector,
+                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()), dict,
                     new ArrowBufIO<>(dict, m_serializer));
             } else {
                 throw new IOException("Cannot read ArrowDictEncodedObjectData data with version " + version
