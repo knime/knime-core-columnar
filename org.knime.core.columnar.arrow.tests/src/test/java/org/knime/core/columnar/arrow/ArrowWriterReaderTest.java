@@ -355,14 +355,16 @@ public class ArrowWriterReaderTest {
      * @throws IOException
      */
     @Test
-    public void testSimpleFilteredRead() throws IOException {
+    public void testFilteredRead() throws IOException {
         final int numBatches = 2;
         final int numColumns = 5;
         final int capacity = 32;
         final int dataCount = 32;
-        final ArrowColumnDataFactory[] factories = IntStream.range(0, numColumns).mapToObj(i -> new SimpleDataFactory())
-            .toArray(ArrowColumnDataFactory[]::new);
-        final SimpleDataChecker dataChecker = new SimpleDataChecker(false);
+        final ArrowColumnDataFactory[] factories =
+            new ArrowColumnDataFactory[]{new SimpleDataFactory(), new SimpleDataFactory(), new ComplexDataFactory(),
+                new ComplexDataFactory(), new DictionaryEncodedDataFactory()};
+        final DataChecker[] dataChecker = new DataChecker[]{new SimpleDataChecker(false), new SimpleDataChecker(false),
+            new ComplexDataChecker(), new ComplexDataChecker(), new DictionaryEncodedDataChecker()};
 
         // Create the data
         final ReadBatch[] batches = new ReadBatch[numBatches];
@@ -370,7 +372,7 @@ public class ArrowWriterReaderTest {
             final ColumnReadData[] data1 = new ColumnReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
                 final ColumnWriteData d = createWrite(factories[c], capacity);
-                data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * (c + 1));
+                data1[c] = dataChecker[c].fillData(d, c, dataCount, (long)b * (c + 1));
             }
             batches[b] = new DefaultReadBatch(data1, dataCount);
         }
@@ -392,10 +394,10 @@ public class ArrowWriterReaderTest {
                 final ReadBatch batch = reader.readRetained(b);
 
                 ColumnReadData data = batch.get(0);
-                dataChecker.checkData(data, 0, dataCount, (long)b * 1);
+                dataChecker[0].checkData(data, 0, dataCount, (long)b * 1);
 
                 data = batch.get(2);
-                dataChecker.checkData(data, 2, dataCount, (long)b * 3);
+                dataChecker[2].checkData(data, 2, dataCount, (long)b * 3);
 
                 assertThrows(NoSuchElementException.class, () -> batch.get(1));
                 assertThrows(NoSuchElementException.class, () -> batch.get(3));
@@ -484,9 +486,12 @@ public class ArrowWriterReaderTest {
      */
     @Test
     public void testFactoryComplexVersionReadWrite() throws IOException {
-        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory(
-            ArrowColumnDataFactoryVersion.version(1, ArrowColumnDataFactoryVersion.version(2, ArrowColumnDataFactoryVersion.version(3), ArrowColumnDataFactoryVersion.version(4)),
-                ArrowColumnDataFactoryVersion.version(6), ArrowColumnDataFactoryVersion.version(17, ArrowColumnDataFactoryVersion.version(7))))};
+        final ArrowColumnDataFactory[] factories =
+            new ArrowColumnDataFactory[]{new SimpleDataFactory(ArrowColumnDataFactoryVersion.version(1,
+                ArrowColumnDataFactoryVersion.version(2, ArrowColumnDataFactoryVersion.version(3),
+                    ArrowColumnDataFactoryVersion.version(4)),
+                ArrowColumnDataFactoryVersion.version(6),
+                ArrowColumnDataFactoryVersion.version(17, ArrowColumnDataFactoryVersion.version(7))))};
         testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false));
     }
 
