@@ -58,7 +58,7 @@ import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.DelegatingColumnReadStore;
 
 /**
  * A {@link ColumnReadStore} that reads {@link ColumnWriteData} from a delegate column store and places it in a
@@ -67,47 +67,27 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class CachedColumnReadStore implements ColumnReadStore {
+public final class CachedColumnReadStore extends DelegatingColumnReadStore {
 
-    private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
-
-    private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
-
-    private int m_maxLength = -1;
-
-    private final class CachedColumnStoreReader implements ColumnDataReader {
-
-        private final ColumnDataReader m_delegateReader;
-
-        private final ColumnSelection m_selection;
+    private final class CachedColumnStoreReader extends DelegatingColumnDataReader {
 
         private final BufferedBatchLoader m_batchLoader;
 
         private final Evictor<ColumnDataUniqueId, ColumnReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
 
-        private boolean m_readerClosed;
-
         CachedColumnStoreReader(final ColumnSelection selection) {
-            m_delegateReader = m_delegate.createReader(selection);
-            m_selection = selection;
+            super(CachedColumnReadStore.this, selection);
             m_batchLoader = new BufferedBatchLoader();
         }
 
         @Override
-        public ReadBatch readRetained(final int chunkIndex) {
-            if (m_readerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-
-            return ColumnSelection.createBatch(m_selection, i -> {
-                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(CachedColumnReadStore.this, i, chunkIndex);
+        protected ReadBatch readRetainedInternal(final int index) throws IOException {
+            return ColumnSelection.createBatch(getSelection(), i -> {
+                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(CachedColumnReadStore.this, i, index);
                 return m_globalCache.getRetained(ccUID, () -> {
                     m_cachedData.add(ccUID);
                     try {
-                        final ColumnReadData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex).get(i);
+                        final ColumnReadData data = m_batchLoader.loadBatch(initAndGetDelegate(), index).get(i);
                         data.retain();
                         return data;
                     } catch (IOException e) {
@@ -118,58 +98,33 @@ public final class CachedColumnReadStore implements ColumnReadStore {
         }
 
         @Override
-        public int getNumBatches() throws IOException {
-            return m_delegateReader.getNumBatches();
-        }
-
-        @Override
-        public int getMaxLength() throws IOException {
-            if (m_maxLength == -1) {
-                m_maxLength = m_delegateReader.getMaxLength();
-            }
-            return m_maxLength;
-        }
-
-        @Override
-        public void close() throws IOException {
-            m_readerClosed = true;
+        protected void closeOnce() throws IOException {
             m_batchLoader.close();
-            m_delegateReader.close();
+            super.closeOnce();
         }
 
     }
 
-    private final ColumnReadStore m_delegate;
-
     private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_globalCache;
 
-    private final Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
-    // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
-    private volatile boolean m_storeClosed;
+    private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /**
      * @param delegate the delegate from which to read in case of a cache miss
      * @param cache the cache for obtaining and storing data
      */
     public CachedColumnReadStore(final ColumnReadStore delegate, final CachedColumnStoreCache cache) {
-        m_delegate = delegate;
+        super(delegate);
         m_globalCache = cache.getCache();
     }
 
     @Override
-    public ColumnStoreSchema getSchema() {
-        return m_delegate.getSchema();
-    }
-
-    @Override
-    public ColumnDataReader createReader(final ColumnSelection selection) {
+    protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
         return new CachedColumnStoreReader(selection);
     }
 
     @Override
-    public void close() throws IOException {
-        m_storeClosed = true;
+    protected void closeOnce() throws IOException {
         for (final ColumnDataUniqueId id : m_cachedData) {
             final ColumnReadData removed = m_globalCache.removeRetained(id);
             if (removed != null) {
@@ -177,8 +132,8 @@ public final class CachedColumnReadStore implements ColumnReadStore {
             }
         }
         m_cachedData.clear();
-
-        m_delegate.close();
+        m_cachedData = null;
+        super.closeOnce();
     }
 
 }

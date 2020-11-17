@@ -55,14 +55,13 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.DelegatingColumnStore;
 
 /**
  * A {@link ColumnStore} that stores {@link ColumnWriteData} in a fixed-size {@link SmallColumnStoreCache LRU cache} in
@@ -73,11 +72,7 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class SmallColumnStore implements ColumnStore {
-
-    private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
-
-    private static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
+public final class SmallColumnStore extends DelegatingColumnStore {
 
     private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
 
@@ -166,41 +161,24 @@ public final class SmallColumnStore implements ColumnStore {
 
     private static final String ERROR_MESSAGE_ON_FLUSH = "Error while flushing small table.";
 
-    private class SmallColumnStoreFactory implements ColumnDataFactory {
-
-        private final ColumnDataFactory m_delegateFactory;
+    private class SmallColumnStoreFactory extends DelegatingColumnDataFactory {
 
         SmallColumnStoreFactory() {
-            m_delegateFactory = m_delegate.getFactory();
-        }
-
-        @Override
-        public WriteBatch create() {
-            if (m_writerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-
-            return m_delegateFactory.create();
+            super(SmallColumnStore.this);
         }
 
     }
 
-    private final class SmallColumnStoreWriter implements ColumnDataWriter {
+    private final class SmallColumnStoreWriter extends DelegatingColumnDataWriter {
 
         private Table m_table = new Table();
 
-        @Override
-        public void write(final ReadBatch batch) throws IOException {
-            if (m_writerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
+        SmallColumnStoreWriter() {
+            super(SmallColumnStore.this);
+        }
 
+        @Override
+        protected void writeInternal(final ReadBatch batch) throws IOException {
             if (m_table != null) {
                 m_table.retainAndAddBatch(batch);
                 if (m_table.sizeOf() > m_smallTableThreshold) {
@@ -209,13 +187,12 @@ public final class SmallColumnStore implements ColumnStore {
                     m_table = null;
                 }
             } else {
-                m_delegateWriter.write(batch);
+                super.writeInternal(batch);
             }
         }
 
         @Override
-        public void close() throws IOException {
-            m_writerClosed = true;
+        protected void closeOnce() throws IOException {
             if (m_table != null) {
                 m_globalCache.put(SmallColumnStore.this, m_table, (store, table) -> {
                     try {
@@ -229,6 +206,20 @@ public final class SmallColumnStore implements ColumnStore {
                 m_table = null;
             } else {
                 closeDelegateWriter();
+            }
+        }
+
+        private synchronized void closeDelegateWriter() throws IOException {
+            super.closeOnce();
+        }
+
+        private synchronized void flush(final Table table) throws IOException {
+            if (!m_flushed) {
+                for (int i = 0; i < table.getNumChunks(); i++) {
+                    final ReadBatch batch = table.getBatch(i);
+                    initAndGetDelegate().write(batch);
+                }
+                m_flushed = true;
             }
         }
 
@@ -252,7 +243,7 @@ public final class SmallColumnStore implements ColumnStore {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
-            if (m_storeClosed) {
+            if (isClosed()) {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
@@ -282,127 +273,61 @@ public final class SmallColumnStore implements ColumnStore {
 
     }
 
-    private final ColumnStore m_delegate;
-
-    private final ColumnDataFactory m_factory;
-
     private final int m_smallTableThreshold;
 
     private final LoadingEvictingCache<SmallColumnStore, Table> m_globalCache;
 
-    private final SmallColumnStoreWriter m_writer;
-
     private boolean m_flushed = false;
 
     // lazily initialized on flush
-    private ColumnDataWriter m_delegateWriter;
-
-    // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
-    private volatile boolean m_writerClosed;
-
-    // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
-    private volatile boolean m_storeClosed;
+    private SmallColumnStoreWriter m_writer;
 
     /**
      * @param delegate the delegate to which to write if the table is not small
      * @param cache the cache for obtaining and storing small tables
      */
     public SmallColumnStore(final ColumnStore delegate, final SmallColumnStoreCache cache) {
-        m_delegate = delegate;
-        m_factory = new SmallColumnStoreFactory();
+        super(delegate);
         m_globalCache = cache.m_cache;
         m_smallTableThreshold = cache.m_smallTableThreshold;
+    }
+
+    @Override
+    protected ColumnDataFactory createFactoryInternal() {
+        return new SmallColumnStoreFactory();
+    }
+
+    @Override
+    protected ColumnDataWriter createWriterInternal() {
         m_writer = new SmallColumnStoreWriter();
-    }
-
-    @Override
-    public ColumnStoreSchema getSchema() {
-        return m_delegate.getSchema();
-    }
-
-    @Override
-    public ColumnDataFactory getFactory() {
-        if (m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
-        return m_factory;
-    }
-
-    @Override
-    public SmallColumnStoreWriter getWriter() {
-        if (m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
         return m_writer;
     }
 
-    private synchronized void closeDelegateWriter() throws IOException {
-        if (m_delegateWriter != null) {
-            m_delegateWriter.close();
-        }
-    }
-
-    private synchronized void flush(final Table table) throws IOException {
-        if (!m_flushed) {
-            m_delegateWriter = m_delegate.getWriter();
-            for (int i = 0; i < table.getNumChunks(); i++) {
-                final ReadBatch batch = table.getBatch(i);
-                m_delegateWriter.write(batch);
-            }
-            m_flushed = true;
-        }
-    }
-
     @Override
-    public void save(final File file) throws IOException {
-        if (!m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
+    protected void saveInternal(final File f) throws IOException {
         final Table cached = m_globalCache.getRetained(SmallColumnStore.this);
         if (cached != null) {
-            flush(cached);
-            closeDelegateWriter();
+            m_writer.flush(cached);
+            m_writer.closeDelegateWriter();
             cached.release();
         }
 
-        m_delegate.save(file);
+        super.saveInternal(f);
     }
 
     @Override
-    @SuppressWarnings("resource")
-    public ColumnDataReader createReader(final ColumnSelection selection) {
-        if (!m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
+    protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
         final Table table = m_globalCache.getRetained(SmallColumnStore.this);
-        return table == null ? m_delegate.createReader(selection) : new SmallColumnStoreReader(selection, table);
+        return table == null ? getDelegate().createReader(selection) : new SmallColumnStoreReader(selection, table);
     }
 
     @Override
-    public void close() throws IOException {
-        m_storeClosed = true;
+    protected void closeOnce() throws IOException {
         final Table removed = m_globalCache.removeRetained(SmallColumnStore.this);
         if (removed != null) {
             removed.release();
         }
-        // TODO: true for other stores as well: shouldn't we close the m_writer here? (and write a test for it)
-        m_delegate.close();
+        super.closeOnce();
     }
 
 }

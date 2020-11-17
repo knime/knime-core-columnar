@@ -55,7 +55,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -65,7 +64,7 @@ import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.DelegatingColumnStore;
 
 /**
  * A {@link ColumnStore column store} that stores {@link ColumnWriteData data} in a fixed-size
@@ -77,58 +76,28 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class AsyncFlushCachedColumnStore implements ColumnStore {
-
-    private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
-
-    private static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
-
-    private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
-
-    private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
+public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for asynchronous write thread.";
 
     private static final CountDownLatch DUMMY = new CountDownLatch(0);
 
-    private class AsyncFlushCachedColumnStoreFactory implements ColumnDataFactory {
-
-        private final ColumnDataFactory m_delegateFactory;
+    private class AsyncFlushCachedColumnStoreFactory extends DelegatingColumnDataFactory {
 
         AsyncFlushCachedColumnStoreFactory() {
-            m_delegateFactory = m_delegate.getFactory();
-        }
-
-        @Override
-        public WriteBatch create() {
-            if (m_writerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-
-            return m_delegateFactory.create();
+            super(AsyncFlushCachedColumnStore.this);
         }
 
     }
 
-    private final class AsyncFlushCachedColumnStoreWriter implements ColumnDataWriter {
-
-        private final ColumnDataWriter m_delegateWriter;
+    private final class AsyncFlushCachedColumnStoreWriter extends DelegatingColumnDataWriter {
 
         AsyncFlushCachedColumnStoreWriter() {
-            m_delegateWriter = m_delegate.getWriter();
+            super(AsyncFlushCachedColumnStore.this);
         }
 
         @Override
-        public void write(final ReadBatch batch) throws IOException {
-            if (m_writerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
+        protected void writeInternal(final ReadBatch batch) throws IOException {
 
             batch.retain();
 
@@ -137,8 +106,8 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             final CountDownLatch batchFlushed = new CountDownLatch(1);
             enqueueRunnable(() -> {
                 try {
-                    if (!m_storeClosed) {
-                        m_delegateWriter.write(batch);
+                    if (!AsyncFlushCachedColumnStore.this.isClosed()) {
+                        super.writeInternal(batch);
                     }
                 } catch (IOException e) {
                     throw new IllegalStateException(String.format("Failed to write batch %d.", m_numChunks), e);
@@ -159,14 +128,11 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
         }
 
         @Override
-        public void close() {
-            m_writerClosed = true;
-
+        protected void closeOnce() throws IOException {
             handleDoneFuture();
-
             enqueueRunnable(() -> {
                 try {
-                    m_delegateWriter.close();
+                    super.closeOnce();
                 } catch (IOException e) {
                     throw new IllegalStateException("Failed to close writer.", e);
                 }
@@ -188,34 +154,20 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
     }
 
-    private final class AsyncFlushCachedColumnStoreReader implements ColumnDataReader {
-
-        private final ColumnSelection m_selection;
+    private final class AsyncFlushCachedColumnStoreReader extends DelegatingColumnDataReader {
 
         private final BufferedBatchLoader m_batchLoader;
 
-        // lazily initialized
-        private ColumnDataReader m_delegateReader;
-
-        private boolean m_readerClosed;
-
         AsyncFlushCachedColumnStoreReader(final ColumnSelection selection) {
-            m_selection = selection;
+            super(AsyncFlushCachedColumnStore.this, selection);
             m_batchLoader = new BufferedBatchLoader();
         }
 
         @Override
-        public ReadBatch readRetained(final int chunkIndex) {
-            if (m_readerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-
-            return ColumnSelection.createBatch(m_selection, i -> {
+        protected ReadBatch readRetainedInternal(final int index) throws IOException {
+            return ColumnSelection.createBatch(getSelection(), i -> {
                 final ColumnDataUniqueId ccUID =
-                    new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, chunkIndex);
+                    new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, index);
                 return m_globalCache.getRetained(ccUID, () -> {
                     try {
                         waitForAndHandleFuture();
@@ -226,12 +178,9 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
                         // this way, the cache stays in a consistent state
                         throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
                     }
-                    if (m_delegateReader == null) {
-                        m_delegateReader = m_delegate.createReader(m_selection);
-                    }
                     m_cachedData.put(ccUID, DUMMY);
                     try {
-                        final ColumnReadData data = m_batchLoader.loadBatch(m_delegateReader, chunkIndex).get(i);
+                        final ColumnReadData data = m_batchLoader.loadBatch(initAndGetDelegate(), index).get(i);
                         data.retain();
                         return data;
                     } catch (IOException e) {
@@ -252,25 +201,16 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
         }
 
         @Override
-        public void close() throws IOException {
-            m_readerClosed = true;
+        protected void closeOnce() throws IOException {
             m_batchLoader.close();
-            if (m_delegateReader != null) {
-                m_delegateReader.close();
-            }
+            super.closeOnce();
         }
 
     }
 
-    private final ColumnStore m_delegate;
-
-    private final ColumnDataFactory m_factory;
-
-    private final AsyncFlushCachedColumnStoreWriter m_writer;
-
     private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_globalCache;
 
-    private final Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
+    private Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
 
     private final Evictor<ColumnDataUniqueId, ColumnReadData> m_evictor = (k, c) -> {
         try {
@@ -302,12 +242,6 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
 
     private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
-    // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
-    private volatile boolean m_writerClosed;
-
-    // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
-    private volatile boolean m_storeClosed;
-
     /**
      * @param delegate the delegate to which to write asynchronously
      * @param cache the cache for storing data
@@ -315,9 +249,7 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
      */
     public AsyncFlushCachedColumnStore(final ColumnStore delegate, final CachedColumnStoreCache cache,
         final ExecutorService executor) {
-        m_delegate = delegate;
-        m_factory = new AsyncFlushCachedColumnStoreFactory();
-        m_writer = new AsyncFlushCachedColumnStoreWriter();
+        super(delegate);
         m_globalCache = cache.getCache();
         m_executor = executor;
     }
@@ -335,43 +267,17 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
     }
 
     @Override
-    public ColumnStoreSchema getSchema() {
-        return m_delegate.getSchema();
+    protected ColumnDataFactory createFactoryInternal() {
+        return new AsyncFlushCachedColumnStoreFactory();
     }
 
     @Override
-    public ColumnDataFactory getFactory() {
-        if (m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
-        return m_factory;
+    protected ColumnDataWriter createWriterInternal() {
+        return new AsyncFlushCachedColumnStoreWriter();
     }
 
     @Override
-    public ColumnDataWriter getWriter() {
-        if (m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
-        return m_writer;
-    }
-
-    @Override
-    public void save(final File file) throws IOException {
-        if (!m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
+    protected void saveInternal(final File f) throws IOException {
         try {
             waitForAndHandleFuture();
         } catch (InterruptedException e) {
@@ -379,25 +285,16 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
         }
-        m_delegate.save(file);
+        super.saveInternal(f);
     }
 
     @Override
-    public ColumnDataReader createReader(final ColumnSelection selection) {
-        if (!m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
+    protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
         return new AsyncFlushCachedColumnStoreReader(selection);
     }
 
     @Override
-    public void close() throws IOException {
-        m_storeClosed = true;
-
+    protected void closeOnce() throws IOException {
         try {
             waitForAndHandleFuture();
         } catch (InterruptedException e) {
@@ -413,7 +310,8 @@ public final class AsyncFlushCachedColumnStore implements ColumnStore {
             }
         }
         m_cachedData.clear();
-        m_delegate.close();
+        m_cachedData = null;
+        super.closeOnce();
     }
 
 }

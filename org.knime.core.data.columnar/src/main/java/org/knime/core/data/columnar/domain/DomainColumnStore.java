@@ -45,7 +45,6 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,12 +60,9 @@ import java.util.concurrent.Future;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.DelegatingColumnStore;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.util.DuplicateChecker;
@@ -82,22 +78,16 @@ import org.knime.core.util.DuplicateKeyException;
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
-public final class DomainColumnStore implements ColumnStore {
+public final class DomainColumnStore extends DelegatingColumnStore {
 
     private final ExecutorService m_executor;
-
-    private final ColumnStore m_delegate;
 
     /* Not final as initialized lazily */
     private volatile Map<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> m_domainCalculators;
 
     private volatile Map<Integer, ColumnarDomainCalculator<?, DataColumnMetaData[]>> m_metadataCalculators;
 
-    private volatile boolean m_storeClosed;
-
     private DomainStoreConfig m_config;
-
-    private DomainColumnDataWriter m_writer;
 
     /**
      * Create a new DomainColumnStore.
@@ -108,23 +98,14 @@ public final class DomainColumnStore implements ColumnStore {
      */
     public DomainColumnStore(final ColumnStore delegate, final DomainStoreConfig config,
         final ExecutorService executor) {
-        m_delegate = delegate;
+        super(delegate);
         m_config = config;
         m_executor = executor;
     }
 
     @Override
-    public ColumnDataFactory getFactory() {
-        return m_delegate.getFactory();
-    }
-
-    @SuppressWarnings("resource")
-    @Override
-    public DomainColumnDataWriter getWriter() {
-        if (m_writer == null) {
-            m_writer = new DomainColumnDataWriter(m_delegate.getWriter());
-        }
-        return m_writer;
+    protected ColumnDataWriter createWriterInternal() {
+        return new DomainColumnDataWriter();
     }
 
     /**
@@ -176,27 +157,11 @@ public final class DomainColumnStore implements ColumnStore {
     }
 
     @Override
-    public void save(final File f) throws IOException {
-        m_delegate.save(f);
-    }
-
-    @Override
-    public ColumnStoreSchema getSchema() {
-        return m_delegate.getSchema();
-    }
-
-    @Override
-    public ColumnDataReader createReader(final ColumnSelection config) {
-        return m_delegate.createReader(config);
-    }
-
-    @Override
-    public void close() throws IOException {
-        m_storeClosed = true;
-        if (m_writer != null) {
-            m_writer.close();
-        }
-        m_delegate.close();
+    protected void closeOnce() throws IOException {
+        m_domainCalculators = null;
+        m_metadataCalculators = null;
+        m_config = null;
+        super.closeOnce();
     }
 
     /**
@@ -205,28 +170,26 @@ public final class DomainColumnStore implements ColumnStore {
      * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
      */
     // TODO can we make this static?
-    public final class DomainColumnDataWriter implements ColumnDataWriter {
+    public final class DomainColumnDataWriter extends DelegatingColumnDataWriter {
 
-        private final ColumnDataWriter m_delegateWriter;
+        private DuplicateChecker m_duplicateChecker;
 
-        private final DuplicateChecker m_duplicateChecker;
+        private List<Future<Void>> m_duplicateChecks = new ArrayList<>();
 
-        private final List<Future<Void>> m_duplicateChecks = new ArrayList<>();
-
-        private final Map<Integer, Future<Void>> m_futures = new HashMap<>();
+        private Map<Integer, Future<Void>> m_futures = new HashMap<>();
 
         /**
          * @param delegate the delegate {@link ColumnDataWriter}.
          * @param config config of store
          */
-        DomainColumnDataWriter(final ColumnDataWriter delegate) {
-            m_delegateWriter = delegate;
+        DomainColumnDataWriter() {
+            super(DomainColumnStore.this);
             m_duplicateChecker = m_config.createDuplicateChecker();
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public void write(final ReadBatch record) throws IOException {
+        protected void writeInternal(final ReadBatch record) throws IOException {
             if (m_domainCalculators == null) {
                 // needs to happen here because of setMaxPossibleValues
                 m_domainCalculators = m_config.createDomainCalculators();
@@ -278,7 +241,7 @@ public final class DomainColumnStore implements ColumnStore {
                     append(record.get(entry.getKey()), m_futures.get(entry.getKey()), calculator));
             }
 
-            m_delegateWriter.write(record);
+            super.writeInternal(record);
         }
 
         private Future<Void> append(final ColumnReadData chunk, final Future<Void> previous,
@@ -296,7 +259,7 @@ public final class DomainColumnStore implements ColumnStore {
         }
 
         @Override
-        public void close() throws IOException {
+        protected void closeOnce() throws IOException {
             try {
                 // Wait for duplicate checks and domain calculations to finish before
                 // closing.
@@ -321,9 +284,12 @@ public final class DomainColumnStore implements ColumnStore {
             } finally {
                 if (m_duplicateChecker != null) {
                     m_duplicateChecker.clear();
+                    m_duplicateChecker = null;
                 }
-                m_delegateWriter.close();
+                m_duplicateChecks = null;
+                m_futures = null;
             }
+            super.closeOnce();
         }
 
         // TODO Marc can we make this static?
@@ -342,7 +308,7 @@ public final class DomainColumnStore implements ColumnStore {
             @Override
             public Void call() throws IOException {
                 try {
-                    if (!m_storeClosed) {
+                    if (!DomainColumnStore.this.isClosed()) {
                         @SuppressWarnings("unchecked")
                         final ObjectReadData<String> rowKeyData = (ObjectReadData<String>)m_keyChunk;
                         for (int i = 0; i < rowKeyData.length(); i++) {
@@ -376,7 +342,7 @@ public final class DomainColumnStore implements ColumnStore {
             public Void call() throws InterruptedException, ExecutionException {
                 // wait for prev
                 m_previous.get();
-                if (m_storeClosed) {
+                if (DomainColumnStore.this.isClosed()) {
                     return null;
                 }
                 try {
