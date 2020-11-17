@@ -70,6 +70,7 @@ import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
 import org.knime.core.columnar.data.ColumnDataSpec;
@@ -87,6 +88,7 @@ import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
@@ -187,6 +189,12 @@ public class ArrowSchemaMapperTest {
     @Test
     public void testMapLocalDateTimeSpec() {
         testMapSingleSpec(LocalDateTimeDataSpec.INSTANCE, ArrowLocalDateTimeDataFactory.INSTANCE);
+    }
+
+    /** Test mapping ZonedDateTime specs to a {@link ArrowZonedDateTimeDataFactory} */
+    @Test
+    public void testMapZonedDateTimeSpec() {
+        testMapSingleSpec(ZonedDateTimeDataSpec.INSTANCE, ArrowZonedDateTimeDataFactory.INSTANCE);
     }
 
     /** Test mapping void specs to a {@link ArrowStructDataFactory} */
