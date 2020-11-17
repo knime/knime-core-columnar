@@ -186,7 +186,7 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory<Boolea
 
         @Override
         public void setValue(final BooleanValue value) {
-            m_data.setMissing(m_index.getIndex());
+            m_data.setBoolean(m_index.getIndex(), value.getBooleanValue());
         }
     }
 }
