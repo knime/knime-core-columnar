@@ -167,7 +167,7 @@ public final class DomainColumnStore implements ColumnStore {
      * @param maxPossibleValues maximum number of possible values for nominal domains
      */
     public void setMaxPossibleValues(final int maxPossibleValues) {
-        if (m_writer != null) {
+        if (m_domainCalculators != null) {
             throw new IllegalStateException(
                 "The maximum number of possible values for a nominal domain may only be set "
                     + "before any values were written.");
