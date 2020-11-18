@@ -48,6 +48,7 @@ package org.knime.core.data.columnar.domain;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.knime.core.columnar.data.ColumnReadData;
@@ -79,7 +80,9 @@ import org.knime.core.util.DuplicateChecker;
 public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     // factory for native domain calculators
-    private final Map<DataType, Supplier<ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>>> m_nativeDomainCalculators;
+    private final Map<DataType, Function<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>>> m_nativeNominalDomainCalculators;
+
+    private final Map<DataType, Supplier<ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>>> m_nativeBoundedDomainCalculators;
 
     private final ColumnarValueSchema m_schema;
 
@@ -107,18 +110,21 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
         m_initDomains = initializeDomains;
         m_checkForDuplicates = checkForDuplicates;
         m_maxNumValues = maxPossibleNominalDomainValues;
-        m_nativeDomainCalculators = new HashMap<>();
+        m_nativeNominalDomainCalculators = new HashMap<>();
+        m_nativeBoundedDomainCalculators = new HashMap<>();
 
         initNativeDomainCalculators();
     }
 
     private void initNativeDomainCalculators() {
-        // TODO Provide extension point for expert users.
-        m_nativeDomainCalculators.put(DoubleCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
-        m_nativeDomainCalculators.put(IntCell.TYPE, () -> new ColumnarIntDomainCalculator());
-        m_nativeDomainCalculators.put(LongCell.TYPE, () -> new ColumnarLongDomainCalculator());
-        m_nativeDomainCalculators.put(BooleanCell.TYPE, () -> new ColumnarBooleanDomainCalculator());
-        m_nativeDomainCalculators.put(StringCell.TYPE, () -> new ColumnarStringDomainCalculator(m_maxNumValues));
+        // bounded
+        m_nativeBoundedDomainCalculators.put(DoubleCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
+        m_nativeBoundedDomainCalculators.put(IntCell.TYPE, () -> new ColumnarIntDomainCalculator());
+        m_nativeBoundedDomainCalculators.put(LongCell.TYPE, () -> new ColumnarLongDomainCalculator());
+
+        // nominal
+        m_nativeNominalDomainCalculators.put(StringCell.TYPE, (n) -> new ColumnarStringDomainCalculator(n));
+        m_nativeNominalDomainCalculators.put(BooleanCell.TYPE, (n) -> new ColumnarBooleanDomainCalculator());
     }
 
     // to make java happy
@@ -149,30 +155,31 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
             final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
             for (int i = 1; i < length; i++) {
                 final DataType type = spec.getColumnSpec(i - 1).getType();
-
                 final ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain> calculator;
-                // check for native (=faster) implementations
-                if (m_nativeDomainCalculators.containsKey(type)) {
-                    calculator = m_nativeDomainCalculators.get(type).get();
-                } else {
-                    // use our fallback implementations
-                    final boolean isNominal = type.isCompatible(NominalValue.class);
-                    final boolean isBounded = type.isCompatible(BoundedValue.class);
-                    // in case the initial domain has more values than m_maxNumValues we want to respect that.
+
+                final boolean isBounded = type.isCompatible(BoundedValue.class);
+                final boolean isNominal = type.isCompatible(NominalValue.class);
+
+                if (isNominal) {
                     final int maxNumValues =
                         m_initDomains ? spec.getColumnSpec(i - 1).getDomain().getValues().size() : m_maxNumValues;
-
-                    if (isNominal && isBounded) {
+                    if (m_nativeNominalDomainCalculators.containsKey(type)) {
+                        calculator = m_nativeNominalDomainCalculators.get(type).apply(maxNumValues);
+                    } else if (isBounded) {
                         calculator = new ColumnarCombinedDomainCalculator<>(factories[i],
                             new DataValueComparatorDelegator<>(type.getComparator()), maxNumValues);
-                    } else if (isNominal) {
+                    } else {
                         calculator = new ColumnarNominalDomainCalculator<>(factories[i], maxNumValues);
-                    } else if (isBounded) {
+                    }
+                } else if (isBounded) {
+                    if (m_nativeBoundedDomainCalculators.containsKey(type)) {
+                        calculator = m_nativeBoundedDomainCalculators.get(type).get();
+                    } else {
                         calculator = new ColumnarBoundedDomainCalculator<>(factories[i],
                             new DataValueComparatorDelegator<>(type.getComparator()));
-                    } else {
-                        calculator = null;
                     }
+                } else {
+                    calculator = null;
                 }
 
                 if (calculator != null) {
