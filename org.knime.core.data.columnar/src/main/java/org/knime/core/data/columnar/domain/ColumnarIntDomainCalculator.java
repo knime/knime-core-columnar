@@ -96,17 +96,20 @@ final class ColumnarIntDomainCalculator implements ColumnarDomainCalculator<IntR
     @Override
     public void update(final DataColumnDomain domain) {
         if (domain.hasBounds()) {
-            final int lower = ((IntValue)domain.getLowerBound()).getIntValue();
-            if (m_lower > lower) {
-                m_lower = lower;
-            }
+            final DataCell lowerBound = domain.getLowerBound();
+            final DataCell upperBound = domain.getUpperBound();
+            if (!lowerBound.isMissing() && !upperBound.isMissing()) {
+                final int lower = ((IntValue)lowerBound).getIntValue();
+                if (m_lower > lower) {
+                    m_lower = lower;
+                }
 
-            final int upper = ((IntValue)domain.getUpperBound()).getIntValue();
-            if (m_upper < upper) {
-                m_upper = upper;
+                final int upper = ((IntValue)upperBound).getIntValue();
+                if (m_upper < upper) {
+                    m_upper = upper;
+                }
             }
         }
-
         if (domain.hasValues()) {
             m_values.addAll(domain.getValues());
         }

@@ -110,10 +110,14 @@ final class ColumnarNominalDomainCalculator<C extends ColumnReadData>
     @Override
     public void update(final DataColumnDomain domain) {
         if (domain.hasValues()) {
-            m_values.addAll(domain.getValues());
-            if (m_values.size() > m_maxNumValues) {
-                m_values = null;
-                return;
+            for (final DataCell cell : domain.getValues()) {
+                if (!cell.isMissing()) {
+                    m_values.add(cell);
+                    if (m_values.size() > m_maxNumValues) {
+                        m_values = null;
+                        return;
+                    }
+                }
             }
         }
     }

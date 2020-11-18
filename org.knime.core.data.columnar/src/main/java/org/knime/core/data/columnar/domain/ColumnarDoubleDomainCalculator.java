@@ -96,14 +96,18 @@ final class ColumnarDoubleDomainCalculator implements ColumnarDomainCalculator<D
     @Override
     public void update(final DataColumnDomain domain) {
         if (domain.hasBounds()) {
-            final double lower = ((DoubleValue)domain.getLowerBound()).getDoubleValue();
-            if (m_lower > lower) {
-                m_lower = lower;
-            }
+            final DataCell lowerBound = domain.getLowerBound();
+            final DataCell upperBound = domain.getUpperBound();
+            if (!lowerBound.isMissing() && !upperBound.isMissing()) {
+                final double lower = ((DoubleValue)lowerBound).getDoubleValue();
+                if (m_lower > lower) {
+                    m_lower = lower;
+                }
 
-            final double upper = ((DoubleValue)domain.getUpperBound()).getDoubleValue();
-            if (m_upper < upper) {
-                m_upper = upper;
+                final double upper = ((DoubleValue)upperBound).getDoubleValue();
+                if (m_upper < upper) {
+                    m_upper = upper;
+                }
             }
         }
 

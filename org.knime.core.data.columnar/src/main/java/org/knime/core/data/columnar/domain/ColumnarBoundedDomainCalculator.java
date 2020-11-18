@@ -125,22 +125,28 @@ final class ColumnarBoundedDomainCalculator<C extends ColumnReadData>
         if (domain.hasBounds()) {
             final DataCell lower = domain.getLowerBound();
             final DataCell upper = domain.getUpperBound();
-            if (m_lower == null) {
-                m_lower = lower;
-                m_upper = upper;
-            } else {
-                if (m_comparator.compare(lower, m_lower) < 0) {
-                    m_lower = domain.getLowerBound();
-                }
+            if (!lower.isMissing()) {
+                if (m_lower == null) {
+                    m_lower = lower;
+                    m_upper = upper;
+                } else {
+                    if (m_comparator.compare(lower, m_lower) < 0) {
+                        m_lower = domain.getLowerBound();
+                    }
 
-                if (m_comparator.compare(upper, m_upper) > 0) {
-                    m_upper = domain.getUpperBound();
+                    if (m_comparator.compare(upper, m_upper) > 0) {
+                        m_upper = domain.getUpperBound();
+                    }
                 }
             }
         }
 
         if (domain.hasValues()) {
-            m_values.addAll(domain.getValues());
+            for (final DataCell cell : domain.getValues()) {
+                if (!cell.isMissing()) {
+                    m_values.add(cell);
+                }
+            }
         }
     }
 }

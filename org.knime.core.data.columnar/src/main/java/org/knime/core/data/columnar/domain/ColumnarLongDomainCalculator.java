@@ -96,14 +96,18 @@ final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<Lon
     @Override
     public void update(final DataColumnDomain domain) {
         if (domain.hasBounds()) {
-            final long lower = ((LongValue)domain.getLowerBound()).getLongValue();
-            if (m_lower > lower) {
-                m_lower = lower;
-            }
+            final DataCell lowerBound = domain.getLowerBound();
+            final DataCell upperBound = domain.getUpperBound();
+            if (!lowerBound.isMissing() && !upperBound.isMissing()) {
+                final long lower = ((LongValue)lowerBound).getLongValue();
+                if (m_lower > lower) {
+                    m_lower = lower;
+                }
 
-            final long upper = ((LongValue)domain.getUpperBound()).getLongValue();
-            if (m_upper < upper) {
-                m_upper = upper;
+                final long upper = ((LongValue)upperBound).getLongValue();
+                if (m_upper < upper) {
+                    m_upper = upper;
+                }
             }
         }
 
