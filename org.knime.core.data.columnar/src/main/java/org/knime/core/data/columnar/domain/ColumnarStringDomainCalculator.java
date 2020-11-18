@@ -109,8 +109,7 @@ final class ColumnarStringDomainCalculator
         if (domain.hasValues()) {
             for (final DataCell cell : domain.getValues()) {
                 if (!cell.isMissing()) {
-                    m_values.add(((StringValue)cell).getStringValue());
-                    if (m_values.size() > m_maxNumValues) {
+                    if (m_values.add(((StringValue)cell).getStringValue()) && m_values.size() > m_maxNumValues) {
                         m_values = null;
                         return;
                     }

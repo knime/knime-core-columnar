@@ -112,8 +112,7 @@ final class ColumnarNominalDomainCalculator<C extends ColumnReadData>
         if (domain.hasValues()) {
             for (final DataCell cell : domain.getValues()) {
                 if (!cell.isMissing()) {
-                    m_values.add(cell);
-                    if (m_values.size() > m_maxNumValues) {
+                    if (m_values.add(cell) && m_values.size() > m_maxNumValues) {
                         m_values = null;
                         return;
                     }

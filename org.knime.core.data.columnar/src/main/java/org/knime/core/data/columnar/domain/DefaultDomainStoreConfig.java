@@ -157,11 +157,15 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                     // use our fallback implementations
                     final boolean isNominal = type.isCompatible(NominalValue.class);
                     final boolean isBounded = type.isCompatible(BoundedValue.class);
+                    // in case the initial domain has more values than m_maxNumValues we want to respect that.
+                    final int maxNumValues =
+                        m_initDomains ? spec.getColumnSpec(i - 1).getDomain().getValues().size() : m_maxNumValues;
+
                     if (isNominal && isBounded) {
                         calculator = new ColumnarCombinedDomainCalculator<>(factories[i],
-                            new DataValueComparatorDelegator<>(type.getComparator()), m_maxNumValues);
+                            new DataValueComparatorDelegator<>(type.getComparator()), maxNumValues);
                     } else if (isNominal) {
-                        calculator = new ColumnarNominalDomainCalculator<>(factories[i], m_maxNumValues);
+                        calculator = new ColumnarNominalDomainCalculator<>(factories[i], maxNumValues);
                     } else if (isBounded) {
                         calculator = new ColumnarBoundedDomainCalculator<>(factories[i],
                             new DataValueComparatorDelegator<>(type.getComparator()));
