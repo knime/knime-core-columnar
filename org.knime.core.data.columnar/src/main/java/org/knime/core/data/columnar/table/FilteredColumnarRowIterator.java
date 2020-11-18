@@ -51,7 +51,6 @@ import java.util.Iterator;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataType;
-import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.UnmaterializedCell;
 import org.knime.core.data.container.CloseableRowIterator;
@@ -116,9 +115,7 @@ class FilteredColumnarRowIterator {
                 if (access.isMissing(m_selection[i])) {
                     cells.put(m_selection[i], DataType.getMissingCell());
                 } else {
-                    // TODO performance!!
-                    final DataValue value = access.getValue(m_selection[i]);
-                    cells.put(m_selection[i], ((ReadValue)value).getDataCell());
+                    cells.put(m_selection[i], access.<ReadValue> getValue(m_selection[i]).getDataCell());
                 }
             }
             return new HashMapDataRow(access.getRowKey().getString(), cells, m_cursor.getNumColumns());
@@ -209,8 +206,7 @@ class FilteredColumnarRowIterator {
                     cells[m_selection[i]] = DataType.getMissingCell();
                 } else {
                     // TODO performance!!
-                    final DataValue value = access.getValue(m_selection[i]);
-                    cells[m_selection[i]] = ((ReadValue)value).getDataCell();
+                    cells[m_selection[i]] = access.<ReadValue> getValue(m_selection[i]).getDataCell();
                 }
             }
             return new ArrayDataRow(access.getRowKey().getString(), cells);
@@ -305,8 +301,7 @@ class FilteredColumnarRowIterator {
             if (access.isMissing(m_colIdx)) {
                 cell = DataType.getMissingCell();
             } else {
-                final DataValue value = access.getValue(m_colIdx);
-                cell = ((ReadValue)value).getDataCell();
+                cell = access.<ReadValue> getValue(m_colIdx).getDataCell();
             }
             return new SingleCellDataRow(access.getRowKey().getString(), cell, m_colIdx, m_cursor.getNumColumns());
         }
