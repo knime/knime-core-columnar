@@ -56,6 +56,8 @@ public interface WriteBatch extends WriteData {
 
     ColumnWriteData get(int index);
 
+    ColumnWriteData[] getUnsafe();
+
     @Override
     ReadBatch close(final int length);
 

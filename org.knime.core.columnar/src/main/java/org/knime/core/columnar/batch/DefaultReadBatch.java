@@ -80,8 +80,8 @@ public class DefaultReadBatch implements ReadBatch {
     }
 
     @Override
-    public ColumnReadData getUnsafe(final int index) {
-        return m_data[index];
+    public ColumnReadData[] getUnsafe() {
+        return m_data;
     }
 
     @Override

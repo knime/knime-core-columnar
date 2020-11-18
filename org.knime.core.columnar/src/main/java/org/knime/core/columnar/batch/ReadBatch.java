@@ -56,8 +56,8 @@ public interface ReadBatch extends ReadData {
 
     ColumnReadData get(int index);
 
-    ColumnReadData getUnsafe(int index);
-
     int getNumColumns();
+
+    ColumnReadData[] getUnsafe();
 
 }

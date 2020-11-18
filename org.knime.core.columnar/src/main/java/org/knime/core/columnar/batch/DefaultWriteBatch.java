@@ -139,4 +139,9 @@ public class DefaultWriteBatch implements WriteBatch {
         return new DefaultReadBatch(data, capacity);
     }
 
+    @Override
+    public ColumnWriteData[] getUnsafe() {
+        return m_data;
+    }
+
 }

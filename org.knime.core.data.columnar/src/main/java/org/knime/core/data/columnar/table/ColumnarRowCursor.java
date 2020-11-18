@@ -100,6 +100,8 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
 
     private int m_currentMaxIndex;
 
+    private ColumnReadData[] m_currentData;
+
     static ColumnarRowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema,
         final long fromRowIndex, final long toRowIndex, final Set<Finalizer> openCursorFinalizers) {
         return create(store, schema, fromRowIndex, toRowIndex, openCursorFinalizers, null);
@@ -193,8 +195,7 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
 
     @Override
     public boolean isMissing(final int index) {
-        // TODO CD - store currentData.
-        return m_currentBatch.getUnsafe(index + 1).isMissing(m_currentIndex);
+        return m_currentData[index + 1].isMissing(m_currentIndex);
     }
 
     @Override
@@ -223,6 +224,7 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
     private void readNextBatch() {
         try {
             m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
+            m_currentData = m_currentBatch.getUnsafe();
             m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this,
                 new ResourceWithRelease(m_currentBatch, ReadBatch::release), m_readerRelease);
             m_openCursorFinalizers.add(m_finalizer);
