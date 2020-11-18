@@ -82,9 +82,7 @@ final class ColumnarStringDomainCalculator
         for (int i = 0; i < length; i++) {
             if (!data.isMissing(i)) {
                 m_index = i;
-                m_values.add(data.getObject(i));
-
-                if (m_values.size() > m_maxNumValues) {
+                if (m_values.add(data.getObject(i)) && m_values.size() > m_maxNumValues) {
                     m_values = null;
                     return;
                 }

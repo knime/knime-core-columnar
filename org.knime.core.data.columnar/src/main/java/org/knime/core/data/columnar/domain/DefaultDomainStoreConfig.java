@@ -164,7 +164,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                 if (isNominal) {
                     final int maxNumValues;
                     if (m_initDomains && domain.hasValues()) {
-                        maxNumValues = domain.getValues().size();
+                        maxNumValues = Math.max(m_maxNumValues, domain.getValues().size());
                     } else {
                         maxNumValues = m_maxNumValues;
                     }
