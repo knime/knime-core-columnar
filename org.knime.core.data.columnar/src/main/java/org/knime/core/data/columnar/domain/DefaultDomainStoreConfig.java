@@ -171,7 +171,9 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                 }
 
                 if (calculator != null) {
-                    calculator.update(spec.getColumnSpec(i - 1).getDomain());
+                    if (m_initDomains) {
+                        calculator.update(spec.getColumnSpec(i - 1).getDomain());
+                    }
                     m_domainCalculators.put(i, calculator);
                 }
             }
