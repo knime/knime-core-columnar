@@ -160,9 +160,14 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                 final boolean isBounded = type.isCompatible(BoundedValue.class);
                 final boolean isNominal = type.isCompatible(NominalValue.class);
 
+                final DataColumnDomain domain = spec.getColumnSpec(i - 1).getDomain();
                 if (isNominal) {
-                    final int maxNumValues =
-                        m_initDomains ? spec.getColumnSpec(i - 1).getDomain().getValues().size() : m_maxNumValues;
+                    final int maxNumValues;
+                    if (m_initDomains && domain.hasValues()) {
+                        maxNumValues = domain.getValues().size();
+                    } else {
+                        maxNumValues = m_maxNumValues;
+                    }
                     if (m_nativeNominalDomainCalculators.containsKey(type)) {
                         calculator = m_nativeNominalDomainCalculators.get(type).apply(maxNumValues);
                     } else if (isBounded) {
@@ -184,7 +189,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
                 if (calculator != null) {
                     if (m_initDomains) {
-                        calculator.update(spec.getColumnSpec(i - 1).getDomain());
+                        calculator.update(domain);
                     }
                     m_domainCalculators.put(i, calculator);
                 }
