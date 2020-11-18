@@ -791,11 +791,11 @@ public class ArrowBufIOTest {
     }
 
     @Test
-    public void testWriteCharsReadLine() {
+    public void testWriteBytesReadLine() {
         final ObjectDataSerializer<String> ser = new ObjectDataSerializer<String>() {
             @Override
             public void serialize(final String obj, final DataOutput output) throws IOException {
-                output.writeChars(obj);
+                output.writeBytes(obj);
             }
 
             @Override
@@ -810,6 +810,8 @@ public class ArrowBufIOTest {
         serdeString("foo\r\nbar", "foo", ser);
         serdeString("foo\nbar", "foo", ser);
     }
+
+    // TODO: write test for writeChars(String)
 
     // ##### Tests for writeUTF(String) and readUTF()
 

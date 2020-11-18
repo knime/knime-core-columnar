@@ -307,14 +307,14 @@ final class ArrowBufIO<T> {
 
         @Override
         public String readLine() {
-            final long maxIndex = m_nextBufferIndex - Character.BYTES;
+            final long maxIndex = m_nextBufferIndex - Byte.BYTES;
             if (m_bufferIndex > maxIndex) {
                 return null;
             }
             final StringBuilder sb = new StringBuilder();
             do { // NOSONAR
-                final char c = m_buffer.getChar(m_bufferIndex);
-                m_bufferIndex += Character.BYTES;
+                final char c = (char)(m_buffer.getByte(m_bufferIndex) & 0xFF);
+                m_bufferIndex += Byte.BYTES;
                 if (c == '\r') {
                     continue;
                 }
