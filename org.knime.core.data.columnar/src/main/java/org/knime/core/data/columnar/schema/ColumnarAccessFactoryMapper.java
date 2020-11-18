@@ -136,7 +136,7 @@ class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFact
 
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final LocalDateTimeAccessSpec spec) {
-        return ColumnarLocalDateAccessFactory.INSTANCE;
+        return ColumnarLocalDateTimeAccessFactory.INSTANCE;
     }
 
     @Override
