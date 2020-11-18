@@ -60,6 +60,7 @@ import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.NominalValue;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.LongCell;
@@ -116,7 +117,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
         m_nativeDomainCalculators.put(DoubleCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
         m_nativeDomainCalculators.put(IntCell.TYPE, () -> new ColumnarIntDomainCalculator());
         m_nativeDomainCalculators.put(LongCell.TYPE, () -> new ColumnarLongDomainCalculator());
-        //        m_nativeDomainCalculators.put(BooleanCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
+        m_nativeDomainCalculators.put(BooleanCell.TYPE, () -> new ColumnarBooleanDomainCalculator());
         m_nativeDomainCalculators.put(StringCell.TYPE, () -> new ColumnarStringDomainCalculator(m_maxNumValues));
     }
 
