@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.batch.DefaultWriteBatch;
@@ -90,6 +91,7 @@ public final class TestColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
+            waitForLatch();
             final ColumnWriteData[] data = new ColumnWriteData[m_schema.getNumColumns()];
             for (int i = 0; i < m_factories.length; i++) {
                 final AbstractTestData testData = m_factories[i].createWriteData(m_maxDataCapacity);
@@ -112,6 +114,7 @@ public final class TestColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
+            waitForLatch();
             final Object[] data = new Object[batch.getNumColumns()];
             for (int i = 0; i < data.length; i++) {
                 final AbstractTestData testData = (AbstractTestData)batch.get(i);
@@ -148,6 +151,7 @@ public final class TestColumnStore implements ColumnStore {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
 
+            waitForLatch();
             final Object[] data = m_batches.get(chunkIndex);
             return ColumnSelection.createBatch(m_selection, i -> {
                 final AbstractTestData testData = m_factories[i].createReadData(data[i]);
@@ -194,6 +198,8 @@ public final class TestColumnStore implements ColumnStore {
     // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
     private volatile boolean m_storeClosed;
 
+    private CountDownLatch m_latch;
+
     public static TestColumnStore create(final ColumnStoreSchema schema, final int maxDataCapacity) {
         final TestColumnStore store = new TestColumnStore(schema, maxDataCapacity);
         ColumnarTest.OPEN_CLOSEABLES.add(store);
@@ -208,6 +214,22 @@ public final class TestColumnStore implements ColumnStore {
             .map(s -> s.accept(TestSchemaMapper.INSTANCE)) //
             .toArray(TestDataFactory[]::new);
         m_maxDataCapacity = maxDataCapacity;
+    }
+
+    public void blockOnCreateWriteRead(final CountDownLatch latch) {
+        m_latch = latch;
+    }
+
+    private void waitForLatch() {
+        if (m_latch != null) {
+            try {
+                m_latch.await();
+            } catch (InterruptedException e) {
+                // Restore interrupted state
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
     }
 
     @Override

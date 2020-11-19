@@ -61,6 +61,10 @@ import static org.knime.core.columnar.TestColumnStoreUtils.tableInStore;
 import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
 
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.junit.Test;
 import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
@@ -208,6 +212,43 @@ public class SmallColumnStoreTest extends ColumnarTest {
             }
             checkCached(table2);
             checkUnflushed(table2, delegate2);
+        }
+    }
+
+    // test for AP-15620
+    @Test
+    public void testGetReaderWhileEvict() throws Exception {
+
+        final SmallColumnStoreCache cache = generateCache();
+        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+                final SmallColumnStore store1 = generateDefaultSmallColumnStore(delegate1, cache);
+                final TestTable table1 = generateDefaultTable(delegate1);
+                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final SmallColumnStore store2 = generateDefaultSmallColumnStore(delegate2, cache);
+                final TestTable table2 = generateDefaultTable(delegate2)) {
+
+            writeTable(store1, table1);
+            final CountDownLatch blockOnWrite1 = new CountDownLatch(1);
+            delegate1.blockOnCreateWriteRead(blockOnWrite1);
+            final ExecutorService executor = Executors.newFixedThreadPool(2);
+            final Future<?> f1 = executor.submit(() -> {
+                // writing table2 leads to eviction of table1, which leads to writing of table1 to delegate1
+                // writing of table1 to delegate1 blocks until blockOnWrite1 is counted down
+                writeTable(store2, table2);
+                return null;
+            });
+            final Future<?> f2 = executor.submit(() -> {
+                blockOnWrite1.countDown();
+                try (final TestTable reassembledTable = readAndCompareTable(store1, table1)) {
+                }
+                return null;
+            });
+            // TODO this test is no 100% solid. if the second thread fully runs fully before the first thread even
+            // commences, the reader will have been created before the table has been evicted from the small cache
+            // this can lead to a false positive test result
+            f1.get();
+            f2.get();
+            executor.shutdown();
         }
     }
 

@@ -50,6 +50,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -73,6 +75,8 @@ import org.knime.core.columnar.store.DelegatingColumnStore;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class SmallColumnStore extends DelegatingColumnStore {
+
+    private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for asynchronous write thread.";
 
     private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
 
@@ -173,6 +177,10 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
         private Table m_table = new Table();
 
+        private final CountDownLatch m_delegateClosed = new CountDownLatch(1);
+
+        private final AtomicBoolean m_flushed = new AtomicBoolean();
+
         SmallColumnStoreWriter() {
             super(SmallColumnStore.this);
         }
@@ -182,7 +190,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             if (m_table != null) {
                 m_table.retainAndAddBatch(batch);
                 if (m_table.sizeOf() > m_smallTableThreshold) {
-                    flush(m_table);
+                    flush(m_table, false);
                     m_table.release();
                     m_table = null;
                 }
@@ -196,8 +204,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             if (m_table != null) {
                 m_globalCache.put(SmallColumnStore.this, m_table, (store, table) -> {
                     try {
-                        flush(table);
-                        closeDelegateWriter();
+                        flush(table, true);
                     } catch (IOException e) {
                         throw new IllegalStateException(ERROR_MESSAGE_ON_FLUSH, e);
                     }
@@ -205,21 +212,47 @@ public final class SmallColumnStore extends DelegatingColumnStore {
                 m_table.release(); // from here on out, the cache is responsible for retaining
                 m_table = null;
             } else {
-                closeDelegateWriter();
+                try {
+                    @SuppressWarnings("resource")
+                    final ColumnDataWriter delegate = initAndGetDelegate();
+                    delegate.close();
+                } finally {
+                    m_delegateClosed.countDown();
+                }
             }
         }
 
-        private synchronized void closeDelegateWriter() throws IOException {
-            super.closeOnce();
+        private void waitForDelegateWriter() {
+            try {
+                m_delegateClosed.await();
+            } catch (InterruptedException e) {
+                // Restore interrupted state
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+            }
         }
 
-        private synchronized void flush(final Table table) throws IOException {
-            if (!m_flushed) {
-                for (int i = 0; i < table.getNumChunks(); i++) {
-                    final ReadBatch batch = table.getBatch(i);
-                    initAndGetDelegate().write(batch);
+        private void flush(final Table table, final boolean close) throws IOException {
+            synchronized (m_flushed) {
+                if (!m_flushed.getAndSet(true)) {
+                    try {
+                        for (int i = 0; i < table.getNumChunks(); i++) {
+                            final ReadBatch batch = table.getBatch(i);
+                            @SuppressWarnings("resource")
+                            final ColumnDataWriter delegate = initAndGetDelegate();
+                            delegate.write(batch);
+                        }
+                        @SuppressWarnings("resource")
+                        final ColumnDataWriter delegate = getDelegate();
+                        if (close && delegate != null) {
+                            delegate.close();
+                        }
+                    } finally {
+                        if (close) {
+                            m_delegateClosed.countDown();
+                        }
+                    }
                 }
-                m_flushed = true;
             }
         }
 
@@ -277,8 +310,6 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     private final LoadingEvictingCache<SmallColumnStore, Table> m_globalCache;
 
-    private boolean m_flushed = false;
-
     // lazily initialized on flush
     private SmallColumnStoreWriter m_writer;
 
@@ -307,18 +338,31 @@ public final class SmallColumnStore extends DelegatingColumnStore {
     protected void saveInternal(final File f) throws IOException {
         final Table cached = m_globalCache.getRetained(SmallColumnStore.this);
         if (cached != null) {
-            m_writer.flush(cached);
-            m_writer.closeDelegateWriter();
+            m_writer.flush(cached, true);
             cached.release();
+        } else {
+            m_writer.waitForDelegateWriter();
         }
 
         super.saveInternal(f);
     }
 
+    @SuppressWarnings("resource")
     @Override
     protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
-        final Table table = m_globalCache.getRetained(SmallColumnStore.this);
-        return table == null ? getDelegate().createReader(selection) : new SmallColumnStoreReader(selection, table);
+        final Table cached = m_globalCache.getRetained(SmallColumnStore.this);
+        if (cached != null) {
+            // cache hit
+            return new SmallColumnStoreReader(selection, cached);
+        } else {
+            // cache miss
+            // we are not putting the small table back into cache here for two reasons:
+            // (1) the CachedColumnStore which this store usually delegates to will already so so
+            // (2) it might not be read fully by the reader, so by putting it back into the cache, we would read
+            // unnecessarily much data
+            m_writer.waitForDelegateWriter();
+            return getDelegate().createReader(selection);
+        }
     }
 
     @Override
