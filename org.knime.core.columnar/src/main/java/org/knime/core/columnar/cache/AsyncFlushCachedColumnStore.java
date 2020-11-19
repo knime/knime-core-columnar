@@ -65,6 +65,8 @@ import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.DelegatingColumnStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link ColumnStore column store} that stores {@link ColumnWriteData data} in a fixed-size
@@ -77,6 +79,8 @@ import org.knime.core.columnar.store.DelegatingColumnStore;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AsyncFlushCachedColumnStore.class);
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for asynchronous write thread.";
 
@@ -134,7 +138,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
                 try {
                     super.closeOnce();
                 } catch (IOException e) {
-                    throw new IllegalStateException("Failed to close writer.", e);
+                	throw new IllegalStateException("Failed to close writer.", e);
                 }
             });
         }
@@ -283,7 +287,8 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         } catch (InterruptedException e) {
             // Restore interrupted state...
             Thread.currentThread().interrupt();
-            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+            LOGGER.info(ERROR_ON_INTERRUPT);
+            return;
         }
         super.saveInternal(f);
     }
@@ -300,9 +305,10 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         } catch (InterruptedException e) {
             // Restore interrupted state...
             Thread.currentThread().interrupt();
-            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+            LOGGER.info(ERROR_ON_INTERRUPT);
         }
 
+        // TODO make asynchronous for wide data?
         for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
             final ColumnReadData removed = m_globalCache.removeRetained(id);
             if (removed != null) {
