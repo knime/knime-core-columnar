@@ -48,6 +48,9 @@
  */
 package org.knime.core.data.columnar.domain;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.data.BooleanValue;
 import org.knime.core.data.DataCell;
@@ -57,60 +60,53 @@ import org.knime.core.data.def.BooleanCell;
 
 final class ColumnarBooleanDomainCalculator implements ColumnarDomainCalculator<BooleanReadData, DataColumnDomain> {
 
-    // 0: missing, 1: false, 2: true, 3: false & true
-    private byte m_type = 0;
+    private Set<Boolean> m_values;
+
+    public ColumnarBooleanDomainCalculator() {
+        m_values = new LinkedHashSet<>();
+    }
 
     @Override
     public final void update(final BooleanReadData data) {
-        if (m_type == 3) {
+        if (m_values == null || m_values.size() == 2) {
             return;
         }
         final int length = data.length();
         for (int i = 0; i < length; i++) {
             if (!data.isMissing(i)) {
-                update(data.getBoolean(i));
+                // TODO that's overly expensive for a simple boolean. However, we use a LinkedHashSet to keep the values in order of appearance.
+                if (m_values.add(data.getBoolean(i)) && m_values.size() == 2) {
+                    m_values = null;
+                    return;
+                }
             }
-        }
-    }
-
-    private void update(final boolean curr) {
-        switch (m_type) {
-            case 0:
-                m_type = curr ? (byte)2 : (byte)1;
-                break;
-            case 1:
-                m_type = curr ? (byte)3 : (byte)1;
-                break;
-            case 2:
-                m_type = curr ? (byte)2 : (byte)3;
-                break;
         }
     }
 
     @Override
     public DataColumnDomain getDomain() {
-        switch (m_type) {
-            case 0:
-                return new DataColumnDomainCreator().createDomain();
-            case 1:
-                return new DataColumnDomainCreator(new DataCell[]{BooleanCell.FALSE}, BooleanCell.FALSE,
-                    BooleanCell.FALSE).createDomain();
-            case 2:
-                return new DataColumnDomainCreator(new DataCell[]{BooleanCell.TRUE}, BooleanCell.TRUE, BooleanCell.TRUE)
-                    .createDomain();
-            case 3:
-                return new DataColumnDomainCreator(new DataCell[]{BooleanCell.FALSE, BooleanCell.TRUE},
-                    BooleanCell.FALSE, BooleanCell.TRUE).createDomain();
-            default:
-                throw new IllegalStateException("Implementation error in Columnar BooleanDomainCalculator.");
+        if (m_values == null || m_values.size() == 0) {
+            return new DataColumnDomainCreator().createDomain();
+        } else if (m_values.size() == 1) {
+            final DataCell[] asArray = m_values.toArray(new DataCell[1]);
+            return new DataColumnDomainCreator(asArray, asArray[0], asArray[0]).createDomain();
+        } else {
+            final DataCell[] asArray = m_values.toArray(new DataCell[2]);
+            return new DataColumnDomainCreator(asArray, BooleanCell.FALSE, BooleanCell.TRUE).createDomain();
         }
     }
 
     @Override
     public void update(final DataColumnDomain domain) {
+        if (m_values == null || m_values.size() == 2) {
+            return;
+        }
         if (domain.hasValues()) {
             for (final DataCell value : domain.getValues()) {
-                update(((BooleanValue)value).getBooleanValue());
+                if (m_values.add(((BooleanValue)value).getBooleanValue()) && m_values.size() == 2) {
+                    m_values = null;
+                    return;
+                }
             }
         }
     }
