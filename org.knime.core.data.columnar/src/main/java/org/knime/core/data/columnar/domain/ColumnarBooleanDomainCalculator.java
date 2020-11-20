@@ -68,7 +68,7 @@ final class ColumnarBooleanDomainCalculator implements ColumnarDomainCalculator<
 
     @Override
     public final void update(final BooleanReadData data) {
-        if (m_values == null || m_values.size() == 2) {
+        if (m_values.size() == 2) {
             return;
         }
         final int length = data.length();
@@ -76,7 +76,6 @@ final class ColumnarBooleanDomainCalculator implements ColumnarDomainCalculator<
             if (!data.isMissing(i)) {
                 // TODO that's overly expensive for a simple boolean. However, we use a LinkedHashSet to keep the values in order of appearance.
                 if (m_values.add(data.getBoolean(i)) && m_values.size() == 2) {
-                    m_values = null;
                     return;
                 }
             }
@@ -85,26 +84,24 @@ final class ColumnarBooleanDomainCalculator implements ColumnarDomainCalculator<
 
     @Override
     public DataColumnDomain getDomain() {
-        if (m_values == null || m_values.size() == 0) {
+        if (m_values.size() == 0) {
             return new DataColumnDomainCreator().createDomain();
-        } else if (m_values.size() == 1) {
-            final DataCell[] asArray = m_values.toArray(new DataCell[1]);
-            return new DataColumnDomainCreator(asArray, asArray[0], asArray[0]).createDomain();
         } else {
-            final DataCell[] asArray = m_values.toArray(new DataCell[2]);
-            return new DataColumnDomainCreator(asArray, BooleanCell.FALSE, BooleanCell.TRUE).createDomain();
+            final DataCell[] asArray =
+                m_values.stream().map((b) -> (b ? BooleanCell.TRUE : BooleanCell.FALSE)).toArray(DataCell[]::new);
+            return m_values.size() == 1 ? new DataColumnDomainCreator(asArray, asArray[0], asArray[0]).createDomain()
+                : new DataColumnDomainCreator(asArray, BooleanCell.FALSE, BooleanCell.TRUE).createDomain();
         }
     }
 
     @Override
     public void update(final DataColumnDomain domain) {
-        if (m_values == null || m_values.size() == 2) {
+        if (m_values.size() == 2) {
             return;
         }
         if (domain.hasValues()) {
             for (final DataCell value : domain.getValues()) {
                 if (m_values.add(((BooleanValue)value).getBooleanValue()) && m_values.size() == 2) {
-                    m_values = null;
                     return;
                 }
             }
