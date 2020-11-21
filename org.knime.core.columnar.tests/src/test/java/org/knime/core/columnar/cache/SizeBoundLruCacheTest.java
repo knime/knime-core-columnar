@@ -47,6 +47,7 @@ package org.knime.core.columnar.cache;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_DATA;
 import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
 import static org.knime.core.columnar.TestColumnStoreUtils.createTable;
 
@@ -67,7 +68,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutGet() throws Exception {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(1);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
         try (final TestColumnStore store = TestColumnStore.create(createSchema(1));
                 final TestTable table = createTable(store, 1)) {
             final TestDoubleData data = table.getBatch(0)[0];
@@ -94,7 +95,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutEvictLoadGet() throws Exception {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(1);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
         try (final TestColumnStore store = TestColumnStore.create(createSchema(2));
                 final TestTable table = createTable(store, 1)) {
             final TestDoubleData[] batch = table.getBatch(0);
@@ -129,7 +130,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutRemove() throws Exception {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(1);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
         try (final TestColumnStore store = TestColumnStore.create(createSchema(1));
                 final TestTable table = createTable(store, 1)) {
             final TestDoubleData data = table.getBatch(0)[0];
@@ -151,7 +152,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
 
     @Test
     public void testLru() throws Exception {
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(2);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA * 2);
         try (final TestColumnStore store = TestColumnStore.create(createSchema(3));
                 final TestTable table = createTable(store, 1)) {
             final TestDoubleData[] batch = table.getBatch(0);
