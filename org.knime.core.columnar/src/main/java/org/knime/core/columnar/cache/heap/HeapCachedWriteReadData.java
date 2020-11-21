@@ -54,6 +54,7 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
+//TODO for AP-15619: split into two classes to reduce statefulness
 final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectReadData<T> {
 
     private final ObjectWriteData<T> m_writeDelegate;
@@ -74,6 +75,7 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     @Override
     public void setMissing(final int index) {
+        m_data.set(index, null);
     }
 
     @Override
@@ -121,10 +123,9 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     @Override
     public void expand(final int minimumCapacity) {
-        // TODO do we need synchronization here?
         m_writeDelegate.expand(minimumCapacity);
 
-        // TODO efficiency
+        // TODO for AP-15619: consider replacing the AtomicReferenceArray with a simple array
         final AtomicReferenceArray<T> expanded = new AtomicReferenceArray<>(m_writeDelegate.capacity());
         for (int i = 0; i < m_data.length(); i++) {
             expanded.set(i, m_data.get(i));
@@ -139,12 +140,10 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     @Override
     public T getObject(final int index) {
-        // TODO MarcB what if m_data.get(index) returns null?
         return m_data.get(index);
     }
 
     AtomicReferenceArray<T> getData() {
-        // TODO sync required?
         return m_data;
     }
 
