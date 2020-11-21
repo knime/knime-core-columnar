@@ -65,15 +65,32 @@ import org.knime.core.data.v2.WriteValue;
 
 final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, RowWrite {
 
+    // the initial capacity (in number of held elements) of a single chunk
+    private static final int CAPACITY_INIT_DEF = 2;
+
+    private static final String CAPACITY_INIT_PROPERTY = "knime.columnar.capacity.initial";
+
+    private static final int CAPACITY_INIT = Integer.getInteger(CAPACITY_INIT_PROPERTY, CAPACITY_INIT_DEF);
+
+    // the maximum capacity (in number of held elements) of a single chunk
+    private static final int CAPACITY_MAX_DEF = (2 << 15); // 64 K
+
+    private static final String CAPACITY_MAX_PROPERTY = "knime.columnar.capacity.max";
+
+    private static final int CAPACITY_MAX = Integer.getInteger(CAPACITY_MAX_PROPERTY, CAPACITY_MAX_DEF);
+
+    // the target size (in bytes) of a full batch
+    private static final long BATCH_SIZE_TARGET_DEF = 2L << 25; // 64 MB
+
+    private static final String BATCH_SIZE_TARGET_PROPERTY = "knime.columnar.batch.size.target";
+
+    private static final long BATCH_SIZE_TARGET = Long.getLong(BATCH_SIZE_TARGET_PROPERTY, BATCH_SIZE_TARGET_DEF);
+
     private final ColumnDataFactory m_columnDataFactory;
 
     private final ColumnDataWriter m_writer;
 
     private final ColumnarWriteValueFactory<?>[] m_factories;
-
-    private final int m_maxCapacity = Integer.getInteger("knime.columnar.chunksize", (int)Math.pow(2, 15) - 750); // subtract 750 to make arrow happy (and not exceed 2^15)
-
-    private final long m_maxSizeInBytes = 1024 * 1024 * 128;
 
     private final WriteValue<?>[] m_values;
 
@@ -81,7 +98,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private WriteBatch m_currentBatch;
 
-    private long m_currentMaxIndex;
+    private int m_currentMaxIndex;
 
     private int m_currentIndex;
 
@@ -201,20 +218,19 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
          * and not the size of the actual written data which will lead to bad chunkSize estimates in the code below.
          */
         if (m_adjusting && m_currentBatch != null) {
-            final long sizeInBytes = m_currentBatch.sizeOf();
-            final double factor = m_maxSizeInBytes / sizeInBytes;
-            final long newCapacity = Math.min(m_maxCapacity, (long)(m_currentBatch.capacity() * factor));
-            if (factor > 1 && m_currentBatch.capacity() <= newCapacity) {
-                m_currentBatch.expand((int)newCapacity);
+            m_adjusting = false; // we only do a single adaption of the capacity
+            final double factor = BATCH_SIZE_TARGET / m_currentBatch.sizeOf();
+            final int curCapacity = m_currentBatch.capacity();
+            final int newCapacity = (int)Math.min(CAPACITY_MAX, curCapacity * factor); // can't exceed Integer.MAX_VALUE
+            if (curCapacity < newCapacity) { // if factor < 1, then curCapacity cannot be smaller than newCapacity
+                m_currentBatch.expand(newCapacity);
                 m_currentMaxIndex = m_currentBatch.capacity() - 1;
                 return;
-            } else {
-                m_adjusting = false;
             }
         }
 
         // minimum chunk size is 2.
-        final int chunkSize = m_currentBatch == null ? 2 : m_currentBatch.capacity();
+        final int chunkSize = m_currentBatch == null ? CAPACITY_INIT : m_currentBatch.capacity();
         writeCurrentBatch(m_currentIndex);
 
         // TODO adjust batch size on the fly (expand).
@@ -222,7 +238,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
         m_currentBatch = m_columnDataFactory.create(chunkSize);
         m_currentData = m_currentBatch.getUnsafe();
         updateWriteValues(m_currentBatch);
-        m_currentMaxIndex = m_currentBatch.capacity() - 1l;
+        m_currentMaxIndex = m_currentBatch.capacity() - 1;
     }
 
     private void updateWriteValues(final WriteBatch batch) {
