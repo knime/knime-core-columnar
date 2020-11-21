@@ -100,7 +100,7 @@ final class ArrowColumnStore implements ColumnStore {
                 chunk[i] =
                     ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, chunkSize);
             }
-            return new DefaultWriteBatch(chunk, chunkSize);
+            return new DefaultWriteBatch(chunk);
         };
     }
 
