@@ -66,14 +66,11 @@ public class DefaultWriteBatch implements WriteBatch {
 
     private int m_capacity;
 
-    public DefaultWriteBatch(final ColumnWriteData[] data, final int capacity) {
+    public DefaultWriteBatch(final ColumnWriteData[] data) {
         Objects.requireNonNull(data, () -> "Column data must not be null.");
-        if (capacity < 0) {
-            throw new IllegalArgumentException("Capacity must be non-negative.");
-        }
 
         m_data = data;
-        m_capacity = capacity;
+        m_capacity = Arrays.stream(m_data).mapToInt(ColumnWriteData::capacity).min().orElse(0);
     }
 
     @Override

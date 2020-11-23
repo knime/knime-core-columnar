@@ -98,7 +98,7 @@ public final class TestColumnStore implements ColumnStore {
                 data[i] = testData;
                 m_tracker.add(testData);
             }
-            return new DefaultWriteBatch(data, chunkSize);
+            return new DefaultWriteBatch(data);
         }
 
     }

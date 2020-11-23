@@ -103,7 +103,7 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
                     data[i] = batch.get(i);
                 }
             }
-            return new DefaultWriteBatch(data, batch.capacity());
+            return new DefaultWriteBatch(data);
         }
 
     }
