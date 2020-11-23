@@ -118,7 +118,14 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     @Override
     public synchronized long sizeOf() {
-        return m_readDelegate != null ? m_readDelegate.sizeOf() : m_writeDelegate.sizeOf();
+    	if (isSerialized()) {
+    		return m_readDelegate.sizeOf();
+    	}
+    	// Instead of flushing to the capacity, we could also remember the largest set index and only flush until there.
+    	// But that would cost us an additional operation per value, even if sizeof is never called.
+    	// So we are probably better of this way.
+    	serialize(capacity());
+    	return m_writeDelegate.sizeOf();
     }
 
     @Override
@@ -157,15 +164,19 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
         return m_length != -1;
     }
 
+    private void serialize(final int toIndex) {
+        for(int i = 0; i < toIndex; i++) {
+            final T t = m_data.get(i);
+            if (t != null) {
+                m_writeDelegate.setObject(i, t);
+            }
+        }
+    }
+
     synchronized void serialize() {
         checkClosed();
         if (!isSerialized()) {
-            for (int i = 0; i < m_length; i++) {
-                final T t = m_data.get(i);
-                if (t != null) {
-                    m_writeDelegate.setObject(i, t);
-                }
-            }
+            serialize(m_length);
             m_readDelegate = m_writeDelegate.close(m_length);
             for (int i = 0; i < m_refDiff; i++) {
                 m_readDelegate.retain();
