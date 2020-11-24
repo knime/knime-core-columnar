@@ -216,7 +216,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private final void switchToNextData() {
         if (m_adjusting && m_currentBatch != null) {
-            final long factor = Math.min(2L, BATCH_SIZE_TARGET / m_currentBatch.sizeOf());
+            final long factor = Math.min(8, BATCH_SIZE_TARGET / m_currentBatch.sizeOf());
             final int curCapacity = m_currentBatch.capacity();
             final int newCapacity = (int)Math.min(CAPACITY_MAX, curCapacity * factor); // can't exceed Integer.MAX_VALUE
             if (curCapacity < newCapacity) { // if factor < 1, then curCapacity > newCapacity
