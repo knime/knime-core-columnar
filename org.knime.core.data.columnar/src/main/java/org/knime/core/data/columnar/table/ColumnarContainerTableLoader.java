@@ -45,7 +45,6 @@
  */
 package org.knime.core.data.columnar.table;
 
-import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.ExtensionTable.LoadContext;
 import org.knime.core.node.ExtensionTableLoader;
@@ -59,11 +58,10 @@ import org.knime.core.node.InvalidSettingsException;
  */
 public class ColumnarContainerTableLoader implements ExtensionTableLoader {
 
-    @SuppressWarnings("resource")
     @Override
     public ExtensionTable load(final LoadContext context) throws InvalidSettingsException {
         final SavedColumnarContainerTable table = new SavedColumnarContainerTable(context);
-        table.m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(table, table.getStore());
+        table.initStoreCloser();
         return table;
     }
 
@@ -74,17 +72,8 @@ public class ColumnarContainerTableLoader implements ExtensionTableLoader {
 
     private static final class SavedColumnarContainerTable extends AbstractColumnarContainerTable {
 
-        // effectively final
-        private Finalizer m_storeCloser;
-
         SavedColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
             super(context);
-        }
-
-        @Override
-        public void clear() {
-            m_storeCloser.close();
-            super.clear();
         }
 
     }

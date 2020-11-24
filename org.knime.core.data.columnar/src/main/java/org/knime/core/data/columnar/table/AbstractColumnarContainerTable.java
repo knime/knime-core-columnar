@@ -62,6 +62,7 @@ import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
+import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -102,6 +103,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final ColumnReadStore m_store;
 
+    // effectively final
+    private Finalizer m_storeCloser;
+
     @SuppressWarnings("resource")
     AbstractColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
         final NodeSettingsRO settings = context.getSettings();
@@ -111,6 +115,13 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         m_schema = ColumnarValueSchemaUtils
             .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
         m_store = ColumnarPreferenceUtils.wrap(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile()));
+    }
+
+    void initStoreCloser() {
+        final ResourceWithRelease readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
+            finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
+        final ResourceWithRelease storeRelease = new ResourceWithRelease(m_store);
+        m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, storeRelease);
     }
 
     @Override
@@ -166,6 +177,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     @Override
     public void clear() {
+        if (m_storeCloser != null) {
+            m_storeCloser.close();
+        }
         for (final Finalizer closer : m_openCursorFinalizers) {
             closer.releaseResourcesAndLogOutput();
         }
