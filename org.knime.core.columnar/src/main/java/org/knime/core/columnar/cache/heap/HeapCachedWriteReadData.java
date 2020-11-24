@@ -64,6 +64,8 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
     private ObjectReadData<T> m_readDelegate;
 
     private int m_length = -1;
+    
+    private int m_serializeFromIndex = 0;
 
     // reference difference between close and serialize
     private int m_refDiff = 0;
@@ -164,11 +166,14 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
         return m_length != -1;
     }
 
-    private void serialize(final int toIndex) {
-        for(int i = 0; i < toIndex; i++) {
+    private void serialize(final int length) {
+        for(int i = m_serializeFromIndex; i < length; i++) {
             final T t = m_data.get(i);
             if (t != null) {
                 m_writeDelegate.setObject(i, t);
+                // The value that has been serialized last will have to be serialized again in the next invocation of
+                // serialize, since it might have been updated or set to missing in the meantime.
+                m_serializeFromIndex = i; 
             }
         }
     }

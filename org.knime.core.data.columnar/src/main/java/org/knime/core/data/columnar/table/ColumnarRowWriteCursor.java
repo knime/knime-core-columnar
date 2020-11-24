@@ -66,6 +66,7 @@ import org.knime.core.data.v2.WriteValue;
 final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, RowWrite {
 
     // the initial capacity (in number of held elements) of a single chunk
+    // arrow has a minimum capacity of 2
     private static final int CAPACITY_INIT_DEF = 2;
 
     private static final String CAPACITY_INIT_PROPERTY = "knime.columnar.capacity.initial";
@@ -73,14 +74,15 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
     private static final int CAPACITY_INIT = Integer.getInteger(CAPACITY_INIT_PROPERTY, CAPACITY_INIT_DEF);
 
     // the maximum capacity (in number of held elements) of a single chunk
-    private static final int CAPACITY_MAX_DEF = (2 << 15); // 64 K
+    // subtract 750 since arrow rounds up to the next power of 2 anyways
+    private static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
 
     private static final String CAPACITY_MAX_PROPERTY = "knime.columnar.capacity.max";
 
     private static final int CAPACITY_MAX = Integer.getInteger(CAPACITY_MAX_PROPERTY, CAPACITY_MAX_DEF);
 
     // the target size (in bytes) of a full batch
-    private static final long BATCH_SIZE_TARGET_DEF = 2L << 25; // 64 MB
+    private static final long BATCH_SIZE_TARGET_DEF = 1L << 26; // 64 MB
 
     private static final String BATCH_SIZE_TARGET_PROPERTY = "knime.columnar.batch.size.target";
 
@@ -108,7 +110,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private boolean m_adjusting;
 
-    ColumnarRowWriteCursor(final ColumnStore store, final ColumnarWriteValueFactory<?>[] factories) throws IOException {
+    ColumnarRowWriteCursor(final ColumnStore store, final ColumnarWriteValueFactory<?>[] factories) {
         m_columnDataFactory = store.getFactory();
         m_writer = store.getWriter();
         m_factories = factories;
@@ -121,7 +123,8 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     @Override
     public final RowWrite forward() {
-        if (++m_currentIndex > m_currentMaxIndex) {
+        m_currentIndex++;
+        if (m_currentIndex > m_currentMaxIndex) {
             switchToNextData();
         }
         return this;
@@ -212,28 +215,22 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
     }
 
     private final void switchToNextData() {
-        /* TODO smarter logic possible. We need, however, keep in mind, that arrow
-         * tries to allocate in power of 2 sizes, i.e. if we allocate a double vector with 17 entries,
-         * arrow will allocate a bigger vector. The sizeOf method of arrow will return the size of the bigger vector
-         * and not the size of the actual written data which will lead to bad chunkSize estimates in the code below.
-         */
         if (m_adjusting && m_currentBatch != null) {
-            m_adjusting = false; // we only do a single adaption of the capacity
-            final double factor = BATCH_SIZE_TARGET / m_currentBatch.sizeOf();
+            final long factor = Math.min(2L, BATCH_SIZE_TARGET / m_currentBatch.sizeOf());
             final int curCapacity = m_currentBatch.capacity();
             final int newCapacity = (int)Math.min(CAPACITY_MAX, curCapacity * factor); // can't exceed Integer.MAX_VALUE
-            if (curCapacity < newCapacity) { // if factor < 1, then curCapacity cannot be smaller than newCapacity
+            if (curCapacity < newCapacity) { // if factor < 1, then curCapacity > newCapacity
                 m_currentBatch.expand(newCapacity);
                 m_currentMaxIndex = m_currentBatch.capacity() - 1;
                 return;
+            } else {
+                m_adjusting = false;
             }
         }
 
-        // minimum chunk size is 2.
         final int chunkSize = m_currentBatch == null ? CAPACITY_INIT : m_currentBatch.capacity();
         writeCurrentBatch(m_currentIndex);
 
-        // TODO adjust batch size on the fly (expand).
         // TODO can we preload data?
         m_currentBatch = m_columnDataFactory.create(chunkSize);
         m_currentData = m_currentBatch.getUnsafe();

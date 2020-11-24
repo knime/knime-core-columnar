@@ -47,6 +47,9 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.WriteData;
 
+/**
+ * The contract is that values are only ever set for ascending indices.
+ */
 @SuppressWarnings("javadoc")
 public interface ColumnWriteData extends WriteData {
 
