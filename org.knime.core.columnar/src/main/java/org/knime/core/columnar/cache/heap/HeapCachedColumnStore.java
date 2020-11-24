@@ -74,6 +74,8 @@ import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.DelegatingColumnStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link ColumnStore} interception {@link ObjectReadData} for in-heap caching of objects.
@@ -83,6 +85,10 @@ import org.knime.core.columnar.store.DelegatingColumnStore;
  * @since 4.3
  */
 public final class HeapCachedColumnStore extends DelegatingColumnStore {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeapCachedColumnStore.class);
+
+    private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
     private final class Factory extends DelegatingColumnDataFactory {
 
@@ -123,7 +129,14 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
             batch.retain();
 
-            waitForPrevBatch();
+            try {
+                waitForPrevBatch();
+            } catch (InterruptedException e) {
+                // Restore interrupted state...
+                Thread.currentThread().interrupt();
+                LOGGER.info(ERROR_ON_INTERRUPT, e);
+                return;
+            }
             final List<CompletableFuture<?>> futures = new ArrayList<>();
 
             for (int i = 0; i < batch.getNumColumns(); i++) {
@@ -159,17 +172,19 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
         @Override
         protected void closeOnce() throws IOException {
-            waitForPrevBatch();
-            super.closeOnce();
-        }
-
-        private void waitForPrevBatch() {
             try {
-                m_serializationFuture.get();
+                waitForPrevBatch();
             } catch (InterruptedException e) {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("Interrupted while waiting for serialization thread.", e);
+                LOGGER.info(ERROR_ON_INTERRUPT, e);
+            }
+            super.closeOnce();
+        }
+
+        private void waitForPrevBatch() throws InterruptedException {
+            try {
+                m_serializationFuture.get();
             } catch (ExecutionException e) {
                 throw new IllegalStateException("Failed to asynchronously serialize object data.", e);
             }
