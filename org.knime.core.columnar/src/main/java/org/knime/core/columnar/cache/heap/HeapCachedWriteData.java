@@ -54,10 +54,9 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-//TODO for AP-15619: split into two classes to reduce statefulness
-final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectReadData<T> {
+final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
-    private final ObjectWriteData<T> m_writeDelegate;
+    private final ObjectWriteData<T> m_delegate;
 
     // We should not need a thread-safe data structure (i.e., an AtomicReferenceArray) here.
     // Reasoning: In Java, there is a happens-before relation between one thread starting another.
@@ -65,17 +64,10 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
     // one that starts the serialization thread in HeapCachedColumnStore#writeInternal(ReadBatch).
     private Object[] m_data;
 
-    private ObjectReadData<T> m_readDelegate;
-
-    private int m_length = -1;
-
     private int m_serializeFromIndex = 0;
 
-    // reference difference between close and serialize
-    private int m_refDiff = 0;
-
-    HeapCachedWriteReadData(final ObjectWriteData<T> delegate) {
-        m_writeDelegate = delegate;
+    HeapCachedWriteData(final ObjectWriteData<T> delegate) {
+        m_delegate = delegate;
         m_data = new Object[delegate.capacity()];
     }
 
@@ -85,59 +77,33 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
     }
 
     @Override
-    public boolean isMissing(final int index) {
-        return m_data[index] == null;
-    }
-
-    @Override
     public int capacity() {
-        return m_writeDelegate.capacity();
+        return m_delegate.capacity();
     }
 
     @Override
-    public int length() {
-        checkClosed();
-        return m_length;
+    public void retain() {
+            m_delegate.retain();
     }
 
     @Override
-    public synchronized void retain() {
-        if (!isClosed()) {
-            m_writeDelegate.retain();
-        } else if (isSerialized()) {
-            m_readDelegate.retain();
-        } else {
-            m_refDiff++;
-        }
+    public void release() {
+            m_delegate.release();
     }
 
     @Override
-    public synchronized void release() {
-        if (!isClosed()) {
-            m_writeDelegate.release();
-        } else if (isSerialized()) {
-            m_readDelegate.release();
-        } else {
-            m_refDiff--;
-        }
-    }
-
-    @Override
-    public synchronized long sizeOf() {
-    	if (isSerialized()) {
-    		return m_readDelegate.sizeOf();
-    	}
+    public long sizeOf() {
     	// Instead of flushing to the capacity, we could also remember the largest set index and only flush until there.
     	// But that would cost us an additional operation per value, even if sizeof is never called.
     	// So we are probably better of this way.
     	serialize(capacity());
-    	return m_writeDelegate.sizeOf();
+    	return m_delegate.sizeOf();
     }
 
     @Override
     public void expand(final int minimumCapacity) {
-        m_writeDelegate.expand(minimumCapacity);
-        m_data = Arrays.copyOf(m_data, m_writeDelegate.capacity());
+        m_delegate.expand(minimumCapacity);
+        m_data = Arrays.copyOf(m_data, m_delegate.capacity());
     }
 
     @Override
@@ -145,31 +111,17 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
         m_data[index] = obj;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public T getObject(final int index) {
-        return (T)m_data[index];
+    public ObjectReadData<T> close(final int length) {
+        return new HeapCachedReadData<>(this, m_data, length);
     }
 
-    Object[] getData() {
-        return m_data;
-    }
-
-    @Override
-    public synchronized ObjectReadData<T> close(final int length) {
-        m_length = length;
-        return this;
-    }
-
-    private boolean isClosed() {
-        return m_length != -1;
-    }
-
-    private void serialize(final int length) {
+    void serialize(final int length) {
         for(int i = m_serializeFromIndex; i < length; i++) {
-            final T t = getObject(i);
+            @SuppressWarnings("unchecked")
+            final T t = (T)m_data[i];
             if (t != null) {
-                m_writeDelegate.setObject(i, t);
+                m_delegate.setObject(i, t);
                 // The value that has been serialized last will have to be serialized again in the next invocation of
                 // serialize, since it might have been updated or set to missing in the meantime.
                 m_serializeFromIndex = i;
@@ -177,31 +129,8 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
         }
     }
 
-    synchronized void serialize() {
-        checkClosed();
-        if (!isSerialized()) {
-            serialize(m_length);
-            m_readDelegate = m_writeDelegate.close(m_length);
-            for (int i = 0; i < m_refDiff; i++) {
-                m_readDelegate.retain();
-            }
-        }
+    ObjectWriteData<T> getDelegate() {
+        return m_delegate;
     }
 
-    private boolean isSerialized() {
-        return m_readDelegate != null;
-    }
-
-    ObjectReadData<T> getDelegate() {
-        if (!isSerialized()) {
-            throw new IllegalStateException("Data has not been serialized.");
-        }
-        return m_readDelegate;
-    }
-
-    private void checkClosed() {
-        if (!isClosed()) {
-            throw new IllegalStateException("Data has not been closed.");
-        }
-    }
 }
