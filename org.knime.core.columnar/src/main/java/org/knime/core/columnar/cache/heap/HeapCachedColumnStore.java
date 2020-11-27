@@ -57,7 +57,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
@@ -198,7 +197,7 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
     private final ColumnSelection m_objectData;
 
-    private final Map<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+    private final Map<ColumnDataUniqueId, Object[]> m_cache;
 
     private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 

@@ -47,7 +47,6 @@
 package org.knime.core.columnar.cache.heap;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.data.ObjectData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
@@ -64,9 +63,9 @@ final class HeapCachedLoadingReadData<T> implements ObjectReadData<T> {
 
     private final ObjectReadData<T> m_delegate;
 
-    private AtomicReferenceArray<T> m_data;
+    private Object[] m_data;
 
-    HeapCachedLoadingReadData(final ObjectReadData<T> delegate, final AtomicReferenceArray<T> data) {
+    HeapCachedLoadingReadData(final ObjectReadData<T> delegate, final Object[] data) {
         m_delegate = delegate;
         m_data = data;
     }
@@ -100,9 +99,13 @@ final class HeapCachedLoadingReadData<T> implements ObjectReadData<T> {
         return m_delegate.sizeOf();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public T getObject(final int index) {
-        return m_data.updateAndGet(index, o -> o == null ? m_delegate.getObject(index) : o);
+        if (m_data[index] == null) {
+            m_data[index] = m_delegate.getObject(index);
+        }
+        return (T)m_data[index];
     }
 
 }

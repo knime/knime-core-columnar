@@ -50,7 +50,6 @@ package org.knime.core.columnar.cache.heap;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
@@ -64,13 +63,13 @@ import com.google.common.cache.RemovalListener;
  */
 public class SoftReferencedObjectCache implements ObjectDataCache {
 
-    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+    private final Cache<ColumnDataUniqueId, Object[]> m_cache;
 
     /**
      * Constructor
      */
     public SoftReferencedObjectCache() {
-        final RemovalListener<ColumnDataUniqueId, AtomicReferenceArray<?>> removalListener = removalNotification -> {
+        final RemovalListener<ColumnDataUniqueId, Object[]> removalListener = removalNotification -> {
             if (removalNotification.wasEvicted()) {
                 final ColumnDataUniqueId ccuid = removalNotification.getKey();
                 @SuppressWarnings("resource")
@@ -84,7 +83,7 @@ public class SoftReferencedObjectCache implements ObjectDataCache {
     }
 
     @Override
-    public Map<ColumnDataUniqueId, AtomicReferenceArray<?>> getCache() {
+    public Map<ColumnDataUniqueId, Object[]> getCache() {
         return m_cache.asMap();
     }
 

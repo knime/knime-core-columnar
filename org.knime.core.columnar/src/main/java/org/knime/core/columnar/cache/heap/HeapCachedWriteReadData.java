@@ -46,7 +46,7 @@
  */
 package org.knime.core.columnar.cache.heap;
 
-import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.Arrays;
 
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
@@ -59,12 +59,16 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     private final ObjectWriteData<T> m_writeDelegate;
 
-    private AtomicReferenceArray<T> m_data;
+    // We should not need a thread-safe data structure (i.e., an AtomicReferenceArray) here.
+    // Reasoning: In Java, there is a happens-before relation between one thread starting another.
+    // Here, the "writer thread", i.e., the thread that creates the data and calls setObject() should be the same as the
+    // one that starts the serialization thread in HeapCachedColumnStore#writeInternal(ReadBatch).
+    private Object[] m_data;
 
     private ObjectReadData<T> m_readDelegate;
 
     private int m_length = -1;
-    
+
     private int m_serializeFromIndex = 0;
 
     // reference difference between close and serialize
@@ -72,17 +76,17 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     HeapCachedWriteReadData(final ObjectWriteData<T> delegate) {
         m_writeDelegate = delegate;
-        m_data = new AtomicReferenceArray<>(delegate.capacity());
+        m_data = new Object[delegate.capacity()];
     }
 
     @Override
     public void setMissing(final int index) {
-        m_data.set(index, null);
+        m_data[index] = null;
     }
 
     @Override
     public boolean isMissing(final int index) {
-        return m_data.get(index) == null;
+        return m_data[index] == null;
     }
 
     @Override
@@ -133,26 +137,21 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
     @Override
     public void expand(final int minimumCapacity) {
         m_writeDelegate.expand(minimumCapacity);
-
-        // TODO for AP-15619: consider replacing the AtomicReferenceArray with a simple array
-        final AtomicReferenceArray<T> expanded = new AtomicReferenceArray<>(m_writeDelegate.capacity());
-        for (int i = 0; i < m_data.length(); i++) {
-            expanded.set(i, m_data.get(i));
-        }
-        m_data = expanded;
+        m_data = Arrays.copyOf(m_data, m_writeDelegate.capacity());
     }
 
     @Override
     public void setObject(final int index, final T obj) {
-        m_data.set(index, obj);
+        m_data[index] = obj;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public T getObject(final int index) {
-        return m_data.get(index);
+        return (T)m_data[index];
     }
 
-    AtomicReferenceArray<T> getData() {
+    Object[] getData() {
         return m_data;
     }
 
@@ -168,12 +167,12 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
 
     private void serialize(final int length) {
         for(int i = m_serializeFromIndex; i < length; i++) {
-            final T t = m_data.get(i);
+            final T t = getObject(i);
             if (t != null) {
                 m_writeDelegate.setObject(i, t);
                 // The value that has been serialized last will have to be serialized again in the next invocation of
                 // serialize, since it might have been updated or set to missing in the meantime.
-                m_serializeFromIndex = i; 
+                m_serializeFromIndex = i;
             }
         }
     }
@@ -193,7 +192,7 @@ final class HeapCachedWriteReadData<T> implements ObjectWriteData<T>, ObjectRead
         return m_readDelegate != null;
     }
 
-    ObjectReadData<?> getDelegate() {
+    ObjectReadData<T> getDelegate() {
         if (!isSerialized()) {
             throw new IllegalStateException("Data has not been serialized.");
         }

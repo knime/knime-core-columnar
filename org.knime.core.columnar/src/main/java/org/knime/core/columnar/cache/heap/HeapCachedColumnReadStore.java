@@ -53,7 +53,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
@@ -90,10 +89,10 @@ public final class HeapCachedColumnReadStore extends DelegatingColumnReadStore {
         private <T> HeapCachedLoadingReadData<T> wrap(final ReadBatch batch, final int batchIndex,
             final int columnIndex) {
             final ObjectReadData<T> columnReadData = (ObjectReadData<T>)batch.get(columnIndex);
-            final AtomicReferenceArray<T> array = (AtomicReferenceArray<T>)m_cache
+            final Object[] array = m_cache
                 .computeIfAbsent(new ColumnDataUniqueId(HeapCachedColumnReadStore.this, columnIndex, batchIndex), k -> {
                     m_cachedData.add(k);
-                    return new AtomicReferenceArray<>(columnReadData.length());
+                    return new Object[columnReadData.length()];
                 });
             return new HeapCachedLoadingReadData<>(columnReadData, array);
         }
@@ -102,7 +101,7 @@ public final class HeapCachedColumnReadStore extends DelegatingColumnReadStore {
 
     private final ColumnSelection m_objectData;
 
-    private final Map<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+    private final Map<ColumnDataUniqueId, Object[]> m_cache;
 
     private Set<ColumnDataUniqueId> m_cachedData;
 

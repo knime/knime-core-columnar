@@ -49,7 +49,6 @@
 package org.knime.core.columnar.cache.heap;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
@@ -63,6 +62,6 @@ public interface ObjectDataCache {
     /**
      * @return the object cache
      */
-    Map<ColumnDataUniqueId, AtomicReferenceArray<?>> getCache();
+    Map<ColumnDataUniqueId, Object[]> getCache();
 
 }

@@ -49,7 +49,6 @@
 package org.knime.core.columnar.cache.heap;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
@@ -62,7 +61,7 @@ import com.google.common.cache.CacheBuilder;
  */
 public class WeakReferencedObjectCache implements ObjectDataCache {
 
-    private final Cache<ColumnDataUniqueId, AtomicReferenceArray<?>> m_cache;
+    private final Cache<ColumnDataUniqueId, Object[]> m_cache;
 
     /**
      * Constructor
@@ -72,7 +71,7 @@ public class WeakReferencedObjectCache implements ObjectDataCache {
     }
 
     @Override
-    public Map<ColumnDataUniqueId, AtomicReferenceArray<?>> getCache() {
+    public Map<ColumnDataUniqueId, Object[]> getCache() {
         return m_cache.asMap();
     }
 
