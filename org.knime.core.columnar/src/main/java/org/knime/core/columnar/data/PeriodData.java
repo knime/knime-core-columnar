@@ -47,21 +47,33 @@ package org.knime.core.columnar.data;
 
 import java.time.Period;
 
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+
 @SuppressWarnings("javadoc")
 public final class PeriodData {
 
     private PeriodData() {
     }
 
-    public static interface PeriodReadData extends ColumnReadData {
+    public static interface PeriodReadData extends ObjectReadData<Period> {
 
         Period getPeriod(int index);
 
+        @Override
+        default Period getObject(final int index) {
+            return getPeriod(index);
+        }
     }
 
-    public static interface PeriodWriteData extends ColumnWriteData {
+    public static interface PeriodWriteData extends ObjectWriteData<Period> {
 
         void setPeriod(int index, Period val);
+
+        @Override
+        default void setObject(final int index, final Period obj) {
+            setPeriod(index, obj);
+        }
 
         @Override
         PeriodReadData close(int length);
@@ -79,7 +91,5 @@ public final class PeriodData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
-
     }
-
 }

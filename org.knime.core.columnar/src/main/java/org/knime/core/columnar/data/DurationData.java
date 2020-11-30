@@ -47,19 +47,33 @@ package org.knime.core.columnar.data;
 
 import java.time.Duration;
 
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+
 @SuppressWarnings("javadoc")
 public final class DurationData {
 
     private DurationData() {
     }
 
-    public static interface DurationReadData extends ColumnReadData {
+    public static interface DurationReadData extends ObjectReadData<Duration> {
+
         Duration getDuration(int index);
+
+        @Override
+        default Duration getObject(final int index) {
+            return getDuration(index);
+        }
     }
 
-    public static interface DurationWriteData extends ColumnWriteData {
+    public static interface DurationWriteData extends ObjectWriteData<Duration> {
 
         void setDuration(int index, Duration val);
+
+        @Override
+        default void setObject(final int index, final Duration obj) {
+            setDuration(index, obj);
+        }
 
         @Override
         DurationReadData close(int length);
@@ -77,6 +91,5 @@ public final class DurationData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
-
     }
 }

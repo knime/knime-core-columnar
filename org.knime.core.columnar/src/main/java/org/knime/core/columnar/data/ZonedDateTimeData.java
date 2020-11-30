@@ -47,21 +47,33 @@ package org.knime.core.columnar.data;
 
 import java.time.ZonedDateTime;
 
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+
 @SuppressWarnings("javadoc")
 public final class ZonedDateTimeData {
 
     private ZonedDateTimeData() {
     }
 
-    public static interface ZonedDateTimeReadData extends ColumnReadData {
+    public static interface ZonedDateTimeReadData extends ObjectReadData<ZonedDateTime> {
 
         ZonedDateTime getZonedDateTime(int index);
 
+        @Override
+        default ZonedDateTime getObject(final int index) {
+            return getZonedDateTime(index);
+        }
     }
 
-    public static interface ZonedDateTimeWriteData extends ColumnWriteData {
+    public static interface ZonedDateTimeWriteData extends ObjectWriteData<ZonedDateTime> {
 
         void setZonedDateTime(int index, ZonedDateTime val);
+
+        @Override
+        default void setObject(final int index, final ZonedDateTime obj) {
+            setZonedDateTime(index, obj);
+        }
 
         @Override
         ZonedDateTimeReadData close(int length);

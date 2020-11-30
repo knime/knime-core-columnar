@@ -48,16 +48,28 @@ package org.knime.core.data.columnar.schema;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.Period;
+import java.time.ZonedDateTime;
 
 import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DurationData.DurationDataSpec;
+import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
+import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
+import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
 import org.knime.core.columnar.data.StringData.StringDataSpec;
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 import org.knime.core.data.v2.access.ObjectAccess.GenericObjectAccessSpec;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectReadAccess;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectSerializer;
@@ -78,10 +90,29 @@ final class ColumnarObjectAccessFactory<T> implements ColumnarAccessFactory<Obje
     public static final ColumnarObjectAccessFactory<String> STRING_ACCESS_FACTORY =
         new ColumnarObjectAccessFactory<>(StringDataSpec.INSTANCE);
 
+    public static final ColumnarObjectAccessFactory<LocalDate> LOCAL_DATE_ACCESS_FACTORY =
+        new ColumnarObjectAccessFactory<>(LocalDateDataSpec.INSTANCE);
+
+    public static final ColumnarObjectAccessFactory<LocalTime> LOCAL_TIME_ACCESS_FACTORY =
+        new ColumnarObjectAccessFactory<>(LocalTimeDataSpec.INSTANCE);
+
+    public static final ColumnarObjectAccessFactory<LocalDateTime> LOCAL_DATE_TIME_ACCESS_FACTORY =
+        new ColumnarObjectAccessFactory<>(LocalDateTimeDataSpec.INSTANCE);
+
+    public static final ColumnarObjectAccessFactory<Duration> DURATION_ACCESS_FACTORY =
+        new ColumnarObjectAccessFactory<>(DurationDataSpec.INSTANCE);
+
+    public static final ColumnarObjectAccessFactory<Period> PERIOD_ACCESS_FACTORY =
+        new ColumnarObjectAccessFactory<>(PeriodDataSpec.INSTANCE);
+
+    public static final ColumnarObjectAccessFactory<ZonedDateTime> ZONED_DATE_TIME_ACCESS_FACTORY =
+        new ColumnarObjectAccessFactory<>(ZonedDateTimeDataSpec.INSTANCE);
+
     private final ColumnDataSpec m_spec;
 
     public ColumnarObjectAccessFactory(final GenericObjectAccessSpec<T> spec) {
-        m_spec = new GenericObjectDataSpec<>(new DefaultObjectDataSerializer<>(spec.getSerializer()), spec.isDictEncoded());
+        m_spec =
+            new GenericObjectDataSpec<>(new DefaultObjectDataSerializer<>(spec.getSerializer()), spec.isDictEncoded());
     }
 
     private ColumnarObjectAccessFactory(final ColumnDataSpec spec) {

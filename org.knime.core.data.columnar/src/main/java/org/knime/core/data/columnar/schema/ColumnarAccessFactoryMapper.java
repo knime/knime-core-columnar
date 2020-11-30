@@ -52,19 +52,19 @@ import org.knime.core.data.v2.access.AccessSpec.AccessSpecMapper;
 import org.knime.core.data.v2.access.BooleanAccess.BooleanAccessSpec;
 import org.knime.core.data.v2.access.ByteArrayAccess.ByteArrayAccessSpec;
 import org.knime.core.data.v2.access.DoubleAccess.DoubleAccessSpec;
-import org.knime.core.data.v2.access.DurationAccess.DurationAccessSpec;
 import org.knime.core.data.v2.access.IntAccess.IntAccessSpec;
 import org.knime.core.data.v2.access.ListAccess.ListAccessSpec;
-import org.knime.core.data.v2.access.LocalDateAccess.LocalDateAccessSpec;
-import org.knime.core.data.v2.access.LocalDateTimeAccess.LocalDateTimeAccessSpec;
-import org.knime.core.data.v2.access.LocalTimeAccess.LocalTimeAccessSpec;
 import org.knime.core.data.v2.access.LongAccess.LongAccessSpec;
+import org.knime.core.data.v2.access.ObjectAccess.DurationAccessSpec;
 import org.knime.core.data.v2.access.ObjectAccess.GenericObjectAccessSpec;
+import org.knime.core.data.v2.access.ObjectAccess.LocalDateAccessSpec;
+import org.knime.core.data.v2.access.ObjectAccess.LocalDateTimeAccessSpec;
+import org.knime.core.data.v2.access.ObjectAccess.LocalTimeAccessSpec;
+import org.knime.core.data.v2.access.ObjectAccess.PeriodAccessSpec;
 import org.knime.core.data.v2.access.ObjectAccess.StringAccessSpec;
-import org.knime.core.data.v2.access.PeriodAccess.PeriodAccessSpec;
+import org.knime.core.data.v2.access.ObjectAccess.ZonedDateTimeAccessSpec;
 import org.knime.core.data.v2.access.StructAccess.StructAccessSpec;
 import org.knime.core.data.v2.access.VoidAccess.VoidAccessSpec;
-import org.knime.core.data.v2.access.ZonedDateTimeAccess.ZonedDateTimeAccessSpec;
 
 /**
  * Mapping AccessSpec to ColumnarValueFactory.
@@ -127,32 +127,32 @@ class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFact
 
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final LocalDateAccessSpec spec) {
-        return ColumnarLocalDateAccessFactory.INSTANCE;
+        return ColumnarObjectAccessFactory.LOCAL_DATE_ACCESS_FACTORY;
     }
 
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final LocalTimeAccessSpec spec) {
-        return ColumnarLocalTimeAccessFactory.INSTANCE;
+        return ColumnarObjectAccessFactory.LOCAL_TIME_ACCESS_FACTORY;
     }
 
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final LocalDateTimeAccessSpec spec) {
-        return ColumnarLocalDateTimeAccessFactory.INSTANCE;
+        return ColumnarObjectAccessFactory.LOCAL_DATE_TIME_ACCESS_FACTORY;
     }
 
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final DurationAccessSpec spec) {
-        return ColumnarDurationAccessFactory.INSTANCE;
+        return ColumnarObjectAccessFactory.DURATION_ACCESS_FACTORY;
     }
 
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final PeriodAccessSpec spec) {
-        return ColumnarPeriodAccessFactory.INSTANCE;
+        return ColumnarObjectAccessFactory.PERIOD_ACCESS_FACTORY;
     }
 
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final ZonedDateTimeAccessSpec spec) {
-        return ColumnarZonedDateTimeAccessFactory.INSTANCE;
+        return ColumnarObjectAccessFactory.ZONED_DATE_TIME_ACCESS_FACTORY;
     }
 
     @Override

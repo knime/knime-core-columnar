@@ -47,21 +47,33 @@ package org.knime.core.columnar.data;
 
 import java.time.LocalDate;
 
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+
 @SuppressWarnings("javadoc")
 public final class LocalDateData {
 
     private LocalDateData() {
     }
 
-    public static interface LocalDateReadData extends ColumnReadData {
+    public static interface LocalDateReadData extends ObjectReadData<LocalDate> {
 
         LocalDate getLocalDate(int index);
 
+        @Override
+        default LocalDate getObject(final int index) {
+            return getLocalDate(index);
+        }
     }
 
-    public static interface LocalDateWriteData extends ColumnWriteData {
+    public static interface LocalDateWriteData extends ObjectWriteData<LocalDate> {
 
         void setLocalDate(int index, LocalDate val);
+
+        @Override
+        default void setObject(final int index, final LocalDate obj) {
+            setLocalDate(index, obj);
+        }
 
         @Override
         LocalDateReadData close(int length);
@@ -79,7 +91,5 @@ public final class LocalDateData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
-
     }
-
 }
