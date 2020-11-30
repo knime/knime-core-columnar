@@ -50,13 +50,15 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 import org.knime.core.columnar.ColumnDataIndex;
+import org.knime.core.columnar.data.ColumnDataSpec;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectAccessSpec;
+import org.knime.core.columnar.data.StringData.StringDataSpec;
+import org.knime.core.data.v2.access.ObjectAccess.GenericObjectAccessSpec;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectReadAccess;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectSerializer;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectWriteAccess;
@@ -73,29 +75,32 @@ import org.knime.core.data.v2.access.WriteAccess;
 final class ColumnarObjectAccessFactory<T> implements ColumnarAccessFactory<ObjectReadData<T>, //
         ObjectReadAccess<T>, ObjectWriteData<T>, ObjectWriteAccess<T>> {
 
-    private final ObjectDataSpec<T> m_spec;
+    public static final ColumnarObjectAccessFactory<String> STRING_ACCESS_FACTORY =
+        new ColumnarObjectAccessFactory<>(StringDataSpec.INSTANCE);
 
-    public ColumnarObjectAccessFactory(final ObjectAccessSpec<T> spec) {
-        m_spec = wrap(spec);
+    private final ColumnDataSpec m_spec;
+
+    public ColumnarObjectAccessFactory(final GenericObjectAccessSpec<T> spec) {
+        m_spec = new GenericObjectDataSpec<>(new DefaultObjectDataSerializer<>(spec.getSerializer()), spec.isDictEncoded());
     }
 
-    private ObjectDataSpec<T> wrap(final ObjectAccessSpec<T> spec) {
-        return new ObjectDataSpec<>(new DefaultObjectDataSerializer<>(spec.getSerializer()), spec.isDictEncoded());
+    private ColumnarObjectAccessFactory(final ColumnDataSpec spec) {
+        m_spec = spec;
     }
 
     @Override
-    public final ObjectDataSpec<T> getColumnDataSpec() {
+    public final ColumnDataSpec getColumnDataSpec() {
         return m_spec;
     }
 
     @Override
     public final ObjectWriteAccess<T> createWriteAccess(final ObjectWriteData<T> data, final ColumnDataIndex index) {
-        return new ColumnarObjectWriteAccess<T>(data, index);
+        return new ColumnarObjectWriteAccess<>(data, index);
     }
 
     @Override
     public final ObjectReadAccess<T> createReadAccess(final ObjectReadData<T> data, final ColumnDataIndex index) {
-        return new ColumnarObjectReadAccess<T>(data, index);
+        return new ColumnarObjectReadAccess<>(data, index);
     }
 
     private static final class DefaultObjectDataSerializer<T> implements ObjectDataSerializer<T> {

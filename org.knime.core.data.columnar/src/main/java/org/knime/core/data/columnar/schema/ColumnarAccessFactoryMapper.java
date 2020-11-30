@@ -59,7 +59,8 @@ import org.knime.core.data.v2.access.LocalDateAccess.LocalDateAccessSpec;
 import org.knime.core.data.v2.access.LocalDateTimeAccess.LocalDateTimeAccessSpec;
 import org.knime.core.data.v2.access.LocalTimeAccess.LocalTimeAccessSpec;
 import org.knime.core.data.v2.access.LongAccess.LongAccessSpec;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectAccessSpec;
+import org.knime.core.data.v2.access.ObjectAccess.GenericObjectAccessSpec;
+import org.knime.core.data.v2.access.ObjectAccess.StringAccessSpec;
 import org.knime.core.data.v2.access.PeriodAccess.PeriodAccessSpec;
 import org.knime.core.data.v2.access.StructAccess.StructAccessSpec;
 import org.knime.core.data.v2.access.VoidAccess.VoidAccessSpec;
@@ -84,7 +85,7 @@ class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFact
     }
 
     @Override
-    public ColumnarAccessFactory<?, ?, ?, ?> visit(final ObjectAccessSpec<?> spec) {
+    public ColumnarAccessFactory<?, ?, ?, ?> visit(final GenericObjectAccessSpec<?> spec) {
         return new ColumnarObjectAccessFactory<>(spec);
     }
 
@@ -152,5 +153,10 @@ class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFact
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final ZonedDateTimeAccessSpec spec) {
         return ColumnarZonedDateTimeAccessFactory.INSTANCE;
+    }
+
+    @Override
+    public ColumnarAccessFactory<?, ?, ?, ?> visit(final StringAccessSpec spec) {
+        return ColumnarObjectAccessFactory.STRING_ACCESS_FACTORY;
     }
 }

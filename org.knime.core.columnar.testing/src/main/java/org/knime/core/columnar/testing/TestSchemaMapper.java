@@ -60,8 +60,9 @@ import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
+import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
+import org.knime.core.columnar.data.StringData.StringDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
@@ -145,7 +146,7 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
     }
 
     @Override
-    public TestDataFactory visit(final ObjectDataSpec<?> spec) {
+    public TestDataFactory visit(final GenericObjectDataSpec<?> spec) {
         throw new UnsupportedOperationException("Not yet implemented.");
     }
 
@@ -161,6 +162,11 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final ZonedDateTimeDataSpec spec) {
+        throw new UnsupportedOperationException("Not yet implemented.");
+    }
+
+    @Override
+    public TestDataFactory visit(final StringDataSpec spec) {
         throw new UnsupportedOperationException("Not yet implemented.");
     }
 }

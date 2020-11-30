@@ -44,50 +44,70 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 9, 2020 (dietzc): created
+ *   Nov 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.cache.heap;
+package org.knime.core.columnar.data;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.FilteredColumnSelection;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
 /**
- * Utility class.
+ * Class holding {@link StringReadData}, {@link StringWriteData} and {@link StringDataSpec} for data holding Strings.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-final class HeapCacheUtils {
+public final class StringData {
 
-    private HeapCacheUtils() {
+    private StringData() {
     }
 
-    /**
-     * Get the indices of all StringData and GenericObjectData in the ColumnStoreSchema.
-     *
-     * @param schema the ColumnStoreSchema
-     * @return indices of ObjectData in the schema
-     */
-    static final ColumnSelection getObjectDataIndices(final ColumnStoreSchema schema) {
-        final List<Integer> indices = new ArrayList<>();
-        final int length = schema.getNumColumns();
-        for (int i = 0; i < length; i++) {
-            // NB: We only cache data which are expensive to serialize/deserialize
-            // * For Strings we need to do UTF-8 encoding and decoding
-            // * For Generic object we need to call a serializer which might be expensive
-            final ColumnDataSpec columnDataSpec = schema.getColumnDataSpec(i);
-            if (columnDataSpec instanceof StringDataSpec //
-                || columnDataSpec instanceof GenericObjectDataSpec) {
-                indices.add(i);
-            }
+    /** A {@link ColumnReadData} holding a String a each index. */
+    public interface StringReadData extends ObjectReadData<String> {
+
+        /**
+         * @param index the index in the chunk
+         * @return the string at the index
+         */
+        String getString(int index);
+
+        @Override
+        default String getObject(final int index) {
+            return getString(index);
         }
-        return new FilteredColumnSelection(length, indices.stream().mapToInt(Integer::intValue).toArray());
     }
 
+    /** A {@link ColumnWriteData} holding a String at each index. */
+    public interface StringWriteData extends ObjectWriteData<String> {
+
+        /**
+         * Set the string a the given index.
+         *
+         * @param index the index in the chunk
+         * @param val the string
+         */
+        void setString(int index, String val);
+
+        @Override
+        default void setObject(final int index, final String obj) {
+            setString(index, obj);
+        }
+
+        @Override
+        StringReadData close(int length);
+    }
+
+    /** Spec for {@link StringReadData} and {@link StringWriteData}. */
+    public static final class StringDataSpec implements ColumnDataSpec {
+
+        /** Final stateless instance of {@link StringDataSpec} */
+        public static final StringDataSpec INSTANCE = new StringDataSpec();
+
+        private StringDataSpec() {
+        }
+
+        @Override
+        public <R> R accept(final Mapper<R> v) {
+            return v.visit(this);
+        }
+    }
 }
