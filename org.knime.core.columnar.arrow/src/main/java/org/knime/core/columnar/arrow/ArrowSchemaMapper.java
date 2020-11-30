@@ -61,6 +61,7 @@ import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataF
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
@@ -80,8 +81,9 @@ import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
+import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
+import org.knime.core.columnar.data.StringData.StringDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
@@ -195,7 +197,7 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final ObjectDataSpec<?> spec) {
+    public ArrowColumnDataFactory visit(final GenericObjectDataSpec<?> spec) {
         if (!spec.isDictEncoded()) {
             return new ArrowObjectDataFactory<>(spec.getSerializer());
         } else {
@@ -222,5 +224,10 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     @Override
     public ArrowZonedDateTimeDataFactory visit(final ZonedDateTimeDataSpec spec) {
         return ArrowZonedDateTimeDataFactory.INSTANCE;
+    }
+
+    @Override
+    public ArrowStringDataFactory visit(final StringDataSpec spec) {
+        return ArrowStringDataFactory.INSTANCE;
     }
 }

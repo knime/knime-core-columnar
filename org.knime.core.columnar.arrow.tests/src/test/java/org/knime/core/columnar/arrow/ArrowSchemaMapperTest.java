@@ -67,6 +67,7 @@ import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataF
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
@@ -83,8 +84,9 @@ import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
 import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSpec;
+import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
+import org.knime.core.columnar.data.StringData.StringDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
@@ -144,14 +146,14 @@ public class ArrowSchemaMapperTest {
     /** Test mapping object specs to a {@link ArrowObjectDataFactory} */
     @Test
     public void testMapObjectSpec() {
-        testMapSingleSpec(new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
+        testMapSingleSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
             new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
     }
 
     /** Test mapping dict encoded byte specs to a {@link ArrowDictEncodedObjectDataFactory} */
     @Test
     public void testMapDictEncodedSpec() {
-        testMapSingleSpec(new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true),
+        testMapSingleSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true),
             new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
     }
 
@@ -197,6 +199,12 @@ public class ArrowSchemaMapperTest {
         testMapSingleSpec(ZonedDateTimeDataSpec.INSTANCE, ArrowZonedDateTimeDataFactory.INSTANCE);
     }
 
+    /** Test mapping String specs to a {@link ArrowStringDataFactory} */
+    @Test
+    public void testMapStringSpec() {
+        testMapSingleSpec(StringDataSpec.INSTANCE, ArrowStringDataFactory.INSTANCE);
+    }
+
     /** Test mapping void specs to a {@link ArrowStructDataFactory} */
     @Test
     public void testMapStructSpec() {
@@ -206,9 +214,9 @@ public class ArrowSchemaMapperTest {
 
         // Complex
         testMapSingleSpec(
-            new StructDataSpec(new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), IntDataSpec.INSTANCE,
-                new StructDataSpec(new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
-                    new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true))),
+            new StructDataSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), IntDataSpec.INSTANCE,
+                new StructDataSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
+                    new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true))),
             new ArrowStructDataFactory(new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
                 ArrowIntDataFactory.INSTANCE,
                 new ArrowStructDataFactory(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
@@ -225,7 +233,7 @@ public class ArrowSchemaMapperTest {
         // Complex
         testMapSingleSpec(
             new ListDataSpec(new ListDataSpec(new StructDataSpec(
-                new ObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), DoubleDataSpec.INSTANCE))),
+                new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), DoubleDataSpec.INSTANCE))),
             new ArrowListDataFactory(new ArrowListDataFactory(
                 new ArrowStructDataFactory(new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
                     ArrowDoubleDataFactory.INSTANCE))));
