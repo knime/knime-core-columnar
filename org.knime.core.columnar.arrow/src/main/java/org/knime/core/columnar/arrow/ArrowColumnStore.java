@@ -117,9 +117,7 @@ final class ArrowColumnStore implements ColumnStore {
     @Override
     public void close() throws IOException {
         m_delegate.close();
-        if (m_file.exists()) {
-            Files.delete(m_file.toPath());
-        }
+        Files.deleteIfExists(m_file.toPath());
         m_allocator.close();
     }
 }
