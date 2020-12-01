@@ -71,6 +71,12 @@ import org.knime.core.columnar.data.StringData.StringWriteData;
  */
 public final class ArrowStringData {
 
+    /**
+     * The initial number of bytes allocated for each element. 32 is a good estimate for UTF-8 encoded Strings and more
+     * memory is allocated when needed.
+     */
+    private static final long INITAL_BYTES_PER_ELEMENT = 32;
+
     private ArrowStringData() {
     }
 
@@ -157,7 +163,7 @@ public final class ArrowStringData {
         public ArrowStringWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final VarCharVector v = (VarCharVector)vector;
-            v.allocateNew(capacity);
+            v.allocateNew(INITAL_BYTES_PER_ELEMENT * capacity, capacity);
             return new ArrowStringWriteData(v);
         }
 
