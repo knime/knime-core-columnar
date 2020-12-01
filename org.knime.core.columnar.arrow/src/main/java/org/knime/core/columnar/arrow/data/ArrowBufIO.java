@@ -54,12 +54,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.UTFDataFormatException;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -504,51 +499,6 @@ final class ArrowBufIO<T> {
                 m_buffer.writerIndex(prev);
                 m_capacity = m_buffer.capacity();
             }
-        }
-    }
-
-    /**
-     * A helper class for data implementations that need to encode and decode Strings.
-     *
-     * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
-     * @since 4.3
-     */
-    private static class StringEncoder {
-
-        private final CharsetDecoder m_decoder = StandardCharsets.UTF_8.newDecoder()
-            .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
-
-        private final CharsetEncoder m_encoder = StandardCharsets.UTF_8.newEncoder()
-            .onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
-
-        final String decode(final ByteBuffer buffer) {
-            try {
-                synchronized (m_decoder) {
-                    return m_decoder.decode(buffer).toString();
-                }
-            } catch (final CharacterCodingException e) {
-                // This cannot happen because the CodingErrorAction is not REPORT
-                throw new IllegalStateException(e);
-            }
-        }
-
-        final String decode(final byte[] bytes) {
-            return decode(ByteBuffer.wrap(bytes));
-        }
-
-        ByteBuffer encode(final CharBuffer values) {
-            try {
-                synchronized (m_encoder) {
-                    return m_encoder.encode(values);
-                }
-            } catch (final CharacterCodingException e) {
-                // This cannot happen because the CodingErrorAction is not REPORT
-                throw new IllegalStateException(e);
-            }
-        }
-
-        ByteBuffer encode(final String value) {
-            return encode(CharBuffer.wrap(value));
         }
     }
 }

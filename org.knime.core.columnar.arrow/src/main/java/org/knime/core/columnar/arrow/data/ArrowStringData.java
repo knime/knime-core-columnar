@@ -49,6 +49,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -57,7 +58,6 @@ import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.arrow.vector.util.Text;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
@@ -84,6 +84,8 @@ public final class ArrowStringData {
     public static final class ArrowStringWriteData extends AbstractArrowWriteData<VarCharVector>
         implements StringWriteData {
 
+        private StringEncoder m_encoder = new StringEncoder();
+
         private ArrowStringWriteData(final VarCharVector vector) {
             super(vector);
         }
@@ -94,7 +96,8 @@ public final class ArrowStringData {
 
         @Override
         public void setString(final int index, final String val) {
-            m_vector.setSafe(m_offset + index, new Text(val));
+            final ByteBuffer encoded = m_encoder.encode(val);
+            m_vector.setSafe(m_offset + index, encoded, 0, encoded.limit());
         }
 
         @Override
@@ -119,6 +122,8 @@ public final class ArrowStringData {
     public static final class ArrowStringReadData extends AbstractArrowReadData<VarCharVector>
         implements StringReadData {
 
+        private final StringEncoder m_decoder = new StringEncoder();
+
         private ArrowStringReadData(final VarCharVector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
@@ -130,7 +135,7 @@ public final class ArrowStringData {
 
         @Override
         public String getString(final int index) {
-            return m_vector.getObject(m_offset + index).toString();
+            return m_decoder.decode(m_vector.get(m_offset + index));
         }
 
         @Override
