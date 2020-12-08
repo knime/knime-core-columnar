@@ -234,7 +234,7 @@ final class ColumnarContainerTable extends ExtensionTable {
 
     @Override
     public RowCursor cursor() {
-        return ColumnarRowCursor.create(m_readStore, m_schema, 0, m_size - 1, m_openCursorFinalizers);
+        return ColumnarRowCursorFactory.create(m_readStore, m_schema, 0, m_size - 1, m_openCursorFinalizers);
     }
 
     @Override
@@ -244,10 +244,10 @@ final class ColumnarContainerTable extends ExtensionTable {
 
         final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
         if (colIndicesOpt.isPresent()) {
-            return ColumnarRowCursor.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers,
+            return ColumnarRowCursorFactory.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers,
                 toSortedIntArray(colIndicesOpt.get()));
         } else {
-            return ColumnarRowCursor.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers);
+            return ColumnarRowCursorFactory.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers);
         }
     }
 
@@ -255,7 +255,7 @@ final class ColumnarContainerTable extends ExtensionTable {
     @SuppressWarnings("resource")
     public final CloseableRowIterator iterator() {
         return new ColumnarRowIterator(
-            ColumnarRowCursor.create(m_readStore, m_schema, 0, m_size - 1, m_openCursorFinalizers));
+            ColumnarRowCursorFactory.create(m_readStore, m_schema, 0, m_size - 1, m_openCursorFinalizers));
     }
 
     @Override
@@ -267,11 +267,11 @@ final class ColumnarContainerTable extends ExtensionTable {
         final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
         if (colIndicesOpt.isPresent()) {
             final int[] selection = toSortedIntArray(colIndicesOpt.get());
-            return FilteredColumnarRowIterator.create(ColumnarRowCursor.create(m_readStore, m_schema, fromRowIndex,
+            return FilteredColumnarRowIterator.create(ColumnarRowCursorFactory.create(m_readStore, m_schema, fromRowIndex,
                 toRowIndex, m_openCursorFinalizers, selection), selection);
         } else {
             return new ColumnarRowIterator(
-                ColumnarRowCursor.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers));
+                ColumnarRowCursorFactory.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers));
         }
     }
 
