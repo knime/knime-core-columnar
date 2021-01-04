@@ -68,6 +68,8 @@ import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.batch.DefaultReadBatch;
@@ -86,6 +88,8 @@ import org.knime.core.columnar.filter.DefaultColumnSelection;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends ArrowReadData> {
+
+    private static final ArrowCompression COMPRESSION_CONFIG = ArrowCompressionUtil.ARROW_NO_COMPRESSION;
 
     /** The factory of the data implementation */
     protected final ArrowColumnDataFactory m_factory;
@@ -558,7 +562,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, factories)) {
+        try (final ArrowColumnDataWriter writer =
+            new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -603,7 +608,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, factories)) {
+        try (final ArrowColumnDataWriter writer =
+            new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -649,7 +655,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(tmp, factories)) {
+        try (final ArrowColumnDataWriter writer =
+            new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }

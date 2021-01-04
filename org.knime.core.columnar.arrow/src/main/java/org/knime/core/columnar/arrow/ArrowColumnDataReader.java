@@ -69,12 +69,14 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.NullVector;
 import org.apache.arrow.vector.TypeLayout;
+import org.apache.arrow.vector.compression.CompressionCodec;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.SeekableReadChannel;
 import org.apache.arrow.vector.ipc.message.ArrowBlock;
+import org.apache.arrow.vector.ipc.message.ArrowBodyCompression;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowFieldNode;
 import org.apache.arrow.vector.ipc.message.ArrowFooter;
@@ -86,6 +88,8 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory.ArrowVectorNullCount;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -172,7 +176,8 @@ class ArrowColumnDataReader implements ColumnDataReader {
                 if (m_columnSelection.isSelected(i)) {
                     @SuppressWarnings("resource") // Resource handled by caller
                     final FieldVector vector = field.createVector(m_allocator);
-                    final ArrowVectorNullCount nullCount = loadVector(vector, nodes, buffers);
+                    final ArrowVectorNullCount nullCount =
+                        loadVector(vector, nodes, buffers, getCompressionCodec(recordBatch), m_allocator);
                     vectors[i] = new FieldVectorAndNullCount(vector, nullCount);
                 } else {
                     skipVector(field, nodes, buffers);
@@ -203,7 +208,8 @@ class ArrowColumnDataReader implements ColumnDataReader {
                     // Load the data into the vector
                     @SuppressWarnings("resource") // Closed by the DictionaryBatch
                     final ArrowRecordBatch data = batch.getDictionary();
-                    loadVector(vector, data.getNodes().iterator(), data.getBuffers().iterator());
+                    loadVector(vector, data.getNodes().iterator(), data.getBuffers().iterator(),
+                        getCompressionCodec(data), m_allocator);
 
                     // Create the dictionary and add it to the provider
                     provider.put(new Dictionary(vector, description.m_encoding));
@@ -330,16 +336,19 @@ class ArrowColumnDataReader implements ColumnDataReader {
 
     /** Load the given vector from the next nodes and buffers */
     private static ArrowVectorNullCount loadVector(final FieldVector vector, final Iterator<ArrowFieldNode> nodes,
-        final Iterator<ArrowBuf> buffers) {
+        final Iterator<ArrowBuf> buffers, final CompressionCodec compressionCodec, final BufferAllocator allocator) {
         final Field field = vector.getField();
-        // Load the buffers of this vector
+        // Load and decompress the buffers of this vector
         final ArrowFieldNode fieldNode = nodes.next();
-        final List<ArrowBuf> ownBuffers = getFieldBuffers(field, buffers);
+        final List<ArrowBuf> compressedBuffers = getFieldBuffers(field, buffers);
+        final List<ArrowBuf> ownBuffers =
+            ArrowReaderWriterUtils.decompressAllBuffers(compressedBuffers, compressionCodec, allocator);
         vector.loadFieldBuffers(fieldNode, ownBuffers);
         // TODO(benjamin) NB: this is a bug in Arrow. The NullVector implementation of #loadFieldBuffers should set the value count
         if (vector instanceof NullVector) {
             vector.setValueCount(fieldNode.getLength());
         }
+        ownBuffers.forEach(ArrowBuf::close);
 
         // Load the buffers for the children
         final List<Field> children = field.getChildren();
@@ -349,7 +358,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
             for (int i = 0; i < children.size(); i++) {
                 @SuppressWarnings("resource") // Resource handled by the parent which is handled by the created ColumnData
                 final FieldVector cv = childrenVectors.get(i);
-                childrenNullCount[i] = loadVector(cv, nodes, buffers);
+                childrenNullCount[i] = loadVector(cv, nodes, buffers, compressionCodec, allocator);
             }
         }
         return new ArrowVectorNullCount(fieldNode.getNullCount(), childrenNullCount);
@@ -390,6 +399,14 @@ class ArrowColumnDataReader implements ColumnDataReader {
         for (int i = 0; i < bufferCount; i++) {
             buffers.next();
         }
+    }
+
+    /** Get the CompressionCodec used by the given record batch */
+    private static CompressionCodec getCompressionCodec(final ArrowRecordBatch recordBatch) {
+        final ArrowBodyCompression bodyCompression = recordBatch.getBodyCompression();
+        final ArrowCompression compressionConfig =
+            ArrowCompressionUtil.getCompressionForType(bodyCompression.getCodec());
+        return compressionConfig.getCompressionCodec();
     }
 
     /**

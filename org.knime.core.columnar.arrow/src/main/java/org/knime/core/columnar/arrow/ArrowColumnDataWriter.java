@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.TypeLayout;
 import org.apache.arrow.vector.dictionary.Dictionary;
@@ -69,6 +70,7 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.ipc.WriteChannel;
 import org.apache.arrow.vector.ipc.message.ArrowBlock;
+import org.apache.arrow.vector.ipc.message.ArrowBodyCompression;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowFieldNode;
 import org.apache.arrow.vector.ipc.message.ArrowFooter;
@@ -81,6 +83,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.store.ColumnDataWriter;
@@ -102,6 +105,10 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
     /** Factories used to get the vectors and dicts from the columns */
     private final ArrowColumnDataFactory[] m_factories;
 
+    private final ArrowCompression m_compression;
+
+    private final BufferAllocator m_allocator;
+
     private boolean m_firstWrite;
 
     private boolean m_closed;
@@ -119,9 +126,12 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    ArrowColumnDataWriter(final File file, final ArrowColumnDataFactory[] factories) {
+    ArrowColumnDataWriter(final File file, final ArrowColumnDataFactory[] factories,
+        final ArrowCompression compression, final BufferAllocator allocator) {
         m_file = file;
         m_factories = factories;
+        m_compression = compression;
+        m_allocator = allocator;
         m_firstWrite = true;
         m_closed = false;
     }
@@ -162,10 +172,10 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
         }
 
         // Write the dictionaries
-        writeDictionaries(m_writer, allDictionaries);
+        writeDictionaries(m_writer, allDictionaries, m_compression, m_allocator);
 
         // Write the vectors
-        writeVectors(m_writer, vectors, batch.length());
+        writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
     }
 
     @Override
@@ -255,35 +265,37 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
         }
     }
 
-    private static void writeDictionaries(final ArrowWriter writer, final List<FieldVector> dictionaries)
-        throws IOException {
+    private static void writeDictionaries(final ArrowWriter writer, final List<FieldVector> dictionaries,
+        final ArrowCompression compression, final BufferAllocator allocator) throws IOException {
         for (int id = 0; id < dictionaries.size(); id++) {
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
             final FieldVector vector = dictionaries.get(id);
-            writeDictionary(writer, id, vector);
+            writeDictionary(writer, id, vector, compression, allocator);
         }
     }
 
     /** Write the dictionary with the given id and vector to the writer */
-    private static void writeDictionary(final ArrowWriter writer, final long id, final FieldVector vector)
-        throws IOException {
+    private static void writeDictionary(final ArrowWriter writer, final long id, final FieldVector vector,
+        final ArrowCompression compression, final BufferAllocator allocator) throws IOException {
         final int length = vector.getValueCount();
-        try (final ArrowRecordBatch data = createRecordBatch(Collections.singletonList(vector), length);
+        try (final ArrowRecordBatch data =
+            createRecordBatch(Collections.singletonList(vector), length, compression, allocator);
                 final ArrowDictionaryBatch batch = new ArrowDictionaryBatch(id, data, false)) {
             writer.writeDictionaryBatch(batch);
         }
     }
 
     /** Write the vectors to the writer */
-    private static void writeVectors(final ArrowWriter writer, final List<FieldVector> vectors, final int length)
-        throws IOException {
-        try (final ArrowRecordBatch recordBatch = createRecordBatch(vectors, length)) {
+    private static void writeVectors(final ArrowWriter writer, final List<FieldVector> vectors, final int length,
+        final ArrowCompression compression, final BufferAllocator allocator) throws IOException {
+        try (final ArrowRecordBatch recordBatch = createRecordBatch(vectors, length, compression, allocator)) {
             writer.writeRecordBatch(recordBatch);
         }
     }
 
     /** Create a record batch to load the given vectors */
-    private static ArrowRecordBatch createRecordBatch(final List<FieldVector> vectors, final int length) {
+    private static ArrowRecordBatch createRecordBatch(final List<FieldVector> vectors, final int length,
+        final ArrowCompression compression, final BufferAllocator allocator) {
         // Extract field nodes and buffers
         final List<ArrowFieldNode> nodes = new ArrayList<>();
         final List<ArrowBuf> buffers = new ArrayList<>();
@@ -291,8 +303,15 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
             appendFieldNodes(v, nodes, buffers);
         }
 
+        // Compress
+        final ArrowBodyCompression bodyCompression = compression.getBodyCompression();
+        final List<ArrowBuf> compressedBuffers =
+            ArrowReaderWriterUtils.compressAllBuffers(buffers, compression.getCompressionCodec(), allocator);
+
         // Create the record batch
-        return new ArrowRecordBatch(length, nodes, buffers);
+        final ArrowRecordBatch recordBatch = new ArrowRecordBatch(length, nodes, compressedBuffers, bodyCompression);
+        compressedBuffers.forEach(ArrowBuf::close);
+        return recordBatch;
     }
 
     /** Append the nodes and buffers for the given vector. Recursive for child vectors */

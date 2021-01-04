@@ -55,6 +55,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.arrow.ArrowTestUtils.createTmpKNIMEArrowFile;
+import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_LZ4_COMPRESSION;
+import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_NO_COMPRESSION;
 
 import java.io.File;
 import java.io.IOException;
@@ -89,6 +91,7 @@ import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
 import org.knime.core.columnar.arrow.ArrowTestUtils.SimpleData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.SimpleDataFactory;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -138,7 +141,18 @@ public class ArrowWriterReaderTest {
     @Test
     public void testSimpleReadWriteOneBatchOneColumn() throws IOException {
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory()};
-        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false));
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false), ARROW_NO_COMPRESSION);
+    }
+
+    /**
+     * Test compressed writing and reading one column one batch of simple integer data.
+     *
+     * @throws IOException
+     */
+    @Test
+    public void testSimpleReadWriteOneBatchOneColumnCompressed() throws IOException {
+        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory()};
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false), ARROW_LZ4_COMPRESSION);
     }
 
     /**
@@ -149,7 +163,18 @@ public class ArrowWriterReaderTest {
     @Test
     public void testSimpleReadWriteOneBatchOneColumnMissing() throws IOException {
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory()};
-        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(true));
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(true), ARROW_NO_COMPRESSION);
+    }
+
+    /**
+     * Test compressed writing and reading one column one batch of simple integer data with missing values.
+     *
+     * @throws IOException
+     */
+    @Test
+    public void testSimpleReadWriteOneBatchOneColumnMissingCompressed() throws IOException {
+        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory()};
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(true), ARROW_LZ4_COMPRESSION);
     }
 
     /**
@@ -162,7 +187,7 @@ public class ArrowWriterReaderTest {
         final int numColumns = 10;
         final ArrowColumnDataFactory[] factories = IntStream.range(0, numColumns).mapToObj(i -> new SimpleDataFactory())
             .toArray(ArrowColumnDataFactory[]::new);
-        testReadWrite(64, 64, numColumns, 1, factories, new SimpleDataChecker(false));
+        testReadWrite(64, 64, numColumns, 1, factories, new SimpleDataChecker(false), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -175,7 +200,7 @@ public class ArrowWriterReaderTest {
         final int numColumns = 10;
         final ArrowColumnDataFactory[] factories = IntStream.range(0, numColumns).mapToObj(i -> new SimpleDataFactory())
             .toArray(ArrowColumnDataFactory[]::new);
-        testReadWrite(64, 64, numColumns, 10, factories, new SimpleDataChecker(false));
+        testReadWrite(64, 64, numColumns, 10, factories, new SimpleDataChecker(false), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -186,7 +211,18 @@ public class ArrowWriterReaderTest {
     @Test
     public void testDictionaryReadWriteOneBatchOneColumn() throws IOException {
         final ArrowColumnDataFactory[] factory = new ArrowColumnDataFactory[]{new DictionaryEncodedDataFactory()};
-        testReadWrite(16, 16, 1, 1, factory, new DictionaryEncodedDataChecker());
+        testReadWrite(16, 16, 1, 1, factory, new DictionaryEncodedDataChecker(), ARROW_NO_COMPRESSION);
+    }
+
+    /**
+     * Test compressed writing and reading one column one batch of dictionary encoded data.
+     *
+     * @throws IOException
+     */
+    @Test
+    public void testDictionaryReadWriteOneBatchOneColumnCompressed() throws IOException {
+        final ArrowColumnDataFactory[] factory = new ArrowColumnDataFactory[]{new DictionaryEncodedDataFactory()};
+        testReadWrite(16, 16, 1, 1, factory, new DictionaryEncodedDataChecker(), ARROW_LZ4_COMPRESSION);
     }
 
     /**
@@ -199,7 +235,7 @@ public class ArrowWriterReaderTest {
         final int numColumns = 10;
         final ArrowColumnDataFactory[] factories = IntStream.range(0, numColumns)
             .mapToObj(i -> new DictionaryEncodedDataFactory()).toArray(ArrowColumnDataFactory[]::new);
-        testReadWrite(16, 16, numColumns, 1, factories, new DictionaryEncodedDataChecker());
+        testReadWrite(16, 16, numColumns, 1, factories, new DictionaryEncodedDataChecker(), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -212,7 +248,7 @@ public class ArrowWriterReaderTest {
         final int numColumns = 10;
         final ArrowColumnDataFactory[] factories = IntStream.range(0, numColumns)
             .mapToObj(i -> new DictionaryEncodedDataFactory()).toArray(ArrowColumnDataFactory[]::new);
-        testReadWrite(16, 16, numColumns, 10, factories, new DictionaryEncodedDataChecker());
+        testReadWrite(16, 16, numColumns, 10, factories, new DictionaryEncodedDataChecker(), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -223,7 +259,7 @@ public class ArrowWriterReaderTest {
     @Test
     public void testComplexReadWriteOneBatchOneColumn() throws IOException {
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new ComplexDataFactory()};
-        testReadWrite(64, 64, 1, 1, factories, new ComplexDataChecker());
+        testReadWrite(64, 64, 1, 1, factories, new ComplexDataChecker(), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -236,7 +272,7 @@ public class ArrowWriterReaderTest {
         final int numColumns = 10;
         final ArrowColumnDataFactory[] factories = IntStream.range(0, numColumns)
             .mapToObj(i -> new ComplexDataFactory()).toArray(ArrowColumnDataFactory[]::new);
-        testReadWrite(64, 64, numColumns, 1, factories, new ComplexDataChecker());
+        testReadWrite(64, 64, numColumns, 1, factories, new ComplexDataChecker(), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -249,7 +285,7 @@ public class ArrowWriterReaderTest {
         final int numColumns = 5;
         final ArrowColumnDataFactory[] factories = IntStream.range(0, numColumns)
             .mapToObj(i -> new ComplexDataFactory()).toArray(ArrowColumnDataFactory[]::new);
-        testReadWrite(8, 8, numColumns, 3, factories, new ComplexDataChecker());
+        testReadWrite(8, 8, numColumns, 3, factories, new ComplexDataChecker(), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -272,7 +308,8 @@ public class ArrowWriterReaderTest {
         final ReadBatch batch2 = new DefaultReadBatch(new ColumnReadData[]{data2}, 13);
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
+        try (final ArrowColumnDataWriter writer =
+            new ArrowColumnDataWriter(m_file, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             writer.write(batch1);
             writer.write(batch2);
         }
@@ -328,7 +365,8 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
+        try (final ArrowColumnDataWriter writer =
+            new ArrowColumnDataWriter(m_file, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -378,7 +416,8 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
+        try (final ArrowColumnDataWriter writer =
+            new ArrowColumnDataWriter(m_file, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -436,7 +475,8 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
+        try (final ArrowColumnDataWriter writer =
+            new ArrowColumnDataWriter(m_file, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -476,7 +516,7 @@ public class ArrowWriterReaderTest {
     public void testFactoryVersionReadWrite() throws IOException {
         final ArrowColumnDataFactory[] factories =
             new ArrowColumnDataFactory[]{new SimpleDataFactory(ArrowColumnDataFactoryVersion.version(15))};
-        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false));
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -492,7 +532,7 @@ public class ArrowWriterReaderTest {
                     ArrowColumnDataFactoryVersion.version(4)),
                 ArrowColumnDataFactoryVersion.version(6),
                 ArrowColumnDataFactoryVersion.version(17, ArrowColumnDataFactoryVersion.version(7))))};
-        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false));
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -519,7 +559,7 @@ public class ArrowWriterReaderTest {
             public void checkData(final ColumnReadData data, final int columnIndex, final int count, final long seed) {
                 m_checkers[columnIndex].checkData(data, columnIndex, count, seed);
             }
-        });
+        }, ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -527,7 +567,8 @@ public class ArrowWriterReaderTest {
      * and check them after reading.
      */
     private void testReadWrite(final int capacity, final int dataCount, final int numColumns, final int numBatches,
-        final ArrowColumnDataFactory[] factories, final DataChecker dataChecker) throws IOException {
+        final ArrowColumnDataFactory[] factories, final DataChecker dataChecker,
+        final ArrowCompression compression) throws IOException {
 
         // Create the data
         final ReadBatch[] batches = new ReadBatch[numBatches];
@@ -541,7 +582,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories, compression, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }

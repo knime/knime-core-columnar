@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.data.ColumnWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -75,16 +76,20 @@ final class ArrowColumnStore implements ColumnStore {
 
     private final BufferAllocator m_allocator;
 
-    ArrowColumnStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator) {
+    private ArrowCompression m_compression;
+
+    ArrowColumnStore(final ColumnStoreSchema schema, final File file, final ArrowCompression compression,
+        final BufferAllocator allocator) {
         m_factories = ArrowSchemaMapper.map(schema);
         m_file = file;
+        m_compression = compression;
         m_allocator = allocator;
         m_delegate = new ArrowColumnReadStore(schema, file, allocator);
     }
 
     @Override
     public ColumnDataWriter getWriter() {
-        return new ArrowColumnDataWriter(m_file, m_factories);
+        return new ArrowColumnDataWriter(m_file, m_factories, m_compression, m_allocator);
     }
 
     @Override

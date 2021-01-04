@@ -49,6 +49,8 @@ import java.io.File;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -70,13 +72,13 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     private long m_maxAllocation;
 
+    private final ArrowCompression m_compression;
+
     /**
      * Create a {@link ColumnStoreFactory} for Arrow using the default root allocator.
      */
     public ArrowColumnStoreFactory() {
-        m_allocator = ROOT;
-        m_initReservation = 0;
-        m_maxAllocation = ROOT.getLimit();
+        this(ROOT, 0, ROOT.getLimit());
     }
 
     /**
@@ -93,6 +95,7 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
         m_allocator = allocator;
         m_initReservation = initReservation;
         m_maxAllocation = maxAllocation;
+        m_compression = ArrowCompressionUtil.getDefaultCompression();
     }
 
     @Override
@@ -100,7 +103,7 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     public ArrowColumnStore createWriteStore(final ColumnStoreSchema schema, final File file) {
         final BufferAllocator allocator =
             m_allocator.newChildAllocator("ArrowColumnStore", m_initReservation, m_maxAllocation);
-        return new ArrowColumnStore(schema, file, allocator);
+        return new ArrowColumnStore(schema, file, m_compression, allocator);
     }
 
     @Override

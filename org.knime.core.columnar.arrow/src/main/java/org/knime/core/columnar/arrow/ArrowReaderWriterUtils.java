@@ -49,8 +49,12 @@
 package org.knime.core.columnar.arrow;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.compression.CompressionCodec;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 
@@ -76,6 +80,48 @@ public final class ArrowReaderWriterUtils {
 
     /** Key for the metadata element holding the factory versions */
     static final String ARROW_FACTORY_VERSIONS_KEY = "KNIME:basic:factoryVersions";
+
+    /**
+     * Compress the given buffers using the given compression coded. The input buffers are not closed. Also the output
+     * buffers need to be closed by the caller.
+     *
+     * @param uncompressedBuffers a list of the buffers to compress
+     * @param compressionCodec the compression to use
+     * @param allocator an allocator to allocate the compressed buffers
+     * @return a list of compressed buffers
+     */
+    public static List<ArrowBuf> compressAllBuffers(final List<ArrowBuf> uncompressedBuffers,
+        final CompressionCodec compressionCodec, final BufferAllocator allocator) {
+        final List<ArrowBuf> compressedBuffers = new ArrayList<>(uncompressedBuffers.size());
+        for (final ArrowBuf uncompressedBuf : uncompressedBuffers) {
+            uncompressedBuf.getReferenceManager().retain();
+            @SuppressWarnings("resource") // Released by the caller
+            final ArrowBuf compressedBuf = compressionCodec.compress(allocator, uncompressedBuf);
+            compressedBuffers.add(compressedBuf);
+        }
+        return compressedBuffers;
+    }
+
+    /**
+     * Decompress the given buffers using the given compression coded. The input buffers are not closed. Also the output
+     * buffers need to be closed by the caller.
+     *
+     * @param compressedBuffers a list of the buffers to decompress
+     * @param compressionCodec the compression to use
+     * @param allocator an allocator to allocate the decompressed buffers
+     * @return a list of decompressed buffers
+     */
+    public static List<ArrowBuf> decompressAllBuffers(final List<ArrowBuf> compressedBuffers,
+        final CompressionCodec compressionCodec, final BufferAllocator allocator) {
+        final List<ArrowBuf> decompressedBuffers = new ArrayList<>(compressedBuffers.size());
+        for (final ArrowBuf compressedBuf : compressedBuffers) {
+            compressedBuf.getReferenceManager().retain();
+            @SuppressWarnings("resource") // Released by the caller
+            final ArrowBuf decompressedBuf = compressionCodec.decompress(allocator, compressedBuf);
+            decompressedBuffers.add(decompressedBuf);
+        }
+        return decompressedBuffers;
+    }
 
     /** A dictionary provider only holding one single dictionary */
     public static final class SingletonDictionaryProvider implements DictionaryProvider {
