@@ -53,9 +53,9 @@ import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_DATA;
 import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_TABLE;
 import static org.knime.core.columnar.TestColumnStoreUtils.checkRefs;
-import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTable;
-import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTestColumnStore;
-import static org.knime.core.columnar.TestColumnStoreUtils.generateEmptyTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestColumnStore;
+import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.createEmptyTestTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readSelectionAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTable;
@@ -67,10 +67,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.Timeout;
-import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
+import org.knime.core.columnar.TestColumnStoreUtils.TestDataTable;
 import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
@@ -86,10 +84,10 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
 
-    @Rule
-    public Timeout globalTimeout = Timeout.seconds(60);
+//    @Rule
+//    public Timeout globalTimeout = Timeout.seconds(60);
 
-    private static CachedColumnStoreCache generateCache(final int numTablesHeld) {
+    static CachedColumnStoreCache generateCache(final int numTablesHeld) {
         return new CachedColumnStoreCache(numTablesHeld * DEF_SIZE_OF_TABLE);
     }
 
@@ -120,7 +118,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     }
 
     private static CountDownLatch blockOnWriteAfterDelayedFlush(final AsyncFlushCachedColumnStore store,
-        final TestTable table) {
+        final TestDataTable table) {
         final CountDownLatch writeLatch = new CountDownLatch(1);
         final Runnable r = () -> {
             try {
@@ -139,11 +137,11 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         latch.await();
     }
 
-    private static void checkUncached(final TestTable table) {
+    static void checkUncached(final TestDataTable table) {
         assertEquals(1, checkRefs(table));
     }
 
-    private static void checkCached(final TestTable table) {
+    static void checkCached(final TestDataTable table) {
         assertEquals(2, checkRefs(table));
     }
 
@@ -151,27 +149,27 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         assertEquals(DEF_SIZE_OF_TABLE * tablesHeldInCache, cache.size() * DEF_SIZE_OF_DATA);
     }
 
-    private static void checkUnflushed(final TestTable table, final TestColumnStore delegate) throws IOException {
+    private static void checkUnflushed(final TestDataTable table, final TestColumnStore delegate) throws IOException {
         assertEquals(3, checkRefs(table));
         assertFalse(tableInStore(delegate, table));
     }
 
-    private static void checkFlushed(final TestTable table, final TestColumnStore delegate) throws IOException {
+    private static void checkFlushed(final TestDataTable table, final TestColumnStore delegate) throws IOException {
         assertTrue(tableInStore(delegate, table));
     }
 
     @Test
     public void testWriteReadWait() throws Exception {
 
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             final CountDownLatch latch = delayFlush(store);
             writeTable(store, table);
             checkUnflushed(table, delegate);
 
-            try (final TestTable reassembledTable = readAndCompareTable(store, table)) {
+            try (final TestDataTable reassembledTable = readAndCompareTable(store, table)) {
             }
             checkUnflushed(table, delegate);
 
@@ -184,9 +182,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     @Test
     public void testWriteWaitRead() throws Exception {
 
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             final CountDownLatch latch = delayFlush(store);
             writeTable(store, table);
@@ -196,7 +194,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
             checkCached(table);
             checkFlushed(table, delegate);
 
-            try (final TestTable reassembledTable = readAndCompareTable(store, table)) {
+            try (final TestDataTable reassembledTable = readAndCompareTable(store, table)) {
             }
             checkCached(table);
             checkFlushed(table, delegate);
@@ -206,9 +204,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     @Test
     public void testWriteMultiReadWait() throws Exception {
 
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             final CountDownLatch latch = delayFlush(store);
             writeTable(store, table);
@@ -227,15 +225,15 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     @Test
     public void testWriteReadSelectionWait() throws Exception {
 
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             final CountDownLatch latch = delayFlush(store);
             writeTable(store, table);
             checkUnflushed(table, delegate);
 
-            try (final TestTable reassembledTable = readSelectionAndCompareTable(store, table, 0)) {
+            try (final TestDataTable reassembledTable = readSelectionAndCompareTable(store, table, 0)) {
             }
             checkUnflushed(table, delegate);
 
@@ -249,12 +247,12 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void testWriteWaitWriteEvictWaitRead() throws Exception {
 
         final CachedColumnStoreCache cache = generateCache(1);
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store1 = generateDefaultCachedColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store2 = generateDefaultCachedColumnStore(delegate2, cache);
-                final TestTable table2 = generateDefaultTable(delegate2)) {
+                final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
             final CountDownLatch latch1 = delayFlush(store1);
             writeTable(store1, table1);
@@ -274,7 +272,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
             checkCached(table2);
             checkFlushed(table2, delegate2);
 
-            try (final TestTable reassembledTable1 = readAndCompareTable(store1, table1);) {
+            try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1);) {
                 checkUncached(table1);
                 checkFlushed(table1, delegate1);
                 checkCached(reassembledTable1);
@@ -283,7 +281,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
                 checkFlushed(table2, delegate2);
             }
 
-            try (final TestTable reassembledTable2 = readAndCompareTable(store2, table2);) {
+            try (final TestDataTable reassembledTable2 = readAndCompareTable(store2, table2);) {
                 checkUncached(table1);
                 checkFlushed(table1, delegate1);
                 checkUncached(table2);
@@ -297,12 +295,12 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void testCacheBlocksOnEvictWhenAllDataUnflushed() throws Exception {
 
         final CachedColumnStoreCache cache = generateCache(1);
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store1 = generateDefaultCachedColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store2 = generateDefaultCachedColumnStore(delegate2, cache);
-                final TestTable table2 = generateDefaultTable(delegate2)) {
+                final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
             final CountDownLatch flushLatch1 = delayFlush(store1);
             writeTable(store1, table1);
@@ -330,15 +328,15 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void testCacheDoesNotBlockOnEvictWhenEvictedDataFlushed() throws Exception {
 
         final CachedColumnStoreCache cache = generateCache(2);
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store1 = generateDefaultCachedColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store2 = generateDefaultCachedColumnStore(delegate2, cache);
-                final TestTable table2 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate3 = generateDefaultTestColumnStore();
+                final TestDataTable table2 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate3 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store3 = generateDefaultCachedColumnStore(delegate3, cache);
-                final TestTable table3 = generateDefaultTable(delegate2)) {
+                final TestDataTable table3 = createDefaultTestTable(delegate2)) {
 
             writeTable(store1, table1);
             store1.waitForAndHandleFuture(); // wait for flush of table1
@@ -376,15 +374,15 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void testCacheBlocksOnEvictWhenEvictedDataUnflushed() throws Exception {
 
         final CachedColumnStoreCache cache = generateCache(2);
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store1 = generateDefaultCachedColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store2 = generateDefaultCachedColumnStore(delegate2, cache);
-                final TestTable table2 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate3 = generateDefaultTestColumnStore();
+                final TestDataTable table2 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate3 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store3 = generateDefaultCachedColumnStore(delegate3, cache);
-                final TestTable table3 = generateDefaultTable(delegate2)) {
+                final TestDataTable table3 = createDefaultTestTable(delegate2)) {
 
             writeTable(store1, table1);
             store1.waitForAndHandleFuture(); // wait for flush of table1
@@ -398,7 +396,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
             writeTable(store2, table2); // cache & queue flush of table2
             checkUnflushed(table2, delegate2);
             checkCacheSize(cache, 2);
-            try (final TestTable reassembledTable1 = readAndCompareTable(store1, table1)) {
+            try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) {
                 // read table1 to make table2 next in line for eviction
             }
 
@@ -423,9 +421,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void testCacheEmptyAfterClear() throws Exception {
 
         final CachedColumnStoreCache cache = generateCache(1);
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate, cache);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             writeTable(store, table);
             store.waitForAndHandleFuture(); // wait for flush of table
@@ -441,15 +439,15 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void testCacheNotEmptyAfterPartialClear() throws Exception {
 
         final CachedColumnStoreCache cache = generateCache(2);
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store1 = generateDefaultCachedColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1)) {
+                final TestDataTable table1 = createDefaultTestTable(delegate1)) {
 
             writeTable(store1, table1);
 
-            try (final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+            try (final TestColumnStore delegate2 = createDefaultTestColumnStore();
                     final AsyncFlushCachedColumnStore store2 = generateDefaultCachedColumnStore(delegate2, cache);
-                    final TestTable table2 = generateDefaultTable(delegate2)) {
+                    final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
                 writeTable(store2, table2);
                 // wait for flush of tables
@@ -471,16 +469,16 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test
     public void testFactorySingleton() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             assertEquals(store.getFactory(), store.getFactory());
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetFactoryAfterWriterClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
             store.getFactory();
@@ -489,8 +487,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetFactoryAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             store.close();
             store.getFactory();
         }
@@ -498,8 +496,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterWriterClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             final ColumnDataFactory factory = store.getFactory();
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
@@ -509,8 +507,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             final ColumnDataFactory factory = store.getFactory();
             store.close();
             factory.create(DEF_SIZE_OF_DATA);
@@ -519,8 +517,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test
     public void testWriterSingleton() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate);
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
                 final ColumnDataWriter writer1 = store.getWriter();
                 final ColumnDataWriter writer2 = store.getWriter()) {
             assertEquals(writer1, writer2);
@@ -529,8 +527,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterWriterClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
             try (final ColumnDataWriter writer = store.getWriter()) {
@@ -540,8 +538,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             store.close();
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
@@ -550,9 +548,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterWriterClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.close();
                 writeTable(store, table);
@@ -562,9 +560,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateEmptyTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 store.close();
                 writeTable(store, table);
@@ -574,8 +572,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveWhileWriterOpen() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 store.save(null);
             }
@@ -584,9 +582,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateEmptyTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -597,8 +595,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderWhileWriterOpen() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 try (final ColumnDataReader reader = store.createReader()) {
                 }
@@ -608,9 +606,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateEmptyTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -622,9 +620,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
             try (ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -637,9 +635,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final TestTable table = generateEmptyTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
             try (ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }

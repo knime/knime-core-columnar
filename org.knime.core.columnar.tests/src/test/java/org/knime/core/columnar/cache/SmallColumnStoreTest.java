@@ -50,10 +50,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_TABLE;
 import static org.knime.core.columnar.TestColumnStoreUtils.checkRefs;
-import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTable;
-import static org.knime.core.columnar.TestColumnStoreUtils.generateDefaultTestColumnStore;
-import static org.knime.core.columnar.TestColumnStoreUtils.generateDoubleSizedDefaultTable;
-import static org.knime.core.columnar.TestColumnStoreUtils.generateEmptyTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.createDoubleSizedDefaultTestTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.createEmptyTestTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestColumnStore;
 import static org.knime.core.columnar.TestColumnStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readSelectionAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTable;
@@ -68,7 +68,7 @@ import java.util.concurrent.Future;
 
 import org.junit.Test;
 import org.knime.core.columnar.TestColumnStoreUtils;
-import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
+import org.knime.core.columnar.TestColumnStoreUtils.TestDataTable;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.store.ColumnDataFactory;
 import org.knime.core.columnar.store.ColumnDataReader;
@@ -96,34 +96,34 @@ public class SmallColumnStoreTest extends ColumnarTest {
         return new SmallColumnStore(delegate, cache);
     }
 
-    private static void checkUncached(final TestTable table) {
+    private static void checkUncached(final TestDataTable table) {
         assertEquals(1, checkRefs(table));
     }
 
-    private static void checkCached(final TestTable table) {
+    private static void checkCached(final TestDataTable table) {
         assertEquals(2, checkRefs(table));
     }
 
-    private static void checkUnflushed(final TestTable table, final TestColumnStore delegate) throws IOException {
+    private static void checkUnflushed(final TestDataTable table, final TestColumnStore delegate) throws IOException {
         assertFalse(tableInStore(delegate, table));
     }
 
-    private static void checkFlushed(final TestTable table, final TestColumnStore delegate) throws IOException {
+    private static void checkFlushed(final TestDataTable table, final TestColumnStore delegate) throws IOException {
         assertTrue(tableInStore(delegate, table));
     }
 
     @Test
     public void testSmallWriteRead() throws Exception {
 
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             writeTable(store, table);
             checkCached(table);
             checkUnflushed(table, delegate);
 
-            try (final TestTable reassembledTable = readAndCompareTable(store, table)) {
+            try (final TestDataTable reassembledTable = readAndCompareTable(store, table)) {
             }
             checkCached(table);
             checkUnflushed(table, delegate);
@@ -133,9 +133,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
     @Test
     public void testSmallWriteMultiRead() throws Exception {
 
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             writeTable(store, table);
             checkCached(table);
@@ -150,15 +150,15 @@ public class SmallColumnStoreTest extends ColumnarTest {
     @Test
     public void testSmallWriteReadSelection() throws Exception {
 
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             writeTable(store, table);
             checkCached(table);
             checkUnflushed(table, delegate);
 
-            try (final TestTable reassembledTable = readSelectionAndCompareTable(store, table, 0)) {
+            try (final TestDataTable reassembledTable = readSelectionAndCompareTable(store, table, 0)) {
             }
             checkCached(table);
             checkUnflushed(table, delegate);
@@ -168,15 +168,15 @@ public class SmallColumnStoreTest extends ColumnarTest {
     @Test
     public void testLargeWriteRead() throws Exception {
 
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDoubleSizedDefaultTable(delegate)) {
+                final TestDataTable table = createDoubleSizedDefaultTestTable(delegate)) {
 
             writeTable(store, table);
             checkUncached(table);
             checkFlushed(table, delegate);
 
-            try (final TestTable reassembledTable = readAndCompareTable(store, table)) {
+            try (final TestDataTable reassembledTable = readAndCompareTable(store, table)) {
             }
             checkUncached(table);
             checkFlushed(table, delegate);
@@ -187,12 +187,12 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void testSmallWriteEvictRead() throws Exception {
 
         final SmallColumnStoreCache cache = generateCache();
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final SmallColumnStore store1 = generateDefaultSmallColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
                 final SmallColumnStore store2 = generateDefaultSmallColumnStore(delegate2, cache);
-                final TestTable table2 = generateDefaultTable(delegate2)) {
+                final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
             writeTable(store1, table1);
             checkCached(table1);
@@ -204,12 +204,12 @@ public class SmallColumnStoreTest extends ColumnarTest {
             checkUncached(table1);
             checkFlushed(table1, delegate1);
 
-            try (final TestTable reassembledTable1 = readAndCompareTable(store1, table1)) {
+            try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) {
             }
             checkUncached(table1);
             checkFlushed(table1, delegate1);
 
-            try (final TestTable reassembledTable2 = readAndCompareTable(store2, table2)) {
+            try (final TestDataTable reassembledTable2 = readAndCompareTable(store2, table2)) {
             }
             checkCached(table2);
             checkUnflushed(table2, delegate2);
@@ -221,12 +221,12 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void testGetReaderWhileEvict() throws Exception {
 
         final SmallColumnStoreCache cache = generateCache();
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final SmallColumnStore store1 = generateDefaultSmallColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
                 final SmallColumnStore store2 = generateDefaultSmallColumnStore(delegate2, cache);
-                final TestTable table2 = generateDefaultTable(delegate2)) {
+                final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
             writeTable(store1, table1);
             final CountDownLatch blockOnWrite1 = new CountDownLatch(1);
@@ -240,7 +240,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
             });
             final Future<?> f2 = executor.submit(() -> {
                 blockOnWrite1.countDown();
-                try (final TestTable reassembledTable = readAndCompareTable(store1, table1)) {
+                try (final TestDataTable reassembledTable = readAndCompareTable(store1, table1)) {
                 }
                 return null;
             });
@@ -257,12 +257,12 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void testSmallWriteEvictSaveRead() throws Exception {
 
         final SmallColumnStoreCache cache = generateCache();
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final SmallColumnStore store1 = generateDefaultSmallColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
                 final SmallColumnStore store2 = generateDefaultSmallColumnStore(delegate2, cache);
-                final TestTable table2 = generateDefaultTable(delegate2)) {
+                final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
             writeTable(store1, table1);
             checkCached(table1);
@@ -288,12 +288,12 @@ public class SmallColumnStoreTest extends ColumnarTest {
             checkCached(table2);
             checkFlushed(table2, delegate2);
 
-            try (final TestTable reassembledTable1 = readAndCompareTable(store1, table1)) {
+            try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) {
             }
             checkUncached(table1);
             checkFlushed(table1, delegate1);
 
-            try (final TestTable reassembledTable2 = readAndCompareTable(store2, table2)) {
+            try (final TestDataTable reassembledTable2 = readAndCompareTable(store2, table2)) {
             }
             checkCached(table2);
             checkFlushed(table2, delegate2);
@@ -304,12 +304,12 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void testSmallWriteSaveEvictRead() throws Exception {
 
         final SmallColumnStoreCache cache = generateCache();
-        try (final TestColumnStore delegate1 = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
                 final SmallColumnStore store1 = generateDefaultSmallColumnStore(delegate1, cache);
-                final TestTable table1 = generateDefaultTable(delegate1);
-                final TestColumnStore delegate2 = generateDefaultTestColumnStore();
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
                 final SmallColumnStore store2 = generateDefaultSmallColumnStore(delegate2, cache);
-                final TestTable table2 = generateDefaultTable(delegate2)) {
+                final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
             writeTable(store1, table1);
             checkCached(table1);
@@ -335,12 +335,12 @@ public class SmallColumnStoreTest extends ColumnarTest {
             checkCached(table2);
             checkFlushed(table2, delegate2);
 
-            try (final TestTable reassembledTable1 = readAndCompareTable(store1, table1)) {
+            try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) {
             }
             checkUncached(table1);
             checkFlushed(table1, delegate1);
 
-            try (final TestTable reassembledTable2 = readAndCompareTable(store2, table2)) {
+            try (final TestDataTable reassembledTable2 = readAndCompareTable(store2, table2)) {
             }
             checkCached(table2);
             checkFlushed(table2, delegate2);
@@ -351,9 +351,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void testCacheEmptyAfterClear() throws Exception {
 
         final SmallColumnStoreCache cache = generateCache();
-        try (final TestColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate, cache);
-                final TestTable table = generateDefaultTable(delegate)) {
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
             writeTable(store, table);
             assertEquals(1, cache.size());
@@ -363,16 +363,16 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test
     public void testFactorySingleton() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             assertEquals(store.getFactory(), store.getFactory());
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetFactoryAfterWriterClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
             store.getFactory();
@@ -381,8 +381,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetFactoryAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             store.close();
             store.getFactory();
         }
@@ -390,8 +390,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterWriterClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             final ColumnDataFactory factory = store.getFactory();
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
@@ -401,8 +401,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             final ColumnDataFactory factory = store.getFactory();
             store.close();
             factory.create(TestColumnStoreUtils.DEF_SIZE_OF_DATA);
@@ -411,8 +411,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test
     public void testWriterSingleton() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
                 final ColumnDataWriter writer1 = store.getWriter();
                 final ColumnDataWriter writer2 = store.getWriter()) {
             assertEquals(writer1, writer2);
@@ -421,8 +421,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterWriterClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
             try (final ColumnDataWriter writer = store.getWriter()) {
@@ -432,8 +432,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             store.close();
             try (final ColumnDataWriter writer = store.getWriter()) {
             }
@@ -442,9 +442,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterWriterClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writer.close();
                 writeTable(store, table);
@@ -454,9 +454,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateEmptyTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 store.close();
                 writeTable(store, table);
@@ -466,8 +466,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveWhileWriterOpen() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 store.save(null);
             }
@@ -476,9 +476,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateEmptyTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -489,8 +489,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderWhileWriterOpen() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 try (final ColumnDataReader reader = store.createReader()) {
                 }
@@ -500,9 +500,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateEmptyTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
             try (final ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -514,9 +514,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
-                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateDefaultTable(delegate)) {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
             try (ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
@@ -529,9 +529,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws Exception {
-        try (final ColumnStore delegate = generateDefaultTestColumnStore();
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final TestTable table = generateEmptyTable(delegate)) {
+                final TestDataTable table = createEmptyTestTable(delegate)) {
             try (ColumnDataWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }

@@ -67,8 +67,10 @@ import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
-import org.knime.core.columnar.testing.TestDoubleData.TestDoubleDataFactory;
-import org.knime.core.columnar.testing.TestVoidData.TestVoidDataFactory;
+import org.knime.core.columnar.testing.data.TestDataFactory;
+import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
+import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
+import org.knime.core.columnar.testing.data.TestVoidData.TestVoidDataFactory;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -167,6 +169,6 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final StringDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestStringDataFactory.INSTANCE;
     }
 }

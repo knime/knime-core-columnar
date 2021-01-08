@@ -43,107 +43,82 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.testing;
+package org.knime.core.columnar.testing.data;
 
 import static org.junit.Assert.assertEquals;
 
-import org.knime.core.columnar.data.DoubleData.DoubleReadData;
-import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.ColumnWriteData;
 
 /**
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class TestDoubleData extends AbstractTestData implements DoubleWriteData, DoubleReadData {
+public abstract class TestData implements ColumnWriteData, ColumnReadData {
 
-    static final class TestDoubleDataFactory implements TestDataFactory {
+    private int m_refs = 1;
 
-        static final TestDoubleDataFactory INSTANCE = new TestDoubleDataFactory();
+    private int m_size;
 
-        private TestDoubleDataFactory() {
-        }
+    private Object[] m_values;
 
-        @Override
-        public TestDoubleData createWriteData(final int capacity) {
-            return new TestDoubleData(capacity);
-        }
-
-        @Override
-        public TestDoubleData createReadData(final Object data) {
-            return new TestDoubleData((Double[])data);
-        }
-
-    }
-
-    private int m_capacity;
-
-    private Double[] m_values;
-
-    private int m_numValues;
-
-    TestDoubleData(final int capacity) {
-        m_capacity = capacity;
-        m_values = new Double[capacity];
-    }
-
-    TestDoubleData(final Double[] doubles) {
-        m_capacity = doubles.length;
-        m_values = doubles;
-        m_numValues = doubles.length;
+    TestData(final Object[] objects) {
+        m_size = objects.length;
+        m_values = objects;
     }
 
     @Override
-    public int capacity() {
-        return m_capacity;
+    public final synchronized void release() {
+        m_refs--;
+    }
+
+    @Override
+    public final synchronized void retain() {
+        m_refs++;
+    }
+
+    public final synchronized int getRefs() {
+        return m_refs;
     }
 
     @Override
     public long sizeOf() {
-        return m_numValues;
+        return length();
     }
 
     @Override
-    public void expand(final int minimumCapacity) {
-        final Double[] expanded = new Double[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, m_capacity);
+    public final int capacity() {
+        return m_size;
+    }
+
+    @Override
+    public final void expand(final int minimumCapacity) {
+        final Object[] expanded = new Object[minimumCapacity];
+        System.arraycopy(m_values, 0, expanded, 0, capacity());
         m_values = expanded;
-        m_capacity = minimumCapacity;
+        m_size = minimumCapacity;
     }
 
     @Override
-    public DoubleReadData close(final int length) {
-        m_numValues = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-        return this;
-    }
-
-    @Override
-    public int length() {
-        return m_numValues;
-    }
-
-    @Override
-    public synchronized void setMissing(final int index) {
+    public final synchronized void setMissing(final int index) {
         m_values[index] = null;
     }
 
     @Override
-    public synchronized boolean isMissing(final int index) {
+    public final synchronized boolean isMissing(final int index) {
         return m_values[index] == null;
     }
 
     @Override
-    public synchronized double getDouble(final int index) {
-        return m_values[index];
+    public final int length() {
+        return m_size;
     }
 
-    @Override
-    public synchronized void setDouble(final int index, final double val) {
-        m_values[index] = val;
+    final void closeInternal(final int length) {
+        m_size = length;
+        assertEquals("Reference count on close not 1.", 1, getRefs());
     }
 
-    @Override
-    public Double[] get() {
+    public final Object[] get() {
         return m_values;
     }
 

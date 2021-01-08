@@ -42,36 +42,60 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   29 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.testing;
+package org.knime.core.columnar.testing.data;
 
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 
 /**
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-abstract class AbstractTestData implements ColumnWriteData, ColumnReadData {
+public final class TestDoubleData extends TestData implements DoubleWriteData, DoubleReadData {
 
-    private int m_refs = 1;
+    public static final class TestDoubleDataFactory implements TestDataFactory {
 
-    @Override
-    public synchronized void release() {
-        m_refs--;
+        public static final TestDoubleDataFactory INSTANCE = new TestDoubleDataFactory();
+
+        private TestDoubleDataFactory() {
+        }
+
+        @Override
+        public TestDoubleData createWriteData(final int capacity) {
+            return new TestDoubleData(capacity);
+        }
+
+        @Override
+        public TestDoubleData createReadData(final Object data) {
+            return new TestDoubleData((Double[])data);
+        }
+
+    }
+
+    TestDoubleData(final int capacity) {
+        super(new Double[capacity]);
+    }
+
+    TestDoubleData(final Double[] doubles) {
+        super(doubles);
+        close(doubles.length);
     }
 
     @Override
-    public synchronized void retain() {
-        m_refs++;
+    public DoubleReadData close(final int length) {
+        closeInternal(length);
+        return this;
     }
 
-    public synchronized int getRefs() {
-        return m_refs;
+    @Override
+    public synchronized double getDouble(final int index) {
+        return (Double)get()[index];
     }
 
-    abstract Object get();
+    @Override
+    public synchronized void setDouble(final int index, final double val) {
+        get()[index] = val;
+    }
 
 }

@@ -42,19 +42,60 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   29 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.testing;
+package org.knime.core.columnar.testing.data;
+
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-interface TestDataFactory {
+public final class TestStringData extends TestData
+    implements StringWriteData, StringReadData {
 
-    AbstractTestData createWriteData(int capacity);
+    public static final class TestStringDataFactory implements TestDataFactory {
 
-    AbstractTestData createReadData(Object data);
+        public static final TestStringDataFactory INSTANCE = new TestStringDataFactory();
+
+        private TestStringDataFactory() {
+        }
+
+        @Override
+        public TestStringData createWriteData(final int capacity) {
+            return new TestStringData(capacity);
+        }
+
+        @Override
+        public TestStringData createReadData(final Object data) {
+            return new TestStringData((String[])data);
+        }
+
+    }
+
+    TestStringData(final int capacity) {
+        super(new String[capacity]);
+    }
+
+    TestStringData(final String[] objects) {
+        super(objects);
+        close(objects.length);
+    }
+
+    @Override
+    public TestStringData close(final int length) {
+        closeInternal(length);
+        return this;
+    }
+
+    @Override
+    public synchronized String getString(final int index) {
+        return (String)get()[index];
+    }
+
+    @Override
+    public synchronized void setString(final int index, final String val) {
+        get()[index] = val;
+    }
 
 }

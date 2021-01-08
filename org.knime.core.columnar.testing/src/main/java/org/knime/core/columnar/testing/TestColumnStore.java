@@ -64,6 +64,8 @@ import org.knime.core.columnar.store.ColumnDataReader;
 import org.knime.core.columnar.store.ColumnDataWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.testing.data.TestData;
+import org.knime.core.columnar.testing.data.TestDataFactory;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -94,7 +96,7 @@ public final class TestColumnStore implements ColumnStore {
             waitForLatch();
             final ColumnWriteData[] data = new ColumnWriteData[m_schema.getNumColumns()];
             for (int i = 0; i < m_factories.length; i++) {
-                final AbstractTestData testData = m_factories[i].createWriteData(chunkSize);
+                final TestData testData = m_factories[i].createWriteData(chunkSize);
                 data[i] = testData;
                 m_tracker.add(testData);
             }
@@ -119,7 +121,7 @@ public final class TestColumnStore implements ColumnStore {
             waitForLatch();
             final Object[] data = new Object[batch.getNumColumns()];
             for (int i = 0; i < data.length; i++) {
-                final AbstractTestData testData = (AbstractTestData)batch.get(i);
+                final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();
             }
             if (m_batches.size() == 0) {
@@ -163,7 +165,7 @@ public final class TestColumnStore implements ColumnStore {
             waitForLatch();
             final Object[] data = m_batches.get(chunkIndex);
             return ColumnSelection.createBatch(m_selection, i -> {
-                final AbstractTestData testData = m_factories[i].createReadData(data[i]);
+                final TestData testData = m_factories[i].createReadData(data[i]);
                 m_tracker.add(testData);
                 return testData;
             });
@@ -197,7 +199,7 @@ public final class TestColumnStore implements ColumnStore {
 
     private final List<Object[]> m_batches = new ArrayList<>();
 
-    private final List<AbstractTestData> m_tracker = new ArrayList<>();
+    private final List<TestData> m_tracker = new ArrayList<>();
 
     // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
     private volatile boolean m_writerClosed;
@@ -293,11 +295,15 @@ public final class TestColumnStore implements ColumnStore {
         m_storeClosed = true;
 
         // check if all memory has been released before closing this store.
-        for (final AbstractTestData data : m_tracker) {
+        for (final TestData data : m_tracker) {
             assertEquals("Data not closed.", 0, data.getRefs());
         }
 
         ColumnarTest.OPEN_CLOSEABLES.remove(this);
+    }
+
+    public List<TestData> getData() {
+        return m_tracker;
     }
 
 }

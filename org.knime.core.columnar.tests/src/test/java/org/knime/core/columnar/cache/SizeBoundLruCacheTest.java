@@ -48,16 +48,14 @@ package org.knime.core.columnar.cache;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_DATA;
-import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
-import static org.knime.core.columnar.TestColumnStoreUtils.createTable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 
 import org.junit.Test;
-import org.knime.core.columnar.TestColumnStoreUtils.TestTable;
 import org.knime.core.columnar.testing.ColumnarTest;
-import org.knime.core.columnar.testing.TestColumnStore;
-import org.knime.core.columnar.testing.TestDoubleData;
+import org.knime.core.columnar.testing.data.TestDoubleData;
+import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -66,118 +64,113 @@ import org.knime.core.columnar.testing.TestDoubleData;
 public class SizeBoundLruCacheTest extends ColumnarTest {
 
     @Test
-    public void testPutGet() throws Exception {
+    public void testPutGet() {
 
         final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
-        try (final TestColumnStore store = TestColumnStore.create(createSchema(1));
-                final TestTable table = createTable(store, 1)) {
-            final TestDoubleData data = table.getBatch(0)[0];
+        final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA);
 
-            assertEquals(1, data.getRefs());
+        assertEquals(1, data.getRefs());
 
-            cache.put(0, data);
-            assertEquals(1, cache.size());
-            assertEquals(2, data.getRefs());
+        cache.put(0, data);
+        assertEquals(1, cache.size());
+        assertEquals(2, data.getRefs());
 
-            assertEquals(data, cache.getRetained(0));
-            assertEquals(3, data.getRefs());
+        assertEquals(data, cache.getRetained(0));
+        assertEquals(3, data.getRefs());
 
-            assertEquals(data, cache.getRetained(0, () -> null, (i, d) -> {
-            }));
-            assertEquals(4, data.getRefs());
+        assertEquals(data, cache.getRetained(0, () -> null, (i, d) -> {
+        }));
+        assertEquals(4, data.getRefs());
 
-            cache.removeRetained(0).release();
-            data.release();
-            data.release();
-        }
+        cache.removeRetained(0);
+        assertEquals(0, cache.size());
+        assertEquals(4, data.getRefs());
     }
 
     @Test
-    public void testPutEvictLoadGet() throws Exception {
+    public void testPutEvictLoadGet() {
 
         final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
-        try (final TestColumnStore store = TestColumnStore.create(createSchema(2));
-                final TestTable table = createTable(store, 1)) {
-            final TestDoubleData[] batch = table.getBatch(0);
+        final TestDoubleData[] batch =
+            IntStream.range(0, 2).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA))
+                .toArray(TestDoubleData[]::new);
 
-            assertEquals(1, batch[0].getRefs());
+        assertEquals(1, batch[0].getRefs());
 
-            final AtomicBoolean evicted = new AtomicBoolean();
-            cache.put(0, batch[0], (i, d) -> {
-                evicted.set(true);
-            });
-            assertEquals(1, cache.size());
-            assertEquals(2, batch[0].getRefs());
+        final AtomicBoolean evicted = new AtomicBoolean();
+        cache.put(0, batch[0], (i, d) -> evicted.set(true));
+        assertEquals(1, cache.size());
+        assertEquals(2, batch[0].getRefs());
 
-            cache.put(1, batch[1]);
-            assertEquals(true, evicted.get());
-            assertEquals(1, cache.size());
-            assertEquals(1, batch[0].getRefs());
+        cache.put(1, batch[1]);
+        assertEquals(true, evicted.get());
+        assertEquals(1, cache.size());
+        assertEquals(1, batch[0].getRefs());
 
-            assertNull(cache.getRetained(0));
-            assertEquals(batch[0], cache.getRetained(0, () -> {
-                batch[0].retain();
-                return batch[0];
-            }, (i, d) -> {
-            }));
-            assertEquals(3, batch[0].getRefs());
+        assertNull(cache.getRetained(0));
+        assertEquals(batch[0], cache.getRetained(0, () -> {
+            batch[0].retain();
+            return batch[0];
+        }, (i, d) -> {
+        }));
+        assertEquals(3, batch[0].getRefs());
 
-            cache.removeRetained(0).release();
-            batch[0].release();
-        }
+        cache.removeRetained(0);
+        assertEquals(0, cache.size());
+        assertEquals(3, batch[0].getRefs());
+        assertEquals(1, batch[1].getRefs());
     }
 
     @Test
-    public void testPutRemove() throws Exception {
+    public void testPutRemove() {
 
         final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
-        try (final TestColumnStore store = TestColumnStore.create(createSchema(1));
-                final TestTable table = createTable(store, 1)) {
-            final TestDoubleData data = table.getBatch(0)[0];
+        final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA);
 
-            assertEquals(1, data.getRefs());
+        assertEquals(1, data.getRefs());
 
-            cache.put(0, data);
-            assertEquals(1, cache.size());
-            assertEquals(2, data.getRefs());
+        cache.put(0, data);
+        assertEquals(1, cache.size());
+        assertEquals(2, data.getRefs());
 
-            assertEquals(data, cache.removeRetained(0));
-            assertEquals(2, data.getRefs());
+        assertEquals(data, cache.removeRetained(0));
+        assertEquals(2, data.getRefs());
 
-            assertNull(cache.removeRetained(0));
-
-            data.release();
-        }
+        assertNull(cache.removeRetained(0));
+        assertEquals(0, cache.size());
+        assertEquals(2, data.getRefs());
     }
 
     @Test
-    public void testLru() throws Exception {
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA * 2);
-        try (final TestColumnStore store = TestColumnStore.create(createSchema(3));
-                final TestTable table = createTable(store, 1)) {
-            final TestDoubleData[] batch = table.getBatch(0);
+    public void testLru() {
 
-            cache.put(0, batch[0]); // content in cache: 0
-            cache.put(1, batch[1]); // content in cache: 1->0
-            cache.put(2, batch[2]); // content in cache: 2->1
-            assertEquals(2, cache.size());
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA * 2L);
+        final TestDoubleData[] batch =
+            IntStream.range(0, 3).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA))
+                .toArray(TestDoubleData[]::new);
 
-            assertEquals(batch[2], cache.getRetained(2)); // content in cache: 2->1
-            batch[2].release();
-            assertEquals(batch[1], cache.getRetained(1)); // content in cache: 1->2
-            batch[1].release();
-            assertNull(cache.getRetained(0));
+        cache.put(0, batch[0]); // content in cache: 0
+        cache.put(1, batch[1]); // content in cache: 1->0
+        cache.put(2, batch[2]); // content in cache: 2->1
+        assertEquals(2, cache.size());
+        assertEquals(1, batch[0].getRefs());
+        assertEquals(2, batch[1].getRefs());
+        assertEquals(2, batch[2].getRefs());
 
-            cache.put(0, batch[0]); // content in cache: 0->1
-            assertEquals(batch[0], cache.getRetained(0));
-            batch[0].release();
-            assertEquals(batch[1], cache.getRetained(1));
-            batch[1].release();
-            assertNull(cache.getRetained(2));
+        assertEquals(batch[2], cache.getRetained(2)); // content in cache: 2->1
+        assertEquals(batch[1], cache.getRetained(1)); // content in cache: 1->2
+        assertNull(cache.getRetained(0));
+        assertEquals(1, batch[0].getRefs());
+        assertEquals(3, batch[1].getRefs());
+        assertEquals(3, batch[2].getRefs());
 
-            cache.removeRetained(0).release();
-            cache.removeRetained(1).release();
-        }
+        cache.put(0, batch[0]); // content in cache: 0->1
+        assertEquals(batch[0], cache.getRetained(0));
+        assertEquals(batch[1], cache.getRetained(1));
+        assertNull(cache.getRetained(2));
+        assertEquals(3, batch[0].getRefs());
+        assertEquals(4, batch[1].getRefs());
+        assertEquals(2, batch[2].getRefs());
     }
 
 }

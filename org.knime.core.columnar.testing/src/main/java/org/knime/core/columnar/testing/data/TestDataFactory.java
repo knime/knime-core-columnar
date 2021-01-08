@@ -46,79 +46,15 @@
  * History
  *   29 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.testing;
-
-import static org.junit.Assert.assertEquals;
-
-import org.knime.core.columnar.data.VoidData.VoidReadData;
-import org.knime.core.columnar.data.VoidData.VoidWriteData;
+package org.knime.core.columnar.testing.data;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class TestVoidData extends AbstractTestData implements VoidWriteData, VoidReadData {
+public interface TestDataFactory {
 
-    static final class TestVoidDataFactory implements TestDataFactory {
+    TestData createWriteData(int capacity);
 
-        static final TestVoidDataFactory INSTANCE = new TestVoidDataFactory();
-
-        private TestVoidDataFactory() {
-        }
-
-        @Override
-        public TestVoidData createWriteData(final int capacity) {
-            return new TestVoidData(capacity);
-        }
-
-        @Override
-        public TestVoidData createReadData(final Object data) {
-            return new TestVoidData((Integer)data);
-        }
-
-    }
-
-    private int m_capacity;
-
-    private int m_numValues;
-
-    TestVoidData(final int capacity) {
-        m_capacity = capacity;
-    }
-
-    TestVoidData(final Integer numValues) {
-        m_numValues = numValues;
-    }
-
-    @Override
-    public int capacity() {
-        return m_capacity;
-    }
-
-    @Override
-    public void expand(final int minimumCapacity) {
-        m_capacity = minimumCapacity;
-    }
-
-    @Override
-    public long sizeOf() {
-        return 0;
-    }
-
-    @Override
-    public int length() {
-        return m_numValues;
-    }
-
-    @Override
-    public VoidReadData close(final int length) {
-        m_numValues = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-        return this;
-    }
-
-    @Override
-    public Object get() {
-        return Integer.valueOf(m_numValues);
-    }
+    TestData createReadData(Object data);
 
 }
