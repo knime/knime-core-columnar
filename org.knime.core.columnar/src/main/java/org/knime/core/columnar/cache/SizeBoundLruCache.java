@@ -82,17 +82,15 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
 
     SizeBoundLruCache(final long maxSize) {
 
-        final Weigher<K, DataWithEvictor<K, D>> weigher =
-            (k, dataWithEvictor) -> {
-                final long size = dataWithEvictor.m_data.sizeOf();
-                if (size > Integer.MAX_VALUE) {
-                    final Logger logger = LoggerFactory.getLogger(getClass());
-                    logger.error(
-                        String.format("Size of data (%d) is larger than maximum (%d).", size, Integer.MAX_VALUE));
-                    return Integer.MAX_VALUE;
-                }
-                return Math.max(1, (int)size);
-            };
+        final Weigher<K, DataWithEvictor<K, D>> weigher = (k, dataWithEvictor) -> {
+            final long size = dataWithEvictor.m_data.sizeOf();
+            if (size > Integer.MAX_VALUE) {
+                final Logger logger = LoggerFactory.getLogger(getClass());
+                logger.error("Size of data ({}) is larger than maximum ({}).", size, Integer.MAX_VALUE);
+                return Integer.MAX_VALUE;
+            }
+            return Math.max(1, (int)size);
+        };
 
         final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
             if (removalNotification.wasEvicted()) {

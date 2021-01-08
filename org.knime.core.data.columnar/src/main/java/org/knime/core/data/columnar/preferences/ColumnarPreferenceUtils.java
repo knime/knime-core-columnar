@@ -220,7 +220,7 @@ public final class ColumnarPreferenceUtils {
         return useDefaults() ? NUM_THREADS_DEF : COLUMNAR_STORE.getInt(NUM_THREADS_KEY);
     }
 
-    public static ExecutorService getDomainCalcExecutor() {
+    public static synchronized ExecutorService getDomainCalcExecutor() {
         if (DOMAIN_CALC_EXECUTOR == null) {
             DOMAIN_CALC_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-DomainCalculator-" + DOMAIN_CALC_THREAD_COUNT.incrementAndGet())));
@@ -239,7 +239,7 @@ public final class ColumnarPreferenceUtils {
         return HEAP_CACHE;
     }
 
-    private static ExecutorService getSerializeExecutor() {
+    private static synchronized ExecutorService getSerializeExecutor() {
         if (SERIALIZE_EXECUTOR == null) {
             SERIALIZE_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
@@ -255,7 +255,7 @@ public final class ColumnarPreferenceUtils {
         return useDefaults() ? SMALL_TABLE_THRESHOLD_DEF : COLUMNAR_STORE.getInt(SMALL_TABLE_THRESHOLD_KEY);
     }
 
-    private static SmallColumnStoreCache getSmallTableCache() {
+    private static synchronized SmallColumnStoreCache getSmallTableCache() {
         if (SMALL_TABLE_CACHE == null) {
             final long smallTableCacheSize = (long)getSmallTableCacheSize() << 20;
             final long totalFreeMemorySize = getTotalFreeMemorySize();
@@ -277,7 +277,7 @@ public final class ColumnarPreferenceUtils {
         return useDefaults() ? COLUMN_DATA_CACHE_SIZE_DEF : COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY);
     }
 
-    private static CachedColumnStoreCache getColumnDataCache() {
+    private static synchronized CachedColumnStoreCache getColumnDataCache() {
         if (COLUMN_DATA_CACHE == null) {
             final long columnDataCacheSize = (long)getColumnDataCacheSize() << 20;
             final long totalFreeMemorySize = getTotalFreeMemorySize();
@@ -294,7 +294,7 @@ public final class ColumnarPreferenceUtils {
         return COLUMN_DATA_CACHE;
     }
 
-    private static ExecutorService getPersistExecutor() {
+    private static synchronized ExecutorService getPersistExecutor() {
         if (PERSIST_EXECUTOR == null) {
             PERSIST_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet())));

@@ -48,6 +48,7 @@ package org.knime.core.data.columnar.domain;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -151,7 +152,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
         if (m_domainCalculators == null) {
             final int length = m_schema.getNumColumns();
             final DataTableSpec spec = m_schema.getSourceSpec();
-            m_domainCalculators = new HashMap<>();
+            m_domainCalculators = new ConcurrentHashMap<>();
             final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
             for (int i = 1; i < length; i++) {
                 final DataType type = spec.getColumnSpec(i - 1).getType();
@@ -168,8 +169,10 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                     } else {
                         maxNumValues = m_maxNumValues;
                     }
-                    if (m_nativeNominalDomainCalculators.containsKey(type)) {
-                        calculator = m_nativeNominalDomainCalculators.get(type).apply(maxNumValues);
+                    final Function<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>> nativeNominalDomainCalculator =
+                        m_nativeNominalDomainCalculators.get(type);
+                    if (nativeNominalDomainCalculator != null) {
+                        calculator = nativeNominalDomainCalculator.apply(maxNumValues);
                     } else if (isBounded) {
                         calculator = new ColumnarCombinedDomainCalculator<>(factories[i],
                             new DataValueComparatorDelegator<>(type.getComparator()), maxNumValues);
@@ -177,8 +180,10 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
                         calculator = new ColumnarNominalDomainCalculator<>(factories[i], maxNumValues);
                     }
                 } else if (isBounded) {
-                    if (m_nativeBoundedDomainCalculators.containsKey(type)) {
-                        calculator = m_nativeBoundedDomainCalculators.get(type).get();
+                    final Supplier<ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>> nativeBoundedDomainCalculator =
+                        m_nativeBoundedDomainCalculators.get(type);
+                    if (nativeBoundedDomainCalculator != null) {
+                        calculator = nativeBoundedDomainCalculator.get();
                     } else {
                         calculator = new ColumnarBoundedDomainCalculator<>(factories[i],
                             new DataValueComparatorDelegator<>(type.getComparator()));
@@ -205,7 +210,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
         createMetadataCalculators() {
         if (m_metadataCalculators == null) {
-            m_metadataCalculators = new HashMap<>();
+            m_metadataCalculators = new ConcurrentHashMap<>();
             final int length = m_schema.getNumColumns();
             final DataTableSpec spec = m_schema.getSourceSpec();
             final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();

@@ -67,6 +67,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.knime.core.columnar.TestColumnStoreUtils.TestDataTable;
 import org.knime.core.columnar.store.ColumnDataFactory;
@@ -84,11 +85,16 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
 
-//    @Rule
-//    public Timeout globalTimeout = Timeout.seconds(60);
+    @AfterClass
+    public static void tearDownTests() {
+        EXECUTOR.shutdown();
+    }
+
+    //    @Rule
+    //    public Timeout globalTimeout = Timeout.seconds(60);
 
     static CachedColumnStoreCache generateCache(final int numTablesHeld) {
-        return new CachedColumnStoreCache(numTablesHeld * DEF_SIZE_OF_TABLE);
+        return new CachedColumnStoreCache((long)numTablesHeld * DEF_SIZE_OF_TABLE);
     }
 
     private static AsyncFlushCachedColumnStore generateDefaultCachedColumnStore(final ColumnStore delegate,
@@ -106,6 +112,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
             try {
                 latch.await();
             } catch (InterruptedException ex) {
+                // Restore interrupted state...
+                Thread.currentThread().interrupt();
             }
         });
         return latch;
@@ -146,7 +154,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     }
 
     private static void checkCacheSize(final CachedColumnStoreCache cache, final int tablesHeldInCache) {
-        assertEquals(DEF_SIZE_OF_TABLE * tablesHeldInCache, cache.size() * DEF_SIZE_OF_DATA);
+        assertEquals((long)DEF_SIZE_OF_TABLE * tablesHeldInCache, (long)cache.size() * DEF_SIZE_OF_DATA);
     }
 
     private static void checkUnflushed(final TestDataTable table, final TestColumnStore delegate) throws IOException {

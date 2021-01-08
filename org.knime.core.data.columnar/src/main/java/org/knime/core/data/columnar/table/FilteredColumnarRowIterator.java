@@ -47,6 +47,7 @@ package org.knime.core.data.columnar.table;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
@@ -108,6 +109,9 @@ class FilteredColumnarRowIterator {
 
         @Override
         public DataRow next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
             final RowRead access = m_cursor.forward();
 
             final HashMap<Integer, DataCell> cells = new HashMap<>(m_selection.length, 1.0f);
@@ -154,6 +158,9 @@ class FilteredColumnarRowIterator {
 
                     @Override
                     public DataCell next() {
+                        if (!hasNext()) {
+                            throw new NoSuchElementException();
+                        }
                         return getCell(idx++);
                     }
                 };
@@ -198,6 +205,9 @@ class FilteredColumnarRowIterator {
 
         @Override
         public DataRow next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
             final RowRead access = m_cursor.forward();
 
             final DataCell[] cells = new DataCell[m_cursor.getNumColumns()];
@@ -247,6 +257,9 @@ class FilteredColumnarRowIterator {
 
                     @Override
                     public DataCell next() {
+                        if (!hasNext()) {
+                            throw new NoSuchElementException();
+                        }
                         return getCell(idx++);
                     }
                 };
@@ -295,6 +308,9 @@ class FilteredColumnarRowIterator {
 
         @Override
         public DataRow next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
             final RowRead access = m_cursor.forward();
 
             final DataCell cell;
@@ -342,6 +358,9 @@ class FilteredColumnarRowIterator {
 
                     @Override
                     public DataCell next() {
+                        if (!hasNext()) {
+                            throw new NoSuchElementException();
+                        }
                         return getCell(idx++);
                     }
                 };

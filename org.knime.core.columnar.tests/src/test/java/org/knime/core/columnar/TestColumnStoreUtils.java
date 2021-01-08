@@ -101,7 +101,7 @@ public final class TestColumnStoreUtils {
         }
 
         @Override
-        public void close() throws IOException {
+        public void close() {
             for (TestData[] batch : m_batches) {
                 for (TestData data : batch) {
                     if (data != null) {

@@ -231,10 +231,8 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
 
     @Override
     public final void close() throws IOException {
-        synchronized (m_storeClosed) {
-            if (!m_storeClosed.getAndSet(true)) {
-                closeOnce();
-            }
+        if (!m_storeClosed.getAndSet(true)) {
+            closeOnce();
         }
     }
 

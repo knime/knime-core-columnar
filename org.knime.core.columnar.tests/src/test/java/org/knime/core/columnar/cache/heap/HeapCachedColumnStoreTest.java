@@ -63,6 +63,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.ColumnReadData;
@@ -78,6 +79,11 @@ import org.knime.core.columnar.store.ColumnStore;
 public class HeapCachedColumnStoreTest {
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
+
+    @AfterClass
+    public static void tearDownTests() {
+        EXECUTOR.shutdown();
+    }
 
     static ObjectDataCache generateCache() {
 

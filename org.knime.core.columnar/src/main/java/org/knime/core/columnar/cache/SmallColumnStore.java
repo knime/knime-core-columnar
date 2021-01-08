@@ -51,7 +51,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -136,15 +135,19 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
         @Override
         public void release() {
-            for (final ReadBatch batch : m_batches) {
-                batch.release();
+            synchronized (m_batches) {
+                for (final ReadBatch batch : m_batches) {
+                    batch.release();
+                }
             }
         }
 
         @Override
         public void retain() {
-            for (final ReadBatch batch : m_batches) {
-                batch.retain();
+            synchronized (m_batches) {
+                for (final ReadBatch batch : m_batches) {
+                    batch.retain();
+                }
             }
         }
 
@@ -179,7 +182,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
         private final CountDownLatch m_delegateClosed = new CountDownLatch(1);
 
-        private final AtomicBoolean m_flushed = new AtomicBoolean();
+        private boolean m_flushed = false;
 
         SmallColumnStoreWriter() {
             super(SmallColumnStore.this);
@@ -232,25 +235,24 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             }
         }
 
-        private void flush(final Table table, final boolean close) throws IOException {
-            synchronized (m_flushed) {
-                if (!m_flushed.getAndSet(true)) {
-                    try {
-                        for (int i = 0; i < table.getNumChunks(); i++) {
-                            final ReadBatch batch = table.getBatch(i);
-                            @SuppressWarnings("resource")
-                            final ColumnDataWriter delegate = initAndGetDelegate();
-                            delegate.write(batch);
-                        }
+        private synchronized void flush(final Table table, final boolean close) throws IOException {
+            if (!m_flushed) {
+                m_flushed = true;
+                try {
+                    for (int i = 0; i < table.getNumChunks(); i++) {
+                        final ReadBatch batch = table.getBatch(i);
                         @SuppressWarnings("resource")
-                        final ColumnDataWriter delegate = getDelegate();
-                        if (close && delegate != null) {
-                            delegate.close();
-                        }
-                    } finally {
-                        if (close) {
-                            m_delegateClosed.countDown();
-                        }
+                        final ColumnDataWriter delegate = initAndGetDelegate();
+                        delegate.write(batch);
+                    }
+                    @SuppressWarnings("resource")
+                    final ColumnDataWriter delegate = getDelegate();
+                    if (close && delegate != null) {
+                        delegate.close();
+                    }
+                } finally {
+                    if (close) {
+                        m_delegateClosed.countDown();
                     }
                 }
             }
@@ -286,7 +288,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
         }
 
         @Override
-        public void close() throws IOException {
+        public void close() {
             m_readerClosed = true;
             if (m_table != null) {
                 m_table.release();

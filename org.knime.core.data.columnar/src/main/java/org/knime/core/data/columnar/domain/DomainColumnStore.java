@@ -83,9 +83,9 @@ public final class DomainColumnStore extends DelegatingColumnStore {
     private final ExecutorService m_executor;
 
     /* Not final as initialized lazily */
-    private volatile Map<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> m_domainCalculators;
+    private Map<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> m_domainCalculators;
 
-    private volatile Map<Integer, ColumnarDomainCalculator<?, DataColumnMetaData[]>> m_metadataCalculators;
+    private Map<Integer, ColumnarDomainCalculator<?, DataColumnMetaData[]>> m_metadataCalculators;
 
     private DomainStoreConfig m_config;
 

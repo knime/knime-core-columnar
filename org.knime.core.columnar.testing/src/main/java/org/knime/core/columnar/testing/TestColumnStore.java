@@ -154,7 +154,7 @@ public final class TestColumnStore implements ColumnStore {
         }
 
         @Override
-        public ReadBatch readRetained(final int chunkIndex) throws IOException {
+        public ReadBatch readRetained(final int chunkIndex) {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
@@ -264,7 +264,7 @@ public final class TestColumnStore implements ColumnStore {
     }
 
     @Override
-    public void save(final File f) throws IOException {
+    public void save(final File f) {
         if (!m_writerClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }

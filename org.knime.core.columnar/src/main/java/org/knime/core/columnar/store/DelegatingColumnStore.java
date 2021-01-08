@@ -194,10 +194,8 @@ public abstract class DelegatingColumnStore implements ColumnStore {
 
         @Override
         public final void close() throws IOException {
-            synchronized (m_writerClosed) {
-                if (!m_writerClosed.getAndSet(true)) {
-                    closeOnce();
-                }
+            if (!m_writerClosed.getAndSet(true)) {
+                closeOnce();
             }
         }
 
@@ -487,12 +485,10 @@ public abstract class DelegatingColumnStore implements ColumnStore {
 
     @Override
     public final void close() throws IOException {
-        synchronized (m_storeClosed) {
-            if (!m_storeClosed.getAndSet(true)) {
-                closeOnce();
-                if (m_writer != null) {
-                    m_writer.close();
-                }
+        if (!m_storeClosed.getAndSet(true)) {
+            closeOnce();
+            if (m_writer != null) {
+                m_writer.close();
             }
         }
     }

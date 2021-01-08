@@ -132,7 +132,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         }
 
         @Override
-        protected void closeOnce() throws IOException {
+        protected void closeOnce() {
             handleDoneFuture();
             enqueueRunnable(() -> {
                 try {

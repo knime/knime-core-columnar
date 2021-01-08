@@ -57,9 +57,9 @@ import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.data.v2.access.AccessSpec;
 import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
 import org.knime.core.data.v2.access.StructAccess.StructReadAccess;
 import org.knime.core.data.v2.access.StructAccess.StructWriteAccess;
+import org.knime.core.data.v2.access.WriteAccess;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -79,7 +79,7 @@ public class ColumnarStructAccessFactory
         m_inner = Stream.of(inner).map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
             .toArray(ColumnarAccessFactory<?, ?, ?, ?>[]::new);
         m_spec =
-            new StructDataSpec(Stream.of(m_inner).map((i) -> i.getColumnDataSpec()).toArray(ColumnDataSpec[]::new));
+            new StructDataSpec(Stream.of(m_inner).map(ColumnarAccessFactory::getColumnDataSpec).toArray(ColumnDataSpec[]::new));
 
     }
 

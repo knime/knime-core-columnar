@@ -270,6 +270,6 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     }
 
     private static int[] toSortedIntArray(final Set<Integer> selection) {
-        return selection.stream().sorted().mapToInt((i) -> (i)).toArray();
+        return selection.stream().sorted().mapToInt(Integer::intValue).toArray();
     }
 }

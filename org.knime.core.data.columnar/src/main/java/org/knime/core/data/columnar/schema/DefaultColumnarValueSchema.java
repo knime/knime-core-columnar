@@ -71,7 +71,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
         @SuppressWarnings("unchecked")
         final ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] factories =
             Stream.of(source.getValueFactories()) //
-                .map(s -> s.getSpec())//
+                .map(ValueFactory::getSpec)//
                 .map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
                 .toArray(ColumnarAccessFactory[]::new);
         m_factories = factories;
