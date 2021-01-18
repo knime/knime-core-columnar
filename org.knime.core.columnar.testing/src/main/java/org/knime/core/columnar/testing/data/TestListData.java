@@ -45,86 +45,71 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import static org.junit.Assert.assertEquals;
+import java.util.Arrays;
+import java.util.stream.IntStream;
 
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.ListData.ListReadData;
+import org.knime.core.columnar.data.ListData.ListWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public final class TestListData extends TestData implements ListWriteData, ListReadData {
 
-    private int m_refs = 1;
+    public static final class TestListDataFactory implements TestDataFactory {
 
-    private int m_size;
+        private final TestDataFactory m_inner;
 
-    private Object[] m_values;
+        public TestListDataFactory(final TestDataFactory inner) {
+            m_inner = inner;
+        }
 
-    TestData(final Object[] objects) {
-        this(objects, objects.length);
+        @Override
+        public TestListData createWriteData(final int capacity) {
+            return new TestListData(
+                IntStream.range(0, capacity).mapToObj(i -> m_inner.createWriteData(0)).toArray(TestData[]::new), false);
+        }
+
+        @Override
+        public TestListData createReadData(final Object data) {
+            return new TestListData((TestData[])data, true);
+        }
+
     }
 
-    TestData(final Object[] objects, final int size) {
-        m_values = objects;
-        m_size = size;
+    TestListData(final TestData[] lists, final boolean close) {
+        super(lists);
+        if (close) {
+            close(lists.length);
+        }
     }
 
     @Override
-    public final synchronized void release() {
-        m_refs--;
-    }
-
-    @Override
-    public final synchronized void retain() {
-        m_refs++;
-    }
-
-    public final synchronized int getRefs() {
-        return m_refs;
+    public ListReadData close(final int length) {
+        closeInternal(length);
+        return this;
     }
 
     @Override
     public long sizeOf() {
-        return length();
+        return Arrays.stream(get()).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <C extends ColumnReadData> C getReadData(final int index) {
+        return (C)get()[index];
     }
 
     @Override
-    public final int capacity() {
-        return m_size;
-    }
-
-    @Override
-    public void expand(final int minimumCapacity) {
-        final Object[] expanded = new Object[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
-    }
-
-    @Override
-    public synchronized void setMissing(final int index) {
-        m_values[index] = null;
-    }
-
-    @Override
-    public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null;
-    }
-
-    @Override
-    public final int length() {
-        return m_size;
-    }
-
-    final void closeInternal(final int length) {
-        m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-    }
-
-    public final Object[] get() {
-        return m_values;
+    public <C extends ColumnWriteData> C getWriteData(final int index, final int size) {
+        @SuppressWarnings("unchecked")
+        final C data = (C)get()[index];
+        data.expand(size);
+        return data;
     }
 
 }

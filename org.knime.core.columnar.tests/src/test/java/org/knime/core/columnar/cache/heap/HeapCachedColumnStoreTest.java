@@ -57,6 +57,7 @@ import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTa
 import static org.knime.core.columnar.TestColumnStoreUtils.releaseTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.writeDefaultTable;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -97,12 +98,13 @@ public class HeapCachedColumnStoreTest {
         };
     }
 
+    @SuppressWarnings("resource")
     private static HeapCachedColumnStore generateDefaultHeapCachedStore() {
         return new HeapCachedColumnStore(createDefaultTestColumnStore(), generateCache(), EXECUTOR);
     }
 
     @Test
-    public void testWriteRead() throws Exception {
+    public void testWriteRead() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             final List<ColumnReadData[]> table = writeDefaultTable(store);
             readAndCompareTable(store, table);
@@ -111,7 +113,7 @@ public class HeapCachedColumnStoreTest {
     }
 
     @Test
-    public void testWriteMultiRead() throws Exception {
+    public void testWriteMultiRead() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             final List<ColumnReadData[]> table = writeDefaultTable(store);
             readTwiceAndCompareTable(store);
@@ -120,7 +122,7 @@ public class HeapCachedColumnStoreTest {
     }
 
     @Test
-    public void testWriteReadSelection() throws Exception {
+    public void testWriteReadSelection() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             final List<ColumnReadData[]> table = writeDefaultTable(store);
             for (int i = 0; i < store.getSchema().getNumColumns(); i++) {
@@ -131,50 +133,50 @@ public class HeapCachedColumnStoreTest {
     }
 
     @Test
-    public void testFactorySingleton() throws Exception {
+    public void testFactorySingleton() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             assertEquals(store.getFactory(), store.getFactory());
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterWriterClose() throws Exception {
+    public void exceptionOnGetFactoryAfterWriterClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
             }
             store.getFactory();
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterStoreClose() throws Exception {
+    public void exceptionOnGetFactoryAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            store.close();
+            store.close(); // NOSONAR
             store.getFactory();
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnCreateAfterWriterClose() throws Exception {
+    public void exceptionOnCreateAfterWriterClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             final ColumnDataFactory factory = store.getFactory();
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
             }
             factory.create(DEF_SIZE_OF_DATA);
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnCreateAfterStoreClose() throws Exception {
+    public void exceptionOnCreateAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             final ColumnDataFactory factory = store.getFactory();
-            store.close();
+            store.close(); // NOSONAR
             factory.create(DEF_SIZE_OF_DATA);
         }
     }
 
     @Test
-    public void testWriterSingleton() throws Exception {
+    public void testWriterSingleton() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore();
                 final ColumnDataWriter writer1 = store.getWriter();
                 final ColumnDataWriter writer2 = store.getWriter()) {
@@ -183,26 +185,26 @@ public class HeapCachedColumnStoreTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetWriterAfterWriterClose() throws Exception {
+    public void exceptionOnGetWriterAfterWriterClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
             }
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetWriterAfterStoreClose() throws Exception {
+    public void exceptionOnGetWriterAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            store.close();
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            store.close(); // NOSONAR
+            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnWriteAfterWriterClose() throws Exception {
+    public void exceptionOnWriteAfterWriterClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             store.getWriter().close();
             releaseTable(writeDefaultTable(store));
@@ -210,64 +212,64 @@ public class HeapCachedColumnStoreTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnWriteAfterStoreClose() throws Exception {
+    public void exceptionOnWriteAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            store.close();
+            store.close(); // NOSONAR
             releaseTable(writeDefaultTable(store));
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveWhileWriterOpen() throws Exception {
+    public void exceptionOnSaveWhileWriterOpen() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             store.save(null);
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveAfterStoreClose() throws Exception {
+    public void exceptionOnSaveAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             releaseTable(writeDefaultTable(store));
-            store.close();
+            store.close(); // NOSONAR
             store.save(null);
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnCreateReaderWhileWriterOpen() throws Exception {
+    public void exceptionOnCreateReaderWhileWriterOpen() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            try (final ColumnDataReader reader = store.createReader()) {
+            try (final ColumnDataReader reader = store.createReader()) { // NOSONAR
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
+    public void exceptionOnCreateReaderAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             releaseTable(writeDefaultTable(store));
-            store.close();
-            try (final ColumnDataReader reader = store.createReader()) {
+            store.close(); // NOSONAR
+            try (final ColumnDataReader reader = store.createReader()) { // NOSONAR
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnReadAfterReaderClose() throws Exception {
+    public void exceptionOnReadAfterReaderClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             releaseTable(writeDefaultTable(store));
             try (final ColumnDataReader reader = store.createReader()) {
-                reader.close();
+                reader.close(); // NOSONAR
                 reader.readRetained(0);
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnReadAfterStoreClose() throws Exception {
+    public void exceptionOnReadAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             releaseTable(writeDefaultTable(store));
             try (final ColumnDataReader reader = store.createReader()) {
-                store.close();
+                store.close(); // NOSONAR
                 reader.readRetained(0);
             }
         }

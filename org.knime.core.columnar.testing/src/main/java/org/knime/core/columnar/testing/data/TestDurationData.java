@@ -45,86 +45,59 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import static org.junit.Assert.assertEquals;
+import java.time.Duration;
 
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DurationData.DurationReadData;
+import org.knime.core.columnar.data.DurationData.DurationWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public final class TestDurationData extends TestData implements DurationWriteData, DurationReadData {
 
-    private int m_refs = 1;
+    public static final class TestDurationDataFactory implements TestDataFactory {
 
-    private int m_size;
+        public static final TestDurationDataFactory INSTANCE = new TestDurationDataFactory();
 
-    private Object[] m_values;
+        private TestDurationDataFactory() {
+        }
 
-    TestData(final Object[] objects) {
-        this(objects, objects.length);
+        @Override
+        public TestDurationData createWriteData(final int capacity) {
+            return new TestDurationData(capacity);
+        }
+
+        @Override
+        public TestDurationData createReadData(final Object data) {
+            return new TestDurationData((Duration[])data);
+        }
+
     }
 
-    TestData(final Object[] objects, final int size) {
-        m_values = objects;
-        m_size = size;
+    TestDurationData(final int capacity) {
+        super(new Duration[capacity]);
     }
 
-    @Override
-    public final synchronized void release() {
-        m_refs--;
-    }
-
-    @Override
-    public final synchronized void retain() {
-        m_refs++;
-    }
-
-    public final synchronized int getRefs() {
-        return m_refs;
-    }
-
-    @Override
-    public long sizeOf() {
-        return length();
+    TestDurationData(final Duration[] durations) {
+        super(durations);
+        close(durations.length);
     }
 
     @Override
-    public final int capacity() {
-        return m_size;
+    public DurationReadData close(final int length) {
+        closeInternal(length);
+        return this;
     }
 
     @Override
-    public void expand(final int minimumCapacity) {
-        final Object[] expanded = new Object[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
+    public synchronized Duration getDuration(final int index) {
+        return (Duration)get()[index];
     }
 
     @Override
-    public synchronized void setMissing(final int index) {
-        m_values[index] = null;
-    }
-
-    @Override
-    public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null;
-    }
-
-    @Override
-    public final int length() {
-        return m_size;
-    }
-
-    final void closeInternal(final int length) {
-        m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-    }
-
-    public final Object[] get() {
-        return m_values;
+    public synchronized void setDuration(final int index, final Duration val) {
+        get()[index] = val;
     }
 
 }

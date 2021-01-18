@@ -95,10 +95,11 @@ public final class SmallColumnStore extends DelegatingColumnStore {
         /**
          * @param smallTableThreshold the size (in bytes) that determines whether a table is considered small
          * @param cacheSize the number of small tables the cache should be able to hold
+         * @param concurrencyLevel the allowed concurrency among update operations
          */
-        public SmallColumnStoreCache(final int smallTableThreshold, final long cacheSize) {
+        public SmallColumnStoreCache(final int smallTableThreshold, final long cacheSize, final int concurrencyLevel) {
             m_smallTableThreshold = smallTableThreshold;
-            m_cache = new SizeBoundLruCache<>(cacheSize);
+            m_cache = new SizeBoundLruCache<>(cacheSize, concurrencyLevel);
             m_cacheSize = cacheSize;
         }
 

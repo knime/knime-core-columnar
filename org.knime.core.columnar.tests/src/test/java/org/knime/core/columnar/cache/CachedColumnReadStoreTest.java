@@ -87,6 +87,7 @@ public class CachedColumnReadStoreTest extends ColumnarTest {
         }
     }
 
+    @SuppressWarnings("resource")
     private static StoreAndTable generateDefaultCachedColumnReadStore() throws IOException {
         final TestColumnStore delegate = createDefaultTestColumnStore();
         final TestDataTable table = createDefaultTestTable(delegate);
@@ -95,7 +96,7 @@ public class CachedColumnReadStoreTest extends ColumnarTest {
     }
 
     @Test
-    public void testRead() throws Exception {
+    public void testRead() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
             checkUncached(storeAndTable.m_table);
             try (final TestDataTable reassembledTable =
@@ -106,7 +107,7 @@ public class CachedColumnReadStoreTest extends ColumnarTest {
     }
 
     @Test
-    public void testMultiRead() throws Exception {
+    public void testMultiRead() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
             checkUncached(storeAndTable.m_table);
             readTwiceAndCompareTable(storeAndTable.m_store);
@@ -114,42 +115,42 @@ public class CachedColumnReadStoreTest extends ColumnarTest {
     }
 
     @Test
-    public void testReadSelection() throws Exception {
+    public void testReadSelection() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
             checkUncached(storeAndTable.m_table);
             readTwiceAndCompareTable(storeAndTable.m_store);
             for (int i = 0; i < storeAndTable.m_store.getSchema().getNumColumns(); i++) {
                 try (final TestDataTable reassembledTable =
-                    readSelectionAndCompareTable(storeAndTable.m_store, storeAndTable.m_table, i)) {
+                    readSelectionAndCompareTable(storeAndTable.m_store, storeAndTable.m_table, i)) { // NOSONAR
                 }
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnCreateReaderAfterStoreClose() throws Exception {
+    public void exceptionOnCreateReaderAfterStoreClose() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
-            storeAndTable.close();
-            try (final ColumnDataReader reader = storeAndTable.m_store.createReader()) {
+            storeAndTable.close(); // NOSONAR
+            try (final ColumnDataReader reader = storeAndTable.m_store.createReader()) { // NOSONAR
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnReadAfterReaderClose() throws Exception {
+    public void exceptionOnReadAfterReaderClose() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
             try (final ColumnDataReader reader = storeAndTable.m_store.createReader()) {
-                reader.close();
+                reader.close(); // NOSONAR
                 reader.readRetained(0);
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnReadAfterStoreClose() throws Exception {
+    public void exceptionOnReadAfterStoreClose() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
             try (final ColumnDataReader reader = storeAndTable.m_store.createReader()) {
-                storeAndTable.close();
+                storeAndTable.close(); // NOSONAR
                 reader.readRetained(0);
             }
         }

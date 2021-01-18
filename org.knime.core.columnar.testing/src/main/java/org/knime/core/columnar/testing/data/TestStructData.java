@@ -45,86 +45,83 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import static org.junit.Assert.assertEquals;
+import java.util.Arrays;
 
 import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.StructData.StructReadData;
+import org.knime.core.columnar.data.StructData.StructWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public final class TestStructData extends TestData implements StructWriteData, StructReadData {
 
-    private int m_refs = 1;
+    public static final class TestStructDataFactory implements TestDataFactory {
 
-    private int m_size;
+        private final TestDataFactory[] m_inner;
 
-    private Object[] m_values;
+        public TestStructDataFactory(final TestDataFactory... inner) {
+            m_inner = inner;
+        }
 
-    TestData(final Object[] objects) {
-        this(objects, objects.length);
+        @Override
+        public TestStructData createWriteData(final int capacity) {
+            return new TestStructData(
+                Arrays.stream(m_inner).map(f -> f.createWriteData(capacity)).toArray(TestData[]::new), false);
+        }
+
+        @Override
+        public TestStructData createReadData(final Object data) {
+            return new TestStructData((TestData[])data, true);
+        }
+
     }
 
-    TestData(final Object[] objects, final int size) {
-        m_values = objects;
-        m_size = size;
+    TestStructData(final TestData[] structs, final boolean close) {
+        super(structs, structs[0].capacity());
+        if (close) {
+            close(structs[0].length());
+        }
     }
 
     @Override
-    public final synchronized void release() {
-        m_refs--;
-    }
-
-    @Override
-    public final synchronized void retain() {
-        m_refs++;
-    }
-
-    public final synchronized int getRefs() {
-        return m_refs;
+    public StructReadData close(final int length) {
+        closeInternal(length);
+        return this;
     }
 
     @Override
     public long sizeOf() {
-        return length();
-    }
-
-    @Override
-    public final int capacity() {
-        return m_size;
+        return Arrays.stream(get()).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
     }
 
     @Override
     public void expand(final int minimumCapacity) {
-        final Object[] expanded = new Object[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
+        Arrays.stream(get()).map(o -> (TestData)(o)).forEach(t -> t.expand(minimumCapacity));
     }
 
     @Override
     public synchronized void setMissing(final int index) {
-        m_values[index] = null;
+        Arrays.stream(get()).map(o -> (TestData)(o)).forEach(t -> t.setMissing(index));
     }
 
     @Override
     public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null;
+        return ((ColumnReadData)get()[0]).isMissing(index);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public final int length() {
-        return m_size;
+    public <C extends ColumnReadData> C getReadDataAt(final int index) {
+        return (C)get()[index];
     }
 
-    final void closeInternal(final int length) {
-        m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-    }
-
-    public final Object[] get() {
-        return m_values;
+    @SuppressWarnings("unchecked")
+    @Override
+    public <C extends ColumnWriteData> C getWriteDataAt(final int index) {
+        return (C)get()[index];
     }
 
 }

@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.testing;
 
+import java.util.Arrays;
+
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
 import org.knime.core.columnar.data.ColumnDataSpec.Mapper;
@@ -67,10 +69,25 @@ import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
+import org.knime.core.columnar.testing.data.TestBooleanData.TestBooleanDataFactory;
+import org.knime.core.columnar.testing.data.TestByteData.TestByteDataFactory;
 import org.knime.core.columnar.testing.data.TestDataFactory;
 import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
+import org.knime.core.columnar.testing.data.TestDurationData.TestDurationDataFactory;
+import org.knime.core.columnar.testing.data.TestFloatData.TestFloatDataFactory;
+import org.knime.core.columnar.testing.data.TestGenericObjectData.TestGenericObjectDataFactory;
+import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
+import org.knime.core.columnar.testing.data.TestListData.TestListDataFactory;
+import org.knime.core.columnar.testing.data.TestLocalDateData.TestLocalDateDataFactory;
+import org.knime.core.columnar.testing.data.TestLocalDateTimeData.TestLocalDateTimeDataFactory;
+import org.knime.core.columnar.testing.data.TestLocalTimeData.TestLocalTimeDataFactory;
+import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
+import org.knime.core.columnar.testing.data.TestPeriodData.TestPeriodDataFactory;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
+import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
+import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
 import org.knime.core.columnar.testing.data.TestVoidData.TestVoidDataFactory;
+import org.knime.core.columnar.testing.data.TestZonedDateTimeData.TestZonedDateTimeDataFactory;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -84,12 +101,12 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final BooleanDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestBooleanDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final ByteDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestByteDataFactory.INSTANCE;
     }
 
     @Override
@@ -99,47 +116,47 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final DurationDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestDurationDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final FloatDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestFloatDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final IntDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestIntDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final LocalDateDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestLocalDateDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final LocalDateTimeDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestLocalDateTimeDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final LocalTimeDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestLocalTimeDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final LongDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestLongDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final PeriodDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestPeriodDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final VarBinaryDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestVarBinaryDataFactory.INSTANCE;
     }
 
     @Override
@@ -149,22 +166,23 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final GenericObjectDataSpec<?> spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestGenericObjectDataFactory.INSTANCE;
     }
 
     @Override
     public TestDataFactory visit(final StructDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return new TestStructDataFactory(
+            Arrays.stream(spec.getInner()).map(s -> s.accept(this)).toArray(TestDataFactory[]::new));
     }
 
     @Override
     public TestDataFactory visit(final ListDataSpec listDataSpec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return new TestListDataFactory(listDataSpec.getInner().accept(this));
     }
 
     @Override
     public TestDataFactory visit(final ZonedDateTimeDataSpec spec) {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return TestZonedDateTimeDataFactory.INSTANCE;
     }
 
     @Override

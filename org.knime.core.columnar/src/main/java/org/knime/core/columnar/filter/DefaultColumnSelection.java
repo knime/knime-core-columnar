@@ -59,6 +59,9 @@ public class DefaultColumnSelection implements ColumnSelection {
     private final int m_numColumns;
 
     public DefaultColumnSelection(final int numColumns) {
+        if (numColumns < 0) {
+            throw new IllegalArgumentException("Number of columns must be non-negative.");
+        }
         m_numColumns = numColumns;
     }
 

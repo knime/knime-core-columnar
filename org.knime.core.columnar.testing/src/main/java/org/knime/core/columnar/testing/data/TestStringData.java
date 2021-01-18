@@ -51,8 +51,8 @@ import org.knime.core.columnar.data.StringData.StringWriteData;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class TestStringData extends TestData
-    implements StringWriteData, StringReadData {
+@SuppressWarnings("javadoc")
+public final class TestStringData extends TestData implements StringWriteData, StringReadData {
 
     public static final class TestStringDataFactory implements TestDataFactory {
 
@@ -77,9 +77,9 @@ public final class TestStringData extends TestData
         super(new String[capacity]);
     }
 
-    TestStringData(final String[] objects) {
-        super(objects);
-        close(objects.length);
+    TestStringData(final String[] strings) {
+        super(strings);
+        close(strings.length);
     }
 
     @Override

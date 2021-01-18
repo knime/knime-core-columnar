@@ -42,89 +42,74 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   18 Jan 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.columnar.filter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import java.util.stream.IntStream;
+
+import org.junit.Test;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public class FilteredColumnSelectionTest {
 
-    private int m_refs = 1;
+    private static final int DEF_NUM_COLUMNS = 2;
 
-    private int m_size;
-
-    private Object[] m_values;
-
-    TestData(final Object[] objects) {
-        this(objects, objects.length);
+    @SuppressWarnings("unused")
+    @Test(expected = NullPointerException.class)
+    public void testNullCheckOnCreate() {
+        new FilteredColumnSelection(0, null);
     }
 
-    TestData(final Object[] objects, final int size) {
-        m_values = objects;
-        m_size = size;
+    @SuppressWarnings("unused")
+    @Test(expected = IllegalArgumentException.class)
+    public void testIllegalArgumentOnCreate() {
+        new FilteredColumnSelection(-1);
     }
 
-    @Override
-    public final synchronized void release() {
-        m_refs--;
+    @SuppressWarnings("unused")
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testIndexOutOfBoundsOnCreateLower() {
+        new FilteredColumnSelection(0, -1);
     }
 
-    @Override
-    public final synchronized void retain() {
-        m_refs++;
+    @SuppressWarnings("unused")
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testIndexOutOfBoundsOnCreateUpper() {
+        new FilteredColumnSelection(0, 0);
     }
 
-    public final synchronized int getRefs() {
-        return m_refs;
+    @Test
+    public void testAllSelected() {
+        final FilteredColumnSelection selection =
+            new FilteredColumnSelection(DEF_NUM_COLUMNS, IntStream.range(0, DEF_NUM_COLUMNS).toArray());
+        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
+            assertTrue(selection.isSelected(i));
+        }
+        assertFalse(selection.isSelected(DEF_NUM_COLUMNS));
     }
 
-    @Override
-    public long sizeOf() {
-        return length();
+    @Test
+    public void testNoneSelected() {
+        final FilteredColumnSelection selection = new FilteredColumnSelection(DEF_NUM_COLUMNS);
+        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
+            assertFalse(selection.isSelected(i));
+        }
     }
 
-    @Override
-    public final int capacity() {
-        return m_size;
-    }
-
-    @Override
-    public void expand(final int minimumCapacity) {
-        final Object[] expanded = new Object[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
-    }
-
-    @Override
-    public synchronized void setMissing(final int index) {
-        m_values[index] = null;
-    }
-
-    @Override
-    public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null;
-    }
-
-    @Override
-    public final int length() {
-        return m_size;
-    }
-
-    final void closeInternal(final int length) {
-        m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-    }
-
-    public final Object[] get() {
-        return m_values;
+    @Test
+    public void testGetNumColumns() {
+        final int numColumns = DEF_NUM_COLUMNS;
+        assertEquals(numColumns, new FilteredColumnSelection(numColumns).getNumColumns());
     }
 
 }

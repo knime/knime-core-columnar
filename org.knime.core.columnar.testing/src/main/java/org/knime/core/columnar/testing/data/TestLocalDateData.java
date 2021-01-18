@@ -45,86 +45,59 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import static org.junit.Assert.assertEquals;
+import java.time.LocalDate;
 
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.LocalDateData.LocalDateReadData;
+import org.knime.core.columnar.data.LocalDateData.LocalDateWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public final class TestLocalDateData extends TestData implements LocalDateWriteData, LocalDateReadData {
 
-    private int m_refs = 1;
+    public static final class TestLocalDateDataFactory implements TestDataFactory {
 
-    private int m_size;
+        public static final TestLocalDateDataFactory INSTANCE = new TestLocalDateDataFactory();
 
-    private Object[] m_values;
+        private TestLocalDateDataFactory() {
+        }
 
-    TestData(final Object[] objects) {
-        this(objects, objects.length);
+        @Override
+        public TestLocalDateData createWriteData(final int capacity) {
+            return new TestLocalDateData(capacity);
+        }
+
+        @Override
+        public TestLocalDateData createReadData(final Object data) {
+            return new TestLocalDateData((LocalDate[])data);
+        }
+
     }
 
-    TestData(final Object[] objects, final int size) {
-        m_values = objects;
-        m_size = size;
+    TestLocalDateData(final int capacity) {
+        super(new LocalDate[capacity]);
     }
 
-    @Override
-    public final synchronized void release() {
-        m_refs--;
-    }
-
-    @Override
-    public final synchronized void retain() {
-        m_refs++;
-    }
-
-    public final synchronized int getRefs() {
-        return m_refs;
-    }
-
-    @Override
-    public long sizeOf() {
-        return length();
+    TestLocalDateData(final LocalDate[] localDates) {
+        super(localDates);
+        close(localDates.length);
     }
 
     @Override
-    public final int capacity() {
-        return m_size;
+    public LocalDateReadData close(final int length) {
+        closeInternal(length);
+        return this;
     }
 
     @Override
-    public void expand(final int minimumCapacity) {
-        final Object[] expanded = new Object[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
+    public synchronized LocalDate getLocalDate(final int index) {
+        return (LocalDate)get()[index];
     }
 
     @Override
-    public synchronized void setMissing(final int index) {
-        m_values[index] = null;
-    }
-
-    @Override
-    public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null;
-    }
-
-    @Override
-    public final int length() {
-        return m_size;
-    }
-
-    final void closeInternal(final int length) {
-        m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-    }
-
-    public final Object[] get() {
-        return m_values;
+    public synchronized void setLocalDate(final int index, final LocalDate val) {
+        get()[index] = val;
     }
 
 }

@@ -262,9 +262,10 @@ public final class ColumnarPreferenceUtils {
             final int smallTableThreshold = (int)Math.min((long)getSmallTableThreshold() << 20, Integer.MAX_VALUE);
 
             if (smallTableCacheSize <= totalFreeMemorySize) {
-                SMALL_TABLE_CACHE = new SmallColumnStoreCache(smallTableThreshold, smallTableCacheSize);
+                SMALL_TABLE_CACHE =
+                    new SmallColumnStoreCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
             } else {
-                SMALL_TABLE_CACHE = new SmallColumnStoreCache(smallTableThreshold, 0);
+                SMALL_TABLE_CACHE = new SmallColumnStoreCache(smallTableThreshold, 0, getNumThreads());
                 System.err.println(String.format(
                     "Small Table Cache is configured to be of size %dB, but only %dB of memory are available.",
                     smallTableCacheSize, totalFreeMemorySize));
@@ -283,9 +284,9 @@ public final class ColumnarPreferenceUtils {
             final long totalFreeMemorySize = getTotalFreeMemorySize();
 
             if (columnDataCacheSize <= totalFreeMemorySize) {
-                COLUMN_DATA_CACHE = new CachedColumnStoreCache(columnDataCacheSize);
+                COLUMN_DATA_CACHE = new CachedColumnStoreCache(columnDataCacheSize, getNumThreads());
             } else {
-                COLUMN_DATA_CACHE = new CachedColumnStoreCache(0);
+                COLUMN_DATA_CACHE = new CachedColumnStoreCache(0, getNumThreads());
                 System.err.println(String.format(
                     "Column Data Cache is configured to be of size %dB, but only %dB of memory are available.",
                     columnDataCacheSize, totalFreeMemorySize));

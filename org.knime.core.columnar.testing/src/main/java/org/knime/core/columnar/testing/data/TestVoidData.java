@@ -54,6 +54,7 @@ import org.knime.core.columnar.data.VoidData.VoidWriteData;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
+@SuppressWarnings("javadoc")
 public final class TestVoidData extends TestData implements VoidWriteData, VoidReadData {
 
     public static final class TestVoidDataFactory implements TestDataFactory {
@@ -79,9 +80,9 @@ public final class TestVoidData extends TestData implements VoidWriteData, VoidR
         super(new Object[capacity]);
     }
 
-    TestVoidData(final Object[] nulls) {
-        super(nulls);
-        close(nulls.length);
+    TestVoidData(final Object[] voids) {
+        super(voids);
+        close(voids.length);
     }
 
     @Override

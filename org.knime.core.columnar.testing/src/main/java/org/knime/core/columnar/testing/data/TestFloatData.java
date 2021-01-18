@@ -45,86 +45,57 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import static org.junit.Assert.assertEquals;
-
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.FloatData.FloatReadData;
+import org.knime.core.columnar.data.FloatData.FloatWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public final class TestFloatData extends TestData implements FloatWriteData, FloatReadData {
 
-    private int m_refs = 1;
+    public static final class TestFloatDataFactory implements TestDataFactory {
 
-    private int m_size;
+        public static final TestFloatDataFactory INSTANCE = new TestFloatDataFactory();
 
-    private Object[] m_values;
+        private TestFloatDataFactory() {
+        }
 
-    TestData(final Object[] objects) {
-        this(objects, objects.length);
+        @Override
+        public TestFloatData createWriteData(final int capacity) {
+            return new TestFloatData(capacity);
+        }
+
+        @Override
+        public TestFloatData createReadData(final Object data) {
+            return new TestFloatData((Float[])data);
+        }
+
     }
 
-    TestData(final Object[] objects, final int size) {
-        m_values = objects;
-        m_size = size;
+    TestFloatData(final int capacity) {
+        super(new Float[capacity]);
     }
 
-    @Override
-    public final synchronized void release() {
-        m_refs--;
-    }
-
-    @Override
-    public final synchronized void retain() {
-        m_refs++;
-    }
-
-    public final synchronized int getRefs() {
-        return m_refs;
-    }
-
-    @Override
-    public long sizeOf() {
-        return length();
+    TestFloatData(final Float[] floats) {
+        super(floats);
+        close(floats.length);
     }
 
     @Override
-    public final int capacity() {
-        return m_size;
+    public FloatReadData close(final int length) {
+        closeInternal(length);
+        return this;
     }
 
     @Override
-    public void expand(final int minimumCapacity) {
-        final Object[] expanded = new Object[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
+    public synchronized float getFloat(final int index) {
+        return (float)get()[index];
     }
 
     @Override
-    public synchronized void setMissing(final int index) {
-        m_values[index] = null;
-    }
-
-    @Override
-    public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null;
-    }
-
-    @Override
-    public final int length() {
-        return m_size;
-    }
-
-    final void closeInternal(final int length) {
-        m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-    }
-
-    public final Object[] get() {
-        return m_values;
+    public synchronized void setFloat(final int index, final float val) {
+        get()[index] = val;
     }
 
 }

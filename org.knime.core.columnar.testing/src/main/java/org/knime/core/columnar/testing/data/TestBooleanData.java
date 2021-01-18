@@ -45,86 +45,57 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import static org.junit.Assert.assertEquals;
-
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.BooleanData.BooleanReadData;
+import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public final class TestBooleanData extends TestData implements BooleanWriteData, BooleanReadData {
 
-    private int m_refs = 1;
+    public static final class TestBooleanDataFactory implements TestDataFactory {
 
-    private int m_size;
+        public static final TestBooleanDataFactory INSTANCE = new TestBooleanDataFactory();
 
-    private Object[] m_values;
+        private TestBooleanDataFactory() {
+        }
 
-    TestData(final Object[] objects) {
-        this(objects, objects.length);
+        @Override
+        public TestBooleanData createWriteData(final int capacity) {
+            return new TestBooleanData(capacity);
+        }
+
+        @Override
+        public TestBooleanData createReadData(final Object data) {
+            return new TestBooleanData((Boolean[])data);
+        }
+
     }
 
-    TestData(final Object[] objects, final int size) {
-        m_values = objects;
-        m_size = size;
+    TestBooleanData(final int capacity) {
+        super(new Boolean[capacity]);
     }
 
-    @Override
-    public final synchronized void release() {
-        m_refs--;
-    }
-
-    @Override
-    public final synchronized void retain() {
-        m_refs++;
-    }
-
-    public final synchronized int getRefs() {
-        return m_refs;
-    }
-
-    @Override
-    public long sizeOf() {
-        return length();
+    TestBooleanData(final Boolean[] booleans) {
+        super(booleans);
+        close(booleans.length);
     }
 
     @Override
-    public final int capacity() {
-        return m_size;
+    public BooleanReadData close(final int length) {
+        closeInternal(length);
+        return this;
     }
 
     @Override
-    public void expand(final int minimumCapacity) {
-        final Object[] expanded = new Object[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
+    public synchronized boolean getBoolean(final int index) {
+        return (boolean)get()[index];
     }
 
     @Override
-    public synchronized void setMissing(final int index) {
-        m_values[index] = null;
-    }
-
-    @Override
-    public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null;
-    }
-
-    @Override
-    public final int length() {
-        return m_size;
-    }
-
-    final void closeInternal(final int length) {
-        m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-    }
-
-    public final Object[] get() {
-        return m_values;
+    public synchronized void setBoolean(final int index, final boolean val) {
+        get()[index] = val;
     }
 
 }

@@ -52,6 +52,7 @@ import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
+@SuppressWarnings("javadoc")
 public final class TestDoubleData extends TestData implements DoubleWriteData, DoubleReadData {
 
     public static final class TestDoubleDataFactory implements TestDataFactory {

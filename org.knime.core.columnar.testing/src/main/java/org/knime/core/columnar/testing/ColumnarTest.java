@@ -62,7 +62,7 @@ import org.junit.Before;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class ColumnarTest {
+public class ColumnarTest {
 
     static final Set<Closeable> OPEN_CLOSEABLES = Collections.newSetFromMap(new HashMap<>());
 

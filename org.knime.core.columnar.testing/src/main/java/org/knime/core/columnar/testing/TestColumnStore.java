@@ -124,9 +124,10 @@ public final class TestColumnStore implements ColumnStore {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();
             }
-            if (m_batches.size() == 0) {
+            if (m_batches.isEmpty()) {
                 m_maxDataLength = batch.length();
-            } else if (m_maxDataLength != batch.length()) {
+            }
+            if (m_maxDataLength != batch.length()) {
                 throw new IllegalStateException("All written batches must have same length.");
             }
             m_batches.add(data);

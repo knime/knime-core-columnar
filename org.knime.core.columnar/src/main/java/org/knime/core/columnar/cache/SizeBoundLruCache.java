@@ -80,7 +80,7 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
 
     private final Map<K, DataWithEvictor<K, D>> m_lruCache;
 
-    SizeBoundLruCache(final long maxSize) {
+    SizeBoundLruCache(final long maxSize, final int concurrencyLevel) {
 
         final Weigher<K, DataWithEvictor<K, D>> weigher = (k, dataWithEvictor) -> {
             final long size = dataWithEvictor.m_data.sizeOf();
@@ -100,8 +100,8 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
             }
         };
 
-        final Cache<K, DataWithEvictor<K, D>> cache =
-            CacheBuilder.newBuilder().maximumWeight(maxSize).weigher(weigher).removalListener(removalListener).build();
+        final Cache<K, DataWithEvictor<K, D>> cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel)
+            .maximumWeight(maxSize).weigher(weigher).removalListener(removalListener).build();
 
         m_lruCache = cache.asMap();
     }

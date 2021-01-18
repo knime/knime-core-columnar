@@ -66,7 +66,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutGet() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA, 1);
         final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA);
 
         assertEquals(1, data.getRefs());
@@ -90,7 +90,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutEvictLoadGet() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA, 1);
         final TestDoubleData[] batch =
             IntStream.range(0, 2).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA))
                 .toArray(TestDoubleData[]::new);
@@ -124,7 +124,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutRemove() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA, 1);
         final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA);
 
         assertEquals(1, data.getRefs());
@@ -144,7 +144,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testLru() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA * 2L);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA * 2L, 1);
         final TestDoubleData[] batch =
             IntStream.range(0, 3).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA))
                 .toArray(TestDoubleData[]::new);

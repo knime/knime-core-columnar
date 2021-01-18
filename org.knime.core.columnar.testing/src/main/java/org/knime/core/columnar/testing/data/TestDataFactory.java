@@ -51,6 +51,7 @@ package org.knime.core.columnar.testing.data;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
+@SuppressWarnings("javadoc")
 public interface TestDataFactory {
 
     TestData createWriteData(int capacity);

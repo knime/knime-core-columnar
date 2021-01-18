@@ -60,6 +60,9 @@ public class FilteredColumnSelection implements ColumnSelection {
     private final Set<Integer> m_indices;
 
     public FilteredColumnSelection(final int numColumns, final int... indices) {
+        if (numColumns < 0) {
+            throw new IllegalArgumentException("Number of columns must be non-negative.");
+        }
         Objects.requireNonNull(indices, () -> "Indices must not be null.");
 
         m_numColumns = numColumns;
@@ -68,7 +71,7 @@ public class FilteredColumnSelection implements ColumnSelection {
             if (index < 0) {
                 throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
             }
-            if (index > numColumns) {
+            if (index >= numColumns) {
                 throw new IndexOutOfBoundsException(String.format(
                     "Column index %d larger then the column store's number of columns (%d).", index, numColumns));
             }

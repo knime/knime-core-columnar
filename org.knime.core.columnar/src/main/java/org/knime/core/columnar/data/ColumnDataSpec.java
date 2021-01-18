@@ -99,6 +99,10 @@ public interface ColumnDataSpec {
         return LocalDateTimeDataSpec.INSTANCE;
     }
 
+    public static LocalTimeDataSpec localTimeSpec() {
+        return LocalTimeDataSpec.INSTANCE;
+    }
+
     public static LongDataSpec longSpec() {
         return LongDataSpec.INSTANCE;
     }
@@ -107,8 +111,16 @@ public interface ColumnDataSpec {
         return PeriodDataSpec.INSTANCE;
     }
 
+    public static StringDataSpec stringSpec() {
+        return StringDataSpec.INSTANCE;
+    }
+
     public static VarBinaryDataSpec varBinarySpec() {
         return VarBinaryDataSpec.INSTANCE;
+    }
+
+    public static ZonedDateTimeDataSpec zonedDateTimeSpec() {
+        return ZonedDateTimeDataSpec.INSTANCE;
     }
 
     public static interface Mapper<R> {

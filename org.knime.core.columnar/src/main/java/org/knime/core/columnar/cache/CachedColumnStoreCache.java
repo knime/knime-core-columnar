@@ -63,9 +63,10 @@ public final class CachedColumnStoreCache {
 
     /**
      * @param cacheSizeBytes the size of the cache in bytes
+     * @param concurrencyLevel the allowed concurrency among update operations
      */
-    public CachedColumnStoreCache(final long cacheSizeBytes) {
-        m_cache = new SizeBoundLruCache<>(cacheSizeBytes);
+    public CachedColumnStoreCache(final long cacheSizeBytes, final int concurrencyLevel) {
+        m_cache = new SizeBoundLruCache<>(cacheSizeBytes, concurrencyLevel);
         m_cacheSizeBytes = cacheSizeBytes;
     }
 

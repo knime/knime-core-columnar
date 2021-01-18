@@ -45,86 +45,58 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import static org.junit.Assert.assertEquals;
-
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public final class TestVarBinaryData extends TestData implements VarBinaryWriteData, VarBinaryReadData {
 
-    private int m_refs = 1;
+    public static final class TestVarBinaryDataFactory implements TestDataFactory {
 
-    private int m_size;
+        public static final TestVarBinaryDataFactory INSTANCE = new TestVarBinaryDataFactory();
 
-    private Object[] m_values;
+        private TestVarBinaryDataFactory() {
+        }
 
-    TestData(final Object[] objects) {
-        this(objects, objects.length);
+        @Override
+        public TestVarBinaryData createWriteData(final int capacity) {
+            return new TestVarBinaryData(capacity);
+        }
+
+        @Override
+        public TestVarBinaryData createReadData(final Object data) {
+            return new TestVarBinaryData((byte[][])data);
+        }
+
     }
 
-    TestData(final Object[] objects, final int size) {
-        m_values = objects;
-        m_size = size;
+    TestVarBinaryData(final int capacity) {
+        super(new byte[capacity][]);
     }
 
-    @Override
-    public final synchronized void release() {
-        m_refs--;
-    }
-
-    @Override
-    public final synchronized void retain() {
-        m_refs++;
-    }
-
-    public final synchronized int getRefs() {
-        return m_refs;
-    }
-
-    @Override
-    public long sizeOf() {
-        return length();
+    TestVarBinaryData(final byte[][] varBinaries) {
+        super(varBinaries);
+        close(varBinaries.length);
     }
 
     @Override
-    public final int capacity() {
-        return m_size;
+    public VarBinaryReadData close(final int length) {
+        closeInternal(length);
+        return this;
     }
 
     @Override
-    public void expand(final int minimumCapacity) {
-        final Object[] expanded = new Object[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
+    public byte[] getBytes(final int index) {
+        return (byte[])get()[index];
     }
 
     @Override
-    public synchronized void setMissing(final int index) {
-        m_values[index] = null;
-    }
+    public void setBytes(final int index, final byte[] val) {
+        get()[index] = val;
 
-    @Override
-    public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null;
-    }
-
-    @Override
-    public final int length() {
-        return m_size;
-    }
-
-    final void closeInternal(final int length) {
-        m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
-    }
-
-    public final Object[] get() {
-        return m_values;
     }
 
 }

@@ -62,8 +62,6 @@ import org.knime.core.columnar.data.ColumnReadData;
 @SuppressWarnings("javadoc")
 public class DefaultReadBatch implements ReadBatch {
 
-    private final int m_maxIndex;
-
     private final ColumnReadData[] m_data;
 
     private final int m_length;
@@ -74,7 +72,6 @@ public class DefaultReadBatch implements ReadBatch {
             throw new IllegalArgumentException("Length must be non-negative.");
         }
 
-        m_maxIndex = data.length;
         m_data = data;
         m_length = length;
     }
@@ -89,9 +86,9 @@ public class DefaultReadBatch implements ReadBatch {
         if (colIndex < 0) {
             throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", colIndex));
         }
-        if (colIndex > m_maxIndex) {
+        if (colIndex >= m_data.length) {
             throw new IndexOutOfBoundsException(String.format(
-                "Column index %d larger then the column store's number of columns (%d).", colIndex, m_maxIndex));
+                "Column index %d larger then the column store's number of columns (%d).", colIndex, m_data.length - 1));
         }
         final ColumnReadData data = m_data[colIndex];
         if (data != null) {

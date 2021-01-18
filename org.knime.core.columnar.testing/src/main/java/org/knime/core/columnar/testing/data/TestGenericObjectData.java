@@ -51,12 +51,12 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class TestGenericObjectData extends TestData
-    implements ObjectWriteData<Object>, ObjectReadData<Object> {
+@SuppressWarnings("javadoc")
+public final class TestGenericObjectData extends TestData implements ObjectWriteData<Object>, ObjectReadData<Object> {
 
-    static final class TestGenericObjectDataFactory implements TestDataFactory {
+    public static final class TestGenericObjectDataFactory implements TestDataFactory {
 
-        static final TestGenericObjectDataFactory INSTANCE = new TestGenericObjectDataFactory();
+        public static final TestGenericObjectDataFactory INSTANCE = new TestGenericObjectDataFactory();
 
         private TestGenericObjectDataFactory() {
         }
