@@ -170,8 +170,8 @@ public final class ColumnarPreferenceUtils {
     }
 
     static long getMaxHeapSize() {
-        return ManagementFactory.getMemoryPoolMXBeans().stream().filter(m -> m.getType() == MemoryType.HEAP)
-            .map(MemoryPoolMXBean::getUsage).mapToLong(MemoryUsage::getMax).sum();
+        return Math.max(ManagementFactory.getMemoryPoolMXBeans().stream().filter(m -> m.getType() == MemoryType.HEAP)
+            .map(MemoryPoolMXBean::getUsage).mapToLong(MemoryUsage::getMax).sum(), 0L);
     }
 
     private static long getTotalPhysicalMemorySize() {
@@ -179,9 +179,11 @@ public final class ColumnarPreferenceUtils {
             // Unfortunately, there does not seem to be a safer way to determine the system's physical memory size.
             // The closest alternative would be ManagementFactory.getOperatingSystemMXBean::getTotalPhysicalMemorySize,
             // which is not supported in OpenJDK 8.
-            return ((Long)ManagementFactory.getPlatformMBeanServer()
-                .getAttribute(new ObjectName("java.lang", "type", "OperatingSystem"), "TotalPhysicalMemorySize"))
-                    .longValue();
+            return Math
+                .max(
+                    ((Long)ManagementFactory.getPlatformMBeanServer().getAttribute(
+                        new ObjectName("java.lang", "type", "OperatingSystem"), "TotalPhysicalMemorySize")).longValue(),
+                    0L);
         } catch (ClassCastException | InstanceNotFoundException | AttributeNotFoundException
                 | MalformedObjectNameException | ReflectionException | MBeanException ex) {
             LOGGER.warn("Error while attempting to determine total physical memory size", ex);
@@ -191,9 +193,10 @@ public final class ColumnarPreferenceUtils {
 
     private static long getTotalFreeMemorySize() {
         try {
-            return ((Long)ManagementFactory.getPlatformMBeanServer()
+            return Math.max(((Long)ManagementFactory.getPlatformMBeanServer()
                 .getAttribute(new ObjectName("java.lang", "type", "OperatingSystem"), "FreePhysicalMemorySize"))
-                    .longValue();
+                    .longValue(),
+                0L);
         } catch (ClassCastException | InstanceNotFoundException | AttributeNotFoundException
                 | MalformedObjectNameException | ReflectionException | MBeanException ex) {
             LOGGER.warn("Error while attempting to determine total free memory size", ex);
@@ -266,13 +269,17 @@ public final class ColumnarPreferenceUtils {
             final long totalFreeMemorySize = getTotalFreeMemorySize();
             final int smallTableThreshold = (int)Math.min((long)getSmallTableThreshold() << 20, Integer.MAX_VALUE);
 
-            if (smallTableCacheSize <= totalFreeMemorySize) {
+            if (smallTableCacheSize <= 0) {
+                smallTableCache = new SmallColumnStoreCache(smallTableThreshold, 0, getNumThreads());
+                LOGGER.warn(
+                    "Small Table Cache is disabled. Consider enabling it in the Columnar Table Backend preferences");
+            } else if (smallTableCacheSize <= totalFreeMemorySize) {
                 smallTableCache = new SmallColumnStoreCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
             } else {
-                smallTableCache = new SmallColumnStoreCache(smallTableThreshold, 0, getNumThreads());
-                LOGGER.errorWithFormat(
-                    "Small Table Cache is configured to be of size %dB, but only %dB of memory are available.",
-                    smallTableCacheSize, totalFreeMemorySize);
+                smallTableCache = new SmallColumnStoreCache(smallTableThreshold, totalFreeMemorySize, getNumThreads());
+                LOGGER.warnWithFormat(
+                    "Small Table Cache is configured to be of size %d MB, but only %d MB of memory are available.",
+                    smallTableCacheSize >> 20, totalFreeMemorySize >> 20);
             }
         }
         return smallTableCache;
@@ -285,15 +292,19 @@ public final class ColumnarPreferenceUtils {
     private static synchronized CachedColumnStoreCache getColumnDataCache() {
         if (columnDataCache == null) {
             final long columnDataCacheSize = (long)getColumnDataCacheSize() << 20;
-            final long totalFreeMemorySize = getTotalFreeMemorySize();
+            final long totalFreeMemorySize = Math.max(getTotalFreeMemorySize() - getSmallTableCache().getMaxSize(), 0L);
 
-            if (columnDataCacheSize <= totalFreeMemorySize) {
+            if (columnDataCacheSize <= 0) {
+                columnDataCache = new CachedColumnStoreCache(0, getNumThreads());
+                LOGGER.warn(
+                    "Column Data Cache is disabled. Consider enabling it in the Columnar Table Backend preferences");
+            } else if (columnDataCacheSize <= totalFreeMemorySize) {
                 columnDataCache = new CachedColumnStoreCache(columnDataCacheSize, getNumThreads());
             } else {
-                columnDataCache = new CachedColumnStoreCache(0, getNumThreads());
-                LOGGER.errorWithFormat(
-                    "Column Data Cache is configured to be of size %dB, but only %dB of memory are available.",
-                    columnDataCacheSize, totalFreeMemorySize);
+                columnDataCache = new CachedColumnStoreCache(totalFreeMemorySize, getNumThreads());
+                LOGGER.warnWithFormat(
+                    "Column Data Cache is configured to be of size %d MB, but only %d MB of memory are available.",
+                    columnDataCacheSize >> 20, totalFreeMemorySize >> 20);
             }
         }
         return columnDataCache;
