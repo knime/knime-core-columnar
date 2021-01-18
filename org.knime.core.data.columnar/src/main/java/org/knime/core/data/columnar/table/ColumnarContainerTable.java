@@ -56,6 +56,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.ColumnWriteStore;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
@@ -85,7 +86,7 @@ import org.knime.core.node.workflow.WorkflowDataRepository;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-abstract class AbstractColumnarContainerTable extends ExtensionTable {
+final class ColumnarContainerTable extends ExtensionTable {
 
     static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
 
@@ -101,27 +102,59 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    private final ColumnReadStore m_store;
+    private final ColumnReadStore m_readStore;
+
+    // will be null if the table has been loaded from disk
+    private final ColumnWriteStore m_writeStore;
 
     // effectively final
     private Finalizer m_storeCloser;
 
+    void initStoreCloser() {
+        final ResourceWithRelease readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
+            finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
+        final ResourceWithRelease storeRelease = new ResourceWithRelease(m_readStore);
+        m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, storeRelease);
+    }
+
+    static ColumnarContainerTable create(final LoadContext context) throws InvalidSettingsException {
+        final ColumnarContainerTable table = new ColumnarContainerTable(context); // NOSONAR
+        table.initStoreCloser();
+        return table;
+    }
+
+    /**
+     * ColumnarContainerTable which has not yet been saved, i.e. all data is still in-memory or temporarily persisted in
+     * the temp directory.
+     */
     @SuppressWarnings("resource")
-    AbstractColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
+    private ColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
         final NodeSettingsRO settings = context.getSettings();
         m_tableId = -1;
         m_size = settings.getLong(CFG_TABLE_SIZE);
         m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
         m_schema = ColumnarValueSchemaUtils
             .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
-        m_store = ColumnarPreferenceUtils.wrap(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile()));
+        m_readStore =
+            ColumnarPreferenceUtils.wrap(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile()));
+        m_writeStore = null;
     }
 
-    void initStoreCloser() {
-        final ResourceWithRelease readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
-            finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
-        final ResourceWithRelease storeRelease = new ResourceWithRelease(m_store);
-        m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, storeRelease);
+    static ColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        final ColumnarContainerTable table = new ColumnarContainerTable(tableId, factory, schema, store, size);
+        table.initStoreCloser();
+        return table;
+    }
+
+    private ColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        m_tableId = tableId;
+        m_factory = factory;
+        m_schema = schema;
+        m_size = size;
+        m_readStore = store;
+        m_writeStore = store;
     }
 
     @Override
@@ -130,15 +163,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         settings.addLong(CFG_TABLE_SIZE, m_size);
         settings.addString(CFG_FACTORY_TYPE, m_factory.getClass().getName());
         ValueSchema.Serializer.save(m_schema.getSourceSchema(), settings);
-    }
-
-    public AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnReadStore store, final long size) {
-        m_tableId = tableId;
-        m_factory = factory;
-        m_schema = schema;
-        m_store = store;
-        m_size = size;
+        if (m_writeStore != null) {
+            m_writeStore.save(f);
+        }
     }
 
     @Override
@@ -153,7 +180,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     @Deprecated
     @Override
-    public int getRowCount() {
+    public int getRowCount() { // NOSONAR
         return KnowsRowCountTable.checkRowCount(m_size);
     }
 
@@ -185,7 +212,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         }
         m_openCursorFinalizers.clear();
         try {
-            m_store.close();
+            m_readStore.close();
         } catch (final IOException e) {
             throw new IllegalStateException("Exception while clearing ContainerTable.", e);
         }
@@ -207,7 +234,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     @Override
     public RowCursor cursor() {
-        return ColumnarRowCursor.create(m_store, m_schema, 0, m_size - 1, m_openCursorFinalizers);
+        return ColumnarRowCursor.create(m_readStore, m_schema, 0, m_size - 1, m_openCursorFinalizers);
     }
 
     @Override
@@ -217,10 +244,10 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
         final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
         if (colIndicesOpt.isPresent()) {
-            return ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers,
+            return ColumnarRowCursor.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers,
                 toSortedIntArray(colIndicesOpt.get()));
         } else {
-            return ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers);
+            return ColumnarRowCursor.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers);
         }
     }
 
@@ -228,7 +255,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     @SuppressWarnings("resource")
     public final CloseableRowIterator iterator() {
         return new ColumnarRowIterator(
-            ColumnarRowCursor.create(m_store, m_schema, 0, m_size - 1, m_openCursorFinalizers));
+            ColumnarRowCursor.create(m_readStore, m_schema, 0, m_size - 1, m_openCursorFinalizers));
     }
 
     @Override
@@ -240,17 +267,12 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
         if (colIndicesOpt.isPresent()) {
             final int[] selection = toSortedIntArray(colIndicesOpt.get());
-            return FilteredColumnarRowIterator.create(ColumnarRowCursor.create(m_store, m_schema, fromRowIndex,
+            return FilteredColumnarRowIterator.create(ColumnarRowCursor.create(m_readStore, m_schema, fromRowIndex,
                 toRowIndex, m_openCursorFinalizers, selection), selection);
         } else {
             return new ColumnarRowIterator(
-                ColumnarRowCursor.create(m_store, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers));
+                ColumnarRowCursor.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers));
         }
-    }
-
-    // TODO can we avoid this method somehow?
-    final ColumnReadStore getStore() {
-        return m_store;
     }
 
     private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {

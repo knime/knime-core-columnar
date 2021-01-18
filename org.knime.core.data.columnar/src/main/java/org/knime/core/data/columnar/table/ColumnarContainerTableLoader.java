@@ -60,21 +60,12 @@ public class ColumnarContainerTableLoader implements ExtensionTableLoader {
 
     @Override
     public ExtensionTable load(final LoadContext context) throws InvalidSettingsException {
-        final SavedColumnarContainerTable table = new SavedColumnarContainerTable(context);
-        table.initStoreCloser();
-        return table;
+        return ColumnarContainerTable.create(context);
     }
 
     @Override
     public boolean canLoad(final String type) {
-        return type.equalsIgnoreCase(UnsavedColumnarContainerTable.class.getName());
+        return type.equalsIgnoreCase(ColumnarContainerTable.class.getName());
     }
 
-    private static final class SavedColumnarContainerTable extends AbstractColumnarContainerTable {
-
-        SavedColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
-            super(context);
-        }
-
-    }
 }

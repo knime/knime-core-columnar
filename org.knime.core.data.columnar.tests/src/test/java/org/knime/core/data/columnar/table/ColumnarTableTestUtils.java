@@ -107,13 +107,13 @@ final class ColumnarTableTestUtils {
         }
     }
 
-    static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int size) {
+    static ColumnarContainerTable createUnsavedColumnarContainerTable(final int size) {
         try (final ColumnarRowContainer container = createColumnarRowContainer();
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
             for (int i = 0; i < size; i++) {
                 cursor.forward();
             }
-            return (UnsavedColumnarContainerTable)container.finishInternal();
+            return (ColumnarContainerTable)container.finishInternal();
         } catch (Exception e) {
             throw new RuntimeException("Exception when trying to create UnsavedColumnarContainerTable.", e);
         }
