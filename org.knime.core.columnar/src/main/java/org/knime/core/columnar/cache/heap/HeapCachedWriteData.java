@@ -56,6 +56,83 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
  */
 final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
+    final class HeapCachedReadData implements ObjectReadData<T> {
+
+        private ObjectReadData<T> m_readDelegate;
+
+        private final int m_length;
+
+        private int m_numRetainsPriorSerialize = 0;
+
+        HeapCachedReadData(final int length) {
+            m_length = length;
+        }
+
+        @Override
+        public boolean isMissing(final int index) {
+            return m_data[index] == null;
+        }
+
+        @Override
+        public int length() {
+            return m_length;
+        }
+
+        @Override
+        public synchronized void retain() {
+            if (m_readDelegate != null) {
+                m_readDelegate.retain();
+            } else {
+                m_numRetainsPriorSerialize++;
+            }
+        }
+
+        @Override
+        public synchronized void release() {
+            if (m_readDelegate != null) {
+                m_readDelegate.release();
+            } else {
+                if (m_numRetainsPriorSerialize == 0) {
+                    // as per contract, the HeapCachedWriteData's ref count was at 1 when it was closed
+                    // therefore, the reference count would drop to 0 here and we have to release the HeapCachedWriteData
+                    // this means that a subsequent call to serialize should and will fail
+                    HeapCachedWriteData.this.release();
+                } else {
+                    m_numRetainsPriorSerialize--;
+                }
+            }
+        }
+
+        @Override
+        public synchronized long sizeOf() {
+            return m_readDelegate != null ? m_readDelegate.sizeOf() : HeapCachedWriteData.this.sizeOf();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public T getObject(final int index) {
+            return (T)m_data[index];
+        }
+
+        Object[] getData() {
+            return m_data;
+        }
+
+        synchronized ObjectReadData<T> serialize() {
+            HeapCachedWriteData.this.serialize(m_length);
+
+            m_readDelegate = HeapCachedWriteData.this.getDelegate().close(m_length);
+            if (m_numRetainsPriorSerialize > 0) {
+                for (int i = 0; i < m_numRetainsPriorSerialize; i++) {
+                    m_readDelegate.retain();
+                }
+            }
+
+            return m_readDelegate;
+        }
+
+    }
+
     private final ObjectWriteData<T> m_delegate;
 
     // We should not need a thread-safe data structure (i.e., an AtomicReferenceArray) here.
@@ -113,7 +190,7 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
     @Override
     public ObjectReadData<T> close(final int length) {
-        return new HeapCachedReadData<>(this, m_data, length);
+        return new HeapCachedReadData(length);
     }
 
     void serialize(final int length) {

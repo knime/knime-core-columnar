@@ -141,7 +141,8 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
             for (int i = 0; i < numColumns; i++) {
                 if (m_objectData.isSelected(i)) {
-                    final HeapCachedReadData<?> heapCachedData = (HeapCachedReadData<?>)batch.get(i);
+                    final HeapCachedWriteData<?>.HeapCachedReadData heapCachedData =
+                        (HeapCachedWriteData<?>.HeapCachedReadData)batch.get(i);
                     futures[i] = CompletableFuture.supplyAsync(heapCachedData::serialize, m_executor);
                     final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
                     m_cache.put(ccuid, heapCachedData.getData());

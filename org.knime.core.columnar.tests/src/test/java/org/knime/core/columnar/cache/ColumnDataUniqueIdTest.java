@@ -50,6 +50,7 @@ package org.knime.core.columnar.cache;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestColumnStore;
 
@@ -87,8 +88,8 @@ public class ColumnDataUniqueIdTest {
         final ColumnReadStore store = createDefaultTestColumnStore();
         final ColumnDataUniqueId cduid1 = new ColumnDataUniqueId(store, 42, 42);
         final ColumnDataUniqueId cduid2 = new ColumnDataUniqueId(store, 42, 42);
-        assertTrue(cduid1.equals(cduid2));
-        assertTrue(cduid2.equals(cduid1));
+        assertEquals(cduid1, cduid2);
+        assertEquals(cduid2, cduid1);
     }
 
     @Test
@@ -98,9 +99,9 @@ public class ColumnDataUniqueIdTest {
         final ColumnDataUniqueId cduid1 = new ColumnDataUniqueId(store, 42, 42);
         final ColumnDataUniqueId cduid2 = new ColumnDataUniqueId(store, 42, 42);
         final ColumnDataUniqueId cduid3 = new ColumnDataUniqueId(store, 42, 42);
-        assertTrue(cduid1.equals(cduid2));
-        assertTrue(cduid2.equals(cduid3));
-        assertTrue(cduid1.equals(cduid3));
+        assertEquals(cduid1, cduid2);
+        assertEquals(cduid2, cduid3);
+        assertEquals(cduid1, cduid3);
     }
 
     @Test
@@ -125,10 +126,10 @@ public class ColumnDataUniqueIdTest {
         final ColumnReadStore testStore1 = createDefaultTestColumnStore();
         @SuppressWarnings("resource")
         final ColumnReadStore testStore2 = createDefaultTestColumnStore();
-        assertFalse(new ColumnDataUniqueId(testStore1, 0, 0).equals(new Object()));
-        assertFalse(new ColumnDataUniqueId(testStore1, 0, 0).equals(new ColumnDataUniqueId(testStore2, 0, 0)));
-        assertFalse(new ColumnDataUniqueId(testStore1, 0, 0).equals(new ColumnDataUniqueId(testStore1, 1, 0)));
-        assertFalse(new ColumnDataUniqueId(testStore1, 0, 0).equals(new ColumnDataUniqueId(testStore1, 0, 1)));
+        assertNotEquals(new ColumnDataUniqueId(testStore1, 0, 0), new Object());
+        assertNotEquals(new ColumnDataUniqueId(testStore1, 0, 0), new ColumnDataUniqueId(testStore2, 0, 0));
+        assertNotEquals(new ColumnDataUniqueId(testStore1, 0, 0), new ColumnDataUniqueId(testStore1, 1, 0));
+        assertNotEquals(new ColumnDataUniqueId(testStore1, 0, 0), new ColumnDataUniqueId(testStore1, 0, 1));
     }
 
     @Test

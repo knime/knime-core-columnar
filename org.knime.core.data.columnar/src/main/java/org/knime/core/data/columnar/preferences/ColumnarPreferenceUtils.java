@@ -232,7 +232,7 @@ public final class ColumnarPreferenceUtils {
         return useDefaults() ? HEAP_CACHE_NAME_DEF : COLUMNAR_STORE.getString(HEAP_CACHE_NAME_KEY);
     }
 
-    private static ObjectDataCache getHeapCache() {
+    private static synchronized ObjectDataCache getHeapCache() {
         if (HEAP_CACHE == null) {
             HEAP_CACHE = HeapCache.valueOf(getHeapCacheName()).createCache();
         }

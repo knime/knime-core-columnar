@@ -491,7 +491,7 @@ public final class TestColumnStoreUtils {
 
                 @Override
                 void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
-                    assertEquals(((VarBinaryReadData)refData).getBytes(index),
+                    assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
                         ((VarBinaryReadData)readData).getBytes(index));
                 }
             },
