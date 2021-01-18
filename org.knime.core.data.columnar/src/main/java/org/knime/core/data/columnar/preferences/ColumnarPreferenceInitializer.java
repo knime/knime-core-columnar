@@ -81,9 +81,9 @@ public class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer
     // the size (in MB) of the LRU cache for ColumnData of all tables
     static final String COLUMN_DATA_CACHE_SIZE_KEY = "knime.core.data.columnar.data-cache-size";
 
-    static final int COLUMN_DATA_CACHE_SIZE_DEF = Math.min((int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20),
-        Math.max(0, ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB())
-            - ColumnarPreferenceUtils.getSmallTableCacheSize());
+    static final int COLUMN_DATA_CACHE_SIZE_DEF = Math.max(0, Math.min(
+        (int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20),
+        ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB() - ColumnarPreferenceUtils.getSmallTableCacheSize()));
 
     @Override
     public void initializeDefaultPreferences() {
