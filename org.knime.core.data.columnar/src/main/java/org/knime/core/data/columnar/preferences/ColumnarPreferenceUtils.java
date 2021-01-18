@@ -93,11 +93,14 @@ import org.knime.core.data.columnar.ColumnarTableBackend;
 import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.util.ThreadUtils;
 import org.osgi.framework.FrameworkUtil;
 
 @SuppressWarnings("javadoc")
 public final class ColumnarPreferenceUtils {
+
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarPreferenceUtils.class);
 
     enum HeapCache {
 
@@ -142,26 +145,26 @@ public final class ColumnarPreferenceUtils {
     private static final AtomicLong DOMAIN_CALC_THREAD_COUNT = new AtomicLong();
 
     // lazily initialized
-    private static ExecutorService DOMAIN_CALC_EXECUTOR;
+    private static ExecutorService domainCalcExecutor;
 
     // lazily initialized
-    private static ObjectDataCache HEAP_CACHE;
+    private static ObjectDataCache heapCache;
 
     private static final AtomicLong SERIALIZE_THREAD_COUNT = new AtomicLong();
 
     // lazily initialized
-    private static ExecutorService SERIALIZE_EXECUTOR;
+    private static ExecutorService serializeExecutor;
 
     // lazily initialized
-    private static SmallColumnStoreCache SMALL_TABLE_CACHE;
+    private static SmallColumnStoreCache smallTableCache;
 
     // lazily initialized
-    private static CachedColumnStoreCache COLUMN_DATA_CACHE;
+    private static CachedColumnStoreCache columnDataCache;
 
     private static final AtomicLong PERSIST_THREAD_COUNT = new AtomicLong();
 
     // lazily initialized
-    private static ExecutorService PERSIST_EXECUTOR;
+    private static ExecutorService persistExecutor;
 
     private ColumnarPreferenceUtils() {
     }
@@ -181,6 +184,7 @@ public final class ColumnarPreferenceUtils {
                     .longValue();
         } catch (ClassCastException | InstanceNotFoundException | AttributeNotFoundException
                 | MalformedObjectNameException | ReflectionException | MBeanException ex) {
+            LOGGER.warn("Error while attempting to determine total physical memory size", ex);
         }
         return 0L;
     }
@@ -192,6 +196,7 @@ public final class ColumnarPreferenceUtils {
                     .longValue();
         } catch (ClassCastException | InstanceNotFoundException | AttributeNotFoundException
                 | MalformedObjectNameException | ReflectionException | MBeanException ex) {
+            LOGGER.warn("Error while attempting to determine total free memory size", ex);
         }
         return 0L;
     }
@@ -221,11 +226,11 @@ public final class ColumnarPreferenceUtils {
     }
 
     public static synchronized ExecutorService getDomainCalcExecutor() {
-        if (DOMAIN_CALC_EXECUTOR == null) {
-            DOMAIN_CALC_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
+        if (domainCalcExecutor == null) {
+            domainCalcExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-DomainCalculator-" + DOMAIN_CALC_THREAD_COUNT.incrementAndGet())));
         }
-        return DOMAIN_CALC_EXECUTOR;
+        return domainCalcExecutor;
     }
 
     static String getHeapCacheName() {
@@ -233,18 +238,18 @@ public final class ColumnarPreferenceUtils {
     }
 
     private static synchronized ObjectDataCache getHeapCache() {
-        if (HEAP_CACHE == null) {
-            HEAP_CACHE = HeapCache.valueOf(getHeapCacheName()).createCache();
+        if (heapCache == null) {
+            heapCache = HeapCache.valueOf(getHeapCacheName()).createCache();
         }
-        return HEAP_CACHE;
+        return heapCache;
     }
 
     private static synchronized ExecutorService getSerializeExecutor() {
-        if (SERIALIZE_EXECUTOR == null) {
-            SERIALIZE_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
+        if (serializeExecutor == null) {
+            serializeExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
         }
-        return SERIALIZE_EXECUTOR;
+        return serializeExecutor;
     }
 
     static int getSmallTableCacheSize() {
@@ -256,22 +261,21 @@ public final class ColumnarPreferenceUtils {
     }
 
     private static synchronized SmallColumnStoreCache getSmallTableCache() {
-        if (SMALL_TABLE_CACHE == null) {
+        if (smallTableCache == null) {
             final long smallTableCacheSize = (long)getSmallTableCacheSize() << 20;
             final long totalFreeMemorySize = getTotalFreeMemorySize();
             final int smallTableThreshold = (int)Math.min((long)getSmallTableThreshold() << 20, Integer.MAX_VALUE);
 
             if (smallTableCacheSize <= totalFreeMemorySize) {
-                SMALL_TABLE_CACHE =
-                    new SmallColumnStoreCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
+                smallTableCache = new SmallColumnStoreCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
             } else {
-                SMALL_TABLE_CACHE = new SmallColumnStoreCache(smallTableThreshold, 0, getNumThreads());
-                System.err.println(String.format(
+                smallTableCache = new SmallColumnStoreCache(smallTableThreshold, 0, getNumThreads());
+                LOGGER.errorWithFormat(
                     "Small Table Cache is configured to be of size %dB, but only %dB of memory are available.",
-                    smallTableCacheSize, totalFreeMemorySize));
+                    smallTableCacheSize, totalFreeMemorySize);
             }
         }
-        return SMALL_TABLE_CACHE;
+        return smallTableCache;
     }
 
     static int getColumnDataCacheSize() {
@@ -279,35 +283,35 @@ public final class ColumnarPreferenceUtils {
     }
 
     private static synchronized CachedColumnStoreCache getColumnDataCache() {
-        if (COLUMN_DATA_CACHE == null) {
+        if (columnDataCache == null) {
             final long columnDataCacheSize = (long)getColumnDataCacheSize() << 20;
             final long totalFreeMemorySize = getTotalFreeMemorySize();
 
             if (columnDataCacheSize <= totalFreeMemorySize) {
-                COLUMN_DATA_CACHE = new CachedColumnStoreCache(columnDataCacheSize, getNumThreads());
+                columnDataCache = new CachedColumnStoreCache(columnDataCacheSize, getNumThreads());
             } else {
-                COLUMN_DATA_CACHE = new CachedColumnStoreCache(0, getNumThreads());
-                System.err.println(String.format(
+                columnDataCache = new CachedColumnStoreCache(0, getNumThreads());
+                LOGGER.errorWithFormat(
                     "Column Data Cache is configured to be of size %dB, but only %dB of memory are available.",
-                    columnDataCacheSize, totalFreeMemorySize));
+                    columnDataCacheSize, totalFreeMemorySize);
             }
         }
-        return COLUMN_DATA_CACHE;
+        return columnDataCache;
     }
 
     private static synchronized ExecutorService getPersistExecutor() {
-        if (PERSIST_EXECUTOR == null) {
-            PERSIST_EXECUTOR = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
+        if (persistExecutor == null) {
+            persistExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet())));
         }
-        return PERSIST_EXECUTOR;
+        return persistExecutor;
     }
 
     @SuppressWarnings("resource")
     public static ColumnStore wrap(final ColumnStore store) {
 
-        final CachedColumnStoreCache columnDataCache = getColumnDataCache();
-        final SmallColumnStoreCache smallTableCache = getSmallTableCache();
+        getColumnDataCache();
+        getSmallTableCache();
 
         ColumnStore wrapped = store;
 
