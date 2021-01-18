@@ -277,7 +277,10 @@ public final class DomainColumnStore extends DelegatingColumnStore {
                 throw new IOException(e);
             } catch (final ExecutionException e) {
                 if (e.getCause() instanceof DuplicateKeyException) {
-                    throw (DuplicateKeyException)e.getCause();
+                    final DuplicateKeyException originalDKE = (DuplicateKeyException)e.getCause();
+                    final DuplicateKeyException newDKE = new DuplicateKeyException(originalDKE.getKey(), originalDKE.getMessage());
+                    newDKE.initCause(e);
+                    throw newDKE;
                 } else {
                     throw new IOException(e.getCause());
                 }

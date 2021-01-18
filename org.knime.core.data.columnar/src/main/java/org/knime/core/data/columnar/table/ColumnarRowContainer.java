@@ -146,7 +146,10 @@ final class ColumnarRowContainer implements RowContainer {
                 m_store.close();
             }
         } catch (DuplicateKeyException e) {
-            throw new DuplicateKeyException("Encountered duplicate row ID \"" + e.getKey() + "\"", e.getKey());
+            final DuplicateKeyException originalDKE = (DuplicateKeyException)e.getCause();
+            final DuplicateKeyException newDKE = new DuplicateKeyException(originalDKE.getKey(), originalDKE.getMessage());
+            newDKE.initCause(e);
+            throw newDKE;
         } catch (final Exception e) {
             // TODO logging
             // TODO ignore exception?
