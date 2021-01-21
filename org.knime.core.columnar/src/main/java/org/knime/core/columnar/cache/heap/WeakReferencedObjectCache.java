@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.cache.heap;
 
+import java.lang.ref.WeakReference;
 import java.util.Map;
 
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
@@ -56,15 +57,18 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
 /**
+ * Implementation of an {@link ObjectDataCache} in which values are weakly referenced. As per contract of
+ * {@link WeakReference WeakReferences}, cached object data is reclaimed as soon as the garbage collector notices that
+ * it is only <a href="package-summary.html#reachability">weakly reachable</a>.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public class WeakReferencedObjectCache implements ObjectDataCache {
+public final class WeakReferencedObjectCache implements ObjectDataCache {
 
     private final Cache<ColumnDataUniqueId, Object[]> m_cache;
 
     /**
-     * Constructor
+     * Creates a new cache.
      */
     public WeakReferencedObjectCache() {
         m_cache = CacheBuilder.newBuilder().weakValues().build();

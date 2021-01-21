@@ -45,23 +45,35 @@
  */
 package org.knime.core.columnar;
 
-@SuppressWarnings("javadoc")
+/**
+ * Data that tracks how many clients reference it. When created, the data is referenced once, by the client that created
+ * it. Whenever an additional client requests access on the data, the reference count must be increased by invoking
+ * {@link ReferencedData#retain() retain}. Whenever a client no longer needs access on the data, the reference count
+ * must be decreased by invoking {@link ReferencedData#release() release}. When the reference count reaches zero, the
+ * data is discarded and any underlying resources are relinquished.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public interface ReferencedData {
 
     /**
-     * Release reference
-     */
-    void release();
-
-    /**
-     * Retain reference
+     * Retain data, increasing reference count by one.
+     *
+     * @throws IllegalStateException when the data has already been discarded as a consequence of the reference count
+     *             reaching zero
      */
     void retain();
 
     /**
-     * Determine the size of the chunk in bytes or a pessimistic estimate thereof.
+     * Release data, decreasing reference count by one. When the reference count reaches zero, the data is discarded and
+     * any underlying resources are relinquished.
+     */
+    void release();
+
+    /**
+     * Determine the memory footprint of the data in bytes or a pessimistic estimate thereof.
      *
-     * @return size of chunk in bytes
+     * @return size of data in bytes
      */
     long sizeOf();
 

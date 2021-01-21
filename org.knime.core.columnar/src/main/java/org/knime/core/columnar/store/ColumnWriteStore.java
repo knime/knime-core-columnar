@@ -48,30 +48,51 @@ package org.knime.core.columnar.store;
 import java.io.File;
 import java.io.IOException;
 
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.WriteBatch;
 
 /**
- * A store to which columnar data can be written. The life cycle of a write
- * store is as follows:
+ * A data structure for storing columnar data. Data can be written to the store. The life cycle of a store is as
+ * follows:
  * <ol>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data created by a {@link ColumnDataFactory} obtained via
- * {@link #getFactory()} is written via
- * {@link ColumnDataWriter#write(ColumnReadData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
+ * <li>The singleton {@link BatchFactory} is obtained via {@link #getFactory()}.</li>
+ * <li>The singleton {@link BatchWriter} is obtained via {@link #getWriter()}.</li>
+ * <li>Data is created by iterating over the following steps:</li>
+ * <ol>
+ * <li>A new {@link WriteBatch} is {@link BatchFactory#create(int) created} using the factory.</li>
+ * <li>Data is {@link WriteBatch#get(int) written} into the batch and {@link WriteBatch#close(int) closed}, which
+ * creates a {@link ReadBatch}.</li>
+ * <li>This batch is {@link BatchWriter#write(ReadBatch) written} into the store using the writer.</li>
+ * </ol>
+ * <li>The writer is {@link BatchWriter#close() closed}.</li>
  * </ol>
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
 public interface ColumnWriteStore {
 
-    ColumnDataWriter getWriter();
+    /**
+     * Obtains the singleton {@link BatchFactory} of this store.
+     *
+     * @return the batch factory of this store
+     */
+    BatchFactory getFactory();
 
-    ColumnDataFactory getFactory();
+    /**
+     * Obtains the singleton {@link BatchWriter} of this store.
+     *
+     * @return the batch writer of this store
+     */
+    BatchWriter getWriter();
 
-    void save(File f) throws IOException;
+    /**
+     * Flushes this store to a file, from which it can be read by invoking
+     * {@link ColumnStoreFactory#createReadStore(ColumnStoreSchema, File)}.
+     *
+     * @param file the file to which the store should be written
+     * @throws IOException if any I/O problem occurs
+     */
+    void save(File file) throws IOException;
 
 }

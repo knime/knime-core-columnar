@@ -62,21 +62,21 @@ import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchFactory;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.DelegatingColumnStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * {@link ColumnStore} interception {@link ObjectReadData} for in-heap caching of objects.
+ * {@link ColumnStore} intercepting {@link ObjectReadData} for in-heap caching of objects.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -88,16 +88,16 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
-    private final class Factory extends DelegatingColumnDataFactory {
+    private final class Factory extends DelegatingBatchFactory {
 
         private Factory() {
             super(HeapCachedColumnStore.this);
         }
 
         @Override
-        protected WriteBatch createInternal(final int chunkSize) {
-            final WriteBatch batch = super.createInternal(chunkSize);
-            final ColumnWriteData[] data = new ColumnWriteData[getSchema().getNumColumns()];
+        protected WriteBatch createInternal(final int capacity) {
+            final WriteBatch batch = super.createInternal(capacity);
+            final NullableWriteData[] data = new NullableWriteData[getSchema().numColumns()];
 
             for (int i = 0; i < data.length; i++) {
                 if (m_objectData.isSelected(i)) {
@@ -112,7 +112,7 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final class Writer extends DelegatingColumnDataWriter {
+    private final class Writer extends DelegatingBatchWriter {
 
         private Future<Void> m_serializationFuture = CompletableFuture.completedFuture(null);
 
@@ -135,9 +135,9 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
                 return;
             }
 
-            final int numColumns = batch.getNumColumns();
+            final int numColumns = batch.size();
             @SuppressWarnings("unchecked")
-            final CompletableFuture<ColumnReadData>[] futures = new CompletableFuture[numColumns];
+            final CompletableFuture<NullableReadData>[] futures = new CompletableFuture[numColumns];
 
             for (int i = 0; i < numColumns; i++) {
                 if (m_objectData.isSelected(i)) {
@@ -155,8 +155,7 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
             m_serializationFuture = CompletableFuture.allOf(futures).thenRunAsync(() -> { // NOSONAR
                 try {
                     super.writeInternal(new DefaultReadBatch(
-                        Arrays.stream(futures).map(CompletableFuture::join).toArray(ColumnReadData[]::new),
-                        batch.length()));
+                        Arrays.stream(futures).map(CompletableFuture::join).toArray(NullableReadData[]::new)));
                 } catch (IOException e) {
                     throw new IllegalStateException(String.format("Failed to write batch %d.", m_numBatches), e);
                 } finally {
@@ -214,17 +213,17 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
     }
 
     @Override
-    protected ColumnDataFactory createFactoryInternal() {
+    protected BatchFactory getFactoryInternal() {
         return new Factory();
     }
 
     @Override
-    protected ColumnDataWriter createWriterInternal() {
+    protected BatchWriter createWriterInternal() {
         return new Writer();
     }
 
     @Override
-    protected ColumnDataReader createReaderInternal(final ColumnSelection config) {
+    protected BatchReader createReaderInternal(final ColumnSelection config) {
         return m_readStore.createReader(config);
     }
 

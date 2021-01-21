@@ -59,12 +59,12 @@ import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.ObjectData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.DelegatingColumnReadStore;
 
 /**
- * {@link ColumnReadStore} caching {@link ObjectData} as weak references in heap.
+ * {@link ColumnReadStore} for in-heap caching of {@link ObjectData}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -72,7 +72,7 @@ import org.knime.core.columnar.store.DelegatingColumnReadStore;
  */
 public final class HeapCachedColumnReadStore extends DelegatingColumnReadStore {
 
-    private final class Reader extends DelegatingColumnDataReader {
+    private final class Reader extends DelegatingBatchReader {
 
         private Reader(final ColumnSelection selection) {
             super(HeapCachedColumnReadStore.this, selection);
@@ -81,8 +81,7 @@ public final class HeapCachedColumnReadStore extends DelegatingColumnReadStore {
         @Override
         protected ReadBatch readRetainedInternal(final int index) throws IOException {
             final ReadBatch batch = super.readRetainedInternal(index);
-            return ColumnSelection.createBatch(getSelection(),
-                i -> m_objectData.isSelected(i) ? wrap(batch, index, i) : batch.get(i));
+            return getSelection().createBatch(i -> m_objectData.isSelected(i) ? wrap(batch, index, i) : batch.get(i));
         }
 
         @SuppressWarnings("unchecked")
@@ -128,7 +127,7 @@ public final class HeapCachedColumnReadStore extends DelegatingColumnReadStore {
     }
 
     @Override
-    protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
+    protected BatchReader createReaderInternal(final ColumnSelection selection) {
         return new Reader(selection);
     }
 

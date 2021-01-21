@@ -48,18 +48,33 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+
+/**
+ * Class holding {@link FloatWriteData}, {@link FloatReadData}, and {@link FloatDataSpec} for data holding float
+ * elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class FloatData {
 
     private FloatData() {
     }
 
-    public static interface FloatReadData extends ColumnReadData {
-        float getFloat(int index);
-    }
+    /**
+     * {@link NullableWriteData} holding float elements.
+     */
+    public static interface FloatWriteData extends NullableWriteData {
 
-    public static interface FloatWriteData extends ColumnWriteData {
-
+        /**
+         * Assigns a float value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the float value
+         * @param val the float value to set
+         */
         void setFloat(int index, float val);
 
         @Override
@@ -67,9 +82,28 @@ public final class FloatData {
 
     }
 
-    public static final class FloatDataSpec implements ColumnDataSpec {
+    /**
+     * {@link NullableReadData} holding float elements.
+     */
+    public static interface FloatReadData extends NullableReadData {
 
-        public static final FloatDataSpec INSTANCE = new FloatDataSpec();
+        /**
+         * Obtains the float value at the given index. It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the float element
+         * @return the float element at the given index
+         */
+        float getFloat(int index);
+
+    }
+
+    /**
+     * {@link DataSpec} for float data.
+     */
+    public static final class FloatDataSpec implements DataSpec {
+
+        static final FloatDataSpec INSTANCE = new FloatDataSpec();
 
         private FloatDataSpec() {
         }

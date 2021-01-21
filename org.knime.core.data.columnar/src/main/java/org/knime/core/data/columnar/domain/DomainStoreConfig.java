@@ -47,7 +47,7 @@ package org.knime.core.data.columnar.domain;
 
 import java.util.Map;
 
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.util.DuplicateChecker;
@@ -75,10 +75,10 @@ interface DomainStoreConfig {
     /**
      * @return map from index to DomainFactory used to calculate domains.
      */
-    Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnDomain>> createDomainCalculators();
+    Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> createDomainCalculators();
 
     /**
      * @return map from index to DomainFactory used to calculate metadata.
      */
-    Map<Integer, ColumnarDomainCalculator<? extends ColumnReadData, DataColumnMetaData[]>> createMetadataCalculators();
+    Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnMetaData[]>> createMetadataCalculators();
 }

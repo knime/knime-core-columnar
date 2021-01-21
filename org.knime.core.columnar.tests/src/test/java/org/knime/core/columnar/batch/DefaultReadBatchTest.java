@@ -48,17 +48,16 @@
  */
 package org.knime.core.columnar.batch;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
 import static org.knime.core.columnar.TestColumnStoreUtils.createTestTable;
 
 import java.util.Arrays;
-import java.util.NoSuchElementException;
 
 import org.junit.Test;
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.TestColumnStoreUtils;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.columnar.testing.TestColumnStore;
 import org.knime.core.columnar.testing.data.TestData;
@@ -78,36 +77,29 @@ public class DefaultReadBatchTest {
         return createTestTable(store, 1).get(0);
     }
 
-    private static DefaultReadBatch createBatch(final ColumnReadData[] data) {
-        return new DefaultReadBatch(data, 0);
+    private static DefaultReadBatch createBatch(final NullableReadData[] data) {
+        return new DefaultReadBatch(data);
     }
 
     @Test(expected = NullPointerException.class)
-    public void testNullCheckOnCreate() {
+    public void testArrayNullCheckOnCreate() {
         createBatch(null);
     }
 
-    @SuppressWarnings("unused")
-    @Test(expected = IllegalArgumentException.class)
-    public void testIllegalArgumentOnCreate() {
-        new DefaultReadBatch(createData(), -1);
+    @Test(expected = NullPointerException.class)
+    public void testElementNullCheckOnCreate() {
+        final NullableReadData[] data = createData();
+        data[0] = null;
+        createBatch(data);
     }
 
     @Test
     public void testGet() {
-        final ColumnReadData[] data = createData();
+        final NullableReadData[] data = createData();
         final DefaultReadBatch batch = createBatch(data);
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
             assertEquals(data[i], batch.get(i));
         }
-        assertArrayEquals(data, batch.getUnsafe());
-    }
-
-    @Test(expected = NoSuchElementException.class)
-    public void testNoSuchElementOnGet() {
-        final ColumnReadData[] data = createData();
-        data[0] = null;
-        createBatch(data).get(0);
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
@@ -146,12 +138,11 @@ public class DefaultReadBatchTest {
     @Test
     public void testGetters() {
         final int numColumns = DEF_NUM_COLUMNS;
-        final int length = 0;
         @SuppressWarnings("resource")
         final DefaultReadBatch batch =
-            new DefaultReadBatch(createTestTable(TestColumnStore.create(createSchema(numColumns)), 1).get(0), length);
-        assertEquals(numColumns, batch.getNumColumns());
-        assertEquals(length, batch.length());
+            new DefaultReadBatch(createTestTable(TestColumnStore.create(createSchema(numColumns)), 1).get(0));
+        assertEquals(numColumns, batch.size());
+        assertEquals(TestColumnStoreUtils.DEF_SIZE_OF_DATA, batch.length());
     }
 
 }

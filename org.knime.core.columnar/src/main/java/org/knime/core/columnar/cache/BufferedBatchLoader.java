@@ -52,7 +52,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.BatchReader;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -63,7 +63,7 @@ final class BufferedBatchLoader implements Closeable {
 
     private ReadBatch m_loadedBatch;
 
-    ReadBatch loadBatch(final ColumnDataReader reader, final int chunkIndex) throws IOException {
+    ReadBatch loadBatch(final BatchReader reader, final int chunkIndex) throws IOException {
         if (m_loadedBatch != null) {
             if (m_loadedBatchIndex == chunkIndex) {
                 return m_loadedBatch;

@@ -49,16 +49,32 @@
 package org.knime.core.columnar.batch;
 
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
 
-@SuppressWarnings("javadoc")
+/**
+ * An ordered batch of {@link NullableWriteData} of a certain size that provides random access to data by their index
+ * and guarantees that data is present at all valid indices.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public interface WriteBatch extends WriteData {
 
-    ColumnWriteData get(int index);
-
-    ColumnWriteData[] getUnsafe();
+    /**
+     * Obtains the {@link NullableWriteData} at a certain index.
+     *
+     * @param index the index at which to look for the data
+     * @return the non-null data at the given index
+     * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the size of the batch
+     */
+    NullableWriteData get(int index);
 
     @Override
-    ReadBatch close(final int length);
+    ReadBatch close(int length);
+
+    /**
+     * The minimum {@link WriteData#capacity() capacity} of all data in this batch, or zero if the batch holds no data.
+     */
+    @Override
+    int capacity();
 
 }

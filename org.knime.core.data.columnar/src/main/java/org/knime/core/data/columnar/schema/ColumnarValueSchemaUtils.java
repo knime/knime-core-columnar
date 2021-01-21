@@ -47,7 +47,7 @@ package org.knime.core.data.columnar.schema;
 
 import java.util.Map;
 
-import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
@@ -68,13 +68,13 @@ public final class ColumnarValueSchemaUtils {
 
     /**
      * Create a new {@link ColumnarValueSchema} based on the provided {@link ValueSchema}. All {@link AccessSpec}s in
-     * the {@link ValueSchema} must have a matching {@link ColumnDataSpec}.
+     * the {@link ValueSchema} must have a matching {@link DataSpec}.
      *
      * @param source the underlying {@link ValueSchema}.
      *
      * @return a new {@link ColumnarValueSchema}.
      *
-     * @throws IllegalArgumentException thrown if {@link AccessSpec} can't be translated to {@link ColumnDataSpec}.
+     * @throws IllegalArgumentException thrown if {@link AccessSpec} can't be translated to {@link DataSpec}.
      */
     public static final ColumnarValueSchema create(final ValueSchema source) throws IllegalArgumentException {
         return new DefaultColumnarValueSchema(source);
@@ -92,7 +92,7 @@ public final class ColumnarValueSchemaUtils {
      */
     public static final ColumnarValueSchema updateSource(final ColumnarValueSchema source,
         final Map<Integer, DataColumnDomain> domainMap, final Map<Integer, DataColumnMetaData[]> metadataMap) {
-        final DataColumnSpec[] result = new DataColumnSpec[source.getNumColumns() - 1];
+        final DataColumnSpec[] result = new DataColumnSpec[source.numColumns() - 1];
         for (int i = 0; i < result.length; i++) {
             final DataColumnSpec colSpec = source.getSourceSpec().getColumnSpec(i);
             final DataColumnDomain domain = domainMap.get(i + 1);

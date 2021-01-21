@@ -47,13 +47,13 @@ package org.knime.core.data.columnar.table;
 
 import java.util.Set;
 
-import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
@@ -72,7 +72,7 @@ import org.knime.core.data.v2.RowRead;
  */
 final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
 
-    private final ColumnDataReader m_reader;
+    private final BatchReader m_reader;
 
     private final ResourceWithRelease m_readerRelease;
 
@@ -99,8 +99,6 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
     private int m_currentIndex;
 
     private int m_currentMaxIndex;
-
-    private ColumnReadData[] m_currentData;
 
     static ColumnarRowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema,
         final long fromRowIndex, final long toRowIndex, final Set<Finalizer> openCursorFinalizers) {
@@ -137,7 +135,7 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
         // number of chunks
         final int maxLength;
         try {
-            maxLength = m_reader.getMaxLength();
+            maxLength = m_reader.maxLength();
         } catch (final Exception e) {
             // TODO
             throw new RuntimeException(e);
@@ -183,7 +181,7 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
 
     @Override
     public int getNumColumns() {
-        return m_schema.getNumColumns() - 1;
+        return m_schema.numColumns() - 1;
     }
 
     @Override
@@ -195,7 +193,7 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
 
     @Override
     public boolean isMissing(final int index) {
-        return m_currentData[index + 1].isMissing(m_currentIndex);
+        return m_currentBatch.get(index + 1).isMissing(m_currentIndex);
     }
 
     @Override
@@ -224,7 +222,6 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
     private void readNextBatch() {
         try {
             m_currentBatch = m_reader.readRetained(++m_currentBatchIndex);
-            m_currentData = m_currentBatch.getUnsafe();
             m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this,
                 new ResourceWithRelease(m_currentBatch, ReadBatch::release), m_readerRelease);
             m_openCursorFinalizers.add(m_finalizer);
@@ -242,22 +239,22 @@ final class ColumnarRowCursor implements RowCursor, RowRead, ColumnDataIndex {
     }
 
     private ReadValue[] create(final ReadBatch batch) {
-        final ReadValue[] values = new ReadValue[m_schema.getNumColumns()];
+        final ReadValue[] values = new ReadValue[m_schema.numColumns()];
         for (int i = 0; i < values.length; i++) {
             @SuppressWarnings("unchecked")
-            final ColumnarReadValueFactory<ColumnReadData> cast =
-                ((ColumnarReadValueFactory<ColumnReadData>)m_factories[i]);
+            final ColumnarReadValueFactory<NullableReadData> cast =
+                ((ColumnarReadValueFactory<NullableReadData>)m_factories[i]);
             values[i] = cast.createReadValue(batch.get(i), this);
         }
         return values;
     }
 
     private final ReadValue[] create(final ReadBatch batch, final int[] selection) {
-        final ReadValue[] values = new ReadValue[m_schema.getNumColumns()];
+        final ReadValue[] values = new ReadValue[m_schema.numColumns()];
         for (int i = 0; i < selection.length; i++) {
             @SuppressWarnings("unchecked")
-            final ColumnarReadValueFactory<ColumnReadData> cast =
-                ((ColumnarReadValueFactory<ColumnReadData>)m_factories[selection[i]]);
+            final ColumnarReadValueFactory<NullableReadData> cast =
+                ((ColumnarReadValueFactory<NullableReadData>)m_factories[selection[i]]);
             values[selection[i]] = cast.createReadValue(batch.get(selection[i]), this);
         }
         return values;

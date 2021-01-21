@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.cache.heap;
 
+import java.lang.ref.SoftReference;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -58,15 +59,20 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 
 /**
+ * Implementation of an {@link ObjectDataCache} in which values are softly referenced. As per contract of
+ * {@link SoftReference SoftReferences}, cached object data that is only
+ * <a href="package-summary.html#reachability">softly reachable</a> is guaranteed to have been cleared before the
+ * virtual machine throws an <code>OutOfMemoryError</code>. Additionally, this cache allows for manual invalidation,
+ * i.e., removal of all entries.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public class SoftReferencedObjectCache implements ObjectDataCache {
+public final class SoftReferencedObjectCache implements ObjectDataCache {
 
     private final Cache<ColumnDataUniqueId, Object[]> m_cache;
 
     /**
-     * Constructor
+     * Creates a new cache.
      */
     public SoftReferencedObjectCache() {
         final RemovalListener<ColumnDataUniqueId, Object[]> removalListener = removalNotification -> {
@@ -88,7 +94,7 @@ public class SoftReferencedObjectCache implements ObjectDataCache {
     }
 
     /**
-     * invalidate the cache
+     * Invalidate the cache, i.e., remove all entries.
      */
     public void invalidate() {
         m_cache.invalidateAll();

@@ -48,8 +48,18 @@
  */
 package org.knime.core.columnar;
 
-@SuppressWarnings("javadoc")
+/**
+ * {@link ReferencedData} that can be read up to a certain length.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public interface ReadData extends ReferencedData {
 
+    /**
+     * The length of the data, i.e., the number of elements that can be read.
+     *
+     * @return length, i.e., number of elements
+     */
     int length();
+
 }

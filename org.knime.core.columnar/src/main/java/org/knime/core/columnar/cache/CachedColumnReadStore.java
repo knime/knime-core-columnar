@@ -53,27 +53,27 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.DelegatingColumnReadStore;
 
 /**
- * A {@link ColumnReadStore} that reads {@link ColumnWriteData} from a delegate column store and places it in a
+ * A {@link ColumnReadStore} that reads {@link NullableWriteData} from a delegate column store and places it in a
  * fixed-size {@link SmallColumnStoreCache LRU cache} in memory for faster subsequent access. The store allows
- * concurrent reading via multiple {@link ColumnDataReader ColumnDataReaders}.
+ * concurrent reading via multiple {@link BatchReader ColumnDataReaders}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class CachedColumnReadStore extends DelegatingColumnReadStore {
 
-    private final class CachedColumnStoreReader extends DelegatingColumnDataReader {
+    private final class CachedColumnStoreReader extends DelegatingBatchReader {
 
         private final BufferedBatchLoader m_batchLoader;
 
-        private final Evictor<ColumnDataUniqueId, ColumnReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
+        private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
 
         CachedColumnStoreReader(final ColumnSelection selection) {
             super(CachedColumnReadStore.this, selection);
@@ -82,12 +82,13 @@ public final class CachedColumnReadStore extends DelegatingColumnReadStore {
 
         @Override
         protected ReadBatch readRetainedInternal(final int index) throws IOException {
-            return ColumnSelection.createBatch(getSelection(), i -> {
+            return getSelection().createBatch(i -> { // NOSONAR
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(CachedColumnReadStore.this, i, index);
-                return m_globalCache.getRetained(ccUID, () -> {
+                return m_globalCache.getRetained(ccUID, () -> { // NOSONAR
                     m_cachedData.add(ccUID);
                     try {
-                        final ColumnReadData data = m_batchLoader.loadBatch(initAndGetDelegate(), index).get(i);
+                        @SuppressWarnings("resource")
+                        final NullableReadData data = m_batchLoader.loadBatch(initAndGetDelegate(), index).get(i);
                         data.retain();
                         return data;
                     } catch (IOException e) {
@@ -105,7 +106,7 @@ public final class CachedColumnReadStore extends DelegatingColumnReadStore {
 
     }
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_globalCache;
+    private final LoadingEvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
 
     private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -119,14 +120,14 @@ public final class CachedColumnReadStore extends DelegatingColumnReadStore {
     }
 
     @Override
-    protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
+    protected BatchReader createReaderInternal(final ColumnSelection selection) {
         return new CachedColumnStoreReader(selection);
     }
 
     @Override
     protected void closeOnce() throws IOException {
         for (final ColumnDataUniqueId id : m_cachedData) {
-            final ColumnReadData removed = m_globalCache.removeRetained(id);
+            final NullableReadData removed = m_globalCache.removeRetained(id);
             if (removed != null) {
                 removed.release();
             }

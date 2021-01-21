@@ -51,7 +51,7 @@ package org.knime.core.columnar.cache.heap;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.StringData.StringDataSpec;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -76,12 +76,12 @@ final class HeapCacheUtils {
      */
     static final ColumnSelection getObjectDataIndices(final ColumnStoreSchema schema) {
         final List<Integer> indices = new ArrayList<>();
-        final int length = schema.getNumColumns();
+        final int length = schema.numColumns();
         for (int i = 0; i < length; i++) {
             // NB: We only cache data which are expensive to serialize/deserialize
             // * For Strings we need to do UTF-8 encoding and decoding
             // * For Generic object we need to call a serializer which might be expensive
-            final ColumnDataSpec columnDataSpec = schema.getColumnDataSpec(i);
+            final DataSpec columnDataSpec = schema.getSpec(i);
             if (columnDataSpec instanceof StringDataSpec //
                 || columnDataSpec instanceof GenericObjectDataSpec) {
                 indices.add(i);

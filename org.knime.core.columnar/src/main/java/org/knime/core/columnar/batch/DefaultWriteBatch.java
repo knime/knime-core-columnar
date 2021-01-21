@@ -49,55 +49,44 @@
 package org.knime.core.columnar.batch;
 
 import java.util.Arrays;
-import java.util.Objects;
 
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.WriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
+ * Default implementation of a {@link WriteBatch} that holds an array of {@link NullableWriteData}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-@SuppressWarnings("javadoc")
-public class DefaultWriteBatch implements WriteBatch {
+public final class DefaultWriteBatch implements WriteBatch {
 
-    private final ColumnWriteData[] m_data;
+    private final NullableWriteData[] m_data;
 
     private int m_capacity;
 
-    public DefaultWriteBatch(final ColumnWriteData[] data) {
-        Objects.requireNonNull(data, () -> "Column data must not be null.");
-
+    /**
+     * @param data the array of data backing this batch
+     */
+    public DefaultWriteBatch(final NullableWriteData[] data) {
         m_data = data;
-        m_capacity = Arrays.stream(m_data).mapToInt(ColumnWriteData::capacity).min().orElse(0);
+        m_capacity = Arrays.stream(data).mapToInt(WriteData::capacity).min().orElse(0);
     }
 
     @Override
-    public ColumnWriteData get(final int colIndex) {
-        if (colIndex < 0) {
-            throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", colIndex));
-        }
-        if (colIndex >= m_data.length) {
-            throw new IndexOutOfBoundsException(
-                String.format("Column index %d larger then the column store's largest column index (%d).", colIndex,
-                    m_data.length - 1));
-        }
-        return m_data[colIndex];
+    public NullableWriteData get(final int index) {
+        return m_data[index];
     }
 
     @Override
     public void release() {
-        for (final ColumnWriteData data : m_data) {
-            data.release();
-        }
+        Arrays.stream(m_data).forEach(ReferencedData::release);
     }
 
     @Override
     public void retain() {
-        for (final ColumnWriteData data : m_data) {
-            data.retain();
-        }
+        Arrays.stream(m_data).forEach(ReferencedData::retain);
     }
 
     @Override
@@ -113,7 +102,7 @@ public class DefaultWriteBatch implements WriteBatch {
     @Override
     public void expand(final int minimumCapacity) {
         int newCapacity = Integer.MAX_VALUE;
-        for (final ColumnWriteData data : m_data) {
+        for (final NullableWriteData data : m_data) {
             data.expand(minimumCapacity);
             newCapacity = Math.min(newCapacity, data.capacity());
         }
@@ -122,26 +111,7 @@ public class DefaultWriteBatch implements WriteBatch {
 
     @Override
     public ReadBatch close(final int length) {
-        if (length < 0) {
-            throw new IllegalArgumentException("Length must be non-negative.");
-        }
-        if (length > m_capacity) {
-            throw new IllegalArgumentException("Length must not be larger than capacity.");
-        }
-
-        final ColumnReadData[] data = new ColumnReadData[m_data.length];
-        int capacity = 0;
-        for (int i = 0; i < m_data.length; i++) {
-            data[i] = m_data[i].close(length);
-            capacity = Math.max(capacity, data[i].length());
-        }
-
-        return new DefaultReadBatch(data, capacity);
-    }
-
-    @Override
-    public ColumnWriteData[] getUnsafe() {
-        return m_data;
+        return new DefaultReadBatch(Arrays.stream(m_data).map(d -> d.close(length)).toArray(NullableReadData[]::new));
     }
 
 }

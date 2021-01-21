@@ -57,11 +57,11 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchFactory;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.columnar.testing.data.TestData;
@@ -82,10 +82,10 @@ public final class TestColumnStore implements ColumnStore {
 
     private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
-    final class TestColumnDataFactory implements ColumnDataFactory {
+    final class TestColumnDataFactory implements BatchFactory {
 
         @Override
-        public WriteBatch create(final int chunkSize) {
+        public WriteBatch create(final int capacity) {
             if (m_writerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -94,9 +94,9 @@ public final class TestColumnStore implements ColumnStore {
             }
 
             waitForLatch();
-            final ColumnWriteData[] data = new ColumnWriteData[m_schema.getNumColumns()];
+            final NullableWriteData[] data = new NullableWriteData[m_schema.numColumns()];
             for (int i = 0; i < m_factories.length; i++) {
-                final TestData testData = m_factories[i].createWriteData(chunkSize);
+                final TestData testData = m_factories[i].createWriteData(capacity);
                 data[i] = testData;
                 m_tracker.add(testData);
             }
@@ -105,7 +105,7 @@ public final class TestColumnStore implements ColumnStore {
 
     }
 
-    final class TestColumnDataWriter implements ColumnDataWriter {
+    final class TestColumnDataWriter implements BatchWriter {
 
         private int m_maxDataLength;
 
@@ -119,7 +119,7 @@ public final class TestColumnStore implements ColumnStore {
             }
 
             waitForLatch();
-            final Object[] data = new Object[batch.getNumColumns()];
+            final Object[] data = new Object[batch.size()];
             for (int i = 0; i < data.length; i++) {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();
@@ -141,7 +141,7 @@ public final class TestColumnStore implements ColumnStore {
 
     }
 
-    final class TestColumnDataReader implements ColumnDataReader {
+    final class TestColumnDataReader implements BatchReader {
 
         private final ColumnSelection m_selection;
 
@@ -165,7 +165,7 @@ public final class TestColumnStore implements ColumnStore {
 
             waitForLatch();
             final Object[] data = m_batches.get(chunkIndex);
-            return ColumnSelection.createBatch(m_selection, i -> {
+            return m_selection.createBatch(i -> {
                 final TestData testData = m_factories[i].createReadData(data[i]);
                 m_tracker.add(testData);
                 return testData;
@@ -173,12 +173,12 @@ public final class TestColumnStore implements ColumnStore {
         }
 
         @Override
-        public int getNumBatches() {
+        public int numBatches() {
             return m_batches.size();
         }
 
         @Override
-        public int getMaxLength() {
+        public int maxLength() {
             return m_maxDataCapacity;
         }
 
@@ -194,7 +194,7 @@ public final class TestColumnStore implements ColumnStore {
 
     private final TestDataFactory[] m_factories;
 
-    private final ColumnDataFactory m_factory = new TestColumnDataFactory();
+    private final BatchFactory m_factory = new TestColumnDataFactory();
 
     private final TestColumnDataWriter m_writer = new TestColumnDataWriter();
 
@@ -219,8 +219,8 @@ public final class TestColumnStore implements ColumnStore {
 
     private TestColumnStore(final ColumnStoreSchema schema) {
         m_schema = schema;
-        m_factories = IntStream.range(0, schema.getNumColumns()) //
-            .mapToObj(schema::getColumnDataSpec) //
+        m_factories = IntStream.range(0, schema.numColumns()) //
+            .mapToObj(schema::getSpec) //
             .map(s -> s.accept(TestSchemaMapper.INSTANCE)) //
             .toArray(TestDataFactory[]::new);
     }
@@ -247,7 +247,7 @@ public final class TestColumnStore implements ColumnStore {
     }
 
     @Override
-    public ColumnDataFactory getFactory() {
+    public BatchFactory getFactory() {
         if (m_storeClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
@@ -256,7 +256,7 @@ public final class TestColumnStore implements ColumnStore {
     }
 
     @Override
-    public ColumnDataWriter getWriter() {
+    public BatchWriter getWriter() {
         if (m_storeClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
@@ -277,7 +277,7 @@ public final class TestColumnStore implements ColumnStore {
     }
 
     @Override
-    public ColumnDataReader createReader(final ColumnSelection selection) {
+    public BatchReader createReader(final ColumnSelection selection) {
         if (!m_writerClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }

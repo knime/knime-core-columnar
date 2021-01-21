@@ -49,10 +49,23 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.WriteBatch;
 
-@SuppressWarnings("javadoc")
-public interface ColumnDataWriter extends Closeable {
+/**
+ * A writer that is associated with a {@link ColumnWriteStore} and that can be used to write {@link ReadBatch
+ * ReadBatches}, i.e., {@link WriteBatch#close(int) closed} {@link WriteBatch WriteBatches}.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public interface BatchWriter extends Closeable {
 
-    void write(final ReadBatch batch) throws IOException;
+    /**
+     * Write a {@link ReadBatch}, i.e., a {@link WriteBatch#close(int) closed} {@link WriteBatch WriteBatches}.
+     *
+     * @param batch a batch to which data can no longer be written
+     * @throws IOException if any I/O problem occurs
+     * @throws IllegalStateException if the store or writer have already been closed
+     */
+    void write(ReadBatch batch) throws IOException;
 
 }

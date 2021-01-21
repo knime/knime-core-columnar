@@ -56,20 +56,19 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchFactory;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.DelegatingColumnStore;
 
 /**
- * A {@link ColumnStore} that stores {@link ColumnWriteData} in a fixed-size {@link SmallColumnStoreCache LRU cache} in
- * memory if the aggregated {@link ReferencedData#sizeOf() size} of data is below a given threshold. If the threshold is
- * exceeded or once evicted from the cache, the data is passed on to a delegate column store. The store allows
- * concurrent reading via multiple {@link ColumnDataReader ColumnDataReaders} once the {@link ColumnDataWriter} has been
- * closed.
+ * A {@link ColumnStore} that stores {@link NullableWriteData} in a fixed-size {@link SmallColumnStoreCache LRU cache}
+ * in memory if the aggregated {@link ReferencedData#sizeOf() size} of data is below a given threshold. If the threshold
+ * is exceeded or once evicted from the cache, the data is passed on to a delegate column store. The store allows
+ * concurrent reading via multiple {@link BatchReader ColumnDataReaders} once the {@link BatchWriter} has been closed.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -169,7 +168,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     private static final String ERROR_MESSAGE_ON_FLUSH = "Error while flushing small table.";
 
-    private class SmallColumnStoreFactory extends DelegatingColumnDataFactory {
+    private class SmallColumnStoreFactory extends DelegatingBatchFactory {
 
         SmallColumnStoreFactory() {
             super(SmallColumnStore.this);
@@ -177,7 +176,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final class SmallColumnStoreWriter extends DelegatingColumnDataWriter {
+    private final class SmallColumnStoreWriter extends DelegatingBatchWriter {
 
         private Table m_table = new Table();
 
@@ -218,7 +217,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             } else {
                 try {
                     @SuppressWarnings("resource")
-                    final ColumnDataWriter delegate = initAndGetDelegate();
+                    final BatchWriter delegate = initAndGetDelegate();
                     delegate.close();
                 } finally {
                     m_delegateClosed.countDown();
@@ -243,11 +242,11 @@ public final class SmallColumnStore extends DelegatingColumnStore {
                     for (int i = 0; i < table.getNumChunks(); i++) {
                         final ReadBatch batch = table.getBatch(i);
                         @SuppressWarnings("resource")
-                        final ColumnDataWriter delegate = initAndGetDelegate();
+                        final BatchWriter delegate = initAndGetDelegate();
                         delegate.write(batch);
                     }
                     @SuppressWarnings("resource")
-                    final ColumnDataWriter delegate = getDelegate();
+                    final BatchWriter delegate = getDelegate();
                     if (close && delegate != null) {
                         delegate.close();
                     }
@@ -261,7 +260,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final class SmallColumnStoreReader implements ColumnDataReader {
+    private final class SmallColumnStoreReader implements BatchReader {
 
         private final ColumnSelection m_selection;
 
@@ -275,15 +274,23 @@ public final class SmallColumnStore extends DelegatingColumnStore {
         }
 
         @Override
-        public ReadBatch readRetained(final int chunkIndex) throws IOException {
+        public ReadBatch readRetained(final int index) throws IOException {
             if (m_readerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
             }
             if (isClosed()) {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
+            if (index < 0) {
+                throw new IndexOutOfBoundsException(String.format("Batch index %d smaller than 0.", index));
+            }
+            if (index >= numBatches()) {
+                throw new IndexOutOfBoundsException(
+                    String.format("Batch index %d greater or equal to the reader's largest batch index (%d).", index,
+                        numBatches() - 1));
+            }
 
-            final ReadBatch batch = ColumnSelection.createBatch(m_selection, i -> m_table.getBatch(chunkIndex).get(i));
+            final ReadBatch batch = m_selection.createBatch(i -> m_table.getBatch(index).get(i));
             batch.retain();
             return batch;
         }
@@ -298,12 +305,12 @@ public final class SmallColumnStore extends DelegatingColumnStore {
         }
 
         @Override
-        public int getNumBatches() {
+        public int numBatches() {
             return m_table.getNumChunks();
         }
 
         @Override
-        public int getMaxLength() {
+        public int maxLength() {
             return m_table.getMaxDataCapacity();
         }
 
@@ -327,12 +334,12 @@ public final class SmallColumnStore extends DelegatingColumnStore {
     }
 
     @Override
-    protected ColumnDataFactory createFactoryInternal() {
+    protected BatchFactory getFactoryInternal() {
         return new SmallColumnStoreFactory();
     }
 
     @Override
-    protected ColumnDataWriter createWriterInternal() {
+    protected BatchWriter createWriterInternal() {
         m_writer = new SmallColumnStoreWriter();
         return m_writer;
     }
@@ -352,7 +359,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     @SuppressWarnings("resource")
     @Override
-    protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
+    protected BatchReader createReaderInternal(final ColumnSelection selection) {
         final Table cached = m_globalCache.getRetained(SmallColumnStore.this);
         if (cached != null) {
             // cache hit

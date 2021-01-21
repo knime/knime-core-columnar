@@ -47,8 +47,8 @@ package org.knime.core.columnar.testing.data;
 
 import java.util.Arrays;
 
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 
@@ -109,18 +109,18 @@ public final class TestStructData extends TestData implements StructWriteData, S
 
     @Override
     public synchronized boolean isMissing(final int index) {
-        return ((ColumnReadData)get()[0]).isMissing(index);
+        return ((NullableReadData)get()[0]).isMissing(index);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <C extends ColumnReadData> C getReadDataAt(final int index) {
+    public <C extends NullableReadData> C getReadDataAt(final int index) {
         return (C)get()[index];
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <C extends ColumnWriteData> C getWriteDataAt(final int index) {
+    public <C extends NullableWriteData> C getWriteDataAt(final int index) {
         return (C)get()[index];
     }
 

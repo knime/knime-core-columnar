@@ -48,42 +48,37 @@
  */
 package org.knime.core.columnar.data;
 
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
 /**
- * Class holding {@link StringReadData}, {@link StringWriteData} and {@link StringDataSpec} for data holding Strings.
+ * Class holding {@link StringWriteData}, {@link StringReadData}, and {@link StringDataSpec} for data holding String
+ * elements.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class StringData {
 
     private StringData() {
     }
 
-    /** A {@link ColumnReadData} holding a String a each index. */
-    public interface StringReadData extends ObjectReadData<String> {
-
-        /**
-         * @param index the index in the chunk
-         * @return the string at the index
-         */
-        String getString(int index);
-
-        @Override
-        default String getObject(final int index) {
-            return getString(index);
-        }
-    }
-
-    /** A {@link ColumnWriteData} holding a String at each index. */
+    /**
+     * {@link ObjectWriteData} holding String elements.
+     *
+     * @author Marc Bux, KNIME GmbH, Berlin, Germany
+     */
     public interface StringWriteData extends ObjectWriteData<String> {
 
         /**
-         * Set the string a the given index.
+         * Assigns a String value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param index the index in the chunk
-         * @param val the string
+         * @param index the index at which to set the String value
+         * @param val the String value to set
          */
         void setString(int index, String val);
 
@@ -94,13 +89,40 @@ public final class StringData {
 
         @Override
         StringReadData close(int length);
+
     }
 
-    /** Spec for {@link StringReadData} and {@link StringWriteData}. */
-    public static final class StringDataSpec implements ColumnDataSpec {
+    /**
+     * {@link ObjectReadData} holding String elements.
+     *
+     * @author Marc Bux, KNIME GmbH, Berlin, Germany
+     */
+    public interface StringReadData extends ObjectReadData<String> {
 
-        /** Final stateless instance of {@link StringDataSpec} */
-        public static final StringDataSpec INSTANCE = new StringDataSpec();
+        /**
+         * Obtains the String value at the given index. It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the String element
+         * @return the String element at the given index
+         */
+        String getString(int index);
+
+        @Override
+        default String getObject(final int index) {
+            return getString(index);
+        }
+
+    }
+
+    /**
+     * {@link DataSpec} for String data.
+     *
+     * @author Marc Bux, KNIME GmbH, Berlin, Germany
+     */
+    public static final class StringDataSpec implements DataSpec {
+
+        static final StringDataSpec INSTANCE = new StringDataSpec();
 
         private StringDataSpec() {
         }
@@ -110,4 +132,5 @@ public final class StringData {
             return v.visit(this);
         }
     }
+
 }

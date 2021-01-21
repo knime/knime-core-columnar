@@ -48,11 +48,15 @@
  */
 package org.knime.core.columnar.data;
 
+import org.knime.core.columnar.WriteData;
+
 /**
- * Class holding the {@link ListReadData}, {@link ListWriteData} interfaces and the {@link ListDataSpec} class. List
- * data contains a list of elements of a child type at each index.
+ * Class holding {@link ListWriteData}, {@link ListReadData}, and {@link ListDataSpec} for data holding list elements.
+ * Each list element contains a list of objects of a certain type. The size of each list is fixed, but can vary between
+ * lists.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class ListData {
 
@@ -60,61 +64,67 @@ public final class ListData {
     }
 
     /**
-     * A {@link ColumnReadData} which contains a list of elements at each index.
+     * A {@link NullableWriteData} holding list elements.
      */
-    public static interface ListReadData extends ColumnReadData {
+    public static interface ListWriteData extends NullableWriteData {
 
         /**
-         * Get the list at the given index. The list itself is a {@link ColumnReadData} again.
+         * Creates a {@link NullableWriteData} of type C that represents a list with a certain fixed size at the given
+         * index, which can then be populated with values. The contract is that lists are only ever created once and
+         * only for ascending indices. Also, the returned data must not be {@link WriteData#close(int) closed} or
+         * {@link WriteData#expand(int) expanded}. It is the responsibility of the client calling this method to make
+         * sure that the provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param <C> type of the {@link ColumnReadData}
-         * @param index the index
-         * @return a {@link ColumnReadData} of all the elements of this lists
-         */
-        <C extends ColumnReadData> C getReadData(int index);
-    }
-
-    /**
-     * A {@link ColumnWriteData} which contains a list of elements at each index.
-     */
-    public static interface ListWriteData extends ColumnWriteData {
-
-        /**
-         * Get a {@link ColumnWriteData} for a new the list at the given index. Do not call
-         * {@link ColumnWriteData#close(int) #close(int)} on the returned data. Only add elements for the indices from 0
-         * to (size-1).
-         *
-         * @param <C> type of the {@link ColumnWriteData}
-         * @param index the index in this data object
+         * @param <C> the type of the {@link NullableWriteData}
+         * @param index the index at which to create the list
          * @param size the size of the list
-         * @return a {@link ColumnWriteData} to insert elements into the list
+         * @return a newly created {@link NullableWriteData} that represents the list
          */
-        <C extends ColumnWriteData> C getWriteData(int index, int size);
+        <C extends NullableWriteData> C createWriteData(int index, int size);
 
         @Override
         ListReadData close(int length);
+
     }
 
     /**
-     * The {@link ColumnDataSpec} for list data.
+     * A {@link NullableReadData} holding list elements.
      */
-    public static final class ListDataSpec implements ColumnDataSpec {
-
-        private final ColumnDataSpec m_inner;
+    public static interface ListReadData extends NullableReadData {
 
         /**
-         * Create a new spec for list data.
+         * Obtains a {@link NullableReadData} of type C that represents the list at the given index, which can then be
+         * used to read values. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param <C> the type of the {@link NullableReadData}
+         * @param index the index at which to obtain the list
+         * @return a {@link NullableReadData} that represents the list
+         */
+        <C extends NullableReadData> C createReadData(int index);
+
+    }
+
+    /**
+     * The {@link DataSpec} for list data.
+     */
+    public static final class ListDataSpec implements DataSpec {
+
+        private final DataSpec m_inner;
+
+        /**
+         * Create a spec for list data, in which lists can hold objects according to a given {@link DataSpec}.
          *
          * @param inner the spec for the elements the lists consist of
          */
-        public ListDataSpec(final ColumnDataSpec inner) {
+        public ListDataSpec(final DataSpec inner) {
             m_inner = inner;
         }
 
         /**
-         * @return the spec of the elements the lists consist of
+         * @return the {@link DataSpec} of the elements the lists consist of
          */
-        public ColumnDataSpec getInner() {
+        public DataSpec getInner() {
             return m_inner;
         }
 
@@ -122,5 +132,7 @@ public final class ListData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
+
     }
+
 }

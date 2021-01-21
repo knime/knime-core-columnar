@@ -123,7 +123,7 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
 
     @Override
     public D getRetained(final K key, final Loader<? extends D> loader, final Evictor<? super K, ? super D> evictor) {
-        final DataWithEvictor<K, D> cached = m_lruCache.compute(key, (k, d) -> {
+        final DataWithEvictor<K, D> cached = m_lruCache.compute(key, (k, d) -> { // NOSONAR
             if (d == null) {
                 final D loaded = loader.loadRetained(); // data is already retained by the loader
                 if (loaded == null) {

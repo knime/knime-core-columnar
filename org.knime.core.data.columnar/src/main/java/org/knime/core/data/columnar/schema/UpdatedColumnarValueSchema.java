@@ -48,7 +48,7 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueSchema;
 
@@ -64,13 +64,13 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public int getNumColumns() {
-        return m_delegate.getNumColumns();
+    public int numColumns() {
+        return m_delegate.numColumns();
     }
 
     @Override
-    public ColumnDataSpec getColumnDataSpec(final int index) {
-        return m_delegate.getColumnDataSpec(index);
+    public DataSpec getSpec(final int index) {
+        return m_delegate.getSpec(index);
     }
 
     @Override

@@ -45,11 +45,24 @@
  */
 package org.knime.core.columnar.store;
 
+import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.batch.WriteBatch;
 
-@SuppressWarnings("javadoc")
-public interface ColumnDataFactory {
+/**
+ * A factory that is associated with a {@link ColumnWriteStore ColumnWriteStore's} {@link BatchWriter} and that can be
+ * used to create {@link WriteBatch WriteBatches} with a certain minimum {@link WriteData#capacity() capacity}.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public interface BatchFactory {
 
-    WriteBatch create(int chunkSize);
+    /**
+     * Create a new {@link WriteBatch} with a certain minimum {@link WriteData#capacity() capacity}.
+     *
+     * @param capacity the minimum capacity of data in the created batch
+     * @return a new batch that can be populated with data
+     * @throws IllegalStateException if the store or writer have already been closed
+     */
+    WriteBatch create(int capacity);
 
 }

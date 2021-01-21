@@ -61,8 +61,8 @@ import java.io.IOException;
 import java.util.List;
 
 import org.junit.Test;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.ColumnStore;
 
 /**
@@ -74,9 +74,9 @@ public class HeapCachedColumnReadStoreTest {
     private static final class StoreAndTable implements Closeable {
         private final HeapCachedColumnReadStore m_store;
 
-        private final List<ColumnReadData[]> m_table;
+        private final List<NullableReadData[]> m_table;
 
-        StoreAndTable(final HeapCachedColumnReadStore store, final List<ColumnReadData[]> table) {
+        StoreAndTable(final HeapCachedColumnReadStore store, final List<NullableReadData[]> table) {
             m_store = store;
             m_table = table;
         }
@@ -90,7 +90,7 @@ public class HeapCachedColumnReadStoreTest {
     @SuppressWarnings("resource")
     private static StoreAndTable generateDefaultHeapCachedReadStoreAndTable() throws IOException {
         final ColumnStore delegate = createDefaultTestColumnStore();
-        final List<ColumnReadData[]> table = writeDefaultTable(delegate);
+        final List<NullableReadData[]> table = writeDefaultTable(delegate);
         releaseTable(table);
         return new StoreAndTable(new HeapCachedColumnReadStore(delegate, generateCache()), table);
     }
@@ -112,7 +112,7 @@ public class HeapCachedColumnReadStoreTest {
     @Test
     public void testReadSelection() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultHeapCachedReadStoreAndTable()) {
-            for (int i = 0; i < storeAndTable.m_store.getSchema().getNumColumns(); i++) {
+            for (int i = 0; i < storeAndTable.m_store.getSchema().numColumns(); i++) {
                 readSelectionAndCompareTable(storeAndTable.m_store, storeAndTable.m_table, i);
             }
         }
@@ -122,7 +122,7 @@ public class HeapCachedColumnReadStoreTest {
     public void exceptionOnCreateReaderAfterStoreClose() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultHeapCachedReadStoreAndTable()) {
             storeAndTable.m_store.close();
-            try (final ColumnDataReader reader = storeAndTable.m_store.createReader()) { // NOSONAR
+            try (final BatchReader reader = storeAndTable.m_store.createReader()) { // NOSONAR
             }
         }
     }
@@ -130,7 +130,7 @@ public class HeapCachedColumnReadStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultHeapCachedReadStoreAndTable()) {
-            try (final ColumnDataReader reader = storeAndTable.m_store.createReader()) {
+            try (final BatchReader reader = storeAndTable.m_store.createReader()) {
                 reader.close(); // NOSONAR
                 reader.readRetained(0);
             }
@@ -140,7 +140,7 @@ public class HeapCachedColumnReadStoreTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws IOException {
         try (final StoreAndTable storeAndTable = generateDefaultHeapCachedReadStoreAndTable()) {
-            try (final ColumnDataReader reader = storeAndTable.m_store.createReader()) {
+            try (final BatchReader reader = storeAndTable.m_store.createReader()) {
                 storeAndTable.m_store.close();
                 reader.readRetained(0);
             }

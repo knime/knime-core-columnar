@@ -48,14 +48,23 @@ package org.knime.core.columnar.data;
 import org.knime.core.columnar.WriteData;
 
 /**
- * The contract is that values are only ever set for ascending indices.
+ * {@link WriteData} in which elements can be missing. Elements are implicitly missing as long as they are not
+ * explicitly set to some other value. Values can also be explicitly set to be missing.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-@SuppressWarnings("javadoc")
-public interface ColumnWriteData extends WriteData {
+public interface NullableWriteData extends WriteData {
 
+    /**
+     * Sets the element at the given index to be missing. The contract is that values are only ever set for ascending
+     * indices. It is the responsibility of the client calling this method to make sure that the provided index is
+     * non-negative and smaller than the capacity of this {@link WriteData}.
+     *
+     * @param index the index at which to set a element to be missing
+     */
     void setMissing(int index);
 
     @Override
-    ColumnReadData close(int length);
+    NullableReadData close(int length);
 
 }

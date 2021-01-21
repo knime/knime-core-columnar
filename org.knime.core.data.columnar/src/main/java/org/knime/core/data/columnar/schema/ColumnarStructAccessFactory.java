@@ -50,11 +50,11 @@ package org.knime.core.data.columnar.schema;
 
 import java.util.stream.Stream;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.access.AccessSpec;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.StructAccess.StructReadAccess;
@@ -69,7 +69,7 @@ public class ColumnarStructAccessFactory
 
     private final ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;
 
-    private final ColumnDataSpec m_spec;
+    private final DataSpec m_spec;
 
     /**
      * @param inner the specs of the inner elements
@@ -79,7 +79,7 @@ public class ColumnarStructAccessFactory
         m_inner = Stream.of(inner).map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
             .toArray(ColumnarAccessFactory<?, ?, ?, ?>[]::new);
         m_spec =
-            new StructDataSpec(Stream.of(m_inner).map(ColumnarAccessFactory::getColumnDataSpec).toArray(ColumnDataSpec[]::new));
+            new StructDataSpec(Stream.of(m_inner).map(ColumnarAccessFactory::getColumnDataSpec).toArray(DataSpec[]::new));
 
     }
 
@@ -94,7 +94,7 @@ public class ColumnarStructAccessFactory
     }
 
     @Override
-    public ColumnDataSpec getColumnDataSpec() {
+    public DataSpec getColumnDataSpec() {
         return m_spec;
     }
 

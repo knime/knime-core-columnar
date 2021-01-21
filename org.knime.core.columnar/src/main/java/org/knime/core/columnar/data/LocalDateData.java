@@ -47,27 +47,35 @@ package org.knime.core.columnar.data;
 
 import java.time.LocalDate;
 
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
-@SuppressWarnings("javadoc")
+/**
+ * Class holding {@link LocalDateWriteData}, {@link LocalDateReadData}, and {@link LocalDateDataSpec} for data holding
+ * LocalDate elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class LocalDateData {
 
     private LocalDateData() {
     }
 
-    public static interface LocalDateReadData extends ObjectReadData<LocalDate> {
-
-        LocalDate getLocalDate(int index);
-
-        @Override
-        default LocalDate getObject(final int index) {
-            return getLocalDate(index);
-        }
-    }
-
+    /**
+     * {@link ObjectWriteData} holding LocalDate elements.
+     */
     public static interface LocalDateWriteData extends ObjectWriteData<LocalDate> {
 
+        /**
+         * Assigns a LocalDate value to the element at the given index. The contract is that values are only ever set
+         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the LocalDate value
+         * @param val the LocalDate value to set
+         */
         void setLocalDate(int index, LocalDate val);
 
         @Override
@@ -80,9 +88,33 @@ public final class LocalDateData {
 
     }
 
-    public static final class LocalDateDataSpec implements ColumnDataSpec {
+    /**
+     * {@link ObjectReadData} holding LocalDate elements.
+     */
+    public static interface LocalDateReadData extends ObjectReadData<LocalDate> {
 
-        public static final LocalDateDataSpec INSTANCE = new LocalDateDataSpec();
+        /**
+         * Obtains the LocalDate value at the given index. It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the LocalDate element
+         * @return the LocalDate element at the given index
+         */
+        LocalDate getLocalDate(int index);
+
+        @Override
+        default LocalDate getObject(final int index) {
+            return getLocalDate(index);
+        }
+
+    }
+
+    /**
+     * {@link DataSpec} for LocalDate data.
+     */
+    public static final class LocalDateDataSpec implements DataSpec {
+
+        static final LocalDateDataSpec INSTANCE = new LocalDateDataSpec();
 
         private LocalDateDataSpec() {
         }
@@ -91,5 +123,7 @@ public final class LocalDateData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
+
     }
+
 }

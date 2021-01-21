@@ -48,34 +48,53 @@ package org.knime.core.columnar.store;
 import java.io.Closeable;
 import java.io.IOException;
 
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 
 /**
- * A store from which columnar data can be read. The life cycle of a read store
- * is as follows:
+ * A data structure for obtaining columnar data. Data can be read from the store. The life cycle of a store is as
+ * follows:
  * <ol>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
+ * <li>Any number of {@link BatchReader readers} are {@link #createReader(ColumnSelection) created}.</li>
+ * <li>Data is read independently by each of these readers by iterating over the following steps:
+ * <ol>
+ * <li>A {@link ReadBatch} is {@link BatchReader#readRetained(int) obtained}.</li>
+ * <li>Data is {@link ReadBatch#get(int) read} from the batch.</li>
+ * </ol>
+ * <li>The readers are {@link BatchReader#close() closed}.</li>
+ * <li>The store itself is {@link #close() closed}, upon which any underlying resources are relinquished.</li>
  * </ol>
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
 public interface ColumnReadStore extends Closeable {
 
-    ColumnDataReader createReader(ColumnSelection config);
+    /**
+     * Creates a new {@link BatchReader} that reads {@link ReadBatch ReadBatches}, in which columns are guaranteed to be
+     * materialized according to a given {@link ColumnSelection}.
+     *
+     * @param selection a selection of columns that determines which columns are guaranteed to be materialized in
+     *            batches read by the reader
+     * @return a new reader
+     */
+    BatchReader createReader(ColumnSelection selection);
 
-    default ColumnDataReader createReader() {
-        return createReader(new DefaultColumnSelection(getSchema().getNumColumns()));
+    /**
+     * Creates a new {@link BatchReader} that reads {@link ReadBatch ReadBatches} in which all columns are materialized.
+     *
+     * @return a new batch reader
+     */
+    default BatchReader createReader() {
+        return createReader(new DefaultColumnSelection(getSchema().numColumns()));
     }
 
+    /**
+     * Obtains the {@link ColumnStoreSchema} of this store.
+     *
+     * @return the schema of this store
+     */
     ColumnStoreSchema getSchema();
 
     @Override

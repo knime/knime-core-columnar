@@ -45,6 +45,7 @@
  */
 package org.knime.core.columnar.data;
 
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
@@ -64,104 +65,170 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 
-@SuppressWarnings("javadoc")
-public interface ColumnDataSpec {
+/**
+ * Specification / configuration of implementations of {@link ReferencedData data}.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public interface DataSpec {
 
-    public static BooleanDataSpec booleanSpec() {
+    /**
+     * @return singleton boolean spec
+     */
+    static BooleanDataSpec booleanSpec() {
         return BooleanDataSpec.INSTANCE;
     }
 
-    public static ByteDataSpec byteSpec() {
+    /**
+     * @return singleton byte spec
+     */
+    static ByteDataSpec byteSpec() {
         return ByteDataSpec.INSTANCE;
     }
 
-    public static DoubleDataSpec doubleSpec() {
+    /**
+     * @return singleton double spec
+     */
+    static DoubleDataSpec doubleSpec() {
         return DoubleDataSpec.INSTANCE;
     }
 
-    public static DurationDataSpec durationSpec() {
+    /**
+     * @return singleton Duration spec
+     */
+    static DurationDataSpec durationSpec() {
         return DurationDataSpec.INSTANCE;
     }
 
-    public static FloatDataSpec floatSpec() {
+    /**
+     * @return singleton float spec
+     */
+    static FloatDataSpec floatSpec() {
         return FloatDataSpec.INSTANCE;
     }
 
-    public static IntDataSpec intSpec() {
+    /**
+     * @return singleton int spec
+     */
+    static IntDataSpec intSpec() {
         return IntDataSpec.INSTANCE;
     }
 
-    public static LocalDateDataSpec localDateSpec() {
+    /**
+     * @return singleton LocalDate spec
+     */
+    static LocalDateDataSpec localDateSpec() {
         return LocalDateDataSpec.INSTANCE;
     }
 
-    public static LocalDateTimeDataSpec localDateTimeSpec() {
+    /**
+     * @return singleton LocalDateTime spec
+     */
+    static LocalDateTimeDataSpec localDateTimeSpec() {
         return LocalDateTimeDataSpec.INSTANCE;
     }
 
-    public static LocalTimeDataSpec localTimeSpec() {
+    /**
+     * @return singleton LocalTime spec
+     */
+    static LocalTimeDataSpec localTimeSpec() {
         return LocalTimeDataSpec.INSTANCE;
     }
 
-    public static LongDataSpec longSpec() {
+    /**
+     * @return singleton long spec
+     */
+    static LongDataSpec longSpec() {
         return LongDataSpec.INSTANCE;
     }
 
-    public static PeriodDataSpec periodSpec() {
+    /**
+     * @return singleton Period spec
+     */
+    static PeriodDataSpec periodSpec() {
         return PeriodDataSpec.INSTANCE;
     }
 
-    public static StringDataSpec stringSpec() {
+    /**
+     * @return singleton String spec
+     */
+    static StringDataSpec stringSpec() {
         return StringDataSpec.INSTANCE;
     }
 
-    public static VarBinaryDataSpec varBinarySpec() {
+    /**
+     * @return singleton VarBinary spec
+     */
+    static VarBinaryDataSpec varBinarySpec() {
         return VarBinaryDataSpec.INSTANCE;
     }
 
-    public static ZonedDateTimeDataSpec zonedDateTimeSpec() {
+    /**
+     * @return singleton void spec
+     */
+    static VoidDataSpec voidSpec() {
+        return VoidDataSpec.INSTANCE;
+    }
+
+    /**
+     * @return singleton ZonedDateTime spec
+     */
+    static ZonedDateTimeDataSpec zonedDateTimeSpec() {
         return ZonedDateTimeDataSpec.INSTANCE;
     }
 
-    public static interface Mapper<R> {
+    /**
+     * A visitor that visits {@link DataSpec DataSpecs}, mapping them to other objects of a certain type R.
+     *
+     * @param <R> the return type of the mapping
+     */
+    static interface Mapper<R> {
 
-        R visit(final BooleanDataSpec spec);
+        R visit(BooleanDataSpec spec);
 
-        R visit(final ByteDataSpec spec);
+        R visit(ByteDataSpec spec);
 
-        R visit(final DoubleDataSpec spec);
+        R visit(DoubleDataSpec spec);
 
-        R visit(final DurationDataSpec spec);
+        R visit(DurationDataSpec spec);
 
-        R visit(final FloatDataSpec spec);
+        R visit(FloatDataSpec spec);
 
-        R visit(final IntDataSpec spec);
+        R visit(IntDataSpec spec);
 
-        R visit(final LocalDateDataSpec spec);
+        R visit(LocalDateDataSpec spec);
 
-        R visit(final LocalDateTimeDataSpec spec);
+        R visit(LocalDateTimeDataSpec spec);
 
-        R visit(final LocalTimeDataSpec spec);
+        R visit(LocalTimeDataSpec spec);
 
-        R visit(final LongDataSpec spec);
+        R visit(LongDataSpec spec);
 
-        R visit(final PeriodDataSpec spec);
+        R visit(PeriodDataSpec spec);
 
-        R visit(final VarBinaryDataSpec spec);
+        R visit(VarBinaryDataSpec spec);
 
-        R visit(final VoidDataSpec spec);
+        R visit(VoidDataSpec spec);
 
-        R visit(final GenericObjectDataSpec<?> spec);
+        R visit(GenericObjectDataSpec<?> spec);
 
-        R visit(final StructDataSpec spec);
+        R visit(StructDataSpec spec);
 
-        R visit(final ListDataSpec listDataSpec);
+        R visit(ListDataSpec listDataSpec);
 
-        R visit(final ZonedDateTimeDataSpec spec);
+        R visit(ZonedDateTimeDataSpec spec);
 
-        R visit(final StringDataSpec spec);
+        R visit(StringDataSpec spec);
+
     }
 
-    <R> R accept(Mapper<R> v);
+    /**
+     * Accept the visit of a {@link Mapper}, returning the result of the mapper's visit.
+     *
+     * @param <R> the return type of the mapping
+     * @param mapper the visiting mapper
+     * @return other an object of type R
+     */
+    <R> R accept(Mapper<R> mapper);
 
 }

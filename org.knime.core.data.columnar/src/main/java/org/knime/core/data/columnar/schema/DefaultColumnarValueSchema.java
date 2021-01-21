@@ -47,9 +47,9 @@ package org.knime.core.data.columnar.schema;
 
 import java.util.stream.Stream;
 
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueSchema;
@@ -60,7 +60,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ValueSchema m_source;
 
-    private final ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] m_factories;
+    private final ColumnarAccessFactory<NullableReadData, ReadAccess, NullableWriteData, WriteAccess>[] m_factories;
 
     private final ColumnarWriteValueFactory<?>[] m_writeFactories;
 
@@ -69,7 +69,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     public DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
         @SuppressWarnings("unchecked")
-        final ColumnarAccessFactory<ColumnReadData, ReadAccess, ColumnWriteData, WriteAccess>[] factories =
+        final ColumnarAccessFactory<NullableReadData, ReadAccess, NullableWriteData, WriteAccess>[] factories =
             Stream.of(source.getValueFactories()) //
                 .map(ValueFactory::getSpec)//
                 .map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
@@ -89,7 +89,16 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public ColumnDataSpec getColumnDataSpec(final int index) {
+    public DataSpec getSpec(final int index) {
+        if (index < 0) {
+            throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
+        }
+        if (index >= numColumns()) {
+            throw new IndexOutOfBoundsException(
+                String.format("Column index %d greater or equal to the reader's largest column index (%d).", index,
+                    numColumns() - 1));
+        }
+
         return m_factories[index].getColumnDataSpec();
     }
 
@@ -114,7 +123,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public int getNumColumns() {
+    public int numColumns() {
         return m_factories.length;
     }
 }

@@ -51,10 +51,20 @@ package org.knime.core.columnar.filter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
+import static org.knime.core.columnar.TestColumnStoreUtils.createTestTable;
 
+import java.util.NoSuchElementException;
 import java.util.stream.IntStream;
 
 import org.junit.Test;
+import org.knime.core.columnar.TestColumnStoreUtils;
+import org.knime.core.columnar.batch.DefaultReadBatch;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.columnar.testing.data.TestData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -64,28 +74,21 @@ public class FilteredColumnSelectionTest {
 
     private static final int DEF_NUM_COLUMNS = 2;
 
+    @SuppressWarnings("resource")
+    private static TestData[] createData() {
+        final ColumnStoreSchema schema = createSchema(DEF_NUM_COLUMNS);
+        final TestColumnStore store = TestColumnStore.create(schema);
+        return createTestTable(store, 1).get(0);
+    }
+
+    private static ReadBatch createBatch(final NullableReadData[] data, final int... indices) {
+        return new FilteredColumnSelection(DEF_NUM_COLUMNS, indices).createBatch(i -> data[i]);
+    }
+
     @SuppressWarnings("unused")
     @Test(expected = NullPointerException.class)
     public void testNullCheckOnCreate() {
         new FilteredColumnSelection(0, null);
-    }
-
-    @SuppressWarnings("unused")
-    @Test(expected = IllegalArgumentException.class)
-    public void testIllegalArgumentOnCreate() {
-        new FilteredColumnSelection(-1);
-    }
-
-    @SuppressWarnings("unused")
-    @Test(expected = IndexOutOfBoundsException.class)
-    public void testIndexOutOfBoundsOnCreateLower() {
-        new FilteredColumnSelection(0, -1);
-    }
-
-    @SuppressWarnings("unused")
-    @Test(expected = IndexOutOfBoundsException.class)
-    public void testIndexOutOfBoundsOnCreateUpper() {
-        new FilteredColumnSelection(0, 0);
     }
 
     @Test
@@ -95,7 +98,6 @@ public class FilteredColumnSelectionTest {
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
             assertTrue(selection.isSelected(i));
         }
-        assertFalse(selection.isSelected(DEF_NUM_COLUMNS));
     }
 
     @Test
@@ -109,7 +111,57 @@ public class FilteredColumnSelectionTest {
     @Test
     public void testGetNumColumns() {
         final int numColumns = DEF_NUM_COLUMNS;
-        assertEquals(numColumns, new FilteredColumnSelection(numColumns).getNumColumns());
+        assertEquals(numColumns, new FilteredColumnSelection(numColumns).numColumns());
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void testNullCheckOnCreateBatch() {
+        new FilteredColumnSelection(DEF_NUM_COLUMNS).createBatch(null);
+    }
+
+    @Test(expected = NoSuchElementException.class)
+    public void testGet() {
+        final NullableReadData[] data = createData();
+        final ReadBatch batch = createBatch(data, 0);
+        assertEquals(data[0], batch.get(0));
+        batch.get(1);
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testGetIndexOutOfBoundsLower() {
+        createBatch(createData()).get(-1);
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testGetIndexOutOfBoundsUpper() {
+        createBatch(createData()).get(DEF_NUM_COLUMNS);
+    }
+
+    @Test
+    public void testRetainRelease() {
+        final TestData[] data = createData();
+        final ReadBatch batch = createBatch(data, 0);
+        assertEquals(1, data[0].getRefs());
+        batch.retain();
+        assertEquals(2, data[0].getRefs());
+        batch.release();
+        assertEquals(1, data[0].getRefs());
+    }
+
+    @Test
+    public void testSizeOf() {
+        final TestData[] data = createData();
+        assertEquals(data[0].sizeOf(), createBatch(data, 0).sizeOf());
+    }
+
+    @Test
+    public void testGetters() {
+        final int numColumns = DEF_NUM_COLUMNS;
+        @SuppressWarnings("resource")
+        final DefaultReadBatch batch =
+            new DefaultReadBatch(createTestTable(TestColumnStore.create(createSchema(numColumns)), 1).get(0));
+        assertEquals(numColumns, batch.size());
+        assertEquals(TestColumnStoreUtils.DEF_SIZE_OF_DATA, batch.length());
     }
 
 }

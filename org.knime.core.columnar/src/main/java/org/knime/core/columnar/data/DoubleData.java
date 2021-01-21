@@ -48,25 +48,62 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+
+/**
+ * Class holding {@link DoubleWriteData}, {@link DoubleReadData}, and {@link DoubleDataSpec} for data holding double
+ * elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class DoubleData {
+
     private DoubleData() {
     }
 
-    public static interface DoubleReadData extends ColumnReadData {
-        double getDouble(int index);
-    }
+    /**
+     * {@link NullableWriteData} holding double elements.
+     */
+    public static interface DoubleWriteData extends NullableWriteData {
 
-    public static interface DoubleWriteData extends ColumnWriteData {
+        /**
+         * Assigns a double value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the double value
+         * @param val the double value to set
+         */
         void setDouble(int index, double val);
 
         @Override
         DoubleReadData close(int length);
+
     }
 
-    public static final class DoubleDataSpec implements ColumnDataSpec {
+    /**
+     * {@link NullableReadData} holding double elements.
+     */
+    public static interface DoubleReadData extends NullableReadData {
 
-        public static final DoubleDataSpec INSTANCE = new DoubleDataSpec();
+        /**
+         * Obtains the double value at the given index. It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the double element
+         * @return the double element at the given index
+         */
+        double getDouble(int index);
+
+    }
+
+    /**
+     * ColumnDataSpec for double data.
+     */
+    public static final class DoubleDataSpec implements DataSpec {
+
+        static final DoubleDataSpec INSTANCE = new DoubleDataSpec();
 
         private DoubleDataSpec() {
         }
@@ -77,4 +114,5 @@ public final class DoubleData {
         }
 
     }
+
 }

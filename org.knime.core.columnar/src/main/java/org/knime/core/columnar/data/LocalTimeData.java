@@ -47,27 +47,35 @@ package org.knime.core.columnar.data;
 
 import java.time.LocalTime;
 
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
-@SuppressWarnings("javadoc")
+/**
+ * Class holding {@link LocalTimeWriteData}, {@link LocalTimeReadData}, and {@link LocalTimeDataSpec} for data holding
+ * LocalTime elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class LocalTimeData {
 
     private LocalTimeData() {
     }
 
-    public static interface LocalTimeReadData extends ObjectReadData<LocalTime> {
-
-        LocalTime getLocalTime(int index);
-
-        @Override
-        default LocalTime getObject(final int index) {
-            return getLocalTime(index);
-        }
-    }
-
+    /**
+     * {@link ObjectWriteData} holding LocalTime elements.
+     */
     public static interface LocalTimeWriteData extends ObjectWriteData<LocalTime> {
 
+        /**
+         * Assigns a LocalTime value to the element at the given index. The contract is that values are only ever set
+         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the LocalTime value
+         * @param val the LocalTime value to set
+         */
         void setLocalTime(int index, LocalTime val);
 
         @Override
@@ -80,9 +88,33 @@ public final class LocalTimeData {
 
     }
 
-    public static final class LocalTimeDataSpec implements ColumnDataSpec {
+    /**
+     * {@link ObjectReadData} holding LocalTime elements.
+     */
+    public static interface LocalTimeReadData extends ObjectReadData<LocalTime> {
 
-        public static final LocalTimeDataSpec INSTANCE = new LocalTimeDataSpec();
+        /**
+         * Obtains the LocalTime value at the given index. It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the LocalTime element
+         * @return the LocalTime element at the given index
+         */
+        LocalTime getLocalTime(int index);
+
+        @Override
+        default LocalTime getObject(final int index) {
+            return getLocalTime(index);
+        }
+
+    }
+
+    /**
+     * {@link DataSpec} for LocalTime data.
+     */
+    public static final class LocalTimeDataSpec implements DataSpec {
+
+        static final LocalTimeDataSpec INSTANCE = new LocalTimeDataSpec();
 
         private LocalTimeDataSpec() {
         }
@@ -91,5 +123,7 @@ public final class LocalTimeData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
+
     }
+
 }

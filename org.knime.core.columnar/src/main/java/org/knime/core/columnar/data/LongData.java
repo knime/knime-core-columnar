@@ -48,14 +48,32 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+
+/**
+ * Class holding {@link LongWriteData}, {@link LongReadData}, and {@link LongDataSpec} for data holding long elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class LongData {
 
     private LongData() {
     }
 
-    public static interface LongWriteData extends ColumnWriteData {
+    /**
+     * {@link NullableWriteData} holding long elements.
+     */
+    public static interface LongWriteData extends NullableWriteData {
 
+        /**
+         * Assigns a long value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the long value
+         * @param val the long value to set
+         */
         void setLong(int index, long val);
 
         @Override
@@ -63,13 +81,28 @@ public final class LongData {
 
     }
 
-    public static interface LongReadData extends ColumnReadData {
+    /**
+     * {@link NullableReadData} holding long elements.
+     */
+    public static interface LongReadData extends NullableReadData {
+
+        /**
+         * Obtains the long value at the given index. It is the responsibility of the client calling this method to make
+         * sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the long element
+         * @return the long element at the given index
+         */
         long getLong(int index);
+
     }
 
-    public static final class LongDataSpec implements ColumnDataSpec {
+    /**
+     * {@link DataSpec} for long data.
+     */
+    public static final class LongDataSpec implements DataSpec {
 
-        public static final LongDataSpec INSTANCE = new LongDataSpec();
+        static final LongDataSpec INSTANCE = new LongDataSpec();
 
         private LongDataSpec() {
         }

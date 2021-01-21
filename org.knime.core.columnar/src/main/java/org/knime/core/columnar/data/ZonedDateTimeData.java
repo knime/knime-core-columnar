@@ -47,27 +47,35 @@ package org.knime.core.columnar.data;
 
 import java.time.ZonedDateTime;
 
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
-@SuppressWarnings("javadoc")
+/**
+ * Class holding {@link ZonedDateTimeWriteData}, {@link ZonedDateTimeReadData}, and {@link ZonedDateTimeDataSpec} for
+ * data holding ZonedDateTime elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class ZonedDateTimeData {
 
     private ZonedDateTimeData() {
     }
 
-    public static interface ZonedDateTimeReadData extends ObjectReadData<ZonedDateTime> {
-
-        ZonedDateTime getZonedDateTime(int index);
-
-        @Override
-        default ZonedDateTime getObject(final int index) {
-            return getZonedDateTime(index);
-        }
-    }
-
+    /**
+     * {@link ObjectWriteData} holding ZonedDateTime elements.
+     */
     public static interface ZonedDateTimeWriteData extends ObjectWriteData<ZonedDateTime> {
 
+        /**
+         * Assigns a ZonedDateTime value to the element at the given index. The contract is that values are only ever
+         * set for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the ZonedDateTime value
+         * @param val the ZonedDateTime value to set
+         */
         void setZonedDateTime(int index, ZonedDateTime val);
 
         @Override
@@ -80,9 +88,33 @@ public final class ZonedDateTimeData {
 
     }
 
-    public static final class ZonedDateTimeDataSpec implements ColumnDataSpec {
+    /**
+     * {@link ObjectReadData} holding ZonedDateTime elements.
+     */
+    public static interface ZonedDateTimeReadData extends ObjectReadData<ZonedDateTime> {
 
-        public static final ZonedDateTimeDataSpec INSTANCE = new ZonedDateTimeDataSpec();
+        /**
+         * Obtains the ZonedDateTime value at the given index. It is the responsibility of the client calling this
+         * method to make sure that the provided index is non-negative and smaller than the length of this
+         * {@link ReadData}.
+         *
+         * @param index the index at which to obtain the ZonedDateTime element
+         * @return the ZonedDateTime element at the given index
+         */
+        ZonedDateTime getZonedDateTime(int index);
+
+        @Override
+        default ZonedDateTime getObject(final int index) {
+            return getZonedDateTime(index);
+        }
+    }
+
+    /**
+     * {@link DataSpec} for ZonedDateTime data.
+     */
+    public static final class ZonedDateTimeDataSpec implements DataSpec {
+
+        static final ZonedDateTimeDataSpec INSTANCE = new ZonedDateTimeDataSpec();
 
         private ZonedDateTimeDataSpec() {
         }
@@ -91,5 +123,7 @@ public final class ZonedDateTimeData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
+
     }
+
 }

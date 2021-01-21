@@ -45,14 +45,15 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.BooleanValue;
 import org.knime.core.data.DataCell;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.v2.access.BooleanAccess.BooleanReadAccess;
 import org.knime.core.data.v2.access.BooleanAccess.BooleanWriteAccess;
@@ -60,7 +61,7 @@ import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link ColumnReadData} / {@link ColumnWriteData} as {@link ReadAccess}
+ * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
  * / {@link WriteAccess}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -86,7 +87,7 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory<Boolea
 
     @Override
     public BooleanDataSpec getColumnDataSpec() {
-        return BooleanDataSpec.INSTANCE;
+        return DataSpec.booleanSpec();
     }
 
     private static final class DefaultBooleanReadAccess extends AbstractAccess<BooleanReadData>

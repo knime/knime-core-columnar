@@ -51,12 +51,12 @@ package org.knime.core.data.columnar.domain;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.StringValue;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.StringCell;
 
 final class ColumnarStringDomainCalculator

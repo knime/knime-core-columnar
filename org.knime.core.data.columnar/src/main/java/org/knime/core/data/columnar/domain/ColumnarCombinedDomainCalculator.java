@@ -50,7 +50,7 @@ package org.knime.core.data.columnar.domain;
 
 import java.util.Comparator;
 
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValue;
@@ -61,7 +61,7 @@ import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarCombinedDomainCalculator<C extends ColumnReadData>
+final class ColumnarCombinedDomainCalculator<C extends NullableReadData>
     implements ColumnarDomainCalculator<C, DataColumnDomain> {
 
     private final ColumnarNominalDomainCalculator<C> m_nominal;

@@ -48,18 +48,32 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+
+/**
+ * Class holding {@link ByteWriteData}, {@link ByteReadData}, and {@link ByteDataSpec} for data holding byte elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class ByteData {
 
     private ByteData() {
     }
 
-    public interface ByteReadData extends ColumnReadData {
-        byte getByte(int index);
-    }
+    /**
+     * {@link NullableWriteData} holding byte elements.
+     */
+    public interface ByteWriteData extends NullableWriteData {
 
-    public interface ByteWriteData extends ColumnWriteData {
-
+        /**
+         * Assigns a byte value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the byte value
+         * @param val the byte value to set
+         */
         void setByte(int index, byte val);
 
         @Override
@@ -67,9 +81,28 @@ public final class ByteData {
 
     }
 
-    public static final class ByteDataSpec implements ColumnDataSpec {
+    /**
+     * {@link NullableReadData} holding byte elements.
+     */
+    public interface ByteReadData extends NullableReadData {
 
-        public static final ByteDataSpec INSTANCE = new ByteDataSpec();
+        /**
+         * Obtains the byte value at the given index. It is the responsibility of the client calling this method to make
+         * sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the byte element
+         * @return the byte element at the given index
+         */
+        byte getByte(int index);
+
+    }
+
+    /**
+     * {@link DataSpec} for byte data.
+     */
+    public static final class ByteDataSpec implements DataSpec {
+
+        static final ByteDataSpec INSTANCE = new ByteDataSpec();
 
         private ByteDataSpec() {
         }
@@ -80,4 +113,5 @@ public final class ByteData {
         }
 
     }
+
 }

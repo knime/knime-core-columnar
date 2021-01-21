@@ -47,27 +47,35 @@ package org.knime.core.columnar.data;
 
 import java.time.Duration;
 
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
-@SuppressWarnings("javadoc")
+/**
+ * Class holding {@link DurationWriteData}, {@link DurationReadData}, and {@link DurationDataSpec} for data holding
+ * Duration elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class DurationData {
 
     private DurationData() {
     }
 
-    public static interface DurationReadData extends ObjectReadData<Duration> {
-
-        Duration getDuration(int index);
-
-        @Override
-        default Duration getObject(final int index) {
-            return getDuration(index);
-        }
-    }
-
+    /**
+     * {@link ObjectWriteData} holding Duration elements.
+     */
     public static interface DurationWriteData extends ObjectWriteData<Duration> {
 
+        /**
+         * Assigns a Duration value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the Duration value
+         * @param val the Duration value to set
+         */
         void setDuration(int index, Duration val);
 
         @Override
@@ -80,9 +88,33 @@ public final class DurationData {
 
     }
 
-    public static final class DurationDataSpec implements ColumnDataSpec {
+    /**
+     * {@link ObjectReadData} holding Duration elements.
+     */
+    public static interface DurationReadData extends ObjectReadData<Duration> {
 
-        public static final DurationDataSpec INSTANCE = new DurationDataSpec();
+        /**
+         * Obtains the Duration value at the given index. It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the Duration element
+         * @return the Duration element at the given index
+         */
+        Duration getDuration(int index);
+
+        @Override
+        default Duration getObject(final int index) {
+            return getDuration(index);
+        }
+
+    }
+
+    /**
+     * {@link DataSpec} for Duration data.
+     */
+    public static final class DurationDataSpec implements DataSpec {
+
+        static final DurationDataSpec INSTANCE = new DurationDataSpec();
 
         private DurationDataSpec() {
         }
@@ -91,5 +123,7 @@ public final class DurationData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
+
     }
+
 }

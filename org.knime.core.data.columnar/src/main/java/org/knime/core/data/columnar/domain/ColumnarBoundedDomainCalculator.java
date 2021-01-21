@@ -52,16 +52,16 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValue;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.v2.ReadValue;
 
-final class ColumnarBoundedDomainCalculator<C extends ColumnReadData>
+final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
     implements ColumnarDomainCalculator<C, DataColumnDomain>, ColumnDataIndex {
 
     private final ColumnarReadValueFactory<C> m_factory;

@@ -48,16 +48,17 @@
  */
 package org.knime.core.columnar.cache;
 
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
- * A cache for storing data that can be shared between multiple {@link CachedColumnReadStore CachedColumnReadStores}.
+ * A cache for storing data that can be shared between multiple {@link AsyncFlushCachedColumnStore
+ * AsyncFlushCachedColumnStores} and {@link CachedColumnReadStore CachedColumnReadStores}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class CachedColumnStoreCache {
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_cache;
+    private final LoadingEvictingCache<ColumnDataUniqueId, NullableReadData> m_cache;
 
     private final long m_cacheSizeBytes;
 
@@ -81,7 +82,7 @@ public final class CachedColumnStoreCache {
         return m_cache.size();
     }
 
-    LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> getCache() {
+    LoadingEvictingCache<ColumnDataUniqueId, NullableReadData> getCache() {
         return m_cache;
     }
 

@@ -43,24 +43,26 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.cache;
+package org.knime.core.columnar.store;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestColumnStore;
-import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readSelectionAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTable;
-import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
-import static org.knime.core.columnar.cache.AsyncFlushCachedColumnStoreTest.checkCached;
-import static org.knime.core.columnar.cache.AsyncFlushCachedColumnStoreTest.checkUncached;
-import static org.knime.core.columnar.cache.AsyncFlushCachedColumnStoreTest.generateCache;
+import static org.knime.core.columnar.TestColumnStoreUtils.releaseTable;
+import static org.knime.core.columnar.TestColumnStoreUtils.writeDefaultTable;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 
 import org.junit.Test;
-import org.knime.core.columnar.TestColumnStoreUtils.TestDataTable;
-import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.store.DelegatingColumnReadStore.DelegatingBatchReader;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestColumnStore;
 
@@ -68,69 +70,94 @@ import org.knime.core.columnar.testing.TestColumnStore;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class CachedColumnReadStoreTest extends ColumnarTest {
+public class DelegatingColumnReadStoreTest extends ColumnarTest {
 
     private static final class StoreAndTable implements Closeable {
-        private final CachedColumnReadStore m_store;
+        private final DelegatingColumnReadStore m_store;
 
-        private final TestDataTable m_table;
+        private final List<NullableReadData[]> m_table;
 
-        StoreAndTable(final CachedColumnReadStore store, final TestDataTable table) {
+        StoreAndTable(final DelegatingColumnReadStore store, final List<NullableReadData[]> table) {
             m_store = store;
             m_table = table;
         }
 
         @Override
         public void close() throws IOException {
-            m_table.close();
             m_store.close();
         }
     }
 
     @SuppressWarnings("resource")
-    private static StoreAndTable generateDefaultCachedColumnReadStore() throws IOException {
-        final TestColumnStore delegate = createDefaultTestColumnStore();
-        final TestDataTable table = createDefaultTestTable(delegate);
-        writeTable(delegate, table);
-        return new StoreAndTable(new CachedColumnReadStore(delegate, generateCache(1)), table);
+    private static StoreAndTable generateDefaultDelegatingReadColumnStoreAndTable() throws IOException {
+        final ColumnStore delegate = createDefaultTestColumnStore();
+        final List<NullableReadData[]> table = writeDefaultTable(delegate);
+        releaseTable(table);
+        return new StoreAndTable(new DelegatingColumnReadStore(delegate) {
+        }, table);
     }
 
     @Test
     public void testRead() throws IOException {
-        try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
-            checkUncached(storeAndTable.m_table);
-            try (final TestDataTable reassembledTable =
-                readAndCompareTable(storeAndTable.m_store, storeAndTable.m_table)) {
-                checkCached(reassembledTable);
-            }
+        try (final StoreAndTable storeAndTable = generateDefaultDelegatingReadColumnStoreAndTable()) {
+            readAndCompareTable(storeAndTable.m_store, storeAndTable.m_table);
         }
     }
 
     @Test
     public void testMultiRead() throws IOException {
-        try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
-            checkUncached(storeAndTable.m_table);
+        try (final StoreAndTable storeAndTable = generateDefaultDelegatingReadColumnStoreAndTable()) {
             readTwiceAndCompareTable(storeAndTable.m_store);
         }
     }
 
     @Test
     public void testReadSelection() throws IOException {
-        try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
-            checkUncached(storeAndTable.m_table);
-            readTwiceAndCompareTable(storeAndTable.m_store);
+        try (final StoreAndTable storeAndTable = generateDefaultDelegatingReadColumnStoreAndTable()) {
             for (int i = 0; i < storeAndTable.m_store.getSchema().numColumns(); i++) {
-                try (final TestDataTable reassembledTable =
-                    readSelectionAndCompareTable(storeAndTable.m_store, storeAndTable.m_table, i)) { // NOSONAR
-                }
+                readSelectionAndCompareTable(storeAndTable.m_store, storeAndTable.m_table, i);
+            }
+        }
+    }
+
+    @SuppressWarnings("resource")
+    @Test
+    public void testGetters() throws IOException {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final DelegatingColumnReadStore store = new DelegatingColumnReadStore(delegate) {
+                }) {
+            assertEquals(delegate, store.getDelegate());
+            assertFalse(store.isClosed());
+            store.close(); // NOSONAR
+            assertTrue(store.isClosed());
+        }
+    }
+
+    @SuppressWarnings("resource")
+    @Test
+    public void testReaderGetters() throws IOException {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final DelegatingColumnReadStore store = new DelegatingColumnReadStore(delegate) {
+                }) {
+            delegate.getWriter().close();
+
+            final DelegatingBatchReader reader = (DelegatingBatchReader)store.createReader(); // NOSONAR
+            try (final BatchReader delegateReader = delegate.createReader()) {
+                reader.initAndGetDelegate();
+                assertNotNull(reader.getDelegate());
+                assertEquals(delegateReader.numBatches(), reader.numBatches());
+                assertEquals(delegateReader.maxLength(), reader.maxLength());
+                assertFalse(reader.isClosed());
+                reader.close();
+                assertTrue(reader.isClosed());
             }
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderAfterStoreClose() throws IOException {
-        try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
-            storeAndTable.close(); // NOSONAR
+        try (final StoreAndTable storeAndTable = generateDefaultDelegatingReadColumnStoreAndTable()) {
+            storeAndTable.m_store.close();
             try (final BatchReader reader = storeAndTable.m_store.createReader()) { // NOSONAR
             }
         }
@@ -138,7 +165,7 @@ public class CachedColumnReadStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws IOException {
-        try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
+        try (final StoreAndTable storeAndTable = generateDefaultDelegatingReadColumnStoreAndTable()) {
             try (final BatchReader reader = storeAndTable.m_store.createReader()) {
                 reader.close(); // NOSONAR
                 reader.readRetained(0);
@@ -148,10 +175,28 @@ public class CachedColumnReadStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws IOException {
-        try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
+        try (final StoreAndTable storeAndTable = generateDefaultDelegatingReadColumnStoreAndTable()) {
             try (final BatchReader reader = storeAndTable.m_store.createReader()) {
-                storeAndTable.close(); // NOSONAR
+                storeAndTable.m_store.close();
                 reader.readRetained(0);
+            }
+        }
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void exceptionOnReadIndexOutOfBoundsLower() throws IOException {
+        try (final StoreAndTable storeAndTable = generateDefaultDelegatingReadColumnStoreAndTable()) {
+            try (final BatchReader reader = storeAndTable.m_store.createReader()) {
+                reader.readRetained(-1);
+            }
+        }
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void exceptionOnReadIndexOutOfBoundsUpper() throws IOException {
+        try (final StoreAndTable storeAndTable = generateDefaultDelegatingReadColumnStoreAndTable()) {
+            try (final BatchReader reader = storeAndTable.m_store.createReader()) {
+                reader.readRetained(Integer.MAX_VALUE);
             }
         }
     }

@@ -58,9 +58,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.DelegatingColumnStore;
 import org.knime.core.data.DataColumnDomain;
@@ -104,7 +104,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
     }
 
     @Override
-    protected ColumnDataWriter createWriterInternal() {
+    protected BatchWriter createWriterInternal() {
         return new DomainColumnDataWriter();
     }
 
@@ -165,12 +165,12 @@ public final class DomainColumnStore extends DelegatingColumnStore {
     }
 
     /**
-     * {@link ColumnDataWriter} taking care of domain calculation
+     * {@link BatchWriter} taking care of domain calculation
      *
      * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
      */
     // TODO can we make this static?
-    public final class DomainColumnDataWriter extends DelegatingColumnDataWriter {
+    public final class DomainColumnDataWriter extends DelegatingBatchWriter {
 
         private DuplicateChecker m_duplicateChecker;
 
@@ -179,7 +179,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
         private Map<Integer, Future<Void>> m_futures = new HashMap<>();
 
         /**
-         * @param delegate the delegate {@link ColumnDataWriter}.
+         * @param delegate the delegate {@link BatchWriter}.
          * @param config config of store
          */
         DomainColumnDataWriter() {
@@ -210,7 +210,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
 
             if (m_duplicateChecker != null) {
                 final Future<Void> duplicateCheck;
-                final ColumnReadData keyChunk = record.get(0);
+                final NullableReadData keyChunk = record.get(0);
                 // Retain for async. duplicate checking. Submitted task will release.
                 keyChunk.retain();
                 try {
@@ -226,8 +226,8 @@ public final class DomainColumnStore extends DelegatingColumnStore {
             // Append all domain calculators
             for (final Entry<Integer, ColumnarDomainCalculator<?, DataColumnDomain>> entry : m_domainCalculators
                 .entrySet()) {
-                final ColumnarDomainCalculator<ColumnReadData, ?> calculator =
-                    (ColumnarDomainCalculator<ColumnReadData, ?>)entry.getValue();
+                final ColumnarDomainCalculator<NullableReadData, ?> calculator =
+                    (ColumnarDomainCalculator<NullableReadData, ?>)entry.getValue();
                 m_futures.put(entry.getKey(),
                     append(record.get(entry.getKey()), m_futures.get(entry.getKey()), calculator));
             }
@@ -235,8 +235,8 @@ public final class DomainColumnStore extends DelegatingColumnStore {
             // Append all metadata mappers
             for (final Entry<Integer, ColumnarDomainCalculator<?, DataColumnMetaData[]>> entry : m_metadataCalculators
                 .entrySet()) {
-                final ColumnarDomainCalculator<ColumnReadData, ?> calculator =
-                    (ColumnarDomainCalculator<ColumnReadData, ?>)entry.getValue();
+                final ColumnarDomainCalculator<NullableReadData, ?> calculator =
+                    (ColumnarDomainCalculator<NullableReadData, ?>)entry.getValue();
                 m_futures.put(entry.getKey(),
                     append(record.get(entry.getKey()), m_futures.get(entry.getKey()), calculator));
             }
@@ -244,8 +244,8 @@ public final class DomainColumnStore extends DelegatingColumnStore {
             super.writeInternal(record);
         }
 
-        private Future<Void> append(final ColumnReadData chunk, final Future<Void> previous,
-            final ColumnarDomainCalculator<ColumnReadData, ?> calculator) {
+        private Future<Void> append(final NullableReadData chunk, final Future<Void> previous,
+            final ColumnarDomainCalculator<NullableReadData, ?> calculator) {
             final Future<Void> current;
             // Retain for async. domain computation. Submitted task will release.
             chunk.retain();
@@ -298,12 +298,12 @@ public final class DomainColumnStore extends DelegatingColumnStore {
         // TODO Marc can we make this static?
         private final class DuplicateCheckTask implements Callable<Void> {
 
-            private final ColumnReadData m_keyChunk;
+            private final NullableReadData m_keyChunk;
 
             @SuppressWarnings("hiding")
             private final DuplicateChecker m_duplicateChecker;
 
-            public DuplicateCheckTask(final ColumnReadData keyChunk, final DuplicateChecker duplicateChecker) {
+            public DuplicateCheckTask(final NullableReadData keyChunk, final DuplicateChecker duplicateChecker) {
                 m_keyChunk = keyChunk;
                 m_duplicateChecker = duplicateChecker;
             }
@@ -330,12 +330,12 @@ public final class DomainColumnStore extends DelegatingColumnStore {
 
             private final Future<Void> m_previous;
 
-            private final ColumnReadData m_chunk;
+            private final NullableReadData m_chunk;
 
-            private final ColumnarDomainCalculator<ColumnReadData, ?> m_calculator;
+            private final ColumnarDomainCalculator<NullableReadData, ?> m_calculator;
 
-            public DomainCalculationTask(final Future<Void> previous, final ColumnReadData chunk,
-                final ColumnarDomainCalculator<ColumnReadData, ?> calculator) {
+            public DomainCalculationTask(final Future<Void> previous, final NullableReadData chunk,
+                final ColumnarDomainCalculator<NullableReadData, ?> calculator) {
                 m_previous = previous;
                 m_chunk = chunk;
                 m_calculator = calculator;

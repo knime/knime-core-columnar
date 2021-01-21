@@ -48,7 +48,6 @@
  */
 package org.knime.core.columnar.batch;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -57,7 +56,7 @@ import java.util.Arrays;
 import org.junit.Test;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.TestColumnStoreUtils;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.columnar.testing.TestColumnStore;
 import org.knime.core.columnar.testing.data.TestData;
@@ -77,23 +76,29 @@ public class DefaultWriteBatchTest {
         return TestColumnStoreUtils.createTestTable(store, 1).get(0);
     }
 
-    private static DefaultWriteBatch createBatch(final ColumnWriteData[] data) {
+    private static DefaultWriteBatch createBatch(final NullableWriteData[] data) {
         return new DefaultWriteBatch(data);
     }
 
     @Test(expected = NullPointerException.class)
-    public void testNullCheckOnCreate() {
+    public void testArrayNullCheckOnCreate() {
         createBatch(null);
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void testElementNullCheckOnCreate() {
+        final NullableWriteData[] data = createData();
+        data[0] = null;
+        createBatch(data);
     }
 
     @Test
     public void testGet() {
-        final ColumnWriteData[] data = createData();
+        final NullableWriteData[] data = createData();
         final DefaultWriteBatch batch = createBatch(data);
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
             assertEquals(data[i], batch.get(i));
         }
-        assertArrayEquals(data, batch.getUnsafe());
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
@@ -142,17 +147,6 @@ public class DefaultWriteBatchTest {
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
             assertTrue(batch.capacity() <= data[i].capacity());
         }
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testIllegalArgumentOnCloseLower() {
-        createBatch(createData()).close(-1);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testIllegalArgumentOnCloseUpper() {
-        final DefaultWriteBatch batch = createBatch(createData());
-        createBatch(createData()).close(batch.capacity() + 1);
     }
 
 }

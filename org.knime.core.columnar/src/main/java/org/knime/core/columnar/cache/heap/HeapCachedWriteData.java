@@ -160,21 +160,21 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
 
     @Override
     public void retain() {
-            m_delegate.retain();
+        m_delegate.retain();
     }
 
     @Override
     public void release() {
-            m_delegate.release();
+        m_delegate.release();
     }
 
     @Override
     public long sizeOf() {
-    	// Instead of flushing to the capacity, we could also remember the largest set index and only flush until there.
-    	// But that would cost us an additional operation per value, even if sizeof is never called.
-    	// So we are probably better of this way.
-    	serialize(capacity());
-    	return m_delegate.sizeOf();
+        // Instead of flushing to the capacity, we could also remember the largest set index and only flush until there.
+        // But that would cost us an additional operation per value, even if sizeof is never called.
+        // So we are probably better of this way.
+        serialize(capacity());
+        return m_delegate.sizeOf();
     }
 
     @Override
@@ -194,7 +194,7 @@ final class HeapCachedWriteData<T> implements ObjectWriteData<T> {
     }
 
     void serialize(final int length) {
-        for(int i = m_serializeFromIndex; i < length; i++) {
+        for (int i = m_serializeFromIndex; i < length; i++) {
             @SuppressWarnings("unchecked")
             final T t = (T)m_data[i];
             if (t != null) {

@@ -42,21 +42,28 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   15 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.store;
+package org.knime.core.columnar.data;
 
-import java.io.Closeable;
-import java.io.IOException;
+import org.knime.core.columnar.ReadData;
 
-import org.knime.core.columnar.batch.ReadBatch;
+/**
+ * {@link ReadData} in which elements can be missing.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public interface NullableReadData extends ReadData {
 
-@SuppressWarnings("javadoc")
-public interface ColumnDataReader extends Closeable {
-
-    ReadBatch readRetained(int index) throws IOException;
-
-    int getNumBatches() throws IOException;
-
-    int getMaxLength() throws IOException;
+    /**
+     * Checks whether the element at the given index is missing. It is the responsibility of the client calling this
+     * method to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+     *
+     * @param index the index at which to check for a missing element
+     * @return true if the element at the given index is missing; otherwise false
+     */
+    boolean isMissing(int index);
 
 }

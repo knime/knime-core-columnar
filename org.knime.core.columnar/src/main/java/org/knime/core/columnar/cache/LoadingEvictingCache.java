@@ -46,6 +46,8 @@
 package org.knime.core.columnar.cache;
 
 import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 import org.knime.core.columnar.ReferencedData;
 
@@ -63,13 +65,17 @@ import org.knime.core.columnar.ReferencedData;
 interface LoadingEvictingCache<K, D extends ReferencedData> {
 
     @FunctionalInterface
-    static interface Loader<D extends ReferencedData> {
-        D loadRetained();
+    static interface Loader<D extends ReferencedData> extends Supplier<D> {
+        default D loadRetained() {
+            return get();
+        }
     }
 
     @FunctionalInterface
-    static interface Evictor<K, D extends ReferencedData> {
-        void evict(final K key, final D data);
+    static interface Evictor<K, D extends ReferencedData> extends BiConsumer<K, D> {
+        default void evict(final K key, final D data) {
+            accept(key, data);
+        }
     }
 
     /**

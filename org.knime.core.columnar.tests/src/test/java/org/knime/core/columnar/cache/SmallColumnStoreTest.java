@@ -60,6 +60,7 @@ import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTa
 import static org.knime.core.columnar.TestColumnStoreUtils.tableInStore;
 import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -71,9 +72,9 @@ import org.junit.Test;
 import org.knime.core.columnar.TestColumnStoreUtils;
 import org.knime.core.columnar.TestColumnStoreUtils.TestDataTable;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchFactory;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestColumnStore;
@@ -85,7 +86,9 @@ import org.knime.core.columnar.testing.TestColumnStore;
 public class SmallColumnStoreTest extends ColumnarTest {
 
     private static SmallColumnStoreCache generateCache() {
-        return new SmallColumnStoreCache(DEF_SIZE_OF_TABLE, DEF_SIZE_OF_TABLE, 1);
+        final SmallColumnStoreCache cache = new SmallColumnStoreCache(DEF_SIZE_OF_TABLE, DEF_SIZE_OF_TABLE, 1);
+        assertEquals(DEF_SIZE_OF_TABLE, cache.getMaxSize());
+        return cache;
     }
 
     private static SmallColumnStore generateDefaultSmallColumnStore(final ColumnStore delegate) {
@@ -276,14 +279,14 @@ public class SmallColumnStoreTest extends ColumnarTest {
             checkFlushed(table1, delegate1);
 
             try {
-                store1.save(null);
+                store1.save(new File(""));
             } catch (UnsupportedOperationException e) { // NOSONAR
             }
             checkUncached(table1);
             checkFlushed(table1, delegate1);
 
             try {
-                store2.save(null);
+                store2.save(new File(""));
             } catch (UnsupportedOperationException e) { // NOSONAR
             }
             checkCached(table2);
@@ -317,7 +320,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
             checkUnflushed(table1, delegate1);
 
             try {
-                store1.save(null);
+                store1.save(new File(""));
             } catch (UnsupportedOperationException e) { // NOSONAR
             }
             checkCached(table1);
@@ -330,7 +333,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
             checkFlushed(table1, delegate1);
 
             try {
-                store2.save(null);
+                store2.save(new File(""));
             } catch (UnsupportedOperationException e) { // NOSONAR
             }
             checkCached(table2);
@@ -374,7 +377,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void exceptionOnGetFactoryAfterWriterClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
             store.getFactory();
         }
@@ -393,8 +396,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void exceptionOnCreateAfterWriterClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            final ColumnDataFactory factory = store.getFactory();
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            final BatchFactory factory = store.getFactory();
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
             factory.create(TestColumnStoreUtils.DEF_SIZE_OF_DATA);
         }
@@ -404,7 +407,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void exceptionOnCreateAfterStoreClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            final ColumnDataFactory factory = store.getFactory();
+            final BatchFactory factory = store.getFactory();
             store.close(); // NOSONAR
             factory.create(TestColumnStoreUtils.DEF_SIZE_OF_DATA);
         }
@@ -414,8 +417,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void testWriterSingleton() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
-                final ColumnDataWriter writer1 = store.getWriter();
-                final ColumnDataWriter writer2 = store.getWriter()) {
+                final BatchWriter writer1 = store.getWriter();
+                final BatchWriter writer2 = store.getWriter()) {
             assertEquals(writer1, writer2);
         }
     }
@@ -424,9 +427,9 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void exceptionOnGetWriterAfterWriterClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
         }
     }
@@ -436,7 +439,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             store.close(); // NOSONAR
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
         }
     }
@@ -446,7 +449,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 writer.close(); // NOSONAR
                 writeTable(store, table);
             }
@@ -458,7 +461,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 store.close(); // NOSONAR
                 writeTable(store, table);
             }
@@ -469,7 +472,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void exceptionOnSaveWhileWriterOpen() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 store.save(null);
             }
         }
@@ -480,7 +483,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
             store.close(); // NOSONAR
@@ -492,8 +495,8 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void exceptionOnCreateReaderWhileWriterOpen() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
-                try (final ColumnDataReader reader = store.createReader()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) {
+                try (final BatchReader reader = store.createReader()) { // NOSONAR
                 }
             }
         }
@@ -504,11 +507,11 @@ public class SmallColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
             store.close(); // NOSONAR
-            try (final ColumnDataReader reader = store.createReader()) { // NOSONAR
+            try (final BatchReader reader = store.createReader()) { // NOSONAR
             }
         }
     }
@@ -518,10 +521,10 @@ public class SmallColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
-            try (ColumnDataWriter writer = store.getWriter()) {
+            try (BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
-            try (final ColumnDataReader reader = store.createReader()) {
+            try (final BatchReader reader = store.createReader()) {
                 reader.close(); // NOSONAR
                 reader.readRetained(0);
             }
@@ -533,12 +536,54 @@ public class SmallColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
-            try (ColumnDataWriter writer = store.getWriter()) {
+            try (BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
-            try (final ColumnDataReader reader = store.createReader()) {
+            try (final BatchReader reader = store.createReader()) {
                 store.close(); // NOSONAR
                 reader.readRetained(0);
+            }
+        }
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void exceptionOnReadIndexOutOfBoundsLower() throws IOException {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
+            try (BatchWriter writer = store.getWriter()) {
+                writeTable(store, table);
+            }
+            try (final BatchReader reader = store.createReader()) {
+                reader.readRetained(-1);
+            }
+        }
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void exceptionOnReadIndexOutOfBoundsUpper() throws IOException {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
+                final TestDataTable table = createEmptyTestTable(delegate)) {
+            try (BatchWriter writer = store.getWriter()) {
+                writeTable(store, table);
+            }
+            try (final BatchReader reader = store.createReader()) {
+                reader.readRetained(Integer.MAX_VALUE);
+            }
+        }
+    }
+
+    @Test
+    public void testReaderGetters() throws IOException {
+        try (final TestColumnStore delegate = createDefaultTestColumnStore();
+                final ColumnStore store = generateDefaultSmallColumnStore(delegate);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
+            try (BatchWriter writer = store.getWriter()) {
+                writeTable(store, table);
+            }
+            try (final BatchReader reader = store.createReader()) {
+                assertEquals(TestColumnStoreUtils.DEF_SIZE_OF_DATA, reader.maxLength());
             }
         }
     }

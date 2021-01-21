@@ -48,8 +48,8 @@ package org.knime.core.columnar.testing.data;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 
@@ -100,12 +100,12 @@ public final class TestListData extends TestData implements ListWriteData, ListR
 
     @SuppressWarnings("unchecked")
     @Override
-    public <C extends ColumnReadData> C getReadData(final int index) {
+    public <C extends NullableReadData> C createReadData(final int index) {
         return (C)get()[index];
     }
 
     @Override
-    public <C extends ColumnWriteData> C getWriteData(final int index, final int size) {
+    public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
         @SuppressWarnings("unchecked")
         final C data = (C)get()[index];
         data.expand(size);

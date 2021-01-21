@@ -48,16 +48,16 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.data.DataValue;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
@@ -78,7 +78,7 @@ import org.knime.core.data.v2.access.WriteAccess;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ColumnarListAccessFactory<R extends ColumnReadData, RA extends ReadAccess, W extends ColumnWriteData, WA extends WriteAccess>
+final class ColumnarListAccessFactory<R extends NullableReadData, RA extends ReadAccess, W extends NullableWriteData, WA extends WriteAccess>
     implements ColumnarAccessFactory<ListReadData, ListReadAccess, ListWriteData, ListWriteAccess> {
 
     private final ValueFactory<RA, WA> m_innerValueFactory;
@@ -105,7 +105,7 @@ final class ColumnarListAccessFactory<R extends ColumnReadData, RA extends ReadA
     }
 
     @Override
-    public ColumnDataSpec getColumnDataSpec() {
+    public DataSpec getColumnDataSpec() {
         return new ListDataSpec(m_innerAccessFactory.getColumnDataSpec());
     }
 
@@ -129,7 +129,7 @@ final class ColumnarListAccessFactory<R extends ColumnReadData, RA extends ReadA
             final int index = m_index.getIndex();
             if (index != m_lastIndex) {
                 m_lastIndex = index;
-                final R innerData = m_data.getReadData(index);
+                final R innerData = m_data.createReadData(index);
                 // If we got the same object we don't need to create a new access and value
                 if (m_innerData != innerData) {
                     m_innerData = innerData;
@@ -193,7 +193,7 @@ final class ColumnarListAccessFactory<R extends ColumnReadData, RA extends ReadA
 
         @Override
         public void create(final int size) {
-            final W writeData = m_data.getWriteData(m_index.getIndex(), size);
+            final W writeData = m_data.createWriteData(m_index.getIndex(), size);
             final WA writeAccess = m_innerAccessFactory.createWriteAccess(writeData, () -> m_innerIndex);
             m_value = m_innerValueFactory.createWriteValue(writeAccess);
         }

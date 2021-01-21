@@ -60,7 +60,7 @@ import org.knime.core.columnar.testing.TestColumnStore;
 public final class TestColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
-    public ColumnStore createWriteStore(final ColumnStoreSchema schema, final File file) {
+    public ColumnStore createStore(final ColumnStoreSchema schema, final File file) {
         return TestColumnStore.create(schema);
     }
 

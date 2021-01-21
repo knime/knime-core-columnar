@@ -48,18 +48,32 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+
+/**
+ * Class holding {@link IntWriteData}, {@link IntReadData}, and {@link IntDataSpec} for data holding int elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class IntData {
 
     private IntData() {
     }
 
-    public static interface IntReadData extends ColumnReadData {
-        int getInt(int index);
-    }
+    /**
+     * {@link NullableWriteData} holding int elements.
+     */
+    public static interface IntWriteData extends NullableWriteData {
 
-    public static interface IntWriteData extends ColumnWriteData {
-
+        /**
+         * Assigns a int value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the int value
+         * @param val the int value to set
+         */
         void setInt(int index, int val);
 
         @Override
@@ -67,9 +81,28 @@ public final class IntData {
 
     }
 
-    public static final class IntDataSpec implements ColumnDataSpec {
+    /**
+     * {@link NullableReadData} holding int elements.
+     */
+    public static interface IntReadData extends NullableReadData {
 
-        public static final IntDataSpec INSTANCE = new IntDataSpec();
+        /**
+         * Obtains the int value at the given index. It is the responsibility of the client calling this method to make
+         * sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the int element
+         * @return the int element at the given index
+         */
+        int getInt(int index);
+
+    }
+
+    /**
+     * {@link DataSpec} for int data.
+     */
+    public static final class IntDataSpec implements DataSpec {
+
+        static final IntDataSpec INSTANCE = new IntDataSpec();
 
         private IntDataSpec() {
         }
@@ -80,4 +113,5 @@ public final class IntData {
         }
 
     }
+
 }

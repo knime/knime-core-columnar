@@ -45,12 +45,29 @@
  */
 package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.data.ColumnDataSpec;
+import org.knime.core.columnar.data.DataSpec;
 
-@SuppressWarnings("javadoc")
+/**
+ * The columnar schema of a {@link ColumnReadStore}.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public interface ColumnStoreSchema {
 
-    int getNumColumns();
+    /**
+     * Obtain the number of columns in the {@link ColumnReadStore} described by this schema.
+     *
+     * @return the number of columns in the store
+     */
+    int numColumns();
 
-    ColumnDataSpec getColumnDataSpec(int index);
+    /**
+     * Obtain the {@link DataSpec} of the column at a given index.
+     *
+     * @param index the index of the column for which to obtain the spec
+     * @return the column's spec
+     * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the number of columns
+     */
+    DataSpec getSpec(int index);
+
 }

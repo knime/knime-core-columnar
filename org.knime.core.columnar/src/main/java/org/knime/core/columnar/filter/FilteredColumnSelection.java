@@ -48,35 +48,37 @@
  */
 package org.knime.core.columnar.filter;
 
-import java.util.HashSet;
-import java.util.Objects;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 
-@SuppressWarnings("javadoc")
-public class FilteredColumnSelection implements ColumnSelection {
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.NullableReadData;
+
+/**
+ * Implementation of {@link ColumnSelection}, in which only some columns are selected.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public final class FilteredColumnSelection implements ColumnSelection {
 
     private final int m_numColumns;
 
     private final Set<Integer> m_indices;
 
+    /**
+     * @param numColumns the total number of columns
+     * @param indices the selected columns
+     */
     public FilteredColumnSelection(final int numColumns, final int... indices) {
-        if (numColumns < 0) {
-            throw new IllegalArgumentException("Number of columns must be non-negative.");
-        }
-        Objects.requireNonNull(indices, () -> "Indices must not be null.");
-
         m_numColumns = numColumns;
-        m_indices = new HashSet<>(indices.length);
-        for (int index : indices) {
-            if (index < 0) {
-                throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
-            }
-            if (index >= numColumns) {
-                throw new IndexOutOfBoundsException(String.format(
-                    "Column index %d larger then the column store's number of columns (%d).", index, numColumns));
-            }
-            m_indices.add(index);
-        }
+        m_indices = Arrays.stream(indices).filter(i -> i >= 0 && i < m_numColumns).boxed().collect(Collectors.toSet());
     }
 
     @Override
@@ -85,7 +87,76 @@ public class FilteredColumnSelection implements ColumnSelection {
     }
 
     @Override
-    public int getNumColumns() {
+    public int numColumns() {
         return m_numColumns;
     }
+
+    @Override
+    public ReadBatch createBatch(final IntFunction<NullableReadData> function) {
+        return new FilteredReadBatch(m_indices.stream().collect(Collectors.toMap(Function.identity(), function::apply)),
+            m_numColumns);
+    }
+
+    private static final class FilteredReadBatch implements ReadBatch {
+
+        private final Map<Integer, NullableReadData> m_data;
+
+        private final int m_size;
+
+        private final int m_length;
+
+        FilteredReadBatch(final Map<Integer, NullableReadData> data, final int size) {
+            m_data = data;
+            m_size = size;
+            m_length = data.values().stream().mapToInt(ReadData::length).max().orElse(0);
+        }
+
+        @Override
+        public NullableReadData get(final int index) {
+            final NullableReadData data = m_data.get(index);
+            if (data != null) {
+                return data;
+            }
+            if (index < 0) {
+                throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
+            }
+            if (index >= m_size) {
+                throw new IndexOutOfBoundsException(String
+                    .format("Column index %d larger then the batch's's number of columns (%d).", index, m_size - 1));
+            }
+            throw new NoSuchElementException(
+                String.format("Data at index %d is not available in this filtered batch.", index));
+        }
+
+        @Override
+        public int length() {
+            return m_length;
+        }
+
+        @Override
+        public void release() {
+            for (final NullableReadData data : m_data.values()) {
+                data.release();
+            }
+        }
+
+        @Override
+        public void retain() {
+            for (final NullableReadData data : m_data.values()) {
+                data.retain();
+            }
+        }
+
+        @Override
+        public long sizeOf() {
+            return m_data.values().stream().mapToLong(ReferencedData::sizeOf).sum();
+        }
+
+        @Override
+        public int size() {
+            return m_size;
+        }
+
+    }
+
 }

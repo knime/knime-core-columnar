@@ -43,14 +43,12 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar;
+package org.knime.core.data.columnar;
 
 /**
  * DataIndex provides an index (or pointer) into ColumnWrite- or ColumnReadData.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- *
- * @apiNote NO API - Experimental. Can change.
  */
 public interface ColumnDataIndex {
 

@@ -45,14 +45,15 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DoubleValue;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.v2.access.DoubleAccess.DoubleReadAccess;
 import org.knime.core.data.v2.access.DoubleAccess.DoubleWriteAccess;
@@ -60,7 +61,7 @@ import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link ColumnReadData} / {@link ColumnWriteData} as {@link ReadAccess}
+ * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
  * / {@link WriteAccess}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -77,7 +78,7 @@ final class ColumnarDoubleAccessFactory
 
     @Override
     public DoubleDataSpec getColumnDataSpec() {
-        return DoubleDataSpec.INSTANCE;
+        return DataSpec.doubleSpec();
     }
 
     @Override

@@ -45,12 +45,38 @@
  */
 package org.knime.core.columnar;
 
-@SuppressWarnings("javadoc")
+/**
+ * {@link ReferencedData} that can be written up to a certain capacity.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public interface WriteData extends ReferencedData {
 
+    /**
+     * Expand the data, potentially increasing capacity. Note that the capacity to which the data will be expanded might
+     * be larger than the provided minimum capacity.
+     *
+     * @param minimumCapacity the capacity to which the data shall be expanded at minimum
+     */
     void expand(int minimumCapacity);
 
+    /**
+     * The non-negative capacity of the data, i.e., the number of elements that can be written.
+     *
+     * @return capacity, i.e., maximum number of elements
+     */
     int capacity();
 
+    /**
+     * Close and dispose of this writable data, creating a readable data of a certain length. The data may only be
+     * closed if its reference count is currently at one. After closing the data, no other operations are allowed on the
+     * {@link WriteData}.
+     *
+     * @param length the length of the to-be-created {@link ReadData}, i.e., the number of elements that have been
+     *            written and that can be read.
+     * @return a new {@link ReadData} from which the written data can be read
+     * @throws IllegalStateException when the reference count is unequal to one
+     */
     ReadData close(int length);
+
 }

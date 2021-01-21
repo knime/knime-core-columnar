@@ -49,7 +49,6 @@
 package org.knime.core.columnar.filter;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -62,25 +61,23 @@ public class DefaultColumnSelectionTest {
 
     private static final int DEF_NUM_COLUMNS = 2;
 
-    @SuppressWarnings("unused")
-    @Test(expected = IllegalArgumentException.class)
-    public void testIllegalArgumentOnCreate() {
-        new DefaultColumnSelection(-1);
-    }
-
     @Test
     public void testAllSelected() {
         final DefaultColumnSelection selection = new DefaultColumnSelection(DEF_NUM_COLUMNS);
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
             assertTrue(selection.isSelected(i));
         }
-        assertFalse(selection.isSelected(DEF_NUM_COLUMNS));
     }
 
     @Test
     public void testGetNumColumns() {
         final int numColumns = DEF_NUM_COLUMNS;
-        assertEquals(numColumns, new FilteredColumnSelection(numColumns).getNumColumns());
+        assertEquals(numColumns, new DefaultColumnSelection(numColumns).numColumns());
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void testNullCheckOnCreateBatch() {
+        new DefaultColumnSelection(DEF_NUM_COLUMNS).createBatch(null);
     }
 
 }

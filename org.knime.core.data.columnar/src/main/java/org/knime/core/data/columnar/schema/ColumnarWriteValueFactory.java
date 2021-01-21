@@ -45,31 +45,31 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
 
 /**
  * {@link ColumnarWriteValueFactory}s typically wrap a {@link ValueFactory} and allow to create {@link WriteValue}s
- * based on {@link ColumnWriteData} in conjunction with a {@link ColumnDataIndex}.
+ * based on {@link NullableWriteData} in conjunction with a {@link ColumnDataIndex}.
  *
  * @param <W> type of ColumnWriteData
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public interface ColumnarWriteValueFactory<W extends ColumnWriteData> {
+public interface ColumnarWriteValueFactory<W extends NullableWriteData> {
 
     /**
      * Create a new {@link WriteValue}. Note that the destination of content written via the write value depends on the
      * {@link ColumnDataIndex}.
      *
-     * @param data the underlying {@link ColumnWriteData}
-     * @param index pointer to position in {@link ColumnWriteData}
+     * @param data the underlying {@link NullableWriteData}
+     * @param index pointer to position in {@link NullableWriteData}
      *
-     * @return a {@link WriteValue} representing the value at the {@link ColumnDataIndex} in the {@link ColumnReadData}.
+     * @return a {@link WriteValue} representing the value at the {@link ColumnDataIndex} in the {@link NullableReadData}.
      */
     WriteValue<?> createWriteValue(W data, ColumnDataIndex index);
 }

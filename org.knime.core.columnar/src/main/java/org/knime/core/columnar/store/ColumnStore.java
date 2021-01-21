@@ -45,34 +45,36 @@
  */
 package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
- * A data structure for storing and obtaining columnar data. Data can be written
- * to and read from the store. The life cycle of a store is as follows:
+ * A data structure for storing and obtaining columnar data. Data can be written to and read from the store. The life
+ * cycle of a store is as follows:
  * <ol>
- * <li>Data is created by a {@link ColumnDataFactory} via {@link #getFactory()}
- * and populated.</li>
- * <li>The singleton {@link ColumnDataWriter writer} is obtained via
- * {@link #getWriter()}.</li>
- * <li>Data is written via {@link ColumnDataWriter#write(ColumnReadData[])}.</li>
- * <li>The writer is closed via {@link ColumnDataWriter#close()}.</li>
- * <li>Any number of {@link ColumnDataReader readers} are created via
- * {@link #createReader()} or {@link #createReader(ColumnSelection)}.</li>
- * <li>Data is read from these readers via
- * {@link ColumnDataReader#readRetained(int)}.</li>
- * <li>Readers are closed via {@link ColumnDataReader#close()}.</li>
- * <li>Finally, the store itself is closed via {@link #close()}, upon which any
- * underlying resources will be relinquished.</li>
+ * <li>The singleton {@link BatchFactory} is obtained via {@link #getFactory()}.</li>
+ * <li>The singleton {@link BatchWriter} is obtained via {@link #getWriter()}.</li>
+ * <li>Data is created by iterating over the following steps:</li>
+ * <ol>
+ * <li>A new {@link WriteBatch} is {@link BatchFactory#create(int) created} using the factory.</li>
+ * <li>Data is {@link WriteBatch#get(int) written} into the batch and {@link WriteBatch#close(int) closed}, which
+ * creates a {@link ReadBatch}.</li>
+ * <li>This batch is {@link BatchWriter#write(ReadBatch) written} into the store using the writer.</li>
  * </ol>
- *
- * TODO: loop... more detailed...
+ * <li>The writer is {@link BatchWriter#close() closed}.</li>
+ * <li>Any number of {@link BatchReader readers} are {@link #createReader(ColumnSelection) created}.</li>
+ * <li>Data is read independently by each of these readers by iterating over the following steps:
+ * <ol>
+ * <li>A {@link ReadBatch} is {@link BatchReader#readRetained(int) obtained}.</li>
+ * <li>Data is {@link ReadBatch#get(int) read} from the batch.</li>
+ * </ol>
+ * <li>The readers are {@link BatchReader#close() closed}.</li>
+ * <li>The store itself is {@link #close() closed}, upon which any underlying resources are relinquished.</li>
+ * </ol>
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
 public interface ColumnStore extends ColumnWriteStore, ColumnReadStore {
-
 }

@@ -45,38 +45,38 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataValue;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ReadValue;
 import org.omg.CORBA.portable.ValueFactory;
 
 /**
  * {@link ColumnarReadValueFactory}s typically wrap a {@link ValueFactory} and allow to create {@link ReadValue}s based
- * on {@link ColumnReadData} in conjunction with a {@link ColumnDataIndex}.
+ * on {@link NullableReadData} in conjunction with a {@link ColumnDataIndex}.
  *
  * @param <R> type of ColumnReadData
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public interface ColumnarReadValueFactory<R extends ColumnReadData> {
+public interface ColumnarReadValueFactory<R extends NullableReadData> {
 
     /**
      * Create a new {@link ReadValue}. Note, the content of the read value is mutable, i.e. changes with the
      * provided {@link ColumnDataIndex}.
      *
-     * @param data the underlying {@link ColumnReadData}
-     * @param index pointer to position in {@link ColumnReadData}
+     * @param data the underlying {@link NullableReadData}
+     * @param index pointer to position in {@link NullableReadData}
      *
      * @return DataValueSupplier supplying a {@link DataValue} representing the value at the {@link ColumnDataIndex} in
-     *         the {@link ColumnReadData}.
+     *         the {@link NullableReadData}.
      */
     ReadValue createReadValue(R data, ColumnDataIndex index);
 
     /**
      * @return spec of the column data.
      */
-    ColumnDataSpec getColumnDataSpec();
+    DataSpec getColumnDataSpec();
 }

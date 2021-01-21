@@ -48,26 +48,34 @@ package org.knime.core.columnar.store;
 import java.io.File;
 
 /**
+ * A factory for creating {@link ColumnStore ColumnStores} and {@link ColumnReadStore ColumnReadStores}.
+ *
  * @author Christian Dietz, KNIME GmbH, Konstanz
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-@SuppressWarnings("javadoc")
 public interface ColumnStoreFactory {
 
     /**
-     * Creates a new {@link ColumnStore}.
+     * Creates a new {@link ColumnStore}, writing data to and reading data from memory and/or the provided file,
+     * depending on its caching strategy and available memory. Note that the store might not be fully written into the
+     * provided file. Consequently, invoking {@link ColumnStoreFactory#createReadStore(ColumnStoreSchema, File)
+     * createReadStore} on the file is not guaranteed to work. To force a {@link ColumnStore} to be fully flushed to a
+     * file which can be used to create a new {@link ColumnReadStore}, invoke {@link ColumnWriteStore#save(File) save}
+     * on that store explicitly.
      *
-     * @param the physical {@link ColumnStoreSchema}
-     * @param file to store data if out of memory
-     * @return a {@link ColumnStore} with the given schema.
+     * @param schema the columnar schema of the to-be-created store
+     * @param file to write data to if out of memory
+     * @return a newly created store
      */
-    ColumnStore createWriteStore(ColumnStoreSchema schema, File file);
+
+    ColumnStore createStore(ColumnStoreSchema schema, File file);
 
     /**
      * Creates a new {@link ColumnReadStore}, reading data from the provided file.
      *
-     * @param schema creates a {@link ColumnReadStore}.
-     * @param file from which data is read.
-     * @return the ColumnReadStore.
+     * @param schema the columnar schema of the to-be-created store
+     * @param file from which data is read
+     * @return a newly created store
      */
     ColumnReadStore createReadStore(ColumnStoreSchema schema, File file);
 

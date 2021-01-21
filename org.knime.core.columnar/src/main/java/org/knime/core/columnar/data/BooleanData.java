@@ -45,18 +45,33 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+
+/**
+ * Class holding {@link BooleanWriteData}, {@link BooleanReadData}, and {@link BooleanDataSpec} for data holding
+ * boolean elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class BooleanData {
 
     private BooleanData() {
     }
 
-    public static interface BooleanReadData extends ColumnReadData {
-        boolean getBoolean(int index);
-    }
+    /**
+     * {@link NullableWriteData} holding boolean elements.
+     */
+    public static interface BooleanWriteData extends NullableWriteData {
 
-    public static interface BooleanWriteData extends ColumnWriteData {
-
+        /**
+         * Assigns a boolean value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the boolean value
+         * @param val the boolean value to set
+         */
         void setBoolean(int index, boolean val);
 
         @Override
@@ -64,9 +79,28 @@ public final class BooleanData {
 
     }
 
-    public static final class BooleanDataSpec implements ColumnDataSpec {
+    /**
+     * {@link NullableReadData} holding boolean elements.
+     */
+    public static interface BooleanReadData extends NullableReadData {
 
-        public static final BooleanDataSpec INSTANCE = new BooleanDataSpec();
+        /**
+         * Obtains the boolean value at the given index. It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the boolean element
+         * @return the boolean element at the given index
+         */
+        boolean getBoolean(int index);
+
+    }
+
+    /**
+     * {@link DataSpec} for boolean data.
+     */
+    public static final class BooleanDataSpec implements DataSpec {
+
+        static final BooleanDataSpec INSTANCE = new BooleanDataSpec();
 
         private BooleanDataSpec() {
         }

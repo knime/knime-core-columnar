@@ -45,14 +45,33 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+
+/**
+ * Class holding {@link VarBinaryWriteData}, {@link VarBinaryReadData}, and {@link VarBinaryDataSpec} for data holding
+ * byte arrays. The size of each byte array can vary between elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class VarBinaryData {
 
     private VarBinaryData() {
     }
 
-    public static interface VarBinaryWriteData extends ColumnWriteData {
+    /**
+     * {@link NullableWriteData} holding byte array elements.
+     */
+    public static interface VarBinaryWriteData extends NullableWriteData {
 
+        /**
+         * Assigns a byte array value to the element at the given index. The contract is that values are only ever set
+         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the byte array value
+         * @param val the byte array value to set
+         */
         void setBytes(int index, byte[] val);
 
         @Override
@@ -60,13 +79,28 @@ public final class VarBinaryData {
 
     }
 
-    public static interface VarBinaryReadData extends ColumnReadData {
+    /**
+     * {@link NullableReadData} holding byte array elements.
+     */
+    public static interface VarBinaryReadData extends NullableReadData {
+
+        /**
+         * Obtains the byte array value at the given index. It is the responsibility of the client calling this method
+         * to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the byte array element
+         * @return the byte array element at the given index
+         */
         byte[] getBytes(int index);
+
     }
 
-    public static final class VarBinaryDataSpec implements ColumnDataSpec {
+    /**
+     * {@link DataSpec} for byte array data.
+     */
+    public static final class VarBinaryDataSpec implements DataSpec {
 
-        public static final VarBinaryDataSpec INSTANCE = new VarBinaryDataSpec();
+        static final VarBinaryDataSpec INSTANCE = new VarBinaryDataSpec();
 
         private VarBinaryDataSpec() {
         }

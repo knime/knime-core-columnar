@@ -45,16 +45,14 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import static org.junit.Assert.assertEquals;
-
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class TestData implements ColumnWriteData, ColumnReadData {
+public abstract class TestData implements NullableWriteData, NullableReadData {
 
     private int m_refs = 1;
 
@@ -78,7 +76,11 @@ public abstract class TestData implements ColumnWriteData, ColumnReadData {
 
     @Override
     public final synchronized void retain() {
-        m_refs++;
+        if (m_refs > 0) {
+            m_refs++;
+        } else {
+            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
+        }
     }
 
     public final synchronized int getRefs() {
@@ -119,8 +121,10 @@ public abstract class TestData implements ColumnWriteData, ColumnReadData {
     }
 
     final void closeInternal(final int length) {
+        if (getRefs() != 1) {
+            throw new IllegalStateException("Closed with outstanding references.");
+        }
         m_size = length;
-        assertEquals("Reference count on close not 1.", 1, getRefs());
     }
 
     public final Object[] get() {

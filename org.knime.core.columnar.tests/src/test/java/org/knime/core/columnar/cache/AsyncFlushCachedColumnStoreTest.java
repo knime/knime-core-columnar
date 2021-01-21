@@ -71,9 +71,9 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
 import org.knime.core.columnar.TestColumnStoreUtils.TestDataTable;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchFactory;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestColumnStore;
@@ -486,7 +486,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void exceptionOnGetFactoryAfterWriterClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
             store.getFactory();
         }
@@ -505,8 +505,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void exceptionOnCreateAfterWriterClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
-            final ColumnDataFactory factory = store.getFactory();
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            final BatchFactory factory = store.getFactory();
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
             factory.create(DEF_SIZE_OF_DATA);
         }
@@ -516,7 +516,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void exceptionOnCreateAfterStoreClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
-            final ColumnDataFactory factory = store.getFactory();
+            final BatchFactory factory = store.getFactory();
             store.close(); // NOSONAR
             factory.create(DEF_SIZE_OF_DATA);
         }
@@ -526,8 +526,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void testWriterSingleton() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
-                final ColumnDataWriter writer1 = store.getWriter();
-                final ColumnDataWriter writer2 = store.getWriter()) {
+                final BatchWriter writer1 = store.getWriter();
+                final BatchWriter writer2 = store.getWriter()) {
             assertEquals(writer1, writer2);
         }
     }
@@ -536,9 +536,9 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void exceptionOnGetWriterAfterWriterClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
         }
     }
@@ -548,7 +548,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             store.close(); // NOSONAR
-            try (final ColumnDataWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
         }
     }
@@ -558,7 +558,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 writer.close(); // NOSONAR
                 writeTable(store, table);
             }
@@ -570,7 +570,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 store.close(); // NOSONAR
                 writeTable(store, table);
             }
@@ -581,7 +581,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void exceptionOnSaveWhileWriterOpen() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 store.save(null);
             }
         }
@@ -592,7 +592,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
             store.close(); // NOSONAR
@@ -604,8 +604,8 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     public void exceptionOnCreateReaderWhileWriterOpen() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
-                try (final ColumnDataReader reader = store.createReader()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) {
+                try (final BatchReader reader = store.createReader()) { // NOSONAR
                 }
             }
         }
@@ -616,11 +616,11 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
-            try (final ColumnDataWriter writer = store.getWriter()) {
+            try (final BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
             store.close(); // NOSONAR
-            try (final ColumnDataReader reader = store.createReader()) { // NOSONAR
+            try (final BatchReader reader = store.createReader()) { // NOSONAR
             }
         }
     }
@@ -630,10 +630,10 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
-            try (ColumnDataWriter writer = store.getWriter()) {
+            try (BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
-            try (final ColumnDataReader reader = store.createReader()) {
+            try (final BatchReader reader = store.createReader()) {
                 reader.close(); // NOSONAR
                 reader.readRetained(0);
             }
@@ -645,10 +645,10 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
-            try (ColumnDataWriter writer = store.getWriter()) {
+            try (BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
-            try (final ColumnDataReader reader = store.createReader()) {
+            try (final BatchReader reader = store.createReader()) {
                 store.close(); // NOSONAR
                 reader.readRetained(0);
             }

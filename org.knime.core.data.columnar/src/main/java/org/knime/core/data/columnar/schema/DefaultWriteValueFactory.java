@@ -45,13 +45,13 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.access.WriteAccess;
 
-final class DefaultWriteValueFactory<W extends ColumnWriteData, WA extends WriteAccess>
+final class DefaultWriteValueFactory<W extends NullableWriteData, WA extends WriteAccess>
     implements ColumnarWriteValueFactory<W> {
 
     private final ColumnarAccessFactory<?, ?, W, WA> m_factory;

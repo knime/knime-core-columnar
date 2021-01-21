@@ -45,10 +45,10 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
@@ -59,32 +59,32 @@ import org.knime.core.data.v2.access.WriteAccess;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-interface ColumnarAccessFactory<R extends ColumnReadData, RA extends ReadAccess, W extends ColumnWriteData, WA extends WriteAccess> {
+interface ColumnarAccessFactory<R extends NullableReadData, RA extends ReadAccess, W extends NullableWriteData, WA extends WriteAccess> {
 
     /**
-     * Creates an access on a {@link ColumnWriteData}. The actual value of the created access depends on
+     * Creates an access on a {@link NullableWriteData}. The actual value of the created access depends on
      * {@link ColumnDataIndex}.
      *
-     * @param data the actual {@link ColumnWriteData}
-     * @param index data index pointing into {@link ColumnWriteData}
+     * @param data the actual {@link NullableWriteData}
+     * @param index data index pointing into {@link NullableWriteData}
      *
-     * @return a {@link WriteAccess} backed by {@link ColumnWriteData}.
+     * @return a {@link WriteAccess} backed by {@link NullableWriteData}.
      */
     WA createWriteAccess(W data, ColumnDataIndex index);
 
     /**
-     * Creates an access on a {@link ColumnReadData}. The actual value of the created access depends on
+     * Creates an access on a {@link NullableReadData}. The actual value of the created access depends on
      * {@link ColumnDataIndex}.
      *
-     * @param data the actual {@link ColumnReadData}
-     * @param index data index pointing into {@link ColumnReadData}
+     * @param data the actual {@link NullableReadData}
+     * @param index data index pointing into {@link NullableReadData}
      *
-     * @return a {@link ReadAccess} backed by {@link ColumnReadData}.
+     * @return a {@link ReadAccess} backed by {@link NullableReadData}.
      */
     RA createReadAccess(R data, ColumnDataIndex index);
 
     /**
-     * @return the underlying {@link ColumnDataSpec}
+     * @return the underlying {@link DataSpec}
      */
-    ColumnDataSpec getColumnDataSpec();
+    DataSpec getColumnDataSpec();
 }

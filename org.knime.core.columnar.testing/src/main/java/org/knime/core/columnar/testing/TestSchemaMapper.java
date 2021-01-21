@@ -52,7 +52,7 @@ import java.util.Arrays;
 
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
-import org.knime.core.columnar.data.ColumnDataSpec.Mapper;
+import org.knime.core.columnar.data.DataSpec.Mapper;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.DurationData.DurationDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;

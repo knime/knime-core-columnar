@@ -55,30 +55,23 @@ import java.time.LocalTime;
 import java.time.Period;
 import java.time.ZonedDateTime;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
-import org.knime.core.columnar.data.DurationData.DurationDataSpec;
-import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
-import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
+import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
-import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
-import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 import org.knime.core.data.v2.access.ObjectAccess.GenericObjectAccessSpec;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectReadAccess;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectSerializer;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectWriteAccess;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link ColumnReadData} / {@link ColumnWriteData} as {@link ReadAccess}
+ * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
  * / {@link WriteAccess}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -88,39 +81,39 @@ final class ColumnarObjectAccessFactory<T> implements ColumnarAccessFactory<Obje
         ObjectReadAccess<T>, ObjectWriteData<T>, ObjectWriteAccess<T>> {
 
     public static final ColumnarObjectAccessFactory<String> STRING_ACCESS_FACTORY =
-        new ColumnarObjectAccessFactory<>(StringDataSpec.INSTANCE);
+        new ColumnarObjectAccessFactory<>(DataSpec.stringSpec());
 
     public static final ColumnarObjectAccessFactory<LocalDate> LOCAL_DATE_ACCESS_FACTORY =
-        new ColumnarObjectAccessFactory<>(LocalDateDataSpec.INSTANCE);
+        new ColumnarObjectAccessFactory<>(DataSpec.localDateSpec());
 
     public static final ColumnarObjectAccessFactory<LocalTime> LOCAL_TIME_ACCESS_FACTORY =
-        new ColumnarObjectAccessFactory<>(LocalTimeDataSpec.INSTANCE);
+        new ColumnarObjectAccessFactory<>(DataSpec.localTimeSpec());
 
     public static final ColumnarObjectAccessFactory<LocalDateTime> LOCAL_DATE_TIME_ACCESS_FACTORY =
-        new ColumnarObjectAccessFactory<>(LocalDateTimeDataSpec.INSTANCE);
+        new ColumnarObjectAccessFactory<>(DataSpec.localDateTimeSpec());
 
     public static final ColumnarObjectAccessFactory<Duration> DURATION_ACCESS_FACTORY =
-        new ColumnarObjectAccessFactory<>(DurationDataSpec.INSTANCE);
+        new ColumnarObjectAccessFactory<>(DataSpec.durationSpec());
 
     public static final ColumnarObjectAccessFactory<Period> PERIOD_ACCESS_FACTORY =
-        new ColumnarObjectAccessFactory<>(PeriodDataSpec.INSTANCE);
+        new ColumnarObjectAccessFactory<>(DataSpec.periodSpec());
 
     public static final ColumnarObjectAccessFactory<ZonedDateTime> ZONED_DATE_TIME_ACCESS_FACTORY =
-        new ColumnarObjectAccessFactory<>(ZonedDateTimeDataSpec.INSTANCE);
+        new ColumnarObjectAccessFactory<>(DataSpec.zonedDateTimeSpec());
 
-    private final ColumnDataSpec m_spec;
+    private final DataSpec m_spec;
 
     public ColumnarObjectAccessFactory(final GenericObjectAccessSpec<T> spec) {
         m_spec =
             new GenericObjectDataSpec<>(new DefaultObjectDataSerializer<>(spec.getSerializer()), spec.isDictEncoded());
     }
 
-    private ColumnarObjectAccessFactory(final ColumnDataSpec spec) {
+    private ColumnarObjectAccessFactory(final DataSpec spec) {
         m_spec = spec;
     }
 
     @Override
-    public final ColumnDataSpec getColumnDataSpec() {
+    public final DataSpec getColumnDataSpec() {
         return m_spec;
     }
 

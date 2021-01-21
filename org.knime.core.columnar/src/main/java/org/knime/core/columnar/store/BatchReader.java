@@ -42,17 +42,47 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   15 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.data;
+package org.knime.core.columnar.store;
 
-import org.knime.core.columnar.ReadData;
+import java.io.Closeable;
+import java.io.IOException;
 
-@SuppressWarnings("javadoc")
-public interface ColumnReadData extends ReadData {
+import org.knime.core.columnar.batch.ReadBatch;
 
-    boolean isMissing(int index);
+/**
+ * A reader that is associated with a {@link ColumnReadStore} and that can be used to read {@link ReadBatch
+ * ReadBatches}.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public interface BatchReader extends Closeable {
+
+    /**
+     * Obtain a {@link ReadBatch} at a certain index that is already retained for the client calling this method.
+     *
+     * @param index the index of the batch
+     * @return a batch from which data can be read
+     * @throws IOException if any I/O problem occurs
+     * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the number of batches
+     * @throws IllegalStateException if the store or reader have already been closed
+     */
+    ReadBatch readRetained(int index) throws IOException;
+
+    /**
+     * Obtain the number of batches this reader can read, i.e., the number of valid indices.
+     *
+     * @return the number of valid indices for reading
+     * @throws IOException if any I/O problem occurs
+     */
+    int numBatches() throws IOException;
+
+    /**
+     * Obtain the maximum {@link ReadBatch#length()} among batches this reader can read.
+     *
+     * @return the maximum length among batches
+     * @throws IOException if any I/O problem occurs
+     */
+    int maxLength() throws IOException;
 
 }

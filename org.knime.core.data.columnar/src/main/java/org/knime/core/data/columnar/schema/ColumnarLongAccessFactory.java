@@ -45,14 +45,15 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.LongValue;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.access.LongAccess.LongReadAccess;
 import org.knime.core.data.v2.access.LongAccess.LongWriteAccess;
@@ -60,7 +61,7 @@ import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link ColumnReadData} / {@link ColumnWriteData} as {@link ReadAccess}
+ * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
  * / {@link WriteAccess}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -77,7 +78,7 @@ final class ColumnarLongAccessFactory
 
     @Override
     public LongDataSpec getColumnDataSpec() {
-        return LongDataSpec.INSTANCE;
+        return DataSpec.longSpec();
     }
 
     @Override

@@ -53,14 +53,16 @@ import java.util.Map;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
 /**
- * In heap memory cache.
+ * A cache for in-heap storing of object data that can be shared between multiple {@link HeapCachedColumnStore
+ * HeapCachedColumnStores} and {@link HeapCachedColumnReadStore HeapCachedColumnReadStores}. Cached data is ephemeral,
+ * i.e, object data referenced only in the cache may be reclaimed by the garbage collector at any point in time.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public interface ObjectDataCache {
 
     /**
-     * @return the object cache
+     * @return the object data cache
      */
     Map<ColumnDataUniqueId, Object[]> getCache();
 

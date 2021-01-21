@@ -49,54 +49,46 @@
 package org.knime.core.columnar.batch;
 
 import java.util.Arrays;
-import java.util.NoSuchElementException;
-import java.util.Objects;
 
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
+ * Default implementation of a {@link ReadBatch} that holds an array of {@link NullableReadData} and guarantees that
+ * data is present at all valid indices.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-@SuppressWarnings("javadoc")
-public class DefaultReadBatch implements ReadBatch {
+public final class DefaultReadBatch implements ReadBatch {
 
-    private final ColumnReadData[] m_data;
+    private final NullableReadData[] m_data;
 
     private final int m_length;
 
-    public DefaultReadBatch(final ColumnReadData[] data, final int length) {
-        Objects.requireNonNull(data, () -> "Column data must not be null.");
-        if (length < 0) {
-            throw new IllegalArgumentException("Length must be non-negative.");
+    /**
+     * Creates a new batch of data.
+     *
+     * @param data the non-null array of nullable data that comprises this batch
+     */
+    public DefaultReadBatch(final NullableReadData[] data) {
+        int length = 0;
+        for (NullableReadData d : data) {
+            length = Math.max(length, d.length());
         }
-
         m_data = data;
         m_length = length;
     }
 
+    /**
+     * Obtains the {@link NullableReadData} at a certain index.
+     *
+     * @param index the index at which to look for the data
+     * @return the non-null data at the given index
+     * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the size of the batch
+     */
     @Override
-    public ColumnReadData[] getUnsafe() {
-        return m_data;
-    }
-
-    @Override
-    public ColumnReadData get(final int colIndex) {
-        if (colIndex < 0) {
-            throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", colIndex));
-        }
-        if (colIndex >= m_data.length) {
-            throw new IndexOutOfBoundsException(String.format(
-                "Column index %d larger then the column store's number of columns (%d).", colIndex, m_data.length - 1));
-        }
-        final ColumnReadData data = m_data[colIndex];
-        if (data != null) {
-            return data;
-        } else {
-            throw new NoSuchElementException(
-                String.format("Data at index %d is not available in this filtered batch.", colIndex));
-        }
+    public NullableReadData get(final int index) {
+        return m_data[index];
     }
 
     @Override
@@ -106,20 +98,12 @@ public class DefaultReadBatch implements ReadBatch {
 
     @Override
     public void release() {
-        for (final ColumnReadData data : m_data) {
-            if (data != null) {
-                data.release();
-            }
-        }
+        Arrays.stream(m_data).forEach(ReferencedData::release);
     }
 
     @Override
     public void retain() {
-        for (final ColumnReadData data : m_data) {
-            if (data != null) {
-                data.retain();
-            }
-        }
+        Arrays.stream(m_data).forEach(ReferencedData::retain);
     }
 
     @Override
@@ -128,7 +112,7 @@ public class DefaultReadBatch implements ReadBatch {
     }
 
     @Override
-    public int getNumColumns() {
+    public int size() {
         return m_data.length;
     }
 

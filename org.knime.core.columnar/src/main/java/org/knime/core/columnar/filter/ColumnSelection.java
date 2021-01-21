@@ -47,34 +47,39 @@ package org.knime.core.columnar.filter;
 
 import java.util.function.IntFunction;
 
-import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 
-@SuppressWarnings("javadoc")
+/**
+ * A selection of columns among a total number of columns.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public interface ColumnSelection {
 
     /**
+     * Determines whether a column at a given index is selected.
+     *
      * @param index the index of the column
-     * @return true if the column is selected
+     * @return true if the column is selected, otherwise false
      */
     boolean isSelected(int index);
 
     /**
-     * @return the total number of columns. Note that this is not the number of selected columns.
+     * Obtains the total number of columns (selected or unselected), and, thus the number of valid indices in this
+     * selection.
+     *
+     * @return number of columns (selected or unselected)
      */
-    int getNumColumns();
+    int numColumns();
 
-    public static ReadBatch createBatch(final ColumnSelection selection, final IntFunction<ColumnReadData> function) {
-        final int numColumns = selection.getNumColumns();
-        final ColumnReadData[] data = new ColumnReadData[numColumns];
-        int length = 0;
-        for (int i = 0; i < numColumns; i++) {
-            if (selection.isSelected(i)) {
-                data[i] = function.apply(i);
-                length = Math.max(length, data[i].length());
-            }
-        }
-        return new DefaultReadBatch(data, length);
-    }
+    /**
+     * Create a new {@link ReadBatch} of size equal to the number of columns in this selection. {@link NullableReadData}
+     * in the batch will be populated for selected columns by applying the given function.
+     *
+     * @param indexToReadData a function that returns data for a given index
+     * @return a newly created batch
+     */
+    ReadBatch createBatch(IntFunction<NullableReadData> indexToReadData);
+
 }

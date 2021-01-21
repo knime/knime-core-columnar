@@ -72,7 +72,7 @@ public class ColumnDataUniqueIdTest {
         final ColumnDataUniqueId cduid = new ColumnDataUniqueId(store, columnIndex, chunkIndex);
         assertEquals(store, cduid.getStore());
         assertEquals(columnIndex, cduid.getColumnIndex());
-        assertEquals(chunkIndex, cduid.getChunkIndex());
+        assertEquals(chunkIndex, cduid.getBatchIndex());
     }
 
     @Test

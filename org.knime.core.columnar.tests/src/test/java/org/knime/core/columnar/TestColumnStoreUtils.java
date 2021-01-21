@@ -73,9 +73,7 @@ import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.FloatData.FloatReadData;
@@ -87,6 +85,8 @@ import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
@@ -96,8 +96,8 @@ import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
@@ -156,17 +156,17 @@ public final class TestColumnStoreUtils {
     private enum Types {
             BOOLEAN {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.booleanSpec();
+                DataSpec getSpec() {
+                    return DataSpec.booleanSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     ((BooleanWriteData)data).setBoolean(index, runningInt++ % 2 == 0); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertEquals(((BooleanReadData)refData).getBoolean(index),
                         ((BooleanReadData)readData).getBoolean(index));
                 }
@@ -174,34 +174,34 @@ public final class TestColumnStoreUtils {
 
             BYTE {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.byteSpec();
+                DataSpec getSpec() {
+                    return DataSpec.byteSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     ((ByteWriteData)data).setByte(index, (byte)runningInt++); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertEquals(((ByteReadData)refData).getByte(index), ((ByteReadData)readData).getByte(index));
                 }
             },
 
             DOUBLE {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.doubleSpec();
+                DataSpec getSpec() {
+                    return DataSpec.doubleSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     ((DoubleWriteData)data).setDouble(index, runningInt++); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertEquals(((DoubleReadData)refData).getDouble(index),
                         ((DoubleReadData)readData).getDouble(index), 0d);
                 }
@@ -209,19 +209,19 @@ public final class TestColumnStoreUtils {
 
             DURATION {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.durationSpec();
+                DataSpec getSpec() {
+                    return DataSpec.durationSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectWriteData<Duration> objectData = ((ObjectWriteData<Duration>)data);
                     objectData.setObject(index, Duration.ofMillis(runningInt++)); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectReadData<Duration> refObjectData = (ObjectReadData<Duration>)refData;
                     @SuppressWarnings("unchecked")
@@ -232,17 +232,17 @@ public final class TestColumnStoreUtils {
 
             FLOAT {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.floatSpec();
+                DataSpec getSpec() {
+                    return DataSpec.floatSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     ((FloatWriteData)data).setFloat(index, runningInt++); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertEquals(((FloatReadData)refData).getFloat(index), ((FloatReadData)readData).getFloat(index),
                         0f);
                 }
@@ -250,56 +250,56 @@ public final class TestColumnStoreUtils {
 
             INT {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.intSpec();
+                DataSpec getSpec() {
+                    return DataSpec.intSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     ((IntWriteData)data).setInt(index, runningInt++); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertEquals(((IntReadData)refData).getInt(index), ((IntReadData)readData).getInt(index));
                 }
             },
 
             LIST {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return new ListDataSpec(ColumnDataSpec.intSpec());
+                DataSpec getSpec() {
+                    return new ListDataSpec(DataSpec.intSpec());
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
-                    final IntWriteData intData = ((ListWriteData)data).getWriteData(index, 1);
+                void setData(final NullableWriteData data, final int index) {
+                    final IntWriteData intData = ((ListWriteData)data).createWriteData(index, 1);
                     intData.setInt(0, runningInt++); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
-                    final IntReadData refIntData = ((ListReadData)refData).getReadData(index);
-                    final IntReadData readIntData = ((ListReadData)readData).getReadData(index);
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    final IntReadData refIntData = ((ListReadData)refData).createReadData(index);
+                    final IntReadData readIntData = ((ListReadData)readData).createReadData(index);
                     assertEquals(refIntData.getInt(0), readIntData.getInt(0));
                 }
             },
 
             LOCALDATE {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.localDateSpec();
+                DataSpec getSpec() {
+                    return DataSpec.localDateSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectWriteData<LocalDate> objectData = ((ObjectWriteData<LocalDate>)data);
                     objectData.setObject(index, LocalDate.ofEpochDay(runningInt++)); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectReadData<LocalDate> refObjectData = (ObjectReadData<LocalDate>)refData;
                     @SuppressWarnings("unchecked")
@@ -310,12 +310,12 @@ public final class TestColumnStoreUtils {
 
             LOCALDATETIME {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.localDateTimeSpec();
+                DataSpec getSpec() {
+                    return DataSpec.localDateTimeSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectWriteData<LocalDateTime> objectData = ((ObjectWriteData<LocalDateTime>)data);
                     objectData.setObject(index,
@@ -323,7 +323,7 @@ public final class TestColumnStoreUtils {
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectReadData<LocalDateTime> refObjectData = (ObjectReadData<LocalDateTime>)refData;
                     @SuppressWarnings("unchecked")
@@ -334,19 +334,19 @@ public final class TestColumnStoreUtils {
 
             LOCALTIME {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.localTimeSpec();
+                DataSpec getSpec() {
+                    return DataSpec.localTimeSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectWriteData<LocalTime> objectData = ((ObjectWriteData<LocalTime>)data);
                     objectData.setObject(index, LocalTime.ofNanoOfDay(runningInt++)); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectReadData<LocalTime> refObjectData = (ObjectReadData<LocalTime>)refData;
                     @SuppressWarnings("unchecked")
@@ -357,53 +357,53 @@ public final class TestColumnStoreUtils {
 
             LONG {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.longSpec();
+                DataSpec getSpec() {
+                    return DataSpec.longSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     ((LongWriteData)data).setLong(index, runningInt++); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertEquals(((LongReadData)refData).getLong(index), ((LongReadData)readData).getLong(index));
                 }
             },
 
             MISSING {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.intSpec();
+                DataSpec getSpec() {
+                    return DataSpec.intSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     ((IntWriteData)data).setMissing(index);
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertEquals(((IntReadData)refData).isMissing(index), ((IntReadData)readData).isMissing(index));
                 }
             },
 
             OBJECT {
                 @Override
-                ColumnDataSpec getSpec() {
+                DataSpec getSpec() {
                     return new GenericObjectDataSpec<Integer>(null, false);
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectWriteData<Integer> objectData = ((ObjectWriteData<Integer>)data);
                     objectData.setObject(index, Integer.valueOf(runningInt++)); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectReadData<Integer> refObjectData = (ObjectReadData<Integer>)refData;
                     @SuppressWarnings("unchecked")
@@ -414,19 +414,19 @@ public final class TestColumnStoreUtils {
 
             PERIOD {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.periodSpec();
+                DataSpec getSpec() {
+                    return DataSpec.periodSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectWriteData<Period> objectData = ((ObjectWriteData<Period>)data);
                     objectData.setObject(index, Period.ofDays(runningInt++)); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectReadData<Period> refObjectData = (ObjectReadData<Period>)refData;
                     @SuppressWarnings("unchecked")
@@ -437,19 +437,19 @@ public final class TestColumnStoreUtils {
 
             STRING {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.stringSpec();
+                DataSpec getSpec() {
+                    return DataSpec.stringSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectWriteData<String> objectData = ((ObjectWriteData<String>)data);
                     objectData.setObject(index, Integer.toString(runningInt++)); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectReadData<String> refObjectData = (ObjectReadData<String>)refData;
                     @SuppressWarnings("unchecked")
@@ -460,18 +460,18 @@ public final class TestColumnStoreUtils {
 
             STRUCT {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return new StructDataSpec(ColumnDataSpec.intSpec());
+                DataSpec getSpec() {
+                    return new StructDataSpec(DataSpec.intSpec());
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     final IntWriteData intData = ((StructWriteData)data).getWriteDataAt(0);
                     intData.setInt(index, runningInt++); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     final IntReadData refIntData = ((StructReadData)refData).getReadDataAt(0);
                     final IntReadData readIntData = ((StructReadData)readData).getReadDataAt(0);
                     assertEquals(refIntData.getInt(index), readIntData.getInt(index));
@@ -480,17 +480,17 @@ public final class TestColumnStoreUtils {
 
             VARBINARY {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.varBinarySpec();
+                DataSpec getSpec() {
+                    return DataSpec.varBinarySpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     ((VarBinaryWriteData)data).setBytes(index, new byte[]{(byte)runningInt++}); // NOSONAR
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
                         ((VarBinaryReadData)readData).getBytes(index));
                 }
@@ -498,12 +498,12 @@ public final class TestColumnStoreUtils {
 
             ZONEDDATETIME {
                 @Override
-                ColumnDataSpec getSpec() {
-                    return ColumnDataSpec.zonedDateTimeSpec();
+                DataSpec getSpec() {
+                    return DataSpec.zonedDateTimeSpec();
                 }
 
                 @Override
-                void setData(final ColumnWriteData data, final int index) {
+                void setData(final NullableWriteData data, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectWriteData<ZonedDateTime> objectData = ((ObjectWriteData<ZonedDateTime>)data);
                     objectData.setObject(index, ZonedDateTime.of(LocalDate.ofEpochDay(runningInt++), // NOSONAR
@@ -511,7 +511,7 @@ public final class TestColumnStoreUtils {
                 }
 
                 @Override
-                void checkEquals(final ColumnReadData refData, final ColumnReadData readData, final int index) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     @SuppressWarnings("unchecked")
                     final ObjectReadData<ZonedDateTime> refObjectData = (ObjectReadData<ZonedDateTime>)refData;
                     @SuppressWarnings("unchecked")
@@ -520,11 +520,11 @@ public final class TestColumnStoreUtils {
                 }
             };
 
-        abstract ColumnDataSpec getSpec();
+        abstract DataSpec getSpec();
 
-        abstract void setData(ColumnWriteData data, int index);
+        abstract void setData(NullableWriteData data, int index);
 
-        abstract void checkEquals(ColumnReadData refData, ColumnReadData readData, final int index);
+        abstract void checkEquals(NullableReadData refData, NullableReadData readData, final int index);
     }
 
     private static Types indexToTypeT(final int index) {
@@ -534,12 +534,12 @@ public final class TestColumnStoreUtils {
     public static ColumnStoreSchema createSchema(final int numColumns) {
         return new ColumnStoreSchema() {
             @Override
-            public int getNumColumns() {
+            public int numColumns() {
                 return numColumns;
             }
 
             @Override
-            public ColumnDataSpec getColumnDataSpec(final int index) {
+            public DataSpec getSpec(final int index) {
                 return indexToTypeT(index).getSpec();
             }
         };
@@ -553,13 +553,13 @@ public final class TestColumnStoreUtils {
         return TestColumnStore.create(createDefaultSchema());
     }
 
-    private static ColumnWriteData[] createBatch(final ColumnStore store) {
+    private static NullableWriteData[] createBatch(final ColumnStore store) {
         final WriteBatch batch = store.getFactory().create(DEF_SIZE_OF_DATA);
-        final ColumnWriteData[] data = new ColumnWriteData[store.getSchema().getNumColumns()];
+        final NullableWriteData[] data = new NullableWriteData[store.getSchema().numColumns()];
 
-        for (int i = 0; i < store.getSchema().getNumColumns(); i++) {
+        for (int i = 0; i < store.getSchema().numColumns(); i++) {
             for (int j = 0; j < batch.capacity(); j++) {
-                final ColumnWriteData data1 = batch.get(i);
+                final NullableWriteData data1 = batch.get(i);
                 indexToTypeT(i).setData(data1, j);
                 data[i] = data1;
             }
@@ -569,7 +569,7 @@ public final class TestColumnStoreUtils {
         return data;
     }
 
-    private static List<ColumnWriteData[]> createWriteTable(final ColumnStore store, final int numBatches) {
+    private static List<NullableWriteData[]> createWriteTable(final ColumnStore store, final int numBatches) {
         return IntStream.range(0, numBatches).mapToObj(i -> createBatch(store)).collect(Collectors.toList());
     }
 
@@ -613,36 +613,35 @@ public final class TestColumnStoreUtils {
         return refs;
     }
 
-    public static List<ColumnReadData[]> writeDefaultTable(final ColumnStore store) throws IOException {
+    public static List<NullableReadData[]> writeDefaultTable(final ColumnStore store) throws IOException {
         return writeTable(store, createWriteTable(store, DEF_NUM_BATCHES));
     }
 
-    private static List<ColumnReadData[]> writeTable(final ColumnStore store, final List<ColumnWriteData[]> table)
+    private static List<NullableReadData[]> writeTable(final ColumnStore store, final List<NullableWriteData[]> table)
         throws IOException {
-        List<ColumnReadData[]> result = new ArrayList<>();
-        try (final ColumnDataWriter writer = store.getWriter()) {
+        List<NullableReadData[]> result = new ArrayList<>();
+        try (final BatchWriter writer = store.getWriter()) {
             for (WriteData[] writeBatch : table) {
-                final ColumnReadData[] readBatch =
-                    Arrays.stream(writeBatch).map(d -> d.close(d.capacity())).toArray(ColumnReadData[]::new);
+                final NullableReadData[] readBatch =
+                    Arrays.stream(writeBatch).map(d -> d.close(d.capacity())).toArray(NullableReadData[]::new);
                 result.add(readBatch);
-                writer.write(new DefaultReadBatch(readBatch, readBatch[0].length()));
+                writer.write(new DefaultReadBatch(readBatch));
             }
         }
         return result;
     }
 
     public static void writeTable(final ColumnStore store, final TestDataTable table) throws IOException {
-        try (final ColumnDataWriter writer = store.getWriter()) {
+        try (final BatchWriter writer = store.getWriter()) {
             for (int i = 0; i < table.size(); i++) {
                 final TestData[] batch = table.getBatch(i);
-                final int length = batch[0].length();
-                writer.write(new DefaultReadBatch(batch, length));
+                writer.write(new DefaultReadBatch(batch));
             }
         }
     }
 
     public static boolean tableInStore(final ColumnStore store, final TestDataTable table) throws IOException {
-        try (final ColumnDataReader reader = store.createReader()) { // NOSONAR
+        try (final BatchReader reader = store.createReader()) { // NOSONAR
         } catch (IllegalStateException e) { // NOSONAR
             return false;
         }
@@ -657,22 +656,22 @@ public final class TestColumnStoreUtils {
     }
 
     @SuppressWarnings("resource")
-    private static ColumnDataReader createReader(final ColumnReadStore store, final int[] indices) {
+    private static BatchReader createReader(final ColumnReadStore store, final int[] indices) {
         return indices == null ? store.createReader()
-            : store.createReader(new FilteredColumnSelection(store.getSchema().getNumColumns(), indices));
+            : store.createReader(new FilteredColumnSelection(store.getSchema().numColumns(), indices));
     }
 
     public static TestDataTable readSelectionAndCompareTable(final ColumnReadStore store, final TestDataTable table,
         final int... indices) throws IOException {
 
-        try (final ColumnDataReader reader = createReader(store, indices)) {
-            assertEquals(table.size(), reader.getNumBatches());
+        try (final BatchReader reader = createReader(store, indices)) {
+            assertEquals(table.size(), reader.numBatches());
 
             final List<TestData[]> result = new ArrayList<>();
-            for (int i = 0; i < reader.getNumBatches(); i++) {
+            for (int i = 0; i < reader.numBatches(); i++) {
                 final TestData[] written = table.getBatch(i);
                 final ReadBatch batch = reader.readRetained(i);
-                final TestData[] data = new TestData[store.getSchema().getNumColumns()];
+                final TestData[] data = new TestData[store.getSchema().numColumns()];
 
                 assertEquals(written.length, data.length);
 
@@ -694,28 +693,28 @@ public final class TestColumnStoreUtils {
         }
     }
 
-    public static void readAndCompareTable(final ColumnReadStore store, final List<ColumnReadData[]> table)
+    public static void readAndCompareTable(final ColumnReadStore store, final List<NullableReadData[]> table)
         throws IOException {
         readSelectionAndCompareTable(store, table, null);
     }
 
-    public static void readSelectionAndCompareTable(final ColumnReadStore store, final List<ColumnReadData[]> table,
+    public static void readSelectionAndCompareTable(final ColumnReadStore store, final List<NullableReadData[]> table,
         final int... indices) throws IOException {
 
-        try (final ColumnDataReader reader = createReader(store, indices)) {
-            assertEquals(table.size(), reader.getNumBatches());
+        try (final BatchReader reader = createReader(store, indices)) {
+            assertEquals(table.size(), reader.numBatches());
 
-            for (int i = 0; i < reader.getNumBatches(); i++) {
-                final ColumnReadData[] refBatch = table.get(i);
+            for (int i = 0; i < reader.numBatches(); i++) {
+                final NullableReadData[] refBatch = table.get(i);
                 final ReadBatch readBatch = reader.readRetained(i);
 
-                assertEquals(refBatch.length, readBatch.getNumColumns());
+                assertEquals(refBatch.length, readBatch.size());
                 assertEquals(refBatch[0].length(), readBatch.length());
                 final int[] indicesNonNull =
-                    indices == null ? IntStream.range(0, store.getSchema().getNumColumns()).toArray() : indices;
+                    indices == null ? IntStream.range(0, store.getSchema().numColumns()).toArray() : indices;
                 for (int j : indicesNonNull) {
-                    final ColumnReadData refData = refBatch[j];
-                    final ColumnReadData readData = readBatch.get(j);
+                    final NullableReadData refData = refBatch[j];
+                    final NullableReadData readData = readBatch.get(j);
                     compareData(refData, readData, j);
                 }
 
@@ -724,27 +723,27 @@ public final class TestColumnStoreUtils {
         }
     }
 
-    public static void releaseTable(final List<ColumnReadData[]> table) {
-        for (ColumnReadData[] batch : table) {
-            for (ColumnReadData data : batch) {
+    public static void releaseTable(final List<NullableReadData[]> table) {
+        for (NullableReadData[] batch : table) {
+            for (NullableReadData data : batch) {
                 data.release();
             }
         }
     }
 
     public static void readTwiceAndCompareTable(final ColumnReadStore store) throws IOException {
-        try (final ColumnDataReader reader1 = store.createReader();
-                final ColumnDataReader reader2 = store.createReader()) {
-            assertEquals(reader1.getNumBatches(), reader2.getNumBatches());
-            for (int i = 0; i < reader1.getNumBatches(); i++) {
+        try (final BatchReader reader1 = store.createReader();
+                final BatchReader reader2 = store.createReader()) {
+            assertEquals(reader1.numBatches(), reader2.numBatches());
+            for (int i = 0; i < reader1.numBatches(); i++) {
                 final ReadBatch batch1 = reader1.readRetained(i);
                 final ReadBatch batch2 = reader2.readRetained(i);
 
-                assertEquals(batch1.getNumColumns(), batch2.getNumColumns());
+                assertEquals(batch1.size(), batch2.size());
                 assertEquals(batch1.length(), batch2.length());
-                for (int j = 0; j < batch1.getNumColumns(); j++) {
-                    final ColumnReadData data1 = batch1.get(j);
-                    final ColumnReadData data2 = batch2.get(j);
+                for (int j = 0; j < batch1.size(); j++) {
+                    final NullableReadData data1 = batch1.get(j);
+                    final NullableReadData data2 = batch2.get(j);
                     compareData(data1, data2, j);
                 }
 
@@ -754,7 +753,7 @@ public final class TestColumnStoreUtils {
         }
     }
 
-    private static void compareData(final ColumnReadData refData, final ColumnReadData readData, final int colIndex) {
+    private static void compareData(final NullableReadData refData, final NullableReadData readData, final int colIndex) {
         final int length = refData.length();
         assertEquals(length, readData.length());
 

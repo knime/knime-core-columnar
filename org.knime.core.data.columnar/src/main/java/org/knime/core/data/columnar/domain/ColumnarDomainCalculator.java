@@ -48,9 +48,9 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 
-interface ColumnarDomainCalculator<C extends ColumnReadData, D> {
+interface ColumnarDomainCalculator<C extends NullableReadData, D> {
     void update(C data);
 
     void update(D domain);

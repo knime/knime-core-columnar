@@ -60,7 +60,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
  * <ul>
  * <li>makes sure that operations adhere to their contracts (e.g. that readers are not created after the store has been
  * closed and that close is idempotent),</li>
- * <li>initializes its {@link ColumnDataReader readers} lazily, and</li>
+ * <li>initializes its {@link BatchReader readers} lazily, and</li>
  * <li>provides a method for determining whether the store has been closed already.</li>
  * </ul>
  *
@@ -69,7 +69,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
 public abstract class DelegatingColumnReadStore implements ColumnReadStore {
 
     /**
-     * A {@link ColumnDataReader} that delegates operations to another reader. In addition, it
+     * A {@link BatchReader} that delegates operations to another reader. In addition, it
      * <ul>
      * <li>makes sure that operations adhere to their contracts (e.g., that readRetained is not called after the store
      * has been closed and that close is idempotent),</li>
@@ -77,7 +77,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
      * <li>provides a method for determining whether the reader has been closed already.</li>
      * </ul>
      */
-    public abstract static class DelegatingColumnDataReader implements ColumnDataReader {
+    public abstract static class DelegatingBatchReader implements BatchReader {
 
         private final DelegatingColumnReadStore m_store;
 
@@ -85,7 +85,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
 
         private final AtomicBoolean m_storeClosed;
 
-        private ColumnDataReader m_delegate;
+        private BatchReader m_delegate;
 
         private boolean m_readerClosed;
 
@@ -93,7 +93,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
          * @param store a delegating store from which to obtain the delegate reader
          * @param selection see {@link ColumnReadStore#createReader(ColumnSelection)}
          */
-        protected DelegatingColumnDataReader(final DelegatingColumnReadStore store, final ColumnSelection selection) {
+        protected DelegatingBatchReader(final DelegatingColumnReadStore store, final ColumnSelection selection) {
             m_store = store;
             m_selection = selection;
             m_storeClosed = store.m_storeClosed;
@@ -107,16 +107,24 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
             if (m_storeClosed.get()) {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
+            if (index < 0) {
+                throw new IndexOutOfBoundsException(String.format("Batch index %d smaller than 0.", index));
+            }
+            if (index >= numBatches()) {
+                throw new IndexOutOfBoundsException(
+                    String.format("Batch index %d greater or equal to the reader's largest batch index (%d).", index,
+                        numBatches() - 1));
+            }
 
             return readRetainedInternal(index);
         }
 
         /**
-         * Calls {@link ColumnDataReader#readRetained(int) readRetained} on the delegate reader.
+         * Calls {@link BatchReader#readRetained(int) readRetained} on the delegate reader.
          *
-         * @param index see {@link ColumnDataReader#readRetained(int)}
+         * @param index see {@link BatchReader#readRetained(int)}
          * @throws IOException if an I/O error occurs
-         * @return see {@link ColumnDataReader#readRetained(int)}
+         * @return see {@link BatchReader#readRetained(int)}
          */
         @SuppressWarnings("resource")
         protected ReadBatch readRetainedInternal(final int index) throws IOException {
@@ -125,14 +133,14 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
 
         @Override
         @SuppressWarnings("resource")
-        public final int getNumBatches() throws IOException {
-            return initAndGetDelegate().getNumBatches();
+        public final int numBatches() throws IOException {
+            return initAndGetDelegate().numBatches();
         }
 
         @Override
         @SuppressWarnings("resource")
-        public final int getMaxLength() throws IOException {
-            return initAndGetDelegate().getMaxLength();
+        public final int maxLength() throws IOException {
+            return initAndGetDelegate().maxLength();
         }
 
         @Override
@@ -158,7 +166,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
         /**
          * @return the column selection for this reader
          */
-        protected ColumnSelection getSelection() {
+        protected final ColumnSelection getSelection() {
             return m_selection;
         }
 
@@ -167,7 +175,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
          *
          * @return the delegate reader
          */
-        protected ColumnDataReader initAndGetDelegate() {
+        protected final BatchReader initAndGetDelegate() {
             if (m_delegate == null) {
                 m_delegate = m_store.m_delegate.createReader(m_selection);
             }
@@ -177,14 +185,14 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
         /**
          * @return the delegate reader, if it has been initialized, otherwise null
          */
-        protected ColumnDataReader getDelegate() {
+        protected final BatchReader getDelegate() {
             return m_delegate;
         }
 
         /**
          * @return true if this writer has been closed, otherwise false
          */
-        protected boolean isClosed() {
+        protected final boolean isClosed() {
             return m_readerClosed;
         }
 
@@ -206,12 +214,12 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
     }
 
     @Override
-    public final ColumnDataReader createReader(final ColumnSelection config) {
+    public final BatchReader createReader(final ColumnSelection selection) {
         if (m_storeClosed.get()) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        return createReaderInternal(config);
+        return createReaderInternal(selection);
     }
 
     /**
@@ -220,8 +228,9 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
      * @param selection see {@link ColumnReadStore#createReader()}
      * @return see {@link ColumnReadStore#createReader()}
      */
-    protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
-        return m_delegate.createReader(selection);
+    protected BatchReader createReaderInternal(final ColumnSelection selection) {
+        return new DelegatingBatchReader(this, selection) {
+        };
     }
 
     @Override
@@ -249,14 +258,14 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
     /**
      * @return the delegate store
      */
-    protected ColumnReadStore getDelegate() {
+    protected final ColumnReadStore getDelegate() {
         return m_delegate;
     }
 
     /**
      * @return true if this store has been closed, otherwise false
      */
-    protected boolean isClosed() {
+    protected final boolean isClosed() {
         return m_storeClosed.get();
     }
 

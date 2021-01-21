@@ -48,14 +48,14 @@ package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
 
-import org.knime.core.columnar.ColumnDataIndex;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.ColumnWriteData;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.store.BatchFactory;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.data.RowKeyValue;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.columnar.schema.ColumnarWriteValueFactory;
 import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.RowRead;
@@ -88,9 +88,9 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private static final long BATCH_SIZE_TARGET = Long.getLong(BATCH_SIZE_TARGET_PROPERTY, BATCH_SIZE_TARGET_DEF);
 
-    private final ColumnDataFactory m_columnDataFactory;
+    private final BatchFactory m_columnDataFactory;
 
-    private final ColumnDataWriter m_writer;
+    private final BatchWriter m_writer;
 
     private final ColumnarWriteValueFactory<?>[] m_factories;
 
@@ -105,8 +105,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
     private int m_currentIndex;
 
     private long m_size = 0;
-
-    private ColumnWriteData[] m_currentData;
 
     private boolean m_adjusting;
 
@@ -139,7 +137,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     @Override
     public final void setMissing(final int index) {
-        m_currentData[index + 1].setMissing(m_currentIndex);
+        m_currentBatch.get(index + 1).setMissing(m_currentIndex);
     }
 
     @Override
@@ -248,7 +246,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
         // TODO can we preload data?
         m_currentBatch = m_columnDataFactory.create(chunkSize);
-        m_currentData = m_currentBatch.getUnsafe();
         updateWriteValues(m_currentBatch);
         m_currentMaxIndex = m_currentBatch.capacity() - 1;
     }
@@ -256,8 +253,8 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
     private void updateWriteValues(final WriteBatch batch) {
         for (int i = 0; i < m_values.length; i++) {
             @SuppressWarnings("unchecked")
-            final ColumnarWriteValueFactory<ColumnWriteData> cast =
-                ((ColumnarWriteValueFactory<ColumnWriteData>)m_factories[i]);
+            final ColumnarWriteValueFactory<NullableWriteData> cast =
+                ((ColumnarWriteValueFactory<NullableWriteData>)m_factories[i]);
             m_values[i] = cast.createWriteValue(batch.get(i), this);
         }
         m_rowKeyValue = (RowKeyWriteValue)m_values[0];

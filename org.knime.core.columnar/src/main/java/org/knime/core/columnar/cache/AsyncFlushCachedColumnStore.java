@@ -57,24 +57,24 @@ import java.util.concurrent.ExecutorService;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchFactory;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.DelegatingColumnStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A {@link ColumnStore column store} that stores {@link ColumnWriteData data} in a fixed-size
+ * A {@link ColumnStore column store} that stores {@link NullableWriteData data} in a fixed-size
  * {@link SmallColumnStoreCache LRU cache} in memory and asynchronously passes (flushes) data on to a delegate column
  * store. When any unflushed data is evicted from the cache, the store blocks until that data has been flushed. On cache
  * miss (i.e., when any evicted, flushed data is read), it blocks until the asynchronous write process has fully
- * terminated. The store allows concurrent reading via multiple {@link ColumnDataReader readers} once the
- * {@link ColumnDataWriter writer} has been closed.
+ * terminated. The store allows concurrent reading via multiple {@link BatchReader readers} once the
+ * {@link BatchWriter writer} has been closed.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -86,7 +86,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     private static final CountDownLatch DUMMY = new CountDownLatch(0);
 
-    private class AsyncFlushCachedColumnStoreFactory extends DelegatingColumnDataFactory {
+    private class AsyncFlushCachedColumnStoreFactory extends DelegatingBatchFactory {
 
         AsyncFlushCachedColumnStoreFactory() {
             super(AsyncFlushCachedColumnStore.this);
@@ -94,7 +94,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final class AsyncFlushCachedColumnStoreWriter extends DelegatingColumnDataWriter {
+    private final class AsyncFlushCachedColumnStoreWriter extends DelegatingBatchWriter {
 
         AsyncFlushCachedColumnStoreWriter() {
             super(AsyncFlushCachedColumnStore.this);
@@ -108,7 +108,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
             handleDoneFuture();
 
             final CountDownLatch batchFlushed = new CountDownLatch(1);
-            enqueueRunnable(() -> {
+            enqueueRunnable(() -> { // NOSONAR
                 try {
                     if (!AsyncFlushCachedColumnStore.this.isClosed()) {
                         super.writeInternal(batch);
@@ -122,7 +122,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
             });
 
             m_maxDataCapacity = Math.max(m_maxDataCapacity, batch.length());
-            for (int i = 0; i < getSchema().getNumColumns(); i++) {
+            for (int i = 0; i < getSchema().numColumns(); i++) {
                 final ColumnDataUniqueId ccUID =
                     new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, m_numChunks);
                 m_cachedData.put(ccUID, batchFlushed);
@@ -158,7 +158,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final class AsyncFlushCachedColumnStoreReader extends DelegatingColumnDataReader {
+    private final class AsyncFlushCachedColumnStoreReader extends DelegatingBatchReader {
 
         private final BufferedBatchLoader m_batchLoader;
 
@@ -169,10 +169,10 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
         @Override
         protected ReadBatch readRetainedInternal(final int index) throws IOException {
-            return ColumnSelection.createBatch(getSelection(), i -> {
+            return getSelection().createBatch(i -> { // NOSONAR
                 final ColumnDataUniqueId ccUID =
                     new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, index);
-                return m_globalCache.getRetained(ccUID, () -> {
+                return m_globalCache.getRetained(ccUID, () -> { // NOSONAR
                     try {
                         waitForAndHandleFuture();
                     } catch (InterruptedException e) {
@@ -184,7 +184,8 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
                     }
                     m_cachedData.put(ccUID, DUMMY);
                     try {
-                        final ColumnReadData data = m_batchLoader.loadBatch(initAndGetDelegate(), index).get(i);
+                        @SuppressWarnings("resource")
+                        final NullableReadData data = m_batchLoader.loadBatch(initAndGetDelegate(), index).get(i);
                         data.retain();
                         return data;
                     } catch (IOException e) {
@@ -195,12 +196,12 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         }
 
         @Override
-        public int getNumBatches() {
+        public int numBatches() {
             return m_numChunks;
         }
 
         @Override
-        public int getMaxLength() {
+        public int maxLength() {
             return m_maxDataCapacity;
         }
 
@@ -212,11 +213,11 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, ColumnReadData> m_globalCache;
+    private final LoadingEvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
 
     private Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
 
-    private final Evictor<ColumnDataUniqueId, ColumnReadData> m_evictor = (k, c) -> {
+    private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> { // NOSONAR
         try {
             final CountDownLatch latch = m_cachedData.remove(k);
             if (latch != null) {
@@ -232,7 +233,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
             @SuppressWarnings("resource")
             AsyncFlushCachedColumnStore store = (AsyncFlushCachedColumnStore)k.getStore();
             store.enqueueRunnable(c::release);
-            System.err.println(String.format("%s "
+            LOGGER.error(String.format("%s "
                     + "Unflushed data evicted from cache. "
                     + "Data will be retained and memory will be allocated until flushed.", ERROR_ON_INTERRUPT));
         }
@@ -271,12 +272,12 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
     }
 
     @Override
-    protected ColumnDataFactory createFactoryInternal() {
+    protected BatchFactory getFactoryInternal() {
         return new AsyncFlushCachedColumnStoreFactory();
     }
 
     @Override
-    protected ColumnDataWriter createWriterInternal() {
+    protected BatchWriter createWriterInternal() {
         return new AsyncFlushCachedColumnStoreWriter();
     }
 
@@ -294,7 +295,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
     }
 
     @Override
-    protected ColumnDataReader createReaderInternal(final ColumnSelection selection) {
+    protected BatchReader createReaderInternal(final ColumnSelection selection) {
         return new AsyncFlushCachedColumnStoreReader(selection);
     }
 
@@ -308,9 +309,8 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
             LOGGER.info(ERROR_ON_INTERRUPT);
         }
 
-        // TODO make asynchronous for wide data?
         for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
-            final ColumnReadData removed = m_globalCache.removeRetained(id);
+            final NullableReadData removed = m_globalCache.removeRetained(id);
             if (removed != null) {
                 removed.release();
             }

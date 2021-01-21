@@ -48,11 +48,10 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.VoidData.VoidDataSpec;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.VoidData.VoidReadData;
 import org.knime.core.columnar.data.VoidData.VoidWriteData;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidReadAccess;
 import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidWriteAccess;
 import org.knime.core.data.v2.access.ReadAccess;
@@ -83,8 +82,8 @@ class ColumnarVoidAccessFactory
     }
 
     @Override
-    public ColumnDataSpec getColumnDataSpec() {
-        return VoidDataSpec.INSTANCE;
+    public DataSpec getColumnDataSpec() {
+        return DataSpec.voidSpec();
     }
 
     static final class VoidReadAccess implements ReadAccess {

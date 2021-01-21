@@ -48,13 +48,21 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+/**
+ * Class holding {@link VoidWriteData}, {@link VoidReadData}, and {@link VoidDataSpec} for data holding
+ * no elements (i.e., all elements are missing).
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class VoidData {
 
     private VoidData() {
     }
 
-    public static interface VoidWriteData extends ColumnWriteData {
+    /**
+     * {@link NullableWriteData} holding no elements.
+     */
+    public static interface VoidWriteData extends NullableWriteData {
 
         @Override
         VoidReadData close(int length);
@@ -65,7 +73,10 @@ public final class VoidData {
 
     }
 
-    public static interface VoidReadData extends ColumnReadData {
+    /**
+     * {@link NullableReadData} holding no elements.
+     */
+    public static interface VoidReadData extends NullableReadData {
 
         @Override
         default boolean isMissing(final int index) {
@@ -82,9 +93,12 @@ public final class VoidData {
 
     }
 
-    public static final class VoidDataSpec implements ColumnDataSpec {
+    /**
+     * {@link DataSpec} for void data.
+     */
+    public static final class VoidDataSpec implements DataSpec {
 
-        public static final VoidDataSpec INSTANCE = new VoidDataSpec();
+        static final VoidDataSpec INSTANCE = new VoidDataSpec();
 
         private VoidDataSpec() {
         }

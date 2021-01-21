@@ -72,7 +72,7 @@ final class ColumnarTableTestUtils {
         }
 
         @Override
-        public ColumnStore createWriteStore(final ColumnStoreSchema schema, final File file) {
+        public ColumnStore createStore(final ColumnStoreSchema schema, final File file) {
             return TestColumnStore.create(schema);
         }
 

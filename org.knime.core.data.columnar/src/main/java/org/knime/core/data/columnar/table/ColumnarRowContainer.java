@@ -109,7 +109,7 @@ final class ColumnarRowContainer implements RowContainer {
 
         m_store = new DomainColumnStore(
             ColumnarPreferenceUtils
-                .wrap(m_storeFactory.createWriteStore(schema, DataContainer.createTempFile(".knable"))),
+                .wrap(m_storeFactory.createStore(schema, DataContainer.createTempFile(".knable"))),
             new DefaultDomainStoreConfig(schema, settings.getMaxPossibleNominalDomainValues(),
                 settings.checkDuplicateRowKeys(), settings.isInitializeDomains()),
             ColumnarPreferenceUtils.getDomainCalcExecutor());
@@ -168,7 +168,7 @@ final class ColumnarRowContainer implements RowContainer {
 
             final Map<Integer, DataColumnDomain> domains = new HashMap<>();
             final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
-            final int numColumns = m_schema.getNumColumns();
+            final int numColumns = m_schema.numColumns();
             for (int i = 1; i < numColumns; i++) {
                 domains.put(i, m_store.getDomains(i));
                 metadata.put(i, m_store.getDomainMetadata(i));

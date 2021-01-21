@@ -48,33 +48,83 @@
  */
 package org.knime.core.columnar.data;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.WriteData;
+
+/**
+ * Class holding {@link StructWriteData}, {@link StructReadData}, and {@link StructDataSpec} for data holding struct
+ * elements. Each struct element contains a number of objects of certain types.
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class StructData {
 
     private StructData() {
     }
 
-    public interface StructReadData extends ColumnReadData {
-        <C extends ColumnReadData> C getReadDataAt(int index);
-    }
+    /**
+     * A {@link NullableWriteData} holding struct elements.
+     */
+    public interface StructWriteData extends NullableWriteData {
 
-    public interface StructWriteData extends ColumnWriteData {
-        <C extends ColumnWriteData> C getWriteDataAt(int index);
+        /**
+         * Obtains a {@link NullableWriteData} of type C at the given index in the struct, which can then be populated
+         * with values. The returned data must not be {@link WriteData#close(int) closed} or
+         * {@link WriteData#expand(int) expanded}. It is the responsibility of the client calling this method to make
+         * sure that the provided index is non-negative and smaller than the size (i.e., number of inner
+         * {@link DataSpec ColumnDataSpecs} in the {@link StructDataSpec}) of this struct.
+         *
+         * @param <C> the type of the {@link NullableWriteData}
+         * @param index the index in the struct at which to obtain the data
+         * @return the {@link NullableWriteData} at the given index in the struct
+         */
+        <C extends NullableWriteData> C getWriteDataAt(int index);
 
         @Override
         StructReadData close(int length);
 
     }
 
-    public static final class StructDataSpec implements ColumnDataSpec {
+    /**
+     * A {@link NullableReadData} holding struct elements.
+     */
+    public interface StructReadData extends NullableReadData {
 
-        private final ColumnDataSpec[] m_inner;
+        /**
+         * Obtains a {@link NullableReadData} of type C at the given index in the struct, which can then be used to read
+         * values. It is the responsibility of the client calling this method to make sure that the provided index is
+         * non-negative and smaller than the size (i.e., number of inner {@link DataSpec ColumnDataSpecs} in the
+         * {@link StructDataSpec}) of this struct.
+         *
+         * @param <C> the type of the {@link NullableReadData}
+         * @param index the index in the struct at which to obtain the data
+         * @return the {@link NullableReadData} at the given index in the struct
+         */
+        <C extends NullableReadData> C getReadDataAt(int index);
 
-        public StructDataSpec(final ColumnDataSpec... inner) {
+    }
+
+    /**
+     * The {@link DataSpec} for struct data.
+     */
+    public static final class StructDataSpec implements DataSpec {
+
+        private final DataSpec[] m_inner;
+
+        /**
+         * Create a spec for struct data, in which structs hold objects according to a given array of
+         * {@link DataSpec ColumnDataSpecs}.
+         *
+         * @param inner the specs for the elements the structs consist of
+         */
+        public StructDataSpec(final DataSpec... inner) {
             m_inner = inner;
         }
 
-        public final ColumnDataSpec[] getInner() {
+        /**
+         * @return the array of {@link DataSpec ColumnDataSpecs} of the elements the structs consist of
+         */
+        public final DataSpec[] getInner() {
             return m_inner;
         }
 
@@ -84,4 +134,5 @@ public final class StructData {
         }
 
     }
+
 }

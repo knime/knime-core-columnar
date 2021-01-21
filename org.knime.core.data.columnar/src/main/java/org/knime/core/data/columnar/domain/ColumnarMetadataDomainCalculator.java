@@ -48,9 +48,9 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataCell;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.meta.DataColumnMetaDataCreator;
@@ -61,15 +61,15 @@ import org.knime.core.data.v2.ReadValue;
  *
  * @author Christian Dietz, KNIME GmbH Konstanz, Germany
  */
-class ColumnarMetadataDomainCalculator<R extends ColumnReadData>
+class ColumnarMetadataDomainCalculator<R extends NullableReadData>
     implements ColumnarDomainCalculator<R, DataColumnMetaData[]> {
 
     private final DataColumnMetaDataCreator<DataColumnMetaData>[] m_creators;
 
-    private final ColumnarReadValueFactory<ColumnReadData> m_factory;
+    private final ColumnarReadValueFactory<NullableReadData> m_factory;
 
     public ColumnarMetadataDomainCalculator(final DataColumnMetaDataCreator<DataColumnMetaData>[] creators,
-        final ColumnarReadValueFactory<ColumnReadData> factory) {
+        final ColumnarReadValueFactory<NullableReadData> factory) {
         m_creators = creators;
         m_factory = factory;
     }

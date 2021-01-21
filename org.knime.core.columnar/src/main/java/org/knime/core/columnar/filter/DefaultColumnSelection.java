@@ -48,30 +48,44 @@
  */
 package org.knime.core.columnar.filter;
 
+import java.util.function.IntFunction;
+import java.util.stream.IntStream;
+
+import org.knime.core.columnar.batch.DefaultReadBatch;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.NullableReadData;
+
 /**
+ * Default implementation of {@link ColumnSelection}, in which all columns are selected.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public class DefaultColumnSelection implements ColumnSelection {
+public final class DefaultColumnSelection implements ColumnSelection {
 
     private final int m_numColumns;
 
+    /**
+     * @param numColumns the total number of columns
+     */
     public DefaultColumnSelection(final int numColumns) {
-        if (numColumns < 0) {
-            throw new IllegalArgumentException("Number of columns must be non-negative.");
-        }
         m_numColumns = numColumns;
     }
 
     @Override
     public boolean isSelected(final int index) {
-        return index < m_numColumns;
+        return index >= 0 && index < m_numColumns;
     }
 
     @Override
-    public int getNumColumns() {
+    public int numColumns() {
         return m_numColumns;
     }
+
+    @Override
+    public ReadBatch createBatch(final IntFunction<NullableReadData> function) {
+        return new DefaultReadBatch(
+            IntStream.range(0, m_numColumns).mapToObj(function::apply).toArray(NullableReadData[]::new));
+    }
+
 }

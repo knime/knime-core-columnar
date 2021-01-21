@@ -47,27 +47,35 @@ package org.knime.core.columnar.data;
 
 import java.time.Period;
 
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 
-@SuppressWarnings("javadoc")
+/**
+ * Class holding {@link PeriodWriteData}, {@link PeriodReadData}, and {@link PeriodDataSpec} for data holding Period
+ * elements.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class PeriodData {
 
     private PeriodData() {
     }
 
-    public static interface PeriodReadData extends ObjectReadData<Period> {
-
-        Period getPeriod(int index);
-
-        @Override
-        default Period getObject(final int index) {
-            return getPeriod(index);
-        }
-    }
-
+    /**
+     * {@link ObjectWriteData} holding Period elements.
+     */
     public static interface PeriodWriteData extends ObjectWriteData<Period> {
 
+        /**
+         * Assigns a Period value to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param index the index at which to set the Period value
+         * @param val the Period value to set
+         */
         void setPeriod(int index, Period val);
 
         @Override
@@ -80,9 +88,33 @@ public final class PeriodData {
 
     }
 
-    public static final class PeriodDataSpec implements ColumnDataSpec {
+    /**
+     * {@link ObjectReadData} holding Period elements.
+     */
+    public static interface PeriodReadData extends ObjectReadData<Period> {
 
-        public static final PeriodDataSpec INSTANCE = new PeriodDataSpec();
+        /**
+         * Obtains the Period value at the given index. It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param index the index at which to obtain the Period element
+         * @return the Period element at the given index
+         */
+        Period getPeriod(int index);
+
+        @Override
+        default Period getObject(final int index) {
+            return getPeriod(index);
+        }
+
+    }
+
+    /**
+     * {@link DataSpec} for Period data.
+     */
+    public static final class PeriodDataSpec implements DataSpec {
+
+        static final PeriodDataSpec INSTANCE = new PeriodDataSpec();
 
         private PeriodDataSpec() {
         }
@@ -91,5 +123,7 @@ public final class PeriodData {
         public <R> R accept(final Mapper<R> v) {
             return v.visit(this);
         }
+
     }
+
 }

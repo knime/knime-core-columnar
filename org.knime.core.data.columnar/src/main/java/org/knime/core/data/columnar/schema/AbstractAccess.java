@@ -45,15 +45,15 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnDataIndex;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * Abstract implementation for {@link ReadAccess} / {@link WriteAccess}es on {@link ColumnReadData} /
- * {@link ColumnWriteData}
+ * Abstract implementation for {@link ReadAccess} / {@link WriteAccess}es on {@link NullableReadData} /
+ * {@link NullableWriteData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3

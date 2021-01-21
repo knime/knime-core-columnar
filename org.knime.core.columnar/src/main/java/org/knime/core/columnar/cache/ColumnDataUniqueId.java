@@ -50,23 +50,31 @@ package org.knime.core.columnar.cache;
 
 import java.util.Objects;
 
+import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.store.ColumnReadStore;
 
 /**
+ * An object that uniquely identifies a {@link ReadData} held by a {@link ColumnReadStore}.
+ *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public class ColumnDataUniqueId {
+public final class ColumnDataUniqueId {
 
     private final ColumnReadStore m_store;
 
     private final int m_columnIndex;
 
-    private final int m_chunkIndex;
+    private final int m_batchIndex;
 
-    public ColumnDataUniqueId(final ColumnReadStore store, final int columnIndex, final int chunkIndex) {
+    /**
+     * @param store the store holding the data
+     * @param columnIndex the column index of the data
+     * @param batchIndex the batch index of the data
+     */
+    public ColumnDataUniqueId(final ColumnReadStore store, final int columnIndex, final int batchIndex) {
         m_store = store;
         m_columnIndex = columnIndex;
-        m_chunkIndex = chunkIndex;
+        m_batchIndex = batchIndex;
     }
 
     @Override
@@ -74,7 +82,7 @@ public class ColumnDataUniqueId {
         int result = 17;
         result = 31 * result + m_store.hashCode();
         result = 31 * result + m_columnIndex;
-        result = 31 * result + m_chunkIndex;
+        result = 31 * result + m_batchIndex;
         return result;
     }
 
@@ -87,18 +95,23 @@ public class ColumnDataUniqueId {
             return false;
         }
         if (getClass() == object.getClass()) {
-        final ColumnDataUniqueId other = (ColumnDataUniqueId)object;
-        return Objects.equals(m_store, other.m_store) && m_columnIndex == other.m_columnIndex
-            && m_chunkIndex == other.m_chunkIndex;
-    }
+            final ColumnDataUniqueId other = (ColumnDataUniqueId)object;
+            return Objects.equals(m_store, other.m_store) && m_columnIndex == other.m_columnIndex
+                && m_batchIndex == other.m_batchIndex;
+        }
         return false;
     }
 
     @Override
     public String toString() {
-        return String.join(",", m_store.toString(), Integer.toString(m_columnIndex), Integer.toString(m_chunkIndex));
+        return String.join(",", m_store.toString(), Integer.toString(m_columnIndex), Integer.toString(m_batchIndex));
     }
 
+    /**
+     * Obtains the {@link ColumnReadStore} that holds the uniquely identified data.
+     *
+     * @return the store holding the data
+     */
     public ColumnReadStore getStore() {
         return m_store;
     }
@@ -107,8 +120,8 @@ public class ColumnDataUniqueId {
         return m_columnIndex;
     }
 
-    int getChunkIndex() {
-        return m_chunkIndex;
+    int getBatchIndex() {
+        return m_batchIndex;
     }
 
 }

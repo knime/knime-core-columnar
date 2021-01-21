@@ -48,16 +48,38 @@
  */
 package org.knime.core.columnar.batch;
 
-import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.data.ColumnReadData;
+import java.util.NoSuchElementException;
 
-@SuppressWarnings("javadoc")
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.data.NullableReadData;
+
+/**
+ * An ordered batch of {@link NullableReadData} of a certain size that provides random access to data by their index,
+ * but does not guarantee that data is present at all valid indices.
+ *
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public interface ReadBatch extends ReadData {
 
-    ColumnReadData get(int index);
+    /**
+     * Obtains the {@link NullableReadData} at a certain index.
+     *
+     * @param index the index at which to look for the data
+     * @return the non-null data at the given index
+     * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the size of the batch
+     * @throws NoSuchElementException if there is no data available at the given index
+     */
+    NullableReadData get(int index);
 
-    int getNumColumns();
+    /**
+     * @return the number of valid indices in this batch
+     */
+    int size();
 
-    ColumnReadData[] getUnsafe();
+    /**
+     * The maximum {@link ReadData#length() length} of all data in this batch, or zero if the batch holds no data.
+     */
+    @Override
+    int length();
 
 }
