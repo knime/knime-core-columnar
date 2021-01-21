@@ -18,7 +18,13 @@
 		<changelist>-SNAPSHOT</changelist>
 		<feature-branch-extension.branchListProperty>git.branch</feature-branch-extension.branchListProperty>
 		<feature-branch-extension.appendArtifactoryProperties>false</feature-branch-extension.appendArtifactoryProperties>
-        <sonar.coverage.exclusions>**/*Test*</sonar.coverage.exclusions>
+        <sonar.coverage.exclusions>
+          org.knime.core.columnar.testing/**/*,
+          org.knime.core.columnar.tests/**/*,
+          org.knime.core.data.columnar.testing/**/*,
+          org.knime.core.data.columnar.tests/**/*,
+          org.knime.core.data.columnar/**/org/knime/core/data/columnar/preferences/*
+        </sonar.coverage.exclusions>
 	</properties>
 
 	<modules>
