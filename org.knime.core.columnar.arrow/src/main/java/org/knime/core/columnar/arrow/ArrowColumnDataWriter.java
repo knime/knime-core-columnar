@@ -85,8 +85,8 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.store.BatchWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +96,7 @@ import org.slf4j.LoggerFactory;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-class ArrowColumnDataWriter implements ColumnDataWriter {
+class ArrowColumnDataWriter implements BatchWriter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArrowColumnDataWriter.class);
 
@@ -144,7 +144,7 @@ class ArrowColumnDataWriter implements ColumnDataWriter {
 
         // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
-            final ColumnReadData data = batch.get(i);
+            final NullableReadData data = batch.get(i);
             final ArrowColumnDataFactory factory = m_factories[i];
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
             final FieldVector vector = factory.getVector(data);

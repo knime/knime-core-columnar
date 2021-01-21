@@ -48,14 +48,14 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
- * Arrow implementation of {@link ColumnWriteData}. Can be sliced with {@link #slice(int)}.
+ * Arrow implementation of {@link NullableWriteData}. Can be sliced with {@link #slice(int)}.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowWriteData extends ColumnWriteData {
+public interface ArrowWriteData extends NullableWriteData {
 
     /**
      * Slice the this object to the given start. Note that this only affects what data is returned when accessing the

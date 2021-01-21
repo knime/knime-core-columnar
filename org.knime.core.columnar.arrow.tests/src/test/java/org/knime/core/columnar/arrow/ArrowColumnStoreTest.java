@@ -66,11 +66,11 @@ import org.apache.arrow.memory.RootAllocator;
 import org.junit.Test;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -139,14 +139,14 @@ public class ArrowColumnStoreTest {
 
     private static void testCreateWriterReader(final ColumnStoreFactory factory) throws IOException {
         final int chunkSize = 64;
-        final ColumnStoreSchema schema = ArrowTestUtils.createSchema(DoubleDataSpec.INSTANCE);
+        final ColumnStoreSchema schema = ArrowTestUtils.createSchema(DataSpec.doubleSpec());
 
         final File writeFile = ArrowTestUtils.createTmpKNIMEArrowFile();
         final File readFile = ArrowTestUtils.createTmpKNIMEArrowFile();
         Files.delete(readFile.toPath());
 
         // Use the write store to write some data
-        try (final ColumnStore writeStore = factory.createWriteStore(schema, writeFile)) {
+        try (final ColumnStore writeStore = factory.createStore(schema, writeFile)) {
             assertEquals(schema, writeStore.getSchema());
 
             // Create a batch
@@ -158,7 +158,7 @@ public class ArrowColumnStoreTest {
             final ReadBatch readBatch = writeBatch.close(chunkSize);
 
             // Write the batch
-            try (final ColumnDataWriter writer = writeStore.getWriter()) {
+            try (final BatchWriter writer = writeStore.getWriter()) {
                 writer.write(readBatch);
             }
             readBatch.release();
@@ -181,7 +181,7 @@ public class ArrowColumnStoreTest {
 
             // Read the batch
             final ReadBatch readBatch;
-            try (final ColumnDataReader reader = readStore.createReader()) {
+            try (final BatchReader reader = readStore.createReader()) {
                 readBatch = reader.readRetained(0);
             }
 

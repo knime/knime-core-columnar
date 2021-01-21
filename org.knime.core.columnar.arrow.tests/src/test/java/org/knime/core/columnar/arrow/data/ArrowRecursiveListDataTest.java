@@ -95,16 +95,16 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
     protected void setValue(final ArrowListWriteData data, final int index, final int seed) {
         if (seed == 1) {
             // Test the special case with an empty list
-            data.getWriteData(index, 0);
+            data.createWriteData(index, 0);
             return;
         }
 
         final Random random = new Random(seed);
         final int size1 = random.nextInt(MAX_LENGTH_1);
         final int[] size2 = getInnerSizes(random, size1);
-        final ArrowListWriteData inner1 = data.getWriteData(index, size1);
+        final ArrowListWriteData inner1 = data.createWriteData(index, size1);
         for (int i = 0; i < size1; i++) {
-            final ArrowIntWriteData inner2 = inner1.getWriteData(i, size2[i]);
+            final ArrowIntWriteData inner2 = inner1.createWriteData(i, size2[i]);
             for (int j = 0; j < size2[i]; j++) {
                 inner2.setInt(j, random.nextInt());
             }
@@ -113,7 +113,7 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
 
     @Override
     protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
-        final ArrowListReadData inner1 = data.getReadData(index);
+        final ArrowListReadData inner1 = data.createReadData(index);
         if (seed == 1) {
             assertEquals(0, inner1.length());
             return;
@@ -125,7 +125,7 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
         assertEquals(size1, inner1.length());
 
         for (int i = 0; i < size1; i++) {
-            final ArrowIntReadData inner2 = inner1.getReadData(i);
+            final ArrowIntReadData inner2 = inner1.createReadData(i);
             assertEquals(size2[i], inner2.length());
             for (int j = 0; j < size2[i]; j++) {
                 assertEquals(random.nextInt(), inner2.getInt(j));

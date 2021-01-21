@@ -107,7 +107,6 @@ abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractRef
         m_vector.setValueCount(length);
         final F vector = m_vector;
         m_vector = null;
-        // TODO(benjamin) is this needed
         if (getReferenceCount() != 1) {
             throw new IllegalStateException("Closed with outstanding references");
         }

@@ -68,10 +68,10 @@ import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
 import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.ByteData.ByteDataSpec;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnDataSpec.Mapper;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.data.DataSpec.Mapper;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.DurationData.DurationDataSpec;
 import org.knime.core.columnar.data.FloatData.FloatDataSpec;
@@ -92,7 +92,7 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
  * Utility class to map a {@link ColumnStoreSchema} to an array of {@link ArrowColumnDataFactory}. The factories can be
- * used to create, read or write the Arrow implementations of {@link ColumnReadData} and {@link ColumnWriteData}.
+ * used to create, read or write the Arrow implementations of {@link NullableReadData} and {@link NullableWriteData}.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -108,26 +108,26 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
 
     /**
      * Map each column of the {@link ColumnStoreSchema} to the according {@link ArrowColumnDataFactory}. The factory can
-     * be used to create, read or write the Arrow implementation of {@link ColumnReadData} and {@link ColumnWriteData}.
+     * be used to create, read or write the Arrow implementation of {@link NullableReadData} and {@link NullableWriteData}.
      *
      * @param schema the schema of the column store
      * @return the factories
      */
     static ArrowColumnDataFactory[] map(final ColumnStoreSchema schema) {
-        return IntStream.range(0, schema.getNumColumns()) //
-            .mapToObj(schema::getColumnDataSpec) //
+        return IntStream.range(0, schema.numColumns()) //
+            .mapToObj(schema::getSpec) //
             .map(ArrowSchemaMapper::map) //
             .toArray(ArrowColumnDataFactory[]::new);
     }
 
     /**
-     * Map a single {@link ColumnDataSpec} to the according {@link ArrowColumnDataFactory}. The factory can be used to
-     * create, read or write the Arrow implementation of {@link ColumnReadData} and {@link ColumnWriteData}.
+     * Map a single {@link DataSpec} to the according {@link ArrowColumnDataFactory}. The factory can be used to
+     * create, read or write the Arrow implementation of {@link NullableReadData} and {@link NullableWriteData}.
      *
      * @param spec the spec of the column
      * @return the factory
      */
-    static ArrowColumnDataFactory map(final ColumnDataSpec spec) {
+    static ArrowColumnDataFactory map(final DataSpec spec) {
         return spec.accept(INSTANCE);
     }
 
@@ -207,7 +207,7 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
 
     @Override
     public ArrowStructDataFactory visit(final StructDataSpec spec) {
-        final ColumnDataSpec[] innerSpecs = spec.getInner();
+        final DataSpec[] innerSpecs = spec.getInner();
         final ArrowColumnDataFactory[] innerFactories = new ArrowColumnDataFactory[innerSpecs.length];
         for (int i = 0; i < innerSpecs.length; i++) {
             innerFactories[i] = ArrowSchemaMapper.map(innerSpecs[i]);

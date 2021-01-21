@@ -94,8 +94,8 @@ import org.knime.core.columnar.arrow.ArrowTestUtils.SimpleDataFactory;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 
@@ -301,11 +301,11 @@ public class ArrowWriterReaderTest {
         // Create the data
         final SimpleData data1 = createWrite(factories[0], 64);
         dataChecker.fillData(data1, 0, 64, 0);
-        final ReadBatch batch1 = new DefaultReadBatch(new ColumnReadData[]{data1}, 64);
+        final ReadBatch batch1 = new DefaultReadBatch(new NullableReadData[]{data1});
 
         final SimpleData data2 = createWrite(factories[0], 64);
         dataChecker.fillData(data2, 0, 13, 1);
-        final ReadBatch batch2 = new DefaultReadBatch(new ColumnReadData[]{data2}, 13);
+        final ReadBatch batch2 = new DefaultReadBatch(new NullableReadData[]{data2});
 
         // Write the data to a file
         try (final ArrowColumnDataWriter writer =
@@ -319,19 +319,19 @@ public class ArrowWriterReaderTest {
         // Read the data from the file
         try (final ArrowColumnDataReader reader =
             new ArrowColumnDataReader(m_file, m_alloc, factories, new DefaultColumnSelection(1))) {
-            assertEquals(64, reader.getMaxLength());
+            assertEquals(64, reader.maxLength());
 
             // Batch 1
             final ReadBatch batch1Read = reader.readRetained(0);
             assertEquals(64, batch1Read.length());
-            final ColumnReadData data1Read = batch1Read.get(0);
+            final NullableReadData data1Read = batch1Read.get(0);
             dataChecker.checkData(data1Read, 0, 64, 0);
             batch1Read.release();
 
             // Batch 2
             final ReadBatch batch2Read = reader.readRetained(1);
             assertEquals(13, batch2Read.length());
-            final ColumnReadData data2Read = batch2Read.get(0);
+            final NullableReadData data2Read = batch2Read.get(0);
             dataChecker.checkData(data2Read, 0, 13, 1);
             batch2Read.release();
         }
@@ -356,12 +356,12 @@ public class ArrowWriterReaderTest {
         // Create the data
         final ReadBatch[] batches = new ReadBatch[numBatches];
         for (int b = 0; b < numBatches; b++) {
-            final ColumnReadData[] data1 = new ColumnReadData[numColumns];
+            final NullableReadData[] data1 = new NullableReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
-                final ColumnWriteData d = createWrite(factories[c], capacity);
+                final NullableWriteData d = createWrite(factories[c], capacity);
                 data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * c);
             }
-            batches[b] = new DefaultReadBatch(data1, dataCount);
+            batches[b] = new DefaultReadBatch(data1);
         }
 
         // Write the data to a file
@@ -379,7 +379,7 @@ public class ArrowWriterReaderTest {
             final int b = 7;
             final ReadBatch batch = reader.readRetained(b);
             for (int c = 0; c < numColumns; c++) {
-                final ColumnReadData data = batch.get(c);
+                final NullableReadData data = batch.get(c);
                 dataChecker.checkData(data, c, dataCount, (long)b * c);
             }
             batch.release();
@@ -407,12 +407,12 @@ public class ArrowWriterReaderTest {
         // Create the data
         final ReadBatch[] batches = new ReadBatch[numBatches];
         for (int b = 0; b < numBatches; b++) {
-            final ColumnReadData[] data1 = new ColumnReadData[numColumns];
+            final NullableReadData[] data1 = new NullableReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
-                final ColumnWriteData d = createWrite(factories[c], capacity);
+                final NullableWriteData d = createWrite(factories[c], capacity);
                 data1[c] = dataChecker[c].fillData(d, c, dataCount, (long)b * (c + 1));
             }
-            batches[b] = new DefaultReadBatch(data1, dataCount);
+            batches[b] = new DefaultReadBatch(data1);
         }
 
         // Write the data to a file
@@ -427,12 +427,12 @@ public class ArrowWriterReaderTest {
         // Read only some columns
         try (final ArrowColumnDataReader reader =
             new ArrowColumnDataReader(m_file, m_alloc, factories, new FilteredColumnSelection(numColumns, 0, 2))) {
-            assertEquals(numBatches, reader.getNumBatches());
-            assertEquals(capacity, reader.getMaxLength());
+            assertEquals(numBatches, reader.numBatches());
+            assertEquals(capacity, reader.maxLength());
             for (int b = 0; b < numBatches; b++) {
                 final ReadBatch batch = reader.readRetained(b);
 
-                ColumnReadData data = batch.get(0);
+                NullableReadData data = batch.get(0);
                 dataChecker[0].checkData(data, 0, dataCount, (long)b * 1);
 
                 data = batch.get(2);
@@ -466,12 +466,12 @@ public class ArrowWriterReaderTest {
         // Create the data
         final ReadBatch[] batches = new ReadBatch[numBatches];
         for (int b = 0; b < numBatches; b++) {
-            final ColumnReadData[] data1 = new ColumnReadData[numColumns];
+            final NullableReadData[] data1 = new NullableReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
-                final ColumnWriteData d = createWrite(factories[c], capacity);
+                final NullableWriteData d = createWrite(factories[c], capacity);
                 data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * (c + 1));
             }
-            batches[b] = new DefaultReadBatch(data1, dataCount);
+            batches[b] = new DefaultReadBatch(data1);
         }
 
         // Write the data to a file
@@ -486,12 +486,12 @@ public class ArrowWriterReaderTest {
         // Read only some columns
         try (final ArrowColumnDataReader reader =
             new ArrowColumnDataReader(m_file, m_alloc, factories, new FilteredColumnSelection(numColumns, 0, 2))) {
-            assertEquals(numBatches, reader.getNumBatches());
-            assertEquals(capacity, reader.getMaxLength());
+            assertEquals(numBatches, reader.numBatches());
+            assertEquals(capacity, reader.maxLength());
             for (int b = 0; b < numBatches; b++) {
                 final ReadBatch batch = reader.readRetained(b);
 
-                ColumnReadData data = batch.get(0);
+                NullableReadData data = batch.get(0);
                 dataChecker.checkData(data, 0, dataCount, (long)b * 1);
 
                 data = batch.get(2);
@@ -550,13 +550,13 @@ public class ArrowWriterReaderTest {
                 new SimpleDataChecker(true), new DictionaryEncodedDataChecker(), new ComplexDataChecker()};
 
             @Override
-            public ColumnReadData fillData(final ColumnWriteData data, final int columnIndex, final int count,
+            public NullableReadData fillData(final NullableWriteData data, final int columnIndex, final int count,
                 final long seed) {
                 return m_checkers[columnIndex].fillData(data, columnIndex, count, seed);
             }
 
             @Override
-            public void checkData(final ColumnReadData data, final int columnIndex, final int count, final long seed) {
+            public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
                 m_checkers[columnIndex].checkData(data, columnIndex, count, seed);
             }
         }, ARROW_NO_COMPRESSION);
@@ -573,12 +573,12 @@ public class ArrowWriterReaderTest {
         // Create the data
         final ReadBatch[] batches = new ReadBatch[numBatches];
         for (int b = 0; b < numBatches; b++) {
-            final ColumnReadData[] data1 = new ColumnReadData[numColumns];
+            final NullableReadData[] data1 = new NullableReadData[numColumns];
             for (int c = 0; c < numColumns; c++) {
-                final ColumnWriteData d = createWrite(factories[c], capacity);
+                final NullableWriteData d = createWrite(factories[c], capacity);
                 data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * c);
             }
-            batches[b] = new DefaultReadBatch(data1, dataCount);
+            batches[b] = new DefaultReadBatch(data1);
         }
 
         // Write the data to a file
@@ -592,12 +592,12 @@ public class ArrowWriterReaderTest {
         // Read the data from the file
         try (final ArrowColumnDataReader reader =
             new ArrowColumnDataReader(m_file, m_alloc, factories, new DefaultColumnSelection(numColumns))) {
-            assertEquals(numBatches, reader.getNumBatches());
-            assertEquals(capacity, reader.getMaxLength());
+            assertEquals(numBatches, reader.numBatches());
+            assertEquals(capacity, reader.maxLength());
             for (int b = 0; b < numBatches; b++) {
                 final ReadBatch batch = reader.readRetained(b);
                 for (int c = 0; c < numColumns; c++) {
-                    final ColumnReadData data = batch.get(c);
+                    final NullableReadData data = batch.get(c);
                     dataChecker.checkData(data, c, dataCount, (long)b * c);
                 }
                 batch.release();
@@ -606,9 +606,9 @@ public class ArrowWriterReaderTest {
         assertEquals(0, m_alloc.getAllocatedMemory());
     }
 
-    /** Create a {@link ColumnWriteData} with the given factory */
+    /** Create a {@link NullableWriteData} with the given factory */
     @SuppressWarnings({"unchecked", "resource"})
-    private final <T extends ColumnWriteData> T createWrite(final ArrowColumnDataFactory factory, final int numValues) {
+    private final <T extends NullableWriteData> T createWrite(final ArrowColumnDataFactory factory, final int numValues) {
         final long firstDictId = new Random().nextInt(1000);
         final AtomicLong dictId1 = new AtomicLong(firstDictId);
         final AtomicLong dictId2 = new AtomicLong(firstDictId);
@@ -627,7 +627,7 @@ public class ArrowWriterReaderTest {
 
         @Override
         @SuppressWarnings("resource")
-        public ColumnReadData fillData(final ColumnWriteData data, final int columnIndex, final int count,
+        public NullableReadData fillData(final NullableWriteData data, final int columnIndex, final int count,
             final long seed) {
             assertTrue(data instanceof SimpleData);
             final SimpleData d = (SimpleData)data;
@@ -644,7 +644,7 @@ public class ArrowWriterReaderTest {
 
         @Override
         @SuppressWarnings("resource")
-        public void checkData(final ColumnReadData data, final int columnIndex, final int count, final long seed) {
+        public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
             assertTrue(data instanceof SimpleData);
             final SimpleData d = (SimpleData)data;
             final Random random = new Random(seed);
@@ -664,7 +664,7 @@ public class ArrowWriterReaderTest {
 
         @Override
         @SuppressWarnings("resource")
-        public ColumnReadData fillData(final ColumnWriteData data, final int columnIndex, final int count,
+        public NullableReadData fillData(final NullableWriteData data, final int columnIndex, final int count,
             final long seed) {
             assertTrue(data instanceof DictionaryEncodedData);
             final DictionaryEncodedData d = (DictionaryEncodedData)data;
@@ -689,7 +689,7 @@ public class ArrowWriterReaderTest {
 
         @Override
         @SuppressWarnings("resource")
-        public void checkData(final ColumnReadData data, final int columnIndex, final int count, final long seed) {
+        public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
             assertTrue(data instanceof DictionaryEncodedData);
             final DictionaryEncodedData d = (DictionaryEncodedData)data;
             final Random random = new Random(seed);
@@ -731,7 +731,7 @@ public class ArrowWriterReaderTest {
 
         @SuppressWarnings("resource")
         @Override
-        public ColumnReadData fillData(final ColumnWriteData data, final int coulumnIndex, final int count,
+        public NullableReadData fillData(final NullableWriteData data, final int coulumnIndex, final int count,
             final long seed) {
             assertTrue(data instanceof ComplexData);
             final ComplexData d = (ComplexData)data;
@@ -811,7 +811,7 @@ public class ArrowWriterReaderTest {
 
         @SuppressWarnings("resource")
         @Override
-        public void checkData(final ColumnReadData data, final int columnIndex, final int count, final long seed) {
+        public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
             assertTrue(data instanceof ComplexData);
             final ComplexData d = (ComplexData)data;
             final Random random = new Random(seed);

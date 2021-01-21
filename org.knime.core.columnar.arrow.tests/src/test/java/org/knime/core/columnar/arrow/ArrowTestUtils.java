@@ -77,9 +77,9 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
@@ -113,16 +113,16 @@ public final class ArrowTestUtils {
      * @param types the types of the columns
      * @return the schema
      */
-    public static ColumnStoreSchema createSchema(final ColumnDataSpec... types) {
+    public static ColumnStoreSchema createSchema(final DataSpec... types) {
         return new ColumnStoreSchema() {
 
             @Override
-            public int getNumColumns() {
+            public int numColumns() {
                 return types.length;
             }
 
             @Override
-            public ColumnDataSpec getColumnDataSpec(final int index) {
+            public DataSpec getSpec(final int index) {
                 return types[index];
             }
         };
@@ -135,8 +135,8 @@ public final class ArrowTestUtils {
      * @param width the number of columns
      * @return the schema
      */
-    public static ColumnStoreSchema createWideSchema(final ColumnDataSpec type, final int width) {
-        final ColumnDataSpec[] types = new ColumnDataSpec[width];
+    public static ColumnStoreSchema createWideSchema(final DataSpec type, final int width) {
+        final DataSpec[] types = new DataSpec[width];
         for (int i = 0; i < width; i++) {
             types[i] = type;
         }
@@ -144,7 +144,7 @@ public final class ArrowTestUtils {
     }
 
     /**
-     * A simple implementation of {@link ColumnReadData} and {@link ColumnWriteData} for testing. Holds an
+     * A simple implementation of {@link NullableReadData} and {@link NullableWriteData} for testing. Holds an
      * {@link IntVector} which can be accessed by {@link #getVector()}. Use the {@link SimpleDataFactory} to create new
      * instances.
      */
@@ -203,6 +203,12 @@ public final class ArrowTestUtils {
 
         @Override
         public SimpleData close(final int length) {
+            if (length < 0) {
+                throw new IllegalArgumentException("Length must be non-negative.");
+            }
+            if (length > capacity()) {
+                throw new IllegalArgumentException("Length must not be larger than capacity.");
+            }
             m_vector.setValueCount(length);
             return this;
         }
@@ -226,7 +232,7 @@ public final class ArrowTestUtils {
     }
 
     /**
-     * A {@link ColumnReadData} and {@link ColumnWriteData} implementation holding a dictionary for testing. Holds an
+     * A {@link NullableReadData} and {@link NullableWriteData} implementation holding a dictionary for testing. Holds an
      * index vector which can be accessed with {@link #getVector()} and a dictionary which can be accessed with
      * {@link #getDictionary()}. Use {@link DictionaryEncodedDataFactory} to create new instances.
      */
@@ -296,6 +302,12 @@ public final class ArrowTestUtils {
 
         @Override
         public DictionaryEncodedData close(final int length) {
+            if (length < 0) {
+                throw new IllegalArgumentException("Length must be non-negative.");
+            }
+            if (length > capacity()) {
+                throw new IllegalArgumentException("Length must not be larger than capacity.");
+            }
             m_vector.setValueCount(length);
             return this;
         }
@@ -319,7 +331,7 @@ public final class ArrowTestUtils {
     }
 
     /**
-     * A complex implemenation of {@link ColumnReadData} and {@link ColumnWriteData}. Holds a struct vector with
+     * A complex implemenation of {@link NullableReadData} and {@link NullableWriteData}. Holds a struct vector with
      * multiple child vectors and three dictionary encodings of which 1 is recursive.
      * </p>
      * ArrowType: <code>Struct&lt;a:BigInt, b:Int, c:List&lt;Int&gt;, d:Struct&lt;e:Int, f:Bit&gt;&gt;</code> </br>
@@ -478,6 +490,12 @@ public final class ArrowTestUtils {
 
         @Override
         public ComplexData close(final int length) {
+            if (length < 0) {
+                throw new IllegalArgumentException("Length must be non-negative.");
+            }
+            if (length > capacity()) {
+                throw new IllegalArgumentException("Length must not be larger than capacity.");
+            }
             m_vector.setValueCount(length);
             return this;
         }
@@ -539,12 +557,12 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public FieldVector getVector(final ColumnReadData data) {
+        public FieldVector getVector(final NullableReadData data) {
             return ((SimpleData)data).m_vector;
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
             return null;
         }
 
@@ -590,12 +608,12 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public FieldVector getVector(final ColumnReadData data) {
+        public FieldVector getVector(final NullableReadData data) {
             return ((DictionaryEncodedData)data).m_vector;
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
             final Dictionary dictionary = ((DictionaryEncodedData)data).m_dictionary;
             return new ArrowReaderWriterUtils.SingletonDictionaryProvider(dictionary);
         }
@@ -706,12 +724,12 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public FieldVector getVector(final ColumnReadData data) {
+        public FieldVector getVector(final NullableReadData data) {
             return ((ComplexData)data).m_vector;
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
             final ComplexData d = ((ComplexData)data);
             return new MapDictionaryProvider(d.m_dictionaryB, d.m_dictionaryE, d.m_dictionaryG);
         }
@@ -723,25 +741,25 @@ public final class ArrowTestUtils {
     }
 
     /**
-     * An interface for classes which can fill a {@link ColumnWriteData} object with values and can check if a
-     * {@link ColumnReadData} object contains the expected values.
+     * An interface for classes which can fill a {@link NullableWriteData} object with values and can check if a
+     * {@link NullableReadData} object contains the expected values.
      */
     public static interface DataChecker {
 
         /**
-         * Set the values of a {@link ColumnWriteData} object and close it.
+         * Set the values of a {@link NullableWriteData} object and close it.
          *
          * @param data the data object
          * @param columnIndex the index of the column. Can be used to handle different kinds of data in different
          *            columns
          * @param count the number of values to write
          * @param seed the seed defining the values
-         * @return the {@link ColumnReadData} for this {@link ColumnWriteData}
+         * @return the {@link NullableReadData} for this {@link NullableWriteData}
          */
-        ColumnReadData fillData(ColumnWriteData data, final int columnIndex, final int count, final long seed);
+        NullableReadData fillData(NullableWriteData data, final int columnIndex, final int count, final long seed);
 
         /**
-         * Check the values in the {@link ColumnReadData}.
+         * Check the values in the {@link NullableReadData}.
          *
          * @param data the data object
          * @param columnIndex the index of the column. Can be used to handle different kinds of data in different
@@ -749,6 +767,6 @@ public final class ArrowTestUtils {
          * @param count the number of values to check
          * @param seed the seed defining the values
          */
-        void checkData(ColumnReadData data, final int columnIndex, final int count, final long seed);
+        void checkData(NullableReadData data, final int columnIndex, final int count, final long seed);
     }
 }

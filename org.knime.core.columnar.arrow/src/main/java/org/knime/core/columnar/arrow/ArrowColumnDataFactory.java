@@ -55,8 +55,8 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 
 import com.google.common.base.Preconditions;
 
@@ -66,16 +66,16 @@ import com.google.common.base.Preconditions;
  * {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}), wrap vectors and dictionaries that have been
  * read from a file
  * ({@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)}) and get
- * vectors and dictionaries that need to be written to a file ({@link #getVector(ColumnReadData)} and
- * {@link #getDictionaries(ColumnReadData)}).
+ * vectors and dictionaries that need to be written to a file ({@link #getVector(NullableReadData)} and
+ * {@link #getDictionaries(NullableReadData)}).
  * </p>
  * The static method {@link #createWrite(ArrowColumnDataFactory, String, BufferAllocator, int)} can be used to create
- * new {@link ColumnWriteData} in just one step.
+ * new {@link NullableWriteData} in just one step.
  * </p>
  * A factor has a {@link ArrowColumnDataFactoryVersion}. Make sure to update the version if
- * {@link #getVector(ColumnReadData)} or {@link #getDictionaries(ColumnReadData)} change. Implement
+ * {@link #getVector(NullableReadData)} or {@link #getDictionaries(NullableReadData)} change. Implement
  * {@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)} such that
- * vectors and dictionaries from all prior versions can be wrapped in an appropriate {@link ColumnReadData} object.
+ * vectors and dictionaries from all prior versions can be wrapped in an appropriate {@link NullableReadData} object.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -103,7 +103,7 @@ public interface ArrowColumnDataFactory {
      *            dictionary ids from the supplier as in {@link #getField(String, LongSupplier)}.
      * @param allocator the allocator used for memory allocation of dictionary vectors
      * @param capacity the initial capacity to allocate
-     * @return the {@link ColumnWriteData}
+     * @return the {@link NullableWriteData}
      */
     ArrowWriteData createWrite(FieldVector vector, LongSupplier dictionaryIdSupplier, BufferAllocator allocator,
         int capacity);
@@ -117,7 +117,7 @@ public interface ArrowColumnDataFactory {
      * @param nullCount the null count of this vector (and its children)
      * @param provider a dictionary provider holding dictionaries that can be used
      * @param version the version the vector and dictionaries were written with
-     * @return the {@link ColumnReadData}
+     * @return the {@link NullableReadData}
      * @throws IOException if the data cannot be loaded with the given version
      */
     ArrowReadData createRead(FieldVector vector, ArrowVectorNullCount nullCount, DictionaryProvider provider,
@@ -129,13 +129,13 @@ public interface ArrowColumnDataFactory {
      * @param data a column data holding some values
      * @return a {@link FieldVector} which should be written to disk
      */
-    FieldVector getVector(ColumnReadData data);
+    FieldVector getVector(NullableReadData data);
 
     /**
      * @param data a column data holding some values
      * @return dictionaries which should be written to disk
      */
-    DictionaryProvider getDictionaries(ColumnReadData data);
+    DictionaryProvider getDictionaries(NullableReadData data);
 
     /**
      * @return the current version used for getting the vectors and dictionaries. Not allowed to contain ','.
@@ -153,18 +153,18 @@ public interface ArrowColumnDataFactory {
     }
 
     /**
-     * Utility method to create a new instance of {@link ColumnWriteData} with a newly allocated vector. First creates a
+     * Utility method to create a new instance of {@link NullableWriteData} with a newly allocated vector. First creates a
      * field using {@link #getField(String, LongSupplier)}. Then allocates a new vector for this field and creates the
-     * {@link ColumnWriteData} using {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}.
+     * {@link NullableWriteData} using {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}.
      *
      * @param factory the factory to create the column data
      * @param name the name of the vector
      * @param allocator the allocator to allocate memory
      * @param capacity the capacity of the data
-     * @return a new {@link ColumnWriteData} object
+     * @return a new {@link NullableWriteData} object
      */
     @SuppressWarnings("resource") // Vector resource handled by ColumnWriteData
-    public static ColumnWriteData createWrite(final ArrowColumnDataFactory factory, final String name,
+    public static NullableWriteData createWrite(final ArrowColumnDataFactory factory, final String name,
         final BufferAllocator allocator, final int capacity) {
         final Field field = factory.getField(name, newDictionaryIdSupplier());
         final FieldVector vector = field.createVector(allocator);

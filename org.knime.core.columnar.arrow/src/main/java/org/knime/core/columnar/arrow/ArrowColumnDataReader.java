@@ -90,11 +90,9 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory.ArrowVectorNullCount;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.BatchReader;
 
 /**
  * The ArrowColumnDataWriter reads batches of columns from an Arrow file.
@@ -102,7 +100,7 @@ import org.knime.core.columnar.store.ColumnDataReader;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-class ArrowColumnDataReader implements ColumnDataReader {
+class ArrowColumnDataReader implements BatchReader {
 
     private final File m_file;
 
@@ -147,17 +145,14 @@ class ArrowColumnDataReader implements ColumnDataReader {
         final DictionaryProvider dictionaries = readDictionaries(index);
 
         // Create the ColumnData
-        final int numColumns = m_columnSelection.getNumColumns();
-        final ColumnReadData[] data = new ColumnReadData[numColumns];
-        int length = 0;
-        for (int i = 0; i < numColumns; i++) {
-            if (m_columnSelection.isSelected(i)) {
-                data[i] = m_factories[i].createRead(vectors[i].m_vector, vectors[i].m_nullCount, dictionaries,
+        return m_columnSelection.createBatch(i -> {
+            try {
+                return m_factories[i].createRead(vectors[i].m_vector, vectors[i].m_nullCount, dictionaries,
                     m_factoryVersions[i]);
-                length = Math.max(length, data[i].length());
+            } catch (IOException e) {
+                throw new IllegalStateException("Exception while reading column data.", e);
             }
-        }
-        return new DefaultReadBatch(data, length);
+        });
     }
 
     /** Read the vectors at the given batch index using the reader */
@@ -242,7 +237,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
     }
 
     @Override
-    public int getNumBatches() throws IOException {
+    public int numBatches() throws IOException {
         if (m_reader == null) {
             initializeReader();
         }
@@ -250,7 +245,7 @@ class ArrowColumnDataReader implements ColumnDataReader {
     }
 
     @Override
-    public int getMaxLength() throws IOException {
+    public int maxLength() throws IOException {
         if (m_reader == null) {
             initializeReader();
         }

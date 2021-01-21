@@ -68,8 +68,8 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.NestedDictionaryProvider;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 
@@ -103,7 +103,7 @@ public final class ArrowStructData {
         public void setMissing(final int index) {
             // NB: We don't need to call m_vector.setNull because it is always null until #close
             // Set all children to missing
-            for (final ColumnWriteData child : m_children) {
+            for (final NullableWriteData child : m_children) {
                 child.setMissing(m_offset + index);
             }
         }
@@ -114,7 +114,7 @@ public final class ArrowStructData {
         }
 
         @Override
-        public <C extends ColumnWriteData> C getWriteDataAt(final int index) {
+        public <C extends NullableWriteData> C getWriteDataAt(final int index) {
             @SuppressWarnings("unchecked")
             final C cast = (C)m_children[index];
             return cast;
@@ -197,7 +197,7 @@ public final class ArrowStructData {
         }
 
         @Override
-        public <C extends ColumnReadData> C getReadDataAt(final int index) {
+        public <C extends NullableReadData> C getReadDataAt(final int index) {
             @SuppressWarnings("unchecked")
             final C cast = (C)m_children[index];
             return cast;
@@ -312,7 +312,7 @@ public final class ArrowStructData {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
             final ArrowStructReadData d = (ArrowStructReadData)data;
             final List<DictionaryProvider> providers = new ArrayList<>();
             for (int i = 0; i < m_inner.length; i++) {

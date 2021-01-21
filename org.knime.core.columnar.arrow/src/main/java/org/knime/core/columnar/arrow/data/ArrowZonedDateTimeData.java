@@ -75,7 +75,7 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.SingletonDictionaryProvider;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
@@ -343,7 +343,7 @@ public final class ArrowZonedDateTimeData {
 
         @Override
         @SuppressWarnings("resource") // Dictionary vector closed by data object
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
             final ArrowZonedDateTimeReadData objData = (ArrowZonedDateTimeReadData)data;
             final LargeVarBinaryVector vector = objData.getDictionary();
             final Dictionary dictionary = new Dictionary(vector, objData.m_zoneIdVector.getField().getDictionary());

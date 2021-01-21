@@ -52,13 +52,13 @@ import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
  * Abstract implementation of {@link ArrowColumnDataFactory} for {@link ArrowReadData} which extend
  * {@link AbstractArrowReadData}. Holds the current version.
  *
- * Overwrite {@link #getDictionaries(ColumnReadData)} if the data object contains dictionaries.
+ * Overwrite {@link #getDictionaries(NullableReadData)} if the data object contains dictionaries.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
@@ -78,12 +78,12 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
     }
 
     @Override
-    public FieldVector getVector(final ColumnReadData data) {
+    public FieldVector getVector(final NullableReadData data) {
         return ((AbstractArrowReadData<?>)data).m_vector;
     }
 
     @Override
-    public DictionaryProvider getDictionaries(final ColumnReadData data) {
+    public DictionaryProvider getDictionaries(final NullableReadData data) {
         return null;
     }
 

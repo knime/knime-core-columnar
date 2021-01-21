@@ -63,7 +63,7 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.SingletonDictionaryProvider;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
@@ -251,7 +251,7 @@ public final class ArrowDictEncodedObjectData {
 
         @Override
         @SuppressWarnings("resource") // Dictionary vector closed by data object
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
             @SuppressWarnings("unchecked")
             final ArrowDictEncodedObjectReadData<T> objData = (ArrowDictEncodedObjectReadData<T>)data;
             final LargeVarBinaryVector vector = objData.getDictionary();

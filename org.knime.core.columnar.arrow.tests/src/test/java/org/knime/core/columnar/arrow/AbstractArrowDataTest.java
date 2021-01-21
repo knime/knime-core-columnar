@@ -74,16 +74,16 @@ import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 
 /**
- * Abstract test for simple Arrow {@link ColumnReadData}, {@link ColumnWriteData} implementations.
+ * Abstract test for simple Arrow {@link NullableReadData}, {@link NullableWriteData} implementations.
  *
- * @param <W> type of the {@link ColumnWriteData} implementation
- * @param <R> type of the {@link ColumnReadData} implementation
+ * @param <W> type of the {@link NullableWriteData} implementation
+ * @param <R> type of the {@link NullableReadData} implementation
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
@@ -211,7 +211,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
      * Create a ColumnWriteData using the saved factory.
      *
      * @param numValues the number of values to allocate
-     * @return the {@link ColumnWriteData}
+     * @return the {@link NullableWriteData}
      */
     protected W createWrite(final int numValues) {
         return castW(ArrowColumnDataFactory.createWrite(m_factory, "0", m_alloc, numValues));
@@ -557,7 +557,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             setValue(dw, i, i);
         }
         R d = castR(dw.close(numValues));
-        ReadBatch batch = new DefaultReadBatch(new ColumnReadData[]{d}, numValues);
+        ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
@@ -603,7 +603,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             }
         }
         R d = castR(dw.close(numValues));
-        ReadBatch batch = new DefaultReadBatch(new ColumnReadData[]{d}, numValues);
+        ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
@@ -650,7 +650,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             dw.setMissing(i);
         }
         R d = castR(dw.close(numValues));
-        ReadBatch batch = new DefaultReadBatch(new ColumnReadData[]{d}, numValues);
+        ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();

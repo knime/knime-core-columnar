@@ -49,7 +49,7 @@ import java.io.File;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataReader;
+import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
@@ -79,7 +79,7 @@ final class ArrowColumnReadStore implements ColumnReadStore {
     }
 
     @Override
-    public ColumnDataReader createReader(final ColumnSelection config) {
+    public BatchReader createReader(final ColumnSelection config) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
         return new ArrowColumnDataReader(m_file, m_allocator, factories, config);
     }

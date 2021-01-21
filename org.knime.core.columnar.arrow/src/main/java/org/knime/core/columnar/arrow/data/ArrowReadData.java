@@ -48,14 +48,14 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
- * Arrow implementation of {@link ColumnReadData}. Can be sliced with {@link #slice(int, int)}.
+ * Arrow implementation of {@link NullableReadData}. Can be sliced with {@link #slice(int, int)}.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowReadData extends ColumnReadData {
+public interface ArrowReadData extends NullableReadData {
 
     /**
      * Slice the this object to the given start and length.

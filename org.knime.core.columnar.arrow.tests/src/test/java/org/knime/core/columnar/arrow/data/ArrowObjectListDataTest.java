@@ -96,13 +96,13 @@ public class ArrowObjectListDataTest extends AbstractArrowDataTest<ArrowListWrit
     protected void setValue(final ArrowListWriteData data, final int index, final int seed) {
         if (seed == 1) {
             // Test the special case with an empty list
-            data.getWriteData(index, 0);
+            data.createWriteData(index, 0);
             return;
         }
 
         final Random random = new Random(seed);
         final int size = random.nextInt(MAX_LENGTH);
-        final ArrowObjectWriteData<byte[]> inner = data.getWriteData(index, size);
+        final ArrowObjectWriteData<byte[]> inner = data.createWriteData(index, size);
         for (int i = 0; i < size; i++) {
             byte[] valueFor = valueFor(random);
             inner.setObject(i, valueFor);
@@ -111,7 +111,7 @@ public class ArrowObjectListDataTest extends AbstractArrowDataTest<ArrowListWrit
 
     @Override
     protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
-        final ArrowObjectReadData<byte[]> element = data.getReadData(index);
+        final ArrowObjectReadData<byte[]> element = data.createReadData(index);
         if (seed == 1) {
             assertEquals(0, element.length());
             return;

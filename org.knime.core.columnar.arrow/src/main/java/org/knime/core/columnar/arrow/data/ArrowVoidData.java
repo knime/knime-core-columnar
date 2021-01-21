@@ -60,7 +60,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.data.ColumnReadData;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.VoidData.VoidReadData;
 import org.knime.core.columnar.data.VoidData.VoidWriteData;
 
@@ -107,6 +107,12 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
 
     @Override
     public ArrowVoidData close(final int length) {
+        if (length < 0) {
+            throw new IllegalArgumentException("Length must be non-negative.");
+        }
+        if (length > capacity()) {
+            throw new IllegalArgumentException("Length must not be larger than capacity.");
+        }
         m_vector.setValueCount(length);
         return new ArrowVoidData(m_vector, m_capacity);
     }
@@ -171,12 +177,12 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
         }
 
         @Override
-        public FieldVector getVector(final ColumnReadData data) {
+        public FieldVector getVector(final NullableReadData data) {
             return ((ArrowVoidData)data).m_vector;
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
             return null;
         }
 

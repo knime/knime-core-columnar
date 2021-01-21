@@ -79,7 +79,11 @@ abstract class AbstractReferencedData implements ReferencedData {
 
     @Override
     public void retain() {
-        m_refCounter.getAndIncrement();
+        if (m_refCounter.get() > 0) {
+            m_refCounter.incrementAndGet();
+        } else {
+            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
+        }
     }
 
     /**

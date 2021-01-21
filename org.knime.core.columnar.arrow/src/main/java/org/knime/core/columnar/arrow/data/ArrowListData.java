@@ -65,8 +65,8 @@ import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.ColumnReadData;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 
@@ -97,7 +97,7 @@ public final class ArrowListData {
         }
 
         @Override
-        public <C extends ColumnWriteData> C getWriteData(final int index, final int size) {
+        public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
             // Set the offset and validity buffer
             final int offset = m_vector.startNewValue(m_offset + index);
             m_vector.endValue(m_offset + index, size);
@@ -178,7 +178,7 @@ public final class ArrowListData {
         }
 
         @Override
-        public <C extends ColumnReadData> C getReadData(final int index) {
+        public <C extends NullableReadData> C createReadData(final int index) {
             // Slice the data
             final int start = m_vector.getElementStartIndex(m_offset + index);
             final int length = m_vector.getElementEndIndex(m_offset + index) - start;
@@ -257,7 +257,7 @@ public final class ArrowListData {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final ColumnReadData data) {
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
             final ArrowListReadData d = (ArrowListReadData)data;
             return m_inner.getDictionaries(d.m_data);
         }

@@ -72,25 +72,10 @@ import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
-import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
-import org.knime.core.columnar.data.ByteData.ByteDataSpec;
-import org.knime.core.columnar.data.ColumnDataSpec;
-import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
-import org.knime.core.columnar.data.DurationData.DurationDataSpec;
-import org.knime.core.columnar.data.FloatData.FloatDataSpec;
-import org.knime.core.columnar.data.IntData.IntDataSpec;
+import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.ListData.ListDataSpec;
-import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
-import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
-import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
-import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
-import org.knime.core.columnar.data.VoidData.VoidDataSpec;
-import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
@@ -104,43 +89,43 @@ public class ArrowSchemaMapperTest {
     /** Test mapping double specs to a {@link ArrowDoubleDataFactory} */
     @Test
     public void testMapDoubleSpec() {
-        testMapSingleSpec(DoubleDataSpec.INSTANCE, ArrowDoubleDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.doubleSpec(), ArrowDoubleDataFactory.INSTANCE);
     }
 
     /** Test mapping int specs to a {@link ArrowIntDataFactory} */
     @Test
     public void testMapIntSpec() {
-        testMapSingleSpec(IntDataSpec.INSTANCE, ArrowIntDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.intSpec(), ArrowIntDataFactory.INSTANCE);
     }
 
     /** Test mapping long specs to a {@link ArrowLongDataFactory} */
     @Test
     public void testMapLongSpec() {
-        testMapSingleSpec(LongDataSpec.INSTANCE, ArrowLongDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.longSpec(), ArrowLongDataFactory.INSTANCE);
     }
 
     /** Test mapping float specs to a {@link ArrowFloatDataFactory} */
     @Test
     public void testMapFloatSpec() {
-        testMapSingleSpec(FloatDataSpec.INSTANCE, ArrowFloatDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.floatSpec(), ArrowFloatDataFactory.INSTANCE);
     }
 
     /** Test mapping boolean specs to a {@link ArrowBooleanDataFactory} */
     @Test
     public void testMapBooleanSpec() {
-        testMapSingleSpec(BooleanDataSpec.INSTANCE, ArrowBooleanDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.booleanSpec(), ArrowBooleanDataFactory.INSTANCE);
     }
 
     /** Test mapping byte specs to a {@link ArrowByteDataFactory} */
     @Test
     public void testMapByteSpec() {
-        testMapSingleSpec(ByteDataSpec.INSTANCE, ArrowByteDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.byteSpec(), ArrowByteDataFactory.INSTANCE);
     }
 
     /** Test mapping var binary specs to a {@link ArrowVarBinaryDataFactory} */
     @Test
     public void testMapVarBinarySpec() {
-        testMapSingleSpec(VarBinaryDataSpec.INSTANCE, ArrowVarBinaryDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.varBinarySpec(), ArrowVarBinaryDataFactory.INSTANCE);
     }
 
     /** Test mapping object specs to a {@link ArrowObjectDataFactory} */
@@ -160,61 +145,62 @@ public class ArrowSchemaMapperTest {
     /** Test mapping void specs to a {@link ArrowVoidDataFactory} */
     @Test
     public void testMapVoidSpec() {
-        testMapSingleSpec(VoidDataSpec.INSTANCE, ArrowVoidDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.voidSpec(), ArrowVoidDataFactory.INSTANCE);
     }
 
     /** Test mapping LocalTime specs to a {@link ArrowLocalTimeDataFactory} */
     @Test
     public void testMapLocalTimeSpec() {
-        testMapSingleSpec(LocalTimeDataSpec.INSTANCE, ArrowLocalTimeDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.localTimeSpec(), ArrowLocalTimeDataFactory.INSTANCE);
     }
 
     /** Test mapping LocalDate specs to a {@link ArrowLocalDateDataFactory} */
     @Test
     public void testMapLocalDateSpec() {
-        testMapSingleSpec(LocalDateDataSpec.INSTANCE, ArrowLocalDateDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.localDateSpec(), ArrowLocalDateDataFactory.INSTANCE);
     }
 
     /** Test mapping Period specs to a {@link ArrowPeriodDataFactory} */
     @Test
     public void testMapPeriodSpec() {
-        testMapSingleSpec(PeriodDataSpec.INSTANCE, ArrowPeriodDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.periodSpec(), ArrowPeriodDataFactory.INSTANCE);
     }
 
     /** Test mapping Duration specs to a {@link ArrowDurationDataFactory} */
     @Test
     public void testMapDurationSpec() {
-        testMapSingleSpec(DurationDataSpec.INSTANCE, ArrowDurationDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.durationSpec(), ArrowDurationDataFactory.INSTANCE);
     }
 
     /** Test mapping LocalDateTime specs to a {@link ArrowLocalDateTimeDataFactory} */
     @Test
     public void testMapLocalDateTimeSpec() {
-        testMapSingleSpec(LocalDateTimeDataSpec.INSTANCE, ArrowLocalDateTimeDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.localDateTimeSpec(), ArrowLocalDateTimeDataFactory.INSTANCE);
     }
 
     /** Test mapping ZonedDateTime specs to a {@link ArrowZonedDateTimeDataFactory} */
     @Test
     public void testMapZonedDateTimeSpec() {
-        testMapSingleSpec(ZonedDateTimeDataSpec.INSTANCE, ArrowZonedDateTimeDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.zonedDateTimeSpec(), ArrowZonedDateTimeDataFactory.INSTANCE);
     }
 
     /** Test mapping String specs to a {@link ArrowStringDataFactory} */
     @Test
     public void testMapStringSpec() {
-        testMapSingleSpec(StringDataSpec.INSTANCE, ArrowStringDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.stringSpec(), ArrowStringDataFactory.INSTANCE);
     }
 
     /** Test mapping void specs to a {@link ArrowStructDataFactory} */
     @Test
     public void testMapStructSpec() {
         // Simple
-        testMapSingleSpec(new StructDataSpec(DoubleDataSpec.INSTANCE, IntDataSpec.INSTANCE),
+        testMapSingleSpec(new StructDataSpec(DataSpec.doubleSpec(), DataSpec.intSpec()),
             new ArrowStructDataFactory(ArrowDoubleDataFactory.INSTANCE, ArrowIntDataFactory.INSTANCE));
 
         // Complex
         testMapSingleSpec(
-            new StructDataSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), IntDataSpec.INSTANCE,
+            new StructDataSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true),
+                DataSpec.intSpec(),
                 new StructDataSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
                     new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true))),
             new ArrowStructDataFactory(new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
@@ -227,13 +213,13 @@ public class ArrowSchemaMapperTest {
     @Test
     public void testMapListSpec() {
         // Simple
-        testMapSingleSpec(new ListDataSpec(DoubleDataSpec.INSTANCE),
+        testMapSingleSpec(new ListDataSpec(DataSpec.doubleSpec()),
             new ArrowListDataFactory(ArrowDoubleDataFactory.INSTANCE));
 
         // Complex
         testMapSingleSpec(
             new ListDataSpec(new ListDataSpec(new StructDataSpec(
-                new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), DoubleDataSpec.INSTANCE))),
+                new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), DataSpec.doubleSpec()))),
             new ArrowListDataFactory(new ArrowListDataFactory(
                 new ArrowStructDataFactory(new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
                     ArrowDoubleDataFactory.INSTANCE))));
@@ -245,10 +231,10 @@ public class ArrowSchemaMapperTest {
     @Test
     public void testMappingMultipleColumns() {
         final ColumnStoreSchema schema = ArrowTestUtils.createSchema( //
-            DoubleDataSpec.INSTANCE, //
-            LongDataSpec.INSTANCE, //
-            DoubleDataSpec.INSTANCE, //
-            IntDataSpec.INSTANCE //
+            DataSpec.doubleSpec(), //
+            DataSpec.longSpec(), //
+            DataSpec.doubleSpec(), //
+            DataSpec.intSpec() //
         );
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(4, factories.length);
@@ -259,7 +245,7 @@ public class ArrowSchemaMapperTest {
     }
 
     /** Test mapping a single column of the given spec. */
-    private static void testMapSingleSpec(final ColumnDataSpec spec, final ArrowColumnDataFactory expectedFactory) {
+    private static void testMapSingleSpec(final DataSpec spec, final ArrowColumnDataFactory expectedFactory) {
         final ColumnStoreSchema schema = ArrowTestUtils.createSchema(spec);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);

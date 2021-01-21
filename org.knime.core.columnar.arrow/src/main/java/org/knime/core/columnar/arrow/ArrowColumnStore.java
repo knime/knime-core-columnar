@@ -52,11 +52,11 @@ import java.nio.file.Files;
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
-import org.knime.core.columnar.data.ColumnWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.ColumnDataFactory;
-import org.knime.core.columnar.store.ColumnDataReader;
-import org.knime.core.columnar.store.ColumnDataWriter;
+import org.knime.core.columnar.store.BatchFactory;
+import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
@@ -88,19 +88,19 @@ final class ArrowColumnStore implements ColumnStore {
     }
 
     @Override
-    public ColumnDataWriter getWriter() {
+    public BatchWriter getWriter() {
         return new ArrowColumnDataWriter(m_file, m_factories, m_compression, m_allocator);
     }
 
     @Override
-    public ColumnDataReader createReader(final ColumnSelection config) {
+    public BatchReader createReader(final ColumnSelection config) {
         return m_delegate.createReader(config);
     }
 
     @Override
-    public ColumnDataFactory getFactory() {
+    public BatchFactory getFactory() {
         return (chunkSize) -> {
-            final ColumnWriteData[] chunk = new ColumnWriteData[m_factories.length];
+            final NullableWriteData[] chunk = new NullableWriteData[m_factories.length];
             for (int i = 0; i < m_factories.length; i++) {
                 chunk[i] =
                     ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, chunkSize);
