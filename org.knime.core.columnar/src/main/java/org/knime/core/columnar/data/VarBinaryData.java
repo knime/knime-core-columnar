@@ -52,6 +52,7 @@ import org.knime.core.columnar.WriteData;
  * Class holding {@link VarBinaryWriteData}, {@link VarBinaryReadData}, and {@link VarBinaryDataSpec} for data holding
  * byte arrays. The size of each byte array can vary between elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class VarBinaryData {

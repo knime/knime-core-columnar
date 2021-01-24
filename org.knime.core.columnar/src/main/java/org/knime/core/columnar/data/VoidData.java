@@ -52,6 +52,7 @@ package org.knime.core.columnar.data;
  * Class holding {@link VoidWriteData}, {@link VoidReadData}, and {@link VoidDataSpec} for data holding
  * no elements (i.e., all elements are missing).
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class VoidData {

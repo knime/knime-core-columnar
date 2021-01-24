@@ -50,6 +50,7 @@ import org.knime.core.columnar.data.DataSpec;
 /**
  * The columnar schema of a {@link ColumnReadStore}.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public interface ColumnStoreSchema {

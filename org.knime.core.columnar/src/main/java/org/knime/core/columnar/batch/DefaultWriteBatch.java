@@ -59,6 +59,7 @@ import org.knime.core.columnar.data.NullableWriteData;
  * Default implementation of a {@link WriteBatch} that holds an array of {@link NullableWriteData}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public final class DefaultWriteBatch implements WriteBatch {
 
@@ -77,6 +78,18 @@ public final class DefaultWriteBatch implements WriteBatch {
     @Override
     public NullableWriteData get(final int index) {
         return m_data[index];
+    }
+
+    /**
+     * Obtains an array of all {@link NullableWriteData} in this batch. This implementation of the method is unsafe,
+     * since the array it returns is the array underlying the batch (and not a defensive copy thereof). Clients must not
+     * modify the returned array.
+     *
+     * @return the non-null array of all data in this batch
+     */
+    @Override
+    public NullableWriteData[] getUnsafe() {
+        return m_data;
     }
 
     @Override

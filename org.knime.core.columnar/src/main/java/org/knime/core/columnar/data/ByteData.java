@@ -54,6 +54,7 @@ import org.knime.core.columnar.WriteData;
 /**
  * Class holding {@link ByteWriteData}, {@link ByteReadData}, and {@link ByteDataSpec} for data holding byte elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class ByteData {

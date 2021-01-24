@@ -60,11 +60,13 @@ import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
  * Implementation of {@link ColumnSelection}, in which only some columns are selected.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public final class FilteredColumnSelection implements ColumnSelection {
 
@@ -126,6 +128,19 @@ public final class FilteredColumnSelection implements ColumnSelection {
             }
             throw new NoSuchElementException(
                 String.format("Data at index %d is not available in this filtered batch.", index));
+        }
+
+        /**
+         * Obtains an array of all {@link NullableWriteData} in this batch. This implementation of the method is safe,
+         * since the array it returns is a defensive copy of the data structure underlying this batch
+         *
+         * @return the non-null array of all data in this batch
+         */
+        @Override
+        public NullableReadData[] getUnsafe() {
+            final NullableReadData[] data = new NullableReadData[m_size];
+            m_data.entrySet().stream().forEach(e -> data[e.getKey()] = e.getValue());
+            return data;
         }
 
         @Override

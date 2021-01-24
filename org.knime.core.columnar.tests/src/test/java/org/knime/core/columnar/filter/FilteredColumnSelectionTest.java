@@ -50,6 +50,7 @@ package org.knime.core.columnar.filter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
 import static org.knime.core.columnar.TestColumnStoreUtils.createTestTable;
@@ -124,6 +125,8 @@ public class FilteredColumnSelectionTest {
         final NullableReadData[] data = createData();
         final ReadBatch batch = createBatch(data, 0);
         assertEquals(data[0], batch.get(0));
+        assertEquals(data[0], batch.getUnsafe()[0]);
+        assertNull(batch.getUnsafe()[1]);
         batch.get(1);
     }
 

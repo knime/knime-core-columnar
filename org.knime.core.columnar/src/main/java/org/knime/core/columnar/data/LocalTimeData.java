@@ -56,6 +56,8 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
  * Class holding {@link LocalTimeWriteData}, {@link LocalTimeReadData}, and {@link LocalTimeDataSpec} for data holding
  * LocalTime elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class LocalTimeData {

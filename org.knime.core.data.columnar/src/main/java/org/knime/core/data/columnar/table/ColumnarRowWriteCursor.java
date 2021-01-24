@@ -106,6 +106,8 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private long m_size = 0;
 
+    private NullableWriteData[] m_currentData;
+
     private boolean m_adjusting;
 
     ColumnarRowWriteCursor(final ColumnStore store, final ColumnarWriteValueFactory<?>[] factories) {
@@ -137,7 +139,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     @Override
     public final void setMissing(final int index) {
-        m_currentBatch.get(index + 1).setMissing(m_currentIndex);
+        m_currentData[index + 1].setMissing(m_currentIndex);
     }
 
     @Override
@@ -246,6 +248,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
         // TODO can we preload data?
         m_currentBatch = m_columnDataFactory.create(chunkSize);
+        m_currentData = m_currentBatch.getUnsafe();
         updateWriteValues(m_currentBatch);
         m_currentMaxIndex = m_currentBatch.capacity() - 1;
     }

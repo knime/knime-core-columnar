@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.batch;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
 import static org.knime.core.columnar.TestColumnStoreUtils.createTestTable;
@@ -99,6 +100,7 @@ public class DefaultReadBatchTest {
         final DefaultReadBatch batch = createBatch(data);
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
             assertEquals(data[i], batch.get(i));
+            assertArrayEquals(data, batch.getUnsafe());
         }
     }
 

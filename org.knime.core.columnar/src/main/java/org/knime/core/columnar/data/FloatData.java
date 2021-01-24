@@ -55,6 +55,7 @@ import org.knime.core.columnar.WriteData;
  * Class holding {@link FloatWriteData}, {@link FloatReadData}, and {@link FloatDataSpec} for data holding float
  * elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class FloatData {

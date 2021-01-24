@@ -54,6 +54,7 @@ import org.knime.core.columnar.WriteData;
 /**
  * Class holding {@link IntWriteData}, {@link IntReadData}, and {@link IntDataSpec} for data holding int elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class IntData {

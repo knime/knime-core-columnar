@@ -55,6 +55,7 @@ import org.knime.core.columnar.WriteData;
  * Class holding {@link DoubleWriteData}, {@link DoubleReadData}, and {@link DoubleDataSpec} for data holding double
  * elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class DoubleData {

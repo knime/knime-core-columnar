@@ -56,6 +56,8 @@ import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
  * Class holding {@link PeriodWriteData}, {@link PeriodReadData}, and {@link PeriodDataSpec} for data holding Period
  * elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class PeriodData {

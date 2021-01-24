@@ -55,6 +55,7 @@ import org.knime.core.columnar.batch.WriteBatch;
  * A writer that is associated with a {@link ColumnWriteStore} and that can be used to write {@link ReadBatch
  * ReadBatches}, i.e., {@link WriteBatch#close(int) closed} {@link WriteBatch WriteBatches}.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public interface BatchWriter extends Closeable {

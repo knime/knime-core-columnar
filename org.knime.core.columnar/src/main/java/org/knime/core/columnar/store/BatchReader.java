@@ -54,6 +54,7 @@ import org.knime.core.columnar.batch.ReadBatch;
  * A reader that is associated with a {@link ColumnReadStore} and that can be used to read {@link ReadBatch
  * ReadBatches}.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public interface BatchReader extends Closeable {

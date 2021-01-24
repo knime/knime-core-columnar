@@ -52,6 +52,7 @@ import org.knime.core.columnar.batch.WriteBatch;
  * A factory that is associated with a {@link ColumnWriteStore ColumnWriteStore's} {@link BatchWriter} and that can be
  * used to create {@link WriteBatch WriteBatches} with a certain minimum {@link WriteData#capacity() capacity}.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public interface BatchFactory {

@@ -58,6 +58,7 @@ import org.knime.core.columnar.data.NullableReadData;
  * data is present at all valid indices.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public final class DefaultReadBatch implements ReadBatch {
 
@@ -89,6 +90,18 @@ public final class DefaultReadBatch implements ReadBatch {
     @Override
     public NullableReadData get(final int index) {
         return m_data[index];
+    }
+
+    /**
+     * Obtains an array of all {@link NullableReadData} in this batch. This implementation of the method is unsafe,
+     * since the array it returns is the array underlying the batch (and not a defensive copy thereof). Clients must not
+     * modify the returned array.
+     *
+     * @return the non-null array of all data in this batch
+     */
+    @Override
+    public NullableReadData[] getUnsafe() {
+        return m_data;
     }
 
     @Override

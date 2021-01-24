@@ -54,6 +54,7 @@ import org.knime.core.columnar.data.NullableReadData;
  * A selection of columns among a total number of columns.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public interface ColumnSelection {
 

@@ -51,6 +51,7 @@ import org.knime.core.columnar.WriteData;
  * {@link WriteData} in which elements can be missing. Elements are implicitly missing as long as they are not
  * explicitly set to some other value. Values can also be explicitly set to be missing.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public interface NullableWriteData extends WriteData {

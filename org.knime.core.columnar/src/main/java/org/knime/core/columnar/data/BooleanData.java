@@ -52,6 +52,7 @@ import org.knime.core.columnar.WriteData;
  * Class holding {@link BooleanWriteData}, {@link BooleanReadData}, and {@link BooleanDataSpec} for data holding
  * boolean elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class BooleanData {

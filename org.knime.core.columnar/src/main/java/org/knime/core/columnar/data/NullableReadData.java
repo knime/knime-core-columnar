@@ -53,6 +53,7 @@ import org.knime.core.columnar.ReadData;
 /**
  * {@link ReadData} in which elements can be missing.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public interface NullableReadData extends ReadData {

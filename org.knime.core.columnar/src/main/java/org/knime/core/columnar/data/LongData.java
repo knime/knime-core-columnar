@@ -54,6 +54,7 @@ import org.knime.core.columnar.WriteData;
 /**
  * Class holding {@link LongWriteData}, {@link LongReadData}, and {@link LongDataSpec} for data holding long elements.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class LongData {

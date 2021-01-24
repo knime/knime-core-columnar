@@ -58,6 +58,7 @@ import org.knime.core.columnar.data.NullableReadData;
  * but does not guarantee that data is present at all valid indices.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
 public interface ReadBatch extends ReadData {
 
@@ -70,6 +71,15 @@ public interface ReadBatch extends ReadData {
      * @throws NoSuchElementException if there is no data available at the given index
      */
     NullableReadData get(int index);
+
+    /**
+     * Obtains an array of all {@link NullableReadData} in this batch. The method is unsafe, since the array it returns
+     * might be the array underlying the batch (and not a defensive copy thereof). Clients must not modify the returned
+     * array.
+     *
+     * @return the non-null array of all data in this batch
+     */
+    NullableReadData[] getUnsafe();
 
     /**
      * @return the number of valid indices in this batch
