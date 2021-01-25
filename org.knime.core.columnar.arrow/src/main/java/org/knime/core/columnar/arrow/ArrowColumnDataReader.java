@@ -169,8 +169,8 @@ class ArrowColumnDataReader implements BatchReader {
             for (int i = 0; i < fields.size(); i++) {
                 final Field field = fields.get(i);
                 if (m_columnSelection.isSelected(i)) {
-                    @SuppressWarnings("resource") // Resource handled by caller
-                    final FieldVector vector = field.createVector(m_allocator);
+                    @SuppressWarnings("resource") // Resource handled by caller (the vector is returned)
+                    final FieldVector vector = field.createVector(m_allocator); // NOSONAR: See SuppressWarnings
                     final ArrowVectorNullCount nullCount =
                         loadVector(vector, nodes, buffers, getCompressionCodec(recordBatch), m_allocator);
                     vectors[i] = new FieldVectorAndNullCount(vector, nullCount);
@@ -197,8 +197,8 @@ class ArrowColumnDataReader implements BatchReader {
                 final long id = batch.getDictionaryId();
                 final DictionaryDescription description = m_dictionaryDescriptions.get(id);
                 if (description != null) {
-                    @SuppressWarnings("resource") // Resource handled by caller
-                    final FieldVector vector = description.m_field.createVector(m_allocator);
+                    @SuppressWarnings("resource") // Resource handled by caller (the vector is returned)
+                    final FieldVector vector = description.m_field.createVector(m_allocator); // NOSONAR: See SuppressWarnings
 
                     // Load the data into the vector
                     @SuppressWarnings("resource") // Closed by the DictionaryBatch
