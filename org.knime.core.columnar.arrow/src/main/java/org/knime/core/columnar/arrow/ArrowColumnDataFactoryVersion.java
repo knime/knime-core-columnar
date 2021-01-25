@@ -50,7 +50,10 @@ package org.knime.core.columnar.arrow;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 /**
  * A class describing the version of a {@link ArrowColumnDataFactory}. The version consists of an integer number and a
@@ -90,45 +93,94 @@ public final class ArrowColumnDataFactoryVersion {
      * @return the version
      */
     public static ArrowColumnDataFactoryVersion version(final String encodedVersion) {
-        final StringBuilder version = new StringBuilder();
-        final List<ArrowColumnDataFactoryVersion> children = new ArrayList<>();
-        StringBuilder currentChild = new StringBuilder();
-        int nestingLevel = 0;
+        final LinkedList<Character> queue = new LinkedList<>();
+        for (final char c : encodedVersion.toCharArray()) {
+            queue.offer(c);
+        }
+        try {
+            return parseVersion(queue);
+        } catch (final IllegalStateException e) {
+            throw new IllegalArgumentException(e.getMessage() + ". Given version was '" + encodedVersion + "'", e);
+        }
+    }
 
-        for (int i = 0; i < encodedVersion.length(); i++) {
-            final char c = encodedVersion.charAt(i);
-            // Check for the special chars
-            if (nestingLevel == 0 && c == ArrowColumnDataFactoryVersion.CHILDREN_START) {
-                // Starting with the children
-                nestingLevel++;
-            } else if (nestingLevel > 0 && c == ArrowColumnDataFactoryVersion.CHILDREN_START) {
-                // Starting inner children
-                nestingLevel++;
-                currentChild.append(c);
-            } else if (nestingLevel == 1 && c == ArrowColumnDataFactoryVersion.CHILDREN_END) {
-                // Last child
-                nestingLevel--;
-            } else if (nestingLevel > 1 && c == ArrowColumnDataFactoryVersion.CHILDREN_END) {
-                // Ending inner children
-                nestingLevel--;
-                currentChild.append(c);
-            } else if (nestingLevel == 1 && c == ArrowColumnDataFactoryVersion.CHILDREN_SEPARATOR) {
-                // Ending the current child
-                children.add(version(currentChild.toString()));
-                currentChild = new StringBuilder();
-            } else {
-                if (nestingLevel == 0) {
-                    // This version
-                    version.append(c);
-                } else {
-                    // A child version
-                    currentChild.append(c);
+    private static ArrowColumnDataFactoryVersion parseVersion(final Queue<Character> encodedVersion) {
+        final StringBuilder version = new StringBuilder();
+        List<ArrowColumnDataFactoryVersion> children = Collections.emptyList();
+
+        while (!encodedVersion.isEmpty()) {
+            final char c = encodedVersion.poll();
+            if (c == CHILDREN_START) {
+                // Parse the children
+                children = parseChildren(encodedVersion);
+                if (!encodedVersion.isEmpty()) {
+                    // Nothing is allowed after the children
+                    throw new IllegalStateException("Version string has an invalid format.");
                 }
+            } else {
+                // This version
+                version.append(c);
             }
         }
 
         return new ArrowColumnDataFactoryVersion(Integer.parseInt(version.toString()),
             children.toArray(new ArrowColumnDataFactoryVersion[0]));
+    }
+
+    /**
+     * Parse the children from the encoded version. Stops when a CHILDREN_END without a CHILDREN_START is encountered.
+     */
+    private static List<ArrowColumnDataFactoryVersion> parseChildren(final Queue<Character> encodedVersion) {
+        final List<ArrowColumnDataFactoryVersion> children = new ArrayList<>();
+        StringBuilder currentChild = new StringBuilder();
+
+        while (!encodedVersion.isEmpty()) {
+            final char c = encodedVersion.poll();
+            if (c == CHILDREN_START) {
+                // The child has children itself. Add everything in the CHILDREN brackets to the string
+                currentChild.append(c);
+                addInnerChildren(encodedVersion, currentChild);
+            } else if (c == CHILDREN_END) {
+                // End of the children
+                return children;
+            } else if (c == CHILDREN_SEPARATOR) {
+                // End of this child. Add it to the list and start a new one
+                children.add(version(currentChild.toString()));
+                currentChild = new StringBuilder();
+            } else {
+                // Current child version
+                currentChild.append(c);
+            }
+        }
+
+        throw new IllegalStateException("Version string has unbalanced brackets.");
+    }
+
+    /**
+     * Add all characters of the inner children to the given string builder. Stops when a CHILDREN_END without a
+     * CHILDREN_START is encountered.
+     */
+    private static void addInnerChildren(final Queue<Character> encodedVersion,
+        final StringBuilder childStringBuilder) {
+        int nestingLevel = 1;
+        while (!encodedVersion.isEmpty()) {
+            final char c = encodedVersion.poll();
+            childStringBuilder.append(c);
+            if (c == CHILDREN_START) {
+                // Deeper nesting
+                nestingLevel++;
+            } else if (c == CHILDREN_END) {
+                // Less deep nesting
+                nestingLevel--;
+            }
+            if (nestingLevel <= 0) {
+                // If nesting is 0 there was one more CHILDREN_END than CHILDREN_START
+                // -> This is the end of this list of children
+                return;
+            }
+        }
+
+        throw new IllegalStateException("Version string has unbalanced brackets.");
     }
 
     private final int m_version;
