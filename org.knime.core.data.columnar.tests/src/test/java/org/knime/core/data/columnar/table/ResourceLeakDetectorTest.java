@@ -73,7 +73,7 @@ import org.knime.core.node.ExtensionTable;
 @SuppressWarnings("javadoc")
 public class ResourceLeakDetectorTest extends ColumnarTest {
 
-    private final int m_chunkSize = ColumnarTableTestUtils.getChunkSize();
+    private static final int CAPACITY = ColumnarRowWriteCursor.CAPACITY_MAX_DEF;
 
     @Override
     @Before
@@ -128,106 +128,64 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
         testCloseUnclosedCloseableOnGC(() -> createUnsavedColumnarContainerTable(0));
     }
 
-    // TODO
-    //    public void testSavedColumnarContainerTableReleaseResourcesOnGC() {
-    //
-    //    }
-
     @Test
-    public void testCloseUnclosedEmptyIteratorOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
-            testCloseUnclosedCloseableOnGC(table::iterator);
-        }
-    }
-
-    @Test
-    public void testCloseUnclosedShortIteratorOnGC() {
+    public void testCloseUnclosedSingleBatchIteratorOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
             testCloseUnclosedCloseableOnGC(table::iterator);
         }
     }
 
     @Test
-    public void testCloseUnclosedLongIteratorOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(m_chunkSize + 1)) {
+    public void testCloseUnclosedMultiBatchIteratorOnGC() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1)) {
             testCloseUnclosedCloseableOnGC(table::iterator);
         }
     }
 
     @Test
-    public void testCloseUnclosedEmptyIteratorWithFilterOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
-            testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()));
-        }
-    }
-
-    @Test
-    public void testCloseUnclosedShortIteratorWithFilterOnGC() {
+    public void testCloseUnclosedSingleBatchIteratorWithFilterOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
             testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()));
         }
     }
 
     @Test
-    public void testCloseUnclosedLongIteratorWithFilterOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(m_chunkSize + 1)) {
+    public void testCloseUnclosedMultiBatchIteratorWithFilterOnGC() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1)) {
             testCloseUnclosedCloseableOnGC(() -> table.iteratorWithFilter(new TableFilter.Builder().build()));
         }
     }
 
     @Test
-    public void testCloseUnclosedEmptyCursorOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
-            testCloseUnclosedCloseableOnGC(table::cursor);
-        }
-    }
-
-    @Test
-    public void testCloseUnclosedShortCursorOnGC() {
+    public void testCloseUnclosedSingleBatchCursorOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
             testCloseUnclosedCloseableOnGC(table::cursor);
         }
     }
 
     @Test
-    public void testCloseUnclosedLongCursorOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(m_chunkSize + 1)) {
+    public void testCloseUnclosedMultiBatchCursorOnGC() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1)) {
             testCloseUnclosedCloseableOnGC(table::cursor);
         }
     }
 
     @Test
-    public void testCloseUnclosedEmptyCursorWithFilterOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
-            testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()));
-        }
-    }
-
-    @Test
-    public void testCloseUnclosedShortCursorWithFilterOnGC() {
+    public void testCloseUnclosedSingleBatchCursorWithFilterOnGC() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
             testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()));
         }
     }
 
     @Test
-    public void testCloseUnclosedLongCursorWithFilterOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(m_chunkSize + 1)) {
+    public void testCloseUnclosedMultiBatchCursorWithFilterOnGC() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1)) {
             testCloseUnclosedCloseableOnGC(() -> table.cursor(new TableFilter.Builder().build()));
         }
     }
 
     @Test
-    public void testCloseUnclosedEmptyIteratorOnTableClear() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0);
-                final CloseableRowIterator iterator = table.iterator()) {
-            table.clear();
-            checkNoOpenFinalizers();
-        }
-    }
-
-    @Test
-    public void testCloseUnclosedShortIteratorOnTableClear() {
+    public void testCloseUnclosedSingleBatchIteratorOnTableClear() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1);
                 final CloseableRowIterator iterator = table.iterator()) {
             table.clear();
@@ -236,8 +194,8 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
     }
 
     @Test
-    public void testCloseUnclosedLongIteratorOnTableClear() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(m_chunkSize + 1);
+    public void testCloseUnclosedMultiBatchIteratorOnTableClear() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1);
                 final CloseableRowIterator iterator = table.iterator()) {
             table.clear();
             checkNoOpenFinalizers();
@@ -245,16 +203,7 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
     }
 
     @Test
-    public void testCloseUnclosedEmptyIteratorWithFilterOnTableClear() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0);
-                final CloseableRowIterator iterator = table.iteratorWithFilter(new TableFilter.Builder().build())) {
-            table.clear();
-            checkNoOpenFinalizers();
-        }
-    }
-
-    @Test
-    public void testCloseUnclosedShortIteratorWithFilterOnTableClear() {
+    public void testCloseUnclosedSingleBatchIteratorWithFilterOnTableClear() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1);
                 final CloseableRowIterator iterator = table.iteratorWithFilter(new TableFilter.Builder().build())) {
             table.clear();
@@ -263,8 +212,8 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
     }
 
     @Test
-    public void testCloseUnclosedLongIteratorWithFilterOnTableClear() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(m_chunkSize + 1);
+    public void testCloseUnclosedMultiBatchIteratorWithFilterOnTableClear() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1);
                 final CloseableRowIterator iterator = table.iteratorWithFilter(new TableFilter.Builder().build())) {
             table.clear();
             checkNoOpenFinalizers();
@@ -272,16 +221,7 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
     }
 
     @Test
-    public void testCloseUnclosedEmptyCursorOnTableClear() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0);
-                final RowCursor cursor = table.cursor()) {
-            table.clear();
-            checkNoOpenFinalizers();
-        }
-    }
-
-    @Test
-    public void testCloseUnclosedShortCursorOnTableClear() {
+    public void testCloseUnclosedSingleBatchCursorOnTableClear() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1);
                 final RowCursor cursor = table.cursor()) {
             table.clear();
@@ -290,8 +230,8 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
     }
 
     @Test
-    public void testCloseUnclosedLongCursorOnTableClear() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(m_chunkSize + 1);
+    public void testCloseUnclosedMultiBatchCursorOnTableClear() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1);
                 final RowCursor cursor = table.cursor()) {
             table.clear();
             checkNoOpenFinalizers();
@@ -299,16 +239,7 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
     }
 
     @Test
-    public void testCloseUnclosedEmptyCursorWithFilterOnTableClear() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0);
-                final RowCursor cursor = table.cursor(new TableFilter.Builder().build())) {
-            table.clear();
-            checkNoOpenFinalizers();
-        }
-    }
-
-    @Test
-    public void testCloseUnclosedShortCursorWithFilterOnTableClear() {
+    public void testCloseUnclosedSingleBatchCursorWithFilterOnTableClear() {
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(1);
                 final RowCursor cursor = table.cursor(new TableFilter.Builder().build())) {
             table.clear();
@@ -317,8 +248,8 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
     }
 
     @Test
-    public void testCloseUnclosedLongCursorWithFilterOnTableClear() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(m_chunkSize + 1);
+    public void testCloseUnclosedMultiBatchCursorWithFilterOnTableClear() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1);
                 final RowCursor cursor = table.cursor(new TableFilter.Builder().build())) {
             table.clear();
             checkNoOpenFinalizers();

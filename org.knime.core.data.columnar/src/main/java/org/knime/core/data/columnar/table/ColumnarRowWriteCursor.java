@@ -75,7 +75,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     // the maximum capacity (in number of held elements) of a single chunk
     // subtract 750 since arrow rounds up to the next power of 2 anyways
-    private static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
+    static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
 
     private static final String CAPACITY_MAX_PROPERTY = "knime.columnar.capacity.max";
 

@@ -234,45 +234,38 @@ final class ColumnarContainerTable extends ExtensionTable {
 
     @Override
     public RowCursor cursor() {
-        return ColumnarRowCursorFactory.create(m_readStore, m_schema, 0, m_size - 1, m_openCursorFinalizers);
+        try {
+            return ColumnarRowCursorFactory.create(m_readStore, m_schema, m_size, m_openCursorFinalizers);
+        } catch (IOException e) {
+            throw new IllegalStateException("Exception while creating ColumnarRowCursor.", e);
+        }
     }
 
     @Override
     public RowCursor cursor(final TableFilter filter) {
-        final long fromRowIndex = filter.getFromRowIndex().orElse(0l);
-        final long toRowIndex = filter.getToRowIndex().orElse(m_size - 1);
-
-        final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
-        if (colIndicesOpt.isPresent()) {
-            return ColumnarRowCursorFactory.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers,
-                toSortedIntArray(colIndicesOpt.get()));
-        } else {
-            return ColumnarRowCursorFactory.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers);
+        try {
+            if (filter != null) {
+                filter.validate(getDataTableSpec(), m_size);
+            }
+            return ColumnarRowCursorFactory.create(m_readStore, m_schema, m_size, m_openCursorFinalizers, filter);
+        } catch (IOException e) {
+            throw new IllegalStateException("Exception while creating ColumnarRowCursor.", e);
         }
     }
 
     @Override
     @SuppressWarnings("resource")
     public final CloseableRowIterator iterator() {
-        return new ColumnarRowIterator(
-            ColumnarRowCursorFactory.create(m_readStore, m_schema, 0, m_size - 1, m_openCursorFinalizers));
+        return new ColumnarRowIterator(cursor());
     }
 
     @Override
     @SuppressWarnings("resource")
     public final CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
-        final long fromRowIndex = filter.getFromRowIndex().orElse(0l);
-        final long toRowIndex = filter.getToRowIndex().orElse(m_size - 1);
-
-        final Optional<Set<Integer>> colIndicesOpt = filter.getMaterializeColumnIndices();
-        if (colIndicesOpt.isPresent()) {
-            final int[] selection = toSortedIntArray(colIndicesOpt.get());
-            return FilteredColumnarRowIterator.create(ColumnarRowCursorFactory.create(m_readStore, m_schema, fromRowIndex,
-                toRowIndex, m_openCursorFinalizers, selection), selection);
-        } else {
-            return new ColumnarRowIterator(
-                ColumnarRowCursorFactory.create(m_readStore, m_schema, fromRowIndex, toRowIndex, m_openCursorFinalizers));
-        }
+        final Optional<Set<Integer>> materializeColumnIndices = filter.getMaterializeColumnIndices();
+        return materializeColumnIndices.isPresent()
+            ? FilteredColumnarRowIterator.create(cursor(filter), materializeColumnIndices.get())
+            : new ColumnarRowIterator(cursor(filter));
     }
 
     private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
@@ -291,7 +284,4 @@ final class ColumnarContainerTable extends ExtensionTable {
         }
     }
 
-    private static int[] toSortedIntArray(final Set<Integer> selection) {
-        return selection.stream().sorted().mapToInt(Integer::intValue).toArray();
-    }
 }

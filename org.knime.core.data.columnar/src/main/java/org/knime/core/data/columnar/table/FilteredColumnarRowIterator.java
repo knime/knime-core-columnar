@@ -48,6 +48,7 @@ package org.knime.core.data.columnar.table;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
@@ -80,7 +81,8 @@ class FilteredColumnarRowIterator {
     private final static double SELECTION_DENSITY_THRESHOLD = 0.7d;
 
     // TODO special case selection ranges, i.e. from column index x to y with x < y.
-    static CloseableRowIterator create(final RowCursor cursor, final int[] selection) {
+    static CloseableRowIterator create(final RowCursor cursor, final Set<Integer> materializeColumnIndices) {
+        final int[] selection = materializeColumnIndices.stream().sorted().mapToInt(Integer::intValue).toArray();
         if (selection.length == 1) {
             return new SingleCellRowIterator(cursor, selection[0]);
         } else if (selection.length <= WIDE_TABLE_THRESHOLD
