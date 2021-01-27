@@ -62,8 +62,6 @@ import org.eclipse.jface.preference.ComboFieldEditor;
 import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.preference.IntegerFieldEditor;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Composite;
@@ -117,18 +115,6 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
         setPreferenceStore(ColumnarPreferenceUtils.COLUMNAR_STORE);
         setDescription("Advanced configuration options for storing data of workflows "
             + "that are configured to use the columnar table backend:");
-    }
-
-    @Override
-    public void createControl(final Composite parent) {
-        super.createControl(parent);
-
-        getDefaultsButton().addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(final SelectionEvent e) {
-                updateFields(ColumnarPreferenceUtils.useDefaults());
-            }
-        });
     }
 
     @Override
@@ -247,6 +233,15 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
         return m_columnDataCacheSizeEditor.isValid() && m_smallTableCacheSizeEditor.isValid()
             && m_columnDataCacheSizeEditor.getIntValue()
                 + m_smallTableCacheSizeEditor.getIntValue() > usablePhysicalMemorySizeMB;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void performDefaults() {
+        super.performDefaults();
+        updateFields(true);
     }
 
     // code from here on out mostly copied from org.knime.workbench.ui.preferences.HeadlessPreferencePage
