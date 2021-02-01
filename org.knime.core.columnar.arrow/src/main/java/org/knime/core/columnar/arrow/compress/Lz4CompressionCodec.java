@@ -62,7 +62,7 @@ public class Lz4CompressionCodec implements CompressionCodec {
     private LZ4FastDecompressor decompressor;
 
     public Lz4CompressionCodec() {
-        factory = LZ4Factory.fastestInstance();
+        factory = LZ4Factory.nativeInstance();
     }
 
     @Override
