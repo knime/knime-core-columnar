@@ -51,7 +51,6 @@ import java.util.NoSuchElementException;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataType;
-import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.v2.ReadValue;
@@ -62,11 +61,65 @@ import org.knime.core.data.v2.RowRead;
  * Implementation of a {@link CloseableRowIterator} via delegation to a {@link RowCursor}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
  */
-public final class ColumnarRowIterator extends CloseableRowIterator {
+final class ColumnarRowIterator extends CloseableRowIterator {
 
-    private static final DataCell INSTANCE = DataType.getMissingCell();
+    private static final class ColumnStoreTableDataRow implements DataRow {
+
+        private final String m_rowKey;
+
+        private final DataCell[] m_cells;
+
+        ColumnStoreTableDataRow(final String rowKey, final DataCell[] cells) {
+            m_rowKey = rowKey;
+            m_cells = cells;
+        }
+
+        @Override
+        public Iterator<DataCell> iterator() {
+            return new Iterator<DataCell>() { // NOSONAR
+                private int m_idx = 0;
+
+                @Override
+                public boolean hasNext() {
+                    return m_idx < m_cells.length;
+                }
+
+                @Override
+                public DataCell next() {
+                    try {
+                        final DataCell cell = getCell(m_idx);
+                        m_idx++;
+                        return cell;
+                    } catch (IndexOutOfBoundsException e) { // NOSONAR
+                        throw new NoSuchElementException();
+                    }
+                }
+
+                @Override
+                public void remove() {
+                    throw new UnsupportedOperationException();
+                }
+            };
+        }
+
+        @Override
+        public int getNumCells() {
+            return m_cells.length;
+        }
+
+        @Override
+        public RowKey getKey() {
+            return new RowKey(m_rowKey);
+        }
+
+        @Override
+        public DataCell getCell(final int index) {
+            return m_cells[index];
+        }
+    }
+
+    private static final DataCell MISSING_CELL = DataType.getMissingCell();
 
     private final RowCursor m_cursor;
 
@@ -87,15 +140,11 @@ public final class ColumnarRowIterator extends CloseableRowIterator {
         if (!hasNext()) {
             throw new NoSuchElementException();
         }
+
         final DataCell[] cells = new DataCell[m_numValues];
         final RowRead access = m_cursor.forward();
         for (int i = 0; i < m_numValues; i++) {
-            if (access.isMissing(i)) {
-                cells[i] = INSTANCE;
-            } else {
-                final DataValue value = access.getValue(i);
-                cells[i] = ((ReadValue)value).getDataCell();
-            }
+            cells[i] = access.isMissing(i) ? MISSING_CELL : access.<ReadValue> getValue(i).getDataCell();
         }
 
         return new ColumnStoreTableDataRow(access.getRowKey().getString(), cells);
@@ -103,62 +152,7 @@ public final class ColumnarRowIterator extends CloseableRowIterator {
 
     @Override
     public void close() {
-        try {
-            m_cursor.close();
-        } catch (Exception e) {
-            // TODO logging
-            throw new IllegalStateException("Exception while closing RowCursorBasedRowIterator.", e);
-        }
+        m_cursor.close();
     }
 
-    static class ColumnStoreTableDataRow implements DataRow {
-
-        private final String m_rowKey;
-
-        private final DataCell[] m_cellValues;
-
-        public ColumnStoreTableDataRow(final String rowKey, final DataCell[] cells) {
-            m_rowKey = rowKey;
-            m_cellValues = cells;
-        }
-
-        @Override
-        public Iterator<DataCell> iterator() {
-            return new Iterator<DataCell>() {
-                int idx = 0;
-
-                @Override
-                public boolean hasNext() {
-                    return idx < m_cellValues.length;
-                }
-
-                @Override
-                public DataCell next() {
-                    if (!hasNext()) {
-                        throw new NoSuchElementException();
-                    }
-                    return getCell(idx++);
-                }
-            };
-        }
-
-        @Override
-        public int getNumCells() {
-            return m_cellValues.length;
-        }
-
-        @Override
-        public RowKey getKey() {
-            if (m_rowKey == null) {
-                /* TODO OK Behaviour? */
-                return null;
-            }
-            return new RowKey(m_rowKey);
-        }
-
-        @Override
-        public DataCell getCell(final int idx) {
-            return m_cellValues[idx];
-        }
-    }
 }

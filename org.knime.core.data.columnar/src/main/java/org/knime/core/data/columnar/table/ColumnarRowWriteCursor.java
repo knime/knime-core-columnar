@@ -63,6 +63,12 @@ import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 
+/**
+ * Columnar implementation of {@link RowWriteCursor} for writing data to a columnar table backend.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, RowWrite {
 
     // the initial capacity (in number of held elements) of a single chunk
@@ -145,8 +151,12 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
     @Override
     public final void setFrom(final RowRead access) {
         setRowKey(access.getRowKey());
-        for (int i = 1; i < m_values.length; i++) {
-            m_values[i].setValue(access.getValue(i - 1));
+        for (int i = 0; i < m_values.length - 1; i++) {
+            if (access.isMissing(i)) {
+                setMissing(i);
+            } else {
+                m_values[i + 1].setValue(access.getValue(i));
+            }
         }
     }
 
@@ -188,16 +198,16 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
         return m_currentIndex;
     }
 
-    final long getSize() {
+    long size() {
         return m_size;
     }
 
-    final void finish() {
+    void finish() {
         writeCurrentBatch(m_currentIndex + 1);
         close();
     }
 
-    private final void writeCurrentBatch(final int numValues) {
+    private void writeCurrentBatch(final int numValues) {
         if (m_currentBatch != null) {
 
             // handle empty tables (fwd was never called)
@@ -214,14 +224,15 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
         }
     }
 
-    private final void switchToNextData() {
+    private void switchToNextData() {
         if (m_adjusting && m_currentBatch != null) {
             final int curCapacity = m_currentBatch.capacity();
             final long curBatchSize = m_currentBatch.sizeOf();
 
             final int newCapacity;
             if (curBatchSize > 0) {
-                // we want to avoid too much serialization overhead for capacities > 100. 100 rows should give us a good estimate for the capacity, though.
+                // we want to avoid too much serialization overhead for capacities > 100
+                // 100 rows should give us a good estimate for the capacity, though
                 long factor = BATCH_SIZE_TARGET / curBatchSize;
                 if (curCapacity <= 100) {
                     factor = Math.min(8, factor);
@@ -246,7 +257,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
         final int chunkSize = m_currentBatch == null ? CAPACITY_INIT : m_currentBatch.capacity();
         writeCurrentBatch(m_currentIndex);
 
-        // TODO can we preload data?
         m_currentBatch = m_columnDataFactory.create(chunkSize);
         m_currentData = m_currentBatch.getUnsafe();
         updateWriteValues(m_currentBatch);

@@ -50,7 +50,6 @@ package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
 
-import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.container.DataContainerDelegate;
@@ -58,42 +57,54 @@ import org.knime.core.data.v2.RowContainer;
 import org.knime.core.node.ExecutionContext;
 
 /**
- * Utility class to create {@link DataContainerDelegate}s and {@link RowContainer}s.
+ * Utility class to create columnar {@link RowContainer RowContainers} and {@link DataContainerDelegate
+ * DataContainerDelegates}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
 public final class ColumnarRowContainerUtils {
 
-    private ColumnarRowContainerUtils() {
-    }
-
-    static RowContainer create(final int tableId, final ColumnStoreFactory storeFactory,
-        final ColumnarValueSchema schema, final ColumnarRowContainerSettings settings) throws Exception {
-        return createInternal(null, tableId, storeFactory, schema, settings);
-    }
-
-    @SuppressWarnings({"javadoc"})
+    /**
+     * Creates a new columnar {@link RowContainer}.
+     *
+     * @param context the execution context
+     * @param tableId the table's id
+     * @param schema the table's schema
+     * @param settings the table's configuration
+     * @return a new columnar row container
+     * @throws IOException when anything goes wrong during instantiation of the underlying row container
+     * @throws Exception when instantiation of the column store factory initially failed
+     */
     public static RowContainer create(final ExecutionContext context, final int tableId,
         final ColumnarValueSchema schema, final ColumnarRowContainerSettings settings) throws Exception {
         return createInternal(context, tableId, schema, settings);
     }
 
-    @SuppressWarnings({"javadoc", "resource"})
+    /**
+     * Creates a new columnar {@link DataContainerDelegate}.
+     *
+     * @param tableId the table's id
+     * @param schema the table's schema
+     * @param settings the table's configuration
+     * @return a new columnar data container delegate
+     * @throws IOException when anything goes wrong during instantiation of the underlying row container
+     * @throws Exception when instantiation of the column store factory initially failed
+     */
+    @SuppressWarnings("resource")
     public static DataContainerDelegate create(final int tableId, final ColumnarValueSchema schema,
-        final ColumnarRowContainerSettings config) throws Exception {
-        return new ColumnarDataContainerDelegate(schema.getSourceSpec(), createInternal(null, tableId, schema, config));
+        final ColumnarRowContainerSettings settings) throws Exception {
+        return new ColumnarDataContainerDelegate(schema.getSourceSpec(),
+            createInternal(null, tableId, schema, settings));
     }
 
     private static ColumnarRowContainer createInternal(final ExecutionContext context, final int tableId,
-        final ColumnarValueSchema schema, final ColumnarRowContainerSettings config) throws Exception {
-        return createInternal(context, tableId, ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton(),
-            schema, config);
+        final ColumnarValueSchema schema, final ColumnarRowContainerSettings settings) throws Exception {
+        return ColumnarRowContainer.create(context, tableId, schema,
+            ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton(), settings);
     }
 
-    private static ColumnarRowContainer createInternal(final ExecutionContext context, final int tableId,
-        final ColumnStoreFactory storeFactory, final ColumnarValueSchema schema,
-        final ColumnarRowContainerSettings config) throws IOException {
-        return ColumnarRowContainer.create(context, tableId, schema, storeFactory, config);
+    private ColumnarRowContainerUtils() {
     }
+
 }

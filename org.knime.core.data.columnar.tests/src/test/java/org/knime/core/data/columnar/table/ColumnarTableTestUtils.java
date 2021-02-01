@@ -48,37 +48,33 @@
  */
 package org.knime.core.data.columnar.table;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
+import java.io.IOException;
+import java.util.stream.IntStream;
 
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
-import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.ValueSchema;
-import org.knime.core.data.v2.value.IntValueFactory.IntReadValue;
 import org.knime.core.data.v2.value.IntValueFactory.IntWriteValue;
+import org.knime.core.node.ExecutionContext;
 
 final class ColumnarTableTestUtils {
 
-    private static final class TestColumnStoreFactory implements ColumnStoreFactory {
+    static final class TestColumnStoreFactory implements ColumnStoreFactory {
 
-        private static final TestColumnStoreFactory INSTANCE = new TestColumnStoreFactory();
+        static final TestColumnStoreFactory INSTANCE = new TestColumnStoreFactory();
 
         private TestColumnStoreFactory() {
         }
@@ -95,60 +91,63 @@ final class ColumnarTableTestUtils {
 
     }
 
-    private ColumnarTableTestUtils() {
-    }
-
-    static ColumnarValueSchema createSchema() {
-        final DataTableSpec spec = new DataTableSpec(new DataColumnSpecCreator("int", IntCell.TYPE).createSpec());
+    static ColumnarValueSchema createSchema(final int nCols) {
+        final DataTableSpec spec = new DataTableSpec(IntStream.range(0, nCols)
+            .mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), IntCell.TYPE).createSpec())
+            .toArray(DataColumnSpec[]::new));
         final ValueSchema valueSchema =
             ValueSchema.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         return ColumnarValueSchemaUtils.create(valueSchema);
     }
 
     static ColumnarRowContainer createColumnarRowContainer() {
-        final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(false, 0, false);
+        return createColumnarRowContainer(null);
+    }
+
+    static ColumnarRowContainer createColumnarRowContainer(final ExecutionContext exec) {
+        return createColumnarRowContainer(1, exec);
+    }
+
+    private static ColumnarRowContainer createColumnarRowContainer(final int nCols, final ExecutionContext exec) {
+        final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(true, 60, true);
         try {
-            return (ColumnarRowContainer)ColumnarRowContainerUtils.create(-1, TestColumnStoreFactory.INSTANCE,
-                createSchema(), settings);
-        } catch (Exception e) {
+            return ColumnarRowContainer.create(exec, -1, createSchema(nCols), TestColumnStoreFactory.INSTANCE,
+                settings);
+        } catch (IOException e) {
             throw new IllegalStateException("Exception when trying to create RowContainer.", e);
         }
     }
 
-    static ColumnarContainerTable createUnsavedColumnarContainerTable(final int size) {
-        try (final ColumnarRowContainer container = createColumnarRowContainer()) {
-            try (final ColumnarRowWriteCursor cursor = container.createCursor()) {
-                for (int i = 0; i < size; i++) {
-                    final RowWrite row = cursor.forward();
-                    row.setRowKey(Integer.toString(i));
+    static ColumnarContainerTable createUnsavedColumnarContainerTable(final int nRows) {
+        return createUnsavedColumnarContainerTable(1, nRows, null);
+    }
+
+    static ColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows) {
+        return createUnsavedColumnarContainerTable(nCols, nRows, null);
+    }
+
+    private static ColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows,
+        final ExecutionContext exec) {
+        try (final ColumnarRowContainer container = createColumnarRowContainer(nCols, exec);
+                final ColumnarRowWriteCursor cursor = container.createCursor()) {
+            for (int i = 0; i < nRows; i++) {
+                final RowWrite row = cursor.forward();
+                row.setRowKey(Integer.toString(i));
+                for (int j = 0; j < nCols; j++) {
                     if (i % 2 == 0) { // NOSONAR
-                        row.setMissing(0);
+                        row.setMissing(j);
                     } else {
-                        row.<IntWriteValue> getWriteValue(0).setIntValue(i);
+                        row.<IntWriteValue> getWriteValue(j).setIntValue(i);
                     }
                 }
-                return (ColumnarContainerTable)container.finishInternal();
             }
+            return (ColumnarContainerTable)container.finishInternal();
         } catch (Exception e) {
             throw new IllegalStateException("Exception when trying to create UnsavedColumnarContainerTable.", e);
         }
     }
 
-    static void compare(final RowCursor cursor, final int... values) {
-        assertEquals(1, cursor.getNumColumns());
-        RowRead row = null;
-        for (final int value : values) {
-            assertTrue(cursor.canForward());
-            assertTrue((row = cursor.forward()) != null);
-            assertEquals(Integer.toString(value), row.getRowKey().getString());
-            if (value % 2 == 0) { // NOSONAR
-                assertTrue(row.isMissing(0));
-            } else {
-                assertEquals(value, row.<IntReadValue> getValue(0).getIntValue());
-            }
-        }
-        assertFalse(cursor.canForward());
-        assertNull(cursor.forward());
+    private ColumnarTableTestUtils() {
     }
 
 }

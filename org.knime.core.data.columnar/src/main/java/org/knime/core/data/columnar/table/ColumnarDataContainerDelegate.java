@@ -45,7 +45,8 @@
  */
 package org.knime.core.data.columnar.table;
 
-import java.io.IOException;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
@@ -55,12 +56,11 @@ import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.v2.Cursor;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.WriteValue;
-import org.knime.core.node.NodeLogger;
-import org.knime.core.util.DuplicateKeyException;
 
+/**
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
 final class ColumnarDataContainerDelegate implements DataContainerDelegate {
-
-    private final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarDataContainerDelegate.class);
 
     private final Cursor<RowWrite> m_delegateCursor;
 
@@ -69,6 +69,10 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     private final int m_numColumns;
 
     private final ColumnarRowContainer m_delegateContainer;
+
+    private final AtomicBoolean m_cleared = new AtomicBoolean();
+
+    private final AtomicBoolean m_closed = new AtomicBoolean();
 
     private long m_size;
 
@@ -83,10 +87,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     @Override
     public DataTableSpec getTableSpec() {
-        if (m_containerTable != null) {
-            return m_containerTable.getDataTableSpec();
-        }
-        return m_spec;
+        return m_containerTable != null ? m_containerTable.getDataTableSpec() : m_spec;
     }
 
     @Override
@@ -96,29 +97,36 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     @Deprecated
     @Override
-    public void setMaxPossibleValues(final int maxPossibleValues) {
+    public void setMaxPossibleValues(final int maxPossibleValues) { // NOSONAR
         m_delegateContainer.setMaxPossibleValues(maxPossibleValues);
     }
 
     @Override
     public void addRowToTable(final DataRow row) {
+        Objects.requireNonNull(row);
         if (row.getNumCells() != m_numColumns) {
-            throw new IllegalStateException(
-                "Cell count in row " + row.getKey().toString() + " is not equal to length of column names array: "
-                    + row.getNumCells() + " vs. " + m_spec.getNumColumns());
+            throw new IllegalArgumentException(
+                String.format("Cell count in row %s is not equal to length of column names array: %d vs. %d",
+                    row.getKey().toString(), row.getNumCells(), m_spec.getNumColumns()));
         }
+        if (m_closed.get()) {
+            throw new IllegalStateException("Container delegate has already been closed.");
+        }
+        if (m_cleared.get()) {
+            throw new IllegalStateException("Container delegate has already been cleared.");
+        }
+        /* As per contract, this method should also throw an unchecked DuplicateKeyException if a row's key has already
+         * been added. Here, this is done asynchronously and taken care of by the delegate ColumnarRowContainer and its
+         * underlying DomainColumnStore. */
 
-        // TODO we could avoid this method call for cases where we know RowWrite is always the same
         final RowWrite rowWrite = m_delegateCursor.forward();
-
-        // TODO in case of no key, this method call is not required.
         rowWrite.setRowKey(row.getKey());
         for (int i = 0; i < m_numColumns; i++) {
             final DataCell cell = row.getCell(i);
-            if (!cell.isMissing()) {
-                rowWrite.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
-            } else {
+            if (cell.isMissing()) {
                 rowWrite.setMissing(i);
+            } else {
+                rowWrite.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
             }
         }
         m_size++;
@@ -126,36 +134,33 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     @Override
     public ContainerTable getTable() {
-        if (m_containerTable == null) {
+        if (!m_closed.get()) {
             throw new IllegalStateException("getTable() can only be called after close() was called.");
+        }
+        if (m_cleared.get()) {
+            throw new IllegalStateException("Container delegate has already been cleared.");
         }
         return m_containerTable;
     }
 
     @Override
     public void close() {
-        try {
+        if (!m_cleared.get() && !m_closed.getAndSet(true)) {
             m_containerTable = m_delegateContainer.finishInternal();
             m_delegateCursor.close();
-        } catch (DuplicateKeyException ex) {
-            throw ex;
-        } catch (IOException ex) {
-            throw new IllegalStateException(ex);
         }
     }
 
     @Override
     public void clear() {
-        if (m_containerTable != null) {
-            m_containerTable.clear();
-        } else {
-            try {
+        if (!m_cleared.getAndSet(true)) {
+            if (m_containerTable != null) {
+                m_containerTable.clear();
+            } else {
                 m_delegateCursor.close();
                 m_delegateContainer.close();
-            } catch (Exception e) {
-                // NB: best effort for clearing
-                LOGGER.debug("Exception while clearing ColumnarDataContainer. ", e);
             }
         }
     }
+
 }

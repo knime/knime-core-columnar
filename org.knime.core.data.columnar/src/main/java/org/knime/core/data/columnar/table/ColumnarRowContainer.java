@@ -66,9 +66,23 @@ import org.knime.core.data.v2.RowContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
-import org.knime.core.util.DuplicateKeyException;
+import org.knime.core.node.NodeLogger;
 
+/**
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 final class ColumnarRowContainer implements RowContainer {
+
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowContainer.class);
+
+    static ColumnarRowContainer create(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
+        final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
+        final ColumnarRowContainer container = new ColumnarRowContainer(context, id, schema, storeFactory, settings);
+        container.m_finalizer =
+            ResourceLeakDetector.getInstance().createFinalizer(container, container.m_delegate, container.m_store);
+        return container;
+    }
 
     private final ColumnarRowWriteCursor m_delegate;
 
@@ -86,19 +100,6 @@ final class ColumnarRowContainer implements RowContainer {
 
     private ExtensionTable m_table;
 
-    static ColumnarRowContainer create(final int id, final ColumnarValueSchema schema,
-        final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
-        return create(null, id, schema, storeFactory, settings);
-    }
-
-    static ColumnarRowContainer create(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
-        final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
-        final ColumnarRowContainer container = new ColumnarRowContainer(context, id, schema, storeFactory, settings);
-        container.m_finalizer =
-            ResourceLeakDetector.getInstance().createFinalizer(container, container.m_delegate, container.m_store);
-        return container;
-    }
-
     @SuppressWarnings("resource")
     private ColumnarRowContainer(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
         final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
@@ -108,10 +109,9 @@ final class ColumnarRowContainer implements RowContainer {
         m_storeFactory = storeFactory;
 
         m_store = new DomainColumnStore(
-            ColumnarPreferenceUtils
-                .wrap(m_storeFactory.createStore(schema, DataContainer.createTempFile(".knable"))),
+            ColumnarPreferenceUtils.wrap(m_storeFactory.createStore(schema, DataContainer.createTempFile(".knable"))),
             new DefaultDomainStoreConfig(schema, settings.getMaxPossibleNominalDomainValues(),
-                settings.checkDuplicateRowKeys(), settings.isInitializeDomains()),
+                settings.isCheckDuplicateRowKeys(), settings.isInitializeDomains()),
             ColumnarPreferenceUtils.getDomainCalcExecutor());
 
         m_delegate = new ColumnarRowWriteCursor(m_store, schema.getWriteValueFactories());
@@ -126,7 +126,6 @@ final class ColumnarRowContainer implements RowContainer {
     @Override
     public BufferedDataTable finish() throws IOException {
         if (m_context == null) {
-            // TODO let's try to separate this from the finishInternal implementation (e.g. delegate to something which has 'finishInternal').
             throw new IllegalStateException(
                 "ColumnarRowContainer has not been initialized with ExecutionContext. Implementation error.");
         }
@@ -145,23 +144,12 @@ final class ColumnarRowContainer implements RowContainer {
                 // (but will make sure duplicate checks and domain calculations are halted)
                 m_store.close();
             }
-        } catch (DuplicateKeyException e) {
-            final DuplicateKeyException originalDKE = (DuplicateKeyException)e.getCause();
-            final DuplicateKeyException newDKE = new DuplicateKeyException(originalDKE.getKey(), originalDKE.getMessage());
-            newDKE.initCause(e);
-            throw newDKE;
-        } catch (final Exception e) {
-            // TODO logging
-            // TODO ignore exception?
-            throw new IllegalStateException("Exception while closing store.", e);
+        } catch (final IOException e) {
+            LOGGER.error("Exception while closing store.", e);
         }
     }
 
-    /*
-     * Used internally for shared code.
-     * TODO factor out of this class and use delegate
-     */
-    ExtensionTable finishInternal() throws IOException {
+    ExtensionTable finishInternal() {
         if (m_table == null) {
             m_finalizer.close();
             m_delegate.finish();
@@ -175,12 +163,12 @@ final class ColumnarRowContainer implements RowContainer {
             }
 
             m_table = ColumnarContainerTable.create(m_id, m_storeFactory,
-                ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_delegate.getSize());
+                ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_delegate.size());
         }
         return m_table;
     }
 
-    /*
+    /**
      * Only to be used by ColumnarDataContainerDelegate#setMaxPossibleValues(int) for backward compatibility reasons.
      *
      * @param maxPossibleValues the maximum number of values for a nominal domain.

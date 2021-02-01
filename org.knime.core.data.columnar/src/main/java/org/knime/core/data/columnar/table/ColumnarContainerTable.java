@@ -71,26 +71,56 @@ import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.WorkflowDataRepository;
 
 /**
- * Abstract implementation of an {@link ExtensionTable}. This table is managed by the KNIME framework and allows access
- * data from within a {@link ColumnStore}.
+ * Implementation of an {@link ExtensionTable}. This table is managed by the KNIME framework and allows to access data
+ * from within a {@link ColumnStore}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
  */
 final class ColumnarContainerTable extends ExtensionTable {
 
-    static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarContainerTable.class);
+
+    private static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
 
     private static final String CFG_TABLE_SIZE = "table_size";
+
+    static ColumnarContainerTable create(final LoadContext context) throws InvalidSettingsException {
+        final ColumnarContainerTable table = new ColumnarContainerTable(context); // NOSONAR
+        table.initStoreCloser();
+        return table;
+    }
+
+    static ColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        final ColumnarContainerTable table = new ColumnarContainerTable(tableId, factory, schema, store, size);
+        table.initStoreCloser();
+        return table;
+    }
+
+    private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
+        try {
+            ColumnStoreFactory factory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+            if (!Objects.equals(factory.getClass().getName(), type)) {
+                throw new InvalidSettingsException(
+                    String.format("Class of column store factory not as expected (installed: %s, requested: %s)",
+                        factory.getClass().getName(), type));
+            }
+            return factory;
+        } catch (InvalidSettingsException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new InvalidSettingsException("Unable to instantiate object of type: " + type, e);
+        }
+    }
 
     private final ColumnStoreFactory m_factory;
 
@@ -110,23 +140,6 @@ final class ColumnarContainerTable extends ExtensionTable {
     // effectively final
     private Finalizer m_storeCloser;
 
-    void initStoreCloser() {
-        final ResourceWithRelease readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
-            finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
-        final ResourceWithRelease storeRelease = new ResourceWithRelease(m_readStore);
-        m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, storeRelease);
-    }
-
-    static ColumnarContainerTable create(final LoadContext context) throws InvalidSettingsException {
-        final ColumnarContainerTable table = new ColumnarContainerTable(context); // NOSONAR
-        table.initStoreCloser();
-        return table;
-    }
-
-    /**
-     * ColumnarContainerTable which has not yet been saved, i.e. all data is still in-memory or temporarily persisted in
-     * the temp directory.
-     */
     @SuppressWarnings("resource")
     private ColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
         final NodeSettingsRO settings = context.getSettings();
@@ -140,13 +153,6 @@ final class ColumnarContainerTable extends ExtensionTable {
         m_writeStore = null;
     }
 
-    static ColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
-        final ColumnarContainerTable table = new ColumnarContainerTable(tableId, factory, schema, store, size);
-        table.initStoreCloser();
-        return table;
-    }
-
     private ColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
         final ColumnarValueSchema schema, final ColumnStore store, final long size) {
         m_tableId = tableId;
@@ -155,6 +161,13 @@ final class ColumnarContainerTable extends ExtensionTable {
         m_size = size;
         m_readStore = store;
         m_writeStore = store;
+    }
+
+    private void initStoreCloser() {
+        final ResourceWithRelease readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
+            finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
+        final ResourceWithRelease storeRelease = new ResourceWithRelease(m_readStore);
+        m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, storeRelease);
     }
 
     @Override
@@ -193,7 +206,11 @@ final class ColumnarContainerTable extends ExtensionTable {
     @Override
     public boolean removeFromTableRepository(final WorkflowDataRepository dataRepository) {
         // only relevant in case of newly created tables
-        dataRepository.removeTable((int)m_tableId);
+        if (!dataRepository.removeTable(getTableId()).isPresent()) {
+            LOGGER.debugWithFormat("Failed to remove container table with id %d from global table repository.",
+                getTableId());
+            return false;
+        }
         return true;
     }
 
@@ -204,9 +221,7 @@ final class ColumnarContainerTable extends ExtensionTable {
 
     @Override
     public void clear() {
-        if (m_storeCloser != null) {
-            m_storeCloser.close();
-        }
+        m_storeCloser.close();
         for (final Finalizer closer : m_openCursorFinalizers) {
             closer.releaseResourcesAndLogOutput();
         }
@@ -216,10 +231,6 @@ final class ColumnarContainerTable extends ExtensionTable {
         } catch (final IOException e) {
             throw new IllegalStateException("Exception while clearing ContainerTable.", e);
         }
-    }
-
-    public BufferedDataTable getBufferedDataTable(final ExecutionContext context) {
-        return create(context);
     }
 
     @Override
@@ -275,22 +286,6 @@ final class ColumnarContainerTable extends ExtensionTable {
         return materializeColumnIndices.isPresent()
             ? FilteredColumnarRowIterator.create(cursor(filter), materializeColumnIndices.get())
             : new ColumnarRowIterator(cursor(filter));
-    }
-
-    private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
-        try {
-            ColumnStoreFactory factory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
-            if (!Objects.equals(factory.getClass().getName(), type)) {
-                throw new InvalidSettingsException(
-                    String.format("Class of column store factory not as expected (installed: %s, requested: %s)",
-                        factory.getClass().getName(), type));
-            }
-            return factory;
-        } catch (InvalidSettingsException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new InvalidSettingsException("Unable to instantiate object of type: " + type, e);
-        }
     }
 
 }

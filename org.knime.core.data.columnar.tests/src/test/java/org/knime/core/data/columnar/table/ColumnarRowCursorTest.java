@@ -48,13 +48,24 @@
  */
 package org.knime.core.data.columnar.table;
 
-import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.compare;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createUnsavedColumnarContainerTable;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import org.junit.Assert;
 import org.junit.Test;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.value.IntValueFactory.IntReadValue;
 import org.knime.core.node.ExtensionTable;
 
 /**
@@ -65,69 +76,108 @@ public class ColumnarRowCursorTest extends ColumnarTest {
 
     private static final int CAPACITY = ColumnarRowWriteCursor.CAPACITY_MAX_DEF;
 
+    static void compare(final ExtensionTable table, final int... values) {
+        int nCols = table.getDataTableSpec().getNumColumns();
+        try (final RowCursor cursor = table.cursor()) {
+            Assert.assertTrue(nCols <= cursor.getNumColumns());
+            RowRead row = null;
+            for (final int value : values) {
+                assertTrue(cursor.canForward());
+                row = cursor.forward();
+                assertNotNull(row);
+                assertEquals(Integer.toString(value), row.getRowKey().getString());
+                for (int j = 0; j < nCols; j++) {
+                    if (value % 2 == 0) { // NOSONAR
+                        assertTrue(row.isMissing(j));
+                    } else {
+                        assertEquals(value, row.<IntReadValue> getValue(j).getIntValue());
+                    }
+                }
+            }
+            assertFalse(cursor.canForward());
+            assertNull(cursor.forward());
+        }
+    }
+
+    private static void compare(final ExtensionTable table, final TableFilter filter, final int... values) {
+        final Set<Integer> indices = filter.getMaterializeColumnIndices()
+            .orElse(IntStream.range(0, table.getDataTableSpec().getNumColumns()).boxed().collect(Collectors.toSet()));
+        try (final RowCursor cursor = table.cursor(filter)) {
+            RowRead row = null;
+            for (final int value : values) {
+                assertTrue(cursor.canForward());
+                row = cursor.forward();
+                assertNotNull(row);
+                assertEquals(Integer.toString(value), row.getRowKey().getString());
+                for (int j : indices) {
+                    if (value % 2 == 0) { // NOSONAR
+                        assertTrue(row.isMissing(j));
+                    } else {
+                        assertEquals(value, row.<IntReadValue> getValue(j).getIntValue());
+                    }
+                }
+            }
+            assertFalse(cursor.canForward());
+            assertNull(cursor.forward());
+        }
+    }
+
     @Test
     public void testEmptyRowCursorOnEmptyTable() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0);
-                final RowCursor cursor = table.cursor()) {
-            compare(cursor);
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
+            compare(table);
         }
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testIndexOutOfBoundsFromIndex() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0);
-                final RowCursor cursor = table.cursor(TableFilter.filterRowsFromIndex(1))) {
-            compare(cursor);
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
+            compare(table, TableFilter.filterRowsFromIndex(1));
         }
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testIndexOutOfBoundsToIndex() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0);
-                final RowCursor cursor = table.cursor(TableFilter.filterRowsToIndex(1))) {
-            compare(cursor);
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(0)) {
+            compare(table, TableFilter.filterRowsToIndex(1));
         }
     }
 
     @Test
     public void testSingleBatchRowCursorOnSingleBatchTable() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(2);
-                final RowCursor cursor = table.cursor(TableFilter.filterRangeOfRows(0, 1))) {
-            compare(cursor, 0, 1);
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(2)) {
+            compare(table, TableFilter.filterRangeOfRows(0, 1), 0, 1);
         }
     }
 
     @Test
     public void testSingleBatchRowCursorOnMultiBatchTable() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 2);
-                final RowCursor cursor = table.cursor(TableFilter.filterRangeOfRows(CAPACITY, CAPACITY + 1))) {
-            compare(cursor, CAPACITY, CAPACITY + 1);
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 2)) {
+            compare(table, TableFilter.filterRangeOfRows(CAPACITY, CAPACITY + 1L), CAPACITY, CAPACITY + 1);
         }
     }
 
     @Test
     public void testSingleBatchRowCursorWithSelection() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(2);
-                final RowCursor cursor = table.cursor(new TableFilter.Builder().withFromRowIndex(0).withToRowIndex(1)
-                    .withMaterializeColumnIndices(0).build())) {
-            compare(cursor, 0, 1);
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(2)) {
+            compare(table,
+                new TableFilter.Builder().withFromRowIndex(0).withToRowIndex(1).withMaterializeColumnIndices(0).build(),
+                0, 1);
         }
     }
 
     @Test
     public void testMultiBatchRowCursor() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 2);
-                final RowCursor cursor = table.cursor(TableFilter.filterRangeOfRows(CAPACITY - 1, CAPACITY))) {
-            compare(cursor, CAPACITY - 1, CAPACITY);
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 2)) {
+            compare(table, TableFilter.filterRangeOfRows(CAPACITY - 1L, CAPACITY), CAPACITY - 1, CAPACITY);
         }
     }
 
     @Test
     public void testMultiBatchRowCursorWithSelection() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 2);
-                final RowCursor cursor = table.cursor(new TableFilter.Builder().withFromRowIndex(CAPACITY - 1)
-                    .withToRowIndex(CAPACITY).withMaterializeColumnIndices(0).build())) {
-            compare(cursor, CAPACITY - 1, CAPACITY);
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 2)) {
+            compare(table, new TableFilter.Builder().withFromRowIndex(CAPACITY - 1L).withToRowIndex(CAPACITY)
+                .withMaterializeColumnIndices(0).build(), CAPACITY - 1, CAPACITY);
         }
     }
 

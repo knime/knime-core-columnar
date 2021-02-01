@@ -42,49 +42,52 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   2 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.data.columnar.table;
 
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.RowContainer;
+import static org.junit.Assert.assertEquals;
+import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createSchema;
+
+import java.io.IOException;
+
+import org.junit.Test;
+import org.knime.core.columnar.testing.ColumnarTest;
+import org.knime.core.data.columnar.table.ColumnarTableTestUtils.TestColumnStoreFactory;
+import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.value.IntValueFactory.IntWriteValue;
 
 /**
- * Settings for columnar {@link RowContainer RowContainers}.
- *
- * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
- * @since 4.3
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class ColumnarRowContainerSettings {
+@SuppressWarnings("javadoc")
+public class ColumnarContainerTableTest extends ColumnarTest {
 
-    private final boolean m_initializeDomains;
+    @SuppressWarnings("deprecation")
+    @Test
+    public void testGetters() throws IOException {
+        final int nRows = 13;
+        final int tableId = 12;
 
-    private final int m_maxPossibleNominalDomainValues;
-
-    private final boolean m_checkDuplicateRowKeys;
-
-    /**
-     * @param initializeDomains if <source>true</source> domains will be initialized via domain values provided through
-     *            incoming {@link DataTableSpec}.
-     * @param maxPossibleNominalDomainValues maximum number of values for nominal domains.
-     * @param checkDuplicateRowKeys whether to check for duplicates among row keys
-     */
-    public ColumnarRowContainerSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
-        final boolean checkDuplicateRowKeys) {
-        m_initializeDomains = initializeDomains;
-        m_checkDuplicateRowKeys = checkDuplicateRowKeys;
-        m_maxPossibleNominalDomainValues = maxPossibleNominalDomainValues;
-    }
-
-    boolean isInitializeDomains() {
-        return m_initializeDomains;
-    }
-
-    int getMaxPossibleNominalDomainValues() {
-        return m_maxPossibleNominalDomainValues;
-    }
-
-    boolean isCheckDuplicateRowKeys() {
-        return m_checkDuplicateRowKeys;
+        final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(true, 0, true);
+        try (final ColumnarRowContainer container =
+            ColumnarRowContainer.create(null, tableId, createSchema(1), TestColumnStoreFactory.INSTANCE, settings);
+                final ColumnarRowWriteCursor cursor = container.createCursor()) {
+            for (int i = 0; i < nRows; i++) {
+                final RowWrite row = cursor.forward();
+                row.setRowKey(Integer.toString(i));
+                row.<IntWriteValue> getWriteValue(0).setIntValue(i);
+            }
+            try (@SuppressWarnings("resource")
+            final ColumnarContainerTable table = (ColumnarContainerTable)container.finishInternal()) {
+                table.ensureOpen();
+                assertEquals(tableId, table.getTableId());
+                assertEquals(nRows, table.getRowCount());
+                assertEquals(nRows, table.size());
+            }
+        }
     }
 
 }

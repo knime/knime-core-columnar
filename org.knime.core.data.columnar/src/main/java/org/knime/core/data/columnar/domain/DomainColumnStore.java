@@ -160,7 +160,6 @@ public final class DomainColumnStore extends DelegatingColumnStore {
     protected void closeOnce() throws IOException {
         m_domainCalculators = null;
         m_metadataCalculators = null;
-        m_config = null;
         super.closeOnce();
     }
 
@@ -278,7 +277,8 @@ public final class DomainColumnStore extends DelegatingColumnStore {
             } catch (final ExecutionException e) {
                 if (e.getCause() instanceof DuplicateKeyException) {
                     final DuplicateKeyException originalDKE = (DuplicateKeyException)e.getCause();
-                    final DuplicateKeyException newDKE = new DuplicateKeyException(originalDKE.getKey(), originalDKE.getMessage());
+                    final DuplicateKeyException newDKE =
+                        new DuplicateKeyException(originalDKE.getMessage(), originalDKE.getKey());
                     newDKE.initCause(e);
                     throw newDKE;
                 } else {

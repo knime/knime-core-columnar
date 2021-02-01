@@ -56,7 +56,7 @@ import org.knime.core.node.InvalidSettingsException;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public class ColumnarContainerTableLoader implements ExtensionTableLoader {
+public final class ColumnarContainerTableLoader implements ExtensionTableLoader {
 
     @Override
     public ExtensionTable load(final LoadContext context) throws InvalidSettingsException {

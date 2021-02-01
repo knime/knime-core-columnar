@@ -42,49 +42,54 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   29 Jan 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.data.columnar.table;
 
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.RowContainer;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.knime.core.data.columnar.table.ColumnarRowCursorTest.compare;
+import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createColumnarRowContainer;
+import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createUnsavedColumnarContainerTable;
+
+import org.junit.Test;
+import org.knime.core.columnar.testing.ColumnarTest;
+import org.knime.core.data.container.filter.TableFilter;
+import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.RowWrite;
+import org.knime.core.node.ExtensionTable;
 
 /**
- * Settings for columnar {@link RowContainer RowContainers}.
- *
- * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
- * @since 4.3
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class ColumnarRowContainerSettings {
+@SuppressWarnings("javadoc")
+public class ColumnarRowWriteCursorTest extends ColumnarTest {
 
-    private final boolean m_initializeDomains;
-
-    private final int m_maxPossibleNominalDomainValues;
-
-    private final boolean m_checkDuplicateRowKeys;
-
-    /**
-     * @param initializeDomains if <source>true</source> domains will be initialized via domain values provided through
-     *            incoming {@link DataTableSpec}.
-     * @param maxPossibleNominalDomainValues maximum number of values for nominal domains.
-     * @param checkDuplicateRowKeys whether to check for duplicates among row keys
-     */
-    public ColumnarRowContainerSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
-        final boolean checkDuplicateRowKeys) {
-        m_initializeDomains = initializeDomains;
-        m_checkDuplicateRowKeys = checkDuplicateRowKeys;
-        m_maxPossibleNominalDomainValues = maxPossibleNominalDomainValues;
+    private static void copy(final RowCursor readCursor, final ColumnarRowWriteCursor writeCursor) {
+        RowRead rowRead = null;
+        RowWrite rowWrite = null;
+        assertEquals(readCursor.getNumColumns(), writeCursor.getNumColumns());
+        while ((rowRead = readCursor.forward()) != null) {
+            assertTrue(writeCursor.canForward());
+            rowWrite = writeCursor.forward();
+            rowWrite.setFrom(rowRead);
+        }
     }
 
-    boolean isInitializeDomains() {
-        return m_initializeDomains;
-    }
-
-    int getMaxPossibleNominalDomainValues() {
-        return m_maxPossibleNominalDomainValues;
-    }
-
-    boolean isCheckDuplicateRowKeys() {
-        return m_checkDuplicateRowKeys;
+    @Test
+    public void testSingleBatchRowCursorCopy() {
+        try (final ExtensionTable table = createUnsavedColumnarContainerTable(2);
+                final RowCursor cursor = table.cursor(TableFilter.filterRangeOfRows(0, 1));
+                final ColumnarRowContainer copyContainer = createColumnarRowContainer();
+                final ColumnarRowWriteCursor copyWriteCursor = copyContainer.createCursor()) {
+            copy(cursor, copyWriteCursor);
+            try (final ExtensionTable copyTable = copyContainer.finishInternal()) {
+                compare(copyTable, 0, 1);
+            }
+        }
     }
 
 }
