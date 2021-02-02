@@ -246,6 +246,15 @@ final class ColumnarContainerTable extends ExtensionTable {
         try {
             if (filter != null) {
                 filter.validate(getDataTableSpec(), m_size);
+                //  for some reason we don't do validation of the 'from index'
+                final Optional<Long> fromRowIndexOpt = filter.getFromRowIndex();
+                if (fromRowIndexOpt.isPresent()) {
+                    final long fromRowIndex = fromRowIndexOpt.get();
+                    if (fromRowIndex >= m_size) { // NOSONAR
+                        throw new IndexOutOfBoundsException(
+                            String.format("From row index %d too large for table of size %d.", fromRowIndex, m_size));
+                    }
+                }
             }
             return ColumnarRowCursorFactory.create(m_readStore, m_schema, m_size, m_openCursorFinalizers, filter);
         } catch (IOException e) {
