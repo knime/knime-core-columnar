@@ -49,20 +49,16 @@ import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.LongValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.access.LongAccess.LongReadAccess;
 import org.knime.core.data.v2.access.LongAccess.LongWriteAccess;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
- * / {@link WriteAccess}
+ * A ColumnarValueFactory implementation wrapping {@link LongReadData} / {@link LongWriteData} as {@link LongReadAccess}
+ * / {@link LongWriteAccess}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
@@ -71,7 +67,7 @@ final class ColumnarLongAccessFactory
     implements ColumnarAccessFactory<LongReadData, LongReadAccess, LongWriteData, LongWriteAccess> {
 
     /** Instance **/
-    public static final ColumnarLongAccessFactory INSTANCE = new ColumnarLongAccessFactory();
+    static final ColumnarLongAccessFactory INSTANCE = new ColumnarLongAccessFactory();
 
     private ColumnarLongAccessFactory() {
     }
@@ -93,7 +89,7 @@ final class ColumnarLongAccessFactory
 
     private static final class DefaultLongReadAccess extends AbstractAccess<LongReadData> implements LongReadAccess {
 
-        public DefaultLongReadAccess(final LongReadData data, final ColumnDataIndex index) {
+        DefaultLongReadAccess(final LongReadData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
@@ -156,11 +152,12 @@ final class ColumnarLongAccessFactory
         public double getCenterOfGravity() {
             return m_data.getLong(m_index.getIndex());
         }
+
     }
 
     private static final class DefaultLongWriteAccess extends AbstractAccess<LongWriteData> implements LongWriteAccess {
 
-        public DefaultLongWriteAccess(final LongWriteData data, final ColumnDataIndex index) {
+        DefaultLongWriteAccess(final LongWriteData data, final ColumnDataIndex index) {
             super(data, index);
         }
 

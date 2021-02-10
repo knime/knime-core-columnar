@@ -72,9 +72,9 @@ import org.knime.core.data.v2.access.VoidAccess.VoidAccessSpec;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFactory<?, ?, ?, ?>> {
+final class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFactory<?, ?, ?, ?>> {
 
-    public final static ColumnarAccessFactoryMapper INSTANCE = new ColumnarAccessFactoryMapper();
+    public static final ColumnarAccessFactoryMapper INSTANCE = new ColumnarAccessFactoryMapper();
 
     private ColumnarAccessFactoryMapper() {
     }
@@ -116,8 +116,7 @@ class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFact
 
     @Override
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final ByteArrayAccessSpec spec) {
-        // TODO
-        throw new UnsupportedOperationException("nyi");
+        return ColumnarByteArrayAccessFactory.INSTANCE;
     }
 
     @Override
@@ -159,4 +158,5 @@ class ColumnarAccessFactoryMapper implements AccessSpecMapper<ColumnarAccessFact
     public ColumnarAccessFactory<?, ?, ?, ?> visit(final StringAccessSpec spec) {
         return ColumnarObjectAccessFactory.STRING_ACCESS_FACTORY;
     }
+
 }

@@ -76,7 +76,7 @@ public final class ColumnarValueSchemaUtils {
      *
      * @throws IllegalArgumentException thrown if {@link AccessSpec} can't be translated to {@link DataSpec}.
      */
-    public static final ColumnarValueSchema create(final ValueSchema source) throws IllegalArgumentException {
+    public static final ColumnarValueSchema create(final ValueSchema source) {
         return new DefaultColumnarValueSchema(source);
     }
 
@@ -107,7 +107,7 @@ public final class ColumnarValueSchemaUtils {
                 }
 
                 if (metadata != null) {
-                    for (final DataColumnMetaData element : metadata) {
+                    for (final DataColumnMetaData element : metadata) { // NOSONAR
                         creator.addMetaData(element, true);
                     }
                 }
@@ -117,4 +117,5 @@ public final class ColumnarValueSchemaUtils {
         }
         return new UpdatedColumnarValueSchema(new DataTableSpec(result), source);
     }
+
 }

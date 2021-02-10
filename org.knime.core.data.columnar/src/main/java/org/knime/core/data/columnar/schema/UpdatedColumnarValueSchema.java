@@ -50,7 +50,7 @@ package org.knime.core.data.columnar.schema;
 
 import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.node.NodeSettingsWO;
 
 final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
 
@@ -58,7 +58,7 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
 
     private final ColumnarValueSchema m_delegate;
 
-    public UpdatedColumnarValueSchema(final DataTableSpec spec, final ColumnarValueSchema delegate) {
+    UpdatedColumnarValueSchema(final DataTableSpec spec, final ColumnarValueSchema delegate) {
         m_updatedSpec = spec;
         m_delegate = delegate;
     }
@@ -79,9 +79,8 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public ValueSchema getSourceSchema() {
-        // TODO also update DataTableSpec of ValueSchema?
-        return m_delegate.getSourceSchema();
+    public void save(final NodeSettingsWO settings) {
+        m_delegate.save(settings);
     }
 
     @Override
@@ -93,4 +92,5 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     public ColumnarWriteValueFactory<?>[] getWriteValueFactories() {
         return m_delegate.getWriteValueFactories();
     }
+
 }

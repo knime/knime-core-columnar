@@ -45,14 +45,13 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.access.ReadAccess;
 
-final class DefaultReadValueFactory<R extends NullableReadData, RA extends ReadAccess>
+final class DefaultReadValueFactory<R extends NullableReadData, RA extends ReadAccess> // NOSONAR
     implements ColumnarReadValueFactory<R> {
 
     private final ColumnarAccessFactory<R, RA, ?, ?> m_factory;
@@ -67,11 +66,6 @@ final class DefaultReadValueFactory<R extends NullableReadData, RA extends ReadA
     @Override
     public ReadValue createReadValue(final R data, final ColumnDataIndex index) {
         return m_delegate.createReadValue(m_factory.createReadAccess(data, index));
-    }
-
-    @Override
-    public DataSpec getColumnDataSpec() {
-        return m_factory.getColumnDataSpec();
     }
 
 }

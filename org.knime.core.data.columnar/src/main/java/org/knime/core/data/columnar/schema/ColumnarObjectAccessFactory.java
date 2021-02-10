@@ -56,23 +56,19 @@ import java.time.Period;
 import java.time.ZonedDateTime;
 
 import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.access.ObjectAccess.GenericObjectAccessSpec;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectReadAccess;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectSerializer;
 import org.knime.core.data.v2.access.ObjectAccess.ObjectWriteAccess;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
- * / {@link WriteAccess}
+ * A ColumnarValueFactory implementation wrapping {@link ObjectReadData} / {@link ObjectWriteData} as
+ * {@link ObjectReadAccess} / {@link ObjectWriteAccess}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
@@ -80,30 +76,30 @@ import org.knime.core.data.v2.access.WriteAccess;
 final class ColumnarObjectAccessFactory<T> implements ColumnarAccessFactory<ObjectReadData<T>, //
         ObjectReadAccess<T>, ObjectWriteData<T>, ObjectWriteAccess<T>> {
 
-    public static final ColumnarObjectAccessFactory<String> STRING_ACCESS_FACTORY =
+    static final ColumnarObjectAccessFactory<String> STRING_ACCESS_FACTORY =
         new ColumnarObjectAccessFactory<>(DataSpec.stringSpec());
 
-    public static final ColumnarObjectAccessFactory<LocalDate> LOCAL_DATE_ACCESS_FACTORY =
+    static final ColumnarObjectAccessFactory<LocalDate> LOCAL_DATE_ACCESS_FACTORY =
         new ColumnarObjectAccessFactory<>(DataSpec.localDateSpec());
 
-    public static final ColumnarObjectAccessFactory<LocalTime> LOCAL_TIME_ACCESS_FACTORY =
+    static final ColumnarObjectAccessFactory<LocalTime> LOCAL_TIME_ACCESS_FACTORY =
         new ColumnarObjectAccessFactory<>(DataSpec.localTimeSpec());
 
-    public static final ColumnarObjectAccessFactory<LocalDateTime> LOCAL_DATE_TIME_ACCESS_FACTORY =
+    static final ColumnarObjectAccessFactory<LocalDateTime> LOCAL_DATE_TIME_ACCESS_FACTORY =
         new ColumnarObjectAccessFactory<>(DataSpec.localDateTimeSpec());
 
-    public static final ColumnarObjectAccessFactory<Duration> DURATION_ACCESS_FACTORY =
+    static final ColumnarObjectAccessFactory<Duration> DURATION_ACCESS_FACTORY =
         new ColumnarObjectAccessFactory<>(DataSpec.durationSpec());
 
-    public static final ColumnarObjectAccessFactory<Period> PERIOD_ACCESS_FACTORY =
+    static final ColumnarObjectAccessFactory<Period> PERIOD_ACCESS_FACTORY =
         new ColumnarObjectAccessFactory<>(DataSpec.periodSpec());
 
-    public static final ColumnarObjectAccessFactory<ZonedDateTime> ZONED_DATE_TIME_ACCESS_FACTORY =
+    static final ColumnarObjectAccessFactory<ZonedDateTime> ZONED_DATE_TIME_ACCESS_FACTORY =
         new ColumnarObjectAccessFactory<>(DataSpec.zonedDateTimeSpec());
 
     private final DataSpec m_spec;
 
-    public ColumnarObjectAccessFactory(final GenericObjectAccessSpec<T> spec) {
+    ColumnarObjectAccessFactory(final GenericObjectAccessSpec<T> spec) {
         m_spec =
             new GenericObjectDataSpec<>(new DefaultObjectDataSerializer<>(spec.getSerializer()), spec.isDictEncoded());
     }
@@ -131,7 +127,7 @@ final class ColumnarObjectAccessFactory<T> implements ColumnarAccessFactory<Obje
 
         private final ObjectSerializer<T> m_serializer;
 
-        public DefaultObjectDataSerializer(final ObjectSerializer<T> serializer) {
+        DefaultObjectDataSerializer(final ObjectSerializer<T> serializer) {
             m_serializer = serializer;
         }
 
@@ -148,11 +144,12 @@ final class ColumnarObjectAccessFactory<T> implements ColumnarAccessFactory<Obje
     }
 
     private static final class ColumnarObjectReadAccess<T> implements ObjectReadAccess<T> {
+
         private final ColumnDataIndex m_index;
 
         private final ObjectReadData<T> m_data;
 
-        public ColumnarObjectReadAccess(final ObjectReadData<T> data, final ColumnDataIndex index) {
+        ColumnarObjectReadAccess(final ObjectReadData<T> data, final ColumnDataIndex index) {
             m_data = data;
             m_index = index;
         }
@@ -166,9 +163,11 @@ final class ColumnarObjectAccessFactory<T> implements ColumnarAccessFactory<Obje
         public boolean isMissing() {
             return m_data.isMissing(m_index.getIndex());
         }
+
     }
 
     private static final class ColumnarObjectWriteAccess<T> implements ObjectWriteAccess<T> {
+
         private final ColumnDataIndex m_index;
 
         private final ObjectWriteData<T> m_data;
@@ -187,5 +186,7 @@ final class ColumnarObjectAccessFactory<T> implements ColumnarAccessFactory<Obje
         public void setMissing() {
             m_data.setMissing(m_index.getIndex());
         }
+
     }
+
 }

@@ -55,6 +55,7 @@ import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
+import org.knime.core.node.NodeSettingsWO;
 
 final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
@@ -66,7 +67,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ColumnarReadValueFactory<?>[] m_readFactories;
 
-    public DefaultColumnarValueSchema(final ValueSchema source) {
+    DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
         @SuppressWarnings("unchecked")
         final ColumnarAccessFactory<NullableReadData, ReadAccess, NullableWriteData, WriteAccess>[] factories =
@@ -118,12 +119,13 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public ValueSchema getSourceSchema() {
-        return m_source;
+    public void save(final NodeSettingsWO settings) {
+        ValueSchema.Serializer.save(m_source, settings);
     }
 
     @Override
     public int numColumns() {
         return m_factories.length;
     }
+
 }

@@ -49,29 +49,25 @@ import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.IntData.IntDataSpec;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.IntValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.v2.access.IntAccess.IntReadAccess;
 import org.knime.core.data.v2.access.IntAccess.IntWriteAccess;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
- * / {@link WriteAccess}
+ * A ColumnarValueFactory implementation wrapping {@link IntReadData} / {@link IntWriteData} as {@link IntReadAccess} /
+ * {@link IntWriteAccess}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ColumnarIntAccessFactory implements ColumnarAccessFactory<IntReadData, //
-        IntReadAccess, IntWriteData, IntWriteAccess> {
+final class ColumnarIntAccessFactory
+    implements ColumnarAccessFactory<IntReadData, IntReadAccess, IntWriteData, IntWriteAccess> {
 
     /** INSTANCE **/
-    public final static ColumnarIntAccessFactory INSTANCE = new ColumnarIntAccessFactory();
+    static final ColumnarIntAccessFactory INSTANCE = new ColumnarIntAccessFactory();
 
     private ColumnarIntAccessFactory() {
     }
@@ -93,7 +89,7 @@ final class ColumnarIntAccessFactory implements ColumnarAccessFactory<IntReadDat
 
     private static final class DefaultIntReadAccess extends AbstractAccess<IntReadData> implements IntReadAccess {
 
-        public DefaultIntReadAccess(final IntReadData data, final ColumnDataIndex index) {
+        DefaultIntReadAccess(final IntReadData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
@@ -161,11 +157,12 @@ final class ColumnarIntAccessFactory implements ColumnarAccessFactory<IntReadDat
         public long getLongValue() {
             return m_data.getInt(m_index.getIndex());
         }
+
     }
 
     private static final class DefaultIntWriteAccess extends AbstractAccess<IntWriteData> implements IntWriteAccess {
 
-        public DefaultIntWriteAccess(final IntWriteData data, final ColumnDataIndex index) {
+        DefaultIntWriteAccess(final IntWriteData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
@@ -185,4 +182,5 @@ final class ColumnarIntAccessFactory implements ColumnarAccessFactory<IntReadDat
         }
 
     }
+
 }

@@ -48,8 +48,6 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import java.util.stream.Stream;
-
 import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.StructData.StructReadData;
@@ -62,9 +60,12 @@ import org.knime.core.data.v2.access.StructAccess.StructWriteAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
 /**
+ * A ColumnarValueFactory implementation wrapping {@link StructReadData} / {@link StructWriteData} as
+ * {@link StructReadAccess} / {@link StructWriteAccess}.
+ *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-public class ColumnarStructAccessFactory
+class ColumnarStructAccessFactory
     implements ColumnarAccessFactory<StructReadData, StructReadAccess, StructWriteData, StructWriteAccess> {
 
     private final ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;
@@ -74,13 +75,14 @@ public class ColumnarStructAccessFactory
     /**
      * @param inner the specs of the inner elements
      */
-    public ColumnarStructAccessFactory(final AccessSpec<?, ?>... inner) {
-        // TODO we could do that without streaming in one loop..:
-        m_inner = Stream.of(inner).map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
-            .toArray(ColumnarAccessFactory<?, ?, ?, ?>[]::new);
-        m_spec =
-            new StructDataSpec(Stream.of(m_inner).map(ColumnarAccessFactory::getColumnDataSpec).toArray(DataSpec[]::new));
-
+    ColumnarStructAccessFactory(final AccessSpec<?, ?>... inner) {
+        m_inner = new ColumnarAccessFactory<?, ?, ?, ?>[inner.length];
+        final DataSpec[] specs = new DataSpec[inner.length];
+        for (int i = 0; i < inner.length; i++) {
+            m_inner[i] = inner[i].accept(ColumnarAccessFactoryMapper.INSTANCE);
+            specs[i] = m_inner[i].getColumnDataSpec();
+        }
+        m_spec = new StructDataSpec(specs);
     }
 
     @Override
@@ -124,6 +126,7 @@ public class ColumnarStructAccessFactory
             final R cast = (R)m_inner[index].createReadAccess(m_data.getReadDataAt(index), m_index);
             return cast;
         }
+
     }
 
     private static final class DefaultStructWriteAccess implements StructWriteAccess {
@@ -152,6 +155,7 @@ public class ColumnarStructAccessFactory
             final W cast = (W)m_inner[index].createWriteAccess(m_data.getWriteDataAt(index), m_index);
             return cast;
         }
+
     }
 
 }

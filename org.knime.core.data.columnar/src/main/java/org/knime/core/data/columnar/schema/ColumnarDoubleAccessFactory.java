@@ -49,20 +49,16 @@ import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DoubleValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.v2.access.DoubleAccess.DoubleReadAccess;
 import org.knime.core.data.v2.access.DoubleAccess.DoubleWriteAccess;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
- * / {@link WriteAccess}
+ * A ColumnarValueFactory implementation wrapping {@link DoubleReadData} / {@link DoubleWriteData} as
+ * {@link DoubleReadAccess} / {@link DoubleWriteAccess}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
@@ -71,7 +67,7 @@ final class ColumnarDoubleAccessFactory
     implements ColumnarAccessFactory<DoubleReadData, DoubleReadAccess, DoubleWriteData, DoubleWriteAccess> {
 
     /** Instance **/
-    public static final ColumnarDoubleAccessFactory INSTANCE = new ColumnarDoubleAccessFactory();
+    static final ColumnarDoubleAccessFactory INSTANCE = new ColumnarDoubleAccessFactory();
 
     private ColumnarDoubleAccessFactory() {
     }
@@ -94,7 +90,7 @@ final class ColumnarDoubleAccessFactory
     private static final class DefaultDoubleReadAccess extends AbstractAccess<DoubleReadData>
         implements DoubleReadAccess {
 
-        public DefaultDoubleReadAccess(final DoubleReadData data, final ColumnDataIndex index) {
+        DefaultDoubleReadAccess(final DoubleReadData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
@@ -152,12 +148,13 @@ final class ColumnarDoubleAccessFactory
         public double getCenterOfGravity() {
             return m_data.getDouble(m_index.getIndex());
         }
+
     }
 
     private static final class DefaultDoubleWriteAccess extends AbstractAccess<DoubleWriteData>
         implements DoubleWriteAccess {
 
-        public DefaultDoubleWriteAccess(final DoubleWriteData data, final ColumnDataIndex index) {
+        DefaultDoubleWriteAccess(final DoubleWriteData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
@@ -176,5 +173,7 @@ final class ColumnarDoubleAccessFactory
             m_data.setDouble(m_index.getIndex(), value.getDoubleValue());
 
         }
+
     }
+
 }

@@ -42,76 +42,50 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   15 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.data.columnar.schema;
 
-import java.util.Arrays;
+import java.util.stream.IntStream;
 
-import org.knime.core.columnar.data.ListData.ListReadData;
-import org.knime.core.columnar.data.ListData.ListWriteData;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
+import org.junit.Test;
+import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataColumnSpecCreator;
+import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.def.IntCell;
+import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
+import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.ValueSchema;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestListData extends TestData implements ListWriteData, ListReadData {
+public class DefaultColumnarValueSchemaTest {
 
-    public static final class TestListDataFactory implements TestDataFactory {
-
-        private final TestDataFactory m_inner;
-
-        public TestListDataFactory(final TestDataFactory inner) {
-            m_inner = inner;
-        }
-
-        @Override
-        public TestListData createWriteData(final int capacity) {
-            return new TestListData(
-                new TestData[capacity], m_inner, false);
-        }
-
-        @Override
-        public TestListData createReadData(final Object data) {
-            return new TestListData((TestData[])data, m_inner, true);
-        }
-
+    static DataTableSpec createSpec(final int nCols) {
+        return new DataTableSpec(IntStream.range(0, nCols)
+            .mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), IntCell.TYPE).createSpec())
+            .toArray(DataColumnSpec[]::new));
     }
 
-    private final TestDataFactory m_inner;
-
-    TestListData(final TestData[] lists, final TestDataFactory inner, final boolean close) {
-        super(lists);
-        m_inner = inner;
-        if (close) {
-            close(lists.length);
-        }
+    static DefaultColumnarValueSchema createDefaultColumnarValueSchema(final DataTableSpec spec) {
+        final ValueSchema valueSchema =
+            ValueSchema.create(spec, RowKeyType.NOKEY, NotInWorkflowWriteFileStoreHandler.create());
+        final ColumnarValueSchema schema = ColumnarValueSchemaUtils.create(valueSchema);
+        return (DefaultColumnarValueSchema)schema;
     }
 
-    @Override
-    public ListReadData close(final int length) {
-        closeInternal(length);
-        return this;
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testGetSpecIndexOutOfBoundsLower() {
+        createDefaultColumnarValueSchema(createSpec(0)).getSpec(-1);
     }
 
-    @Override
-    public long sizeOf() {
-        return Arrays.stream(get()).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <C extends NullableReadData> C createReadData(final int index) {
-        return (C)get()[index];
-    }
-
-    @Override
-    public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
-        @SuppressWarnings("unchecked")
-        final C data = (C)m_inner.createWriteData(size);
-        get()[index] = data;
-        return data;
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testGetSpecIndexOutOfBoundsUpper() {
+        createDefaultColumnarValueSchema(createSpec(0)).getSpec(1);
     }
 
 }

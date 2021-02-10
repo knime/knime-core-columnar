@@ -175,7 +175,7 @@ final class ColumnarContainerTable extends ExtensionTable {
         throws IOException, CanceledExecutionException {
         settings.addLong(CFG_TABLE_SIZE, m_size);
         settings.addString(CFG_FACTORY_TYPE, m_factory.getClass().getName());
-        ValueSchema.Serializer.save(m_schema.getSourceSchema(), settings);
+        m_schema.save(settings);
         if (m_writeStore != null) {
             m_writeStore.save(f);
         }

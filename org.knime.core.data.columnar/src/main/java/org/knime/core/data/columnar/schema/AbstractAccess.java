@@ -45,27 +45,25 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * Abstract implementation for {@link ReadAccess} / {@link WriteAccess}es on {@link NullableReadData} /
- * {@link NullableWriteData}
+ * Abstract implementation for {@link ReadAccess ReadAccesses} and {@link WriteAccess WriteAccesses}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-abstract class AbstractAccess<T> {
+abstract class AbstractAccess<T> { // NOSONAR
 
-    protected final T m_data;
+    final T m_data;
 
-    protected final ColumnDataIndex m_index;
+    final ColumnDataIndex m_index;
 
-    public AbstractAccess(final T data, final ColumnDataIndex index) {
+    AbstractAccess(final T data, final ColumnDataIndex index) {
         m_data = data;
         m_index = index;
     }
+
 }

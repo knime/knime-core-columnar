@@ -51,11 +51,11 @@ package org.knime.core.data.columnar.schema;
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ReadValue;
@@ -78,14 +78,15 @@ import org.knime.core.data.v2.access.WriteAccess;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ColumnarListAccessFactory<R extends NullableReadData, RA extends ReadAccess, W extends NullableWriteData, WA extends WriteAccess>
+final class ColumnarListAccessFactory<R extends NullableReadData, RA extends ReadAccess, // NOSONAR
+        W extends NullableWriteData, WA extends WriteAccess> // NOSONAR
     implements ColumnarAccessFactory<ListReadData, ListReadAccess, ListWriteData, ListWriteAccess> {
 
     private final ValueFactory<RA, WA> m_innerValueFactory;
 
     private final ColumnarAccessFactory<R, RA, W, WA> m_innerAccessFactory;
 
-    public ColumnarListAccessFactory(final ListAccessSpec<RA, WA> listAccessSpec) {
+    ColumnarListAccessFactory(final ListAccessSpec<RA, WA> listAccessSpec) {
         m_innerValueFactory = listAccessSpec.getInnerValueFactory();
         @SuppressWarnings("unchecked")
         final ColumnarAccessFactory<R, RA, W, WA> innerAccessFactory =
@@ -119,7 +120,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
 
         private R m_innerData;
 
-        public DefaultListReadAccess(final ListReadData data, final ColumnDataIndex index) {
+        DefaultListReadAccess(final ListReadData data, final ColumnDataIndex index) {
             super(data, index);
             m_lastIndex = -1;
         }
@@ -127,15 +128,12 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
         /** Update the m_value if we are at a new index */
         private void updateReadValue() {
             final int index = m_index.getIndex();
+            // If we got the same index we don't need to create a new access and value
             if (index != m_lastIndex) {
                 m_lastIndex = index;
-                final R innerData = m_data.createReadData(index);
-                // If we got the same object we don't need to create a new access and value
-                if (m_innerData != innerData) {
-                    m_innerData = innerData;
-                    final RA readAccess = m_innerAccessFactory.createReadAccess(m_innerData, () -> m_innerIndex);
-                    m_value = m_innerValueFactory.createReadValue(readAccess);
-                }
+                m_innerData = m_data.createReadData(index);
+                final RA readAccess = m_innerAccessFactory.createReadAccess(m_innerData, () -> m_innerIndex);
+                m_value = m_innerValueFactory.createReadValue(readAccess);
             }
         }
 
@@ -145,7 +143,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
         }
 
         @Override
-        public <RV extends ReadValue> RV getReadValue(final int index) {
+        public <RV extends ReadValue> RV getReadValue(final int index) { // NOSONAR
             updateReadValue();
             m_innerIndex = index;
             @SuppressWarnings("unchecked")
@@ -164,6 +162,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
             updateReadValue();
             return m_innerData.length();
         }
+
     }
 
     private final class DefaultListWriteAccess extends AbstractAccess<ListWriteData> implements ListWriteAccess {
@@ -172,7 +171,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
 
         private int m_innerIndex;
 
-        public DefaultListWriteAccess(final ListWriteData data, final ColumnDataIndex index) {
+        DefaultListWriteAccess(final ListWriteData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
@@ -182,7 +181,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
         }
 
         @Override
-        public <D extends DataValue, WV extends WriteValue<D>> WV getWriteValue(final int index) {
+        public <D extends DataValue, WV extends WriteValue<D>> WV getWriteValue(final int index) { // NOSONAR
             m_innerIndex = index;
             // NB: m_value is always the value for the current index
             // because users must call #create at an index first
@@ -197,5 +196,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
             final WA writeAccess = m_innerAccessFactory.createWriteAccess(writeData, () -> m_innerIndex);
             m_value = m_innerValueFactory.createWriteValue(writeAccess);
         }
+
     }
+
 }

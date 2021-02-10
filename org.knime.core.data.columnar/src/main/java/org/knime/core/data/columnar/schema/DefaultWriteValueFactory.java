@@ -51,7 +51,7 @@ import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.access.WriteAccess;
 
-final class DefaultWriteValueFactory<W extends NullableWriteData, WA extends WriteAccess>
+final class DefaultWriteValueFactory<W extends NullableWriteData, WA extends WriteAccess> // NOSONAR
     implements ColumnarWriteValueFactory<W> {
 
     private final ColumnarAccessFactory<?, ?, W, WA> m_factory;

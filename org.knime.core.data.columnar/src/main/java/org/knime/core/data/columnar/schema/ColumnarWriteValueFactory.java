@@ -52,8 +52,9 @@ import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
 
 /**
- * {@link ColumnarWriteValueFactory}s typically wrap a {@link ValueFactory} and allow to create {@link WriteValue}s
- * based on {@link NullableWriteData} in conjunction with a {@link ColumnDataIndex}.
+ * {@link ColumnarWriteValueFactory ColumnarWriteValueFactorys} typically wrap a {@link ValueFactory} and allow to
+ * create {@link WriteValue WriteValues} based on {@link NullableWriteData} in conjunction with a
+ * {@link ColumnDataIndex}.
  *
  * @param <W> type of ColumnWriteData
  *
@@ -69,7 +70,9 @@ public interface ColumnarWriteValueFactory<W extends NullableWriteData> {
      * @param data the underlying {@link NullableWriteData}
      * @param index pointer to position in {@link NullableWriteData}
      *
-     * @return a {@link WriteValue} representing the value at the {@link ColumnDataIndex} in the {@link NullableReadData}.
+     * @return a {@link WriteValue} representing the value at the {@link ColumnDataIndex} in the
+     *         {@link NullableReadData}.
      */
-    WriteValue<?> createWriteValue(W data, ColumnDataIndex index);
+    WriteValue<?> createWriteValue(W data, ColumnDataIndex index); // NOSONAR
+
 }

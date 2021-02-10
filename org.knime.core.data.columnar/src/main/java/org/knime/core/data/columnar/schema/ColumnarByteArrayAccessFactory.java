@@ -44,65 +44,88 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 12, 2020 (dietzc): created
+ *   10 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.data.columnar.schema;
 
 import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.VoidData.VoidReadData;
-import org.knime.core.columnar.data.VoidData.VoidWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidReadAccess;
-import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidWriteAccess;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
+import org.knime.core.data.v2.access.ByteArrayAccess.VarBinaryReadAccess;
+import org.knime.core.data.v2.access.ByteArrayAccess.VarBinaryWriteAccess;
 
 /**
- * VoidValueFactory to create VoidData.
+ * A ColumnarValueFactory implementation wrapping {@link VarBinaryReadData} / {@link VarBinaryWriteData} as
+ * {@link VarBinaryReadAccess} / {@link VarBinaryWriteAccess}.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarVoidAccessFactory
-    implements ColumnarAccessFactory<VoidReadData, VoidReadAccess, VoidWriteData, VoidWriteAccess> {
+final class ColumnarByteArrayAccessFactory
+    implements ColumnarAccessFactory<VarBinaryReadData, VarBinaryReadAccess, VarBinaryWriteData, VarBinaryWriteAccess> {
 
-    /** Singleton instance on Void **/
-    static final ColumnarVoidAccessFactory INSTANCE = new ColumnarVoidAccessFactory();
+    /** Instance **/
+    static final ColumnarByteArrayAccessFactory INSTANCE = new ColumnarByteArrayAccessFactory();
 
-    private ColumnarVoidAccessFactory() {
-    }
-
-    @Override
-    public VoidWriteAccess createWriteAccess(final VoidWriteData data, final ColumnDataIndex index) {
-        return VoidWriteAccess.WRITE_ACCESS_INSTANCE;
-    }
-
-    @Override
-    public VoidReadAccess createReadAccess(final VoidReadData data, final ColumnDataIndex index) {
-        return VoidReadAccess.READ_ACCESS_INSTANCE;
+    private ColumnarByteArrayAccessFactory() {
     }
 
     @Override
     public DataSpec getColumnDataSpec() {
-        return DataSpec.voidSpec();
+        return DataSpec.varBinarySpec();
     }
 
-    static final class VoidReadAccess implements ReadAccess {
+    @Override
+    public VarBinaryWriteAccess createWriteAccess(final VarBinaryWriteData data, final ColumnDataIndex index) {
+        return new DefaultVarBinaryWriteAccess(data, index);
+    }
 
-        private static final VoidReadAccess READ_ACCESS_INSTANCE = new VoidReadAccess();
+    @Override
+    public VarBinaryReadAccess createReadAccess(final VarBinaryReadData data, final ColumnDataIndex index) {
+        return new DefaultVarBinaryReadAccess(data, index);
+    }
+
+    private static final class DefaultVarBinaryWriteAccess extends AbstractAccess<VarBinaryWriteData>
+        implements VarBinaryWriteAccess {
+
+        DefaultVarBinaryWriteAccess(final VarBinaryWriteData data, final ColumnDataIndex index) {
+            super(data, index);
+        }
 
         @Override
-        public boolean isMissing() {
-            return true;
+        public void setMissing() {
+            m_data.setMissing(m_index.getIndex());
+        }
+
+        @Override
+        public void setByteArray(final byte[] value) {
+            m_data.setBytes(m_index.getIndex(), value);
+        }
+
+        @Override
+        public void setByteArray(final byte[] array, final int index, final int length) {
+            final byte[] subArray = new byte[length];
+            System.arraycopy(array, index, subArray, 0, length);
+            m_data.setBytes(m_index.getIndex(), subArray);
         }
 
     }
 
-    static final class VoidWriteAccess implements WriteAccess {
+    private static final class DefaultVarBinaryReadAccess extends AbstractAccess<VarBinaryReadData>
+        implements VarBinaryReadAccess {
 
-        private static final VoidWriteAccess WRITE_ACCESS_INSTANCE = new VoidWriteAccess();
+        DefaultVarBinaryReadAccess(final VarBinaryReadData data, final ColumnDataIndex index) {
+            super(data, index);
+        }
 
         @Override
-        public void setMissing() { // NOSONAR
+        public boolean isMissing() {
+            return m_data.isMissing(m_index.getIndex());
+        }
+
+        @Override
+        public byte[] getByteArray() {
+            return m_data.getBytes(m_index.getIndex());
         }
 
     }

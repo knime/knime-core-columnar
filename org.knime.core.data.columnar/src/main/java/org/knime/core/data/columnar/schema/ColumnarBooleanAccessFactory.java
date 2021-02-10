@@ -49,20 +49,16 @@ import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.BooleanValue;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.v2.access.BooleanAccess.BooleanReadAccess;
 import org.knime.core.data.v2.access.BooleanAccess.BooleanWriteAccess;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link NullableReadData} / {@link NullableWriteData} as {@link ReadAccess}
- * / {@link WriteAccess}
+ * A ColumnarValueFactory implementation wrapping {@link BooleanReadData} / {@link BooleanWriteData} as
+ * {@link BooleanReadAccess} / {@link BooleanWriteAccess}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
@@ -70,7 +66,7 @@ import org.knime.core.data.v2.access.WriteAccess;
 final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory<BooleanReadData, //
         BooleanReadAccess, BooleanWriteData, BooleanWriteAccess> {
 
-    public final static ColumnarBooleanAccessFactory INSTANCE = new ColumnarBooleanAccessFactory();
+    static final ColumnarBooleanAccessFactory INSTANCE = new ColumnarBooleanAccessFactory();
 
     private ColumnarBooleanAccessFactory() {
     }
@@ -93,7 +89,7 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory<Boolea
     private static final class DefaultBooleanReadAccess extends AbstractAccess<BooleanReadData>
         implements BooleanReadAccess {
 
-        public DefaultBooleanReadAccess(final BooleanReadData data, final ColumnDataIndex index) {
+        DefaultBooleanReadAccess(final BooleanReadData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
@@ -166,12 +162,13 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory<Boolea
         public DataCell getDataCell() {
             return m_data.getBoolean(m_index.getIndex()) ? BooleanCell.TRUE : BooleanCell.FALSE;
         }
+
     }
 
     private static final class DefaultBooleanWriteAccess extends AbstractAccess<BooleanWriteData>
         implements BooleanWriteAccess {
 
-        public DefaultBooleanWriteAccess(final BooleanWriteData data, final ColumnDataIndex index) {
+        DefaultBooleanWriteAccess(final BooleanWriteData data, final ColumnDataIndex index) {
             super(data, index);
         }
 
@@ -189,5 +186,7 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory<Boolea
         public void setValue(final BooleanValue value) {
             m_data.setBoolean(m_index.getIndex(), value.getBooleanValue());
         }
+
     }
+
 }

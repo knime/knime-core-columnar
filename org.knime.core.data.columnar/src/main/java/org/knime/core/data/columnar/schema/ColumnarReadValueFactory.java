@@ -45,7 +45,6 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
@@ -75,8 +74,4 @@ public interface ColumnarReadValueFactory<R extends NullableReadData> {
      */
     ReadValue createReadValue(R data, ColumnDataIndex index);
 
-    /**
-     * @return spec of the column data.
-     */
-    DataSpec getColumnDataSpec();
 }

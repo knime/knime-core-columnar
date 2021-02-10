@@ -14,13 +14,13 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *  aVoid with this program; if not, see <http://www.gnu.org/licenses>.
  *
  *  Additional permission under GNU GPL version 3 section 7:
  *
- *  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+ *  KNIME Voideroperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
  *  Hence, KNIME and ECLIPSE are both independent programs and are not
- *  derived from each other. Should, however, the interpretation of the
+ *  derived from each other. Should, however, the Voiderpretation of the
  *  GNU GPL Version 3 ("License") under any applicable laws result in
  *  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
  *  you the additional permission to use and propagate KNIME together with
@@ -31,62 +31,56 @@
  *
  *  Additional permission relating to nodes for KNIME that extend the Node
  *  Extension (and in particular that are based on subclasses of NodeModel,
- *  NodeDialog, and NodeView) and that only interoperate with KNIME through
+ *  NodeDialog, and NodeView) and that only Voideroperate with KNIME through
  *  standard APIs ("Nodes"):
  *  Nodes are deemed to be separate and independent programs and to not be
  *  covered works.  Notwithstanding anything to the contrary in the
  *  License, the License does not apply to Nodes, you are not required to
  *  license Nodes under the License, and you are granted a license to
  *  prepare and propagate Nodes, in each case even if such Nodes are
- *  propagated with or for interoperation with KNIME.  The owner of a Node
+ *  propagated with or for Voideroperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
- *  when such Node is propagated with or for interoperation with KNIME.
+ *  when such Node is propagated with or for Voideroperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   8 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.data.columnar.schema;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
 import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
+import org.knime.core.columnar.testing.data.TestVoidData;
+import org.knime.core.columnar.testing.data.TestVoidData.TestVoidDataFactory;
+import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidReadAccess;
+import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidWriteAccess;
+import org.knime.core.data.v2.access.VoidAccess.VoidAccessSpec;
 
 /**
- * Columnar wrapper around a {@link ValueFactory}.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-interface ColumnarAccessFactory<R extends NullableReadData, RA extends ReadAccess, // NOSONAR
-        W extends NullableWriteData, WA extends WriteAccess> { // NOSONAR
+@SuppressWarnings("javadoc")
+public class ColumnarVoidAccessFactoryTest {
 
-    /**
-     * Creates an access on a {@link NullableWriteData}. The actual value of the created access depends on
-     * {@link ColumnDataIndex}.
-     *
-     * @param data the actual {@link NullableWriteData}
-     * @param index data index pointing into {@link NullableWriteData}
-     *
-     * @return a {@link WriteAccess} backed by {@link NullableWriteData}.
-     */
-    WA createWriteAccess(W data, ColumnDataIndex index);
+    @Test
+    public void testAccesses() {
 
-    /**
-     * Creates an access on a {@link NullableReadData}. The actual value of the created access depends on
-     * {@link ColumnDataIndex}.
-     *
-     * @param data the actual {@link NullableReadData}
-     * @param index data index pointing into {@link NullableReadData}
-     *
-     * @return a {@link ReadAccess} backed by {@link NullableReadData}.
-     */
-    RA createReadAccess(R data, ColumnDataIndex index);
+        final VoidAccessSpec spec = VoidAccessSpec.INSTANCE;
+        final ColumnarVoidAccessFactory factory =
+            (ColumnarVoidAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
+        assertEquals(DataSpec.voidSpec(), factory.getColumnDataSpec());
+        final TestVoidData data = TestVoidDataFactory.INSTANCE.createWriteData(1);
+        final VoidWriteAccess writeAccess = factory.createWriteAccess(data, () -> 0);
+        final VoidReadAccess readAccess = factory.createReadAccess(data, () -> 0);
 
-    /**
-     * @return the underlying {@link DataSpec}
-     */
-    DataSpec getColumnDataSpec();
+        // set cell
+        assertTrue(readAccess.isMissing());
+        writeAccess.setMissing();
+        assertTrue(readAccess.isMissing());
+
+    }
 
 }

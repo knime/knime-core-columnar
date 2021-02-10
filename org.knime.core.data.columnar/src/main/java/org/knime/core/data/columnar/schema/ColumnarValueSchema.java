@@ -48,6 +48,7 @@ package org.knime.core.data.columnar.schema;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.node.NodeSettingsWO;
 
 /**
  * Columnar wrapper around a {@link ValueSchema}.
@@ -81,13 +82,10 @@ public interface ColumnarValueSchema extends ColumnStoreSchema {
     ColumnarWriteValueFactory<?>[] getWriteValueFactories();
 
     /**
-     * TODO get rid of this method, for reasons stated below.
-     *
-     * NB: {@link DataTableSpec} of {@link ValueSchema} can differ from {@link DataTableSpec} received through
-     * {@link #getSourceSpec()} (update after domain calculation).
-     *
-     * @return the wrapped {@link ValueSchema}.
-     */
-    ValueSchema getSourceSchema();
+    * Saves the wrapped {@link ValueSchema} to the provided settings.
+    *
+    * @param settings the settings to save the ValueSchema to
+    */
+    void save(NodeSettingsWO settings);
 
 }
