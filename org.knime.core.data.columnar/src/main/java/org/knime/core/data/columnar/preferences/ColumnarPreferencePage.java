@@ -73,8 +73,10 @@ import org.eclipse.ui.IWorkbenchPreferencePage;
 import org.eclipse.ui.PlatformUI;
 import org.knime.core.ui.util.SWTUtilities;
 
-@SuppressWarnings("javadoc")
-public class ColumnarPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
+/**
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public final class ColumnarPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
     private static final UnaryOperator<String> RESTART_MESSAGE_OPERATOR =
         s -> String.format("Changes to the %s require a restart of the workbenck to become effective.%n"
@@ -102,6 +104,9 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
 
     private boolean m_apply;
 
+    /**
+     * Constructor.
+     */
     public ColumnarPreferencePage() {
         super(GRID);
         m_numThreads = ColumnarPreferenceUtils.getNumThreads();
@@ -235,9 +240,6 @@ public class ColumnarPreferencePage extends FieldEditorPreferencePage implements
                 + m_smallTableCacheSizeEditor.getIntValue() > usablePhysicalMemorySizeMB;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected void performDefaults() {
         super.performDefaults();

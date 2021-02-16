@@ -106,10 +106,8 @@ public final class ColumnarValueSchemaUtils {
                     creator.setDomain(domain);
                 }
 
-                if (metadata != null) {
-                    for (final DataColumnMetaData element : metadata) { // NOSONAR
-                        creator.addMetaData(element, true);
-                    }
+                for (final DataColumnMetaData element : metadata) {
+                    creator.addMetaData(element, true);
                 }
 
                 result[i] = creator.createSpec();

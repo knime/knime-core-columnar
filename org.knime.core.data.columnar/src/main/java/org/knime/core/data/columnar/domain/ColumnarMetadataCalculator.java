@@ -48,6 +48,8 @@
  */
 package org.knime.core.data.columnar.domain;
 
+import java.util.Arrays;
+
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.columnar.ColumnDataIndex;
@@ -56,19 +58,22 @@ import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.meta.DataColumnMetaDataCreator;
 import org.knime.core.data.v2.ReadValue;
 
-/*
- * Calculates metadata
+/**
+ * Columnar metadata calculator.
  *
- * @author Christian Dietz, KNIME GmbH Konstanz, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-class ColumnarMetadataDomainCalculator<R extends NullableReadData>
-    implements ColumnarDomainCalculator<R, DataColumnMetaData[]> {
+final class ColumnarMetadataCalculator<R extends NullableReadData>
+    implements ColumnarCalculator<R, DataColumnMetaData[]>, ColumnDataIndex {
 
     private final DataColumnMetaDataCreator<DataColumnMetaData>[] m_creators;
 
     private final ColumnarReadValueFactory<NullableReadData> m_factory;
 
-    public ColumnarMetadataDomainCalculator(final DataColumnMetaDataCreator<DataColumnMetaData>[] creators,
+    private int m_index;
+
+    ColumnarMetadataCalculator(final DataColumnMetaDataCreator<DataColumnMetaData>[] creators,
         final ColumnarReadValueFactory<NullableReadData> factory) {
         m_creators = creators;
         m_factory = factory;
@@ -76,43 +81,34 @@ class ColumnarMetadataDomainCalculator<R extends NullableReadData>
 
     @Override
     public void update(final R data) {
-        final DummyIndex index = new DummyIndex();
-        final ReadValue value = m_factory.createReadValue(data, index);
-        final int length = data.length();
-        for (int i = 0; i < length; i++) {
+        final ReadValue value = m_factory.createReadValue(data, this);
+        for (int i = 0; i < data.length(); i++) {
             if (!data.isMissing(i)) {
-                index.index = i;
+                m_index = i;
                 final DataCell cell = value.getDataCell();
-                for (final DataColumnMetaDataCreator<?> creator : m_creators) {
+                for (final DataColumnMetaDataCreator<DataColumnMetaData> creator : m_creators) {
                     creator.update(cell);
                 }
             }
         }
     }
 
-    private static final class DummyIndex implements ColumnDataIndex {
-        public int index = 0;
-
-        @Override
-        public int getIndex() {
-            return index;
-        }
+    @Override
+    public DataColumnMetaData[] get() {
+        return Arrays.stream(m_creators).map(DataColumnMetaDataCreator<DataColumnMetaData>::create)
+            .toArray(DataColumnMetaData[]::new);
     }
 
     @Override
-    public DataColumnMetaData[] getDomain() {
-        final DataColumnMetaData[] results = new DataColumnMetaData[m_creators.length];
-        for (int i = 0; i < results.length; i++) {
-            results[i] = m_creators[i].create();
-        }
-        return results;
+    public int getIndex() {
+        return m_index;
     }
 
     @Override
     public void update(final DataColumnMetaData[] domain) {
-        assert (domain.length == m_creators.length);
         for (int j = 0; j < domain.length; j++) {
-            m_creators[j].merge(domain[j++]);
+            m_creators[j].merge(domain[j]);
         }
     }
+
 }

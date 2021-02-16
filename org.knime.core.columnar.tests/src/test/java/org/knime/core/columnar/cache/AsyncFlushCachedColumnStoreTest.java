@@ -50,7 +50,7 @@ import static org.awaitility.Duration.ONE_HUNDRED_MILLISECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_DATA;
+import static org.knime.core.columnar.TestColumnStoreUtils.DEF_BATCH_LENGTH;
 import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_TABLE;
 import static org.knime.core.columnar.TestColumnStoreUtils.checkRefs;
 import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestColumnStore;
@@ -153,7 +153,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     }
 
     private static void checkCacheSize(final CachedColumnStoreCache cache, final int tablesHeldInCache) {
-        assertEquals((long)DEF_SIZE_OF_TABLE * tablesHeldInCache, (long)cache.size() * DEF_SIZE_OF_DATA);
+        assertEquals((long)DEF_SIZE_OF_TABLE * tablesHeldInCache, (long)cache.size() * DEF_BATCH_LENGTH);
     }
 
     private static void checkUnflushed(final TestDataTable table, final TestColumnStore delegate) throws IOException {
@@ -508,7 +508,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
             final BatchFactory factory = store.getFactory();
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
-            factory.create(DEF_SIZE_OF_DATA);
+            factory.create(DEF_BATCH_LENGTH);
         }
     }
 
@@ -518,7 +518,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
             final BatchFactory factory = store.getFactory();
             store.close(); // NOSONAR
-            factory.create(DEF_SIZE_OF_DATA);
+            factory.create(DEF_BATCH_LENGTH);
         }
     }
 

@@ -97,7 +97,9 @@ import org.knime.core.node.NodeLogger;
 import org.knime.core.util.ThreadUtils;
 import org.osgi.framework.FrameworkUtil;
 
-@SuppressWarnings("javadoc")
+/**
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 public final class ColumnarPreferenceUtils {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarPreferenceUtils.class);
@@ -141,6 +143,11 @@ public final class ColumnarPreferenceUtils {
 
     static final ScopedPreferenceStore COLUMNAR_STORE =
         new ScopedPreferenceStore(InstanceScope.INSTANCE, COLUMNAR_SYMBOLIC_NAME);
+
+    private static final AtomicLong DUPLICATE_CHECK_THREAD_COUNT = new AtomicLong();
+
+    // lazily initialized
+    private static ExecutorService duplicateCheckExecutor;
 
     private static final AtomicLong DOMAIN_CALC_THREAD_COUNT = new AtomicLong();
 
@@ -228,6 +235,21 @@ public final class ColumnarPreferenceUtils {
         return useDefaults() ? NUM_THREADS_DEF : COLUMNAR_STORE.getInt(NUM_THREADS_KEY);
     }
 
+    /**
+     * @return the executor for performing duplicate row id checks
+     */
+    public static synchronized ExecutorService getDuplicateCheckExecutor() {
+        if (duplicateCheckExecutor == null) {
+            duplicateCheckExecutor =
+                ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
+                    r -> new Thread(r, "KNIME-DuplicateChecker-" + DUPLICATE_CHECK_THREAD_COUNT.incrementAndGet())));
+        }
+        return duplicateCheckExecutor;
+    }
+
+    /**
+     * @return the executor for calculating domains
+     */
     public static synchronized ExecutorService getDomainCalcExecutor() {
         if (domainCalcExecutor == null) {
             domainCalcExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
@@ -318,6 +340,12 @@ public final class ColumnarPreferenceUtils {
         return persistExecutor;
     }
 
+    /**
+     * Wraps a given {@link ColumnStore} inside multiple layers of caches.
+     *
+     * @param store the to-be-wrapped store
+     * @return the wrapped store
+     */
     @SuppressWarnings("resource")
     public static ColumnStore wrap(final ColumnStore store) {
 
@@ -336,6 +364,12 @@ public final class ColumnarPreferenceUtils {
         return new HeapCachedColumnStore(wrapped, getHeapCache(), getSerializeExecutor());
     }
 
+    /**
+     * Wraps a given {@link ColumnReadStore} inside multiple layers of caches.
+     *
+     * @param store the to-be-wrapped store
+     * @return the wrapped store
+     */
     @SuppressWarnings("resource")
     public static ColumnReadStore wrap(final ColumnReadStore store) {
         ColumnReadStore wrapped = store;

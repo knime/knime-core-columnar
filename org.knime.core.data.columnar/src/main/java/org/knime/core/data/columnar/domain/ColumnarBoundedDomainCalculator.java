@@ -53,6 +53,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.data.BoundedValue;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
@@ -61,12 +62,21 @@ import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.v2.ReadValue;
 
+/**
+ * Columnar domain calculator for arbitrary {@link BoundedValue bounded} data.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
 final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
-    implements ColumnarDomainCalculator<C, DataColumnDomain>, ColumnDataIndex {
+    implements ColumnarCalculator<C, DataColumnDomain>, ColumnDataIndex {
 
     private final ColumnarReadValueFactory<C> m_factory;
 
     private final Comparator<DataValue> m_comparator;
+
+    // ignored during update with ReadData, but used in case domain was initialized with possible values
+    private Set<DataCell> m_values = null;
 
     private DataCell m_lower;
 
@@ -74,11 +84,7 @@ final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
 
     private int m_index;
 
-    // ignored during update with IntReadData, but used in case domain was initialized with possible values
-    private final Set<DataCell> m_values = new LinkedHashSet<>();
-
-    public ColumnarBoundedDomainCalculator(final ColumnarReadValueFactory<C> factory,
-        final Comparator<DataValue> delegate) {
+    ColumnarBoundedDomainCalculator(final ColumnarReadValueFactory<C> factory, final Comparator<DataValue> delegate) {
         m_factory = factory;
         m_comparator = delegate;
     }
@@ -86,19 +92,18 @@ final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
     @Override
     public final void update(final C data) {
         final ReadValue value = m_factory.createReadValue(data, this);
-        final int length = data.length();
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < data.length(); i++) {
             if (!data.isMissing(i)) {
                 m_index = i;
                 if (m_lower == null) {
                     m_lower = value.getDataCell();
                     m_upper = m_lower;
                 } else {
-                    if (m_comparator.compare(value, m_lower) < 0) {
+                    if (m_comparator.compare(value.getDataCell(), m_lower) < 0) { // NOSONAR
                         m_lower = value.getDataCell();
                     }
 
-                    if (m_comparator.compare(value, m_upper) > 0) {
+                    if (m_comparator.compare(value.getDataCell(), m_upper) > 0) { // NOSONAR
                         m_upper = value.getDataCell();
                     }
                 }
@@ -107,12 +112,9 @@ final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
     }
 
     @Override
-    public DataColumnDomain getDomain() {
-        if (m_lower == null) {
-            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values).createDomain();
-        } else {
-            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values, m_lower, m_upper).createDomain();
-        }
+    public DataColumnDomain get() {
+        return m_lower == null ? new DataColumnDomainCreator(m_values).createDomain()
+            : new DataColumnDomainCreator(m_values, m_lower, m_upper).createDomain();
     }
 
     @Override
@@ -122,26 +124,36 @@ final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
 
     @Override
     public void update(final DataColumnDomain domain) {
+        updateBounds(domain);
+        updateValues(domain);
+    }
+
+    void updateBounds(final DataColumnDomain domain) { // NOSONAR
         if (domain.hasBounds()) {
             final DataCell lower = domain.getLowerBound();
             final DataCell upper = domain.getUpperBound();
-            if (!lower.isMissing()) {
+            if (!lower.isMissing() && !upper.isMissing()) {
                 if (m_lower == null) {
                     m_lower = lower;
                     m_upper = upper;
                 } else {
-                    if (m_comparator.compare(lower, m_lower) < 0) {
+                    if (m_comparator.compare(lower, m_lower) < 0) { // NOSONAR
                         m_lower = domain.getLowerBound();
                     }
 
-                    if (m_comparator.compare(upper, m_upper) > 0) {
+                    if (m_comparator.compare(upper, m_upper) > 0) { // NOSONAR
                         m_upper = domain.getUpperBound();
                     }
                 }
             }
         }
+    }
 
+    void updateValues(final DataColumnDomain domain) {
         if (domain.hasValues()) {
+            if (m_values == null) {
+                m_values = new LinkedHashSet<>();
+            }
             for (final DataCell cell : domain.getValues()) {
                 if (!cell.isMissing()) {
                     m_values.add(cell);
@@ -149,4 +161,5 @@ final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
             }
         }
     }
+
 }

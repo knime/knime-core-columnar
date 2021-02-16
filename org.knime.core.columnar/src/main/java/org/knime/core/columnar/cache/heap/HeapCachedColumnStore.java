@@ -55,7 +55,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
@@ -114,7 +113,7 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
     private final class Writer extends DelegatingBatchWriter {
 
-        private Future<Void> m_serializationFuture = CompletableFuture.completedFuture(null);
+        private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
         private int m_numBatches;
 
@@ -152,7 +151,7 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
                 }
             }
 
-            m_serializationFuture = CompletableFuture.allOf(futures).thenRunAsync(() -> { // NOSONAR
+            m_future = CompletableFuture.allOf(futures).thenRun(() -> { // NOSONAR
                 try {
                     super.writeInternal(new DefaultReadBatch(
                         Arrays.stream(futures).map(CompletableFuture::join).toArray(NullableReadData[]::new)));
@@ -161,7 +160,7 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
                 } finally {
                     batch.release();
                 }
-            }, m_executor);
+            });
 
             m_numBatches++;
         }
@@ -178,11 +177,11 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
             super.closeOnce();
         }
 
-        private void waitForPrevBatch() throws InterruptedException {
+        private void waitForPrevBatch() throws InterruptedException, IOException {
             try {
-                m_serializationFuture.get();
+                m_future.get();
             } catch (ExecutionException e) {
-                throw new IllegalStateException("Failed to asynchronously serialize object data.", e);
+                throw new IOException("Failed to asynchronously serialize object data.", e);
             }
         }
 

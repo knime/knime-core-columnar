@@ -51,6 +51,11 @@ import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.access.WriteAccess;
 
+/**
+ * Default Implementation of {@link ColumnarWriteValueFactory}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
 final class DefaultWriteValueFactory<W extends NullableWriteData, WA extends WriteAccess> // NOSONAR
     implements ColumnarWriteValueFactory<W> {
 

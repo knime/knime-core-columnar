@@ -57,40 +57,41 @@ import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.def.BooleanCell;
+import org.knime.core.data.def.BooleanCell.BooleanCellFactory;
 
-final class ColumnarBooleanDomainCalculator implements ColumnarDomainCalculator<BooleanReadData, DataColumnDomain> {
+/**
+ * Columnar domain calculator for {@link BooleanReadData}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+final class ColumnarBooleanDomainCalculator implements ColumnarCalculator<BooleanReadData, DataColumnDomain> {
 
-    private Set<Boolean> m_values;
-
-    public ColumnarBooleanDomainCalculator() {
-        m_values = new LinkedHashSet<>();
-    }
+    private final Set<DataCell> m_values = new LinkedHashSet<>(2);
 
     @Override
     public final void update(final BooleanReadData data) {
         if (m_values.size() == 2) {
             return;
         }
-        final int length = data.length();
-        for (int i = 0; i < length; i++) {
-            if (!data.isMissing(i)) {
-                // TODO that's overly expensive for a simple boolean. However, we use a LinkedHashSet to keep the values in order of appearance.
-                if (m_values.add(data.getBoolean(i)) && m_values.size() == 2) {
-                    return;
-                }
+        for (int i = 0; i < data.length(); i++) {
+            if (!data.isMissing(i) && m_values.add(BooleanCellFactory.create(data.getBoolean(i)))
+                && m_values.size() == 2) {
+                return;
             }
         }
     }
 
     @Override
-    public DataColumnDomain getDomain() {
-        if (m_values.size() == 0) {
-            return new DataColumnDomainCreator().createDomain();
-        } else {
-            final DataCell[] asArray =
-                m_values.stream().map((b) -> (b ? BooleanCell.TRUE : BooleanCell.FALSE)).toArray(DataCell[]::new);
-            return m_values.size() == 1 ? new DataColumnDomainCreator(asArray, asArray[0], asArray[0]).createDomain()
-                : new DataColumnDomainCreator(asArray, BooleanCell.FALSE, BooleanCell.TRUE).createDomain();
+    public DataColumnDomain get() {
+        switch (m_values.size()) {
+            case 1:
+                final DataCell cell = m_values.iterator().next();
+                return new DataColumnDomainCreator(m_values, cell, cell).createDomain();
+            case 2:
+                return new DataColumnDomainCreator(m_values, BooleanCell.FALSE, BooleanCell.TRUE).createDomain();
+            default:
+                return new DataColumnDomainCreator(m_values).createDomain();
         }
     }
 
@@ -100,11 +101,13 @@ final class ColumnarBooleanDomainCalculator implements ColumnarDomainCalculator<
             return;
         }
         if (domain.hasValues()) {
-            for (final DataCell value : domain.getValues()) {
-                if (m_values.add(((BooleanValue)value).getBooleanValue()) && m_values.size() == 2) {
+            for (final DataCell cell : domain.getValues()) {
+                if (!cell.isMissing() && m_values.add(BooleanCellFactory.create(((BooleanValue)cell).getBooleanValue()))
+                    && m_values.size() == 2) {
                     return;
                 }
             }
         }
     }
+
 }

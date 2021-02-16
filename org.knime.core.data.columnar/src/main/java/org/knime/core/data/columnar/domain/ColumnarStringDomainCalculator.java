@@ -55,22 +55,22 @@ import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
-import org.knime.core.data.StringValue;
-import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.def.StringCell;
 
-final class ColumnarStringDomainCalculator
-    implements ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain>, ColumnDataIndex {
+/**
+ * Columnar domain calculator for {@link ObjectReadData} of type String.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+final class ColumnarStringDomainCalculator implements ColumnarCalculator<ObjectReadData<String>, DataColumnDomain> {
 
     private final int m_maxNumValues;
 
-    private Set<String> m_values;
+    private Set<DataCell> m_values = new LinkedHashSet<>();
 
-    private int m_index;
-
-    public ColumnarStringDomainCalculator(final int maxNumvalues) {
+    ColumnarStringDomainCalculator(final int maxNumvalues) {
         m_maxNumValues = maxNumvalues;
-        m_values = new LinkedHashSet<>();
     }
 
     @Override
@@ -78,11 +78,29 @@ final class ColumnarStringDomainCalculator
         if (m_values == null) {
             return;
         }
-        final int length = data.length();
-        for (int i = 0; i < length; i++) {
-            if (!data.isMissing(i)) {
-                m_index = i;
-                if (m_values.add(data.getObject(i)) && m_values.size() > m_maxNumValues) {
+        for (int i = 0; i < data.length(); i++) {
+            if (!data.isMissing(i) && m_values.add(new StringCell(data.getObject(i)))
+                && m_values.size() > m_maxNumValues) {
+                m_values = null;
+                return;
+            }
+        }
+    }
+
+    @Override
+    public DataColumnDomain get() {
+        return m_values == null ? new DataColumnDomainCreator().createDomain()
+            : new DataColumnDomainCreator(m_values).createDomain();
+    }
+
+    @Override
+    public void update(final DataColumnDomain domain) {
+        if (m_values == null) {
+            return;
+        }
+        if (domain.hasValues()) {
+            for (final DataCell cell : domain.getValues()) {
+                if (!cell.isMissing() && m_values.add(cell) && m_values.size() > m_maxNumValues) {
                     m_values = null;
                     return;
                 }
@@ -90,29 +108,4 @@ final class ColumnarStringDomainCalculator
         }
     }
 
-    @Override
-    public DataColumnDomain getDomain() {
-        return m_values == null ? new DataColumnDomainCreator().createDomain()
-            : new DataColumnDomainCreator(m_values.stream().map((s) -> new StringCell(s)).toArray(StringCell[]::new))
-                .createDomain();
-    }
-
-    @Override
-    public int getIndex() {
-        return m_index;
-    }
-
-    @Override
-    public void update(final DataColumnDomain domain) {
-        if (domain.hasValues()) {
-            for (final DataCell cell : domain.getValues()) {
-                if (!cell.isMissing()) {
-                    if (m_values.add(((StringValue)cell).getStringValue()) && m_values.size() > m_maxNumValues) {
-                        m_values = null;
-                        return;
-                    }
-                }
-            }
-        }
-    }
 }

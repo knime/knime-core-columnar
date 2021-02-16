@@ -49,7 +49,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_DATA;
+import static org.knime.core.columnar.TestColumnStoreUtils.DEF_BATCH_LENGTH;
 import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestColumnStore;
 import static org.knime.core.columnar.TestColumnStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestColumnStoreUtils.readSelectionAndCompareTable;
@@ -201,7 +201,7 @@ public class DelegatingColumnStoreTest extends ColumnarTest {
             final BatchFactory factory = store.getFactory();
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
-            factory.create(DEF_SIZE_OF_DATA);
+            factory.create(DEF_BATCH_LENGTH);
         }
     }
 
@@ -210,7 +210,7 @@ public class DelegatingColumnStoreTest extends ColumnarTest {
         try (final ColumnStore store = generateDefaultDelegatingColumnStore()) {
             final BatchFactory factory = store.getFactory();
             store.close(); // NOSONAR
-            factory.create(DEF_SIZE_OF_DATA);
+            factory.create(DEF_BATCH_LENGTH);
         }
     }
 

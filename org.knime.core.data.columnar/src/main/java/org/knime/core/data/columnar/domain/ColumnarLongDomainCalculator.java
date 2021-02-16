@@ -58,19 +58,24 @@ import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.LongValue;
 import org.knime.core.data.def.LongCell;
 
-final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<LongReadData, DataColumnDomain> {
+/**
+ * Columnar domain calculator for {@link LongReadData}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+final class ColumnarLongDomainCalculator implements ColumnarCalculator<LongReadData, DataColumnDomain> {
 
     private long m_lower = Long.MAX_VALUE;
 
     private long m_upper = Long.MIN_VALUE;
 
-    // ignored during update with IntReadData, but used in case domain was initialized with possible values
-    private final Set<DataCell> m_values = new LinkedHashSet<>();
+    // ignored during update with LongReadData, but used in case domain was initialized with possible values
+    private Set<DataCell> m_values = null;
 
     @Override
     public final void update(final LongReadData data) {
-        final int length = data.length();
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < data.length(); i++) {
             if (!data.isMissing(i)) {
                 final long curr = data.getLong(i);
                 if (m_lower > curr) {
@@ -84,17 +89,13 @@ final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<Lon
     }
 
     @Override
-    public DataColumnDomain getDomain() {
-        if (m_lower > m_upper) {
-            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values).createDomain();
-        } else {
-            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values, new LongCell(m_lower),
-                new LongCell(m_upper)).createDomain();
-        }
+    public DataColumnDomain get() {
+        return m_lower > m_upper ? new DataColumnDomainCreator(m_values).createDomain()
+            : new DataColumnDomainCreator(m_values, new LongCell(m_lower), new LongCell(m_upper)).createDomain();
     }
 
     @Override
-    public void update(final DataColumnDomain domain) {
+    public void update(final DataColumnDomain domain) { // NOSONAR
         if (domain.hasBounds()) {
             final DataCell lowerBound = domain.getLowerBound();
             final DataCell upperBound = domain.getUpperBound();
@@ -112,7 +113,15 @@ final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<Lon
         }
 
         if (domain.hasValues()) {
-            m_values.addAll(domain.getValues());
+            if (m_values == null) {
+                m_values = new LinkedHashSet<>();
+            }
+            for (final DataCell cell : domain.getValues()) {
+                if (!cell.isMissing()) {
+                    m_values.add(cell);
+                }
+            }
         }
     }
+
 }

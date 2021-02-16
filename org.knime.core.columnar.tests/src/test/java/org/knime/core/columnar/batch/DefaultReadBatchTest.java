@@ -144,7 +144,7 @@ public class DefaultReadBatchTest {
         final DefaultReadBatch batch =
             new DefaultReadBatch(createTestTable(TestColumnStore.create(createSchema(numColumns)), 1).get(0));
         assertEquals(numColumns, batch.size());
-        assertEquals(TestColumnStoreUtils.DEF_SIZE_OF_DATA, batch.length());
+        assertEquals(TestColumnStoreUtils.DEF_BATCH_LENGTH, batch.length());
     }
 
 }

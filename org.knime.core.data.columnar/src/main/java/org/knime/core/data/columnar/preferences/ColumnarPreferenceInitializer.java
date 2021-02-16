@@ -53,8 +53,10 @@ import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.C
 import org.eclipse.core.runtime.preferences.AbstractPreferenceInitializer;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.HeapCache;
 
-@SuppressWarnings("javadoc")
-public class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer {
+/**
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+public final class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer {
 
     static final String USE_DEFAULTS_KEY = "knime.core.data.columnar.use-defaults";
 

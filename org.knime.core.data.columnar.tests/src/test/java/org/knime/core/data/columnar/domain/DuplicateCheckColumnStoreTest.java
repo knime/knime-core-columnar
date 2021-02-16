@@ -46,38 +46,43 @@
  * History
  *   15 Dec 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.cache.heap;
+package org.knime.core.data.columnar.domain;
 
 import static org.junit.Assert.assertEquals;
-import static org.knime.core.columnar.TestColumnStoreUtils.DEF_BATCH_LENGTH;
-import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestColumnStore;
-import static org.knime.core.columnar.TestColumnStoreUtils.readAndCompareTable;
-import static org.knime.core.columnar.TestColumnStoreUtils.readSelectionAndCompareTable;
-import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTable;
-import static org.knime.core.columnar.TestColumnStoreUtils.releaseTable;
-import static org.knime.core.columnar.TestColumnStoreUtils.writeDefaultTable;
+import static org.knime.core.data.columnar.domain.TestDataColumnStoreUtils.DEF_CAPACITY;
+import static org.knime.core.data.columnar.domain.TestDataColumnStoreUtils.closeWriteReleaseBatches;
+import static org.knime.core.data.columnar.domain.TestDataColumnStoreUtils.createBatches;
+import static org.knime.core.data.columnar.domain.TestDataColumnStoreUtils.createSpec;
+import static org.knime.core.data.columnar.domain.TestDataColumnStoreUtils.readDefaultTable;
+import static org.knime.core.data.columnar.domain.TestDataColumnStoreUtils.writeDefaultTable;
+import static org.knime.core.data.columnar.domain.TestDataColumnStoreUtils.writeRowKeys;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.junit.AfterClass;
 import org.junit.Test;
-import org.knime.core.columnar.cache.ColumnDataUniqueId;
-import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
+import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.util.DuplicateChecker;
+import org.knime.core.util.DuplicateKeyException;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class HeapCachedColumnStoreTest {
+public class DuplicateCheckColumnStoreTest {
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
 
@@ -86,62 +91,43 @@ public class HeapCachedColumnStoreTest {
         EXECUTOR.shutdown();
     }
 
-    static ObjectDataCache generateCache() {
-
-        return new ObjectDataCache() {
-            private final Map<ColumnDataUniqueId, Object[]> m_cache = new ConcurrentHashMap<>();
-
-            @Override
-            public Map<ColumnDataUniqueId, Object[]> getCache() {
-                return m_cache;
-            }
-        };
+    @SuppressWarnings("resource")
+    private static DuplicateCheckColumnStore generateDuplicateCheckStore() {
+        final DataTableSpec spec = createSpec();
+        final ValueSchema valueSchema =
+            ValueSchema.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
+        final ColumnarValueSchema schema = ColumnarValueSchemaUtils.create(valueSchema);
+        return new DuplicateCheckColumnStore(TestColumnStore.create(schema), new DuplicateChecker(), EXECUTOR);
     }
 
-    @SuppressWarnings("resource")
-    private static HeapCachedColumnStore generateDefaultHeapCachedStore() {
-        return new HeapCachedColumnStore(createDefaultTestColumnStore(), generateCache(), EXECUTOR);
+    @Test(expected = DuplicateKeyException.class)
+    public void testWriteDuplicate() throws IOException {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
+            final WriteBatch[] batches = createBatches(store, 2, 2);
+            writeRowKeys(batches, "1", "1");
+            closeWriteReleaseBatches(store, batches);
+        }
     }
 
     @Test
     public void testWriteRead() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            final List<NullableReadData[]> table = writeDefaultTable(store);
-            readAndCompareTable(store, table);
-            releaseTable(table);
-        }
-    }
-
-    @Test
-    public void testWriteMultiRead() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            final List<NullableReadData[]> table = writeDefaultTable(store);
-            readTwiceAndCompareTable(store);
-            releaseTable(table);
-        }
-    }
-
-    @Test
-    public void testWriteReadSelection() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            final List<NullableReadData[]> table = writeDefaultTable(store);
-            for (int i = 0; i < store.getSchema().numColumns(); i++) {
-                readSelectionAndCompareTable(store, table, i);
-            }
-            releaseTable(table);
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
+            writeDefaultTable(store);
+            readDefaultTable(store);
+            readDefaultTable(store);
         }
     }
 
     @Test
     public void testFactorySingleton() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             assertEquals(store.getFactory(), store.getFactory());
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetFactoryAfterWriterClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
             store.getFactory();
@@ -150,7 +136,7 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetFactoryAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             store.close(); // NOSONAR
             store.getFactory();
         }
@@ -158,26 +144,26 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterWriterClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             final BatchFactory factory = store.getFactory();
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
-            factory.create(DEF_BATCH_LENGTH);
+            factory.create(DEF_CAPACITY);
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             final BatchFactory factory = store.getFactory();
             store.close(); // NOSONAR
-            factory.create(DEF_BATCH_LENGTH);
+            factory.create(DEF_CAPACITY);
         }
     }
 
     @Test
     public void testWriterSingleton() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore();
+        try (final ColumnStore store = generateDuplicateCheckStore();
                 final BatchWriter writer1 = store.getWriter();
                 final BatchWriter writer2 = store.getWriter()) {
             assertEquals(writer1, writer2);
@@ -186,7 +172,7 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterWriterClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
@@ -196,7 +182,7 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             store.close(); // NOSONAR
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
@@ -205,31 +191,31 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterWriterClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             store.getWriter().close();
-            releaseTable(writeDefaultTable(store));
+            writeDefaultTable(store);
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             store.close(); // NOSONAR
-            releaseTable(writeDefaultTable(store));
+            writeDefaultTable(store);
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveWhileWriterOpen() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             store.save(null);
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            releaseTable(writeDefaultTable(store));
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
+            writeDefaultTable(store);
             store.close(); // NOSONAR
             store.save(null);
         }
@@ -237,7 +223,7 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderWhileWriterOpen() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
             try (final BatchReader reader = store.createReader()) { // NOSONAR
             }
         }
@@ -245,8 +231,8 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            releaseTable(writeDefaultTable(store));
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
+            writeDefaultTable(store);
             store.close(); // NOSONAR
             try (final BatchReader reader = store.createReader()) { // NOSONAR
             }
@@ -255,8 +241,8 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            releaseTable(writeDefaultTable(store));
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
+            writeDefaultTable(store);
             try (final BatchReader reader = store.createReader()) {
                 reader.close(); // NOSONAR
                 reader.readRetained(0);
@@ -266,8 +252,8 @@ public class HeapCachedColumnStoreTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            releaseTable(writeDefaultTable(store));
+        try (final ColumnStore store = generateDuplicateCheckStore()) {
+            writeDefaultTable(store);
             try (final BatchReader reader = store.createReader()) {
                 store.close(); // NOSONAR
                 reader.readRetained(0);

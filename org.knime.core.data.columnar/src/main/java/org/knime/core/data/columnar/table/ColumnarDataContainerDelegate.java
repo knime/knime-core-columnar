@@ -137,15 +137,12 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         if (!m_closed.get()) {
             throw new IllegalStateException("getTable() can only be called after close() was called.");
         }
-        if (m_cleared.get()) {
-            throw new IllegalStateException("Container delegate has already been cleared.");
-        }
         return m_containerTable;
     }
 
     @Override
     public void close() {
-        if (!m_cleared.get() && !m_closed.getAndSet(true)) {
+        if (!m_closed.getAndSet(true)) {
             m_containerTable = m_delegateContainer.finishInternal();
             m_delegateCursor.close();
         }

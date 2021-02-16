@@ -51,6 +51,11 @@ import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.access.ReadAccess;
 
+/**
+ * Default Implementation of {@link ColumnarReadValueFactory}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
 final class DefaultReadValueFactory<R extends NullableReadData, RA extends ReadAccess> // NOSONAR
     implements ColumnarReadValueFactory<R> {
 

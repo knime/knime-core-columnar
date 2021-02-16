@@ -47,7 +47,7 @@ package org.knime.core.columnar.cache;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_DATA;
+import static org.knime.core.columnar.TestColumnStoreUtils.DEF_BATCH_LENGTH;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
@@ -66,8 +66,8 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutGet() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA, 1);
-        final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
+        final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH);
 
         assertEquals(1, data.getRefs());
 
@@ -90,9 +90,9 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutEvictLoadGet() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA, 1);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
         final TestDoubleData[] batch =
-            IntStream.range(0, 2).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA))
+            IntStream.range(0, 2).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH))
                 .toArray(TestDoubleData[]::new);
 
         assertEquals(1, batch[0].getRefs());
@@ -124,8 +124,8 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutRemove() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA, 1);
-        final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
+        final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH);
 
         assertEquals(1, data.getRefs());
 
@@ -144,9 +144,9 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testLru() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_SIZE_OF_DATA * 2L, 1);
+        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH * 2L, 1);
         final TestDoubleData[] batch =
-            IntStream.range(0, 3).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_SIZE_OF_DATA))
+            IntStream.range(0, 3).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH))
                 .toArray(TestDoubleData[]::new);
 
         cache.put(0, batch[0]); // content in cache: 0

@@ -145,9 +145,9 @@ public final class TestColumnStoreUtils {
 
     private static final int DEF_NUM_BATCHES = 2;
 
-    public static final int DEF_SIZE_OF_DATA = 2;
+    public static final int DEF_BATCH_LENGTH = 2;
 
-    public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * DEF_NUM_COLUMNS * DEF_SIZE_OF_DATA;
+    public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * DEF_NUM_COLUMNS * DEF_BATCH_LENGTH;
 
     private TestColumnStoreUtils() {
         // Utility class
@@ -554,7 +554,7 @@ public final class TestColumnStoreUtils {
     }
 
     private static NullableWriteData[] createBatch(final ColumnStore store) {
-        final WriteBatch batch = store.getFactory().create(DEF_SIZE_OF_DATA);
+        final WriteBatch batch = store.getFactory().create(DEF_BATCH_LENGTH);
         final NullableWriteData[] data = new NullableWriteData[store.getSchema().numColumns()];
 
         for (int i = 0; i < store.getSchema().numColumns(); i++) {

@@ -58,19 +58,24 @@ import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.IntValue;
 import org.knime.core.data.def.IntCell;
 
-final class ColumnarIntDomainCalculator implements ColumnarDomainCalculator<IntReadData, DataColumnDomain> {
+/**
+ * Columnar domain calculator for {@link IntReadData}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+final class ColumnarIntDomainCalculator implements ColumnarCalculator<IntReadData, DataColumnDomain> {
 
     private int m_lower = Integer.MAX_VALUE;
 
     private int m_upper = Integer.MIN_VALUE;
 
     // ignored during update with IntReadData, but used in case domain was initialized with possible values
-    private final Set<DataCell> m_values = new LinkedHashSet<>();
+    private Set<DataCell> m_values = null;
 
     @Override
     public final void update(final IntReadData data) {
-        final int length = data.length();
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < data.length(); i++) {
             if (!data.isMissing(i)) {
                 final int curr = data.getInt(i);
                 if (m_lower > curr) {
@@ -84,17 +89,13 @@ final class ColumnarIntDomainCalculator implements ColumnarDomainCalculator<IntR
     }
 
     @Override
-    public DataColumnDomain getDomain() {
-        if (m_lower > m_upper) {
-            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values).createDomain();
-        } else {
-            return new DataColumnDomainCreator(m_values.size() == 0 ? null : m_values, new IntCell(m_lower),
-                new IntCell(m_upper)).createDomain();
-        }
+    public DataColumnDomain get() {
+        return m_lower > m_upper ? new DataColumnDomainCreator(m_values).createDomain()
+            : new DataColumnDomainCreator(m_values, new IntCell(m_lower), new IntCell(m_upper)).createDomain();
     }
 
     @Override
-    public void update(final DataColumnDomain domain) {
+    public void update(final DataColumnDomain domain) { // NOSONAR
         if (domain.hasBounds()) {
             final DataCell lowerBound = domain.getLowerBound();
             final DataCell upperBound = domain.getUpperBound();
@@ -111,7 +112,15 @@ final class ColumnarIntDomainCalculator implements ColumnarDomainCalculator<IntR
             }
         }
         if (domain.hasValues()) {
-            m_values.addAll(domain.getValues());
+            if (m_values == null) {
+                m_values = new LinkedHashSet<>();
+            }
+            for (final DataCell cell : domain.getValues()) {
+                if (!cell.isMissing()) {
+                    m_values.add(cell);
+                }
+            }
         }
     }
+
 }

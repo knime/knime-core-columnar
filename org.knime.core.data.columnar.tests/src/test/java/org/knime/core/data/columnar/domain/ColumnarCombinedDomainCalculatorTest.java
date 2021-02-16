@@ -44,16 +44,64 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 31, 2020 (dietzc): created
+ *   16 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.data.columnar.domain;
 
-import org.knime.core.columnar.data.NullableReadData;
+import static org.junit.Assert.assertEquals;
 
-interface ColumnarDomainCalculator<C extends NullableReadData, D> {
-    void update(C data);
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-    void update(D domain);
+import org.junit.Test;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
+import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.DataColumnDomainCreator;
+import org.knime.core.data.DataValueComparatorDelegator;
+import org.knime.core.data.def.IntCell;
 
-    D getDomain();
+/**
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ */
+@SuppressWarnings("javadoc")
+public class ColumnarCombinedDomainCalculatorTest {
+
+    private static final IntCell I0 = new IntCell(0);
+
+    private static final IntCell I1 = new IntCell(1);
+
+    private static final IntCell I2 = new IntCell(2);
+
+    private static ColumnarCombinedDomainCalculator<IntReadData> createCalculator(final int maxNumvalues) {
+        return new ColumnarCombinedDomainCalculator<>((data, index) -> () -> new IntCell(data.getInt(index.getIndex())),
+            new DataValueComparatorDelegator<>(IntCell.TYPE.getComparator()), maxNumvalues);
+    }
+
+    @Test
+    public void testUpdateWithData() {
+        final ColumnarCombinedDomainCalculator<IntReadData> calc = createCalculator(60);
+        calc.update(TestIntDataFactory.INSTANCE.createReadData(new Integer[]{null, 1, 0, 2}));
+        final DataColumnDomain domain = calc.get();
+        assertEquals(I0, domain.getLowerBound());
+        assertEquals(I2, domain.getUpperBound());
+        assertEquals(Stream.of(I0, I1, I2).collect(Collectors.toSet()), domain.getValues());
+    }
+
+    @Test
+    public void testUpdate() {
+        final ColumnarCombinedDomainCalculator<IntReadData> calc = createCalculator(60);
+        final DataColumnDomainCreator creator = new DataColumnDomainCreator();
+        final Set<IntCell> set = Stream.of(I0, I1, I2).collect(Collectors.toSet());
+        creator.setLowerBound(I0);
+        creator.setUpperBound(I2);
+        creator.setValues(set);
+        calc.update(creator.createDomain());
+        final DataColumnDomain domain = calc.get();
+        assertEquals(I0, domain.getLowerBound());
+        assertEquals(I2, domain.getUpperBound());
+        assertEquals(Stream.of(I0, I1, I2).collect(Collectors.toSet()), domain.getValues());
+    }
+
 }

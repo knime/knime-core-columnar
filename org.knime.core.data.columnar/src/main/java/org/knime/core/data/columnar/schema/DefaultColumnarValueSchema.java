@@ -57,6 +57,11 @@ import org.knime.core.data.v2.access.ReadAccess;
 import org.knime.core.data.v2.access.WriteAccess;
 import org.knime.core.node.NodeSettingsWO;
 
+/**
+ * Default implementation of a {@link ColumnarValueSchema}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
 final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ValueSchema m_source;

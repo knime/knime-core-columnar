@@ -52,6 +52,11 @@ import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.node.NodeSettingsWO;
 
+/**
+ * {@link ColumnarValueSchema} that is based on another schema, but has an updated {@link DataTableSpec}.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ */
 final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
 
     private final DataTableSpec m_updatedSpec;

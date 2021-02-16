@@ -52,10 +52,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainStoreConfig;
 import org.knime.core.data.columnar.domain.DomainColumnStore;
+import org.knime.core.data.columnar.domain.DuplicateCheckColumnStore;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
@@ -67,6 +69,7 @@ import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.NodeLogger;
+import org.knime.core.util.DuplicateChecker;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -108,10 +111,14 @@ final class ColumnarRowContainer implements RowContainer {
         m_context = context;
         m_storeFactory = storeFactory;
 
-        m_store = new DomainColumnStore(
-            ColumnarPreferenceUtils.wrap(m_storeFactory.createStore(schema, DataContainer.createTempFile(".knable"))),
-            new DefaultDomainStoreConfig(schema, settings.getMaxPossibleNominalDomainValues(),
-                settings.isCheckDuplicateRowKeys(), settings.isInitializeDomains()),
+        ColumnStore wrapped =
+            ColumnarPreferenceUtils.wrap(m_storeFactory.createStore(schema, DataContainer.createTempFile(".knable")));
+        if (settings.isCheckDuplicateRowKeys()) {
+            wrapped = new DuplicateCheckColumnStore(wrapped, new DuplicateChecker(),
+                ColumnarPreferenceUtils.getDuplicateCheckExecutor());
+        }
+        m_store = new DomainColumnStore(wrapped, new DefaultDomainStoreConfig(schema,
+            settings.getMaxPossibleNominalDomainValues(), settings.isInitializeDomains()),
             ColumnarPreferenceUtils.getDomainCalcExecutor());
 
         m_delegate = new ColumnarRowWriteCursor(m_store, schema.getWriteValueFactories());
@@ -158,8 +165,8 @@ final class ColumnarRowContainer implements RowContainer {
             final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
             final int numColumns = m_schema.numColumns();
             for (int i = 1; i < numColumns; i++) {
-                domains.put(i, m_store.getDomains(i));
-                metadata.put(i, m_store.getDomainMetadata(i));
+                domains.put(i, m_store.getDomain(i));
+                metadata.put(i, m_store.getMetadata(i));
             }
 
             m_table = ColumnarContainerTable.create(m_id, m_storeFactory,

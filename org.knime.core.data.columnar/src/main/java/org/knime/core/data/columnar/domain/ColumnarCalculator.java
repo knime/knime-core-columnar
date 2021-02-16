@@ -42,36 +42,41 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 31, 2020 (dietzc): created
  */
 package org.knime.core.data.columnar.domain;
 
-import java.util.Map;
-
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.meta.DataColumnMetaData;
 
 /**
- * Config object for a {@link DomainColumnStore}.
+ * An interface for classes that calculate / aggregate some result data for columnar {@link NullableReadData read data}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @param <D> the type of columnar data to process
+ * @param <R> the type of the result of the calculation
  */
-interface DomainStoreConfig {
+interface ColumnarCalculator<D extends NullableReadData, R> {
 
     /**
-     * @param maxPossibleValues number of maximum possible values for nominal domains
-     * @return config with maxPossibleValues set
+     * Merge data into the aggregate result.
+     *
+     * @param data to-be-added data
      */
-    DomainStoreConfig withMaxPossibleNominalDomainValues(int maxPossibleValues);
+    void update(D data);
 
     /**
-     * @return map from index to DomainFactory used to calculate domains.
+     * Merge some intermediate or previous result into the aggregate result.
+     *
+     * @param data to-be-added data
      */
-    Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> createDomainCalculators(); // NOSONAR
+    void update(R data);
 
     /**
-     * @return map from index to DomainFactory used to calculate metadata.
+     * @return the result of the calculation.
      */
-    Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnMetaData[]>> createMetadataCalculators(); // NOSONAR
+    R get();
 
 }

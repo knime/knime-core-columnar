@@ -51,25 +51,29 @@ package org.knime.core.data.columnar.domain;
 import java.util.Comparator;
 
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.data.BoundedValue;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValue;
+import org.knime.core.data.NominalValue;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 
 /**
- * Fallback to calculate both, bounded and columnar domains.
+ * Columnar domain calculator for arbitrary data that is both {@link BoundedValue bounded} and {@link NominalValue
+ * nominal}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 final class ColumnarCombinedDomainCalculator<C extends NullableReadData>
-    implements ColumnarDomainCalculator<C, DataColumnDomain> {
+    implements ColumnarCalculator<C, DataColumnDomain> {
 
     private final ColumnarNominalDomainCalculator<C> m_nominal;
 
     private final ColumnarBoundedDomainCalculator<C> m_bounded;
 
-    ColumnarCombinedDomainCalculator(final ColumnarReadValueFactory<C> factory,
-        final Comparator<DataValue> delegate, final int maxNumValues) {
+    ColumnarCombinedDomainCalculator(final ColumnarReadValueFactory<C> factory, final Comparator<DataValue> delegate,
+        final int maxNumValues) {
         m_nominal = new ColumnarNominalDomainCalculator<>(factory, maxNumValues);
         m_bounded = new ColumnarBoundedDomainCalculator<>(factory, delegate);
     }
@@ -83,14 +87,15 @@ final class ColumnarCombinedDomainCalculator<C extends NullableReadData>
     @Override
     public void update(final DataColumnDomain domain) {
         m_nominal.update(domain);
-        m_bounded.update(domain);
+        // calling update here would lead to values being stored redundantly, once in m_nominal and once in m_bounded
+        m_bounded.updateBounds(domain);
     }
 
     @Override
-    public DataColumnDomain getDomain() {
-        final DataColumnDomain boundedDomain = m_bounded.getDomain();
-        final DataColumnDomain nominalDomain = m_nominal.getDomain();
-        return new DataColumnDomainCreator(nominalDomain.getValues(), boundedDomain.getLowerBound(),
+    public DataColumnDomain get() {
+        final DataColumnDomain boundedDomain = m_bounded.get();
+        return new DataColumnDomainCreator(m_nominal.get().getValues(), boundedDomain.getLowerBound(),
             boundedDomain.getUpperBound()).createDomain();
     }
+
 }

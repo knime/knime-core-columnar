@@ -65,7 +65,7 @@ import org.knime.core.data.v2.access.WriteAccess;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-class ColumnarStructAccessFactory
+final class ColumnarStructAccessFactory
     implements ColumnarAccessFactory<StructReadData, StructReadAccess, StructWriteData, StructWriteAccess> {
 
     private final ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;

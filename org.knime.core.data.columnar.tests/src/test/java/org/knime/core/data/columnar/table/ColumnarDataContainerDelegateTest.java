@@ -173,16 +173,6 @@ public class ColumnarDataContainerDelegateTest extends ColumnarTest {
         }
     }
 
-    @SuppressWarnings("resource")
-    @Test(expected = IllegalStateException.class)
-    public void testIllegalStateExceptionOnGetTableAfterClear() throws IOException {
-        try (final ColumnarDataContainerDelegate delegate = createColumnarDataContainerDelegate(createSpec(0))) {
-            delegate.close(); // NOSONAR
-            delegate.clear();
-            delegate.getTable();
-        }
-    }
-
     @Test
     public void testGetTableSpec() throws IOException {
         final DataTableSpec spec = createSpec(1);

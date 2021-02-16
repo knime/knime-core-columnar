@@ -49,8 +49,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.function.IntFunction;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.BoundedValue;
@@ -70,20 +69,34 @@ import org.knime.core.data.def.StringCell;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.meta.DataColumnMetaDataCreator;
 import org.knime.core.data.meta.DataColumnMetaDataRegistry;
-import org.knime.core.util.DuplicateChecker;
 
 /**
- * Config for {@link DomainColumnStore}.
+ * Default Configuration for {@link DomainColumnStore}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
 public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
-    // factory for native domain calculators
-    private final Map<DataType, Function<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>>> m_nativeNominalDomainCalculators;
+    @SuppressWarnings("unchecked")
+    private static final void merge(@SuppressWarnings("rawtypes") final DataColumnMetaDataCreator m, // NOSONAR
+        final DataColumnMetaData o) {
+        m.merge(o);
+    }
 
-    private final Map<DataType, Supplier<ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>>> m_nativeBoundedDomainCalculators;
+    // factory for native domain calculators
+    private static final Map<DataType, //
+            IntFunction<ColumnarCalculator<? extends NullableReadData, DataColumnDomain>>> NATIVE_DOMAIN_CALCULATORS;
+    static {
+        NATIVE_DOMAIN_CALCULATORS = new HashMap<>(5);
+        //bounded
+        NATIVE_DOMAIN_CALCULATORS.put(IntCell.TYPE, n -> new ColumnarIntDomainCalculator());
+        NATIVE_DOMAIN_CALCULATORS.put(LongCell.TYPE, n -> new ColumnarLongDomainCalculator());
+        NATIVE_DOMAIN_CALCULATORS.put(DoubleCell.TYPE, n -> new ColumnarDoubleDomainCalculator());
+        // nominal
+        NATIVE_DOMAIN_CALCULATORS.put(StringCell.TYPE, ColumnarStringDomainCalculator::new);
+        NATIVE_DOMAIN_CALCULATORS.put(BooleanCell.TYPE, n -> new ColumnarBooleanDomainCalculator());
+    }
 
     private final ColumnarValueSchema m_schema;
 
@@ -91,145 +104,101 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     private final boolean m_initDomains;
 
-    private final boolean m_checkForDuplicates;
+    private Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnMetaData[]>> m_metadataCalculators;
 
-    private Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnMetaData[]>> m_metadataCalculators;
-
-    private Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> m_domainCalculators;
+    private Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> m_domainCalculators;
 
     /**
-     * Create a new {@link DefaultDomainStoreConfig}
-     *
-     * @param schema the schema used to determine the column configuration.
-     * @param maxPossibleNominalDomainValues
-     * @param checkForDuplicates <source>true</source> if row key should be checked for duplicates
-     * @param initializeDomains <source>true</source> if incoming domains/metadata should be used for initialization.
+     * @param schema the schema used to determine the column configuration
+     * @param maxPossibleNominalDomainValues the maximum number of values for nominal domains
+     * @param initializeDomains <source>true</source> if incoming domains/metadata should be used for initialization
      */
     public DefaultDomainStoreConfig(final ColumnarValueSchema schema, final int maxPossibleNominalDomainValues,
-        final boolean checkForDuplicates, final boolean initializeDomains) {
+        final boolean initializeDomains) {
         m_schema = schema;
         m_initDomains = initializeDomains;
-        m_checkForDuplicates = checkForDuplicates;
         m_maxNumValues = maxPossibleNominalDomainValues;
-        m_nativeNominalDomainCalculators = new HashMap<>();
-        m_nativeBoundedDomainCalculators = new HashMap<>();
-
-        initNativeDomainCalculators();
-    }
-
-    private void initNativeDomainCalculators() {
-        // bounded
-        m_nativeBoundedDomainCalculators.put(DoubleCell.TYPE, () -> new ColumnarDoubleDomainCalculator());
-        m_nativeBoundedDomainCalculators.put(IntCell.TYPE, () -> new ColumnarIntDomainCalculator());
-        m_nativeBoundedDomainCalculators.put(LongCell.TYPE, () -> new ColumnarLongDomainCalculator());
-
-        // nominal
-        m_nativeNominalDomainCalculators.put(StringCell.TYPE, (n) -> new ColumnarStringDomainCalculator(n));
-        m_nativeNominalDomainCalculators.put(BooleanCell.TYPE, (n) -> new ColumnarBooleanDomainCalculator());
-    }
-
-    // to make java happy
-    @SuppressWarnings("unchecked")
-    private static final void merge(@SuppressWarnings("rawtypes") final DataColumnMetaDataCreator m,
-        final DataColumnMetaData o) {
-        m.merge(o);
     }
 
     @Override
     public DomainStoreConfig withMaxPossibleNominalDomainValues(final int maxPossibleValues) {
-        return new DefaultDomainStoreConfig(m_schema, maxPossibleValues, m_checkForDuplicates, m_initDomains);
+        return new DefaultDomainStoreConfig(m_schema, maxPossibleValues, m_initDomains);
     }
 
     @Override
-    public DuplicateChecker createDuplicateChecker() {
-        return m_checkForDuplicates ? new DuplicateChecker() : null;
-    }
-
-    // also initializes with incoming DataTableSpec
-    @Override
-    public Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>>
-        createDomainCalculators() {
+    public Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> createDomainCalculators() {
         if (m_domainCalculators == null) {
-            final int length = m_schema.numColumns();
-            final DataTableSpec spec = m_schema.getSourceSpec();
             m_domainCalculators = new ConcurrentHashMap<>();
+            final DataTableSpec spec = m_schema.getSourceSpec();
             final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
-            for (int i = 1; i < length; i++) {
-                final DataType type = spec.getColumnSpec(i - 1).getType();
-                final ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain> calculator;
-
-                final boolean isBounded = type.isCompatible(BoundedValue.class);
-                final boolean isNominal = type.isCompatible(NominalValue.class);
-
-                final DataColumnDomain domain = spec.getColumnSpec(i - 1).getDomain();
-                if (isNominal) {
-                    final int maxNumValues;
-                    if (m_initDomains && domain.hasValues()) {
-                        maxNumValues = Math.max(m_maxNumValues, domain.getValues().size());
-                    } else {
-                        maxNumValues = m_maxNumValues;
-                    }
-                    final Function<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> nativeNominalDomainCalculator =
-                        m_nativeNominalDomainCalculators.get(type);
-                    if (nativeNominalDomainCalculator != null) {
-                        calculator = nativeNominalDomainCalculator.apply(maxNumValues);
-                    } else if (isBounded) {
-                        calculator = new ColumnarCombinedDomainCalculator<>(factories[i],
-                            new DataValueComparatorDelegator<>(type.getComparator()), maxNumValues);
-                    } else {
-                        calculator = new ColumnarNominalDomainCalculator<>(factories[i], maxNumValues);
-                    }
-                } else if (isBounded) {
-                    final Supplier<ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> nativeBoundedDomainCalculator =
-                        m_nativeBoundedDomainCalculators.get(type);
-                    if (nativeBoundedDomainCalculator != null) {
-                        calculator = nativeBoundedDomainCalculator.get();
-                    } else {
-                        calculator = new ColumnarBoundedDomainCalculator<>(factories[i],
-                            new DataValueComparatorDelegator<>(type.getComparator()));
-                    }
-                } else {
-                    calculator = null;
-                }
-
+            for (int i = 1; i < m_schema.numColumns(); i++) {
+                final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
+                final ColumnarCalculator<? extends NullableReadData, DataColumnDomain> calculator =
+                    createDomainCalculator(colSpec, factories[i]);
                 if (calculator != null) {
-                    if (m_initDomains) {
-                        calculator.update(domain);
+                    if (m_initDomains) { // NOSONAR
+                        calculator.update(colSpec.getDomain());
                     }
                     m_domainCalculators.put(i, calculator);
                 }
             }
         }
         return m_domainCalculators;
+    }
 
+    private ColumnarCalculator<? extends NullableReadData, DataColumnDomain>
+        createDomainCalculator(final DataColumnSpec colSpec, final ColumnarReadValueFactory<?> factory) {
+
+        final DataType type = colSpec.getType();
+        final DataColumnDomain domain = colSpec.getDomain();
+        final int maxNumValues =
+            m_initDomains && domain.hasValues() ? Math.max(m_maxNumValues, domain.getValues().size()) : m_maxNumValues;
+        final IntFunction<ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> nativeDomainCalculator =
+            NATIVE_DOMAIN_CALCULATORS.get(type);
+        if (nativeDomainCalculator != null) {
+            return nativeDomainCalculator.apply(maxNumValues);
+        }
+
+        final boolean isNominal = type.isCompatible(NominalValue.class);
+        final boolean isBounded = type.isCompatible(BoundedValue.class);
+        if (isNominal) {
+            if (isBounded) {
+                return new ColumnarCombinedDomainCalculator<>(factory,
+                    new DataValueComparatorDelegator<>(type.getComparator()), maxNumValues);
+            } else {
+                return new ColumnarNominalDomainCalculator<>(factory, maxNumValues);
+            }
+        } else if (isBounded) {
+            return new ColumnarBoundedDomainCalculator<>(factory,
+                new DataValueComparatorDelegator<>(type.getComparator()));
+        } else {
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnMetaData[]>>
-
+    public Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnMetaData[]>>
         createMetadataCalculators() {
         if (m_metadataCalculators == null) {
             m_metadataCalculators = new ConcurrentHashMap<>();
-            final int length = m_schema.numColumns();
             final DataTableSpec spec = m_schema.getSourceSpec();
             final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
-            for (int i = 1; i < length; i++) {
+            for (int i = 1; i < m_schema.numColumns(); i++) {
                 final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
                 final Collection<DataColumnMetaDataCreator<?>> metadataCreators =
                     DataColumnMetaDataRegistry.INSTANCE.getCreators(colSpec.getType());
-                if (!metadataCreators.isEmpty()) {
-                    if (m_initDomains) {
-                        metadataCreators
-                            .forEach(m -> colSpec.getMetaDataOfType(m.getMetaDataClass()).ifPresent(o -> merge(m, o)));
-                        m_metadataCalculators.put(i,
-                            new ColumnarMetadataDomainCalculator<>(
-                                metadataCreators.toArray(new DataColumnMetaDataCreator[metadataCreators.size()]),
-                                (ColumnarReadValueFactory<NullableReadData>)factories[i]));
-                    }
+                if (!metadataCreators.isEmpty() && m_initDomains) {
+                    metadataCreators
+                        .forEach(m -> colSpec.getMetaDataOfType(m.getMetaDataClass()).ifPresent(o -> merge(m, o)));
+                    m_metadataCalculators.put(i,
+                        new ColumnarMetadataCalculator<>(
+                            metadataCreators.toArray(new DataColumnMetaDataCreator[metadataCreators.size()]),
+                            (ColumnarReadValueFactory<NullableReadData>)factories[i]));
                 }
             }
         }
         return m_metadataCalculators;
     }
+
 }

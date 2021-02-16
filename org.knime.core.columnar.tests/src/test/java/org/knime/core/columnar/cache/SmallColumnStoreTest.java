@@ -399,7 +399,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
             final BatchFactory factory = store.getFactory();
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
-            factory.create(TestColumnStoreUtils.DEF_SIZE_OF_DATA);
+            factory.create(TestColumnStoreUtils.DEF_BATCH_LENGTH);
         }
     }
 
@@ -409,7 +409,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
             final BatchFactory factory = store.getFactory();
             store.close(); // NOSONAR
-            factory.create(TestColumnStoreUtils.DEF_SIZE_OF_DATA);
+            factory.create(TestColumnStoreUtils.DEF_BATCH_LENGTH);
         }
     }
 
@@ -583,7 +583,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
                 writeTable(store, table);
             }
             try (final BatchReader reader = store.createReader()) {
-                assertEquals(TestColumnStoreUtils.DEF_SIZE_OF_DATA, reader.maxLength());
+                assertEquals(TestColumnStoreUtils.DEF_BATCH_LENGTH, reader.maxLength());
             }
         }
     }

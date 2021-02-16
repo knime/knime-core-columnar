@@ -46,35 +46,33 @@
 package org.knime.core.data.columnar.domain;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Stream;
 
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.DelegatingColumnStore;
-import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.node.NodeLogger;
+import org.knime.core.util.DuplicateChecker;
+import org.knime.core.util.DuplicateKeyException;
 
 /**
- * A {@link ColumnStore} for calculating domains for individual columns. Only required during writing.
+ * A {@link ColumnStore} that checks for duplicates among row keys. Only required during writing.
  *
- * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
-public final class DomainColumnStore extends DelegatingColumnStore {
+public final class DuplicateCheckColumnStore extends DelegatingColumnStore {
 
     private final class Writer extends DelegatingBatchWriter {
 
         private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
         Writer() {
-            super(DomainColumnStore.this);
+            super(DuplicateCheckColumnStore.this);
         }
 
         @SuppressWarnings("unchecked")
@@ -91,31 +89,33 @@ public final class DomainColumnStore extends DelegatingColumnStore {
                 return;
             }
 
-            // lazily init domain and metadata calculators; needs to happen here because of setMaxPossibleValues
-            if (m_domainCalculators == null) {
-                m_domainCalculators = m_config.createDomainCalculators();
-                m_metadataCalculators = m_config.createMetadataCalculators();
-            }
-
-            m_future = CompletableFuture.allOf(Stream
-                .concat(m_domainCalculators.entrySet().stream(), m_metadataCalculators.entrySet().stream()).map(e -> {
-                    final NullableReadData data = batch.get(e.getKey());
-                    data.retain();
-                    return CompletableFuture.runAsync(() -> {
-                        ((ColumnarCalculator<NullableReadData, ?>)e.getValue()).update(data);
-                        data.release();
-                    }, m_executor);
-                }).toArray(CompletableFuture[]::new));
+            final ObjectReadData<String> rowKeyData = (ObjectReadData<String>)batch.get(0);
+            rowKeyData.retain();
+            m_future = m_future.thenRunAsync(() -> { // NOSONAR
+                try {
+                    for (int i = 0; i < rowKeyData.length(); i++) {
+                        m_duplicateChecker.addKey(rowKeyData.getObject(i));
+                    }
+                } catch (IOException e) {
+                    throw new IllegalStateException("Failure while checking for duplicate row IDs", e);
+                } finally {
+                    rowKeyData.release();
+                }
+            }, m_executor);
         }
 
         @Override
         protected void closeOnce() throws IOException {
             try {
                 waitForPrevBatch();
+                m_duplicateChecker.checkForDuplicates();
             } catch (InterruptedException e) {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
                 LOGGER.info(ERROR_ON_INTERRUPT, e);
+            } finally {
+                m_duplicateChecker.clear();
+                m_duplicateChecker = null;
             }
             super.closeOnce();
         }
@@ -124,97 +124,43 @@ public final class DomainColumnStore extends DelegatingColumnStore {
             try {
                 m_future.get();
             } catch (ExecutionException e) {
-                throw new IOException("Failed to asynchronously calculate domains.", e);
+                if (e.getCause() instanceof DuplicateKeyException) {
+                    final DuplicateKeyException originalDKE = (DuplicateKeyException)e.getCause();
+                    final DuplicateKeyException newDKE =
+                        new DuplicateKeyException(originalDKE.getMessage(), originalDKE.getKey());
+                    newDKE.initCause(e);
+                    throw newDKE;
+                } else {
+                    throw new IOException("Failed to asynchronously check for duplicate row IDs.", e);
+                }
             }
         }
 
     }
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(DomainColumnStore.class);
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(DuplicateCheckColumnStore.class);
 
-    private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for domain calculation thread.";
+    private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for row key duplicate checker thread.";
 
     private final ExecutorService m_executor;
 
-    /* Not final as initialized lazily */
-    private Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> m_domainCalculators;
-
-    private Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnMetaData[]>> m_metadataCalculators;
-
-    private DomainStoreConfig m_config;
+    private DuplicateChecker m_duplicateChecker;
 
     /**
      * @param delegate to read/write data from/to
-     * @param config of the store
-     * @param executor the executor to which to submit asynchronous domain calculations checks
+     * @param duplicateChecker the duplicate checker to use
+     * @param executor the executor to which to submit asynchronous duplicate checks
      */
-    public DomainColumnStore(final ColumnStore delegate, final DomainStoreConfig config,
+    public DuplicateCheckColumnStore(final ColumnStore delegate, final DuplicateChecker duplicateChecker,
         final ExecutorService executor) {
         super(delegate);
-        m_config = config;
+        m_duplicateChecker = duplicateChecker;
         m_executor = executor;
     }
 
     @Override
     protected BatchWriter createWriterInternal() {
         return new Writer();
-    }
-
-    /**
-     * Get the resulting {@link DataColumnDomain}.
-     *
-     * @param colIndex the columnIndex
-     * @return the resulting domain, if present, otherwise null
-     */
-    public final DataColumnDomain getDomain(final int colIndex) {
-        if (m_domainCalculators != null) {
-            final ColumnarCalculator<?, DataColumnDomain> calculator = m_domainCalculators.get(colIndex);
-            if (calculator != null) {
-                return calculator.get();
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Get the resulting {@link DataColumnMetaData}.
-     *
-     * @param colIndex the columnIndex
-     * @return the resulting metadata
-     */
-    public final DataColumnMetaData[] getMetadata(final int colIndex) {
-        if (m_metadataCalculators != null) {
-            final ColumnarCalculator<?, DataColumnMetaData[]> calculator = m_metadataCalculators.get(colIndex);
-            if (calculator != null) {
-                return calculator.get();
-            }
-        }
-        return new DataColumnMetaData[0];
-    }
-
-    /**
-     * Only to be used by {@code ColumnarRowWriteCursor.setMaxPossibleValues(int)} for backward compatibility reasons.
-     * <br>
-     * May only be called before the first call to {@link BatchWriter#write(ReadBatch) write()}.
-     *
-     * @param maxPossibleValues maximum number of possible values for nominal domains
-     *
-     * @throws IllegalStateException when called after {@link #getWriter()}
-     */
-    public void setMaxPossibleValues(final int maxPossibleValues) {
-        if (m_domainCalculators != null) {
-            throw new IllegalStateException(
-                "The maximum number of possible values for a nominal domain may only be set "
-                    + "before any values were written.");
-        }
-        m_config = m_config.withMaxPossibleNominalDomainValues(maxPossibleValues);
-    }
-
-    @Override
-    protected void closeOnce() throws IOException {
-        m_domainCalculators = null;
-        m_metadataCalculators = null;
-        super.closeOnce();
     }
 
 }
