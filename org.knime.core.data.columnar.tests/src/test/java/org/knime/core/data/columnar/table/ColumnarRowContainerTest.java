@@ -55,17 +55,7 @@ import java.io.IOException;
 
 import org.junit.Test;
 import org.knime.core.columnar.testing.ColumnarTest;
-import org.knime.core.data.filestore.internal.NotInWorkflowDataRepository;
-import org.knime.core.node.BufferedDataTable;
-import org.knime.core.node.DefaultNodeProgressMonitor;
-import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
-import org.knime.core.node.Node;
-import org.knime.core.node.NodeFactory;
-import org.knime.core.node.NodeProgressMonitor;
-import org.knime.core.node.port.PortType;
-import org.knime.core.node.workflow.SingleNodeContainer;
-import org.knime.core.node.workflow.virtual.parchunk.VirtualParallelizedChunkPortObjectInNodeFactory;
 import org.knime.core.util.DuplicateKeyException;
 
 /**
@@ -75,17 +65,6 @@ import org.knime.core.util.DuplicateKeyException;
 public class ColumnarRowContainerTest extends ColumnarTest {
 
     private static final int CAPACITY = ColumnarRowWriteCursor.CAPACITY_MAX_DEF;
-
-    private static final NotInWorkflowDataRepository REPO = NotInWorkflowDataRepository.newInstance();
-
-    private static final NodeProgressMonitor PROGRESS = new DefaultNodeProgressMonitor();
-
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private static final ExecutionContext exec() {
-        return new ExecutionContext(PROGRESS,
-            new Node((NodeFactory)new VirtualParallelizedChunkPortObjectInNodeFactory(new PortType[0])),
-            SingleNodeContainer.MemoryPolicy.CacheSmallInMemory, REPO);
-    }
 
     @Test
     public void testClose() {
@@ -99,15 +78,6 @@ public class ColumnarRowContainerTest extends ColumnarTest {
                 final ExtensionTable table1 = container.finishInternal();
                 final ExtensionTable table2 = container.finishInternal()) {
             assertEquals(table1, table2);
-        }
-    }
-
-    @Test
-    public void testFinish() throws IOException {
-        final ExecutionContext exec = exec();
-        try (final ColumnarRowContainer container = createColumnarRowContainer(exec)) {
-            final BufferedDataTable table1 = container.finish();
-            exec.clearTable(table1);
         }
     }
 
