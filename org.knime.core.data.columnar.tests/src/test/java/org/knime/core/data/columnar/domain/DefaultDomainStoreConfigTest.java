@@ -194,7 +194,7 @@ public class DefaultDomainStoreConfigTest {
     public void testDomainCalculators() {
         final DefaultDomainStoreConfig config = new DefaultDomainStoreConfig(
             createSchema(INT, LONG, DOUBLE, STRING, BOOLEAN, BOUNDED, NOMINAL, BOUNDED_NOMINAL, NO_DOMAIN), 0, true);
-        final Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> calculators =
+        final Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> calculators =
             config.createDomainCalculators();
         assertTrue(calculators.get(1) instanceof ColumnarIntDomainCalculator);
         assertTrue(calculators.get(2) instanceof ColumnarLongDomainCalculator);

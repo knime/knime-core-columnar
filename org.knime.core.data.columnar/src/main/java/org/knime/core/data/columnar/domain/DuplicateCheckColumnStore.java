@@ -67,11 +67,11 @@ import org.knime.core.util.DuplicateKeyException;
  */
 public final class DuplicateCheckColumnStore extends DelegatingColumnStore {
 
-    private final class Writer extends DelegatingBatchWriter {
+    private final class DuplicateCheckBatchWriter extends DelegatingBatchWriter {
 
         private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
-        Writer() {
+        DuplicateCheckBatchWriter() {
             super(DuplicateCheckColumnStore.this);
         }
 
@@ -160,7 +160,7 @@ public final class DuplicateCheckColumnStore extends DelegatingColumnStore {
 
     @Override
     protected BatchWriter createWriterInternal() {
-        return new Writer();
+        return new DuplicateCheckBatchWriter();
     }
 
 }

@@ -86,7 +86,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     // factory for native domain calculators
     private static final Map<DataType, //
-            IntFunction<ColumnarCalculator<? extends NullableReadData, DataColumnDomain>>> NATIVE_DOMAIN_CALCULATORS;
+            IntFunction<ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>>> NATIVE_DOMAIN_CALCULATORS;
     static {
         NATIVE_DOMAIN_CALCULATORS = new HashMap<>(5);
         //bounded
@@ -104,9 +104,9 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     private final boolean m_initDomains;
 
-    private Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnMetaData[]>> m_metadataCalculators;
+    private Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnMetaData[]>> m_metadataCalculators;
 
-    private Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> m_domainCalculators;
+    private Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> m_domainCalculators;
 
     /**
      * @param schema the schema used to determine the column configuration
@@ -126,14 +126,14 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
     }
 
     @Override
-    public Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> createDomainCalculators() {
+    public Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> createDomainCalculators() {
         if (m_domainCalculators == null) {
             m_domainCalculators = new ConcurrentHashMap<>();
             final DataTableSpec spec = m_schema.getSourceSpec();
             final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
             for (int i = 1; i < m_schema.numColumns(); i++) {
                 final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
-                final ColumnarCalculator<? extends NullableReadData, DataColumnDomain> calculator =
+                final ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain> calculator =
                     createDomainCalculator(colSpec, factories[i]);
                 if (calculator != null) {
                     if (m_initDomains) { // NOSONAR
@@ -146,14 +146,14 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
         return m_domainCalculators;
     }
 
-    private ColumnarCalculator<? extends NullableReadData, DataColumnDomain>
+    private ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>
         createDomainCalculator(final DataColumnSpec colSpec, final ColumnarReadValueFactory<?> factory) {
 
         final DataType type = colSpec.getType();
         final DataColumnDomain domain = colSpec.getDomain();
         final int maxNumValues =
             m_initDomains && domain.hasValues() ? Math.max(m_maxNumValues, domain.getValues().size()) : m_maxNumValues;
-        final IntFunction<ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> nativeDomainCalculator =
+        final IntFunction<ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> nativeDomainCalculator =
             NATIVE_DOMAIN_CALCULATORS.get(type);
         if (nativeDomainCalculator != null) {
             return nativeDomainCalculator.apply(maxNumValues);
@@ -178,7 +178,7 @@ public final class DefaultDomainStoreConfig implements DomainStoreConfig {
 
     @SuppressWarnings("unchecked")
     @Override
-    public Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnMetaData[]>>
+    public Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnMetaData[]>>
         createMetadataCalculators() {
         if (m_metadataCalculators == null) {
             m_metadataCalculators = new ConcurrentHashMap<>();

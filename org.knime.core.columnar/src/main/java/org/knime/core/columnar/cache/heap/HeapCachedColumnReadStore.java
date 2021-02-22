@@ -72,9 +72,9 @@ import org.knime.core.columnar.store.DelegatingColumnReadStore;
  */
 public final class HeapCachedColumnReadStore extends DelegatingColumnReadStore {
 
-    private final class Reader extends DelegatingBatchReader {
+    private final class HeapCachedBatchReader extends DelegatingBatchReader {
 
-        private Reader(final ColumnSelection selection) {
+        private HeapCachedBatchReader(final ColumnSelection selection) {
             super(HeapCachedColumnReadStore.this, selection);
         }
 
@@ -128,7 +128,7 @@ public final class HeapCachedColumnReadStore extends DelegatingColumnReadStore {
 
     @Override
     protected BatchReader createReaderInternal(final ColumnSelection selection) {
-        return new Reader(selection);
+        return new HeapCachedBatchReader(selection);
     }
 
     @Override

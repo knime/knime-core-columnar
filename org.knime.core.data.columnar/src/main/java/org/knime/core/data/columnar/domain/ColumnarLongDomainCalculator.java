@@ -64,7 +64,7 @@ import org.knime.core.data.def.LongCell;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarLongDomainCalculator implements ColumnarCalculator<LongReadData, DataColumnDomain> {
+final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<LongReadData, DataColumnDomain> {
 
     private long m_lower = Long.MAX_VALUE;
 

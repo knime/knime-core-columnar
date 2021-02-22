@@ -65,7 +65,7 @@ import org.knime.core.data.def.BooleanCell.BooleanCellFactory;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarBooleanDomainCalculator implements ColumnarCalculator<BooleanReadData, DataColumnDomain> {
+final class ColumnarBooleanDomainCalculator implements ColumnarDomainCalculator<BooleanReadData, DataColumnDomain> {
 
     private final Set<DataCell> m_values = new LinkedHashSet<>(2);
 

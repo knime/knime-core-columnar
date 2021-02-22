@@ -68,10 +68,19 @@ import org.knime.core.data.v2.ReadValue;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
-    implements ColumnarCalculator<C, DataColumnDomain>, ColumnDataIndex {
+final class ColumnarBoundedDomainCalculator<R extends NullableReadData>
+    implements ColumnarDomainCalculator<R, DataColumnDomain> {
 
-    private final ColumnarReadValueFactory<C> m_factory;
+    private static final class DummyIndex implements ColumnDataIndex {
+        private int m_index = 0;
+
+        @Override
+        public int getIndex() {
+            return m_index;
+        }
+    }
+
+    private final ColumnarReadValueFactory<R> m_factory;
 
     private final Comparator<DataValue> m_comparator;
 
@@ -82,19 +91,18 @@ final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
 
     private DataCell m_upper;
 
-    private int m_index;
-
-    ColumnarBoundedDomainCalculator(final ColumnarReadValueFactory<C> factory, final Comparator<DataValue> delegate) {
+    ColumnarBoundedDomainCalculator(final ColumnarReadValueFactory<R> factory, final Comparator<DataValue> delegate) {
         m_factory = factory;
         m_comparator = delegate;
     }
 
     @Override
-    public final void update(final C data) {
-        final ReadValue value = m_factory.createReadValue(data, this);
+    public final void update(final R data) {
+        final DummyIndex index = new DummyIndex();
+        final ReadValue value = m_factory.createReadValue(data, index);
         for (int i = 0; i < data.length(); i++) {
             if (!data.isMissing(i)) {
-                m_index = i;
+                index.m_index = i;
                 if (m_lower == null) {
                     m_lower = value.getDataCell();
                     m_upper = m_lower;
@@ -115,11 +123,6 @@ final class ColumnarBoundedDomainCalculator<C extends NullableReadData>
     public DataColumnDomain get() {
         return m_lower == null ? new DataColumnDomainCreator(m_values).createDomain()
             : new DataColumnDomainCreator(m_values, m_lower, m_upper).createDomain();
-    }
-
-    @Override
-    public int getIndex() {
-        return m_index;
     }
 
     @Override

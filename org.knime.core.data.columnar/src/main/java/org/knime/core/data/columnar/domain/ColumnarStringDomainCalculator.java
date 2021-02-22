@@ -55,6 +55,7 @@ import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
+import org.knime.core.data.StringValue;
 import org.knime.core.data.def.StringCell;
 
 /**
@@ -63,11 +64,12 @@ import org.knime.core.data.def.StringCell;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarStringDomainCalculator implements ColumnarCalculator<ObjectReadData<String>, DataColumnDomain> {
+final class ColumnarStringDomainCalculator
+    implements ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain> {
 
     private final int m_maxNumValues;
 
-    private Set<DataCell> m_values = new LinkedHashSet<>();
+    private Set<String> m_values = new LinkedHashSet<>();
 
     ColumnarStringDomainCalculator(final int maxNumvalues) {
         m_maxNumValues = maxNumvalues;
@@ -79,8 +81,7 @@ final class ColumnarStringDomainCalculator implements ColumnarCalculator<ObjectR
             return;
         }
         for (int i = 0; i < data.length(); i++) {
-            if (!data.isMissing(i) && m_values.add(new StringCell(data.getObject(i)))
-                && m_values.size() > m_maxNumValues) {
+            if (!data.isMissing(i) && m_values.add(data.getObject(i)) && m_values.size() > m_maxNumValues) {
                 m_values = null;
                 return;
             }
@@ -90,7 +91,8 @@ final class ColumnarStringDomainCalculator implements ColumnarCalculator<ObjectR
     @Override
     public DataColumnDomain get() {
         return m_values == null ? new DataColumnDomainCreator().createDomain()
-            : new DataColumnDomainCreator(m_values).createDomain();
+            : new DataColumnDomainCreator(m_values.stream().map(StringCell::new).toArray(StringCell[]::new))
+                .createDomain();
     }
 
     @Override
@@ -100,7 +102,8 @@ final class ColumnarStringDomainCalculator implements ColumnarCalculator<ObjectR
         }
         if (domain.hasValues()) {
             for (final DataCell cell : domain.getValues()) {
-                if (!cell.isMissing() && m_values.add(cell) && m_values.size() > m_maxNumValues) {
+                if (!cell.isMissing() && m_values.add(((StringValue)cell).getStringValue())
+                    && m_values.size() > m_maxNumValues) {
                     m_values = null;
                     return;
                 }

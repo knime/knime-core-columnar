@@ -69,13 +69,13 @@ import org.knime.core.columnar.store.DelegatingColumnReadStore;
  */
 public final class CachedColumnReadStore extends DelegatingColumnReadStore {
 
-    private final class CachedColumnStoreReader extends DelegatingBatchReader {
+    private final class CachedBatchReader extends DelegatingBatchReader {
 
         private final BufferedBatchLoader m_batchLoader;
 
         private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
 
-        CachedColumnStoreReader(final ColumnSelection selection) {
+        CachedBatchReader(final ColumnSelection selection) {
             super(CachedColumnReadStore.this, selection);
             m_batchLoader = new BufferedBatchLoader();
         }
@@ -121,7 +121,7 @@ public final class CachedColumnReadStore extends DelegatingColumnReadStore {
 
     @Override
     protected BatchReader createReaderInternal(final ColumnSelection selection) {
-        return new CachedColumnStoreReader(selection);
+        return new CachedBatchReader(selection);
     }
 
     @Override

@@ -66,30 +66,38 @@ import org.knime.core.data.v2.ReadValue;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarNominalDomainCalculator<C extends NullableReadData>
-    implements ColumnarCalculator<C, DataColumnDomain>, ColumnDataIndex {
+final class ColumnarNominalDomainCalculator<R extends NullableReadData>
+    implements ColumnarDomainCalculator<R, DataColumnDomain> {
 
-    private final ColumnarReadValueFactory<C> m_factory;
+    private static final class DummyIndex implements ColumnDataIndex {
+        private int m_index = 0;
+
+        @Override
+        public int getIndex() {
+            return m_index;
+        }
+    }
+
+    private final ColumnarReadValueFactory<R> m_factory;
 
     private final int m_maxNumValues;
 
     private Set<DataCell> m_values = new LinkedHashSet<>();
 
-    private int m_index;
-
-    ColumnarNominalDomainCalculator(final ColumnarReadValueFactory<C> factory, final int maxNumvalues) {
+    ColumnarNominalDomainCalculator(final ColumnarReadValueFactory<R> factory, final int maxNumvalues) {
         m_factory = factory;
         m_maxNumValues = maxNumvalues;
     }
 
     @Override
-    public void update(final C data) {
+    public void update(final R data) {
+        final DummyIndex index = new DummyIndex();
         if (m_values == null) {
             return;
         }
-        final ReadValue value = m_factory.createReadValue(data, this);
+        final ReadValue value = m_factory.createReadValue(data, index);
         for (int i = 0; i < data.length(); i++) {
-            m_index = i;
+            index.m_index = i;
             if (!data.isMissing(i) && m_values.add(value.getDataCell()) && m_values.size() > m_maxNumValues) {
                 m_values = null;
                 return;
@@ -101,11 +109,6 @@ final class ColumnarNominalDomainCalculator<C extends NullableReadData>
     public DataColumnDomain get() {
         return m_values == null ? new DataColumnDomainCreator().createDomain()
             : new DataColumnDomainCreator(m_values).createDomain();
-    }
-
-    @Override
-    public int getIndex() {
-        return m_index;
     }
 
     @Override

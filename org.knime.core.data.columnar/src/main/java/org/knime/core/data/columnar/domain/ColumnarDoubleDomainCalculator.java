@@ -65,7 +65,7 @@ import org.knime.core.data.def.DoubleCell;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarDoubleDomainCalculator implements ColumnarCalculator<DoubleReadData, DataColumnDomain> {
+final class ColumnarDoubleDomainCalculator implements ColumnarDomainCalculator<DoubleReadData, DataColumnDomain> {
 
     private double m_lower = Double.POSITIVE_INFINITY;
 

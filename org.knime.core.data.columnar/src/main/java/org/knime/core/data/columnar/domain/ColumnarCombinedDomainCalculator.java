@@ -65,21 +65,21 @@ import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarCombinedDomainCalculator<C extends NullableReadData>
-    implements ColumnarCalculator<C, DataColumnDomain> {
+final class ColumnarCombinedDomainCalculator<R extends NullableReadData>
+    implements ColumnarDomainCalculator<R, DataColumnDomain> {
 
-    private final ColumnarNominalDomainCalculator<C> m_nominal;
+    private final ColumnarNominalDomainCalculator<R> m_nominal;
 
-    private final ColumnarBoundedDomainCalculator<C> m_bounded;
+    private final ColumnarBoundedDomainCalculator<R> m_bounded;
 
-    ColumnarCombinedDomainCalculator(final ColumnarReadValueFactory<C> factory, final Comparator<DataValue> delegate,
+    ColumnarCombinedDomainCalculator(final ColumnarReadValueFactory<R> factory, final Comparator<DataValue> delegate,
         final int maxNumValues) {
         m_nominal = new ColumnarNominalDomainCalculator<>(factory, maxNumValues);
         m_bounded = new ColumnarBoundedDomainCalculator<>(factory, delegate);
     }
 
     @Override
-    public void update(final C data) {
+    public void update(final R data) {
         m_nominal.update(data);
         m_bounded.update(data);
     }

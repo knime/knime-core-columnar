@@ -73,8 +73,8 @@ import org.slf4j.LoggerFactory;
  * {@link SmallColumnStoreCache LRU cache} in memory and asynchronously passes (flushes) data on to a delegate column
  * store. When any unflushed data is evicted from the cache, the store blocks until that data has been flushed. On cache
  * miss (i.e., when any evicted, flushed data is read), it blocks until the asynchronous write process has fully
- * terminated. The store allows concurrent reading via multiple {@link BatchReader readers} once the
- * {@link BatchWriter writer} has been closed.
+ * terminated. The store allows concurrent reading via multiple {@link BatchReader readers} once the {@link BatchWriter
+ * writer} has been closed.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -86,17 +86,17 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     private static final CountDownLatch DUMMY = new CountDownLatch(0);
 
-    private class AsyncFlushCachedColumnStoreFactory extends DelegatingBatchFactory {
+    private class AsyncFlushCachedBatchFactory extends DelegatingBatchFactory {
 
-        AsyncFlushCachedColumnStoreFactory() {
+        AsyncFlushCachedBatchFactory() {
             super(AsyncFlushCachedColumnStore.this);
         }
 
     }
 
-    private final class AsyncFlushCachedColumnStoreWriter extends DelegatingBatchWriter {
+    private final class AsyncFlushCachedBatchWriter extends DelegatingBatchWriter {
 
-        AsyncFlushCachedColumnStoreWriter() {
+        AsyncFlushCachedBatchWriter() {
             super(AsyncFlushCachedColumnStore.this);
         }
 
@@ -138,7 +138,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
                 try {
                     super.closeOnce();
                 } catch (IOException e) {
-                	throw new IllegalStateException("Failed to close writer.", e);
+                    throw new IllegalStateException("Failed to close writer.", e);
                 }
             });
         }
@@ -158,11 +158,11 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final class AsyncFlushCachedColumnStoreReader extends DelegatingBatchReader {
+    private final class AsyncFlushCachedBatchReader extends DelegatingBatchReader {
 
         private final BufferedBatchLoader m_batchLoader;
 
-        AsyncFlushCachedColumnStoreReader(final ColumnSelection selection) {
+        AsyncFlushCachedBatchReader(final ColumnSelection selection) {
             super(AsyncFlushCachedColumnStore.this, selection);
             m_batchLoader = new BufferedBatchLoader();
         }
@@ -170,8 +170,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         @Override
         protected ReadBatch readRetainedInternal(final int index) throws IOException {
             return getSelection().createBatch(i -> { // NOSONAR
-                final ColumnDataUniqueId ccUID =
-                    new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, index);
+                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, index);
                 return m_globalCache.getRetained(ccUID, () -> { // NOSONAR
                     try {
                         waitForAndHandleFuture();
@@ -233,9 +232,8 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
             @SuppressWarnings("resource")
             AsyncFlushCachedColumnStore store = (AsyncFlushCachedColumnStore)k.getStore();
             store.enqueueRunnable(c::release);
-            LOGGER.error(String.format("%s "
-                    + "Unflushed data evicted from cache. "
-                    + "Data will be retained and memory will be allocated until flushed.", ERROR_ON_INTERRUPT));
+            LOGGER.error(String.format("%s " + "Unflushed data evicted from cache. "
+                + "Data will be retained and memory will be allocated until flushed.", ERROR_ON_INTERRUPT));
         }
     };
 
@@ -273,12 +271,12 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     @Override
     protected BatchFactory getFactoryInternal() {
-        return new AsyncFlushCachedColumnStoreFactory();
+        return new AsyncFlushCachedBatchFactory();
     }
 
     @Override
     protected BatchWriter createWriterInternal() {
-        return new AsyncFlushCachedColumnStoreWriter();
+        return new AsyncFlushCachedBatchWriter();
     }
 
     @Override
@@ -296,7 +294,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     @Override
     protected BatchReader createReaderInternal(final ColumnSelection selection) {
-        return new AsyncFlushCachedColumnStoreReader(selection);
+        return new AsyncFlushCachedBatchReader(selection);
     }
 
     @Override

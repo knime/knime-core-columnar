@@ -69,11 +69,11 @@ import org.knime.core.node.NodeLogger;
  */
 public final class DomainColumnStore extends DelegatingColumnStore {
 
-    private final class Writer extends DelegatingBatchWriter {
+    private final class DomainBatchWriter extends DelegatingBatchWriter {
 
         private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
-        Writer() {
+        DomainBatchWriter() {
             super(DomainColumnStore.this);
         }
 
@@ -102,7 +102,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
                     final NullableReadData data = batch.get(e.getKey());
                     data.retain();
                     return CompletableFuture.runAsync(() -> {
-                        ((ColumnarCalculator<NullableReadData, ?>)e.getValue()).update(data);
+                        ((ColumnarDomainCalculator<NullableReadData, ?>)e.getValue()).update(data);
                         data.release();
                     }, m_executor);
                 }).toArray(CompletableFuture[]::new));
@@ -137,9 +137,9 @@ public final class DomainColumnStore extends DelegatingColumnStore {
     private final ExecutorService m_executor;
 
     /* Not final as initialized lazily */
-    private Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> m_domainCalculators;
+    private Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> m_domainCalculators;
 
-    private Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnMetaData[]>> m_metadataCalculators;
+    private Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnMetaData[]>> m_metadataCalculators;
 
     private DomainStoreConfig m_config;
 
@@ -157,7 +157,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
 
     @Override
     protected BatchWriter createWriterInternal() {
-        return new Writer();
+        return new DomainBatchWriter();
     }
 
     /**
@@ -168,7 +168,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
      */
     public final DataColumnDomain getDomain(final int colIndex) {
         if (m_domainCalculators != null) {
-            final ColumnarCalculator<?, DataColumnDomain> calculator = m_domainCalculators.get(colIndex);
+            final ColumnarDomainCalculator<?, DataColumnDomain> calculator = m_domainCalculators.get(colIndex);
             if (calculator != null) {
                 return calculator.get();
             }
@@ -184,7 +184,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
      */
     public final DataColumnMetaData[] getMetadata(final int colIndex) {
         if (m_metadataCalculators != null) {
-            final ColumnarCalculator<?, DataColumnMetaData[]> calculator = m_metadataCalculators.get(colIndex);
+            final ColumnarDomainCalculator<?, DataColumnMetaData[]> calculator = m_metadataCalculators.get(colIndex);
             if (calculator != null) {
                 return calculator.get();
             }

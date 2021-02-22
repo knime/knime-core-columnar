@@ -65,13 +65,20 @@ import org.knime.core.data.v2.ReadValue;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 final class ColumnarMetadataCalculator<R extends NullableReadData>
-    implements ColumnarCalculator<R, DataColumnMetaData[]>, ColumnDataIndex {
+    implements ColumnarDomainCalculator<R, DataColumnMetaData[]> {
+
+    private static final class DummyIndex implements ColumnDataIndex {
+        private int m_index = 0;
+
+        @Override
+        public int getIndex() {
+            return m_index;
+        }
+    }
 
     private final DataColumnMetaDataCreator<DataColumnMetaData>[] m_creators;
 
     private final ColumnarReadValueFactory<NullableReadData> m_factory;
-
-    private int m_index;
 
     ColumnarMetadataCalculator(final DataColumnMetaDataCreator<DataColumnMetaData>[] creators,
         final ColumnarReadValueFactory<NullableReadData> factory) {
@@ -81,10 +88,11 @@ final class ColumnarMetadataCalculator<R extends NullableReadData>
 
     @Override
     public void update(final R data) {
-        final ReadValue value = m_factory.createReadValue(data, this);
+        final DummyIndex index = new DummyIndex();
+        final ReadValue value = m_factory.createReadValue(data, index);
         for (int i = 0; i < data.length(); i++) {
             if (!data.isMissing(i)) {
-                m_index = i;
+                index.m_index = i;
                 final DataCell cell = value.getDataCell();
                 for (final DataColumnMetaDataCreator<DataColumnMetaData> creator : m_creators) {
                     creator.update(cell);
@@ -97,11 +105,6 @@ final class ColumnarMetadataCalculator<R extends NullableReadData>
     public DataColumnMetaData[] get() {
         return Arrays.stream(m_creators).map(DataColumnMetaDataCreator<DataColumnMetaData>::create)
             .toArray(DataColumnMetaData[]::new);
-    }
-
-    @Override
-    public int getIndex() {
-        return m_index;
     }
 
     @Override

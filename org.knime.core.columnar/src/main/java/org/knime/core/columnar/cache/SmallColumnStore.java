@@ -168,15 +168,15 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     private static final String ERROR_MESSAGE_ON_FLUSH = "Error while flushing small table.";
 
-    private class SmallColumnStoreFactory extends DelegatingBatchFactory {
+    private class SmallBatchFactory extends DelegatingBatchFactory {
 
-        SmallColumnStoreFactory() {
+        SmallBatchFactory() {
             super(SmallColumnStore.this);
         }
 
     }
 
-    private final class SmallColumnStoreWriter extends DelegatingBatchWriter {
+    private final class SmallBatchWriter extends DelegatingBatchWriter {
 
         private Table m_table = new Table();
 
@@ -184,7 +184,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
         private boolean m_flushed = false;
 
-        SmallColumnStoreWriter() {
+        SmallBatchWriter() {
             super(SmallColumnStore.this);
         }
 
@@ -260,7 +260,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final class SmallColumnStoreReader implements BatchReader {
+    private final class SmallBatchReader implements BatchReader {
 
         private final ColumnSelection m_selection;
 
@@ -268,7 +268,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
         private boolean m_readerClosed;
 
-        SmallColumnStoreReader(final ColumnSelection selection, final Table table) {
+        SmallBatchReader(final ColumnSelection selection, final Table table) {
             m_selection = selection;
             m_table = table;
         }
@@ -321,7 +321,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
     private final LoadingEvictingCache<SmallColumnStore, Table> m_globalCache;
 
     // lazily initialized on flush
-    private SmallColumnStoreWriter m_writer;
+    private SmallBatchWriter m_writer;
 
     /**
      * @param delegate the delegate to which to write if the table is not small
@@ -335,12 +335,12 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     @Override
     protected BatchFactory getFactoryInternal() {
-        return new SmallColumnStoreFactory();
+        return new SmallBatchFactory();
     }
 
     @Override
     protected BatchWriter createWriterInternal() {
-        m_writer = new SmallColumnStoreWriter();
+        m_writer = new SmallBatchWriter();
         return m_writer;
     }
 
@@ -363,7 +363,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
         final Table cached = m_globalCache.getRetained(SmallColumnStore.this);
         if (cached != null) {
             // cache hit
-            return new SmallColumnStoreReader(selection, cached);
+            return new SmallBatchReader(selection, cached);
         } else {
             // cache miss
             // we are not putting the small table back into cache here for two reasons:

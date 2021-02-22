@@ -67,11 +67,11 @@ interface DomainStoreConfig {
     /**
      * @return map from index to DomainFactory used to calculate domains.
      */
-    Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnDomain>> createDomainCalculators(); // NOSONAR
+    Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> createDomainCalculators(); // NOSONAR
 
     /**
      * @return map from index to DomainFactory used to calculate metadata.
      */
-    Map<Integer, ColumnarCalculator<? extends NullableReadData, DataColumnMetaData[]>> createMetadataCalculators(); // NOSONAR
+    Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnMetaData[]>> createMetadataCalculators(); // NOSONAR
 
 }

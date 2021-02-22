@@ -64,7 +64,7 @@ import org.knime.core.data.def.IntCell;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarIntDomainCalculator implements ColumnarCalculator<IntReadData, DataColumnDomain> {
+final class ColumnarIntDomainCalculator implements ColumnarDomainCalculator<IntReadData, DataColumnDomain> {
 
     private int m_lower = Integer.MAX_VALUE;
 

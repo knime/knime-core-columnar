@@ -87,9 +87,9 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
-    private final class Factory extends DelegatingBatchFactory {
+    private final class HeapCachedBatchFactory extends DelegatingBatchFactory {
 
-        private Factory() {
+        private HeapCachedBatchFactory() {
             super(HeapCachedColumnStore.this);
         }
 
@@ -111,13 +111,13 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final class Writer extends DelegatingBatchWriter {
+    private final class HeapCachedBatchWriter extends DelegatingBatchWriter {
 
         private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
         private int m_numBatches;
 
-        private Writer() {
+        private HeapCachedBatchWriter() {
             super(HeapCachedColumnStore.this);
         }
 
@@ -213,12 +213,12 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
     @Override
     protected BatchFactory getFactoryInternal() {
-        return new Factory();
+        return new HeapCachedBatchFactory();
     }
 
     @Override
     protected BatchWriter createWriterInternal() {
-        return new Writer();
+        return new HeapCachedBatchWriter();
     }
 
     @Override
