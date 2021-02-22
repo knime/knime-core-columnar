@@ -56,7 +56,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnWriteStore;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
@@ -85,26 +84,13 @@ import org.knime.core.node.workflow.WorkflowDataRepository;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarContainerTable extends ExtensionTable {
+abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarContainerTable.class);
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(AbstractColumnarContainerTable.class);
 
     private static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
 
     private static final String CFG_TABLE_SIZE = "table_size";
-
-    static ColumnarContainerTable create(final LoadContext context) throws InvalidSettingsException {
-        final ColumnarContainerTable table = new ColumnarContainerTable(context); // NOSONAR
-        table.initStoreCloser();
-        return table;
-    }
-
-    static ColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
-        final ColumnarContainerTable table = new ColumnarContainerTable(tableId, factory, schema, store, size);
-        table.initStoreCloser();
-        return table;
-    }
 
     private static ColumnStoreFactory createInstance(final String type) throws InvalidSettingsException {
         try {
@@ -134,14 +120,11 @@ final class ColumnarContainerTable extends ExtensionTable {
 
     private final ColumnReadStore m_readStore;
 
-    // will be null if the table has been loaded from disk
-    private final ColumnWriteStore m_writeStore;
-
     // effectively final
     private Finalizer m_storeCloser;
 
     @SuppressWarnings("resource")
-    private ColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
+    AbstractColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
         final NodeSettingsRO settings = context.getSettings();
         m_tableId = -1;
         m_size = settings.getLong(CFG_TABLE_SIZE);
@@ -150,20 +133,18 @@ final class ColumnarContainerTable extends ExtensionTable {
             .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
         m_readStore =
             ColumnarPreferenceUtils.wrap(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile()));
-        m_writeStore = null;
     }
 
-    private ColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+    AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnReadStore store, final long size) {
         m_tableId = tableId;
         m_factory = factory;
         m_schema = schema;
         m_size = size;
         m_readStore = store;
-        m_writeStore = store;
     }
 
-    private void initStoreCloser() {
+    void initStoreCloser() {
         final ResourceWithRelease readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
             finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
         final ResourceWithRelease storeRelease = new ResourceWithRelease(m_readStore);
@@ -176,9 +157,6 @@ final class ColumnarContainerTable extends ExtensionTable {
         settings.addLong(CFG_TABLE_SIZE, m_size);
         settings.addString(CFG_FACTORY_TYPE, m_factory.getClass().getName());
         m_schema.save(settings);
-        if (m_writeStore != null) {
-            m_writeStore.save(f);
-        }
     }
 
     @Override

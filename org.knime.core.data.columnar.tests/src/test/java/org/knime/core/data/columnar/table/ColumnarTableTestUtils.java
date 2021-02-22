@@ -118,15 +118,15 @@ final class ColumnarTableTestUtils {
         }
     }
 
-    static ColumnarContainerTable createUnsavedColumnarContainerTable(final int nRows) {
+    static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int nRows) {
         return createUnsavedColumnarContainerTable(1, nRows, null);
     }
 
-    static ColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows) {
+    static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows) {
         return createUnsavedColumnarContainerTable(nCols, nRows, null);
     }
 
-    private static ColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows,
+    private static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows,
         final ExecutionContext exec) {
         try (final ColumnarRowContainer container = createColumnarRowContainer(nCols, exec);
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
@@ -141,7 +141,7 @@ final class ColumnarTableTestUtils {
                     }
                 }
             }
-            return (ColumnarContainerTable)container.finishInternal();
+            return (UnsavedColumnarContainerTable)container.finishInternal();
         } catch (Exception e) {
             throw new IllegalStateException("Exception when trying to create UnsavedColumnarContainerTable.", e);
         }

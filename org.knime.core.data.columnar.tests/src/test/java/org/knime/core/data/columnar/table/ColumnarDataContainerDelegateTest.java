@@ -114,7 +114,7 @@ public class ColumnarDataContainerDelegateTest extends ColumnarTest {
             }
             delegate.close(); // NOSONAR
             try (@SuppressWarnings("resource")
-            ColumnarContainerTable table = (ColumnarContainerTable)delegate.getTable()) {
+            AbstractColumnarContainerTable table = (AbstractColumnarContainerTable)delegate.getTable()) {
                 ColumnarRowIteratorTest.compare(table, 0, 1);
             }
         }

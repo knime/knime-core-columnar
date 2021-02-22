@@ -169,7 +169,7 @@ final class ColumnarRowContainer implements RowContainer {
                 metadata.put(i, m_store.getMetadata(i));
             }
 
-            m_table = ColumnarContainerTable.create(m_id, m_storeFactory,
+            m_table = UnsavedColumnarContainerTable.create(m_id, m_storeFactory,
                 ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_delegate.size());
         }
         return m_table;

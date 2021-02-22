@@ -44,50 +44,49 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   2 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   22 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.data.columnar.table;
 
-import static org.junit.Assert.assertEquals;
-import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createSchema;
-
+import java.io.File;
 import java.io.IOException;
 
-import org.junit.Test;
-import org.knime.core.columnar.testing.ColumnarTest;
-import org.knime.core.data.columnar.table.ColumnarTableTestUtils.TestColumnStoreFactory;
-import org.knime.core.data.v2.RowWrite;
-import org.knime.core.data.v2.value.IntValueFactory.IntWriteValue;
+import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.node.CanceledExecutionException;
+import org.knime.core.node.ExecutionMonitor;
+import org.knime.core.node.NodeSettingsWO;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * ColumnarContainerTable which has not yet been saved, i.e. all data is still in-memory or temporarily persisted in the
+ * temp directory.
+ *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public class ColumnarContainerTableTest extends ColumnarTest {
+final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
 
-    @SuppressWarnings("deprecation")
-    @Test
-    public void testGetters() throws IOException {
-        final int nRows = 13;
-        final int tableId = 12;
+    private final ColumnStore m_store;
 
-        final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(true, 0, true);
-        try (final ColumnarRowContainer container =
-            ColumnarRowContainer.create(null, tableId, createSchema(1), TestColumnStoreFactory.INSTANCE, settings);
-                final ColumnarRowWriteCursor cursor = container.createCursor()) {
-            for (int i = 0; i < nRows; i++) {
-                final RowWrite row = cursor.forward();
-                row.setRowKey(Integer.toString(i));
-                row.<IntWriteValue> getWriteValue(0).setIntValue(i);
-            }
-            try (@SuppressWarnings("resource")
-            final AbstractColumnarContainerTable table = (AbstractColumnarContainerTable)container.finishInternal()) {
-                table.ensureOpen();
-                assertEquals(tableId, table.getTableId());
-                assertEquals(nRows, table.getRowCount());
-                assertEquals(nRows, table.size());
-            }
-        }
+    static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        final UnsavedColumnarContainerTable table =
+            new UnsavedColumnarContainerTable(tableId, factory, schema, store, size);
+        table.initStoreCloser();
+        return table;
+    }
+
+    private UnsavedColumnarContainerTable(final int tableId, //
+        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        super(tableId, factory, schema, store, size);
+        m_store = store;
+    }
+
+    @Override
+    protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
+        throws IOException, CanceledExecutionException {
+        super.saveToFileOverwrite(f, settings, exec);
+        m_store.save(f);
     }
 
 }
