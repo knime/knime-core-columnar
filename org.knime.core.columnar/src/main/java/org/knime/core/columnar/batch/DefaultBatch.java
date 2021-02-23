@@ -44,52 +44,54 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   9 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   23 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.batch;
 
 import java.util.Arrays;
 
-import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.data.NullableWriteData;
 
 /**
- * Default implementation of a {@link WriteBatch} that holds an array of {@link NullableWriteData}.
- *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class DefaultWriteBatch extends DefaultBatch<NullableWriteData> implements WriteBatch {
+abstract class DefaultBatch<T extends ReferencedData> implements ReferencedData {
 
-    private int m_capacity;
+    final T[] m_data;
+
+    DefaultBatch(final T[] data) {
+        m_data = data;
+    }
+
+    @Override
+    public final void release() {
+        Arrays.stream(m_data).forEach(ReferencedData::release);
+    }
+
+    @Override
+    public final void retain() {
+        Arrays.stream(m_data).forEach(ReferencedData::retain);
+    }
+
+    @Override
+    public final long sizeOf() {
+        return Arrays.stream(m_data).mapToLong(ReferencedData::sizeOf).sum();
+    }
+
+    public final T get(final int index) {
+        return m_data[index];
+    }
 
     /**
-     * @param data the array of data backing this batch
+     * Obtains an array of all {@link NullableWriteData} in this batch. This implementation of the method is unsafe,
+     * since the array it returns is the array underlying the batch (and not a defensive copy thereof). Clients must not
+     * modify the returned array.
+     *
+     * @return the non-null array of all data in this batch
      */
-    public DefaultWriteBatch(final NullableWriteData[] data) {
-        super(data);
-        m_capacity = Arrays.stream(data).mapToInt(WriteData::capacity).min().orElse(0);
-    }
-
-    @Override
-    public int capacity() {
-        return m_capacity;
-    }
-
-    @Override
-    public void expand(final int minimumCapacity) {
-        int newCapacity = Integer.MAX_VALUE;
-        for (final NullableWriteData data : m_data) {
-            data.expand(minimumCapacity);
-            newCapacity = Math.min(newCapacity, data.capacity());
-        }
-        m_capacity = newCapacity;
-    }
-
-    @Override
-    public ReadBatch close(final int length) {
-        return new DefaultReadBatch(Arrays.stream(m_data).map(d -> d.close(length)).toArray(NullableReadData[]::new));
+    public final T[] getUnsafe() {
+        return m_data;
     }
 
 }

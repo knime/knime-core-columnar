@@ -48,18 +48,12 @@
  */
 package org.knime.core.columnar.batch;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
 import static org.knime.core.columnar.TestColumnStoreUtils.createTestTable;
 
-import java.util.Arrays;
-
 import org.junit.Test;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.TestColumnStoreUtils;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.store.ColumnStoreSchema;
 import org.knime.core.columnar.testing.TestColumnStore;
 import org.knime.core.columnar.testing.data.TestData;
 
@@ -67,74 +61,11 @@ import org.knime.core.columnar.testing.data.TestData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class DefaultReadBatchTest {
+public class DefaultReadBatchTest extends DefaultBatchTest<DefaultReadBatch> {
 
-    private static final int DEF_NUM_COLUMNS = 2;
-
-    @SuppressWarnings("resource")
-    private static TestData[] createData() {
-        final ColumnStoreSchema schema = createSchema(DEF_NUM_COLUMNS);
-        final TestColumnStore store = TestColumnStore.create(schema);
-        return createTestTable(store, 1).get(0);
-    }
-
-    private static DefaultReadBatch createBatch(final NullableReadData[] data) {
+    @Override
+    DefaultReadBatch createBatch(final TestData[] data) {
         return new DefaultReadBatch(data);
-    }
-
-    @Test(expected = NullPointerException.class)
-    public void testArrayNullCheckOnCreate() {
-        createBatch(null);
-    }
-
-    @Test(expected = NullPointerException.class)
-    public void testElementNullCheckOnCreate() {
-        final TestData[] data = createData();
-        data[0] = null;
-        createBatch(data);
-    }
-
-    @Test
-    public void testGet() {
-        final TestData[] data = createData();
-        final DefaultReadBatch batch = createBatch(data);
-        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(data[i], batch.get(i));
-            assertArrayEquals(data, batch.getUnsafe());
-        }
-    }
-
-    @Test(expected = IndexOutOfBoundsException.class)
-    public void testGetIndexOutOfBoundsLower() {
-        createBatch(createData()).get(-1);
-    }
-
-    @Test(expected = IndexOutOfBoundsException.class)
-    public void testGetIndexOutOfBoundsUpper() {
-        createBatch(createData()).get(DEF_NUM_COLUMNS);
-    }
-
-    @Test
-    public void testRetainRelease() {
-        final TestData[] data = createData();
-        final DefaultReadBatch batch = createBatch(data);
-        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(1, data[i].getRefs());
-        }
-        batch.retain();
-        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(2, data[i].getRefs());
-        }
-        batch.release();
-        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(1, data[i].getRefs());
-        }
-    }
-
-    @Test
-    public void testSizeOf() {
-        final TestData[] data = createData();
-        assertEquals(Arrays.stream(data).mapToLong(ReferencedData::sizeOf).sum(), createBatch(data).sizeOf());
     }
 
     @Test

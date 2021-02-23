@@ -48,9 +48,6 @@
  */
 package org.knime.core.columnar.batch;
 
-import java.util.Arrays;
-
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.data.NullableReadData;
 
 /**
@@ -60,9 +57,7 @@ import org.knime.core.columnar.data.NullableReadData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class DefaultReadBatch implements ReadBatch {
-
-    private final NullableReadData[] m_data;
+public final class DefaultReadBatch extends DefaultBatch<NullableReadData> implements ReadBatch {
 
     private final int m_length;
 
@@ -72,56 +67,17 @@ public final class DefaultReadBatch implements ReadBatch {
      * @param data the non-null array of nullable data that comprises this batch
      */
     public DefaultReadBatch(final NullableReadData[] data) {
+        super(data);
         int length = 0;
         for (NullableReadData d : data) {
             length = Math.max(length, d.length());
         }
-        m_data = data;
         m_length = length;
-    }
-
-    /**
-     * Obtains the {@link NullableReadData} at a certain index.
-     *
-     * @param index the index at which to look for the data
-     * @return the non-null data at the given index
-     * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the size of the batch
-     */
-    @Override
-    public NullableReadData get(final int index) {
-        return m_data[index];
-    }
-
-    /**
-     * Obtains an array of all {@link NullableReadData} in this batch. This implementation of the method is unsafe,
-     * since the array it returns is the array underlying the batch (and not a defensive copy thereof). Clients must not
-     * modify the returned array.
-     *
-     * @return the non-null array of all data in this batch
-     */
-    @Override
-    public NullableReadData[] getUnsafe() {
-        return m_data;
     }
 
     @Override
     public int length() {
         return m_length;
-    }
-
-    @Override
-    public void release() {
-        Arrays.stream(m_data).forEach(ReferencedData::release);
-    }
-
-    @Override
-    public void retain() {
-        Arrays.stream(m_data).forEach(ReferencedData::retain);
-    }
-
-    @Override
-    public long sizeOf() {
-        return Arrays.stream(m_data).mapToLong(ReferencedData::sizeOf).sum();
     }
 
     @Override

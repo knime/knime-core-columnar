@@ -54,8 +54,9 @@ import java.util.Set;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataType;
-import org.knime.core.data.RowKey;
 import org.knime.core.data.UnmaterializedCell;
+import org.knime.core.data.columnar.table.ColumnarRowIterator.CellIterator;
+import org.knime.core.data.columnar.table.ColumnarRowIterator.FilteredColumnarDataRow;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
@@ -67,30 +68,50 @@ import org.knime.core.data.v2.RowRead;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class FilteredColumnarRowIterator {
+final class FilteredColumnarRowIteratorFactory {
 
-    private static final class SingleCellRowIterator extends CloseableRowIterator {
+    private abstract static class FilteredColumnarRowIterator extends CloseableRowIterator {
 
-        private final RowCursor m_cursor;
+        final RowCursor m_cursor;
 
-        private final int m_colIdx;
-
-        SingleCellRowIterator(final RowCursor cursor, final int colIdx) {
+        FilteredColumnarRowIterator(final RowCursor cursor) {
             m_cursor = cursor;
-            m_colIdx = colIdx;
         }
 
         @Override
-        public boolean hasNext() {
+        public final boolean hasNext() {
             return m_cursor.canForward();
         }
 
         @Override
-        public DataRow next() {
+        public final DataRow next() {
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }
 
+            return nextInternal();
+        }
+
+        @Override
+        public final void close() {
+            m_cursor.close();
+        }
+
+        abstract DataRow nextInternal();
+
+    }
+
+    private static final class SingleCellRowIterator extends FilteredColumnarRowIterator {
+
+        private final int m_colIdx;
+
+        SingleCellRowIterator(final RowCursor cursor, final int colIdx) {
+            super(cursor);
+            m_colIdx = colIdx;
+        }
+
+        @Override
+        final DataRow nextInternal() {
             final RowRead access = m_cursor.forward();
             final DataCell cell =
                 access.isMissing(m_colIdx) ? MISSING_CELL : access.<ReadValue> getValue(m_colIdx).getDataCell();
@@ -98,33 +119,23 @@ final class FilteredColumnarRowIterator {
             return new SingleCellDataRow(access.getRowKey().getString(), cell, m_colIdx, m_cursor.getNumColumns());
         }
 
-        @Override
-        public void close() {
-            m_cursor.close();
-        }
-
     }
 
-    private static final class SingleCellDataRow implements DataRow {
-
-        private final String m_rowKey;
+    private static final class SingleCellDataRow extends FilteredColumnarDataRow {
 
         private final DataCell m_cell;
 
         private final int m_index;
 
-        private final int m_numCells;
-
         public SingleCellDataRow(final String rowKey, final DataCell cell, final int index, final int numCells) {
-            m_rowKey = rowKey;
+            super(rowKey, numCells);
             m_index = index;
             m_cell = cell;
-            m_numCells = numCells;
         }
 
         @Override
         public Iterator<DataCell> iterator() {
-            return new Iterator<DataCell>() {
+            return new CellIterator() {
                 private boolean m_hasNext = true;
 
                 @Override
@@ -140,22 +151,7 @@ final class FilteredColumnarRowIterator {
                     m_hasNext = false;
                     return m_cell;
                 }
-
-                @Override
-                public void remove() {
-                    throw new UnsupportedOperationException();
-                }
             };
-        }
-
-        @Override
-        public int getNumCells() {
-            return m_numCells;
-        }
-
-        @Override
-        public RowKey getKey() {
-            return new RowKey(m_rowKey);
         }
 
         @Override
@@ -171,28 +167,17 @@ final class FilteredColumnarRowIterator {
 
     }
 
-    private static final class ArrayRowIterator extends CloseableRowIterator {
-
-        private final RowCursor m_cursor;
+    private static final class ArrayRowIterator extends FilteredColumnarRowIterator {
 
         private final int[] m_selection;
 
         ArrayRowIterator(final RowCursor cursor, final int[] selection) {
-            m_cursor = cursor;
+            super(cursor);
             m_selection = selection;
         }
 
         @Override
-        public boolean hasNext() {
-            return m_cursor.canForward();
-        }
-
-        @Override
-        public DataRow next() {
-            if (!hasNext()) {
-                throw new NoSuchElementException();
-            }
-
+        public DataRow nextInternal() {
             final RowRead access = m_cursor.forward();
             final DataCell[] cells = new DataCell[m_cursor.getNumColumns()];
             for (int idx : m_selection) {
@@ -202,30 +187,23 @@ final class FilteredColumnarRowIterator {
             return new ArrayDataRow(access.getRowKey().getString(), cells, m_selection);
         }
 
-        @Override
-        public void close() {
-            m_cursor.close();
-        }
-
     }
 
-    private static final class ArrayDataRow implements DataRow {
-
-        private final String m_rowKey;
+    private static final class ArrayDataRow extends FilteredColumnarDataRow {
 
         private final DataCell[] m_cells;
 
         private final int[] m_selection;
 
         ArrayDataRow(final String rowKey, final DataCell[] values, final int[] selection) {
-            m_rowKey = rowKey;
+            super(rowKey, values.length);
             m_cells = values;
             m_selection = selection;
         }
 
         @Override
         public Iterator<DataCell> iterator() {
-            return new Iterator<DataCell>() { // NOSONAR
+            return new CellIterator() {
                 private int m_idx = 0;
 
                 @Override
@@ -242,22 +220,7 @@ final class FilteredColumnarRowIterator {
                     m_idx++;
                     return cell;
                 }
-
-                @Override
-                public void remove() {
-                    throw new UnsupportedOperationException();
-                }
             };
-        }
-
-        @Override
-        public int getNumCells() {
-            return m_cells.length;
-        }
-
-        @Override
-        public RowKey getKey() {
-            return new RowKey(m_rowKey);
         }
 
         @Override
@@ -271,28 +234,17 @@ final class FilteredColumnarRowIterator {
 
     }
 
-    private static final class HashMapRowIterator extends CloseableRowIterator {
-
-        private final RowCursor m_cursor;
+    private static final class HashMapRowIterator extends FilteredColumnarRowIterator {
 
         private final int[] m_selection;
 
         HashMapRowIterator(final RowCursor cursor, final int[] selection) {
-            m_cursor = cursor;
+            super(cursor);
             m_selection = selection;
         }
 
         @Override
-        public boolean hasNext() {
-            return m_cursor.canForward();
-        }
-
-        @Override
-        public DataRow next() {
-            if (!hasNext()) {
-                throw new NoSuchElementException();
-            }
-
+        public DataRow nextInternal() {
             final RowRead access = m_cursor.forward();
             final Map<Integer, DataCell> cells = new LinkedHashMap<>(m_selection.length);
             for (int selection : m_selection) {
@@ -302,30 +254,20 @@ final class FilteredColumnarRowIterator {
             return new HashMapDataRow(access.getRowKey().getString(), cells, m_cursor.getNumColumns());
         }
 
-        @Override
-        public void close() {
-            m_cursor.close();
-        }
-
     }
 
-    private static final class HashMapDataRow implements DataRow {
-
-        private final String m_rowKey;
+    private static final class HashMapDataRow extends FilteredColumnarDataRow {
 
         private final Map<Integer, DataCell> m_cells;
 
-        private int m_numCells;
-
         public HashMapDataRow(final String rowKey, final Map<Integer, DataCell> values, final int numCells) {
-            m_rowKey = rowKey;
+            super(rowKey, numCells);
             m_cells = values;
-            m_numCells = numCells;
         }
 
         @Override
         public Iterator<DataCell> iterator() {
-            return new Iterator<DataCell>() {
+            return new CellIterator() {
                 private Iterator<DataCell> m_delegate = m_cells.values().iterator();
 
                 @Override
@@ -337,22 +279,7 @@ final class FilteredColumnarRowIterator {
                 public DataCell next() {
                     return m_delegate.next();
                 }
-
-                @Override
-                public void remove() {
-                    throw new UnsupportedOperationException();
-                }
             };
-        }
-
-        @Override
-        public int getNumCells() {
-            return m_numCells;
-        }
-
-        @Override
-        public RowKey getKey() {
-            return new RowKey(m_rowKey);
         }
 
         @Override
@@ -395,7 +322,7 @@ final class FilteredColumnarRowIterator {
         }
     }
 
-    private FilteredColumnarRowIterator() {
+    private FilteredColumnarRowIteratorFactory() {
     }
 
 }

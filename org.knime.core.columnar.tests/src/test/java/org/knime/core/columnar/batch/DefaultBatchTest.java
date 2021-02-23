@@ -44,52 +44,92 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   9 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   23 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.batch;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+
 import java.util.Arrays;
 
-import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
+import org.junit.Test;
+import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.TestColumnStoreUtils;
+import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.columnar.testing.data.TestData;
 
 /**
- * Default implementation of a {@link WriteBatch} that holds an array of {@link NullableWriteData}.
- *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class DefaultWriteBatch extends DefaultBatch<NullableWriteData> implements WriteBatch {
+@SuppressWarnings("javadoc")
+public abstract class DefaultBatchTest<B extends DefaultBatch<? extends ReferencedData>> {
 
-    private int m_capacity;
-
-    /**
-     * @param data the array of data backing this batch
-     */
-    public DefaultWriteBatch(final NullableWriteData[] data) {
-        super(data);
-        m_capacity = Arrays.stream(data).mapToInt(WriteData::capacity).min().orElse(0);
+    @SuppressWarnings("resource")
+    static TestData[] createData() {
+        final ColumnStoreSchema schema = TestColumnStoreUtils.createSchema(DEF_NUM_COLUMNS);
+        final TestColumnStore store = TestColumnStore.create(schema);
+        return TestColumnStoreUtils.createTestTable(store, 1).get(0);
     }
 
-    @Override
-    public int capacity() {
-        return m_capacity;
+    static final int DEF_NUM_COLUMNS = 2;
+
+    abstract B createBatch(final TestData[] data);
+
+    @Test(expected = NullPointerException.class)
+    public void testArrayNullCheckOnCreate() {
+        createBatch(null);
     }
 
-    @Override
-    public void expand(final int minimumCapacity) {
-        int newCapacity = Integer.MAX_VALUE;
-        for (final NullableWriteData data : m_data) {
-            data.expand(minimumCapacity);
-            newCapacity = Math.min(newCapacity, data.capacity());
+    @Test(expected = NullPointerException.class)
+    public void testElementNullCheckOnCreate() {
+        final TestData[] data = createData();
+        data[0] = null;
+        createBatch(data);
+    }
+
+    @Test
+    public void testGet() {
+        final TestData[] data = createData();
+        final B batch = createBatch(data);
+        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
+            assertEquals(data[i], batch.get(i));
+            assertArrayEquals(data, batch.getUnsafe());
         }
-        m_capacity = newCapacity;
     }
 
-    @Override
-    public ReadBatch close(final int length) {
-        return new DefaultReadBatch(Arrays.stream(m_data).map(d -> d.close(length)).toArray(NullableReadData[]::new));
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testGetIndexOutOfBoundsLower() {
+        createBatch(createData()).get(-1);
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testGetIndexOutOfBoundsUpper() {
+        createBatch(createData()).get(DEF_NUM_COLUMNS);
+    }
+
+    @Test
+    public void testRetainRelease() {
+        final TestData[] data = createData();
+        final B batch = createBatch(data);
+        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
+            assertEquals(1, data[i].getRefs());
+        }
+        batch.retain();
+        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
+            assertEquals(2, data[i].getRefs());
+        }
+        batch.release();
+        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
+            assertEquals(1, data[i].getRefs());
+        }
+    }
+
+    @Test
+    public void testSizeOf() {
+        final TestData[] data = createData();
+        assertEquals(Arrays.stream(data).mapToLong(ReferencedData::sizeOf).sum(), createBatch(data).sizeOf());
     }
 
 }

@@ -136,8 +136,6 @@ public class ColumnarBooleanAccessFactoryTest {
         assertEquals(cell.getMinCore(), readAccess.getMinCore(), 0d);
         assertEquals(cell.getMaxCore(), readAccess.getMaxCore(), 0d);
         assertEquals(cell.getCenterOfGravity(), readAccess.getCenterOfGravity(), 0d);
-        assertEquals(cell.getCore(), readAccess.getCore(), 0d);
-
     }
 
 }

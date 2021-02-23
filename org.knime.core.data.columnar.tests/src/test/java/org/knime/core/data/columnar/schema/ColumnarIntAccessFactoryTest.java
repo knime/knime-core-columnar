@@ -130,13 +130,11 @@ public class ColumnarIntAccessFactoryTest {
         assertEquals(cell.getRealValue(), readAccess.getRealValue(), 0d);
         assertEquals(cell.getImaginaryValue(), readAccess.getImaginaryValue(), 0d);
         assertEquals(cell.getMinSupport(), readAccess.getMinSupport(), 0d);
-        assertEquals(cell.getCore(), readAccess.getCore(), 0d);
         assertEquals(cell.getMaxSupport(), readAccess.getMaxSupport(), 0d);
+        assertEquals(cell.getCore(), readAccess.getCore(), 0d);
         assertEquals(cell.getMinCore(), readAccess.getMinCore(), 0d);
         assertEquals(cell.getMaxCore(), readAccess.getMaxCore(), 0d);
         assertEquals(cell.getCenterOfGravity(), readAccess.getCenterOfGravity(), 0d);
-        assertEquals(cell.getCore(), readAccess.getCore(), 0d);
-
     }
 
 }

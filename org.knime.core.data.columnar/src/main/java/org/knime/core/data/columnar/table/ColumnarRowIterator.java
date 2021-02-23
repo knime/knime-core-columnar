@@ -64,20 +64,51 @@ import org.knime.core.data.v2.RowRead;
  */
 final class ColumnarRowIterator extends CloseableRowIterator {
 
-    private static final class ColumnStoreTableDataRow implements DataRow {
+    abstract static class CellIterator implements Iterator<DataCell> {
+        /**
+         * @throws UnsupportedOperationException since the <tt>remove</tt> operation is not supported by this Iterator.
+         */
+        @Override
+        public final void remove() {
+            throw new UnsupportedOperationException("Can't remove cell from row. Data rows are read-only.");
+        }
+    }
 
-        private final String m_rowKey;
+    abstract static class FilteredColumnarDataRow implements DataRow {
+
+        final String m_rowKey;
+
+        final int m_numCells;
+
+        FilteredColumnarDataRow(final String rowKey, final int numCells) {
+            m_rowKey = rowKey;
+            m_numCells = numCells;
+        }
+
+        @Override
+        public final int getNumCells() {
+            return m_numCells;
+        }
+
+        @Override
+        public final RowKey getKey() {
+            return new RowKey(m_rowKey);
+        }
+
+    }
+
+    private static final class ColumnStoreTableDataRow extends FilteredColumnarDataRow {
 
         private final DataCell[] m_cells;
 
         ColumnStoreTableDataRow(final String rowKey, final DataCell[] cells) {
-            m_rowKey = rowKey;
+            super(rowKey, cells.length);
             m_cells = cells;
         }
 
         @Override
         public Iterator<DataCell> iterator() {
-            return new Iterator<DataCell>() { // NOSONAR
+            return new CellIterator() {
                 private int m_idx = 0;
 
                 @Override
@@ -94,28 +125,14 @@ final class ColumnarRowIterator extends CloseableRowIterator {
                     m_idx++;
                     return cell;
                 }
-
-                @Override
-                public void remove() {
-                    throw new UnsupportedOperationException();
-                }
             };
-        }
-
-        @Override
-        public int getNumCells() {
-            return m_cells.length;
-        }
-
-        @Override
-        public RowKey getKey() {
-            return new RowKey(m_rowKey);
         }
 
         @Override
         public DataCell getCell(final int index) {
             return m_cells[index];
         }
+
     }
 
     private static final DataCell MISSING_CELL = DataType.getMissingCell();

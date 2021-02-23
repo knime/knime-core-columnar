@@ -262,7 +262,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     public final CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
         final Optional<Set<Integer>> materializeColumnIndices = filter.getMaterializeColumnIndices();
         return materializeColumnIndices.isPresent()
-            ? FilteredColumnarRowIterator.create(cursor(filter), materializeColumnIndices.get())
+            ? FilteredColumnarRowIteratorFactory.create(cursor(filter), materializeColumnIndices.get())
             : new ColumnarRowIterator(cursor(filter));
     }
 
