@@ -83,7 +83,7 @@ public class ColumnarCombinedDomainCalculatorTest {
     public void testUpdateWithData() {
         final ColumnarCombinedDomainCalculator<IntReadData> calc = createCalculator(60);
         calc.update(TestIntDataFactory.INSTANCE.createReadData(new Integer[]{null, 1, 0, 2}));
-        final DataColumnDomain domain = calc.get();
+        final DataColumnDomain domain = calc.createDomain();
         assertEquals(I0, domain.getLowerBound());
         assertEquals(I2, domain.getUpperBound());
         assertEquals(Stream.of(I0, I1, I2).collect(Collectors.toSet()), domain.getValues());
@@ -98,7 +98,7 @@ public class ColumnarCombinedDomainCalculatorTest {
         creator.setUpperBound(I2);
         creator.setValues(set);
         calc.update(creator.createDomain());
-        final DataColumnDomain domain = calc.get();
+        final DataColumnDomain domain = calc.createDomain();
         assertEquals(I0, domain.getLowerBound());
         assertEquals(I2, domain.getUpperBound());
         assertEquals(Stream.of(I0, I1, I2).collect(Collectors.toSet()), domain.getValues());

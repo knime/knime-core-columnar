@@ -79,7 +79,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
      */
     public abstract static class DelegatingBatchReader implements BatchReader {
 
-        private final DelegatingColumnReadStore m_store;
+        private final ColumnReadStore m_delegateStore;
 
         private final ColumnSelection m_selection;
 
@@ -93,8 +93,18 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
          * @param store a delegating store from which to obtain the delegate reader
          * @param selection see {@link ColumnReadStore#createReader(ColumnSelection)}
          */
+        protected DelegatingBatchReader(final DelegatingColumnStore store, final ColumnSelection selection) {
+            m_delegateStore = store.m_delegate;
+            m_selection = selection;
+            m_storeClosed = store.m_storeClosed;
+        }
+
+        /**
+         * @param store a delegating store from which to obtain the delegate reader
+         * @param selection see {@link ColumnReadStore#createReader(ColumnSelection)}
+         */
         protected DelegatingBatchReader(final DelegatingColumnReadStore store, final ColumnSelection selection) {
-            m_store = store;
+            m_delegateStore = store.m_delegate;
             m_selection = selection;
             m_storeClosed = store.m_storeClosed;
         }
@@ -133,13 +143,13 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
 
         @Override
         @SuppressWarnings("resource")
-        public final int numBatches() throws IOException {
+        public int numBatches() throws IOException {
             return initAndGetDelegate().numBatches();
         }
 
         @Override
         @SuppressWarnings("resource")
-        public final int maxLength() throws IOException {
+        public int maxLength() throws IOException {
             return initAndGetDelegate().maxLength();
         }
 
@@ -177,7 +187,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
          */
         protected final BatchReader initAndGetDelegate() {
             if (m_delegate == null) {
-                m_delegate = m_store.m_delegate.createReader(m_selection);
+                m_delegate = m_delegateStore.createReader(m_selection);
             }
             return m_delegate;
         }

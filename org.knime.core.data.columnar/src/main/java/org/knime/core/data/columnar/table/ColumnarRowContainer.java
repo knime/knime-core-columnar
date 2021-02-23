@@ -131,7 +131,7 @@ final class ColumnarRowContainer implements RowContainer {
 
     @SuppressWarnings("resource")
     @Override
-    public BufferedDataTable finish() throws IOException {
+    public BufferedDataTable finish() {
         if (m_context == null) {
             throw new IllegalStateException(
                 "ColumnarRowContainer has not been initialized with ExecutionContext. Implementation error.");

@@ -48,20 +48,8 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-
-import java.util.Collections;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.junit.Test;
-import org.knime.core.columnar.data.StringData.StringReadData;
-import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
-import org.knime.core.data.DataCell;
-import org.knime.core.data.DataColumnDomainCreator;
-import org.knime.core.data.DataType;
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.data.def.StringCell;
 
 /**
@@ -70,71 +58,24 @@ import org.knime.core.data.def.StringCell;
 @SuppressWarnings("javadoc")
 public class ColumnarNominalDomainCalculatorTest {
 
-    private static final DataCell MISSING_CELL = DataType.getMissingCell();
-
-    private static final StringCell S1 = new StringCell("1");
-
-    private static final StringCell S2 = new StringCell("2");
-
-    private static ColumnarNominalDomainCalculator<StringReadData> createCalculator(final int maxNumvalues) {
+    private static ColumnarNominalDomainCalculator<ObjectReadData<String>> createCalculator(final int maxNumvalues) {
         return new ColumnarNominalDomainCalculator<>(
-            (data, index) -> () -> new StringCell(data.getString(index.getIndex())), maxNumvalues);
+            (data, index) -> () -> new StringCell(data.getObject(index.getIndex())), maxNumvalues);
     }
 
     @Test
     public void testUpdateWithData() {
-        final ColumnarNominalDomainCalculator<StringReadData> calc = createCalculator(1);
-
-        calc.update(TestStringDataFactory.INSTANCE.createReadData(new String[]{null}));
-        assertEquals(Collections.emptySet(), calc.get().getValues());
-
-        final String[] arr1 = new String[]{"1"};
-        final Set<DataCell> set1 = Stream.of(S1).collect(Collectors.toSet());
-        calc.update(TestStringDataFactory.INSTANCE.createReadData(arr1));
-        assertEquals(set1, calc.get().getValues());
-
-        calc.update(TestStringDataFactory.INSTANCE.createReadData(arr1));
-        assertEquals(set1, calc.get().getValues());
-
-        calc.update(TestStringDataFactory.INSTANCE.createReadData(new String[]{"2"}));
-        assertNull(calc.get().getValues());
-
-        calc.update(TestStringDataFactory.INSTANCE.createReadData(arr1));
-        assertNull(calc.get().getValues());
+        ColumnarStringDomainCalculatorTest.testUpdateWithDataInternal(createCalculator(1));
     }
 
     @Test
     public void testUpdateVoid() {
-        final ColumnarNominalDomainCalculator<StringReadData> calc = createCalculator(60);
-        calc.update(new DataColumnDomainCreator().createDomain());
-        assertEquals(Collections.emptySet(), calc.get().getValues());
+        ColumnarStringDomainCalculatorTest.testUpdateVoidInternal(createCalculator(60));
     }
 
     @Test
     public void testUpdate() {
-        final ColumnarNominalDomainCalculator<StringReadData> calc = createCalculator(1);
-        final DataColumnDomainCreator creator = new DataColumnDomainCreator();
-
-        creator.setValues(Stream.of(MISSING_CELL).collect(Collectors.toSet()));
-        calc.update(creator.createDomain());
-        assertEquals(Collections.emptySet(), calc.get().getValues());
-
-        final Set<StringCell> set1 = Stream.of(S1).collect(Collectors.toSet());
-        creator.setValues(set1);
-        calc.update(creator.createDomain());
-        assertEquals(set1, calc.get().getValues());
-
-        creator.setValues(set1);
-        calc.update(creator.createDomain());
-        assertEquals(set1, calc.get().getValues());
-
-        creator.setValues(Stream.of(S2).collect(Collectors.toSet()));
-        calc.update(creator.createDomain());
-        assertNull(calc.get().getValues());
-
-        creator.setValues(set1);
-        calc.update(creator.createDomain());
-        assertNull(calc.get().getValues());
+        ColumnarStringDomainCalculatorTest.testUpdateInternal(createCalculator(1));
     }
 
 }

@@ -89,7 +89,7 @@ final class ColumnarIntDomainCalculator implements ColumnarDomainCalculator<IntR
     }
 
     @Override
-    public DataColumnDomain get() {
+    public DataColumnDomain createDomain() {
         return m_lower > m_upper ? new DataColumnDomainCreator(m_values).createDomain()
             : new DataColumnDomainCreator(m_values, new IntCell(m_lower), new IntCell(m_upper)).createDomain();
     }

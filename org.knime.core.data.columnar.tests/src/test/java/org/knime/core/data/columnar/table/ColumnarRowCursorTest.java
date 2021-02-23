@@ -100,8 +100,8 @@ public class ColumnarRowCursorTest extends ColumnarTest {
     }
 
     private static void compare(final ExtensionTable table, final TableFilter filter, final int... values) {
-        final Set<Integer> indices = filter.getMaterializeColumnIndices()
-            .orElse(IntStream.range(0, table.getDataTableSpec().getNumColumns()).boxed().collect(Collectors.toSet()));
+        final Set<Integer> indices = filter.getMaterializeColumnIndices().orElseGet(
+            () -> IntStream.range(0, table.getDataTableSpec().getNumColumns()).boxed().collect(Collectors.toSet()));
         try (final RowCursor cursor = table.cursor(filter)) {
             RowRead row = null;
             for (final int value : values) {

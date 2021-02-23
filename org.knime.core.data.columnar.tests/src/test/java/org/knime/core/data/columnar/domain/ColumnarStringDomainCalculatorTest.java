@@ -57,8 +57,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.Test;
+import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
 import org.knime.core.data.DataCell;
+import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataType;
 import org.knime.core.data.def.StringCell;
@@ -77,58 +79,67 @@ public class ColumnarStringDomainCalculatorTest {
 
     @Test
     public void testUpdateWithData() {
-        final ColumnarStringDomainCalculator calc = new ColumnarStringDomainCalculator(1);
+        testUpdateWithDataInternal(new ColumnarStringDomainCalculator(1));
+    }
 
+    static void
+        testUpdateWithDataInternal(final ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain> calc) {
         calc.update(TestStringDataFactory.INSTANCE.createReadData(new String[]{null}));
-        assertEquals(Collections.emptySet(), calc.get().getValues());
+        assertEquals(Collections.emptySet(), calc.createDomain().getValues());
 
         final String[] arr1 = new String[]{"1"};
         final Set<DataCell> set1 = Stream.of(S1).collect(Collectors.toSet());
         calc.update(TestStringDataFactory.INSTANCE.createReadData(arr1));
-        assertEquals(set1, calc.get().getValues());
+        assertEquals(set1, calc.createDomain().getValues());
 
         calc.update(TestStringDataFactory.INSTANCE.createReadData(arr1));
-        assertEquals(set1, calc.get().getValues());
+        assertEquals(set1, calc.createDomain().getValues());
 
         calc.update(TestStringDataFactory.INSTANCE.createReadData(new String[]{"2"}));
-        assertNull(calc.get().getValues());
+        assertNull(calc.createDomain().getValues());
 
         calc.update(TestStringDataFactory.INSTANCE.createReadData(arr1));
-        assertNull(calc.get().getValues());
+        assertNull(calc.createDomain().getValues());
     }
 
     @Test
     public void testUpdateVoid() {
-        final ColumnarStringDomainCalculator calc = new ColumnarStringDomainCalculator(60);
+        testUpdateVoidInternal(new ColumnarStringDomainCalculator(60));
+    }
+
+    static void testUpdateVoidInternal(final ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain> calc) {
         calc.update(new DataColumnDomainCreator().createDomain());
-        assertEquals(Collections.emptySet(), calc.get().getValues());
+        assertEquals(Collections.emptySet(), calc.createDomain().getValues());
     }
 
     @Test
     public void testUpdate() {
-        final ColumnarStringDomainCalculator calc = new ColumnarStringDomainCalculator(1);
+        testUpdateInternal(new ColumnarStringDomainCalculator(1));
+    }
+
+    static void testUpdateInternal(final ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain> calc) {
         final DataColumnDomainCreator creator = new DataColumnDomainCreator();
 
         creator.setValues(Stream.of(MISSING_CELL).collect(Collectors.toSet()));
         calc.update(creator.createDomain());
-        assertEquals(Collections.emptySet(), calc.get().getValues());
+        assertEquals(Collections.emptySet(), calc.createDomain().getValues());
 
         final Set<StringCell> set1 = Stream.of(S1).collect(Collectors.toSet());
         creator.setValues(set1);
         calc.update(creator.createDomain());
-        assertEquals(set1, calc.get().getValues());
+        assertEquals(set1, calc.createDomain().getValues());
 
         creator.setValues(set1);
         calc.update(creator.createDomain());
-        assertEquals(set1, calc.get().getValues());
+        assertEquals(set1, calc.createDomain().getValues());
 
         creator.setValues(Stream.of(S2).collect(Collectors.toSet()));
         calc.update(creator.createDomain());
-        assertNull(calc.get().getValues());
+        assertNull(calc.createDomain().getValues());
 
         creator.setValues(set1);
         calc.update(creator.createDomain());
-        assertNull(calc.get().getValues());
+        assertNull(calc.createDomain().getValues());
     }
 
 }

@@ -48,20 +48,8 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.junit.Test;
 import org.knime.core.columnar.data.IntData.IntReadData;
-import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
-import org.knime.core.data.DataCell;
-import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.DataColumnDomainCreator;
-import org.knime.core.data.DataType;
 import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.def.IntCell;
 
@@ -71,14 +59,6 @@ import org.knime.core.data.def.IntCell;
 @SuppressWarnings("javadoc")
 public class ColumnarBoundedDomainCalculatorTest {
 
-    private static final DataCell MISSING_CELL = DataType.getMissingCell();
-
-    private static final IntCell I0 = new IntCell(0);
-
-    private static final IntCell I1 = new IntCell(1);
-
-    private static final IntCell I2 = new IntCell(2);
-
     private static ColumnarBoundedDomainCalculator<IntReadData> createCalculator() {
         return new ColumnarBoundedDomainCalculator<>((data, index) -> () -> new IntCell(data.getInt(index.getIndex())),
             new DataValueComparatorDelegator<>(IntCell.TYPE.getComparator()));
@@ -86,86 +66,32 @@ public class ColumnarBoundedDomainCalculatorTest {
 
     @Test
     public void testUpdateWithData() {
-        final ColumnarBoundedDomainCalculator<IntReadData> calc = createCalculator();
-        calc.update(TestIntDataFactory.INSTANCE.createReadData(new Integer[]{null, 1, 0, 2}));
-        final DataColumnDomain domain = calc.get();
-        assertEquals(I0, domain.getLowerBound());
-        assertEquals(I2, domain.getUpperBound());
-        assertNull(domain.getValues());
+        ColumnarIntDomainCalculatorTest.testUpdateWithDataInternal(createCalculator());
     }
 
     @Test
     public void testUpdateVoid() {
-        final ColumnarBoundedDomainCalculator<IntReadData> calc = createCalculator();
-        calc.update(new DataColumnDomainCreator().createDomain());
-        final DataColumnDomain domain = calc.get();
-        assertNull(domain.getLowerBound());
-        assertNull(domain.getUpperBound());
-        assertNull(domain.getValues());
+        ColumnarIntDomainCalculatorTest.testUpdateVoidInternal(createCalculator());
     }
 
     @Test
     public void testUpdateValues() {
-        final ColumnarBoundedDomainCalculator<IntReadData> calc = createCalculator();
-        final DataColumnDomainCreator creator = new DataColumnDomainCreator();
-        final Set<IntCell> set = Stream.of(I1).collect(Collectors.toSet());
-        creator.setValues(set);
-        calc.update(creator.createDomain());
-        final DataColumnDomain domain = calc.get();
-        assertNull(domain.getLowerBound());
-        assertNull(domain.getUpperBound());
-        assertEquals(set, domain.getValues());
+        ColumnarIntDomainCalculatorTest.testUpdateValuesInternal(createCalculator());
     }
 
     @Test
     public void testUpdateLowerBoundMissing() {
-        final ColumnarBoundedDomainCalculator<IntReadData> calc = createCalculator();
-        final DataColumnDomainCreator creator = new DataColumnDomainCreator();
-        creator.setLowerBound(MISSING_CELL);
-        creator.setUpperBound(I0);
-        calc.update(creator.createDomain());
-        final DataColumnDomain domain = calc.get();
-        assertNull(domain.getLowerBound());
-        assertNull(domain.getUpperBound());
-        assertNull(domain.getValues());
+        ColumnarIntDomainCalculatorTest.testUpdateLowerBoundMissingInternal(createCalculator());
     }
 
     @Test
     public void testUpdateUpperBoundMissing() {
-        final ColumnarBoundedDomainCalculator<IntReadData> calc = createCalculator();
-        final DataColumnDomainCreator creator = new DataColumnDomainCreator();
-        creator.setLowerBound(I0);
-        creator.setUpperBound(MISSING_CELL);
-        calc.update(creator.createDomain());
-        final DataColumnDomain domain = calc.get();
-        assertNull(domain.getLowerBound());
-        assertNull(domain.getUpperBound());
-        assertNull(domain.getValues());
+        ColumnarIntDomainCalculatorTest.testUpdateUpperBoundMissingInternal(createCalculator());
     }
 
     @Test
     public void testUpdateAllThrice() {
-        final ColumnarBoundedDomainCalculator<IntReadData> calc = createCalculator();
-        final DataColumnDomainCreator creator = new DataColumnDomainCreator();
-
-        creator.setLowerBound(I1);
-        creator.setUpperBound(I1);
-        calc.update(creator.createDomain());
-
-        creator.setLowerBound(I0);
-        creator.setUpperBound(I2);
-        creator.setValues(Stream.of(I0, I2).collect(Collectors.toSet()));
-        calc.update(creator.createDomain());
-
-        creator.setLowerBound(I1);
-        creator.setUpperBound(I1);
-        creator.setValues(Stream.of(I1, MISSING_CELL).collect(Collectors.toSet()));
-        calc.update(creator.createDomain());
-
-        final DataColumnDomain domain = calc.get();
-        assertEquals(I0, domain.getLowerBound());
-        assertEquals(I2, domain.getUpperBound());
-        assertEquals(Stream.of(I0, I1, I2).collect(Collectors.toSet()), domain.getValues());
+        ColumnarIntDomainCalculatorTest.testUpdateAllThriceInternal(createCalculator());
     }
 
 }

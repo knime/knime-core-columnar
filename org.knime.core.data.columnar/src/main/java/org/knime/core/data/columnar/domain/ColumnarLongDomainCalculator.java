@@ -89,7 +89,7 @@ final class ColumnarLongDomainCalculator implements ColumnarDomainCalculator<Lon
     }
 
     @Override
-    public DataColumnDomain get() {
+    public DataColumnDomain createDomain() {
         return m_lower > m_upper ? new DataColumnDomainCreator(m_values).createDomain()
             : new DataColumnDomainCreator(m_values, new LongCell(m_lower), new LongCell(m_upper)).createDomain();
     }

@@ -53,6 +53,7 @@ import static org.knime.core.data.def.BooleanCell.FALSE;
 import static org.knime.core.data.def.BooleanCell.TRUE;
 
 import java.util.Collections;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -75,23 +76,24 @@ public class ColumnarBooleanDomainCalculatorTest {
         final ColumnarBooleanDomainCalculator calc = new ColumnarBooleanDomainCalculator();
 
         calc.update(TestBooleanDataFactory.INSTANCE.createReadData(new Boolean[]{null}));
-        assertEquals(Collections.emptySet(), calc.get().getValues());
+        assertEquals(Collections.emptySet(), calc.createDomain().getValues());
 
         calc.update(TestBooleanDataFactory.INSTANCE.createReadData(new Boolean[]{false, false}));
-        assertEquals(Stream.of(FALSE).collect(Collectors.toSet()), calc.get().getValues());
+        assertEquals(Stream.of(FALSE).collect(Collectors.toSet()), calc.createDomain().getValues());
 
+        final Set<DataCell> falseTrue = Stream.of(FALSE, TRUE).collect(Collectors.toSet());
         calc.update(TestBooleanDataFactory.INSTANCE.createReadData(new Boolean[]{true, false}));
-        assertEquals(Stream.of(FALSE, TRUE).collect(Collectors.toSet()), calc.get().getValues());
+        assertEquals(falseTrue, calc.createDomain().getValues());
 
         calc.update(TestBooleanDataFactory.INSTANCE.createReadData(new Boolean[]{true}));
-        assertEquals(Stream.of(FALSE, TRUE).collect(Collectors.toSet()), calc.get().getValues());
+        assertEquals(falseTrue, calc.createDomain().getValues());
     }
 
     @Test
     public void testUpdateVoid() {
         final ColumnarBooleanDomainCalculator calc = new ColumnarBooleanDomainCalculator();
         calc.update(new DataColumnDomainCreator().createDomain());
-        assertEquals(Collections.emptySet(), calc.get().getValues());
+        assertEquals(Collections.emptySet(), calc.createDomain().getValues());
     }
 
     @Test
@@ -101,19 +103,20 @@ public class ColumnarBooleanDomainCalculatorTest {
 
         creator.setValues(Stream.of(MISSING_CELL).collect(Collectors.toSet()));
         calc.update(creator.createDomain());
-        assertEquals(Collections.emptySet(), calc.get().getValues());
+        assertEquals(Collections.emptySet(), calc.createDomain().getValues());
 
         creator.setValues(Stream.of(FALSE, FALSE).collect(Collectors.toSet()));
         calc.update(creator.createDomain());
-        assertEquals(Stream.of(FALSE).collect(Collectors.toSet()), calc.get().getValues());
+        assertEquals(Stream.of(FALSE).collect(Collectors.toSet()), calc.createDomain().getValues());
 
+        final Set<DataCell> falseTrue = Stream.of(FALSE, TRUE).collect(Collectors.toSet());
         creator.setValues(Stream.of(TRUE, FALSE).collect(Collectors.toSet()));
         calc.update(creator.createDomain());
-        assertEquals(Stream.of(FALSE, TRUE).collect(Collectors.toSet()), calc.get().getValues());
+        assertEquals(falseTrue, calc.createDomain().getValues());
 
         creator.setValues(Stream.of(TRUE).collect(Collectors.toSet()));
         calc.update(creator.createDomain());
-        assertEquals(Stream.of(FALSE, TRUE).collect(Collectors.toSet()), calc.get().getValues());
+        assertEquals(falseTrue, calc.createDomain().getValues());
     }
 
 }

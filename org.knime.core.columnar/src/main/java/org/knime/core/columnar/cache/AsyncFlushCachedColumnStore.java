@@ -64,6 +64,7 @@ import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.DelegatingColumnReadStore.DelegatingBatchReader;
 import org.knime.core.columnar.store.DelegatingColumnStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -232,8 +233,8 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
             @SuppressWarnings("resource")
             AsyncFlushCachedColumnStore store = (AsyncFlushCachedColumnStore)k.getStore();
             store.enqueueRunnable(c::release);
-            LOGGER.error(String.format("%s " + "Unflushed data evicted from cache. "
-                + "Data will be retained and memory will be allocated until flushed.", ERROR_ON_INTERRUPT));
+            LOGGER.error("{} Unflushed data evicted from cache. "
+                + "Data will be retained and memory will be allocated until flushed.", ERROR_ON_INTERRUPT);
         }
     };
 

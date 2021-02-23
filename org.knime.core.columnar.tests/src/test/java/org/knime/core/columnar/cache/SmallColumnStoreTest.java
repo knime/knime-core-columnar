@@ -269,38 +269,13 @@ public class SmallColumnStoreTest extends ColumnarTest {
                 final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
             writeTable(store1, table1);
-            checkCached(table1);
-            checkUnflushed(table1, delegate1);
-
             writeTable(store2, table2);
-            checkCached(table2);
-            checkUnflushed(table2, delegate2);
-            checkUncached(table1);
-            checkFlushed(table1, delegate1);
 
             try {
                 store1.save(new File(""));
             } catch (UnsupportedOperationException e) { // NOSONAR
             }
-            checkUncached(table1);
-            checkFlushed(table1, delegate1);
-
-            try {
-                store2.save(new File(""));
-            } catch (UnsupportedOperationException e) { // NOSONAR
-            }
-            checkCached(table2);
-            checkFlushed(table2, delegate2);
-
-            try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) { // NOSONAR
-            }
-            checkUncached(table1);
-            checkFlushed(table1, delegate1);
-
-            try (final TestDataTable reassembledTable2 = readAndCompareTable(store2, table2)) { // NOSONAR
-            }
-            checkCached(table2);
-            checkFlushed(table2, delegate2);
+            saveRead(delegate1, store1, table1, delegate2, store2, table2);
         }
     }
 
@@ -329,26 +304,32 @@ public class SmallColumnStoreTest extends ColumnarTest {
             writeTable(store2, table2);
             checkCached(table2);
             checkUnflushed(table2, delegate2);
-            checkUncached(table1);
-            checkFlushed(table1, delegate1);
-
-            try {
-                store2.save(new File(""));
-            } catch (UnsupportedOperationException e) { // NOSONAR
-            }
-            checkCached(table2);
-            checkFlushed(table2, delegate2);
-
-            try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) { // NOSONAR
-            }
-            checkUncached(table1);
-            checkFlushed(table1, delegate1);
-
-            try (final TestDataTable reassembledTable2 = readAndCompareTable(store2, table2)) { // NOSONAR
-            }
-            checkCached(table2);
-            checkFlushed(table2, delegate2);
+            saveRead(delegate1, store1, table1, delegate2, store2, table2);
         }
+    }
+
+    private static void saveRead(final TestColumnStore delegate1, final SmallColumnStore store1,
+        final TestDataTable table1, final TestColumnStore delegate2, final SmallColumnStore store2,
+        final TestDataTable table2) throws IOException {
+        checkUncached(table1);
+        checkFlushed(table1, delegate1);
+
+        try {
+            store2.save(new File(""));
+        } catch (UnsupportedOperationException e) { // NOSONAR
+        }
+        checkCached(table2);
+        checkFlushed(table2, delegate2);
+
+        try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) { // NOSONAR
+        }
+        checkUncached(table1);
+        checkFlushed(table1, delegate1);
+
+        try (final TestDataTable reassembledTable2 = readAndCompareTable(store2, table2)) { // NOSONAR
+        }
+        checkCached(table2);
+        checkFlushed(table2, delegate2);
     }
 
     @Test

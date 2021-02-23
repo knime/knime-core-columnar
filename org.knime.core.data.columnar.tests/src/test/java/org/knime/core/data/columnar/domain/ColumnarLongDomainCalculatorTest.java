@@ -81,7 +81,7 @@ public class ColumnarLongDomainCalculatorTest {
     public void testUpdateWithData() {
         final ColumnarLongDomainCalculator calc = new ColumnarLongDomainCalculator();
         calc.update(TestLongDataFactory.INSTANCE.createReadData(new Long[]{null, 1L, 0L, 2L}));
-        final DataColumnDomain domain = calc.get();
+        final DataColumnDomain domain = calc.createDomain();
         assertEquals(L0, domain.getLowerBound());
         assertEquals(L2, domain.getUpperBound());
         assertNull(domain.getValues());
@@ -91,7 +91,7 @@ public class ColumnarLongDomainCalculatorTest {
     public void testUpdateVoid() {
         final ColumnarLongDomainCalculator calc = new ColumnarLongDomainCalculator();
         calc.update(new DataColumnDomainCreator().createDomain());
-        final DataColumnDomain domain = calc.get();
+        final DataColumnDomain domain = calc.createDomain();
         assertNull(domain.getLowerBound());
         assertNull(domain.getUpperBound());
         assertNull(domain.getValues());
@@ -104,7 +104,7 @@ public class ColumnarLongDomainCalculatorTest {
         final Set<LongCell> set = Stream.of(L1).collect(Collectors.toSet());
         creator.setValues(set);
         calc.update(creator.createDomain());
-        final DataColumnDomain domain = calc.get();
+        final DataColumnDomain domain = calc.createDomain();
         assertNull(domain.getLowerBound());
         assertNull(domain.getUpperBound());
         assertEquals(set, domain.getValues());
@@ -117,7 +117,7 @@ public class ColumnarLongDomainCalculatorTest {
         creator.setLowerBound(MISSING_CELL);
         creator.setUpperBound(L0);
         calc.update(creator.createDomain());
-        final DataColumnDomain domain = calc.get();
+        final DataColumnDomain domain = calc.createDomain();
         assertNull(domain.getLowerBound());
         assertNull(domain.getUpperBound());
         assertNull(domain.getValues());
@@ -130,7 +130,7 @@ public class ColumnarLongDomainCalculatorTest {
         creator.setLowerBound(L0);
         creator.setUpperBound(MISSING_CELL);
         calc.update(creator.createDomain());
-        final DataColumnDomain domain = calc.get();
+        final DataColumnDomain domain = calc.createDomain();
         assertNull(domain.getLowerBound());
         assertNull(domain.getUpperBound());
         assertNull(domain.getValues());
@@ -155,7 +155,7 @@ public class ColumnarLongDomainCalculatorTest {
         creator.setValues(Stream.of(L1, MISSING_CELL).collect(Collectors.toSet()));
         calc.update(creator.createDomain());
 
-        final DataColumnDomain domain = calc.get();
+        final DataColumnDomain domain = calc.createDomain();
         assertEquals(L0, domain.getLowerBound());
         assertEquals(L2, domain.getUpperBound());
         assertEquals(Stream.of(L0, L1, L2).collect(Collectors.toSet()), domain.getValues());

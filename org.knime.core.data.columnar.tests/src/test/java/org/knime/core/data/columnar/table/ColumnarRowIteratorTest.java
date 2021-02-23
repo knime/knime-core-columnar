@@ -114,8 +114,8 @@ public class ColumnarRowIteratorTest extends ColumnarTest {
 
     private static void compare(final ExtensionTable table, final TableFilter filter, final int... values) { // NOSONAR
         int nCols = table.getDataTableSpec().getNumColumns();
-        final Set<Integer> indices = filter.getMaterializeColumnIndices()
-            .orElse(IntStream.range(0, table.getDataTableSpec().getNumColumns()).boxed().collect(Collectors.toSet()));
+        final Set<Integer> indices = filter.getMaterializeColumnIndices().orElseGet(
+            () -> IntStream.range(0, table.getDataTableSpec().getNumColumns()).boxed().collect(Collectors.toSet()));
         try (final CloseableRowIterator iterator = table.iteratorWithFilter(filter)) {
             DataRow row = null;
             for (final int value : values) {

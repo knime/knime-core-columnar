@@ -83,7 +83,7 @@ final class ColumnarBooleanDomainCalculator implements ColumnarDomainCalculator<
     }
 
     @Override
-    public DataColumnDomain get() {
+    public DataColumnDomain createDomain() {
         switch (m_values.size()) {
             case 1:
                 final DataCell cell = m_values.iterator().next();

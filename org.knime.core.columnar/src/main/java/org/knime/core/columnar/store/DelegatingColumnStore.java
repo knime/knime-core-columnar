@@ -56,6 +56,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.DelegatingColumnReadStore.DelegatingBatchReader;
 
 /**
  * A {@link ColumnStore} that delegates operations to another store. In addition, it
@@ -237,147 +238,15 @@ public abstract class DelegatingColumnStore implements ColumnStore {
 
     }
 
-    /**
-     * A {@link BatchReader} that delegates operations to another reader. In addition, it
-     * <ul>
-     * <li>makes sure that operations adhere to their contracts (e.g., that readRetained is not called after the store
-     * has been closed and that close is idempotent),</li>
-     * <li>initializes its delegate reader lazily, and</li>
-     * <li>provides a method for determining whether the reader has been closed already.</li>
-     * </ul>
-     */
-    public abstract static class DelegatingBatchReader implements BatchReader {
-
-        private final DelegatingColumnStore m_store;
-
-        private final ColumnSelection m_selection;
-
-        private final AtomicBoolean m_storeClosed;
-
-        private BatchReader m_delegate;
-
-        private boolean m_readerClosed;
-
-        /**
-         * @param store a delegating store from which to obtain the delegate reader
-         * @param selection see {@link ColumnReadStore#createReader(ColumnSelection)}
-         */
-        protected DelegatingBatchReader(final DelegatingColumnStore store, final ColumnSelection selection) {
-            m_store = store;
-            m_selection = selection;
-            m_storeClosed = store.m_storeClosed;
-        }
-
-        @Override
-        public final ReadBatch readRetained(final int index) throws IOException {
-            if (m_readerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
-            }
-            if (m_storeClosed.get()) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-            if (index < 0) {
-                throw new IndexOutOfBoundsException(String.format("Batch index %d smaller than 0.", index));
-            }
-            if (index >= numBatches()) {
-                throw new IndexOutOfBoundsException(
-                    String.format("Batch index %d greater or equal to the reader's largest batch index (%d).", index,
-                        numBatches() - 1));
-            }
-
-            return readRetainedInternal(index);
-        }
-
-        /**
-         * Calls {@link BatchReader#readRetained(int) readRetained} on the delegate reader.
-         *
-         * @param index see {@link BatchReader#readRetained(int)}
-         * @throws IOException if an I/O error occurs
-         * @return see {@link BatchReader#readRetained(int)}
-         */
-        @SuppressWarnings("resource")
-        protected ReadBatch readRetainedInternal(final int index) throws IOException {
-            return initAndGetDelegate().readRetained(index);
-        }
-
-        @SuppressWarnings("resource")
-        @Override
-        public int numBatches() throws IOException {
-            return initAndGetDelegate().numBatches();
-        }
-
-        @SuppressWarnings("resource")
-        @Override
-        public int maxLength() throws IOException {
-            return initAndGetDelegate().maxLength();
-        }
-
-        @Override
-        public final void close() throws IOException {
-            if (!m_readerClosed) {
-                m_readerClosed = true;
-                closeOnce();
-            }
-        }
-
-        /**
-         * Calls {@link Closeable#close() close} on the delegate reader. When overriding this method, make sure to close
-         * the delegate reader, if it has been initialized.
-         *
-         * @throws IOException if an I/O error occurs
-         */
-        protected void closeOnce() throws IOException {
-            if (m_delegate != null) {
-                m_delegate.close();
-            }
-        }
-
-        /**
-         * @return the column selection for this reader
-         */
-        protected final ColumnSelection getSelection() {
-            return m_selection;
-        }
-
-        /**
-         * Initializes the delegate reader, if it has not been initialized before, and returns it.
-         *
-         * @return the delegate reader
-         */
-        protected final BatchReader initAndGetDelegate() {
-            if (m_delegate == null) {
-                m_delegate = m_store.m_delegate.createReader(m_selection);
-            }
-            return m_delegate;
-        }
-
-        /**
-         * @return the delegate reader, if it has been initialized, otherwise null
-         */
-        protected final BatchReader getDelegate() {
-            return m_delegate;
-        }
-
-        /**
-         * @return true if this writer has been closed, otherwise false
-         */
-        protected final boolean isClosed() {
-            return m_readerClosed;
-        }
-
-    }
-
     private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
     private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
 
     private static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
 
-    private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
+    final ColumnStore m_delegate;
 
-    private final ColumnStore m_delegate;
-
-    private final AtomicBoolean m_storeClosed = new AtomicBoolean();
+    final AtomicBoolean m_storeClosed = new AtomicBoolean();
 
     private final AtomicBoolean m_writerClosed = new AtomicBoolean();
 

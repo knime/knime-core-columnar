@@ -48,7 +48,6 @@ package org.knime.core.columnar.testing;
 import static org.junit.Assert.assertEquals;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -82,7 +81,7 @@ public final class TestColumnStore implements ColumnStore {
 
     private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
-    final class TestColumnDataFactory implements BatchFactory {
+    final class TestBatchFactory implements BatchFactory {
 
         @Override
         public WriteBatch create(final int capacity) {
@@ -105,12 +104,12 @@ public final class TestColumnStore implements ColumnStore {
 
     }
 
-    final class TestColumnDataWriter implements BatchWriter {
+    final class TestBatchWriter implements BatchWriter {
 
         private int m_maxDataLength;
 
         @Override
-        public void write(final ReadBatch batch) throws IOException {
+        public void write(final ReadBatch batch) {
             if (m_writerClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
             }
@@ -136,12 +135,12 @@ public final class TestColumnStore implements ColumnStore {
         @Override
         public void close() {
             m_writerClosed = true;
-            ColumnarTest.OPEN_CLOSEABLES.remove(TestColumnDataWriter.this);
+            ColumnarTest.OPEN_CLOSEABLES.remove(TestBatchWriter.this);
         }
 
     }
 
-    final class TestColumnDataReader implements BatchReader {
+    final class TestBatchReader implements BatchReader {
 
         private final ColumnSelection m_selection;
 
@@ -149,7 +148,7 @@ public final class TestColumnStore implements ColumnStore {
 
         private boolean m_readerClosed;
 
-        TestColumnDataReader(final ColumnSelection selection, final int maxCapacity) {
+        TestBatchReader(final ColumnSelection selection, final int maxCapacity) {
             m_selection = selection;
             m_maxDataCapacity = maxCapacity;
         }
@@ -185,7 +184,7 @@ public final class TestColumnStore implements ColumnStore {
         @Override
         public void close() {
             m_readerClosed = true;
-            ColumnarTest.OPEN_CLOSEABLES.remove(TestColumnDataReader.this);
+            ColumnarTest.OPEN_CLOSEABLES.remove(TestBatchReader.this);
         }
 
     }
@@ -194,9 +193,9 @@ public final class TestColumnStore implements ColumnStore {
 
     private final TestDataFactory[] m_factories;
 
-    private final BatchFactory m_factory = new TestColumnDataFactory();
+    private final BatchFactory m_factory = new TestBatchFactory();
 
-    private final TestColumnDataWriter m_writer = new TestColumnDataWriter();
+    private final TestBatchWriter m_writer = new TestBatchWriter();
 
     private final List<Object[]> m_batches = new ArrayList<>();
 
@@ -285,7 +284,7 @@ public final class TestColumnStore implements ColumnStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        final TestColumnDataReader reader = new TestColumnDataReader(selection, m_writer.m_maxDataLength);
+        final TestBatchReader reader = new TestBatchReader(selection, m_writer.m_maxDataLength);
         ColumnarTest.OPEN_CLOSEABLES.add(reader);
         return reader;
     }

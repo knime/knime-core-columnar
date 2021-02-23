@@ -102,7 +102,7 @@ final class ColumnarMetadataCalculator<R extends NullableReadData>
     }
 
     @Override
-    public DataColumnMetaData[] get() {
+    public DataColumnMetaData[] createDomain() {
         return Arrays.stream(m_creators).map(DataColumnMetaDataCreator<DataColumnMetaData>::create)
             .toArray(DataColumnMetaData[]::new);
     }

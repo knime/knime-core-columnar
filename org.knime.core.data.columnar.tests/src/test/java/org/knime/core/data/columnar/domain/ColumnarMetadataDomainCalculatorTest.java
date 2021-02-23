@@ -122,7 +122,7 @@ public class ColumnarMetadataDomainCalculatorTest {
     public void testUpdateWithData() {
         ColumnarMetadataCalculator<IntReadData> calc = createCalculator();
         calc.update(TestIntDataFactory.INSTANCE.createReadData(new Integer[]{null, 1, 0, 2}));
-        final TestDataColumnMetaData data = (TestDataColumnMetaData)calc.get()[0];
+        final TestDataColumnMetaData data = (TestDataColumnMetaData)calc.createDomain()[0];
         assertEquals(Stream.of(0, 1, 2).collect(Collectors.toSet()), data.m_values);
     }
 
@@ -132,7 +132,7 @@ public class ColumnarMetadataDomainCalculatorTest {
         final Set<Integer> set = Stream.of(0, 1, 2).collect(Collectors.toSet());
         final DataColumnMetaData[] domain = new DataColumnMetaData[]{new TestDataColumnMetaData(set)};
         calc.update(domain);
-        final TestDataColumnMetaData data = (TestDataColumnMetaData)calc.get()[0];
+        final TestDataColumnMetaData data = (TestDataColumnMetaData)calc.createDomain()[0];
         assertNotEquals(domain[0], data);
         assertEquals(set, data.m_values);
     }

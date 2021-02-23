@@ -170,7 +170,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
         if (m_domainCalculators != null) {
             final ColumnarDomainCalculator<?, DataColumnDomain> calculator = m_domainCalculators.get(colIndex);
             if (calculator != null) {
-                return calculator.get();
+                return calculator.createDomain();
             }
         }
         return null;
@@ -186,7 +186,7 @@ public final class DomainColumnStore extends DelegatingColumnStore {
         if (m_metadataCalculators != null) {
             final ColumnarDomainCalculator<?, DataColumnMetaData[]> calculator = m_metadataCalculators.get(colIndex);
             if (calculator != null) {
-                return calculator.get();
+                return calculator.createDomain();
             }
         }
         return new DataColumnMetaData[0];

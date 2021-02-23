@@ -87,13 +87,12 @@ final class ColumnarRowIterator extends CloseableRowIterator {
 
                 @Override
                 public DataCell next() {
-                    try {
-                        final DataCell cell = getCell(m_idx);
-                        m_idx++;
-                        return cell;
-                    } catch (IndexOutOfBoundsException e) { // NOSONAR
+                    if (!hasNext()) {
                         throw new NoSuchElementException();
                     }
+                    final DataCell cell = getCell(m_idx);
+                    m_idx++;
+                    return cell;
                 }
 
                 @Override

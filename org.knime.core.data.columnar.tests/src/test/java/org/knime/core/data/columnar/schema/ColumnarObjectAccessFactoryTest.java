@@ -106,147 +106,147 @@ public class ColumnarObjectAccessFactoryTest {
         private Integer m_value;
 
         @Override
-        public void write(final int b) throws IOException {
+        public void write(final int b) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void write(final byte[] b) throws IOException {
+        public void write(final byte[] b) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void write(final byte[] b, final int off, final int len) throws IOException {
+        public void write(final byte[] b, final int off, final int len) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeBoolean(final boolean v) throws IOException {
+        public void writeBoolean(final boolean v) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeByte(final int v) throws IOException {
+        public void writeByte(final int v) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeShort(final int v) throws IOException {
+        public void writeShort(final int v) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeChar(final int v) throws IOException {
+        public void writeChar(final int v) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeInt(final int v) throws IOException {
+        public void writeInt(final int v) {
             m_value = Integer.valueOf(v);
         }
 
         @Override
-        public void writeLong(final long v) throws IOException {
+        public void writeLong(final long v) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeFloat(final float v) throws IOException {
+        public void writeFloat(final float v) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeDouble(final double v) throws IOException {
+        public void writeDouble(final double v) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeBytes(final String s) throws IOException {
+        public void writeBytes(final String s) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeChars(final String s) throws IOException {
+        public void writeChars(final String s) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void writeUTF(final String s) throws IOException {
+        public void writeUTF(final String s) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void readFully(final byte[] b) throws IOException {
+        public void readFully(final byte[] b) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public void readFully(final byte[] b, final int off, final int len) throws IOException {
+        public void readFully(final byte[] b, final int off, final int len) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public int skipBytes(final int n) throws IOException {
+        public int skipBytes(final int n) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public boolean readBoolean() throws IOException {
+        public boolean readBoolean() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public byte readByte() throws IOException {
+        public byte readByte() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public int readUnsignedByte() throws IOException {
+        public int readUnsignedByte() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public short readShort() throws IOException {
+        public short readShort() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public int readUnsignedShort() throws IOException {
+        public int readUnsignedShort() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public char readChar() throws IOException {
+        public char readChar() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public int readInt() throws IOException {
+        public int readInt() {
             return m_value.intValue();
         }
 
         @Override
-        public long readLong() throws IOException {
+        public long readLong() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public float readFloat() throws IOException {
+        public float readFloat() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public double readDouble() throws IOException {
+        public double readDouble() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public String readLine() throws IOException {
+        public String readLine() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public String readUTF() throws IOException {
+        public String readUTF() {
             throw new UnsupportedOperationException();
         }
 

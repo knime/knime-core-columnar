@@ -77,6 +77,6 @@ interface ColumnarDomainCalculator<D extends NullableReadData, R> {
     /**
      * @return the result of the calculation.
      */
-    R get();
+    R createDomain();
 
 }

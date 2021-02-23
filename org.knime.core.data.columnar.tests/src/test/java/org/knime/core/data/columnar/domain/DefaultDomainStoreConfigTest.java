@@ -82,12 +82,10 @@ import org.knime.core.data.v2.ValueSchema;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-@SuppressWarnings("javadoc")
+@SuppressWarnings({"serial", "javadoc"})
 public class DefaultDomainStoreConfigTest {
 
-    private static class BoundedCell extends DataCell implements BoundedValue {
-        private static final long serialVersionUID = 1L;
-
+    private abstract static class DefaultDomainStoreConfigTestCell extends DataCell {
         @Override
         public String toString() {
             throw new UnsupportedOperationException();
@@ -104,61 +102,17 @@ public class DefaultDomainStoreConfigTest {
         }
     }
 
-    private static class NominalCell extends DataCell implements NominalValue {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public String toString() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        protected boolean equalsDataCell(final DataCell dc) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int hashCode() { // NOSONAR
-            throw new UnsupportedOperationException();
-        }
+    private static class BoundedCell extends DefaultDomainStoreConfigTestCell implements BoundedValue {
     }
 
-    private static class BoundedNominalCell extends DataCell implements BoundedValue, NominalValue {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public String toString() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        protected boolean equalsDataCell(final DataCell dc) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int hashCode() { // NOSONAR
-            throw new UnsupportedOperationException();
-        }
+    private static class NominalCell extends DefaultDomainStoreConfigTestCell implements NominalValue {
     }
 
-    private static class NoDomainCell extends DataCell {
-        private static final long serialVersionUID = 1L;
+    private static class BoundedNominalCell extends DefaultDomainStoreConfigTestCell
+        implements BoundedValue, NominalValue {
+    }
 
-        @Override
-        public String toString() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        protected boolean equalsDataCell(final DataCell dc) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int hashCode() { // NOSONAR
-            throw new UnsupportedOperationException();
-        }
+    private static class NoDomainCell extends DefaultDomainStoreConfigTestCell {
     }
 
     private static ColumnarValueSchema createSchema(final DataColumnSpec... specs) {
@@ -218,7 +172,7 @@ public class DefaultDomainStoreConfigTest {
         specCreator.setDomain(domain);
         final DataColumnSpec spec = specCreator.createSpec();
         final DefaultDomainStoreConfig config = new DefaultDomainStoreConfig(createSchema(spec), 0, true);
-        assertEquals(values, config.createDomainCalculators().get(1).get().getValues());
+        assertEquals(values, config.createDomainCalculators().get(1).createDomain().getValues());
     }
 
 }

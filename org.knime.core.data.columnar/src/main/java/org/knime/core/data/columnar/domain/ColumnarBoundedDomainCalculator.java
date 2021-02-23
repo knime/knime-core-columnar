@@ -120,7 +120,7 @@ final class ColumnarBoundedDomainCalculator<R extends NullableReadData>
     }
 
     @Override
-    public DataColumnDomain get() {
+    public DataColumnDomain createDomain() {
         return m_lower == null ? new DataColumnDomainCreator(m_values).createDomain()
             : new DataColumnDomainCreator(m_values, m_lower, m_upper).createDomain();
     }

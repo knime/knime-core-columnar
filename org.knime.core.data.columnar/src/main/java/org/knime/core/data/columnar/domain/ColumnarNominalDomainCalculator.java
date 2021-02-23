@@ -106,7 +106,7 @@ final class ColumnarNominalDomainCalculator<R extends NullableReadData>
     }
 
     @Override
-    public DataColumnDomain get() {
+    public DataColumnDomain createDomain() {
         return m_values == null ? new DataColumnDomainCreator().createDomain()
             : new DataColumnDomainCreator(m_values).createDomain();
     }

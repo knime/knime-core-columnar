@@ -393,16 +393,11 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
             writeTable(store1, table1);
             store1.waitForAndHandleFuture(); // wait for flush of table1
-            checkCached(table1);
-            checkFlushed(table1, delegate1);
-            checkCacheSize(cache, 1);
 
             final CountDownLatch flushLatch2 = delayFlush(store2);
             final CountDownLatch flushLatch3 = delayFlush(store3);
 
             writeTable(store2, table2); // cache & queue flush of table2
-            checkUnflushed(table2, delegate2);
-            checkCacheSize(cache, 2);
             try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) {
                 // read table1 to make table2 next in line for eviction
             }

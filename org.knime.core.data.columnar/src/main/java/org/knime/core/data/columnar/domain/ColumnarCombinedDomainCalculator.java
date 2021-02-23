@@ -92,9 +92,9 @@ final class ColumnarCombinedDomainCalculator<R extends NullableReadData>
     }
 
     @Override
-    public DataColumnDomain get() {
-        final DataColumnDomain boundedDomain = m_bounded.get();
-        return new DataColumnDomainCreator(m_nominal.get().getValues(), boundedDomain.getLowerBound(),
+    public DataColumnDomain createDomain() {
+        final DataColumnDomain boundedDomain = m_bounded.createDomain();
+        return new DataColumnDomainCreator(m_nominal.createDomain().getValues(), boundedDomain.getLowerBound(),
             boundedDomain.getUpperBound()).createDomain();
     }
 

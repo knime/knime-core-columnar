@@ -90,7 +90,7 @@ final class ColumnarDoubleDomainCalculator implements ColumnarDomainCalculator<D
     }
 
     @Override
-    public DataColumnDomain get() {
+    public DataColumnDomain createDomain() {
         return m_lower > m_upper ? new DataColumnDomainCreator(m_values).createDomain()
             : new DataColumnDomainCreator(m_values, new DoubleCell(m_lower), new DoubleCell(m_upper)).createDomain();
     }

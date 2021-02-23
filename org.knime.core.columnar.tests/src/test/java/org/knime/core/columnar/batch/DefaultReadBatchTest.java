@@ -89,14 +89,14 @@ public class DefaultReadBatchTest {
 
     @Test(expected = NullPointerException.class)
     public void testElementNullCheckOnCreate() {
-        final NullableReadData[] data = createData();
+        final TestData[] data = createData();
         data[0] = null;
         createBatch(data);
     }
 
     @Test
     public void testGet() {
-        final NullableReadData[] data = createData();
+        final TestData[] data = createData();
         final DefaultReadBatch batch = createBatch(data);
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
             assertEquals(data[i], batch.get(i));
