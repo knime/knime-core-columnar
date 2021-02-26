@@ -125,9 +125,9 @@ public final class DuplicateCheckColumnStore extends DelegatingColumnStore {
                 m_future.get();
             } catch (ExecutionException e) {
                 if (e.getCause() instanceof DuplicateKeyException) {
-                    final DuplicateKeyException originalDKE = (DuplicateKeyException)e.getCause();
+                    final String key = ((DuplicateKeyException)e.getCause()).getKey();
                     final DuplicateKeyException newDKE =
-                        new DuplicateKeyException(originalDKE.getMessage(), originalDKE.getKey());
+                        new DuplicateKeyException(String.format("Encountered duplicate row ID \"%s\"", key), key);
                     newDKE.initCause(e);
                     throw newDKE;
                 } else {
