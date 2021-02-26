@@ -46,6 +46,7 @@
 package org.knime.core.columnar.store;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 
 import org.knime.core.columnar.batch.ReadBatch;
@@ -100,4 +101,5 @@ public interface ColumnReadStore extends Closeable {
     @Override
     void close() throws IOException;
 
+    File getFile();
 }

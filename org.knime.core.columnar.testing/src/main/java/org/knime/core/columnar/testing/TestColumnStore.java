@@ -306,4 +306,9 @@ public final class TestColumnStore implements ColumnStore {
         return m_tracker;
     }
 
+    @Override
+    public File getFile() {
+        throw new IllegalStateException("Foo");
+    }
+
 }

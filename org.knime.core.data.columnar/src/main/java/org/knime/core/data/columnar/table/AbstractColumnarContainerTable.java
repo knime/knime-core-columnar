@@ -266,4 +266,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
             : new ColumnarRowIterator(cursor(filter));
     }
 
+    @Override
+    public File getFile() {
+        return m_readStore.getFile();
+    }
 }

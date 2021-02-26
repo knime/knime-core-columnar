@@ -395,4 +395,8 @@ public abstract class DelegatingColumnStore implements ColumnStore {
         return m_storeClosed.get();
     }
 
+    @Override
+    public File getFile() {
+        return m_delegate.getFile();
+    }
 }

@@ -49,6 +49,7 @@
 package org.knime.core.columnar.store;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -277,6 +278,11 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
      */
     protected final boolean isClosed() {
         return m_storeClosed.get();
+    }
+
+    @Override
+    public File getFile() {
+        return m_delegate.getFile();
     }
 
 }
