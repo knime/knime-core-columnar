@@ -51,8 +51,10 @@ package org.knime.core.columnar;
 import java.io.Closeable;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -61,6 +63,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,13 +122,19 @@ public final class ResourceLeakDetector {
 
         private final AtomicBoolean m_closed = new AtomicBoolean();
 
-        private final String m_stackTraceAtConstructionTime =
-            VERBOSE ? stackTraceToString(Thread.currentThread().getStackTrace()) : null;
+        private final List<String> m_stackTraces;
 
         private Finalizer(final Object referent, final ResourceWithRelease... resources) {
             super(referent, m_enqueuedFinalizers);
-            m_referentName = VERBOSE ? referent.getClass().getSimpleName() : null;
             m_resources = resources;
+            if (VERBOSE) {
+                m_referentName = referent.getClass().getSimpleName();
+                m_stackTraces = new ArrayList<>();
+                addStackTrace();
+            } else {
+                m_referentName = null;
+                m_stackTraces = null;
+            }
         }
 
         /**
@@ -146,6 +155,23 @@ public final class ResourceLeakDetector {
             return m_closed.get();
         }
 
+        public void addStackTrace() {
+            if (VERBOSE) {
+                final StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+                m_stackTraces.add(IntStream.range(2, stackTrace.length).mapToObj(i -> stackTrace[i])
+                    .map(StackTraceElement::toString).collect(Collectors.joining("\n  ")));
+            }
+        }
+
+        public void releaseResources() {
+            if (!isClosed()) {
+                for (final ResourceWithRelease resource : m_resources) {
+                    resource.release();
+                }
+            }
+            close();
+        }
+
         /**
          * If this Finalizer is unclosed, close it, release the resource held by the referent object, and log some
          * output for detecting and debugging the potential resource leak.
@@ -153,11 +179,13 @@ public final class ResourceLeakDetector {
         public void releaseResourcesAndLogOutput() {
             if (!isClosed()) {
                 if (VERBOSE) {
-                    final String stackTrace = stackTraceToString(Thread.currentThread().getStackTrace());
                     LOGGER.debug("Resource leak detected: Reclaimed {} did not release its resources. Releasing now.",
                         m_referentName);
-                    LOGGER.debug("Construction time call stack: {}", m_stackTraceAtConstructionTime);
-                    LOGGER.debug("Current call stack: {}", stackTrace);
+                    addStackTrace();
+                    LOGGER.debug("Call stacks:");
+                    for (String stackTrace : m_stackTraces) {
+                        LOGGER.debug(stackTrace);
+                    }
                 }
                 for (final ResourceWithRelease resource : m_resources) {
                     resource.release();
