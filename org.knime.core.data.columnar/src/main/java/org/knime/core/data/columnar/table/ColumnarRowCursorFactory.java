@@ -51,6 +51,9 @@ import java.util.Set;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.ResourceLeakDetector;
+import org.knime.core.columnar.ResourceLeakDetector.Finalizer;
+import org.knime.core.columnar.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
@@ -61,8 +64,6 @@ import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;

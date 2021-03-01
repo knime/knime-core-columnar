@@ -53,6 +53,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.knime.core.columnar.ResourceLeakDetector;
+import org.knime.core.columnar.ResourceLeakDetector.Finalizer;
+import org.knime.core.columnar.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -61,8 +64,6 @@ import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;

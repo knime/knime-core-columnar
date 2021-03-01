@@ -61,6 +61,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.knime.core.columnar.ResourceLeakDetector;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;

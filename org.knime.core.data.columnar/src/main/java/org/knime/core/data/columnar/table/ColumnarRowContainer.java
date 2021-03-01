@@ -52,6 +52,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.knime.core.columnar.ResourceLeakDetector;
+import org.knime.core.columnar.ResourceLeakDetector.Finalizer;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
@@ -61,7 +63,6 @@ import org.knime.core.data.columnar.domain.DuplicateCheckColumnStore;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowContainer;

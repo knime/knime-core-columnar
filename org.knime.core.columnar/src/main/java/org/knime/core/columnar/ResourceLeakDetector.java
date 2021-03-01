@@ -46,7 +46,7 @@
  * History
  *   3 Nov 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.columnar;
 
 import java.io.Closeable;
 import java.lang.ref.PhantomReference;
@@ -62,18 +62,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import org.knime.core.node.NodeLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ResourceLeakDetector {
+public final class ResourceLeakDetector {
 
-    static final class ResourceWithRelease {
+    public static final class ResourceWithRelease {
 
         private final Runnable m_release;
 
-        ResourceWithRelease(final AutoCloseable closeable) {
+        public ResourceWithRelease(final AutoCloseable closeable) {
             this(closeable, c -> {
                 try {
                     c.close();
@@ -83,11 +84,11 @@ final class ResourceLeakDetector {
             });
         }
 
-        <R> ResourceWithRelease(final R resource, final Consumer<R> release) {
+        public <R> ResourceWithRelease(final R resource, final Consumer<R> release) {
             m_release = () -> release.accept(resource);
         }
 
-        void release() {
+        public void release() {
             m_release.run();
         }
 
@@ -106,7 +107,7 @@ final class ResourceLeakDetector {
      *
      * @author Marc Bux, KNIME GmbH, Berlin, Germany
      */
-    final class Finalizer extends PhantomReference<Object> implements Closeable {
+    public final class Finalizer extends PhantomReference<Object> implements Closeable {
 
         private String stackTraceToString(final StackTraceElement[] stack) {
             return Arrays.stream(stack).map(StackTraceElement::toString).collect(Collectors.joining("\n  "));
@@ -141,7 +142,7 @@ final class ResourceLeakDetector {
          *
          * @return true, if this Finalizer has already been closed; false otherwise
          */
-        boolean isClosed() {
+        public boolean isClosed() {
             return m_closed.get();
         }
 
@@ -149,15 +150,14 @@ final class ResourceLeakDetector {
          * If this Finalizer is unclosed, close it, release the resource held by the referent object, and log some
          * output for detecting and debugging the potential resource leak.
          */
-        void releaseResourcesAndLogOutput() {
+        public void releaseResourcesAndLogOutput() {
             if (!isClosed()) {
                 if (VERBOSE) {
-                    LOGGER.debugWithFormat(
-                        "Resource leak detected: Reclaimed %s did not release its resources. Releasing now.",
+                    final String stackTrace = stackTraceToString(Thread.currentThread().getStackTrace());
+                    LOGGER.debug("Resource leak detected: Reclaimed {} did not release its resources. Releasing now.",
                         m_referentName);
-                    LOGGER.debugWithFormat("Construction time call stack: %s", m_stackTraceAtConstructionTime);
-                    LOGGER.debugWithFormat("Current call stack: %s",
-                        stackTraceToString(Thread.currentThread().getStackTrace()));
+                    LOGGER.debug("Construction time call stack: {}", m_stackTraceAtConstructionTime);
+                    LOGGER.debug("Current call stack: {}", stackTrace);
                 }
                 for (final ResourceWithRelease resource : m_resources) {
                     resource.release();
@@ -172,13 +172,13 @@ final class ResourceLeakDetector {
 
     private static final boolean VERBOSE = Boolean.getBoolean(VERBOSE_PROPERTY);
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(ResourceLeakDetector.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ResourceLeakDetector.class);
 
     private static final long POLL_PERIOD_MS = 1_000L;
 
     private static final ResourceLeakDetector INSTANCE = new ResourceLeakDetector();
 
-    static ResourceLeakDetector getInstance() {
+    public static ResourceLeakDetector getInstance() {
         return INSTANCE;
     }
 
@@ -197,7 +197,7 @@ final class ResourceLeakDetector {
         m_openFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     }
 
-    Finalizer createFinalizer(final Object referent, final AutoCloseable... closeables) {
+    public Finalizer createFinalizer(final Object referent, final AutoCloseable... closeables) {
         return createFinalizer(referent,
             Arrays.stream(closeables).map(ResourceWithRelease::new).toArray(ResourceWithRelease[]::new));
     }
@@ -211,22 +211,22 @@ final class ResourceLeakDetector {
      * @return a new Finalizer that, if left unclosed itself, will release the resource held by the referent once the
      *         garbage collector reclaims the referent
      */
-    Finalizer createFinalizer(final Object referent, final ResourceWithRelease... resources) {
+    public Finalizer createFinalizer(final Object referent, final ResourceWithRelease... resources) {
         final Finalizer dc = new Finalizer(referent, resources);
         m_openFinalizers.add(dc);
         return dc;
     }
 
-    void clear() {
+    public void clear() {
         m_openFinalizers.clear();
     }
 
-    int getNumOpenFinalizers() {
+    public int getNumOpenFinalizers() {
         return m_openFinalizers.size();
     }
 
     @SuppressWarnings("resource")
-    void poll() {
+    public void poll() {
         Finalizer finalizer;
         while ((finalizer = (Finalizer)m_enqueuedFinalizers.poll()) != null) {
             finalizer.releaseResourcesAndLogOutput();
