@@ -4,7 +4,7 @@ Bundle-Name: KNIME Table Plugin
 Bundle-SymbolicName: org.knime.core.columnar;singleton:=true
 Bundle-Version: 4.4.0.qualifier
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
-Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-RequiredExecutionEnvironment: JavaSE-11
 Bundle-ActivationPolicy: lazy
 Require-Bundle: 
  com.google.guava;bundle-version="[19.0.0,20.0.0)",
@@ -18,3 +18,4 @@ Export-Package: org.knime.core.columnar,
  org.knime.core.columnar.data,
  org.knime.core.columnar.filter,
  org.knime.core.columnar.store
+Automatic-Module-Name: org.knime.core.columnar

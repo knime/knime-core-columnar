@@ -49,7 +49,7 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ReadValue;
-import org.omg.CORBA.portable.ValueFactory;
+import org.knime.core.data.v2.ValueFactory;
 
 /**
  * {@link ColumnarReadValueFactory}s typically wrap a {@link ValueFactory} and allow to create {@link ReadValue}s based
