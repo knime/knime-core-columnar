@@ -62,7 +62,7 @@ import org.knime.core.node.NodeSettingsWO;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class DefaultColumnarValueSchema implements ColumnarValueSchema {
+public final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ValueSchema m_source;
 
@@ -72,7 +72,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ColumnarReadValueFactory<?>[] m_readFactories;
 
-    DefaultColumnarValueSchema(final ValueSchema source) {
+    public DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
         @SuppressWarnings("unchecked")
         final ColumnarAccessFactory<NullableReadData, ReadAccess, NullableWriteData, WriteAccess>[] factories =
