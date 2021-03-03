@@ -48,7 +48,10 @@
  */
 package org.knime.core.data.columnar.table;
 
+import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -62,7 +65,6 @@ import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
-import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.node.BufferedDataTable;
@@ -70,6 +72,7 @@ import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.util.DuplicateChecker;
+import org.knime.core.util.FileUtil;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -111,8 +114,8 @@ final class ColumnarRowContainer implements RowContainer {
         m_context = context;
         m_storeFactory = storeFactory;
 
-        ColumnStore wrapped =
-            ColumnarPreferenceUtils.wrap(m_storeFactory.createStore(schema, DataContainer.createTempFile(".knable")));
+        // FIXME: let back end decide whether it stores its data in a file or in a directory
+        ColumnStore wrapped = ColumnarPreferenceUtils.wrap(m_storeFactory.createStore(schema, createTempDir()));
         if (settings.isCheckDuplicateRowKeys()) {
             wrapped = new DuplicateCheckColumnStore(wrapped, new DuplicateChecker(),
                 ColumnarPreferenceUtils.getDuplicateCheckExecutor());
@@ -123,6 +126,20 @@ final class ColumnarRowContainer implements RowContainer {
 
         m_delegate = new ColumnarRowWriteCursor(m_store, schema.getWriteValueFactories());
     }
+
+    // Copied from DataContainer
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyyMMdd");
+
+    private static File createTempDir() throws IOException {
+        final File tempDir = FileUtil.getWorkflowTempDir();
+        String date;
+        synchronized (DATE_FORMAT) {
+            date = DATE_FORMAT.format(new Date());
+        }
+        String fileName = "knime_container_" + date + "_";
+        return FileUtil.createTempDir(fileName, tempDir, true);
+    }
+    // --
 
     @Override
     public ColumnarRowWriteCursor createCursor() {
