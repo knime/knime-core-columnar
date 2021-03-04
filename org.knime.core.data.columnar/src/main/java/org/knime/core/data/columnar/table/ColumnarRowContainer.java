@@ -78,7 +78,7 @@ import org.knime.core.util.FileUtil;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarRowContainer implements RowContainer {
+public final class ColumnarRowContainer implements RowContainer {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowContainer.class);
 
@@ -130,7 +130,7 @@ final class ColumnarRowContainer implements RowContainer {
     // Copied from DataContainer
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyyMMdd");
 
-    private static File createTempDir() throws IOException {
+    public static File createTempDir() throws IOException {
         final File tempDir = FileUtil.getWorkflowTempDir();
         String date;
         synchronized (DATE_FORMAT) {
