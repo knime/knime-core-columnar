@@ -58,7 +58,7 @@ import org.knime.core.columnar.data.NullableReadData;
  */
 public final class CachedColumnStoreCache {
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, NullableReadData> m_cache;
+    private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_cache;
 
     private final long m_cacheSizeBytes;
 
@@ -82,7 +82,7 @@ public final class CachedColumnStoreCache {
         return m_cache.size();
     }
 
-    LoadingEvictingCache<ColumnDataUniqueId, NullableReadData> getCache() {
+    EvictingCache<ColumnDataUniqueId, NullableReadData> getCache() {
         return m_cache;
     }
 

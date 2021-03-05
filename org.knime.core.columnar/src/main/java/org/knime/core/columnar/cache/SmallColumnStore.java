@@ -87,7 +87,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
         private final int m_smallTableThreshold;
 
-        private final LoadingEvictingCache<SmallColumnStore, Table> m_cache;
+        private final EvictingCache<SmallColumnStore, Table> m_cache;
 
         private final long m_cacheSize;
 
@@ -318,7 +318,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     private final int m_smallTableThreshold;
 
-    private final LoadingEvictingCache<SmallColumnStore, Table> m_globalCache;
+    private final EvictingCache<SmallColumnStore, Table> m_globalCache;
 
     // lazily initialized on flush
     private SmallBatchWriter m_writer;

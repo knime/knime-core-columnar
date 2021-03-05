@@ -65,7 +65,7 @@ import com.google.common.cache.Weigher;
  * @param <K> the type of keys maintained by this cache
  * @param <D> the type of cached data
  */
-final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvictingCache<K, D> {
+final class SizeBoundLruCache<K, D extends ReferencedData> implements EvictingCache<K, D> {
 
     private static final class DataWithEvictor<K, D extends ReferencedData> {
         private final D m_data;
@@ -109,7 +109,12 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
     @Override
     public void put(final K key, final D data, final Evictor<? super K, ? super D> evictor) {
         data.retain();
-        m_lruCache.put(key, new DataWithEvictor<K, D>(data, evictor));
+        m_lruCache.compute(key, (k, d) -> {
+            if (d != null) {
+                d.m_data.release(); // if we replace data, we have to make sure to release the old data
+            }
+            return new DataWithEvictor<K, D>(data, evictor);
+        });
     }
 
     @Override
@@ -117,24 +122,6 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements LoadingEvi
         final DataWithEvictor<K, D> cached = m_lruCache.computeIfPresent(key, (k, d) -> {
             d.m_data.retain(); // retain for the caller of this method
             return d;
-        });
-        return cached == null ? null : cached.m_data;
-    }
-
-    @Override
-    public D getRetained(final K key, final Loader<? extends D> loader, final Evictor<? super K, ? super D> evictor) {
-        final DataWithEvictor<K, D> cached = m_lruCache.compute(key, (k, d) -> { // NOSONAR
-            if (d == null) {
-                final D loaded = loader.loadRetained(); // data is already retained by the loader
-                if (loaded == null) {
-                    return null;
-                }
-                loaded.retain(); // retain for the caller of this method
-                return new DataWithEvictor<K, D>(loaded, evictor);
-            } else {
-                d.m_data.retain(); // retain for the caller of this method
-                return d;
-            }
         });
         return cached == null ? null : cached.m_data;
     }

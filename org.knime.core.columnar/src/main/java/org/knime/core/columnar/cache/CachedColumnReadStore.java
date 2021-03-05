@@ -46,12 +46,11 @@
 package org.knime.core.columnar.cache;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
+import org.knime.core.columnar.cache.EvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -84,17 +83,24 @@ public final class CachedColumnReadStore extends DelegatingColumnReadStore {
         protected ReadBatch readRetainedInternal(final int index) throws IOException {
             return getSelection().createBatch(i -> { // NOSONAR
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(CachedColumnReadStore.this, i, index);
-                return m_globalCache.getRetained(ccUID, () -> { // NOSONAR
-                    m_cachedData.add(ccUID);
+                final Object lock = m_cachedData.computeIfAbsent(ccUID, k -> new Object());
+
+                synchronized (lock) {
+                    final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
+                    if (cachedData != null) {
+                        return cachedData;
+                    }
+
                     try {
                         @SuppressWarnings("resource")
                         final NullableReadData data = m_batchLoader.loadBatch(initAndGetDelegate(), index).get(i);
                         data.retain();
+                        m_globalCache.put(ccUID, data, m_evictor);
                         return data;
                     } catch (IOException e) {
                         throw new IllegalStateException("Exception while loading column data.", e);
                     }
-                }, m_evictor);
+                }
             });
         }
 
@@ -106,9 +112,9 @@ public final class CachedColumnReadStore extends DelegatingColumnReadStore {
 
     }
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
+    private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
 
-    private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private Map<ColumnDataUniqueId, Object> m_cachedData = new ConcurrentHashMap<>();
 
     /**
      * @param delegate the delegate from which to read in case of a cache miss
@@ -126,7 +132,7 @@ public final class CachedColumnReadStore extends DelegatingColumnReadStore {
 
     @Override
     protected void closeOnce() throws IOException {
-        for (final ColumnDataUniqueId id : m_cachedData) {
+        for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
             final NullableReadData removed = m_globalCache.removeRetained(id);
             if (removed != null) {
                 removed.release();

@@ -66,7 +66,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testPutGet() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
+        final EvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
         final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH);
 
         assertEquals(1, data.getRefs());
@@ -78,53 +78,65 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
         assertEquals(data, cache.getRetained(0));
         assertEquals(3, data.getRefs());
 
-        assertEquals(data, cache.getRetained(0, () -> null, (i, d) -> {
-        }));
-        assertEquals(4, data.getRefs());
-
         cache.removeRetained(0);
         assertEquals(0, cache.size());
-        assertEquals(4, data.getRefs());
+        assertEquals(3, data.getRefs());
     }
 
     @Test
-    public void testPutEvictLoadGet() {
+    public void testPutTwice() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
+        final EvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
+        final TestDoubleData data1 = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH);
+        final TestDoubleData data2 = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH);
+
+        assertEquals(1, data1.getRefs());
+        assertEquals(1, data2.getRefs());
+
+        cache.put(0, data1);
+        assertEquals(1, cache.size());
+        assertEquals(2, data1.getRefs());
+
+        cache.put(0, data2);
+        assertEquals(1, cache.size());
+        assertEquals(1, data1.getRefs());
+        assertEquals(2, data2.getRefs());
+    }
+
+    @Test
+    public void testPutEvictGet() {
+
+        final EvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
         final TestDoubleData[] batch =
             IntStream.range(0, 2).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH))
                 .toArray(TestDoubleData[]::new);
 
         assertEquals(1, batch[0].getRefs());
+        assertEquals(1, batch[1].getRefs());
 
-        final AtomicBoolean evicted = new AtomicBoolean();
-        cache.put(0, batch[0], (i, d) -> evicted.set(true));
+        final AtomicBoolean batch0Evicted = new AtomicBoolean();
+        cache.put(0, batch[0], (i, d) -> batch0Evicted.set(true));
         assertEquals(1, cache.size());
         assertEquals(2, batch[0].getRefs());
 
         cache.put(1, batch[1]);
-        assertEquals(true, evicted.get());
+        assertEquals(true, batch0Evicted.get());
         assertEquals(1, cache.size());
         assertEquals(1, batch[0].getRefs());
 
         assertNull(cache.getRetained(0));
-        assertEquals(batch[0], cache.getRetained(0, () -> {
-            batch[0].retain();
-            return batch[0];
-        }, (i, d) -> {
-        }));
-        assertEquals(3, batch[0].getRefs());
+        assertEquals(1, batch[0].getRefs());
 
-        cache.removeRetained(0);
+        cache.removeRetained(1);
         assertEquals(0, cache.size());
-        assertEquals(3, batch[0].getRefs());
-        assertEquals(1, batch[1].getRefs());
+        assertEquals(1, batch[0].getRefs());
+        assertEquals(2, batch[1].getRefs());
     }
 
     @Test
     public void testPutRemove() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
+        final EvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH, 1);
         final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH);
 
         assertEquals(1, data.getRefs());
@@ -144,7 +156,7 @@ public class SizeBoundLruCacheTest extends ColumnarTest {
     @Test
     public void testLru() {
 
-        final LoadingEvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH * 2L, 1);
+        final EvictingCache<Integer, TestDoubleData> cache = new SizeBoundLruCache<>(DEF_BATCH_LENGTH * 2L, 1);
         final TestDoubleData[] batch =
             IntStream.range(0, 3).mapToObj(i -> TestDoubleDataFactory.INSTANCE.createWriteData(DEF_BATCH_LENGTH))
                 .toArray(TestDoubleData[]::new);

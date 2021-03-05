@@ -55,7 +55,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.cache.LoadingEvictingCache.Evictor;
+import org.knime.core.columnar.cache.EvictingCache.Evictor;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -84,8 +84,6 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(AsyncFlushCachedColumnStore.class);
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for asynchronous write thread.";
-
-    private static final CountDownLatch DUMMY = new CountDownLatch(0);
 
     private class AsyncFlushCachedBatchFactory extends DelegatingBatchFactory {
 
@@ -172,7 +170,14 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         protected ReadBatch readRetainedInternal(final int index) throws IOException {
             return getSelection().createBatch(i -> { // NOSONAR
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(AsyncFlushCachedColumnStore.this, i, index);
-                return m_globalCache.getRetained(ccUID, () -> { // NOSONAR
+                final CountDownLatch lock = m_cachedData.computeIfAbsent(ccUID, k -> new CountDownLatch(0));
+
+                synchronized (lock) {
+                    final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
+                    if (cachedData != null) {
+                        return cachedData;
+                    }
+
                     try {
                         waitForAndHandleFuture();
                     } catch (InterruptedException e) {
@@ -182,16 +187,16 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
                         // this way, the cache stays in a consistent state
                         throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
                     }
-                    m_cachedData.put(ccUID, DUMMY);
                     try {
                         @SuppressWarnings("resource")
                         final NullableReadData data = m_batchLoader.loadBatch(initAndGetDelegate(), index).get(i);
                         data.retain();
+                        m_globalCache.put(ccUID, data, m_evictor);
                         return data;
                     } catch (IOException e) {
                         throw new IllegalStateException("Exception while loading column data.", e);
                     }
-                }, m_evictor);
+                }
             });
         }
 
@@ -213,7 +218,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
 
     }
 
-    private final LoadingEvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
+    private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
 
     private Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
 
