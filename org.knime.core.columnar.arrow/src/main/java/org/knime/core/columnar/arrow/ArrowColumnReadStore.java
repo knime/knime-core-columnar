@@ -46,6 +46,7 @@
 package org.knime.core.columnar.arrow;
 
 import java.io.File;
+import java.io.IOException;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -74,7 +75,12 @@ final class ArrowColumnReadStore implements ColumnReadStore {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
+        final long allocated = m_allocator.getAllocatedMemory();
+        if (allocated > 0) {
+            throw new IOException(
+                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
+        }
         m_allocator.close();
     }
 
