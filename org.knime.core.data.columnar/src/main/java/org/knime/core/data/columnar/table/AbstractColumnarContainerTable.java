@@ -207,7 +207,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         try {
             m_readStore.close();
         } catch (final IOException e) {
-            throw new IllegalStateException("Exception while clearing ContainerTable.", e);
+            LOGGER.error(String.format("Exception while clearing ContainerTable: %s", e.getMessage()), e);
         }
     }
 
