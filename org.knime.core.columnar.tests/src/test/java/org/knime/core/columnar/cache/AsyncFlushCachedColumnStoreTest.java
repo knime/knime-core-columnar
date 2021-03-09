@@ -66,6 +66,7 @@ import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -74,6 +75,7 @@ import org.knime.core.columnar.TestColumnStoreUtils.TestDataTable;
 import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
+import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestColumnStore;
@@ -142,6 +144,22 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
 
     private static void waitForWrite(final CountDownLatch latch) throws InterruptedException {
         latch.await();
+    }
+
+    static void readConcurrently(final int numConcurrentLoads, final ColumnReadStore store, final TestDataTable table)
+        throws InterruptedException {
+        final ExecutorService threadPool = Executors.newFixedThreadPool(numConcurrentLoads);
+        for (int i = 0; i < numConcurrentLoads; i++) {
+            threadPool.submit(() -> {
+                try (final TestDataTable reassembledTable = readAndCompareTable(store, table)) { // NOSONAR
+                }
+                return null;
+            });
+        }
+        threadPool.shutdown();
+        if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
+            threadPool.shutdownNow();
+        }
     }
 
     static void checkUncached(final TestDataTable table) {
@@ -467,6 +485,27 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
         }
 
         checkCacheSize(cache, 0);
+    }
+
+    @Test
+    public void testMultiCacheMisses() throws IOException, InterruptedException {
+        final CachedColumnStoreCache cache = generateCache(1);
+        try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store1 = generateDefaultCachedColumnStore(delegate1, cache);
+                final TestDataTable table1 = createDefaultTestTable(delegate1);
+                final TestColumnStore delegate2 = createDefaultTestColumnStore();
+                final AsyncFlushCachedColumnStore store2 = generateDefaultCachedColumnStore(delegate2, cache);
+                final TestDataTable table2 = createDefaultTestTable(delegate2)) {
+
+            final CountDownLatch latch1 = delayFlush(store1);
+            writeTable(store1, table1);
+            waitForFlush(store1, latch1);
+            final CountDownLatch latch2 = delayFlush(store2);
+            writeTable(store2, table2); // evict table1
+            waitForFlush(store2, latch2);
+
+            readConcurrently(4, store1, table1);
+        }
     }
 
     @Test

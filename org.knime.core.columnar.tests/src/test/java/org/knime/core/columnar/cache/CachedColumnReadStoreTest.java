@@ -54,6 +54,7 @@ import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
 import static org.knime.core.columnar.cache.AsyncFlushCachedColumnStoreTest.checkCached;
 import static org.knime.core.columnar.cache.AsyncFlushCachedColumnStoreTest.checkUncached;
 import static org.knime.core.columnar.cache.AsyncFlushCachedColumnStoreTest.generateCache;
+import static org.knime.core.columnar.cache.AsyncFlushCachedColumnStoreTest.readConcurrently;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -111,6 +112,13 @@ public class CachedColumnReadStoreTest extends ColumnarTest {
         try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
             checkUncached(storeAndTable.m_table);
             readTwiceAndCompareTable(storeAndTable.m_store);
+        }
+    }
+
+    @Test
+    public void testMultiCacheMisses() throws IOException, InterruptedException {
+        try (final StoreAndTable storeAndTable = generateDefaultCachedColumnReadStore()) {
+            readConcurrently(4, storeAndTable.m_store, storeAndTable.m_table);
         }
     }
 
