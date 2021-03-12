@@ -238,7 +238,9 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
             @SuppressWarnings("resource")
             AsyncFlushCachedColumnStore store = (AsyncFlushCachedColumnStore)k.getStore();
             store.enqueueRunnable(c::release);
-            LOGGER.error("{} Unflushed data evicted from cache. "
+            // We can easily get into this state when cancelling a node that writes a lot of data. A warning should
+            // therefore be sufficient here.
+            LOGGER.warn("{} Unflushed data evicted from cache. "
                 + "Data will be retained and memory will be allocated until flushed.", ERROR_ON_INTERRUPT);
         }
     };

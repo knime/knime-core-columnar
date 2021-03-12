@@ -62,6 +62,7 @@ import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.node.NodeLogger;
 
 /**
  * Columnar implementation of {@link RowWriteCursor} for writing data to a columnar table backend.
@@ -70,6 +71,8 @@ import org.knime.core.data.v2.WriteValue;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, RowWrite {
+
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteCursor.class);
 
     // the initial capacity (in number of held elements) of a single chunk
     // arrow has a minimum capacity of 2
@@ -189,7 +192,9 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
         try {
             m_writer.close();
         } catch (IOException ex) {
-            throw new IllegalStateException(ex);
+            // This exception is usually not critical, since we are dopne with the m_writer.
+            // It could be a ClosedByInterruptException as a consequence of the thread being interrupted on node cancel.
+            LOGGER.warn(ex);
         }
     }
 
@@ -216,11 +221,12 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
                 m_writer.write(readBatch);
             } catch (final IOException e) {
                 throw new IllegalStateException("Problem occurred when writing column data.", e);
+            } finally {
+                readBatch.release();
+                m_currentBatch = null;
+                m_size += numValues;
+                m_currentIndex = 0;
             }
-            readBatch.release();
-            m_currentBatch = null;
-            m_size += numValues;
-            m_currentIndex = 0;
         }
     }
 
