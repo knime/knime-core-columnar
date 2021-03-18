@@ -55,13 +55,12 @@ import org.knime.core.columnar.batch.WriteBatch;
  * A data structure for storing columnar data. Data can be written to the store. The life cycle of a store is as
  * follows:
  * <ol>
- * <li>The singleton {@link BatchFactory} is obtained via {@link #getFactory()}.</li>
  * <li>The singleton {@link BatchWriter} is obtained via {@link #getWriter()}.</li>
  * <li>Data is created by iterating over the following steps:</li>
  * <ol>
- * <li>A new {@link WriteBatch} is {@link BatchFactory#create(int) created} using the factory.</li>
- * <li>Data is {@link WriteBatch#get(int) written} into the batch and {@link WriteBatch#close(int) closed}, which
- * creates a {@link ReadBatch}.</li>
+ * <li>A new {@link WriteBatch} is {@link BatchWriter#create(int) created} using the writer.</li>
+ * <li>Data is {@link WriteBatch#get(int) written} into the batch and the batch is {@link WriteBatch#close(int) closed},
+ * which creates a {@link ReadBatch}.</li>
  * <li>This batch is {@link BatchWriter#write(ReadBatch) written} into the store using the writer.</li>
  * </ol>
  * <li>The writer is {@link BatchWriter#close() closed}.</li>
@@ -71,13 +70,6 @@ import org.knime.core.columnar.batch.WriteBatch;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
 public interface ColumnWriteStore {
-
-    /**
-     * Obtains the singleton {@link BatchFactory} of this store.
-     *
-     * @return the batch factory of this store
-     */
-    BatchFactory getFactory();
 
     /**
      * Obtains the singleton {@link BatchWriter} of this store.

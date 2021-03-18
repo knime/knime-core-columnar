@@ -48,17 +48,28 @@ package org.knime.core.columnar.store;
 import java.io.Closeable;
 import java.io.IOException;
 
+import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 
 /**
- * A writer that is associated with a {@link ColumnWriteStore} and that can be used to write {@link ReadBatch
+ * A writer that is associated with a {@link ColumnWriteStore} and that can be used to (i) create {@link WriteBatch
+ * WriteBatches} with a certain minimum {@link WriteData#capacity() capacity} and (ii) write {@link ReadBatch
  * ReadBatches}, i.e., {@link WriteBatch#close(int) closed} {@link WriteBatch WriteBatches}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public interface BatchWriter extends Closeable {
+
+    /**
+     * Create a new {@link WriteBatch} with a certain minimum {@link WriteData#capacity() capacity}.
+     *
+     * @param capacity the minimum capacity of data in the created batch
+     * @return a new batch that can be populated with data
+     * @throws IllegalStateException if the store or writer have already been closed
+     */
+    WriteBatch create(int capacity);
 
     /**
      * Write a {@link ReadBatch}, i.e., a {@link WriteBatch#close(int) closed} {@link WriteBatch WriteBatches}.

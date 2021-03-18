@@ -60,7 +60,6 @@ import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
@@ -84,14 +83,6 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(AsyncFlushCachedColumnStore.class);
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for asynchronous write thread.";
-
-    private class AsyncFlushCachedBatchFactory extends DelegatingBatchFactory {
-
-        AsyncFlushCachedBatchFactory() {
-            super(AsyncFlushCachedColumnStore.this);
-        }
-
-    }
 
     private final class AsyncFlushCachedBatchWriter extends DelegatingBatchWriter {
 
@@ -275,11 +266,6 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         } catch (final ExecutionException e) {
             throw new IllegalStateException("Failed to asynchronously write cached rows to file.", e);
         }
-    }
-
-    @Override
-    protected BatchFactory getFactoryInternal() {
-        return new AsyncFlushCachedBatchFactory();
     }
 
     @Override

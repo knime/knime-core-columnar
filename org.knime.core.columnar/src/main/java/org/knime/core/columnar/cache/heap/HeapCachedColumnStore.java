@@ -66,7 +66,6 @@ import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
@@ -87,9 +86,13 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
-    private final class HeapCachedBatchFactory extends DelegatingBatchFactory {
+    private final class HeapCachedBatchWriter extends DelegatingBatchWriter {
 
-        private HeapCachedBatchFactory() {
+        private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
+
+        private int m_numBatches;
+
+        private HeapCachedBatchWriter() {
             super(HeapCachedColumnStore.this);
         }
 
@@ -107,18 +110,6 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
                 }
             }
             return new DefaultWriteBatch(data);
-        }
-
-    }
-
-    private final class HeapCachedBatchWriter extends DelegatingBatchWriter {
-
-        private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
-
-        private int m_numBatches;
-
-        private HeapCachedBatchWriter() {
-            super(HeapCachedColumnStore.this);
         }
 
         @Override
@@ -209,11 +200,6 @@ public final class HeapCachedColumnStore extends DelegatingColumnStore {
         m_readStore = new HeapCachedColumnReadStore(delegate, cache, m_cachedData);
         m_cache = cache.getCache();
         m_executor = executor;
-    }
-
-    @Override
-    protected BatchFactory getFactoryInternal() {
-        return new HeapCachedBatchFactory();
     }
 
     @Override

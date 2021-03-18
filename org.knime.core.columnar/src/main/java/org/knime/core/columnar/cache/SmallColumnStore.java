@@ -58,7 +58,6 @@ import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
@@ -167,14 +166,6 @@ public final class SmallColumnStore extends DelegatingColumnStore {
     }
 
     private static final String ERROR_MESSAGE_ON_FLUSH = "Error while flushing small table.";
-
-    private class SmallBatchFactory extends DelegatingBatchFactory {
-
-        SmallBatchFactory() {
-            super(SmallColumnStore.this);
-        }
-
-    }
 
     private final class SmallBatchWriter extends DelegatingBatchWriter {
 
@@ -331,11 +322,6 @@ public final class SmallColumnStore extends DelegatingColumnStore {
         super(delegate);
         m_globalCache = cache.m_cache;
         m_smallTableThreshold = cache.m_smallTableThreshold;
-    }
-
-    @Override
-    protected BatchFactory getFactoryInternal() {
-        return new SmallBatchFactory();
     }
 
     @Override

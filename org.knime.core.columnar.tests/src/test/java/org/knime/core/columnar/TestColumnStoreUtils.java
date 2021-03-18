@@ -554,7 +554,8 @@ public final class TestColumnStoreUtils {
     }
 
     private static NullableWriteData[] createBatch(final ColumnStore store) {
-        final WriteBatch batch = store.getFactory().create(DEF_BATCH_LENGTH);
+        @SuppressWarnings("resource")
+        final WriteBatch batch = store.getWriter().create(DEF_BATCH_LENGTH);
         final NullableWriteData[] data = new NullableWriteData[store.getSchema().numColumns()];
 
         for (int i = 0; i < store.getSchema().numColumns(); i++) {

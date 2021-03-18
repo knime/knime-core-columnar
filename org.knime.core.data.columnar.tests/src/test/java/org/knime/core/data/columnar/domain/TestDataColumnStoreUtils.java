@@ -92,7 +92,7 @@ final class TestDataColumnStoreUtils {
     }
 
     static WriteBatch[] createBatches(final ColumnStore store, final int length, final int capacity) {
-        return IntStream.range(0, length / capacity).mapToObj(i -> store.getFactory().create(capacity))
+        return IntStream.range(0, length / capacity).mapToObj(i -> store.getWriter().create(capacity))
             .toArray(WriteBatch[]::new);
     }
 

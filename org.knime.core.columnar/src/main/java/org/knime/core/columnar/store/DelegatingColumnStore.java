@@ -63,84 +63,13 @@ import org.knime.core.columnar.store.DelegatingColumnReadStore.DelegatingBatchRe
  * <ul>
  * <li>makes sure that operations adhere to their contracts (e.g. that the writer is a singleton, that readers are only
  * created after the writer has been closed, and that close is idempotent),</li>
- * <li>initializes its {@link BatchFactory factory}, its {@link BatchWriter writer} and its {@link BatchReader readers}
- * lazily, and</li>
+ * <li>initializes its {@link BatchWriter writer} and its {@link BatchReader readers} lazily, and</li>
  * <li>provides a method for determining whether the store has been closed already.</li>
  * </ul>
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public abstract class DelegatingColumnStore implements ColumnStore {
-
-    /**
-     * A {@link BatchFactory} that delegates operations to another factory. In addition, it
-     * <ul>
-     * <li>makes sure that operations adhere to their contracts (e.g., that create is not called after the store or
-     * writer have been closed) and</li>
-     * <li>initializes its delegate factory lazily.</li>
-     * </ul>
-     */
-    public abstract static class DelegatingBatchFactory implements BatchFactory {
-
-        private final DelegatingColumnStore m_store;
-
-        private final AtomicBoolean m_storeClosed;
-
-        private final AtomicBoolean m_writerClosed;
-
-        private BatchFactory m_delegate;
-
-        /**
-         * @param store a delegating store from which to obtain the delegate factory
-         */
-        protected DelegatingBatchFactory(final DelegatingColumnStore store) {
-            m_store = store;
-            m_storeClosed = store.m_storeClosed;
-            m_writerClosed = store.m_writerClosed;
-        }
-
-        @Override
-        public final WriteBatch create(final int capacity) {
-            if (m_writerClosed.get()) {
-                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-            }
-            if (m_storeClosed.get()) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-
-            return createInternal(capacity);
-        }
-
-        /**
-         * Calls {@link BatchFactory#create(int) create} on the delegate factory.
-         *
-         * @param capacity see {@link BatchFactory#create(int)}
-         * @return the result of the delegated operation
-         */
-        protected WriteBatch createInternal(final int capacity) {
-            return initAndGetDelegate().create(capacity);
-        }
-
-        /**
-         * Initializes the delegate factory, if it has not been initialized before, and returns it.
-         *
-         * @return the delegate factory
-         */
-        protected final BatchFactory initAndGetDelegate() {
-            if (m_delegate == null) {
-                m_delegate = m_store.m_delegate.getFactory();
-            }
-            return m_delegate;
-        }
-
-        /**
-         * @return the delegate factory, if it has been initialized, otherwise null
-         */
-        protected final BatchFactory getDelegate() {
-            return m_delegate;
-        }
-
-    }
 
     /**
      * A {@link BatchWriter} that delegates operations to another writer. In addition, it
@@ -168,6 +97,29 @@ public abstract class DelegatingColumnStore implements ColumnStore {
             m_store = store;
             m_storeClosed = store.m_storeClosed;
             m_writerClosed = store.m_writerClosed;
+        }
+
+        @Override
+        public final WriteBatch create(final int capacity) {
+            if (m_writerClosed.get()) {
+                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
+            }
+            if (m_storeClosed.get()) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
+
+            return createInternal(capacity);
+        }
+
+        /**
+         * Calls {@link BatchWriter#create(int) create} on the delegate factory.
+         *
+         * @param capacity see {@link BatchWriter#create(int)}
+         * @return the result of the delegated operation
+         */
+        @SuppressWarnings("resource")
+        protected WriteBatch createInternal(final int capacity) {
+            return initAndGetDelegate().create(capacity);
         }
 
         @Override
@@ -250,8 +202,6 @@ public abstract class DelegatingColumnStore implements ColumnStore {
 
     private final AtomicBoolean m_writerClosed = new AtomicBoolean();
 
-    private BatchFactory m_factory;
-
     private BatchWriter m_writer;
 
     /**
@@ -264,31 +214,6 @@ public abstract class DelegatingColumnStore implements ColumnStore {
     @Override
     public final ColumnStoreSchema getSchema() {
         return m_delegate.getSchema();
-    }
-
-    @Override
-    public final BatchFactory getFactory() {
-        if (m_writerClosed.get()) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-        }
-        if (m_storeClosed.get()) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
-        if (m_factory == null) {
-            m_factory = getFactoryInternal();
-        }
-        return m_factory;
-    }
-
-    /**
-     * Calls {@link ColumnWriteStore#getFactory() getFactory} on the delegate store.
-     *
-     * @return see {@link ColumnWriteStore#getFactory()}
-     */
-    protected BatchFactory getFactoryInternal() {
-        return new DelegatingBatchFactory(this) {
-        };
     }
 
     @Override

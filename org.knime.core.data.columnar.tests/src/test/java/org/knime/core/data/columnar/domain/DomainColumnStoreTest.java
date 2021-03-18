@@ -69,7 +69,6 @@ import java.util.stream.Stream;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
@@ -164,46 +163,23 @@ public class DomainColumnStoreTest {
         }
     }
 
-    @Test
-    public void testFactorySingleton() throws IOException {
-        try (final ColumnStore store = generateDomainStore()) {
-            assertEquals(store.getFactory(), store.getFactory());
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterWriterClose() throws IOException {
-        try (final ColumnStore store = generateDomainStore()) {
-            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
-            }
-            store.getFactory();
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDomainStore()) {
-            store.close(); // NOSONAR
-            store.getFactory();
-        }
-    }
-
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterWriterClose() throws IOException {
         try (final ColumnStore store = generateDomainStore()) {
-            final BatchFactory factory = store.getFactory();
-            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) {
+                writer.close(); // NOSONAR
+                writer.create(DEF_CAPACITY);
             }
-            factory.create(DEF_CAPACITY);
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDomainStore()) {
-            final BatchFactory factory = store.getFactory();
-            store.close(); // NOSONAR
-            factory.create(DEF_CAPACITY);
+            try (final BatchWriter writer = store.getWriter()) {
+                store.close(); // NOSONAR
+                writer.create(DEF_CAPACITY);
+            }
         }
     }
 

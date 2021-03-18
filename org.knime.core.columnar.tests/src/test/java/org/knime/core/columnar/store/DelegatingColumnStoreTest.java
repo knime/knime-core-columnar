@@ -64,7 +64,6 @@ import org.junit.Test;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.store.DelegatingColumnReadStore.DelegatingBatchReader;
-import org.knime.core.columnar.store.DelegatingColumnStore.DelegatingBatchFactory;
 import org.knime.core.columnar.store.DelegatingColumnStore.DelegatingBatchWriter;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestColumnStore;
@@ -123,17 +122,6 @@ public class DelegatingColumnStoreTest extends ColumnarTest {
         }
     }
 
-    @Test
-    public void testFactoryGetters() throws IOException {
-        try (final TestColumnStore delegate = createDefaultTestColumnStore();
-                final DelegatingColumnStore store = new DelegatingColumnStore(delegate) {
-                }) {
-            final DelegatingBatchFactory factory = (DelegatingBatchFactory)store.getFactory();
-            factory.initAndGetDelegate();
-            assertEquals(delegate.getFactory(), factory.getDelegate());
-        }
-    }
-
     @SuppressWarnings("resource")
     @Test
     public void testWriterGetters() throws IOException {
@@ -171,46 +159,23 @@ public class DelegatingColumnStoreTest extends ColumnarTest {
         }
     }
 
-    @Test
-    public void testFactorySingleton() throws IOException {
-        try (final ColumnStore store = generateDefaultDelegatingColumnStore()) {
-            assertEquals(store.getFactory(), store.getFactory());
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterWriterClose() throws IOException {
-        try (final ColumnStore store = generateDefaultDelegatingColumnStore()) {
-            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
-            }
-            store.getFactory();
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultDelegatingColumnStore()) {
-            store.close(); // NOSONAR
-            store.getFactory();
-        }
-    }
-
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterWriterClose() throws IOException {
         try (final ColumnStore store = generateDefaultDelegatingColumnStore()) {
-            final BatchFactory factory = store.getFactory();
-            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) {
+                writer.close(); // NOSONAR
+                writer.create(DEF_BATCH_LENGTH);
             }
-            factory.create(DEF_BATCH_LENGTH);
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultDelegatingColumnStore()) {
-            final BatchFactory factory = store.getFactory();
-            store.close(); // NOSONAR
-            factory.create(DEF_BATCH_LENGTH);
+            try (final BatchWriter writer = store.getWriter()) {
+                store.close(); // NOSONAR
+                writer.create(DEF_BATCH_LENGTH);
+            }
         }
     }
 
@@ -245,11 +210,10 @@ public class DelegatingColumnStoreTest extends ColumnarTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterWriterClose() throws IOException {
         try (final ColumnStore store = generateDefaultDelegatingColumnStore()) {
-            final BatchFactory factory = store.getFactory();
-            final ReadBatch batch = factory.create(0).close(0);
-            batch.release();
             @SuppressWarnings("resource")
             final BatchWriter writer = store.getWriter();
+            final ReadBatch batch = writer.create(0).close(0);
+            batch.release();
             writer.close();
             writer.write(batch);
         }
@@ -258,11 +222,10 @@ public class DelegatingColumnStoreTest extends ColumnarTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultDelegatingColumnStore()) {
-            final BatchFactory factory = store.getFactory();
-            final ReadBatch batch = factory.create(0).close(0);
-            batch.release();
             @SuppressWarnings("resource")
             final BatchWriter writer = store.getWriter();
+            final ReadBatch batch = writer.create(0).close(0);
+            batch.release();
             store.close(); // NOSONAR
             writer.write(batch);
         }

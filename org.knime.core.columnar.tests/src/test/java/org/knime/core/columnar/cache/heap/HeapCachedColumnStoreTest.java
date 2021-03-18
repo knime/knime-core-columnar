@@ -68,7 +68,6 @@ import org.junit.AfterClass;
 import org.junit.Test;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
@@ -132,46 +131,23 @@ public class HeapCachedColumnStoreTest {
         }
     }
 
-    @Test
-    public void testFactorySingleton() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            assertEquals(store.getFactory(), store.getFactory());
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterWriterClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
-            }
-            store.getFactory();
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterStoreClose() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            store.close(); // NOSONAR
-            store.getFactory();
-        }
-    }
-
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterWriterClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            final BatchFactory factory = store.getFactory();
-            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) {
+                writer.close(); // NOSONAR
+                writer.create(DEF_BATCH_LENGTH);
             }
-            factory.create(DEF_BATCH_LENGTH);
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            final BatchFactory factory = store.getFactory();
-            store.close(); // NOSONAR
-            factory.create(DEF_BATCH_LENGTH);
+            try (final BatchWriter writer = store.getWriter()) {
+                store.close(); // NOSONAR
+                writer.create(DEF_BATCH_LENGTH);
+            }
         }
     }
 

@@ -58,7 +58,6 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
@@ -81,7 +80,9 @@ public final class TestColumnStore implements ColumnStore {
 
     private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
-    final class TestBatchFactory implements BatchFactory {
+    final class TestBatchWriter implements BatchWriter {
+
+        private int m_maxDataLength;
 
         @Override
         public WriteBatch create(final int capacity) {
@@ -101,12 +102,6 @@ public final class TestColumnStore implements ColumnStore {
             }
             return new DefaultWriteBatch(data);
         }
-
-    }
-
-    final class TestBatchWriter implements BatchWriter {
-
-        private int m_maxDataLength;
 
         @Override
         public void write(final ReadBatch batch) {
@@ -193,8 +188,6 @@ public final class TestColumnStore implements ColumnStore {
 
     private final TestDataFactory[] m_factories;
 
-    private final BatchFactory m_factory = new TestBatchFactory();
-
     private final TestBatchWriter m_writer = new TestBatchWriter();
 
     private final List<Object[]> m_batches = new ArrayList<>();
@@ -243,15 +236,6 @@ public final class TestColumnStore implements ColumnStore {
     @Override
     public ColumnStoreSchema getSchema() {
         return m_schema;
-    }
-
-    @Override
-    public BatchFactory getFactory() {
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
-        return m_factory;
     }
 
     @Override

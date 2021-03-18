@@ -51,7 +51,6 @@ import java.io.IOException;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.data.RowKeyValue;
@@ -97,8 +96,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private static final long BATCH_SIZE_TARGET = Long.getLong(BATCH_SIZE_TARGET_PROPERTY, BATCH_SIZE_TARGET_DEF);
 
-    private final BatchFactory m_columnDataFactory;
-
     private final BatchWriter m_writer;
 
     private final ColumnarWriteValueFactory<?>[] m_factories;
@@ -120,7 +117,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
     private boolean m_adjusting;
 
     ColumnarRowWriteCursor(final ColumnStore store, final ColumnarWriteValueFactory<?>[] factories) {
-        m_columnDataFactory = store.getFactory();
         m_writer = store.getWriter();
         m_factories = factories;
         m_adjusting = true;
@@ -263,7 +259,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
         final int chunkSize = m_currentBatch == null ? CAPACITY_INIT : m_currentBatch.capacity();
         writeCurrentBatch(m_currentIndex);
 
-        m_currentBatch = m_columnDataFactory.create(chunkSize);
+        m_currentBatch = m_writer.create(chunkSize);
         m_currentData = m_currentBatch.getUnsafe();
         updateWriteValues(m_currentBatch);
         m_currentMaxIndex = m_currentBatch.capacity() - 1;

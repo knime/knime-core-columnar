@@ -48,6 +48,7 @@ package org.knime.core.columnar.cache;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.knime.core.columnar.TestColumnStoreUtils.DEF_BATCH_LENGTH;
 import static org.knime.core.columnar.TestColumnStoreUtils.DEF_SIZE_OF_TABLE;
 import static org.knime.core.columnar.TestColumnStoreUtils.checkRefs;
 import static org.knime.core.columnar.TestColumnStoreUtils.createDefaultTestColumnStore;
@@ -72,7 +73,6 @@ import org.junit.Test;
 import org.knime.core.columnar.TestColumnStoreUtils;
 import org.knime.core.columnar.TestColumnStoreUtils.TestDataTable;
 import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
@@ -346,41 +346,14 @@ public class SmallColumnStoreTest extends ColumnarTest {
         assertEquals(0, cache.size());
     }
 
-    @Test
-    public void testFactorySingleton() throws IOException {
-        try (final TestColumnStore delegate = createDefaultTestColumnStore();
-                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            assertEquals(store.getFactory(), store.getFactory());
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterWriterClose() throws IOException {
-        try (final TestColumnStore delegate = createDefaultTestColumnStore();
-                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
-            }
-            store.getFactory();
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnGetFactoryAfterStoreClose() throws IOException {
-        try (final TestColumnStore delegate = createDefaultTestColumnStore();
-                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            store.close(); // NOSONAR
-            store.getFactory();
-        }
-    }
-
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterWriterClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            final BatchFactory factory = store.getFactory();
-            try (final BatchWriter writer = store.getWriter()) { // NOSONAR
+            try (final BatchWriter writer = store.getWriter()) {
+                writer.close(); // NOSONAR
+                writer.create(DEF_BATCH_LENGTH);
             }
-            factory.create(TestColumnStoreUtils.DEF_BATCH_LENGTH);
         }
     }
 
@@ -388,9 +361,10 @@ public class SmallColumnStoreTest extends ColumnarTest {
     public void exceptionOnCreateAfterStoreClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            final BatchFactory factory = store.getFactory();
-            store.close(); // NOSONAR
-            factory.create(TestColumnStoreUtils.DEF_BATCH_LENGTH);
+            try (final BatchWriter writer = store.getWriter()) {
+                store.close(); // NOSONAR
+                writer.create(DEF_BATCH_LENGTH);
+            }
         }
     }
 
