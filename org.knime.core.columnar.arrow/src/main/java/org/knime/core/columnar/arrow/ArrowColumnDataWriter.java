@@ -84,8 +84,11 @@ import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.BatchWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,6 +137,15 @@ class ArrowColumnDataWriter implements BatchWriter {
         m_allocator = allocator;
         m_firstWrite = true;
         m_closed = false;
+    }
+
+    @Override
+    public WriteBatch create(final int capacity) {
+        final NullableWriteData[] chunk = new NullableWriteData[m_factories.length];
+        for (int i = 0; i < m_factories.length; i++) {
+            chunk[i] = ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, capacity);
+        }
+        return new DefaultWriteBatch(chunk);
     }
 
     @Override

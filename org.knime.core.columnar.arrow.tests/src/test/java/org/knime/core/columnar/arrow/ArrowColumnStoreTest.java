@@ -137,6 +137,7 @@ public class ArrowColumnStoreTest {
         assertEquals(0, childAllocators.get(1).getAllocatedMemory());
     }
 
+    @SuppressWarnings("resource")
     private static void testCreateWriterReader(final ColumnStoreFactory factory) throws IOException {
         final int chunkSize = 64;
         final ColumnStoreSchema schema = ArrowTestUtils.createSchema(DataSpec.doubleSpec());
@@ -150,7 +151,7 @@ public class ArrowColumnStoreTest {
             assertEquals(schema, writeStore.getSchema());
 
             // Create a batch
-            final WriteBatch writeBatch = writeStore.getFactory().create(chunkSize);
+            final WriteBatch writeBatch = writeStore.getWriter().create(chunkSize);
             final DoubleWriteData data = (DoubleWriteData)writeBatch.get(0);
             for (int i = 0; i < chunkSize; i++) {
                 data.setDouble(i, i);

@@ -51,10 +51,7 @@ import java.nio.file.Files;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
-import org.knime.core.columnar.batch.DefaultWriteBatch;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchFactory;
 import org.knime.core.columnar.store.BatchReader;
 import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.ColumnStore;
@@ -95,18 +92,6 @@ final class ArrowColumnStore implements ColumnStore {
     @Override
     public BatchReader createReader(final ColumnSelection config) {
         return m_delegate.createReader(config);
-    }
-
-    @Override
-    public BatchFactory getFactory() {
-        return (chunkSize) -> {
-            final NullableWriteData[] chunk = new NullableWriteData[m_factories.length];
-            for (int i = 0; i < m_factories.length; i++) {
-                chunk[i] =
-                    ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, chunkSize);
-            }
-            return new DefaultWriteBatch(chunk);
-        };
     }
 
     @Override

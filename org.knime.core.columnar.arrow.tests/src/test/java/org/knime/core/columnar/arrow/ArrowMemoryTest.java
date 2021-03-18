@@ -109,12 +109,13 @@ public class ArrowMemoryTest {
     }
 
     /** Store some data into the column store */
+    @SuppressWarnings("resource")
     private static void storeData(final int numChunks, final int chunkSize, final int numColumns,
         final ColumnStore store) throws IOException {
         // let's store some data
         try (final BatchWriter writer = store.getWriter()) {
             for (int c = 0; c < numChunks; c++) {
-                final WriteBatch batch = store.getFactory().create(chunkSize);
+                final WriteBatch batch = store.getWriter().create(chunkSize);
                 for (int i = 0; i < numColumns; i++) {
                     final NullableWriteData data = batch.get(i);
                     for (int j = 0; j < chunkSize; j++) {
