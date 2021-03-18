@@ -57,14 +57,12 @@ import org.knime.core.columnar.data.NullableReadData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class DefaultReadBatch extends DefaultBatch<NullableReadData> implements ReadBatch {
+public final class DefaultReadBatch extends AbstractBatch<NullableReadData> implements ReadBatch {
 
     private final int m_length;
 
     /**
-     * Creates a new batch of data.
-     *
-     * @param data the non-null array of nullable data that comprises this batch
+     * @param data the array of data comprising this batch
      */
     public DefaultReadBatch(final NullableReadData[] data) {
         super(data);
@@ -73,6 +71,11 @@ public final class DefaultReadBatch extends DefaultBatch<NullableReadData> imple
             length = Math.max(length, d.length());
         }
         m_length = length;
+    }
+
+    @Override
+    public boolean isMissing(final int index) {
+        return false;
     }
 
     @Override

@@ -130,6 +130,11 @@ public final class FilteredColumnSelection implements ColumnSelection {
                 String.format("Data at index %d is not available in this filtered batch.", index));
         }
 
+        @Override
+        public boolean isMissing(final int index) {
+            return m_data.containsKey(index);
+        }
+
         /**
          * Obtains an array of all {@link NullableWriteData} in this batch. This implementation of the method is safe,
          * since the array it returns is a defensive copy of the data structure underlying this batch

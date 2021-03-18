@@ -60,12 +60,12 @@ import org.knime.core.columnar.data.NullableWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class DefaultWriteBatch extends DefaultBatch<NullableWriteData> implements WriteBatch {
+public final class DefaultWriteBatch extends AbstractBatch<NullableWriteData> implements WriteBatch {
 
     private int m_capacity;
 
     /**
-     * @param data the array of data backing this batch
+     * @param data the array of data comprising this batch
      */
     public DefaultWriteBatch(final NullableWriteData[] data) {
         super(data);

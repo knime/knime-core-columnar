@@ -44,44 +44,36 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   15 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   16 Mar 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.batch;
 
-import java.util.NoSuchElementException;
-
-import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.ReferencedData;
 
 /**
- * An ordered batch of {@link NullableReadData} that provides random access to data by their index, but does not
- * guarantee that data is present at all valid indices.
+ * An ordered batch of {@link ReferencedData} that provides random access to data by their index.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @param <D> the type of data comprising this batch
  */
-public interface ReadBatch extends Batch<NullableReadData>, NullableReadData {
+public interface Batch<D extends ReferencedData> extends ReferencedData {
 
     /**
-     * Obtains the {@link NullableReadData} at a certain index.
+     * Obtains the {@link ReferencedData} at a certain index.
      *
      * @param index the index at which to look for the data
      * @return the non-null data at the given index
      * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the size of the batch
-     * @throws NoSuchElementException if there is no data available at the given index
      */
-    @Override
-    NullableReadData get(int index);
+    D get(int index);
 
     /**
-     * @return the number of valid indices in this batch
+     * Obtains an array of all {@link ReferencedData} in this batch. The method is unsafe, since the array it returns
+     * might be the array underlying the batch (and not a defensive copy thereof). Clients must not modify the returned
+     * array.
+     *
+     * @return the non-null array of all data in this batch
      */
-    int size();
-
-    /**
-     * The maximum {@link ReadData#length() length} of all data in this batch, or zero if the batch holds no data.
-     */
-    @Override
-    int length();
+    D[] getUnsafe();
 
 }

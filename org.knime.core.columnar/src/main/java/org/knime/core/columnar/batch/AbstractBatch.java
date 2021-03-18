@@ -48,88 +48,44 @@
  */
 package org.knime.core.columnar.batch;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-
 import java.util.Arrays;
 
-import org.junit.Test;
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.TestColumnStoreUtils;
-import org.knime.core.columnar.store.ColumnStoreSchema;
-import org.knime.core.columnar.testing.TestColumnStore;
-import org.knime.core.columnar.testing.data.TestData;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-@SuppressWarnings("javadoc")
-public abstract class DefaultBatchTest<B extends DefaultBatch<? extends ReferencedData>> {
+abstract class AbstractBatch<D extends ReferencedData> implements Batch<D> {
 
-    @SuppressWarnings("resource")
-    static TestData[] createData() {
-        final ColumnStoreSchema schema = TestColumnStoreUtils.createSchema(DEF_NUM_COLUMNS);
-        final TestColumnStore store = TestColumnStore.create(schema);
-        return TestColumnStoreUtils.createTestTable(store, 1).get(0);
+    final D[] m_data;
+
+    AbstractBatch(final D[] data) {
+        m_data = data;
     }
 
-    static final int DEF_NUM_COLUMNS = 2;
-
-    abstract B createBatch(final TestData[] data);
-
-    @Test(expected = NullPointerException.class)
-    public void testArrayNullCheckOnCreate() {
-        createBatch(null);
+    @Override
+    public final void release() {
+        Arrays.stream(m_data).forEach(ReferencedData::release);
     }
 
-    @Test(expected = NullPointerException.class)
-    public void testElementNullCheckOnCreate() {
-        final TestData[] data = createData();
-        data[0] = null;
-        createBatch(data);
+    @Override
+    public final void retain() {
+        Arrays.stream(m_data).forEach(ReferencedData::retain);
     }
 
-    @Test
-    public void testGet() {
-        final TestData[] data = createData();
-        final B batch = createBatch(data);
-        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(data[i], batch.get(i));
-            assertArrayEquals(data, batch.getUnsafe());
-        }
+    @Override
+    public final long sizeOf() {
+        return Arrays.stream(m_data).mapToLong(ReferencedData::sizeOf).sum();
     }
 
-    @Test(expected = IndexOutOfBoundsException.class)
-    public void testGetIndexOutOfBoundsLower() {
-        createBatch(createData()).get(-1);
+    @Override
+    public final D get(final int index) {
+        return m_data[index];
     }
 
-    @Test(expected = IndexOutOfBoundsException.class)
-    public void testGetIndexOutOfBoundsUpper() {
-        createBatch(createData()).get(DEF_NUM_COLUMNS);
-    }
-
-    @Test
-    public void testRetainRelease() {
-        final TestData[] data = createData();
-        final B batch = createBatch(data);
-        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(1, data[i].getRefs());
-        }
-        batch.retain();
-        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(2, data[i].getRefs());
-        }
-        batch.release();
-        for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(1, data[i].getRefs());
-        }
-    }
-
-    @Test
-    public void testSizeOf() {
-        final TestData[] data = createData();
-        assertEquals(Arrays.stream(data).mapToLong(ReferencedData::sizeOf).sum(), createBatch(data).sizeOf());
+    @Override
+    public final D[] getUnsafe() {
+        return m_data;
     }
 
 }

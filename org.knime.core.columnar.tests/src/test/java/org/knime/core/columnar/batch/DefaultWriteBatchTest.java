@@ -57,7 +57,7 @@ import org.knime.core.columnar.testing.data.TestData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class DefaultWriteBatchTest extends DefaultBatchTest<DefaultWriteBatch> {
+public class DefaultWriteBatchTest extends AbstractBatchTest<DefaultWriteBatch> {
 
     @Override
     DefaultWriteBatch createBatch(final TestData[] data) {
