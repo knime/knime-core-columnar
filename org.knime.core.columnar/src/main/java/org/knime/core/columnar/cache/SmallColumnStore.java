@@ -346,15 +346,18 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
     @Override
     protected void saveInternal(final File f) throws IOException {
+        flush();
+        super.saveInternal(f);
+    }
+
+    public void flush() throws IOException {
         final Table cached = m_globalCache.getRetained(SmallColumnStore.this);
         if (cached != null) {
-            m_writer.flush(cached, true);
+            m_writer.flush(cached, false);
             cached.release();
         } else {
             m_writer.waitForDelegateWriter();
         }
-
-        super.saveInternal(f);
     }
 
     @SuppressWarnings("resource")

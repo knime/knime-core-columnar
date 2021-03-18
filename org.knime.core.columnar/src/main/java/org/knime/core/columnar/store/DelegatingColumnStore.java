@@ -384,7 +384,7 @@ public abstract class DelegatingColumnStore implements ColumnStore {
     /**
      * @return the delegate store
      */
-    protected final ColumnStore getDelegate() {
+    public final ColumnStore getDelegate() {
         return m_delegate;
     }
 

@@ -84,7 +84,7 @@ import org.knime.core.node.workflow.WorkflowDataRepository;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractColumnarContainerTable extends ExtensionTable {
+abstract class AbstractColumnarContainerTable extends ExtensionTable implements ColumnarContainerTable {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(AbstractColumnarContainerTable.class);
 
@@ -157,6 +157,11 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         settings.addLong(CFG_TABLE_SIZE, m_size);
         settings.addString(CFG_FACTORY_TYPE, m_factory.getClass().getName());
         m_schema.save(settings);
+    }
+
+    @Override
+    public ColumnReadStore getColumnStore() {
+        return m_readStore;
     }
 
     @Override
@@ -264,10 +269,5 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         return materializeColumnIndices.isPresent()
             ? FilteredColumnarRowIteratorFactory.create(cursor(filter), materializeColumnIndices.get())
             : new ColumnarRowIterator(cursor(filter));
-    }
-
-    @Override
-    public File getFile() {
-        return m_readStore.getFile();
     }
 }

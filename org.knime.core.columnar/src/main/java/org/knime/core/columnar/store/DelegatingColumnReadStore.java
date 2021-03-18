@@ -269,7 +269,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
     /**
      * @return the delegate store
      */
-    protected final ColumnReadStore getDelegate() {
+    public final ColumnReadStore getDelegate() {
         return m_delegate;
     }
 
