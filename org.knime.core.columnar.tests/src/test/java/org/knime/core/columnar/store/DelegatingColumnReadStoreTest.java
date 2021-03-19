@@ -127,6 +127,8 @@ public class DelegatingColumnReadStoreTest extends ColumnarTest {
                 final DelegatingColumnReadStore store = new DelegatingColumnReadStore(delegate) {
                 }) {
             assertEquals(delegate, store.getDelegate());
+            assertEquals(delegate.numBatches(), store.numBatches());
+            assertEquals(delegate.maxLength(), store.maxLength());
             assertFalse(store.isClosed());
             store.close(); // NOSONAR
             assertTrue(store.isClosed());
@@ -145,8 +147,6 @@ public class DelegatingColumnReadStoreTest extends ColumnarTest {
             try (final BatchReader delegateReader = delegate.createReader()) {
                 reader.initAndGetDelegate();
                 assertNotNull(reader.getDelegate());
-                assertEquals(delegateReader.numBatches(), reader.numBatches());
-                assertEquals(delegateReader.maxLength(), reader.maxLength());
                 assertFalse(reader.isClosed());
                 reader.close();
                 assertTrue(reader.isClosed());

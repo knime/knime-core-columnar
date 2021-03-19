@@ -139,13 +139,10 @@ public final class TestColumnStore implements ColumnStore {
 
         private final ColumnSelection m_selection;
 
-        private final int m_maxDataCapacity;
-
         private boolean m_readerClosed;
 
-        TestBatchReader(final ColumnSelection selection, final int maxCapacity) {
+        TestBatchReader(final ColumnSelection selection) {
             m_selection = selection;
-            m_maxDataCapacity = maxCapacity;
         }
 
         @Override
@@ -164,16 +161,6 @@ public final class TestColumnStore implements ColumnStore {
                 m_tracker.add(testData);
                 return testData;
             });
-        }
-
-        @Override
-        public int numBatches() {
-            return m_batches.size();
-        }
-
-        @Override
-        public int maxLength() {
-            return m_maxDataCapacity;
         }
 
         @Override
@@ -268,7 +255,7 @@ public final class TestColumnStore implements ColumnStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        final TestBatchReader reader = new TestBatchReader(selection, m_writer.m_maxDataLength);
+        final TestBatchReader reader = new TestBatchReader(selection);
         ColumnarTest.OPEN_CLOSEABLES.add(reader);
         return reader;
     }
@@ -288,6 +275,16 @@ public final class TestColumnStore implements ColumnStore {
 
     public List<TestData> getData() {
         return m_tracker;
+    }
+
+    @Override
+    public int numBatches() {
+        return m_batches.size();
+    }
+
+    @Override
+    public int maxLength() {
+        return m_writer.m_maxDataLength;
     }
 
 }

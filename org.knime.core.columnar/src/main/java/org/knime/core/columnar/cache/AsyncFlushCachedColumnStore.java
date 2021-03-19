@@ -192,16 +192,6 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         }
 
         @Override
-        public int numBatches() {
-            return m_numChunks;
-        }
-
-        @Override
-        public int maxLength() {
-            return m_maxDataCapacity;
-        }
-
-        @Override
         protected void closeOnce() throws IOException {
             m_batchLoader.close();
             super.closeOnce();
@@ -310,6 +300,16 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
         m_cachedData.clear();
         m_cachedData = null;
         super.closeOnce();
+    }
+
+    @Override
+    public int numBatches() {
+        return m_numChunks;
+    }
+
+    @Override
+    public int maxLength() {
+        return m_maxDataCapacity;
     }
 
 }

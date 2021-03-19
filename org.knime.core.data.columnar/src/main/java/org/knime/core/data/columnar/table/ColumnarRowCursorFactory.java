@@ -129,22 +129,19 @@ final class ColumnarRowCursorFactory {
 
         private int m_index;
 
-        private SingleBatchRowCursor(final BatchReader reader, final ColumnarValueSchema schema, final int batchIndex,
-            final int firstIndexInBatch, final int lastIndexInBatch, final Set<Finalizer> openCursorFinalizers,
-            final int[] selection) {
+        private SingleBatchRowCursor(final ColumnReadStore store, final ColumnarValueSchema schema,
+            final int batchIndex, final int firstIndexInBatch, final int lastIndexInBatch,
+            final Set<Finalizer> openCursorFinalizers, final int[] selection) throws IOException {
 
             m_schema = schema;
             m_openCursorFinalizers = openCursorFinalizers;
             m_index = firstIndexInBatch;
             m_maxIndex = lastIndexInBatch;
 
-            try {
+            try (@SuppressWarnings("resource")
+            final BatchReader reader = selection == null ? store.createReader()
+                : store.createReader(new FilteredColumnSelection(schema.numColumns(), selection))) {
                 m_batch = reader.readRetained(batchIndex);
-                reader.close();
-            } catch (final IOException e) {
-                final String error = "Exception while reading batch from store.";
-                LOGGER.error(error, e);
-                throw new IllegalStateException(error, e);
             }
             m_data = m_batch.getUnsafe();
             m_values = selection == null ? createReadValues(m_batch, m_schema, this)
@@ -232,10 +229,13 @@ final class ColumnarRowCursorFactory {
 
         private NullableReadData[] m_currentData;
 
-        private MultiBatchRowCursor(final BatchReader reader, final ColumnarValueSchema schema, // NOSONAR
+        private MultiBatchRowCursor(final ColumnReadStore store, final ColumnarValueSchema schema, // NOSONAR
             final int firstBatchIndex, final int lastBatchIndex, final int firstIndexInFirstBatch,
             final int lastIndexInLastBatch, final Set<Finalizer> openCursorFinalizers, final int[] selection) {
             m_selection = selection;
+            @SuppressWarnings("resource")
+            final BatchReader reader = selection == null ? store.createReader()
+                : store.createReader(new FilteredColumnSelection(schema.numColumns(), selection));
             m_reader = reader;
             m_readerRelease = new ResourceWithRelease(m_reader);
             m_schema = schema;
@@ -371,16 +371,7 @@ final class ColumnarRowCursorFactory {
             .concat(IntStream.of(0), materializeColumnIndices.get().stream().sorted().mapToInt(i -> i.intValue() + 1))
             .toArray() : null;
 
-        @SuppressWarnings("resource")
-        final BatchReader reader = selection == null ? store.createReader()
-            : store.createReader(new FilteredColumnSelection(schema.numColumns(), selection));
-        final int maxLength;
-        try {
-            maxLength = reader.maxLength();
-        } catch (IOException e) {
-            reader.close();
-            throw e;
-        }
+        final int maxLength = store.maxLength();
         if (maxLength < 1) {
             throw new IllegalStateException(
                 String.format("Length of table is %d, but maximum batch length is %d.", size, maxLength));
@@ -393,15 +384,21 @@ final class ColumnarRowCursorFactory {
         final int firstIndexInFirstBatch = (int)(fromRowIndex % maxLength) - 1;
         final int lastIndexInLastBatch = (int)(toRowIndex % maxLength);
 
+        final int numBatches = store.numBatches();
+        if (lastBatchIndex >= numBatches) {
+            throw new IllegalStateException(String.format("Last batch index is %d, but maximum batch index is %d.",
+                lastBatchIndex, numBatches - 1));
+        }
+
         if (firstBatchIndex == lastBatchIndex) {
-            final SingleBatchRowCursor cursor = new SingleBatchRowCursor(reader, schema, firstBatchIndex,
+            final SingleBatchRowCursor cursor = new SingleBatchRowCursor(store, schema, firstBatchIndex,
                 firstIndexInFirstBatch, lastIndexInLastBatch, openCursorFinalizers, selection);
             cursor.m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(cursor,
                 new ResourceWithRelease(cursor.m_batch, ReferencedData::release));
             openCursorFinalizers.add(cursor.m_finalizer);
             return cursor;
         } else {
-            final MultiBatchRowCursor cursor = new MultiBatchRowCursor(reader, schema, firstBatchIndex, // NOSONAR
+            final MultiBatchRowCursor cursor = new MultiBatchRowCursor(store, schema, firstBatchIndex, // NOSONAR
                 lastBatchIndex, firstIndexInFirstBatch, lastIndexInLastBatch, openCursorFinalizers, selection);
             // can't invoke this in the constructor since it passes a reference to itself to the ResourceLeakDetector
             cursor.readCurrentBatch();

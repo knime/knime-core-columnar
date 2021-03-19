@@ -248,7 +248,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
                 }
                 return null;
             });
-            // This test is no 100% solid. if the second thread fully runs fully before the first thread even
+            // This test is not 100% solid. if the second thread runs fully before the first thread even
             // commences, the reader will have been created before the table has been evicted from the small cache
             // this can lead to a false positive test result.
             f1.get();
@@ -530,16 +530,14 @@ public class SmallColumnStoreTest extends ColumnarTest {
     }
 
     @Test
-    public void testReaderGetters() throws IOException {
+    public void testGetters() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final ColumnStore store = generateDefaultSmallColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
             try (BatchWriter writer = store.getWriter()) {
                 writeTable(store, table);
             }
-            try (final BatchReader reader = store.createReader()) {
-                assertEquals(TestColumnStoreUtils.DEF_BATCH_LENGTH, reader.maxLength());
-            }
+            assertEquals(TestColumnStoreUtils.DEF_BATCH_LENGTH, store.maxLength());
         }
     }
 

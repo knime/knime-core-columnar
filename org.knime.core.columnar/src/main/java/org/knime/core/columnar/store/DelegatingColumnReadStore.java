@@ -85,6 +85,8 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
 
         private final AtomicBoolean m_storeClosed;
 
+        private final int m_numBatches;
+
         private BatchReader m_delegate;
 
         private boolean m_readerClosed;
@@ -97,6 +99,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
             m_delegateStore = store.m_delegate;
             m_selection = selection;
             m_storeClosed = store.m_storeClosed;
+            m_numBatches = store.numBatches();
         }
 
         /**
@@ -107,6 +110,7 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
             m_delegateStore = store.m_delegate;
             m_selection = selection;
             m_storeClosed = store.m_storeClosed;
+            m_numBatches = store.numBatches();
         }
 
         @Override
@@ -120,10 +124,10 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
             if (index < 0) {
                 throw new IndexOutOfBoundsException(String.format("Batch index %d smaller than 0.", index));
             }
-            if (index >= numBatches()) {
+            if (index >= m_numBatches) {
                 throw new IndexOutOfBoundsException(
                     String.format("Batch index %d greater or equal to the reader's largest batch index (%d).", index,
-                        numBatches() - 1));
+                        m_numBatches - 1));
             }
 
             return readRetainedInternal(index);
@@ -139,18 +143,6 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
         @SuppressWarnings("resource")
         protected ReadBatch readRetainedInternal(final int index) throws IOException {
             return initAndGetDelegate().readRetained(index);
-        }
-
-        @Override
-        @SuppressWarnings("resource")
-        public int numBatches() throws IOException {
-            return initAndGetDelegate().numBatches();
-        }
-
-        @Override
-        @SuppressWarnings("resource")
-        public int maxLength() throws IOException {
-            return initAndGetDelegate().maxLength();
         }
 
         @Override
@@ -246,6 +238,16 @@ public abstract class DelegatingColumnReadStore implements ColumnReadStore {
     @Override
     public final ColumnStoreSchema getSchema() {
         return m_delegate.getSchema();
+    }
+
+    @Override
+    public int numBatches() {
+        return m_delegate.numBatches();
+    }
+
+    @Override
+    public int maxLength() {
+        return m_delegate.maxLength();
     }
 
     @Override

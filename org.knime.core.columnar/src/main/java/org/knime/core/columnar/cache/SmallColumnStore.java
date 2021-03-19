@@ -119,12 +119,9 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
         private final AtomicLong m_sizeOf = new AtomicLong();
 
-        private final AtomicInteger m_maxDataCapacity = new AtomicInteger();
-
         void retainAndAddBatch(final ReadBatch batch) {
             batch.retain();
             m_sizeOf.addAndGet(batch.sizeOf());
-            m_maxDataCapacity.accumulateAndGet(batch.length(), Math::max);
             m_batches.add(batch);
         }
 
@@ -155,14 +152,6 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             return m_sizeOf.get();
         }
 
-        int getMaxDataCapacity() {
-            return m_maxDataCapacity.get();
-        }
-
-        int getNumChunks() {
-            return m_batches.size();
-        }
-
     }
 
     private static final String ERROR_MESSAGE_ON_FLUSH = "Error while flushing small table.";
@@ -181,6 +170,8 @@ public final class SmallColumnStore extends DelegatingColumnStore {
 
         @Override
         protected void writeInternal(final ReadBatch batch) throws IOException {
+            m_maxLength.accumulateAndGet(batch.length(), Math::max);
+            m_numBatches.incrementAndGet();
             if (m_table != null) {
                 m_table.retainAndAddBatch(batch);
                 if (m_table.sizeOf() > m_smallTableThreshold) {
@@ -230,7 +221,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             if (!m_flushed) {
                 m_flushed = true;
                 try {
-                    for (int i = 0; i < table.getNumChunks(); i++) {
+                    for (int i = 0; i < table.m_batches.size(); i++) {
                         final ReadBatch batch = table.getBatch(i);
                         @SuppressWarnings("resource")
                         final BatchWriter delegate = initAndGetDelegate();
@@ -295,21 +286,15 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             }
         }
 
-        @Override
-        public int numBatches() {
-            return m_table.getNumChunks();
-        }
-
-        @Override
-        public int maxLength() {
-            return m_table.getMaxDataCapacity();
-        }
-
     }
 
     private final int m_smallTableThreshold;
 
     private final EvictingCache<SmallColumnStore, Table> m_globalCache;
+
+    private final AtomicInteger m_numBatches = new AtomicInteger();
+
+    private final AtomicInteger m_maxLength = new AtomicInteger();
 
     // lazily initialized on flush
     private SmallBatchWriter m_writer;
@@ -368,6 +353,16 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             removed.release();
         }
         super.closeOnce();
+    }
+
+    @Override
+    public int numBatches() {
+        return m_numBatches.get();
+    }
+
+    @Override
+    public int maxLength() {
+        return m_maxLength.get();
     }
 
 }

@@ -665,11 +665,11 @@ public final class TestColumnStoreUtils {
     public static TestDataTable readSelectionAndCompareTable(final ColumnReadStore store, final TestDataTable table,
         final int... indices) throws IOException {
 
-        try (final BatchReader reader = createReader(store, indices)) {
-            assertEquals(table.size(), reader.numBatches());
+        assertEquals(table.size(), store.numBatches());
 
+        try (final BatchReader reader = createReader(store, indices)) {
             final List<TestData[]> result = new ArrayList<>();
-            for (int i = 0; i < reader.numBatches(); i++) {
+            for (int i = 0; i < store.numBatches(); i++) {
                 final TestData[] written = table.getBatch(i);
                 final ReadBatch batch = reader.readRetained(i);
                 final TestData[] data = new TestData[store.getSchema().numColumns()];
@@ -702,10 +702,10 @@ public final class TestColumnStoreUtils {
     public static void readSelectionAndCompareTable(final ColumnReadStore store, final List<NullableReadData[]> table,
         final int... indices) throws IOException {
 
-        try (final BatchReader reader = createReader(store, indices)) {
-            assertEquals(table.size(), reader.numBatches());
+        assertEquals(table.size(), store.numBatches());
 
-            for (int i = 0; i < reader.numBatches(); i++) {
+        try (final BatchReader reader = createReader(store, indices)) {
+            for (int i = 0; i < store.numBatches(); i++) {
                 final NullableReadData[] refBatch = table.get(i);
                 final ReadBatch readBatch = reader.readRetained(i);
 
@@ -735,8 +735,7 @@ public final class TestColumnStoreUtils {
     public static void readTwiceAndCompareTable(final ColumnReadStore store) throws IOException {
         try (final BatchReader reader1 = store.createReader();
                 final BatchReader reader2 = store.createReader()) {
-            assertEquals(reader1.numBatches(), reader2.numBatches());
-            for (int i = 0; i < reader1.numBatches(); i++) {
+            for (int i = 0; i < store.numBatches(); i++) {
                 final ReadBatch batch1 = reader1.readRetained(i);
                 final ReadBatch batch2 = reader2.readRetained(i);
 

@@ -70,20 +70,4 @@ public interface BatchReader extends Closeable {
      */
     ReadBatch readRetained(int index) throws IOException;
 
-    /**
-     * Obtain the number of batches this reader can read, i.e., the number of valid indices.
-     *
-     * @return the number of valid indices for reading
-     * @throws IOException if any I/O problem occurs
-     */
-    int numBatches() throws IOException;
-
-    /**
-     * Obtain the maximum {@link ReadBatch#length()} among batches this reader can read.
-     *
-     * @return the maximum length among batches
-     * @throws IOException if any I/O problem occurs
-     */
-    int maxLength() throws IOException;
-
 }

@@ -217,6 +217,16 @@ public abstract class DelegatingColumnStore implements ColumnStore {
     }
 
     @Override
+    public int numBatches() {
+        return m_delegate.numBatches();
+    }
+
+    @Override
+    public int maxLength() {
+        return m_delegate.maxLength();
+    }
+
+    @Override
     public final BatchWriter getWriter() {
         if (m_writerClosed.get()) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);

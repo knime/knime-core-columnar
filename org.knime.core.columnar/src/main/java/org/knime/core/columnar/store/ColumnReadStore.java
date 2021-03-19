@@ -97,6 +97,20 @@ public interface ColumnReadStore extends Closeable {
      */
     ColumnStoreSchema getSchema();
 
+    /**
+     * Obtain the number of batches in this store, i.e., the number of valid indices for readers provided by this store.
+     *
+     * @return the number of valid indices for reading
+     */
+    int numBatches();
+
+    /**
+     * Obtain the maximum {@link ReadBatch#length()} among batches in this store.
+     *
+     * @return the maximum length among batches
+     */
+    int maxLength();
+
     @Override
     void close() throws IOException;
 
