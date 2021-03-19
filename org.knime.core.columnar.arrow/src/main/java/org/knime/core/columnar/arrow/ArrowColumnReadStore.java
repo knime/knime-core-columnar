@@ -47,10 +47,11 @@ package org.knime.core.columnar.arrow;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStoreSchema;
 
@@ -68,10 +69,21 @@ final class ArrowColumnReadStore implements ColumnReadStore {
 
     private final ColumnStoreSchema m_schema;
 
+    private AtomicInteger m_numBatches;
+
+    private AtomicInteger m_maxLength;
+
     ArrowColumnReadStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator) {
+        this(schema, file, allocator, null, null);
+    }
+
+    ArrowColumnReadStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator,
+        final AtomicInteger numBatches, final AtomicInteger maxLength) {
         m_schema = schema;
         m_file = file;
         m_allocator = allocator;
+        m_numBatches = numBatches;
+        m_maxLength = maxLength;
     }
 
     @Override
@@ -85,7 +97,7 @@ final class ArrowColumnReadStore implements ColumnReadStore {
     }
 
     @Override
-    public BatchReader createReader(final ColumnSelection config) {
+    public ArrowColumnDataReader createReader(final ColumnSelection config) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
         return new ArrowColumnDataReader(m_file, m_allocator, factories, config);
     }
@@ -94,4 +106,30 @@ final class ArrowColumnReadStore implements ColumnReadStore {
     public ColumnStoreSchema getSchema() {
         return m_schema;
     }
+
+    private final void initNumBatchesMaxLength() {
+        try (final ArrowColumnDataReader reader = createReader(new DefaultColumnSelection(m_schema.numColumns()))) {
+            m_numBatches = new AtomicInteger(reader.numBatches());
+            m_maxLength = new AtomicInteger(reader.maxLength());
+        } catch (final IOException e) {
+            throw new IllegalStateException("Error when reading footer.", e);
+        }
+    }
+
+    @Override
+    public int numBatches() {
+        if (m_numBatches == null) {
+            initNumBatchesMaxLength();
+        }
+        return m_numBatches.get();
+    }
+
+    @Override
+    public int maxLength() {
+        if (m_maxLength == null) {
+            initNumBatchesMaxLength();
+        }
+        return m_maxLength.get();
+    }
+
 }

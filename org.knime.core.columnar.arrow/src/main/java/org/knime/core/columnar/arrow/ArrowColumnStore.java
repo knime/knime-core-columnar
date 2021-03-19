@@ -73,7 +73,9 @@ final class ArrowColumnStore implements ColumnStore {
 
     private final BufferAllocator m_allocator;
 
-    private ArrowCompression m_compression;
+    private final ArrowCompression m_compression;
+
+    private final ArrowColumnDataWriter m_writer;
 
     ArrowColumnStore(final ColumnStoreSchema schema, final File file, final ArrowCompression compression,
         final BufferAllocator allocator) {
@@ -81,12 +83,13 @@ final class ArrowColumnStore implements ColumnStore {
         m_file = file;
         m_compression = compression;
         m_allocator = allocator;
-        m_delegate = new ArrowColumnReadStore(schema, file, allocator);
+        m_writer = new ArrowColumnDataWriter(m_file, m_factories, m_compression, m_allocator);
+        m_delegate = new ArrowColumnReadStore(schema, file, allocator, m_writer.m_numBatches, m_writer.m_chunkSize);
     }
 
     @Override
     public BatchWriter getWriter() {
-        return new ArrowColumnDataWriter(m_file, m_factories, m_compression, m_allocator);
+        return m_writer;
     }
 
     @Override
@@ -100,6 +103,16 @@ final class ArrowColumnStore implements ColumnStore {
     }
 
     @Override
+    public int numBatches() {
+        return m_delegate.numBatches();
+    }
+
+    @Override
+    public int maxLength() {
+        return m_delegate.maxLength();
+    }
+
+    @Override
     public void save(final File f) throws IOException {
         Files.copy(m_file.toPath(), f.toPath());
     }
@@ -110,4 +123,5 @@ final class ArrowColumnStore implements ColumnStore {
         m_delegate.close();
         Files.deleteIfExists(m_file.toPath());
     }
+
 }

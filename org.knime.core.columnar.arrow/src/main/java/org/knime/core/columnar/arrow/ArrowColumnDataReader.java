@@ -236,16 +236,14 @@ class ArrowColumnDataReader implements BatchReader {
         }
     }
 
-    @Override
-    public int numBatches() throws IOException {
+    int numBatches() throws IOException {
         if (m_reader == null) {
             initializeReader();
         }
         return m_reader.getNumberOfBatches();
     }
 
-    @Override
-    public int maxLength() throws IOException {
+    int maxLength() throws IOException {
         if (m_reader == null) {
             initializeReader();
         }

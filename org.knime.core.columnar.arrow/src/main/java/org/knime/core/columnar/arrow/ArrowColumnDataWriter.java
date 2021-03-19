@@ -59,6 +59,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -116,7 +117,9 @@ class ArrowColumnDataWriter implements BatchWriter {
 
     private boolean m_closed;
 
-    private int m_chunkSize;
+    final AtomicInteger m_chunkSize = new AtomicInteger();
+
+    final AtomicInteger m_numBatches = new AtomicInteger();
 
     // Initialized on first #write
     private ArrowWriter m_writer;
@@ -153,6 +156,7 @@ class ArrowColumnDataWriter implements BatchWriter {
         final List<Field> fields = new ArrayList<>(m_factories.length);
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
+        m_numBatches.incrementAndGet();
 
         // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
@@ -177,7 +181,7 @@ class ArrowColumnDataWriter implements BatchWriter {
 
         // If this is the first call we need to create the writer and write the schema to the file
         if (m_firstWrite) {
-            m_chunkSize = batch.length();
+            m_chunkSize.set(batch.length());
             m_firstWrite = false;
             final Schema schema = new Schema(fields, Collections.emptyMap());
             m_writer = new ArrowWriter(m_file, schema);
@@ -197,7 +201,7 @@ class ArrowColumnDataWriter implements BatchWriter {
                 final Map<String, String> metadata = new HashMap<>();
 
                 // Max chunk size
-                metadata.put(ARROW_CHUNK_SIZE_KEY, Integer.toString(m_chunkSize));
+                metadata.put(ARROW_CHUNK_SIZE_KEY, Integer.toString(m_chunkSize.get()));
 
                 // Factory versions
                 final String factoryVersions = Arrays.stream(m_factories) //
