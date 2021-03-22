@@ -45,7 +45,6 @@
  */
 package org.knime.core.columnar.cache;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -316,7 +315,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
     }
 
     @Override
-    protected void saveInternal(final File f) throws IOException {
+    protected void flushInternal() throws IOException {
         final Table cached = m_globalCache.getRetained(SmallColumnStore.this);
         if (cached != null) {
             m_writer.flush(cached, true);
@@ -325,7 +324,7 @@ public final class SmallColumnStore extends DelegatingColumnStore {
             m_writer.waitForDelegateWriter();
         }
 
-        super.saveInternal(f);
+        super.flushInternal();
     }
 
     @SuppressWarnings("resource")

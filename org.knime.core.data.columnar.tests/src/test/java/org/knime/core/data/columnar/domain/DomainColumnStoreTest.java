@@ -228,18 +228,11 @@ public class DomainColumnStoreTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveWhileWriterOpen() throws IOException {
-        try (final ColumnStore store = generateDomainStore()) {
-            store.save(null);
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveAfterStoreClose() throws IOException {
+    public void exceptionOnFlushAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDomainStore()) {
             writeDefaultTable(store);
             store.close(); // NOSONAR
-            store.save(null);
+            store.flush();
         }
     }
 

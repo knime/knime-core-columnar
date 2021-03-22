@@ -47,7 +47,6 @@ package org.knime.core.columnar.testing;
 
 import static org.junit.Assert.assertEquals;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -235,10 +234,7 @@ public final class TestColumnStore implements ColumnStore {
     }
 
     @Override
-    public void save(final File f) {
-        if (!m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
-        }
+    public void flush() {
         if (m_storeClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }

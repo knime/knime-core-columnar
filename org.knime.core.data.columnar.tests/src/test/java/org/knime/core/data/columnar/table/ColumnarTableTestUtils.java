@@ -48,8 +48,8 @@
  */
 package org.knime.core.data.columnar.table;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.store.ColumnReadStore;
@@ -80,12 +80,12 @@ final class ColumnarTableTestUtils {
         }
 
         @Override
-        public ColumnStore createStore(final ColumnStoreSchema schema, final File file) {
+        public ColumnStore createStore(final ColumnStoreSchema schema, final Path path) {
             return TestColumnStore.create(schema);
         }
 
         @Override
-        public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final File file) {
+        public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final Path path) {
             throw new UnsupportedOperationException("Loading from file not supported by test column store.");
         }
 

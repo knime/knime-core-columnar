@@ -45,7 +45,7 @@
  */
 package org.knime.core.columnar;
 
-import java.io.File;
+import java.nio.file.Path;
 
 import org.knime.core.columnar.store.ColumnReadStore;
 import org.knime.core.columnar.store.ColumnStore;
@@ -60,12 +60,12 @@ import org.knime.core.columnar.testing.TestColumnStore;
 public final class TestColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
-    public ColumnStore createStore(final ColumnStoreSchema schema, final File file) {
+    public ColumnStore createStore(final ColumnStoreSchema schema, final Path path) {
         return TestColumnStore.create(schema);
     }
 
     @Override
-    public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final File file) {
+    public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final Path path) {
         throw new UnsupportedOperationException("not implemented");
     }
 

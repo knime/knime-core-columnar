@@ -45,8 +45,7 @@
  */
 package org.knime.core.columnar.store;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.Flushable;
 
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
@@ -69,7 +68,7 @@ import org.knime.core.columnar.batch.WriteBatch;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-public interface ColumnWriteStore {
+public interface ColumnWriteStore extends Flushable {
 
     /**
      * Obtains the singleton {@link BatchWriter} of this store.
@@ -77,14 +76,5 @@ public interface ColumnWriteStore {
      * @return the batch writer of this store
      */
     BatchWriter getWriter();
-
-    /**
-     * Flushes this store to a file, from which it can be read by invoking
-     * {@link ColumnStoreFactory#createReadStore(ColumnStoreSchema, File)}.
-     *
-     * @param file the file to which the store should be written
-     * @throws IOException if any I/O problem occurs
-     */
-    void save(File file) throws IOException;
 
 }

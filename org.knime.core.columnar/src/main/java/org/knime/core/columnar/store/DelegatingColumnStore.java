@@ -49,7 +49,6 @@
 package org.knime.core.columnar.store;
 
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -252,25 +251,21 @@ public abstract class DelegatingColumnStore implements ColumnStore {
     }
 
     @Override
-    public final void save(final File file) throws IOException {
-        if (!m_writerClosed.get()) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
-        }
+    public final void flush() throws IOException {
         if (m_storeClosed.get()) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        saveInternal(file);
+        flushInternal();
     }
 
     /**
-     * Calls {@link ColumnWriteStore#save(File) saveInternal} on the delegate store.
+     * Calls {@link ColumnWriteStore#flush() flush} on the delegate writer.
      *
-     * @param f see {@link ColumnWriteStore#save(File)}
      * @throws IOException if an I/O error occurs
      */
-    protected void saveInternal(final File f) throws IOException {
-        m_delegate.save(f);
+    protected void flushInternal() throws IOException {
+        m_delegate.flush();
     }
 
     @Override

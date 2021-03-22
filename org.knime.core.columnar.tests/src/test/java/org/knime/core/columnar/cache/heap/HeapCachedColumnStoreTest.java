@@ -196,18 +196,11 @@ public class HeapCachedColumnStoreTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveWhileWriterOpen() throws IOException {
-        try (final ColumnStore store = generateDefaultHeapCachedStore()) {
-            store.save(null);
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveAfterStoreClose() throws IOException {
+    public void exceptionOnFlushAfterStoreClose() throws IOException {
         try (final ColumnStore store = generateDefaultHeapCachedStore()) {
             releaseTable(writeDefaultTable(store));
             store.close(); // NOSONAR
-            store.save(null);
+            store.flush();
         }
     }
 

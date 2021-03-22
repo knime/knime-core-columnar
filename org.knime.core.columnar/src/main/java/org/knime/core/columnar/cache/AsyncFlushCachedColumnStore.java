@@ -45,7 +45,6 @@
  */
 package org.knime.core.columnar.cache;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -264,7 +263,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
     }
 
     @Override
-    protected void saveInternal(final File f) throws IOException {
+    protected void flushInternal() throws IOException {
         try {
             waitForAndHandleFuture();
         } catch (InterruptedException e) {
@@ -273,7 +272,7 @@ public final class AsyncFlushCachedColumnStore extends DelegatingColumnStore {
             LOGGER.info(ERROR_ON_INTERRUPT);
             return;
         }
-        super.saveInternal(f);
+        super.flushInternal();
     }
 
     @Override

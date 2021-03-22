@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -99,6 +100,8 @@ final class ColumnarRowContainer implements RowContainer {
 
     private final ColumnarValueSchema m_schema;
 
+    private final Path m_path;
+
     private Finalizer m_finalizer;
 
     private ExtensionTable m_table;
@@ -111,8 +114,8 @@ final class ColumnarRowContainer implements RowContainer {
         m_context = context;
         m_storeFactory = storeFactory;
 
-        ColumnStore wrapped =
-            ColumnarPreferenceUtils.wrap(m_storeFactory.createStore(schema, DataContainer.createTempFile(".knable")));
+        m_path = DataContainer.createTempFile(".knable").toPath();
+        ColumnStore wrapped = ColumnarPreferenceUtils.wrap(m_storeFactory.createStore(schema, m_path));
         if (settings.isCheckDuplicateRowKeys()) {
             wrapped = new DuplicateCheckColumnStore(wrapped, new DuplicateChecker(),
                 ColumnarPreferenceUtils.getDuplicateCheckExecutor());
@@ -169,7 +172,7 @@ final class ColumnarRowContainer implements RowContainer {
                 metadata.put(i, m_store.getMetadata(i));
             }
 
-            m_table = UnsavedColumnarContainerTable.create(m_id, m_storeFactory,
+            m_table = UnsavedColumnarContainerTable.create(m_path, m_id, m_storeFactory,
                 ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_delegate.size());
         }
         return m_table;

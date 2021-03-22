@@ -50,6 +50,8 @@ package org.knime.core.data.columnar.table;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -68,17 +70,20 @@ final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable
 
     private final ColumnStore m_store;
 
-    static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
+    private final Path m_path;
+
+    static UnsavedColumnarContainerTable create(final Path path, final int tableId, final ColumnStoreFactory factory,
         final ColumnarValueSchema schema, final ColumnStore store, final long size) {
         final UnsavedColumnarContainerTable table =
-            new UnsavedColumnarContainerTable(tableId, factory, schema, store, size);
+            new UnsavedColumnarContainerTable(path, tableId, factory, schema, store, size);
         table.initStoreCloser();
         return table;
     }
 
-    private UnsavedColumnarContainerTable(final int tableId, //
-        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+    private UnsavedColumnarContainerTable(final Path path, final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
         super(tableId, factory, schema, store, size);
+        m_path = path;
         m_store = store;
     }
 
@@ -86,7 +91,8 @@ final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable
     protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
         throws IOException, CanceledExecutionException {
         super.saveToFileOverwrite(f, settings, exec);
-        m_store.save(f);
+        m_store.flush();
+        Files.copy(m_path, f.toPath());
     }
 
 }

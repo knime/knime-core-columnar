@@ -585,17 +585,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveWhileWriterOpen() throws IOException {
-        try (final TestColumnStore delegate = createDefaultTestColumnStore();
-                final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate)) {
-            try (final BatchWriter writer = store.getWriter()) {
-                store.save(null);
-            }
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveAfterStoreClose() throws IOException {
+    public void exceptionOnFlushAfterStoreClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final AsyncFlushCachedColumnStore store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createEmptyTestTable(delegate)) {
@@ -603,7 +593,7 @@ public class AsyncFlushCachedColumnStoreTest extends ColumnarTest {
                 writeTable(store, table);
             }
             store.close(); // NOSONAR
-            store.save(null);
+            store.flush();
         }
     }
 

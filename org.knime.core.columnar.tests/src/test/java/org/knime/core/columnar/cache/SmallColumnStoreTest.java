@@ -61,7 +61,6 @@ import static org.knime.core.columnar.TestColumnStoreUtils.readTwiceAndCompareTa
 import static org.knime.core.columnar.TestColumnStoreUtils.tableInStore;
 import static org.knime.core.columnar.TestColumnStoreUtils.writeTable;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -258,7 +257,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
     }
 
     @Test
-    public void testSmallWriteEvictSaveRead() throws IOException {
+    public void testSmallWriteEvictFlushRead() throws IOException {
 
         final SmallColumnStoreCache cache = generateCache();
         try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
@@ -272,15 +271,15 @@ public class SmallColumnStoreTest extends ColumnarTest {
             writeTable(store2, table2);
 
             try {
-                store1.save(new File(""));
+                store1.flush();
             } catch (UnsupportedOperationException e) { // NOSONAR
             }
-            saveRead(delegate1, store1, table1, delegate2, store2, table2);
+            flushRead(delegate1, store1, table1, delegate2, store2, table2);
         }
     }
 
     @Test
-    public void testSmallWriteSaveEvictRead() throws IOException {
+    public void testSmallWriteFlushEvictRead() throws IOException {
 
         final SmallColumnStoreCache cache = generateCache();
         try (final TestColumnStore delegate1 = createDefaultTestColumnStore();
@@ -295,7 +294,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
             checkUnflushed(table1, delegate1);
 
             try {
-                store1.save(new File(""));
+                store1.flush();
             } catch (UnsupportedOperationException e) { // NOSONAR
             }
             checkCached(table1);
@@ -304,18 +303,18 @@ public class SmallColumnStoreTest extends ColumnarTest {
             writeTable(store2, table2);
             checkCached(table2);
             checkUnflushed(table2, delegate2);
-            saveRead(delegate1, store1, table1, delegate2, store2, table2);
+            flushRead(delegate1, store1, table1, delegate2, store2, table2);
         }
     }
 
-    private static void saveRead(final TestColumnStore delegate1, final SmallColumnStore store1,
+    private static void flushRead(final TestColumnStore delegate1, final SmallColumnStore store1,
         final TestDataTable table1, final TestColumnStore delegate2, final SmallColumnStore store2,
         final TestDataTable table2) throws IOException {
         checkUncached(table1);
         checkFlushed(table1, delegate1);
 
         try {
-            store2.save(new File(""));
+            store2.flush();
         } catch (UnsupportedOperationException e) { // NOSONAR
         }
         checkCached(table2);
@@ -424,16 +423,6 @@ public class SmallColumnStoreTest extends ColumnarTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void exceptionOnSaveWhileWriterOpen() throws IOException {
-        try (final TestColumnStore delegate = createDefaultTestColumnStore();
-                final SmallColumnStore store = generateDefaultSmallColumnStore(delegate)) {
-            try (final BatchWriter writer = store.getWriter()) {
-                store.save(null);
-            }
-        }
-    }
-
-    @Test(expected = IllegalStateException.class)
     public void exceptionOnSaveAfterStoreClose() throws IOException {
         try (final TestColumnStore delegate = createDefaultTestColumnStore();
                 final SmallColumnStore store = generateDefaultSmallColumnStore(delegate);
@@ -442,7 +431,7 @@ public class SmallColumnStoreTest extends ColumnarTest {
                 writeTable(store, table);
             }
             store.close(); // NOSONAR
-            store.save(null);
+            store.flush();
         }
     }
 
