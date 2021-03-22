@@ -90,15 +90,15 @@ public final class ArrowCompressionUtil {
     public static ArrowCompression getDefaultCompression() {
         if (defaultCompression == null) {
             final String compressionName = System.getProperty(PROPERTY_COMPRESSION);
-            if (compressionName == null || PROPERTY_COMPRESSION_LZ4.equals(compressionName)) {
-                defaultCompression = ARROW_LZ4_COMPRESSION;
-            } else if (PROPERTY_COMPRESSION_NONE.equals(compressionName)) {
+            if (compressionName == null || PROPERTY_COMPRESSION_NONE.equals(compressionName)) {
                 defaultCompression = ARROW_NO_COMPRESSION;
+            } else if (PROPERTY_COMPRESSION_LZ4.equals(compressionName)) {
+                defaultCompression = ARROW_LZ4_COMPRESSION;
             } else {
                 LOGGER.error(
                     "Invalid Arrow compression format '{}'. Valid options are ({}|{}). Using the default '{}'.",
-                    compressionName, PROPERTY_COMPRESSION_LZ4, PROPERTY_COMPRESSION_NONE, PROPERTY_COMPRESSION_LZ4);
-                defaultCompression = ARROW_LZ4_COMPRESSION;
+                    compressionName, PROPERTY_COMPRESSION_LZ4, PROPERTY_COMPRESSION_NONE, PROPERTY_COMPRESSION_NONE);
+                defaultCompression = ARROW_NO_COMPRESSION;
             }
         }
         return defaultCompression;
