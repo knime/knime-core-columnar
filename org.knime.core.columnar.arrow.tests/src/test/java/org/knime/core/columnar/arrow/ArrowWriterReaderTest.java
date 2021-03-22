@@ -54,13 +54,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.knime.core.columnar.arrow.ArrowTestUtils.createTmpKNIMEArrowFile;
+import static org.knime.core.columnar.arrow.ArrowTestUtils.createTmpKNIMEArrowPath;
 import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_LZ4_COMPRESSION;
 import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_NO_COMPRESSION;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -109,7 +109,7 @@ public class ArrowWriterReaderTest {
 
     private RootAllocator m_alloc;
 
-    private File m_file;
+    private Path m_path;
 
     /**
      * Create the root allocator for each test
@@ -119,7 +119,7 @@ public class ArrowWriterReaderTest {
     @Before
     public void before() throws IOException {
         m_alloc = new RootAllocator();
-        m_file = createTmpKNIMEArrowFile();
+        m_path = createTmpKNIMEArrowPath();
     }
 
     /**
@@ -130,7 +130,7 @@ public class ArrowWriterReaderTest {
     @After
     public void after() throws IOException {
         m_alloc.close();
-        Files.delete(m_file.toPath());
+        Files.delete(m_path);
     }
 
     /**
@@ -309,7 +309,7 @@ public class ArrowWriterReaderTest {
 
         // Write the data to a file
         try (final ArrowColumnDataWriter writer =
-            new ArrowColumnDataWriter(m_file, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+            new ArrowColumnDataWriter(m_path.toFile(), factories, ARROW_NO_COMPRESSION, m_alloc)) {
             writer.write(batch1);
             writer.write(batch2);
         }
@@ -318,7 +318,7 @@ public class ArrowWriterReaderTest {
 
         // Read the data from the file
         try (final ArrowColumnDataReader reader =
-            new ArrowColumnDataReader(m_file, m_alloc, factories, new DefaultColumnSelection(1))) {
+            new ArrowColumnDataReader(m_path.toFile(), m_alloc, factories, new DefaultColumnSelection(1))) {
             assertEquals(64, reader.maxLength());
 
             // Batch 1
@@ -366,7 +366,7 @@ public class ArrowWriterReaderTest {
 
         // Write the data to a file
         try (final ArrowColumnDataWriter writer =
-            new ArrowColumnDataWriter(m_file, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+            new ArrowColumnDataWriter(m_path.toFile(), factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -375,7 +375,7 @@ public class ArrowWriterReaderTest {
 
         // Read only one batch of the data
         try (final ArrowColumnDataReader reader =
-            new ArrowColumnDataReader(m_file, m_alloc, factories, new DefaultColumnSelection(numColumns))) {
+            new ArrowColumnDataReader(m_path.toFile(), m_alloc, factories, new DefaultColumnSelection(numColumns))) {
             final int b = 7;
             final ReadBatch batch = reader.readRetained(b);
             for (int c = 0; c < numColumns; c++) {
@@ -417,7 +417,7 @@ public class ArrowWriterReaderTest {
 
         // Write the data to a file
         try (final ArrowColumnDataWriter writer =
-            new ArrowColumnDataWriter(m_file, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+            new ArrowColumnDataWriter(m_path.toFile(), factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -426,7 +426,7 @@ public class ArrowWriterReaderTest {
 
         // Read only some columns
         try (final ArrowColumnDataReader reader =
-            new ArrowColumnDataReader(m_file, m_alloc, factories, new FilteredColumnSelection(numColumns, 0, 2))) {
+            new ArrowColumnDataReader(m_path.toFile(), m_alloc, factories, new FilteredColumnSelection(numColumns, 0, 2))) {
             assertEquals(numBatches, reader.numBatches());
             assertEquals(capacity, reader.maxLength());
             for (int b = 0; b < numBatches; b++) {
@@ -476,7 +476,7 @@ public class ArrowWriterReaderTest {
 
         // Write the data to a file
         try (final ArrowColumnDataWriter writer =
-            new ArrowColumnDataWriter(m_file, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+            new ArrowColumnDataWriter(m_path.toFile(), factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -485,7 +485,7 @@ public class ArrowWriterReaderTest {
 
         // Read only some columns
         try (final ArrowColumnDataReader reader =
-            new ArrowColumnDataReader(m_file, m_alloc, factories, new FilteredColumnSelection(numColumns, 0, 2))) {
+            new ArrowColumnDataReader(m_path.toFile(), m_alloc, factories, new FilteredColumnSelection(numColumns, 0, 2))) {
             assertEquals(numBatches, reader.numBatches());
             assertEquals(capacity, reader.maxLength());
             for (int b = 0; b < numBatches; b++) {
@@ -582,7 +582,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_file, factories, compression, m_alloc)) {
+        try (final ArrowColumnDataWriter writer = new ArrowColumnDataWriter(m_path.toFile(), factories, compression, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -591,7 +591,7 @@ public class ArrowWriterReaderTest {
 
         // Read the data from the file
         try (final ArrowColumnDataReader reader =
-            new ArrowColumnDataReader(m_file, m_alloc, factories, new DefaultColumnSelection(numColumns))) {
+            new ArrowColumnDataReader(m_path.toFile(), m_alloc, factories, new DefaultColumnSelection(numColumns))) {
             assertEquals(numBatches, reader.numBatches());
             assertEquals(capacity, reader.maxLength());
             for (int b = 0; b < numBatches; b++) {

@@ -45,8 +45,8 @@
  */
 package org.knime.core.columnar.arrow;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -65,7 +65,7 @@ final class ArrowColumnReadStore implements ColumnReadStore {
 
     private final BufferAllocator m_allocator;
 
-    private final File m_file;
+    private final Path m_path;
 
     private final ColumnStoreSchema m_schema;
 
@@ -73,14 +73,14 @@ final class ArrowColumnReadStore implements ColumnReadStore {
 
     private AtomicInteger m_maxLength;
 
-    ArrowColumnReadStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator) {
-        this(schema, file, allocator, null, null);
+    ArrowColumnReadStore(final ColumnStoreSchema schema, final Path path, final BufferAllocator allocator) {
+        this(schema, path, allocator, null, null);
     }
 
-    ArrowColumnReadStore(final ColumnStoreSchema schema, final File file, final BufferAllocator allocator,
+    ArrowColumnReadStore(final ColumnStoreSchema schema, final Path path, final BufferAllocator allocator,
         final AtomicInteger numBatches, final AtomicInteger maxLength) {
         m_schema = schema;
-        m_file = file;
+        m_path = path;
         m_allocator = allocator;
         m_numBatches = numBatches;
         m_maxLength = maxLength;
@@ -99,7 +99,7 @@ final class ArrowColumnReadStore implements ColumnReadStore {
     @Override
     public ArrowColumnDataReader createReader(final ColumnSelection config) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
-        return new ArrowColumnDataReader(m_file, m_allocator, factories, config);
+        return new ArrowColumnDataReader(m_path.toFile(), m_allocator, factories, config);
     }
 
     @Override

@@ -560,7 +560,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
+        final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowColumnDataWriter writer =
             new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
@@ -606,7 +606,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
+        final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowColumnDataWriter writer =
             new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
@@ -653,7 +653,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final File tmp = ArrowTestUtils.createTmpKNIMEArrowFile();
+        final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowColumnDataWriter writer =
             new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {

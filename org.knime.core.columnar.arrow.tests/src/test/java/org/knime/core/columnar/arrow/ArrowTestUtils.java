@@ -53,9 +53,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.function.LongSupplier;
@@ -100,11 +100,10 @@ public final class ArrowTestUtils {
      * @return the file
      * @throws IOException if the file could not be created
      */
-    public static File createTmpKNIMEArrowFile() throws IOException {
-        // file
-        final File f = Files.createTempFile("KNIME-" + UUID.randomUUID().toString(), ".knarrow").toFile();
-        f.deleteOnExit();
-        return f;
+    public static Path createTmpKNIMEArrowPath() throws IOException {
+        final Path path = Files.createTempFile("KNIME-" + UUID.randomUUID().toString(), ".knarrow");
+        path.toFile().deleteOnExit();
+        return path;
     }
 
     /**

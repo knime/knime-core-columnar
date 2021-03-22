@@ -45,9 +45,9 @@
  */
 package org.knime.core.columnar.arrow;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
@@ -65,7 +65,7 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  */
 final class ArrowColumnStore implements ColumnStore {
 
-    private final File m_file;
+    private final Path m_path;
 
     private final ArrowColumnReadStore m_delegate;
 
@@ -77,14 +77,14 @@ final class ArrowColumnStore implements ColumnStore {
 
     private final ArrowColumnDataWriter m_writer;
 
-    ArrowColumnStore(final ColumnStoreSchema schema, final File file, final ArrowCompression compression,
+    ArrowColumnStore(final ColumnStoreSchema schema, final Path path, final ArrowCompression compression,
         final BufferAllocator allocator) {
         m_factories = ArrowSchemaMapper.map(schema);
-        m_file = file;
+        m_path = path;
         m_compression = compression;
         m_allocator = allocator;
-        m_writer = new ArrowColumnDataWriter(m_file, m_factories, m_compression, m_allocator);
-        m_delegate = new ArrowColumnReadStore(schema, file, allocator, m_writer.m_numBatches, m_writer.m_chunkSize);
+        m_writer = new ArrowColumnDataWriter(path.toFile(), m_factories, m_compression, m_allocator);
+        m_delegate = new ArrowColumnReadStore(schema, path, allocator, m_writer.m_numBatches, m_writer.m_chunkSize);
     }
 
     @Override
@@ -113,15 +113,15 @@ final class ArrowColumnStore implements ColumnStore {
     }
 
     @Override
-    public void save(final File f) throws IOException {
-        Files.copy(m_file.toPath(), f.toPath());
+    public void flush() {
+        // nothing to do; this store is always flushed
     }
-
+    
     @Override
     public void close() throws IOException {
         // m_allocator is closed via the delegate.
         m_delegate.close();
-        Files.deleteIfExists(m_file.toPath());
+        Files.deleteIfExists(m_path);
     }
 
 }

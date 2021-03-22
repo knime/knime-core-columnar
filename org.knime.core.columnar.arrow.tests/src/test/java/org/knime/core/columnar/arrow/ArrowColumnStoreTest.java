@@ -53,9 +53,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -98,11 +98,9 @@ public class ArrowColumnStoreTest {
     /**
      * Test the {@link ArrowColumnStoreFactory} with an allocator with a very small limit which is not enough for
      * allocating the data.
-     *
-     * @throws IOException
      */
     @Test
-    public void testCreateWriterReaderCustomUnsufficientAllocator() throws IOException {
+    public void testCreateWriterReaderCustomUnsufficientAllocator() {
         try (final RootAllocator allocator = new RootAllocator()) {
             final ArrowColumnStoreFactory factory = new ArrowColumnStoreFactory(allocator, 10, 10);
             assertThrows(OutOfMemoryException.class, () -> testCreateWriterReader(factory));
@@ -142,12 +140,12 @@ public class ArrowColumnStoreTest {
         final int chunkSize = 64;
         final ColumnStoreSchema schema = ArrowTestUtils.createSchema(DataSpec.doubleSpec());
 
-        final File writeFile = ArrowTestUtils.createTmpKNIMEArrowFile();
-        final File readFile = ArrowTestUtils.createTmpKNIMEArrowFile();
-        Files.delete(readFile.toPath());
+        final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
+        final Path readPath = ArrowTestUtils.createTmpKNIMEArrowPath();
+        Files.delete(readPath);
 
         // Use the write store to write some data
-        try (final ColumnStore writeStore = factory.createStore(schema, writeFile)) {
+        try (final ColumnStore writeStore = factory.createStore(schema, writePath)) {
             assertEquals(schema, writeStore.getSchema());
 
             // Create a batch
@@ -165,19 +163,19 @@ public class ArrowColumnStoreTest {
             readBatch.release();
 
             // Assert that the file has been written
-            assertTrue(writeFile.exists());
-            assertTrue(writeFile.length() > 0);
+            assertTrue(Files.exists(writePath));
+            assertTrue(Files.size(writePath) > 0);
 
-            // Save to the read file for reading
-            writeStore.save(readFile);
+            writeStore.flush();
+            Files.copy(writePath, readPath);
         }
 
         // Assert that the file for reading exists
-        assertTrue(readFile.exists());
-        assertTrue(readFile.length() > 0);
+        assertTrue(Files.exists(readPath));
+        assertTrue(Files.size(readPath) > 0);
 
         // Use the read store to read some data
-        try (final ColumnReadStore readStore = factory.createReadStore(schema, readFile)) {
+        try (final ColumnReadStore readStore = factory.createReadStore(schema, readPath)) {
             assertEquals(schema, readStore.getSchema());
 
             // Read the batch
@@ -198,7 +196,7 @@ public class ArrowColumnStoreTest {
         }
 
         // Assert that the file for reading exists
-        assertTrue(readFile.exists());
-        assertTrue(readFile.length() > 0);
+        assertTrue(Files.exists(readPath));
+        assertTrue(Files.size(readPath) > 0);
     }
 }

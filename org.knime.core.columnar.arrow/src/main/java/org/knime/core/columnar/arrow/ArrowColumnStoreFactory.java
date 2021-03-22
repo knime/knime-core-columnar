@@ -45,7 +45,7 @@
  */
 package org.knime.core.columnar.arrow;
 
-import java.io.File;
+import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -100,17 +100,17 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowColumnStore createStore(final ColumnStoreSchema schema, final File file) {
+    public ArrowColumnStore createStore(final ColumnStoreSchema schema, final Path path) {
         final BufferAllocator allocator =
             m_allocator.newChildAllocator("ArrowColumnStore", m_initReservation, m_maxAllocation);
-        return new ArrowColumnStore(schema, file, m_compression, allocator);
+        return new ArrowColumnStore(schema, path, m_compression, allocator);
     }
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowColumnReadStore createReadStore(final ColumnStoreSchema schema, final File file) {
+    public ArrowColumnReadStore createReadStore(final ColumnStoreSchema schema, final Path path) {
         final BufferAllocator allocator =
             m_allocator.newChildAllocator("ArrowColumnReadStore", m_initReservation, m_maxAllocation);
-        return new ArrowColumnReadStore(schema, file, allocator);
+        return new ArrowColumnReadStore(schema, path, allocator);
     }
 }
