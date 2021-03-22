@@ -85,12 +85,12 @@ import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.store.BatchWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,9 +100,9 @@ import org.slf4j.LoggerFactory;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-class ArrowColumnDataWriter implements BatchWriter {
+class ArrowBatchWriter implements BatchWriter {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ArrowColumnDataWriter.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ArrowBatchWriter.class);
 
     private final File m_file;
 
@@ -132,7 +132,7 @@ class ArrowColumnDataWriter implements BatchWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    ArrowColumnDataWriter(final File file, final ArrowColumnDataFactory[] factories,
+    ArrowBatchWriter(final File file, final ArrowColumnDataFactory[] factories,
         final ArrowCompression compression, final BufferAllocator allocator) {
         m_file = file;
         m_factories = factories;

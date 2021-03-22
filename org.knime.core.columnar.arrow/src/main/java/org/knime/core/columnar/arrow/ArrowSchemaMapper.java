@@ -47,6 +47,7 @@ package org.knime.core.columnar.arrow;
 
 import java.util.stream.IntStream;
 
+import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
@@ -88,10 +89,9 @@ import org.knime.core.columnar.data.StructData.StructDataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
 import org.knime.core.columnar.data.VoidData.VoidDataSpec;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
-import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
- * Utility class to map a {@link ColumnStoreSchema} to an array of {@link ArrowColumnDataFactory}. The factories can be
+ * Utility class to map a {@link ColumnarSchema} to an array of {@link ArrowColumnDataFactory}. The factories can be
  * used to create, read or write the Arrow implementations of {@link NullableReadData} and {@link NullableWriteData}.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
@@ -107,13 +107,13 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     }
 
     /**
-     * Map each column of the {@link ColumnStoreSchema} to the according {@link ArrowColumnDataFactory}. The factory can
+     * Map each column of the {@link ColumnarSchema} to the according {@link ArrowColumnDataFactory}. The factory can
      * be used to create, read or write the Arrow implementation of {@link NullableReadData} and {@link NullableWriteData}.
      *
      * @param schema the schema of the column store
      * @return the factories
      */
-    static ArrowColumnDataFactory[] map(final ColumnStoreSchema schema) {
+    static ArrowColumnDataFactory[] map(final ColumnarSchema schema) {
         return IntStream.range(0, schema.numColumns()) //
             .mapToObj(schema::getSpec) //
             .map(ArrowSchemaMapper::map) //

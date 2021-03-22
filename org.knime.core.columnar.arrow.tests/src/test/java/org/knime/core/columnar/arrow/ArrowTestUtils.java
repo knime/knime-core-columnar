@@ -80,7 +80,7 @@ import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.BatchStoreSchema;
 
 /**
  * A static class with utility methods for arrow tests.
@@ -112,8 +112,8 @@ public final class ArrowTestUtils {
      * @param types the types of the columns
      * @return the schema
      */
-    public static ColumnStoreSchema createSchema(final DataSpec... types) {
-        return new ColumnStoreSchema() {
+    public static BatchStoreSchema createSchema(final DataSpec... types) {
+        return new BatchStoreSchema() {
 
             @Override
             public int numColumns() {
@@ -134,7 +134,7 @@ public final class ArrowTestUtils {
      * @param width the number of columns
      * @return the schema
      */
-    public static ColumnStoreSchema createWideSchema(final DataSpec type, final int width) {
+    public static BatchStoreSchema createWideSchema(final DataSpec type, final int width) {
         final DataSpec[] types = new DataSpec[width];
         for (int i = 0; i < width; i++) {
             types[i] = type;

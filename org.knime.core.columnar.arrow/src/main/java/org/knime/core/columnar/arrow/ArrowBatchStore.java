@@ -46,90 +46,77 @@
 package org.knime.core.columnar.arrow;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.ColumnarSchema;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.DefaultColumnSelection;
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.BatchStore;
 
 /**
- * A {@link ColumnReadStore} implementation for Arrow.
+ * A {@link BatchStore} implementation for Arrow.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-final class ArrowColumnReadStore implements ColumnReadStore {
-
-    private final BufferAllocator m_allocator;
+final class ArrowBatchStore implements BatchStore {
 
     private final Path m_path;
 
-    private final ColumnStoreSchema m_schema;
+    private final ArrowBatchReadStore m_delegate;
 
-    private AtomicInteger m_numBatches;
+    private final ArrowColumnDataFactory[] m_factories;
 
-    private AtomicInteger m_maxLength;
+    private final BufferAllocator m_allocator;
 
-    ArrowColumnReadStore(final ColumnStoreSchema schema, final Path path, final BufferAllocator allocator) {
-        this(schema, path, allocator, null, null);
-    }
+    private final ArrowCompression m_compression;
 
-    ArrowColumnReadStore(final ColumnStoreSchema schema, final Path path, final BufferAllocator allocator,
-        final AtomicInteger numBatches, final AtomicInteger maxLength) {
-        m_schema = schema;
+    private final ArrowBatchWriter m_writer;
+
+    ArrowBatchStore(final ColumnarSchema schema, final Path path, final ArrowCompression compression,
+        final BufferAllocator allocator) {
+        m_factories = ArrowSchemaMapper.map(schema);
         m_path = path;
+        m_compression = compression;
         m_allocator = allocator;
-        m_numBatches = numBatches;
-        m_maxLength = maxLength;
+        m_writer = new ArrowBatchWriter(path.toFile(), m_factories, m_compression, m_allocator);
+        m_delegate = new ArrowBatchReadStore(schema, path, allocator, m_writer.m_numBatches, m_writer.m_chunkSize);
     }
 
     @Override
-    public void close() throws IOException {
-        final long allocated = m_allocator.getAllocatedMemory();
-        if (allocated > 0) {
-            throw new IOException(
-                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
-        }
-        m_allocator.close();
+    public BatchWriter getWriter() {
+        return m_writer;
     }
 
     @Override
-    public ArrowColumnDataReader createReader(final ColumnSelection config) {
-        final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
-        return new ArrowColumnDataReader(m_path.toFile(), m_allocator, factories, config);
+    public RandomAccessBatchReader createReader(final ColumnSelection config) {
+        return m_delegate.createReader(config);
     }
 
     @Override
-    public ColumnStoreSchema getSchema() {
-        return m_schema;
-    }
-
-    private final void initNumBatchesMaxLength() {
-        try (final ArrowColumnDataReader reader = createReader(new DefaultColumnSelection(m_schema.numColumns()))) {
-            m_numBatches = new AtomicInteger(reader.numBatches());
-            m_maxLength = new AtomicInteger(reader.maxLength());
-        } catch (final IOException e) {
-            throw new IllegalStateException("Error when reading footer.", e);
-        }
+    public ColumnarSchema getSchema() {
+        return m_delegate.getSchema();
     }
 
     @Override
     public int numBatches() {
-        if (m_numBatches == null) {
-            initNumBatchesMaxLength();
-        }
-        return m_numBatches.get();
+        return m_delegate.numBatches();
     }
 
     @Override
-    public int maxLength() {
-        if (m_maxLength == null) {
-            initNumBatchesMaxLength();
-        }
-        return m_maxLength.get();
+    public int batchLength() {
+        return m_delegate.batchLength();
+    }
+
+    @Override
+    public void close() throws IOException {
+        // m_allocator is closed via the delegate.
+        m_delegate.close();
+        Files.deleteIfExists(m_path);
     }
 
 }

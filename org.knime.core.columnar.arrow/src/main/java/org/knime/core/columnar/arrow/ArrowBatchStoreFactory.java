@@ -49,12 +49,12 @@ import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreSchema;
 
 /**
  * A {@link ColumnStoreFactory} implementation for Arrow.
@@ -62,7 +62,7 @@ import org.knime.core.columnar.store.ColumnStoreSchema;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowColumnStoreFactory implements ColumnStoreFactory {
+public class ArrowBatchStoreFactory implements ColumnStoreFactory {
 
     private static final RootAllocator ROOT = new RootAllocator();
 
@@ -77,20 +77,20 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     /**
      * Create a {@link ColumnStoreFactory} for Arrow using the default root allocator.
      */
-    public ArrowColumnStoreFactory() {
+    public ArrowBatchStoreFactory() {
         this(ROOT, 0, ROOT.getLimit());
     }
 
     /**
-     * Create a {@link ColumnStoreFactory} for Arrow using the given allocator. For each {@link ColumnStore} and
-     * {@link ColumnReadStore} the allocator is used to create a child allocator with the given initial reservation and
+     * Create a {@link ColumnStoreFactory} for Arrow using the given allocator. For each {@link BatchStore} and
+     * {@link BatchReadStore} the allocator is used to create a child allocator with the given initial reservation and
      * max allocation.
      *
      * @param allocator the allocator to use
      * @param initReservation the initial reservation for a child allocator
      * @param maxAllocation the maximum alloaction for the child allocator
      */
-    public ArrowColumnStoreFactory(final BufferAllocator allocator, final long initReservation,
+    public ArrowBatchStoreFactory(final BufferAllocator allocator, final long initReservation,
         final long maxAllocation) {
         m_allocator = allocator;
         m_initReservation = initReservation;
@@ -100,17 +100,17 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowColumnStore createStore(final ColumnStoreSchema schema, final Path path) {
+    public ArrowBatchStore createStore(final ColumnarSchema schema, final Path path) {
         final BufferAllocator allocator =
             m_allocator.newChildAllocator("ArrowColumnStore", m_initReservation, m_maxAllocation);
-        return new ArrowColumnStore(schema, path, m_compression, allocator);
+        return new ArrowBatchStore(schema, path, m_compression, allocator);
     }
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowColumnReadStore createReadStore(final ColumnStoreSchema schema, final Path path) {
+    public ArrowBatchReadStore createReadStore(final ColumnarSchema schema, final Path path) {
         final BufferAllocator allocator =
             m_allocator.newChildAllocator("ArrowColumnReadStore", m_initReservation, m_maxAllocation);
-        return new ArrowColumnReadStore(schema, path, allocator);
+        return new ArrowBatchReadStore(schema, path, allocator);
     }
 }

@@ -69,12 +69,12 @@ import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
-import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.RandomAccessBatchReader;
 import org.knime.core.columnar.store.BatchWriter;
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.store.BatchStoreFactory;
+import org.knime.core.columnar.store.BatchStoreSchema;
 
 /**
  * Test {@link ArrowColumnStoreFactory}, ArrowColumnReadStore and ArrowColumnStore.
@@ -136,16 +136,16 @@ public class ArrowColumnStoreTest {
     }
 
     @SuppressWarnings("resource")
-    private static void testCreateWriterReader(final ColumnStoreFactory factory) throws IOException {
+    private static void testCreateWriterReader(final BatchStoreFactory factory) throws IOException {
         final int chunkSize = 64;
-        final ColumnStoreSchema schema = ArrowTestUtils.createSchema(DataSpec.doubleSpec());
+        final BatchStoreSchema schema = ArrowTestUtils.createSchema(DataSpec.doubleSpec());
 
         final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
         final Path readPath = ArrowTestUtils.createTmpKNIMEArrowPath();
         Files.delete(readPath);
 
         // Use the write store to write some data
-        try (final ColumnStore writeStore = factory.createStore(schema, writePath)) {
+        try (final BatchStore writeStore = factory.createStore(schema, writePath)) {
             assertEquals(schema, writeStore.getSchema());
 
             // Create a batch
@@ -175,12 +175,12 @@ public class ArrowColumnStoreTest {
         assertTrue(Files.size(readPath) > 0);
 
         // Use the read store to read some data
-        try (final ColumnReadStore readStore = factory.createReadStore(schema, readPath)) {
+        try (final BatchReadStore readStore = factory.createReadStore(schema, readPath)) {
             assertEquals(schema, readStore.getSchema());
 
             // Read the batch
             final ReadBatch readBatch;
-            try (final BatchReader reader = readStore.createReader()) {
+            try (final RandomAccessBatchReader reader = readStore.createReader()) {
                 readBatch = reader.readRetained(0);
             }
 

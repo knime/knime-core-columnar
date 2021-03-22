@@ -56,11 +56,11 @@ import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.store.BatchReader;
+import org.knime.core.columnar.store.RandomAccessBatchReader;
 import org.knime.core.columnar.store.BatchWriter;
-import org.knime.core.columnar.store.ColumnStore;
-import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.store.BatchStoreFactory;
+import org.knime.core.columnar.store.BatchStoreSchema;
 
 /**
  * A long running test allocating, writing and reading many chunks.
@@ -88,16 +88,16 @@ public class ArrowMemoryTest {
 
         for (int l = 0; l < numLoops; l++) {
             pool.submit(() -> {
-                final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
-                final ColumnStoreSchema schema =
+                final BatchStoreFactory factory = new ArrowColumnStoreFactory();
+                final BatchStoreSchema schema =
                     ArrowTestUtils.createWideSchema(DataSpec.doubleSpec(), numColumns);
 
-                try (final ColumnStore store =
+                try (final BatchStore store =
                     factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowPath())) {
 
                     storeData(numChunks, chunkSize, numColumns, store);
 
-                    try (final ColumnStore copyStore =
+                    try (final BatchStore copyStore =
                         factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowPath())) {
 
                         copyData(numChunks, store, copyStore);
@@ -111,7 +111,7 @@ public class ArrowMemoryTest {
     /** Store some data into the column store */
     @SuppressWarnings("resource")
     private static void storeData(final int numChunks, final int chunkSize, final int numColumns,
-        final ColumnStore store) throws IOException {
+        final BatchStore store) throws IOException {
         // let's store some data
         try (final BatchWriter writer = store.getWriter()) {
             for (int c = 0; c < numChunks; c++) {
@@ -129,10 +129,10 @@ public class ArrowMemoryTest {
     }
 
     /** Read some data from one column store and copy it to the other */
-    private static void copyData(final int numChunks, final ColumnStore store, final ColumnStore copyStore)
+    private static void copyData(final int numChunks, final BatchStore store, final BatchStore copyStore)
         throws IOException {
         // let's read some data back
-        try (final BatchReader reader = store.createReader();
+        try (final RandomAccessBatchReader reader = store.createReader();
                 final BatchWriter copyWriter = copyStore.getWriter()) {
             for (int c = 0; c < numChunks; c++) {
                 final ReadBatch batch = reader.readRetained(c);

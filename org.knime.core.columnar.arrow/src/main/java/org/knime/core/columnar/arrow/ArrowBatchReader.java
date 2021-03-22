@@ -90,9 +90,9 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory.ArrowVectorNullCount;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchReader;
 
 /**
  * The ArrowColumnDataWriter reads batches of columns from an Arrow file.
@@ -100,7 +100,7 @@ import org.knime.core.columnar.store.BatchReader;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-class ArrowColumnDataReader implements BatchReader {
+class ArrowBatchReader implements RandomAccessBatchReader {
 
     private final File m_file;
 
@@ -124,7 +124,7 @@ class ArrowColumnDataReader implements BatchReader {
 
     private boolean m_closed;
 
-    ArrowColumnDataReader(final File file, final BufferAllocator allocator, final ArrowColumnDataFactory[] factories,
+    ArrowBatchReader(final File file, final BufferAllocator allocator, final ArrowColumnDataFactory[] factories,
         final ColumnSelection columnSelection) {
         m_file = file;
         m_allocator = allocator;
