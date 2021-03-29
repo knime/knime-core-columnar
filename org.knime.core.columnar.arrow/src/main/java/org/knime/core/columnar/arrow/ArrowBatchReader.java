@@ -51,9 +51,7 @@ import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_L
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -90,6 +88,8 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory.ArrowVectorNullCount;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
+import org.knime.core.columnar.arrow.mmap.MappedMessageSerializer;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -158,7 +158,6 @@ class ArrowBatchReader implements RandomAccessBatchReader {
     /** Read the vectors at the given batch index using the reader */
     private FieldVectorAndNullCount[] readVectors(final int index) throws IOException {
         try (final ArrowRecordBatch recordBatch = m_reader.readRecordBatch(index)) {
-
             // The data from the record batch
             final Iterator<ArrowFieldNode> nodes = recordBatch.getNodes().iterator();
             final Iterator<ArrowBuf> buffers = recordBatch.getBuffers().iterator();
@@ -183,11 +182,9 @@ class ArrowBatchReader implements RandomAccessBatchReader {
     }
 
     private DictionaryProvider readDictionaries(final int index) throws IOException {
-        ArrowDictionaryBatch[] batches = null;
+        // Read the dictionary batches
+        final ArrowDictionaryBatch[] batches = m_reader.readDictionaryBatches(index);
         try {
-            // Read the dictionary batches
-            batches = m_reader.readDictionaryBatches(index);
-
             // The provider to hold the dictionaries
             final MapDictionaryProvider provider = new MapDictionaryProvider();
 
@@ -212,11 +209,8 @@ class ArrowBatchReader implements RandomAccessBatchReader {
             }
             return provider;
         } finally {
-            if (batches != null) {
-                // Close all dictionary batches
-                for (final ArrowDictionaryBatch d : batches) {
-                    d.close();
-                }
+            for (final ArrowDictionaryBatch b : batches) {
+                b.close();
             }
         }
     }
@@ -224,7 +218,7 @@ class ArrowBatchReader implements RandomAccessBatchReader {
     private synchronized void initializeReader() throws IOException {
         // Check if another thread already initialized the reader
         if (m_reader == null) {
-            m_reader = new ArrowReader(m_file, m_allocator);
+            m_reader = new ArrowReader(m_file);
             m_dictionaryDescriptions = new HashMap<>();
             m_schema = mapFileSchemaToMemoryFormat(m_reader.getSchema(), m_columnSelection, m_dictionaryDescriptions);
             m_factoryVersions = Arrays.stream( //
@@ -386,7 +380,7 @@ class ArrowBatchReader implements RandomAccessBatchReader {
     }
 
     /** Skip the buffers for the given field from the iterator */
-    @SuppressWarnings("resource") // Buffers closed by caller (with ArrowRecordBatch#close)
+    @SuppressWarnings("resource") // Buffers closed by caller
     private static void skipFieldBuffers(final Field field, final Iterator<ArrowBuf> buffers) {
         final int bufferCount = TypeLayout.getTypeBufferCount(field.getType());
         for (int i = 0; i < bufferCount; i++) {
@@ -413,19 +407,14 @@ class ArrowBatchReader implements RandomAccessBatchReader {
      */
     private static final class ArrowReader implements AutoCloseable {
 
-        private final SeekableReadChannel m_in;
+        private final MappableReadChannel m_in;
 
         private final ArrowFooter m_footer;
 
-        public final BufferAllocator m_allocator;
-
         private final int m_dictionariesPerBatch;
 
-        private ArrowReader(final File file, final BufferAllocator allocator) throws IOException {
-            @SuppressWarnings("resource") // Channel is closed by close of m_in. The channel closes the file
-            final FileChannel channel = new RandomAccessFile(file, "rw").getChannel(); // NOSONAR: See comment above
-            m_in = new SeekableReadChannel(channel);
-            m_allocator = allocator;
+        private ArrowReader(final File file) throws IOException {
+            m_in = new MappableReadChannel(file, "r");
 
             synchronized (m_in) {
                 checkFileSize(m_in);
@@ -455,8 +444,7 @@ class ArrowBatchReader implements RandomAccessBatchReader {
         private ArrowRecordBatch readRecordBatch(final int index) throws IOException {
             synchronized (m_in) {
                 final ArrowBlock block = m_footer.getRecordBatches().get(index);
-                m_in.setPosition(block.getOffset());
-                return MessageSerializer.deserializeRecordBatch(m_in, block, m_allocator);
+                return MappedMessageSerializer.deserializeRecordBatch(m_in, block.getOffset());
             }
         }
 
@@ -465,13 +453,22 @@ class ArrowBatchReader implements RandomAccessBatchReader {
             synchronized (m_in) {
                 final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[m_dictionariesPerBatch];
                 final int offset = m_dictionariesPerBatch * index;
-                for (int i = 0; i < m_dictionariesPerBatch; i++) {
-                    final ArrowBlock block = m_footer.getDictionaries().get(i + offset);
-                    m_in.setPosition(block.getOffset());
-                    @SuppressWarnings("resource") // Resource closed by caller
-                    final ArrowDictionaryBatch batch =
-                        MessageSerializer.deserializeDictionaryBatch(m_in, block, m_allocator);
-                    dictionaryBatches[i] = batch;
+                try {
+                    for (int i = 0; i < m_dictionariesPerBatch; i++) {
+                        final ArrowBlock block = m_footer.getDictionaries().get(i + offset);
+                        @SuppressWarnings("resource") // Resource closed by caller
+                        final ArrowDictionaryBatch batch =
+                            MappedMessageSerializer.deserializeDictionaryBatch(m_in, block.getOffset());
+                        dictionaryBatches[i] = batch;
+                    }
+                } catch (final IOException ex) {
+                    // Close all batches in case of an exception
+                    for (final ArrowDictionaryBatch b : dictionaryBatches) {
+                        if (b != null) {
+                            b.close();
+                        }
+                    }
+                    throw ex;
                 }
                 return dictionaryBatches;
             }

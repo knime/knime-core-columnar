@@ -72,6 +72,7 @@ import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
+import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
@@ -204,6 +205,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     /** Close the root allocator after running a test */
     @After
     public void after() {
+        MappedMessageSerializerTestUtil.assertAllClosed();
         m_alloc.close();
     }
 
