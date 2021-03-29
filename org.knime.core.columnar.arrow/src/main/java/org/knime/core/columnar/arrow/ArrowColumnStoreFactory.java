@@ -62,7 +62,7 @@ import org.knime.core.columnar.store.ColumnStoreFactory;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowBatchStoreFactory implements ColumnStoreFactory {
+public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     private static final RootAllocator ROOT = new RootAllocator();
 
@@ -77,7 +77,7 @@ public class ArrowBatchStoreFactory implements ColumnStoreFactory {
     /**
      * Create a {@link ColumnStoreFactory} for Arrow using the default root allocator.
      */
-    public ArrowBatchStoreFactory() {
+    public ArrowColumnStoreFactory() {
         this(ROOT, 0, ROOT.getLimit());
     }
 
@@ -90,7 +90,7 @@ public class ArrowBatchStoreFactory implements ColumnStoreFactory {
      * @param initReservation the initial reservation for a child allocator
      * @param maxAllocation the maximum alloaction for the child allocator
      */
-    public ArrowBatchStoreFactory(final BufferAllocator allocator, final long initReservation,
+    public ArrowColumnStoreFactory(final BufferAllocator allocator, final long initReservation,
         final long maxAllocation) {
         m_allocator = allocator;
         m_initReservation = initReservation;
