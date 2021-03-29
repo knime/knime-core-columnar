@@ -64,17 +64,17 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.OutOfMemoryException;
 import org.apache.arrow.memory.RootAllocator;
 import org.junit.Test;
+import org.knime.core.columnar.ColumnarSchema;
+import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
-import org.knime.core.columnar.store.RandomAccessBatchReader;
-import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.columnar.store.BatchStoreFactory;
-import org.knime.core.columnar.store.BatchStoreSchema;
+import org.knime.core.columnar.store.ColumnStoreFactory;
 
 /**
  * Test {@link ArrowColumnStoreFactory}, ArrowColumnReadStore and ArrowColumnStore.
@@ -136,9 +136,9 @@ public class ArrowColumnStoreTest {
     }
 
     @SuppressWarnings("resource")
-    private static void testCreateWriterReader(final BatchStoreFactory factory) throws IOException {
+    private static void testCreateWriterReader(final ColumnStoreFactory factory) throws IOException {
         final int chunkSize = 64;
-        final BatchStoreSchema schema = ArrowTestUtils.createSchema(DataSpec.doubleSpec());
+        final ColumnarSchema schema = ArrowTestUtils.createSchema(DataSpec.doubleSpec());
 
         final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
         final Path readPath = ArrowTestUtils.createTmpKNIMEArrowPath();
@@ -166,7 +166,6 @@ public class ArrowColumnStoreTest {
             assertTrue(Files.exists(writePath));
             assertTrue(Files.size(writePath) > 0);
 
-            writeStore.flush();
             Files.copy(writePath, readPath);
         }
 

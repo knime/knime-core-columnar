@@ -75,12 +75,12 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
+import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.store.BatchStoreSchema;
 
 /**
  * A static class with utility methods for arrow tests.
@@ -112,8 +112,8 @@ public final class ArrowTestUtils {
      * @param types the types of the columns
      * @return the schema
      */
-    public static BatchStoreSchema createSchema(final DataSpec... types) {
-        return new BatchStoreSchema() {
+    public static ColumnarSchema createSchema(final DataSpec... types) {
+        return new ColumnarSchema() {
 
             @Override
             public int numColumns() {
@@ -134,7 +134,7 @@ public final class ArrowTestUtils {
      * @param width the number of columns
      * @return the schema
      */
-    public static BatchStoreSchema createWideSchema(final DataSpec type, final int width) {
+    public static ColumnarSchema createWideSchema(final DataSpec type, final int width) {
         final DataSpec[] types = new DataSpec[width];
         for (int i = 0; i < width; i++) {
             types[i] = type;

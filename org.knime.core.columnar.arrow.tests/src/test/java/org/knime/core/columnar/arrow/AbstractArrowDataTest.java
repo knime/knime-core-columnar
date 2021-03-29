@@ -562,15 +562,15 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowColumnDataWriter writer =
-            new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer =
+            new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
 
         // Read
-        try (final ArrowColumnDataReader reader =
-            new ArrowColumnDataReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
+        try (final ArrowBatchReader reader =
+            new ArrowBatchReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
             assertEquals(numValues, batch.length());
@@ -608,15 +608,15 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowColumnDataWriter writer =
-            new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer =
+            new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
 
         // Read
-        try (final ArrowColumnDataReader reader =
-            new ArrowColumnDataReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
+        try (final ArrowBatchReader reader =
+            new ArrowBatchReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
             assertEquals(numValues, batch.length());
@@ -655,15 +655,15 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowColumnDataWriter writer =
-            new ArrowColumnDataWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer =
+            new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
 
         // Read
-        try (final ArrowColumnDataReader reader =
-            new ArrowColumnDataReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
+        try (final ArrowBatchReader reader =
+            new ArrowBatchReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
             assertEquals(numValues, batch.length());

@@ -52,6 +52,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 import org.junit.Test;
+import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest.DummyByteArraySerializer;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
@@ -76,7 +77,6 @@ import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
 import org.knime.core.columnar.data.StructData.StructDataSpec;
-import org.knime.core.columnar.store.BatchStoreSchema;
 
 /**
  * Test the ArrowSchemaMapper.
@@ -230,7 +230,7 @@ public class ArrowSchemaMapperTest {
     /** Test mapping multiple columns of different specs. */
     @Test
     public void testMappingMultipleColumns() {
-        final BatchStoreSchema schema = ArrowTestUtils.createSchema( //
+        final ColumnarSchema schema = ArrowTestUtils.createSchema( //
             DataSpec.doubleSpec(), //
             DataSpec.longSpec(), //
             DataSpec.doubleSpec(), //
@@ -246,7 +246,7 @@ public class ArrowSchemaMapperTest {
 
     /** Test mapping a single column of the given spec. */
     private static void testMapSingleSpec(final DataSpec spec, final ArrowColumnDataFactory expectedFactory) {
-        final BatchStoreSchema schema = ArrowTestUtils.createSchema(spec);
+        final ColumnarSchema schema = ArrowTestUtils.createSchema(spec);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
         assertEquals(expectedFactory, factories[0]);

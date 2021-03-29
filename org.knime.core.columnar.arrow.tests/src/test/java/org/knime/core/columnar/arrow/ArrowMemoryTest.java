@@ -51,16 +51,16 @@ import java.util.concurrent.Executors;
 
 import org.junit.Ignore;
 import org.junit.Test;
+import org.knime.core.columnar.ColumnarSchema;
+import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.store.RandomAccessBatchReader;
-import org.knime.core.columnar.store.BatchWriter;
 import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.columnar.store.BatchStoreFactory;
-import org.knime.core.columnar.store.BatchStoreSchema;
+import org.knime.core.columnar.store.ColumnStoreFactory;
 
 /**
  * A long running test allocating, writing and reading many chunks.
@@ -88,8 +88,8 @@ public class ArrowMemoryTest {
 
         for (int l = 0; l < numLoops; l++) {
             pool.submit(() -> {
-                final BatchStoreFactory factory = new ArrowColumnStoreFactory();
-                final BatchStoreSchema schema =
+                final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
+                final ColumnarSchema schema =
                     ArrowTestUtils.createWideSchema(DataSpec.doubleSpec(), numColumns);
 
                 try (final BatchStore store =
