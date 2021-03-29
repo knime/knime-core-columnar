@@ -79,7 +79,7 @@ public interface ReadBatch extends Batch<NullableReadData>, NullableReadData {
     int size();
 
     /**
-     * The maximum {@link ReadData#length() length} of all data in this batch, or zero if the batch holds no data.
+     * The {@link ReadData#length() length} of any data in this batch, or zero if the batch holds no data.
      */
     @Override
     int length();

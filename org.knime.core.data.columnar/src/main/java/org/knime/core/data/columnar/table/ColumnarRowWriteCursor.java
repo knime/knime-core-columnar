@@ -48,11 +48,11 @@ package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
 
+import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.store.BatchWriter;
-import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.columnar.schema.ColumnarWriteValueFactory;
@@ -116,7 +116,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     private boolean m_adjusting;
 
-    ColumnarRowWriteCursor(final ColumnStore store, final ColumnarWriteValueFactory<?>[] factories) {
+    ColumnarRowWriteCursor(final BatchStore store, final ColumnarWriteValueFactory<?>[] factories) {
         m_writer = store.getWriter();
         m_factories = factories;
         m_adjusting = true;
@@ -188,7 +188,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
         try {
             m_writer.close();
         } catch (IOException ex) {
-            // This exception is usually not critical, since we are dopne with the m_writer.
+            // This exception is usually not critical, since we are done with the m_writer.
             // It could be a ClosedByInterruptException as a consequence of the thread being interrupted on node cancel.
             LOGGER.warn(ex);
         }

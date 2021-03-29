@@ -53,13 +53,8 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.columnar.domain.DefaultDomainStoreConfig;
-import org.knime.core.data.columnar.domain.DomainColumnStore;
-import org.knime.core.data.columnar.domain.DuplicateCheckColumnStore;
-import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
@@ -70,7 +65,6 @@ import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.NodeLogger;
-import org.knime.core.util.DuplicateChecker;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -96,7 +90,7 @@ final class ColumnarRowContainer implements RowContainer {
 
     private final ColumnStoreFactory m_storeFactory;
 
-    private final DomainColumnStore m_store;
+    private final CachedDomainBatchStore m_store;
 
     private final ColumnarValueSchema m_schema;
 
@@ -115,15 +109,7 @@ final class ColumnarRowContainer implements RowContainer {
         m_storeFactory = storeFactory;
 
         m_path = DataContainer.createTempFile(".knable").toPath();
-        ColumnStore wrapped = ColumnarPreferenceUtils.wrap(m_storeFactory.createStore(schema, m_path));
-        if (settings.isCheckDuplicateRowKeys()) {
-            wrapped = new DuplicateCheckColumnStore(wrapped, new DuplicateChecker(),
-                ColumnarPreferenceUtils.getDuplicateCheckExecutor());
-        }
-        m_store = new DomainColumnStore(wrapped, new DefaultDomainStoreConfig(schema,
-            settings.getMaxPossibleNominalDomainValues(), settings.isInitializeDomains()),
-            ColumnarPreferenceUtils.getDomainCalcExecutor());
-
+        m_store = new CachedDomainBatchStore(m_storeFactory.createStore(schema, m_path), schema, settings);
         m_delegate = new ColumnarRowWriteCursor(m_store, schema.getWriteValueFactories());
     }
 
@@ -146,16 +132,16 @@ final class ColumnarRowContainer implements RowContainer {
     public final void close() {
         // in case m_table was not created, we have to destroy the store. otherwise the
         // m_table has a handle on the store and therefore the store shouldn't be destroyed.
-        try {
-            if (m_table == null) {
-                m_finalizer.close();
-                m_delegate.close();
-                // closing the store includes closing the writer
-                // (but will make sure duplicate checks and domain calculations are halted)
+        if (m_table == null) {
+            m_finalizer.close();
+            m_delegate.close();
+            // closing the store includes closing the writer
+            // (but will make sure duplicate checks and domain calculations are halted)
+            try {
                 m_store.close();
+            } catch (final IOException e) {
+                LOGGER.error("Exception while closing store.", e);
             }
-        } catch (final IOException e) {
-            LOGGER.error("Exception while closing store.", e);
         }
     }
 

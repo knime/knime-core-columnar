@@ -49,11 +49,11 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.File;
+import java.io.Flushable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.knime.core.columnar.store.ColumnStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.node.CanceledExecutionException;
@@ -68,12 +68,12 @@ import org.knime.core.node.NodeSettingsWO;
  */
 final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
 
-    private final ColumnStore m_store;
+    private final Flushable m_flushable;
 
     private final Path m_path;
 
     static UnsavedColumnarContainerTable create(final Path path, final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        final ColumnarValueSchema schema, final CachedDomainBatchStore store, final long size) {
         final UnsavedColumnarContainerTable table =
             new UnsavedColumnarContainerTable(path, tableId, factory, schema, store, size);
         table.initStoreCloser();
@@ -81,17 +81,17 @@ final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable
     }
 
     private UnsavedColumnarContainerTable(final Path path, final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnStore store, final long size) {
+        final ColumnarValueSchema schema, final CachedDomainBatchStore store, final long size) {
         super(tableId, factory, schema, store, size);
         m_path = path;
-        m_store = store;
+        m_flushable = store;
     }
 
     @Override
     protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
         throws IOException, CanceledExecutionException {
         super.saveToFileOverwrite(f, settings, exec);
-        m_store.flush();
+        m_flushable.flush();
         Files.copy(m_path, f.toPath());
     }
 

@@ -96,7 +96,6 @@ public class ColumnarRowContainerTest extends ColumnarTest {
                 cursor.forward().setRowKey("1");
             }
             cursor.forward().setRowKey("1");
-            container.close(); // NOSONAR
         }
     }
 

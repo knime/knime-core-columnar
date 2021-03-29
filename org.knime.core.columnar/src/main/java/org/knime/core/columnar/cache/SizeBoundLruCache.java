@@ -65,7 +65,7 @@ import com.google.common.cache.Weigher;
  * @param <K> the type of keys maintained by this cache
  * @param <D> the type of cached data
  */
-final class SizeBoundLruCache<K, D extends ReferencedData> implements EvictingCache<K, D> {
+public final class SizeBoundLruCache<K, D extends ReferencedData> implements EvictingCache<K, D> {
 
     private static final class DataWithEvictor<K, D extends ReferencedData> {
         private final D m_data;
@@ -80,7 +80,11 @@ final class SizeBoundLruCache<K, D extends ReferencedData> implements EvictingCa
 
     private final Map<K, DataWithEvictor<K, D>> m_lruCache;
 
-    SizeBoundLruCache(final long maxSize, final int concurrencyLevel) {
+    /**
+     * @param maxSize the total size (in bytes) the cache should be able to hold
+     * @param concurrencyLevel the allowed concurrency among update operations
+     */
+    public SizeBoundLruCache(final long maxSize, final int concurrencyLevel) {
 
         final Weigher<K, DataWithEvictor<K, D>> weigher = (k, dataWithEvictor) -> {
             final long size = dataWithEvictor.m_data.sizeOf();

@@ -49,12 +49,12 @@
 package org.knime.core.columnar.batch;
 
 import static org.junit.Assert.assertEquals;
-import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
-import static org.knime.core.columnar.TestColumnStoreUtils.createTestTable;
+import static org.knime.core.columnar.TestBatchStoreUtils.createSchema;
+import static org.knime.core.columnar.TestBatchStoreUtils.createTestTable;
 
 import org.junit.Test;
-import org.knime.core.columnar.TestColumnStoreUtils;
-import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.columnar.TestBatchStoreUtils;
+import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.columnar.testing.data.TestData;
 
 /**
@@ -73,9 +73,9 @@ public class DefaultReadBatchTest extends AbstractBatchTest<DefaultReadBatch> {
         final int numColumns = DEF_NUM_COLUMNS;
         @SuppressWarnings("resource")
         final DefaultReadBatch batch =
-            new DefaultReadBatch(createTestTable(TestColumnStore.create(createSchema(numColumns)), 1).get(0));
+            new DefaultReadBatch(createTestTable(TestBatchStore.create(createSchema(numColumns)), 1).get(0));
         assertEquals(numColumns, batch.size());
-        assertEquals(TestColumnStoreUtils.DEF_BATCH_LENGTH, batch.length());
+        assertEquals(TestBatchStoreUtils.DEF_BATCH_LENGTH, batch.length());
     }
 
 }

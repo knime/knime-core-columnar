@@ -51,28 +51,28 @@ package org.knime.core.columnar.cache;
 import java.util.Objects;
 
 import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 
 /**
- * An object that uniquely identifies a {@link ReadData} held by a {@link ColumnReadStore}.
+ * An object that uniquely identifies a {@link ReadData} held by a {@link RandomAccessBatchReadable}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class ColumnDataUniqueId {
 
-    private final ColumnReadStore m_store;
+    private final RandomAccessBatchReadable m_readable;
 
     private final int m_columnIndex;
 
     private final int m_batchIndex;
 
     /**
-     * @param store the store holding the data
+     * @param readable the readable holding the data
      * @param columnIndex the column index of the data
      * @param batchIndex the batch index of the data
      */
-    public ColumnDataUniqueId(final ColumnReadStore store, final int columnIndex, final int batchIndex) {
-        m_store = store;
+    public ColumnDataUniqueId(final RandomAccessBatchReadable readable, final int columnIndex, final int batchIndex) {
+        m_readable = readable;
         m_columnIndex = columnIndex;
         m_batchIndex = batchIndex;
     }
@@ -80,7 +80,7 @@ public final class ColumnDataUniqueId {
     @Override
     public int hashCode() {
         int result = 17;
-        result = 31 * result + m_store.hashCode();
+        result = 31 * result + m_readable.hashCode();
         result = 31 * result + m_columnIndex;
         result = 31 * result + m_batchIndex;
         return result;
@@ -96,7 +96,7 @@ public final class ColumnDataUniqueId {
         }
         if (getClass() == object.getClass()) {
             final ColumnDataUniqueId other = (ColumnDataUniqueId)object;
-            return Objects.equals(m_store, other.m_store) && m_columnIndex == other.m_columnIndex
+            return Objects.equals(m_readable, other.m_readable) && m_columnIndex == other.m_columnIndex
                 && m_batchIndex == other.m_batchIndex;
         }
         return false;
@@ -104,16 +104,16 @@ public final class ColumnDataUniqueId {
 
     @Override
     public String toString() {
-        return String.join(",", m_store.toString(), Integer.toString(m_columnIndex), Integer.toString(m_batchIndex));
+        return String.join(",", m_readable.toString(), Integer.toString(m_columnIndex), Integer.toString(m_batchIndex));
     }
 
     /**
-     * Obtains the {@link ColumnReadStore} that holds the uniquely identified data.
+     * Obtains the {@link RandomAccessBatchReadable} that holds the uniquely identified data.
      *
      * @return the store holding the data
      */
-    public ColumnReadStore getStore() {
-        return m_store;
+    public RandomAccessBatchReadable getReadable() {
+        return m_readable;
     }
 
     int getColumnIndex() {

@@ -77,18 +77,12 @@ import javax.management.ReflectionException;
 
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
-import org.knime.core.columnar.cache.AsyncFlushCachedColumnStore;
-import org.knime.core.columnar.cache.CachedColumnReadStore;
-import org.knime.core.columnar.cache.CachedColumnStoreCache;
-import org.knime.core.columnar.cache.SmallColumnStore;
-import org.knime.core.columnar.cache.SmallColumnStore.SmallColumnStoreCache;
-import org.knime.core.columnar.cache.heap.HeapCachedColumnReadStore;
-import org.knime.core.columnar.cache.heap.HeapCachedColumnStore;
-import org.knime.core.columnar.cache.heap.ObjectDataCache;
-import org.knime.core.columnar.cache.heap.SoftReferencedObjectCache;
-import org.knime.core.columnar.cache.heap.WeakReferencedObjectCache;
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.batch.BatchWritable;
+import org.knime.core.columnar.cache.data.SharedReadDataCache;
+import org.knime.core.columnar.cache.object.SharedObjectCache;
+import org.knime.core.columnar.cache.object.SoftReferencedObjectCache;
+import org.knime.core.columnar.cache.object.WeakReferencedObjectCache;
+import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.data.columnar.ColumnarTableBackend;
 import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
@@ -108,14 +102,14 @@ public final class ColumnarPreferenceUtils {
 
             WEAK {
                 @Override
-                ObjectDataCache createCache() {
+                SharedObjectCache createCache() {
                     return new WeakReferencedObjectCache();
                 }
             },
 
             SOFT {
                 @Override
-                ObjectDataCache createCache() {
+                SharedObjectCache createCache() {
                     final SoftReferencedObjectCache cache = new SoftReferencedObjectCache();
 
                     MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
@@ -130,7 +124,7 @@ public final class ColumnarPreferenceUtils {
                 }
             };
 
-        abstract ObjectDataCache createCache();
+        abstract SharedObjectCache createCache();
     }
 
     private static final String RESERVED_SIZE_PROPERTY = "knime.columnar.reservedmemorymb";
@@ -155,7 +149,7 @@ public final class ColumnarPreferenceUtils {
     private static ExecutorService domainCalcExecutor;
 
     // lazily initialized
-    private static ObjectDataCache heapCache;
+    private static SharedObjectCache heapCache;
 
     private static final AtomicLong SERIALIZE_THREAD_COUNT = new AtomicLong();
 
@@ -163,10 +157,10 @@ public final class ColumnarPreferenceUtils {
     private static ExecutorService serializeExecutor;
 
     // lazily initialized
-    private static SmallColumnStoreCache smallTableCache;
+    private static SharedBatchWritableCache smallTableCache;
 
     // lazily initialized
-    private static CachedColumnStoreCache columnDataCache;
+    private static SharedReadDataCache columnDataCache;
 
     private static final AtomicLong PERSIST_THREAD_COUNT = new AtomicLong();
 
@@ -262,14 +256,20 @@ public final class ColumnarPreferenceUtils {
         return useDefaults() ? HEAP_CACHE_NAME_DEF : COLUMNAR_STORE.getString(HEAP_CACHE_NAME_KEY);
     }
 
-    private static synchronized ObjectDataCache getHeapCache() {
+    /**
+     * @return the cache for in-heap storing of object data
+     */
+    public static synchronized SharedObjectCache getHeapCache() {
         if (heapCache == null) {
             heapCache = HeapCache.valueOf(getHeapCacheName()).createCache();
         }
         return heapCache;
     }
 
-    private static synchronized ExecutorService getSerializeExecutor() {
+    /**
+     * @return the executor for serialization of object data
+     */
+    public static synchronized ExecutorService getSerializeExecutor() {
         if (serializeExecutor == null) {
             serializeExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
@@ -285,20 +285,25 @@ public final class ColumnarPreferenceUtils {
         return useDefaults() ? SMALL_TABLE_THRESHOLD_DEF : COLUMNAR_STORE.getInt(SMALL_TABLE_THRESHOLD_KEY);
     }
 
-    private static synchronized SmallColumnStoreCache getSmallTableCache() {
+    /**
+     * @return the cache for storing entire small {@link BatchWritable BatchWritables} up to a given size
+     */
+    public static synchronized SharedBatchWritableCache getSmallTableCache() {
         if (smallTableCache == null) {
             final long smallTableCacheSize = (long)getSmallTableCacheSize() << 20;
             final long totalFreeMemorySize = getTotalFreeMemorySize();
             final int smallTableThreshold = (int)Math.min((long)getSmallTableThreshold() << 20, Integer.MAX_VALUE);
 
             if (smallTableCacheSize <= 0) {
-                smallTableCache = new SmallColumnStoreCache(smallTableThreshold, 0, getNumThreads());
+                smallTableCache = new SharedBatchWritableCache(smallTableThreshold, 0, getNumThreads());
                 LOGGER.warn(
                     "Small Table Cache is disabled. Consider enabling it in the Columnar Table Backend preferences");
             } else if (smallTableCacheSize <= totalFreeMemorySize) {
-                smallTableCache = new SmallColumnStoreCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
+                smallTableCache =
+                    new SharedBatchWritableCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
             } else {
-                smallTableCache = new SmallColumnStoreCache(smallTableThreshold, totalFreeMemorySize, getNumThreads());
+                smallTableCache =
+                    new SharedBatchWritableCache(smallTableThreshold, totalFreeMemorySize, getNumThreads());
                 LOGGER.warnWithFormat(
                     "Small Table Cache is configured to be of size %d MB, but only %d MB of memory are available.",
                     smallTableCacheSize >> 20, totalFreeMemorySize >> 20);
@@ -307,23 +312,30 @@ public final class ColumnarPreferenceUtils {
         return smallTableCache;
     }
 
-    static int getColumnDataCacheSize() {
+    /**
+     * @return the size of the cache for storing general ReadData
+     */
+    public static int getColumnDataCacheSize() {
         return useDefaults() ? COLUMN_DATA_CACHE_SIZE_DEF : COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY);
     }
 
-    private static synchronized CachedColumnStoreCache getColumnDataCache() {
+    /**
+     * @return the cache for storing general ReadData
+     */
+    public static synchronized SharedReadDataCache getColumnDataCache() {
         if (columnDataCache == null) {
             final long columnDataCacheSize = (long)getColumnDataCacheSize() << 20;
-            final long totalFreeMemorySize = Math.max(getTotalFreeMemorySize() - getSmallTableCache().getMaxSize(), 0L);
+            final long totalFreeMemorySize =
+                Math.max(getTotalFreeMemorySize() - getSmallTableCache().getCacheSize(), 0L);
 
             if (columnDataCacheSize <= 0) {
-                columnDataCache = new CachedColumnStoreCache(0, getNumThreads());
+                columnDataCache = new SharedReadDataCache(0, getNumThreads());
                 LOGGER.warn(
                     "Column Data Cache is disabled. Consider enabling it in the Columnar Table Backend preferences");
             } else if (columnDataCacheSize <= totalFreeMemorySize) {
-                columnDataCache = new CachedColumnStoreCache(columnDataCacheSize, getNumThreads());
+                columnDataCache = new SharedReadDataCache(columnDataCacheSize, getNumThreads());
             } else {
-                columnDataCache = new CachedColumnStoreCache(totalFreeMemorySize, getNumThreads());
+                columnDataCache = new SharedReadDataCache(totalFreeMemorySize, getNumThreads());
                 LOGGER.warnWithFormat(
                     "Column Data Cache is configured to be of size %d MB, but only %d MB of memory are available.",
                     columnDataCacheSize >> 20, totalFreeMemorySize >> 20);
@@ -332,52 +344,15 @@ public final class ColumnarPreferenceUtils {
         return columnDataCache;
     }
 
-    private static synchronized ExecutorService getPersistExecutor() {
+    /**
+     * @return the executor for persisting data from memory to disk
+     */
+    public static synchronized ExecutorService getPersistExecutor() {
         if (persistExecutor == null) {
             persistExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet())));
         }
         return persistExecutor;
-    }
-
-    /**
-     * Wraps a given {@link ColumnStore} inside multiple layers of caches.
-     *
-     * @param store the to-be-wrapped store
-     * @return the wrapped store
-     */
-    @SuppressWarnings("resource")
-    public static ColumnStore wrap(final ColumnStore store) {
-
-        getColumnDataCache();
-        getSmallTableCache();
-
-        ColumnStore wrapped = store;
-
-        if (columnDataCache.getMaxSizeInBytes() > 0) {
-            wrapped = new AsyncFlushCachedColumnStore(wrapped, columnDataCache, getPersistExecutor());
-        }
-        if (smallTableCache.getMaxSize() > 0) {
-            wrapped = new SmallColumnStore(wrapped, smallTableCache);
-        }
-
-        return new HeapCachedColumnStore(wrapped, getHeapCache(), getSerializeExecutor());
-    }
-
-    /**
-     * Wraps a given {@link ColumnReadStore} inside multiple layers of caches.
-     *
-     * @param store the to-be-wrapped store
-     * @return the wrapped store
-     */
-    @SuppressWarnings("resource")
-    public static ColumnReadStore wrap(final ColumnReadStore store) {
-        ColumnReadStore wrapped = store;
-        if (getColumnDataCacheSize() > 0) {
-            wrapped = new CachedColumnReadStore(wrapped, getColumnDataCache());
-        }
-
-        return new HeapCachedColumnReadStore(wrapped, getHeapCache());
     }
 
 }

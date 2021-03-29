@@ -47,7 +47,7 @@ package org.knime.core.columnar.cache;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.knime.core.columnar.TestColumnStoreUtils.DEF_BATCH_LENGTH;
+import static org.knime.core.columnar.TestBatchStoreUtils.DEF_BATCH_LENGTH;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;

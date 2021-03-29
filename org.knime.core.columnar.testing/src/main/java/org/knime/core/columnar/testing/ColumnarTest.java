@@ -73,7 +73,7 @@ public class ColumnarTest {
 
     @After
     public void tearDown() {
-        assertEquals("Unclosed Closeables.", OPEN_CLOSEABLES.size(), 0);
+        assertEquals("Unclosed Closeables.", 0, OPEN_CLOSEABLES.size());
     }
 
 }

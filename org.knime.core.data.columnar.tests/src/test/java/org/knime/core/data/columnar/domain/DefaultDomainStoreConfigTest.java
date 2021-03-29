@@ -146,7 +146,7 @@ public class DefaultDomainStoreConfigTest {
 
     @Test
     public void testDomainCalculators() {
-        final DefaultDomainStoreConfig config = new DefaultDomainStoreConfig(
+        final DefaultDomainWritableConfig config = new DefaultDomainWritableConfig(
             createSchema(INT, LONG, DOUBLE, STRING, BOOLEAN, BOUNDED, NOMINAL, BOUNDED_NOMINAL, NO_DOMAIN), 0, true);
         final Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> calculators =
             config.createDomainCalculators();
@@ -171,7 +171,7 @@ public class DefaultDomainStoreConfigTest {
         final DataColumnSpecCreator specCreator = new DataColumnSpecCreator("int", IntCell.TYPE);
         specCreator.setDomain(domain);
         final DataColumnSpec spec = specCreator.createSpec();
-        final DefaultDomainStoreConfig config = new DefaultDomainStoreConfig(createSchema(spec), 0, true);
+        final DefaultDomainWritableConfig config = new DefaultDomainWritableConfig(createSchema(spec), 0, true);
         assertEquals(values, config.createDomainCalculators().get(1).createDomain().getValues());
     }
 

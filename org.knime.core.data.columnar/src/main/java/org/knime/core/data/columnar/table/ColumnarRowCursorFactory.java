@@ -51,11 +51,11 @@ import java.util.Set;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
-import org.knime.core.columnar.store.BatchReader;
-import org.knime.core.columnar.store.ColumnReadStore;
+import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.ColumnDataIndex;
@@ -129,9 +129,9 @@ final class ColumnarRowCursorFactory {
 
         private int m_index;
 
-        private SingleBatchRowCursor(final ColumnReadStore store, final ColumnarValueSchema schema,
-            final int batchIndex, final int firstIndexInBatch, final int lastIndexInBatch,
-            final Set<Finalizer> openCursorFinalizers, final int[] selection) throws IOException {
+        private SingleBatchRowCursor(final BatchReadStore store, final ColumnarValueSchema schema, final int batchIndex,
+            final int firstIndexInBatch, final int lastIndexInBatch, final Set<Finalizer> openCursorFinalizers,
+            final int[] selection) throws IOException {
 
             m_schema = schema;
             m_openCursorFinalizers = openCursorFinalizers;
@@ -139,7 +139,7 @@ final class ColumnarRowCursorFactory {
             m_maxIndex = lastIndexInBatch;
 
             try (@SuppressWarnings("resource")
-            final BatchReader reader = selection == null ? store.createReader()
+            final RandomAccessBatchReader reader = selection == null ? store.createReader()
                 : store.createReader(new FilteredColumnSelection(schema.numColumns(), selection))) {
                 m_batch = reader.readRetained(batchIndex);
             }
@@ -201,7 +201,7 @@ final class ColumnarRowCursorFactory {
 
     private static final class MultiBatchRowCursor implements RowCursor, RowRead, ColumnDataIndex {
 
-        private final BatchReader m_reader;
+        private final RandomAccessBatchReader m_reader;
 
         private final ResourceWithRelease m_readerRelease;
 
@@ -229,12 +229,12 @@ final class ColumnarRowCursorFactory {
 
         private NullableReadData[] m_currentData;
 
-        private MultiBatchRowCursor(final ColumnReadStore store, final ColumnarValueSchema schema, // NOSONAR
+        private MultiBatchRowCursor(final BatchReadStore store, final ColumnarValueSchema schema, // NOSONAR
             final int firstBatchIndex, final int lastBatchIndex, final int firstIndexInFirstBatch,
             final int lastIndexInLastBatch, final Set<Finalizer> openCursorFinalizers, final int[] selection) {
             m_selection = selection;
             @SuppressWarnings("resource")
-            final BatchReader reader = selection == null ? store.createReader()
+            final RandomAccessBatchReader reader = selection == null ? store.createReader()
                 : store.createReader(new FilteredColumnSelection(schema.numColumns(), selection));
             m_reader = reader;
             m_readerRelease = new ResourceWithRelease(m_reader);
@@ -346,12 +346,12 @@ final class ColumnarRowCursorFactory {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowCursorFactory.class);
 
-    static RowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema, final long size,
+    static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size,
         final Set<Finalizer> openCursorFinalizers) throws IOException {
         return create(store, schema, size, openCursorFinalizers, null);
     }
 
-    static RowCursor create(final ColumnReadStore store, final ColumnarValueSchema schema, final long size, // NOSONAR
+    static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size, // NOSONAR
         final Set<Finalizer> openCursorFinalizers, final TableFilter filter) throws IOException {
 
         final long maxRowIndex = size - 1;
@@ -371,7 +371,7 @@ final class ColumnarRowCursorFactory {
             .concat(IntStream.of(0), materializeColumnIndices.get().stream().sorted().mapToInt(i -> i.intValue() + 1))
             .toArray() : null;
 
-        final int maxLength = store.maxLength();
+        final int maxLength = store.batchLength();
         if (maxLength < 1) {
             throw new IllegalStateException(
                 String.format("Length of table is %d, but maximum batch length is %d.", size, maxLength));

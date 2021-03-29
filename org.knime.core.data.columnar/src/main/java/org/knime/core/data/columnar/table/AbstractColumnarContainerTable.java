@@ -53,12 +53,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
-import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
@@ -80,7 +79,7 @@ import org.knime.core.node.workflow.WorkflowDataRepository;
 
 /**
  * Implementation of an {@link ExtensionTable}. This table is managed by the KNIME framework and allows to access data
- * from within a {@link ColumnStore}.
+ * from within a {@link BatchStore}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
@@ -118,7 +117,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    private final ColumnReadStore m_readStore;
+    private final BatchReadStore m_readStore;
 
     // effectively final
     private Finalizer m_storeCloser;
@@ -131,12 +130,12 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
         m_schema = ColumnarValueSchemaUtils
             .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
-        m_readStore = ColumnarPreferenceUtils
-            .wrap(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath()));
+        m_readStore =
+            new CachedBatchReadStore(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath()));
     }
 
-    AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnReadStore store, final long size) {
+    AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory, final ColumnarValueSchema schema,
+        final BatchReadStore store, final long size) {
         m_tableId = tableId;
         m_factory = factory;
         m_schema = schema;

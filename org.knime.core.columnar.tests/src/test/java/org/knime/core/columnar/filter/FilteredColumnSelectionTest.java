@@ -52,19 +52,19 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.knime.core.columnar.TestColumnStoreUtils.createSchema;
-import static org.knime.core.columnar.TestColumnStoreUtils.createTestTable;
+import static org.knime.core.columnar.TestBatchStoreUtils.createSchema;
+import static org.knime.core.columnar.TestBatchStoreUtils.createTestTable;
 
 import java.util.NoSuchElementException;
 import java.util.stream.IntStream;
 
 import org.junit.Test;
-import org.knime.core.columnar.TestColumnStoreUtils;
+import org.knime.core.columnar.ColumnarSchema;
+import org.knime.core.columnar.TestBatchStoreUtils;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.store.ColumnStoreSchema;
-import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.columnar.testing.data.TestData;
 
 /**
@@ -77,8 +77,8 @@ public class FilteredColumnSelectionTest {
 
     @SuppressWarnings("resource")
     private static TestData[] createData() {
-        final ColumnStoreSchema schema = createSchema(DEF_NUM_COLUMNS);
-        final TestColumnStore store = TestColumnStore.create(schema);
+        final ColumnarSchema schema = createSchema(DEF_NUM_COLUMNS);
+        final TestBatchStore store = TestBatchStore.create(schema);
         return createTestTable(store, 1).get(0);
     }
 
@@ -162,9 +162,9 @@ public class FilteredColumnSelectionTest {
         final int numColumns = DEF_NUM_COLUMNS;
         @SuppressWarnings("resource")
         final DefaultReadBatch batch =
-            new DefaultReadBatch(createTestTable(TestColumnStore.create(createSchema(numColumns)), 1).get(0));
+            new DefaultReadBatch(createTestTable(TestBatchStore.create(createSchema(numColumns)), 1).get(0));
         assertEquals(numColumns, batch.size());
-        assertEquals(TestColumnStoreUtils.DEF_BATCH_LENGTH, batch.length());
+        assertEquals(TestBatchStoreUtils.DEF_BATCH_LENGTH, batch.length());
     }
 
 }

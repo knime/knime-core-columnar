@@ -54,10 +54,10 @@ import static org.junit.Assert.assertEquals;
 import java.util.Arrays;
 
 import org.junit.Test;
+import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.TestColumnStoreUtils;
-import org.knime.core.columnar.store.ColumnStoreSchema;
-import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.columnar.TestBatchStoreUtils;
+import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.columnar.testing.data.TestData;
 
 /**
@@ -68,9 +68,9 @@ public abstract class AbstractBatchTest<B extends AbstractBatch<? extends Refere
 
     @SuppressWarnings("resource")
     static TestData[] createData() {
-        final ColumnStoreSchema schema = TestColumnStoreUtils.createSchema(DEF_NUM_COLUMNS);
-        final TestColumnStore store = TestColumnStore.create(schema);
-        return TestColumnStoreUtils.createTestTable(store, 1).get(0);
+        final ColumnarSchema schema = TestBatchStoreUtils.createSchema(DEF_NUM_COLUMNS);
+        final TestBatchStore store = TestBatchStore.create(schema);
+        return TestBatchStoreUtils.createTestTable(store, 1).get(0);
     }
 
     static final int DEF_NUM_COLUMNS = 2;

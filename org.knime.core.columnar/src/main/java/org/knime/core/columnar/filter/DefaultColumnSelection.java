@@ -74,7 +74,7 @@ public final class DefaultColumnSelection implements ColumnSelection {
 
     @Override
     public boolean isSelected(final int index) {
-        return index >= 0 && index < m_numColumns;
+        return true;
     }
 
     @Override

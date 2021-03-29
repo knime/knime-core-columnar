@@ -47,8 +47,10 @@ package org.knime.core.columnar.store;
 
 import java.nio.file.Path;
 
+import org.knime.core.columnar.ColumnarSchema;
+
 /**
- * A factory for creating {@link ColumnStore ColumnStores} and {@link ColumnReadStore ColumnReadStores}.
+ * A factory for creating {@link BatchStore BatchStores} and {@link BatchReadStore BatchReadStores}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -56,27 +58,23 @@ import java.nio.file.Path;
 public interface ColumnStoreFactory {
 
     /**
-     * Creates a new {@link ColumnStore}, writing data to and reading data from memory and/or the provided file,
-     * depending on its caching strategy and available memory. Note that the store might not be fully written into the
-     * provided file. Consequently, invoking {@link ColumnStoreFactory#createReadStore(ColumnStoreSchema, Path)
-     * createReadStore} on the file is not guaranteed to work. To force a {@link ColumnStore} to be fully flushed to a
-     * file which can be used to create a new {@link ColumnReadStore}, invoke {@link ColumnWriteStore#flush() flush} on
-     * that store explicitly.
+     * Creates a new {@link BatchStore}, writing data to and reading data from memory and/or the provided file,
+     * depending on its caching strategy and available memory.
      *
      * @param schema the columnar schema of the to-be-created store
      * @param path to write data to if out of memory
      * @return a newly created store
      */
 
-    ColumnStore createStore(ColumnStoreSchema schema, Path path);
+    BatchStore createStore(ColumnarSchema schema, Path path);
 
     /**
-     * Creates a new {@link ColumnReadStore}, reading data from the provided file.
+     * Creates a new {@link BatchReadStore}, reading data from the provided file.
      *
      * @param schema the columnar schema of the to-be-created store
      * @param path from which data is read
      * @return a newly created store
      */
-    ColumnReadStore createReadStore(ColumnStoreSchema schema, Path path);
+    BatchReadStore createReadStore(ColumnarSchema schema, Path path);
 
 }

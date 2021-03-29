@@ -45,7 +45,7 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.store.ColumnStoreSchema;
+import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
@@ -56,7 +56,7 @@ import org.knime.core.node.NodeSettingsWO;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public interface ColumnarValueSchema extends ColumnStoreSchema {
+public interface ColumnarValueSchema extends ColumnarSchema {
 
     /**
      * @return the spec used to create this schema

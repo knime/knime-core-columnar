@@ -52,11 +52,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.store.ColumnReadStore;
-import org.knime.core.columnar.store.ColumnStore;
+import org.knime.core.columnar.ColumnarSchema;
+import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.ColumnStoreSchema;
-import org.knime.core.columnar.testing.TestColumnStore;
+import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
@@ -80,12 +80,12 @@ final class ColumnarTableTestUtils {
         }
 
         @Override
-        public ColumnStore createStore(final ColumnStoreSchema schema, final Path path) {
-            return TestColumnStore.create(schema);
+        public BatchStore createStore(final ColumnarSchema schema, final Path path) {
+            return TestBatchStore.create(schema);
         }
 
         @Override
-        public ColumnReadStore createReadStore(final ColumnStoreSchema schema, final Path path) {
+        public BatchReadStore createReadStore(final ColumnarSchema schema, final Path path) {
             throw new UnsupportedOperationException("Loading from file not supported by test column store.");
         }
 

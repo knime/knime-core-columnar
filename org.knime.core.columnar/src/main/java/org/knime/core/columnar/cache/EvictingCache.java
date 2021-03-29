@@ -60,8 +60,13 @@ import org.knime.core.columnar.ReferencedData;
  * @param <K> the type of keys maintained by this cache
  * @param <D> the type of cached data
  */
-interface EvictingCache<K, D extends ReferencedData> {
+public interface EvictingCache<K, D extends ReferencedData> {
 
+    /**
+     * @author Marc Bux, KNIME GmbH, Berlin, Germany
+     * @param <K> the type of keys maintained by the cache
+     * @param <D> the type of cached data
+     */
     @FunctionalInterface
     static interface Evictor<K, D extends ReferencedData> extends BiConsumer<K, D> {
         default void evict(final K key, final D data) {
