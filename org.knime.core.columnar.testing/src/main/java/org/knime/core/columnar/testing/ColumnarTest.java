@@ -64,7 +64,8 @@ import org.junit.Before;
 @SuppressWarnings("javadoc")
 public class ColumnarTest {
 
-    static final Set<Closeable> OPEN_CLOSEABLES = Collections.newSetFromMap(new HashMap<>());
+    static final Set<Closeable> OPEN_CLOSEABLES =
+        Collections.synchronizedSet(Collections.newSetFromMap(new HashMap<>()));
 
     @Before
     public void setup() {
