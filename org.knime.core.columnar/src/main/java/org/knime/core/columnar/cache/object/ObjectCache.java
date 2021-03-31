@@ -119,16 +119,16 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         @Override
         public synchronized void write(final ReadBatch batch) throws IOException {
 
-            batch.retain();
             try {
                 waitForPrevBatch();
             } catch (InterruptedException e) {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
-                LOGGER.info(ERROR_ON_INTERRUPT, e);
+                LOGGER.warn(ERROR_ON_INTERRUPT, e);
                 return;
             }
 
+            batch.retain();
             final int numColumns = batch.size();
             @SuppressWarnings("unchecked")
             final CompletableFuture<NullableReadData>[] futures = new CompletableFuture[numColumns];
@@ -158,6 +158,15 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             });
 
             m_numBatches++;
+
+            // with the following code block, the memory leak is gone (but so is asynchronous serialization)
+//            try {
+//                waitForPrevBatch();
+//            } catch (InterruptedException ex) {
+//                // TODO Auto-generated catch block
+//            } catch (IOException ex) {
+//                // TODO Auto-generated catch block
+//            }
         }
 
         @Override
@@ -167,7 +176,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             } catch (InterruptedException e) {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
-                LOGGER.info(ERROR_ON_INTERRUPT, e);
+                LOGGER.warn(ERROR_ON_INTERRUPT, e);
             }
             m_writerDelegate.close();
         }
@@ -226,6 +235,13 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     @Override
     public synchronized void close() throws IOException {
+        try {
+            m_writer.waitForPrevBatch();
+        } catch (InterruptedException ex) {
+            // TODO Auto-generated catch block
+        } catch (IOException ex) {
+            // TODO Auto-generated catch block
+        }
         m_readStore.close();
         m_cachedData = null;
     }
