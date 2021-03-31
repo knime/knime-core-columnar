@@ -123,11 +123,17 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
     @Override
     public D getRetained(final K key) {
-        final DataWithEvictor<K, D> cached = m_lruCache.computeIfPresent(key, (k, d) -> {
-            d.m_data.retain(); // retain for the caller of this method
-            return d;
-        });
-        return cached == null ? null : cached.m_data;
+        final DataWithEvictor<K, D> cached = m_lruCache.get(key);
+        if (cached == null) {
+            return null;
+        }
+        try {
+            cached.m_data.retain();
+        } catch (IllegalStateException e) { // NOSONAR
+            // we should only end up here in the very rare case where the data is evicted in between get() and retain()
+            return null;
+        }
+        return cached.m_data;
     }
 
     @Override
