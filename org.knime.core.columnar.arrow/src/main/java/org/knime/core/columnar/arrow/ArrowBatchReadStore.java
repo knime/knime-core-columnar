@@ -97,7 +97,7 @@ final class ArrowBatchReadStore implements BatchReadStore {
     }
 
     @Override
-    public ArrowBatchReader createReader(final ColumnSelection config) {
+    public ArrowBatchReader createRandomAccessReader(final ColumnSelection config) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
         return new ArrowBatchReader(m_path.toFile(), m_allocator, factories, config);
     }
@@ -108,7 +108,7 @@ final class ArrowBatchReadStore implements BatchReadStore {
     }
 
     private final void initNumBatchesMaxLength() {
-        try (final ArrowBatchReader reader = createReader(new DefaultColumnSelection(m_schema.numColumns()))) {
+        try (final ArrowBatchReader reader = createRandomAccessReader(new DefaultColumnSelection(m_schema.numColumns()))) {
             m_numBatches = new AtomicInteger(reader.numBatches());
             m_maxLength = new AtomicInteger(reader.maxLength());
         } catch (final IOException e) {

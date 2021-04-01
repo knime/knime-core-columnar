@@ -90,7 +90,7 @@ final class ArrowBatchStore implements BatchStore {
     }
 
     @Override
-    public RandomAccessBatchReader createReader(final ColumnSelection config) {
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
         return new ArrowPartialFileBatchReader(m_path.toFile(), m_allocator, m_factories, config,
             m_writer.getOffsetProvider());
     }

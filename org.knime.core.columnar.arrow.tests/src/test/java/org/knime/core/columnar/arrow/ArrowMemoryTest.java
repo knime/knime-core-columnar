@@ -132,7 +132,7 @@ public class ArrowMemoryTest {
     private static void copyData(final int numChunks, final BatchStore store, final BatchStore copyStore)
         throws IOException {
         // let's read some data back
-        try (final RandomAccessBatchReader reader = store.createReader();
+        try (final RandomAccessBatchReader reader = store.createRandomAccessReader();
                 final BatchWriter copyWriter = copyStore.getWriter()) {
             for (int c = 0; c < numChunks; c++) {
                 final ReadBatch batch = reader.readRetained(c);

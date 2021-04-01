@@ -177,7 +177,7 @@ public class ArrowColumnStoreTest {
             assertEquals(2, store.numBatches());
 
             @SuppressWarnings("resource")
-            final RandomAccessBatchReader reader = store.createReader(); // NOSONAR
+            final RandomAccessBatchReader reader = store.createRandomAccessReader(); // NOSONAR
 
             // Read back batch 1 already
             batch = reader.readRetained(1);
@@ -356,7 +356,7 @@ public class ArrowColumnStoreTest {
 
             // Read the batch
             final ReadBatch readBatch;
-            try (final RandomAccessBatchReader reader = readStore.createReader()) {
+            try (final RandomAccessBatchReader reader = readStore.createRandomAccessReader()) {
                 readBatch = reader.readRetained(0);
             }
 
