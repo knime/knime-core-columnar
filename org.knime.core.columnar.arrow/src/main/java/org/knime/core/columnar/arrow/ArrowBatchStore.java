@@ -65,26 +65,23 @@ import org.knime.core.columnar.store.BatchStore;
  */
 final class ArrowBatchStore implements BatchStore {
 
-    private final Path m_path;
+    private final ColumnarSchema m_schema;
 
-    private final ArrowBatchReadStore m_delegate;
+    private final Path m_path;
 
     private final ArrowColumnDataFactory[] m_factories;
 
     private final BufferAllocator m_allocator;
 
-    private final ArrowCompression m_compression;
-
     private final ArrowBatchWriter m_writer;
 
     ArrowBatchStore(final ColumnarSchema schema, final Path path, final ArrowCompression compression,
         final BufferAllocator allocator) {
+        m_schema = schema;
         m_factories = ArrowSchemaMapper.map(schema);
         m_path = path;
-        m_compression = compression;
         m_allocator = allocator;
-        m_writer = new ArrowBatchWriter(path.toFile(), m_factories, m_compression, m_allocator);
-        m_delegate = new ArrowBatchReadStore(schema, path, allocator, m_writer.m_numBatches, m_writer.m_chunkSize);
+        m_writer = new ArrowBatchWriter(path.toFile(), m_factories, compression, m_allocator);
     }
 
     @Override
@@ -94,29 +91,33 @@ final class ArrowBatchStore implements BatchStore {
 
     @Override
     public RandomAccessBatchReader createReader(final ColumnSelection config) {
-        return m_delegate.createReader(config);
+        return new ArrowPartialFileBatchReader(m_path.toFile(), m_allocator, m_factories, config,
+            m_writer.getOffsetProvider());
     }
 
     @Override
     public ColumnarSchema getSchema() {
-        return m_delegate.getSchema();
+        return m_schema;
     }
 
     @Override
     public int numBatches() {
-        return m_delegate.numBatches();
+        return m_writer.numBatches();
     }
 
     @Override
     public int batchLength() {
-        return m_delegate.batchLength();
+        return m_writer.batchLength();
     }
 
     @Override
     public void close() throws IOException {
-        // m_allocator is closed via the delegate.
-        m_delegate.close();
+        final long allocated = m_allocator.getAllocatedMemory();
+        if (allocated > 0) {
+            throw new IOException(
+                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
+        }
+        m_allocator.close();
         Files.deleteIfExists(m_path);
     }
-
 }

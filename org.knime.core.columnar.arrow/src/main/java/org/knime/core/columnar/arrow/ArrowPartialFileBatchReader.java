@@ -45,22 +45,15 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_LENGTH;
-
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Map;
 
-import org.apache.arrow.flatbuf.Footer;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.ipc.SeekableReadChannel;
-import org.apache.arrow.vector.ipc.message.ArrowBlock;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
-import org.apache.arrow.vector.ipc.message.ArrowFooter;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializer;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
@@ -68,92 +61,75 @@ import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
  * An implementation of a {@link RandomAccessBatchReader} for Arrow which reads from a file in the Arrow IPC file format
- * after it has been written completely.
+ * using an {@link OffsetProvider} to access the individual batches. The file does not have to be written completely.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-class ArrowBatchReader extends AbstractArrowBatchReader {
+class ArrowPartialFileBatchReader extends AbstractArrowBatchReader {
 
     private final File m_file;
 
-    ArrowBatchReader(final File file, final BufferAllocator allocator, final ArrowColumnDataFactory[] factories,
-        final ColumnSelection columnSelection) {
+    private final OffsetProvider m_offsetProvider;
+
+    ArrowPartialFileBatchReader(final File file, final BufferAllocator allocator,
+        final ArrowColumnDataFactory[] factories, final ColumnSelection columnSelection,
+        final OffsetProvider offsetProvider) {
         super(allocator, factories, columnSelection);
         m_file = file;
+        m_offsetProvider = offsetProvider;
     }
 
     @Override
     protected ArrowReader createReader() throws IOException {
-        return new ArrowFileReader(m_file);
+        return new ArrowPartialFileReader(m_file, m_offsetProvider);
     }
 
-    // Override getMetadata to handle legacy files
-    @Override
-    protected Map<String, String> getMetadata() {
-        final Map<String, String> metadata = super.getMetadata();
-        if (metadata.isEmpty()) {
-            // Legacy: For <4.4 the metadata was saved in the footer
-            return ((ArrowFileReader)m_reader).getFooter().getMetaData();
-        }
-        return metadata;
-    }
-
-    int numBatches() throws IOException {
-        if (m_reader == null) {
-            initializeReader();
-        }
-        return ((ArrowFileReader)m_reader).getNumberOfBatches();
-    }
-
-    /** An {@link ArrowReader} that reads from a file with the IPC File format. The file must be written completely. */
-    private static final class ArrowFileReader implements ArrowReader {
+    /**
+     * An {@link ArrowReader} that reads from a file with the IPC File format using the offsets from a
+     * {@link OffsetProvider}. The file does not have to be written completely.
+     */
+    private static final class ArrowPartialFileReader implements ArrowReader {
 
         private final MappableReadChannel m_in;
 
-        private final ArrowFooter m_footer;
+        private final Schema m_schema;
 
-        private final int m_dictionariesPerBatch;
+        private final OffsetProvider m_offsetProvider;
 
-        private ArrowFileReader(final File file) throws IOException {
+        private ArrowPartialFileReader(final File file, final OffsetProvider offsetProvider) throws IOException {
+            m_offsetProvider = offsetProvider;
             m_in = new MappableReadChannel(file, "r");
 
             synchronized (m_in) {
                 ArrowReader.checkFileSize(m_in);
-                ArrowReader.checkArrowMagic(m_in, true);
-                m_footer = readFooter(m_in);
+                ArrowReader.checkArrowMagic(m_in, false);
+                m_schema = readSchema(m_in);
             }
-
-            m_dictionariesPerBatch = getDictionariesPerBatch(m_footer);
         }
 
-        /** Get the schema of the read file */
         @Override
         public Schema getSchema() {
-            return m_footer.getSchema();
+            return m_schema;
         }
 
-        /** Read the record batch for the given index */
         @Override
         public ArrowRecordBatch readRecordBatch(final int index) throws IOException {
             synchronized (m_in) {
-                final ArrowBlock block = m_footer.getRecordBatches().get(index);
-                return MappedMessageSerializer.deserializeRecordBatch(m_in, block.getOffset());
+                final long offset = m_offsetProvider.getRecordBatchOffset(index);
+                return MappedMessageSerializer.deserializeRecordBatch(m_in, offset);
             }
         }
 
-        /** Read the dictionary batches for the given index */
         @Override
         public ArrowDictionaryBatch[] readDictionaryBatches(final int index) throws IOException {
             synchronized (m_in) {
-                final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[m_dictionariesPerBatch];
-                final int offset = m_dictionariesPerBatch * index;
+                final long[] offsets = m_offsetProvider.getDictionaryBatchOffsets(index);
+                final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[offsets.length];
                 try {
-                    for (int i = 0; i < m_dictionariesPerBatch; i++) {
-                        final ArrowBlock block = m_footer.getDictionaries().get(i + offset);
+                    for (int i = 0; i < offsets.length; i++) {
                         @SuppressWarnings("resource") // Resource closed by caller
                         final ArrowDictionaryBatch batch =
-                            MappedMessageSerializer.deserializeDictionaryBatch(m_in, block.getOffset());
+                            MappedMessageSerializer.deserializeDictionaryBatch(m_in, offsets[i]);
                         dictionaryBatches[i] = batch;
                     }
                 } catch (final IOException ex) {
@@ -174,49 +150,11 @@ class ArrowBatchReader extends AbstractArrowBatchReader {
             m_in.close();
         }
 
-        /** Get the footer of the read file */
-        private ArrowFooter getFooter() {
-            return m_footer;
-        }
-
-        /** Get the number of batches */
-        private int getNumberOfBatches() {
-            return m_footer.getRecordBatches().size();
-        }
-
-        /** Read the footer length from the file */
-        private static final int readFooterLength(final SeekableReadChannel in) throws IOException {
-            final ByteBuffer buffer = ByteBuffer.allocate(4);
-            in.setPosition(in.size() - ARROW_MAGIC_LENGTH - 4);
-            in.readFully(buffer);
-            buffer.flip();
-            final int footerLength = MessageSerializer.bytesToInt(buffer.array());
-            if (footerLength <= 0 || footerLength + ARROW_MAGIC_LENGTH * 2 + 4 > in.size()) {
-                throw new IOException("Arrow file invalid: Invalid footer length: " + footerLength);
-            }
-            return footerLength;
-        }
-
-        /** Read the footer from the file */
-        private static final ArrowFooter readFooter(final SeekableReadChannel in) throws IOException {
-            final int footerLength = readFooterLength(in);
-            final long footerStart = in.size() - ARROW_MAGIC_LENGTH - 4 - footerLength;
-            final ByteBuffer buffer = ByteBuffer.allocate(footerLength);
-            in.setPosition(footerStart);
-            in.readFully(buffer);
-            buffer.flip();
-            return new ArrowFooter(Footer.getRootAsFooter(buffer));
-        }
-
-        /** Get the number of dictionaries per batch. Throw an exception if the number of dictionaries does not fit */
-        private static int getDictionariesPerBatch(final ArrowFooter footer) throws IOException {
-            final int numBatches = footer.getRecordBatches().size();
-            final int numDictionaries = footer.getDictionaries().size();
-            if (numDictionaries % numBatches != 0) {
-                throw new IOException(
-                    "Arrow file invalid: There must be the same number of dictionaries for each batch.");
-            }
-            return numDictionaries / numBatches;
+        /** Read the schema from the beginning of the channel (after the magic number) */
+        private static Schema readSchema(final MappableReadChannel in) throws IOException {
+            // Magic number (6 bytes) + empty padding to 8 byte boundary
+            in.setPosition(8);
+            return MessageSerializer.deserializeSchema(in);
         }
     }
 }

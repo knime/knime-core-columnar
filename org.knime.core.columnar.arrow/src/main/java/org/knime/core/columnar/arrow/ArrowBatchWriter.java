@@ -84,6 +84,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
+import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
@@ -117,9 +118,9 @@ class ArrowBatchWriter implements BatchWriter {
 
     private boolean m_closed;
 
-    final AtomicInteger m_chunkSize = new AtomicInteger();
+    final AtomicInteger m_chunkSize = new AtomicInteger(-1);
 
-    final AtomicInteger m_numBatches = new AtomicInteger();
+    final AtomicInteger m_numBatches = new AtomicInteger(0);
 
     // Initialized on first #write
     private ArrowWriter m_writer;
@@ -156,7 +157,6 @@ class ArrowBatchWriter implements BatchWriter {
         final List<Field> fields = new ArrayList<>(m_factories.length);
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
-        m_numBatches.incrementAndGet();
 
         // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
@@ -192,21 +192,53 @@ class ArrowBatchWriter implements BatchWriter {
 
         // Write the vectors
         writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
+
+        m_numBatches.incrementAndGet();
     }
 
-    /** Create and return the metadata for this writer */
-    private Map<String, String> getMetadata() {
-        final Map<String, String> metadata = new HashMap<>();
+    /**
+     * @return an offset provider that can return the offset of each record batch and dictionary batch once it is
+     *         written to the file
+     */
+    OffsetProvider getOffsetProvider() {
+        return new OffsetProvider() {
 
-        // Max chunk size
-        metadata.put(ARROW_CHUNK_SIZE_KEY, Integer.toString(m_chunkSize.get()));
+            @Override
+            public long getRecordBatchOffset(final int index) {
+                if (numBatches() <= index) {
+                    throw new IndexOutOfBoundsException("Record batch with index " + index + " not yet written.");
+                }
+                return m_writer.m_recordBlocks.get(index).getOffset();
+            }
 
-        // Factory versions
-        final String factoryVersions = Arrays.stream(m_factories) //
-            .map(f -> f.getVersion().toString()) //
-            .collect(Collectors.joining(","));
-        metadata.put(ARROW_FACTORY_VERSIONS_KEY, factoryVersions);
-        return metadata;
+            @Override
+            public long[] getDictionaryBatchOffsets(final int index) {
+                if (numBatches() <= index) {
+                    throw new IndexOutOfBoundsException("Dictionary batch with index " + index + " not yet written.");
+                }
+                return Arrays.stream(m_writer.m_dictionaryBlocks.get(index)) //
+                    .mapToLong(ArrowBlock::getOffset) //
+                    .toArray();
+            }
+        };
+    }
+
+    /**
+     * @return the number of batches already written
+     */
+    int numBatches() {
+        return m_numBatches.get();
+    }
+
+    /**
+     * @return the length of the batches (recorded by observing the length of the first batch written)
+     */
+    int batchLength() {
+        final int bl = m_chunkSize.get();
+        if (bl == -1) {
+            throw new IllegalStateException("The batch length is not yet know. No batch has been written.");
+        }
+        return bl;
     }
 
     @Override
@@ -222,6 +254,21 @@ class ArrowBatchWriter implements BatchWriter {
             }
             m_closed = true;
         }
+    }
+
+    /** Create and return the metadata for this writer */
+    private Map<String, String> getMetadata() {
+        final Map<String, String> metadata = new HashMap<>();
+
+        // Max chunk size
+        metadata.put(ARROW_CHUNK_SIZE_KEY, Integer.toString(m_chunkSize.get()));
+
+        // Factory versions
+        final String factoryVersions = Arrays.stream(m_factories) //
+            .map(f -> f.getVersion().toString()) //
+            .collect(Collectors.joining(","));
+        metadata.put(ARROW_FACTORY_VERSIONS_KEY, factoryVersions);
+        return metadata;
     }
 
     /** Map the dictionary ids in the given field to new unique ids and convert the type to the message format type */
@@ -287,21 +334,28 @@ class ArrowBatchWriter implements BatchWriter {
 
     private static void writeDictionaries(final ArrowWriter writer, final List<FieldVector> dictionaries,
         final ArrowCompression compression, final BufferAllocator allocator) throws IOException {
-        for (int id = 0; id < dictionaries.size(); id++) {
-            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-            final FieldVector vector = dictionaries.get(id);
-            writeDictionary(writer, id, vector, compression, allocator);
-        }
-    }
+        final ArrowDictionaryBatch[] batches = new ArrowDictionaryBatch[dictionaries.size()];
+        try { // NOSONAR: Arrays are not AutoCloseable (and creating a custom collection would be overkill)
 
-    /** Write the dictionary with the given id and vector to the writer */
-    private static void writeDictionary(final ArrowWriter writer, final long id, final FieldVector vector,
-        final ArrowCompression compression, final BufferAllocator allocator) throws IOException {
-        final int length = vector.getValueCount();
-        try (final ArrowRecordBatch data =
-            createRecordBatch(Collections.singletonList(vector), length, compression, allocator);
-                final ArrowDictionaryBatch batch = new ArrowDictionaryBatch(id, data, false)) {
-            writer.writeDictionaryBatch(batch);
+            // Collect the batches
+            for (int id = 0; id < dictionaries.size(); id++) {
+                @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
+                final FieldVector vector = dictionaries.get(id);
+                @SuppressWarnings("resource") // Record batch closed with the dictionary batch
+                final ArrowRecordBatch data = createRecordBatch(Collections.singletonList(vector),
+                    vector.getValueCount(), compression, allocator);
+                batches[id] = new ArrowDictionaryBatch(id, data, false);
+            }
+
+            // Write the batches to the file
+            writer.writeDictionaryBatches(batches);
+
+        } finally {
+            for (final ArrowDictionaryBatch b : batches) {
+                if (b != null) {
+                    b.close();
+                }
+            }
         }
     }
 
@@ -374,7 +428,7 @@ class ArrowBatchWriter implements BatchWriter {
 
         private final IpcOption m_option;
 
-        private final List<ArrowBlock> m_dictionaryBlocks;
+        private final List<ArrowBlock[]> m_dictionaryBlocks;
 
         private final List<ArrowBlock> m_recordBlocks;
 
@@ -396,9 +450,12 @@ class ArrowBatchWriter implements BatchWriter {
         }
 
         /** Write the given dictionary batch */
-        private void writeDictionaryBatch(final ArrowDictionaryBatch batch) throws IOException {
-            final ArrowBlock block = MessageSerializer.serialize(m_out, batch, m_option);
-            m_dictionaryBlocks.add(block);
+        private void writeDictionaryBatches(final ArrowDictionaryBatch[] batches) throws IOException {
+            final ArrowBlock[] blocks = new ArrowBlock[batches.length];
+            for (int i = 0; i < batches.length; i++) {
+                blocks[i] = MessageSerializer.serialize(m_out, batches[i], m_option);
+            }
+            m_dictionaryBlocks.add(blocks);
         }
 
         /** Write the given data batch */
@@ -414,8 +471,10 @@ class ArrowBatchWriter implements BatchWriter {
             m_out.writeIntLittleEndian(0);
 
             // Write the footer
-            final ArrowFooter footer = new ArrowFooter(m_schema, m_dictionaryBlocks, m_recordBlocks,
-                Collections.emptyMap(), m_option.metadataVersion);
+            final List<ArrowBlock> dictBlocks =
+                m_dictionaryBlocks.stream().flatMap(Arrays::stream).collect(Collectors.toList());
+            final ArrowFooter footer =
+                new ArrowFooter(m_schema, dictBlocks, m_recordBlocks, Collections.emptyMap(), m_option.metadataVersion);
             final long footerStart = m_out.getCurrentPosition();
             m_out.write(footer, false);
 

@@ -178,4 +178,22 @@ public final class ArrowReaderWriterUtils {
             return null;
         }
     }
+
+    /** A provider of offsets of record batches and dictionary batches in an Arrow file. */
+    public interface OffsetProvider {
+
+        /**
+         * @param index the index of the record batch
+         * @return the offset of the record batch with the given index
+         * @throws IndexOutOfBoundsException if there is no record batch with the given index in the file (yet)
+         */
+        long getRecordBatchOffset(int index);
+
+        /**
+         * @param index the index of the dictionary batches
+         * @return the offsets of all dictionary batches for the given index
+         * @throws IndexOutOfBoundsException if there are no dictionaries for the given index in the file (yet)
+         */
+        long[] getDictionaryBatchOffsets(int index);
+    }
 }
