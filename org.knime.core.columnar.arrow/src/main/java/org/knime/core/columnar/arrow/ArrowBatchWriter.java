@@ -132,8 +132,8 @@ class ArrowBatchWriter implements BatchWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    ArrowBatchWriter(final File file, final ArrowColumnDataFactory[] factories,
-        final ArrowCompression compression, final BufferAllocator allocator) {
+    ArrowBatchWriter(final File file, final ArrowColumnDataFactory[] factories, final ArrowCompression compression,
+        final BufferAllocator allocator) {
         m_file = file;
         m_factories = factories;
         m_compression = compression;
@@ -183,7 +183,7 @@ class ArrowBatchWriter implements BatchWriter {
         if (m_firstWrite) {
             m_chunkSize.set(batch.length());
             m_firstWrite = false;
-            final Schema schema = new Schema(fields, Collections.emptyMap());
+            final Schema schema = new Schema(fields, getMetadata());
             m_writer = new ArrowWriter(m_file, schema);
         }
 
@@ -194,22 +194,26 @@ class ArrowBatchWriter implements BatchWriter {
         writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
     }
 
+    /** Create and return the metadata for this writer */
+    private Map<String, String> getMetadata() {
+        final Map<String, String> metadata = new HashMap<>();
+
+        // Max chunk size
+        metadata.put(ARROW_CHUNK_SIZE_KEY, Integer.toString(m_chunkSize.get()));
+
+        // Factory versions
+        final String factoryVersions = Arrays.stream(m_factories) //
+            .map(f -> f.getVersion().toString()) //
+            .collect(Collectors.joining(","));
+        metadata.put(ARROW_FACTORY_VERSIONS_KEY, factoryVersions);
+        return metadata;
+    }
+
     @Override
     public synchronized void close() throws IOException {
         if (!m_closed) {
             if (!m_firstWrite) {
-                final Map<String, String> metadata = new HashMap<>();
-
-                // Max chunk size
-                metadata.put(ARROW_CHUNK_SIZE_KEY, Integer.toString(m_chunkSize.get()));
-
-                // Factory versions
-                final String factoryVersions = Arrays.stream(m_factories) //
-                    .map(f -> f.getVersion().toString()) //
-                    .collect(Collectors.joining(","));
-                metadata.put(ARROW_FACTORY_VERSIONS_KEY, factoryVersions);
-
-                m_writer.writeFooter(metadata);
+                m_writer.writeFooter();
                 m_writer.close();
                 if (LOGGER.isDebugEnabled()) {
                     LOGGER.debug("Closing file {} ({})", m_file.getAbsolutePath(),
@@ -404,14 +408,14 @@ class ArrowBatchWriter implements BatchWriter {
         }
 
         /** Write the arrow file footer. Call before close to create a valid arrow file */
-        private void writeFooter(final Map<String, String> metadata) throws IOException {
+        private void writeFooter() throws IOException {
             // Write EOS
             m_out.writeIntLittleEndian(MessageSerializer.IPC_CONTINUATION_TOKEN);
             m_out.writeIntLittleEndian(0);
 
             // Write the footer
-            final ArrowFooter footer =
-                new ArrowFooter(m_schema, m_dictionaryBlocks, m_recordBlocks, metadata, m_option.metadataVersion);
+            final ArrowFooter footer = new ArrowFooter(m_schema, m_dictionaryBlocks, m_recordBlocks,
+                Collections.emptyMap(), m_option.metadataVersion);
             final long footerStart = m_out.getCurrentPosition();
             m_out.write(footer, false);
 

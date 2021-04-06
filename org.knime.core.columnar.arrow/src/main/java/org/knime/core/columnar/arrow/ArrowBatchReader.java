@@ -117,6 +117,9 @@ class ArrowBatchReader implements RandomAccessBatchReader {
     private Schema m_schema;
 
     // Initialized on first #readRetained
+    private Map<String, String> m_metadata;
+
+    // Initialized on first #readRetained
     private Map<Long, DictionaryDescription> m_dictionaryDescriptions;
 
     // Initialized on first #readRetained
@@ -221,10 +224,9 @@ class ArrowBatchReader implements RandomAccessBatchReader {
             m_reader = new ArrowReader(m_file);
             m_dictionaryDescriptions = new HashMap<>();
             m_schema = mapFileSchemaToMemoryFormat(m_reader.getSchema(), m_columnSelection, m_dictionaryDescriptions);
+            m_metadata = getMetadata(m_reader);
             m_factoryVersions = Arrays.stream( //
-                m_reader.getFooter().getMetaData() //
-                    .get(ArrowReaderWriterUtils.ARROW_FACTORY_VERSIONS_KEY) //
-                    .split(",")) //
+                m_metadata.get(ArrowReaderWriterUtils.ARROW_FACTORY_VERSIONS_KEY).split(",")) //
                 .map(ArrowColumnDataFactoryVersion::version) //
                 .toArray(ArrowColumnDataFactoryVersion[]::new);
         }
@@ -241,7 +243,7 @@ class ArrowBatchReader implements RandomAccessBatchReader {
         if (m_reader == null) {
             initializeReader();
         }
-        return Integer.parseInt(m_reader.getFooter().getMetaData().get(ARROW_CHUNK_SIZE_KEY));
+        return Integer.parseInt(m_metadata.get(ARROW_CHUNK_SIZE_KEY));
     }
 
     @Override
@@ -250,6 +252,16 @@ class ArrowBatchReader implements RandomAccessBatchReader {
             m_reader.close();
             m_closed = true;
         }
+    }
+
+    /** Get the metadata from the footer or the schema of the file accessed by the reader. */
+    private static Map<String, String> getMetadata(final ArrowReader reader) {
+        final Map<String, String> metadata = reader.getSchema().getCustomMetadata();
+        if (metadata.isEmpty()) {
+            // Legacy: For <4.4 the metadata was saved in the footer
+            return reader.getFooter().getMetaData();
+        }
+        return metadata;
     }
 
     /**
