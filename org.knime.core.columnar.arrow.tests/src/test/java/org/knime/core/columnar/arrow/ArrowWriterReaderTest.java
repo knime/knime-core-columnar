@@ -48,10 +48,7 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -63,7 +60,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
@@ -71,24 +67,13 @@ import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.BigIntVector;
-import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VarBinaryVector;
-import org.apache.arrow.vector.complex.ListVector;
-import org.apache.arrow.vector.complex.StructVector;
-import org.apache.arrow.vector.complex.impl.UnionListWriter;
-import org.apache.arrow.vector.dictionary.Dictionary;
-import org.apache.arrow.vector.types.Types.MinorType;
-import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.knime.core.columnar.arrow.ArrowTestUtils.ComplexData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.ComplexDataFactory;
-import org.knime.core.columnar.arrow.ArrowTestUtils.DataChecker;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
 import org.knime.core.columnar.arrow.ArrowTestUtils.SimpleData;
@@ -699,6 +684,36 @@ public class ArrowWriterReaderTest {
         return (T)factory.createWrite(vector, dictId2::getAndIncrement, m_alloc, numValues);
     }
 
+    /**
+     * An interface for classes which can fill a {@link NullableWriteData} object with values and can check if a
+     * {@link NullableReadData} object contains the expected values.
+     */
+    private static interface DataChecker {
+
+        /**
+         * Set the values of a {@link NullableWriteData} object and close it.
+         *
+         * @param data the data object
+         * @param columnIndex the index of the column. Can be used to handle different kinds of data in different
+         *            columns
+         * @param count the number of values to write
+         * @param seed the seed defining the values
+         * @return the {@link NullableReadData} for this {@link NullableWriteData}
+         */
+        NullableReadData fillData(NullableWriteData data, final int columnIndex, final int count, final long seed);
+
+        /**
+         * Check the values in the {@link NullableReadData}.
+         *
+         * @param data the data object
+         * @param columnIndex the index of the column. Can be used to handle different kinds of data in different
+         *            columns
+         * @param count the number of values to check
+         * @param seed the seed defining the values
+         */
+        void checkData(NullableReadData data, final int columnIndex, final int count, final long seed);
+    }
+
     private static final class SimpleDataChecker implements DataChecker {
 
         private final boolean m_checkMissing;
@@ -708,276 +723,48 @@ public class ArrowWriterReaderTest {
         }
 
         @Override
-        @SuppressWarnings("resource")
         public NullableReadData fillData(final NullableWriteData data, final int columnIndex, final int count,
             final long seed) {
             assertTrue(data instanceof SimpleData);
-            final SimpleData d = (SimpleData)data;
-            final Random random = new Random(seed);
-            for (int i = 0; i < count; i++) {
-                if (m_checkMissing && random.nextDouble() < 0.4) {
-                    d.setMissing(i);
-                } else {
-                    d.getVector().set(i, random.nextInt());
-                }
-            }
-            return data.close(count);
+            return ArrowTestUtils.fillData((SimpleData)data, m_checkMissing, count, seed);
         }
 
         @Override
-        @SuppressWarnings("resource")
         public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
             assertTrue(data instanceof SimpleData);
-            final SimpleData d = (SimpleData)data;
-            final Random random = new Random(seed);
-            assertEquals(count, d.getVector().getValueCount());
-            for (int i = 0; i < count; i++) {
-                if (m_checkMissing && random.nextDouble() < 0.4) {
-                    assertTrue(d.isMissing(i));
-                } else {
-                    assertFalse(d.isMissing(i));
-                    assertEquals(random.nextInt(), d.getVector().get(i));
-                }
-            }
+            ArrowTestUtils.checkData((SimpleData)data, m_checkMissing, count, seed);
         }
     }
 
     private static final class DictionaryEncodedDataChecker implements DataChecker {
 
         @Override
-        @SuppressWarnings("resource")
         public NullableReadData fillData(final NullableWriteData data, final int columnIndex, final int count,
             final long seed) {
             assertTrue(data instanceof DictionaryEncodedData);
-            final DictionaryEncodedData d = (DictionaryEncodedData)data;
-            final Random random = new Random(seed);
-            final BigIntVector dictVector = (BigIntVector)d.getDictionary().getVector();
-            final IntVector vector = d.getVector();
-
-            // Set the dictionary
-            final int numDistinct = random.nextInt(10) + 5;
-            dictVector.allocateNew(numDistinct);
-            for (int i = 0; i < numDistinct; i++) {
-                dictVector.set(i, random.nextLong());
-            }
-            dictVector.setValueCount(numDistinct);
-
-            // Set the values to indices
-            for (int i = 0; i < count; i++) {
-                vector.set(i, random.nextInt(numDistinct));
-            }
-            return data.close(count);
+            return ArrowTestUtils.fillData((DictionaryEncodedData)data, count, seed);
         }
 
         @Override
-        @SuppressWarnings("resource")
         public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
             assertTrue(data instanceof DictionaryEncodedData);
-            final DictionaryEncodedData d = (DictionaryEncodedData)data;
-            final Random random = new Random(seed);
-
-            // The vector
-            final IntVector vector = d.getVector();
-            assertNotNull(vector.getField().getDictionary());
-
-            // The dictionary
-            final Dictionary dictionary = d.getDictionary();
-            assertNotNull(dictionary);
-            final DictionaryEncoding encoding = dictionary.getEncoding();
-            assertNotNull(encoding);
-            assertEquals(vector.getField().getDictionary().getId(), encoding.getId());
-            assertFalse(encoding.isOrdered());
-            assertEquals(MinorType.INT.getType(), encoding.getIndexType());
-            final FieldVector dictVectorNotCasted = dictionary.getVector();
-            assertNotNull(dictVectorNotCasted);
-            assertTrue(dictVectorNotCasted instanceof BigIntVector);
-            final BigIntVector dictVector = (BigIntVector)dictVectorNotCasted;
-
-            // Check the dictionary
-            final int numDistinct = random.nextInt(10) + 5;
-            assertEquals(numDistinct, dictVector.getValueCount());
-            for (int i = 0; i < numDistinct; i++) {
-                assertFalse(dictVector.isNull(i));
-                assertEquals(random.nextLong(), dictVector.get(i));
-            }
-
-            // Set the values to indices
-            for (int i = 0; i < count; i++) {
-                assertFalse(vector.isNull(i));
-                assertEquals(random.nextInt(numDistinct), vector.get(i));
-            }
+            ArrowTestUtils.checkData((DictionaryEncodedData)data, count, seed);
         }
     }
 
     private static final class ComplexDataChecker implements DataChecker {
 
-        @SuppressWarnings("resource")
         @Override
         public NullableReadData fillData(final NullableWriteData data, final int coulumnIndex, final int count,
             final long seed) {
             assertTrue(data instanceof ComplexData);
-            final ComplexData d = (ComplexData)data;
-            final Random random = new Random(seed);
-
-            // Fill dictionary G:
-            final int numDistinctG = random.nextInt(5) + 5;
-            final VarBinaryVector dictG = d.getDictionaryVectorG();
-            dictG.allocateNew(numDistinctG);
-            for (int i = 0; i < numDistinctG; i++) {
-                dictG.set(i, nextBytes(random));
-            }
-            dictG.setValueCount(numDistinctG);
-
-            // Fill dictionary E:
-            final int numDistinctE = random.nextInt(5) + 5;
-            final VarBinaryVector dictE = d.getDictionaryVectorE();
-            dictE.allocateNew(numDistinctE);
-            for (int i = 0; i < numDistinctE; i++) {
-                dictE.set(i, nextBytes(random));
-            }
-            dictE.setValueCount(numDistinctE);
-
-            // Fill dictionary B:
-            final int numDistinctB = random.nextInt(5) + 5;
-            final StructVector dictB = d.getDictionaryVectorB();
-            final IntVector vectorG = d.getVectorG();
-            final IntVector vectorH = d.getVectorH();
-            vectorG.allocateNew(numDistinctB);
-            vectorH.allocateNew(numDistinctB);
-            for (int i = 0; i < numDistinctB; i++) {
-                dictB.setIndexDefined(i);
-                vectorG.set(i, random.nextInt(numDistinctG));
-                vectorH.set(i, random.nextInt());
-            }
-            vectorG.setValueCount(numDistinctB);
-            vectorH.setValueCount(numDistinctB);
-            dictB.setValueCount(numDistinctB);
-
-            // Fill the struct vector
-            final StructVector vector = d.getVector();
-            final BigIntVector vectorA = d.getVectorA();
-            final IntVector vectorB = d.getVectorB();
-            final ListVector vectorC = d.getVectorC();
-            final UnionListWriter writerC = vectorC.getWriter();
-            final StructVector vectorD = d.getVectorD();
-            final IntVector vectorE = d.getVectorE();
-            final BitVector vectorF = d.getVectorF();
-            vectorA.allocateNew(count);
-            vectorB.allocateNew(count);
-            vectorE.allocateNew(count);
-            vectorF.allocateNew(count);
-            writerC.allocate();
-            for (int i = 0; i < count; i++) {
-                vectorA.set(i, random.nextLong());
-                vectorB.set(i, random.nextInt(numDistinctB));
-                writerC.setPosition(i);
-                writerC.startList();
-                for (int j = 0; j < random.nextInt(4); j++) {
-                    writerC.integer().writeInt(random.nextInt());
-                }
-                writerC.endList();
-                vectorE.set(i, random.nextInt(numDistinctE));
-                vectorF.set(i, random.nextBoolean() ? 1 : 0);
-                vectorD.setIndexDefined(i);
-                vector.setIndexDefined(i);
-            }
-            writerC.setValueCount(count);
-            return d.close(count);
+            return ArrowTestUtils.fillData((ComplexData)data, count, seed);
         }
 
-        private static final byte[] nextBytes(final Random random) {
-            final byte[] bytes = new byte[random.nextInt(10) + 5];
-            random.nextBytes(bytes);
-            return bytes;
-        }
-
-        @SuppressWarnings("resource")
         @Override
         public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
             assertTrue(data instanceof ComplexData);
-            final ComplexData d = (ComplexData)data;
-            final Random random = new Random(seed);
-
-            // Check dictionary G:
-            final int numDistinctG = random.nextInt(5) + 5;
-            final VarBinaryVector dictG = d.getDictionaryVectorG();
-            assertNotNull(dictG);
-            assertEquals(numDistinctG, dictG.getValueCount());
-            for (int i = 0; i < numDistinctG; i++) {
-                assertFalse(dictG.isNull(i));
-                assertArrayEquals(nextBytes(random), dictG.get(i));
-            }
-
-            // Check dictionary E:
-            final int numDistinctE = random.nextInt(5) + 5;
-            final VarBinaryVector dictE = d.getDictionaryVectorE();
-            assertNotNull(dictE);
-            assertEquals(numDistinctE, dictE.getValueCount());
-            for (int i = 0; i < numDistinctE; i++) {
-                assertFalse(dictE.isNull(i));
-                assertArrayEquals(nextBytes(random), dictE.get(i));
-            }
-
-            // Check dictionary B:
-            final int numDistinctB = random.nextInt(5) + 5;
-            final StructVector dictB = d.getDictionaryVectorB();
-            assertNotNull(dictB);
-            assertEquals(numDistinctB, dictB.getValueCount());
-            final IntVector vectorG = d.getVectorG();
-            assertNotNull(vectorG);
-            assertEquals(numDistinctB, vectorG.getValueCount());
-            final IntVector vectorH = d.getVectorH();
-            assertNotNull(vectorH);
-            assertEquals(numDistinctB, vectorH.getValueCount());
-            for (int i = 0; i < numDistinctB; i++) {
-                assertFalse(dictB.isNull(i));
-                assertFalse(vectorG.isNull(i));
-                assertFalse(vectorH.isNull(i));
-                assertEquals(random.nextInt(numDistinctG), vectorG.get(i));
-                assertEquals(random.nextInt(), vectorH.get(i));
-            }
-
-            // Fill the struct vector
-            final StructVector vector = d.getVector();
-            assertNotNull(vector);
-            assertEquals(count, vector.getValueCount());
-            final BigIntVector vectorA = d.getVectorA();
-            assertNotNull(vectorA);
-            assertEquals(count, vectorA.getValueCount());
-            final IntVector vectorB = d.getVectorB();
-            assertNotNull(vectorB);
-            assertEquals(count, vectorB.getValueCount());
-            final ListVector vectorC = d.getVectorC();
-            assertNotNull(vectorC);
-            assertEquals(count, vectorC.getValueCount());
-            final StructVector vectorD = d.getVectorD();
-            assertNotNull(vectorD);
-            assertEquals(count, vectorD.getValueCount());
-            final IntVector vectorE = d.getVectorE();
-            assertNotNull(vectorE);
-            assertEquals(count, vectorE.getValueCount());
-            final BitVector vectorF = d.getVectorF();
-            assertNotNull(vectorF);
-            assertEquals(count, vectorF.getValueCount());
-            for (int i = 0; i < count; i++) {
-                assertFalse(vector.isNull(i));
-                assertFalse(vectorA.isNull(i));
-                assertEquals(random.nextLong(), vectorA.get(i));
-                assertFalse(vectorB.isNull(i));
-                assertEquals(random.nextInt(numDistinctB), vectorB.get(i));
-                final Object valuesC = vectorC.getObject(i);
-                assertTrue(valuesC instanceof List);
-                @SuppressWarnings("unchecked")
-                final List<Integer> valuesCList = (List<Integer>)valuesC;
-                for (int j = 0; j < random.nextInt(4); j++) {
-                    assertEquals(random.nextInt(), (int)valuesCList.get(j));
-                }
-                assertFalse(vectorD.isNull(i));
-                assertFalse(vectorE.isNull(i));
-                assertEquals(random.nextInt(numDistinctE), vectorE.get(i));
-                assertFalse(vectorF.isNull(i));
-                assertEquals(random.nextBoolean(), vectorF.get(i) == 1);
-            }
+            ArrowTestUtils.checkData((ComplexData)data, count, seed);
         }
     }
 }
