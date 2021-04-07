@@ -113,11 +113,11 @@ final class ArrowBatchStore implements BatchStore {
     @Override
     public void close() throws IOException {
         final long allocated = m_allocator.getAllocatedMemory();
+        m_allocator.close();
+        Files.deleteIfExists(m_path);
         if (allocated > 0) {
             throw new IOException(
                 String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
         }
-        m_allocator.close();
-        Files.deleteIfExists(m_path);
     }
 }

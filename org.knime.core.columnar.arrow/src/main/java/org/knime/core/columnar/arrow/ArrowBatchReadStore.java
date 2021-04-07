@@ -89,11 +89,11 @@ final class ArrowBatchReadStore implements BatchReadStore {
     @Override
     public void close() throws IOException {
         final long allocated = m_allocator.getAllocatedMemory();
+        m_allocator.close();
         if (allocated > 0) {
             throw new IOException(
                 String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
         }
-        m_allocator.close();
     }
 
     @Override
