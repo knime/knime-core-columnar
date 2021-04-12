@@ -118,12 +118,9 @@ class ArrowBatchReader extends AbstractArrowBatchReader {
         private ArrowFileReader(final File file) throws IOException {
             m_in = new MappableReadChannel(file, "r");
 
-            synchronized (m_in) {
-                ArrowReader.checkFileSize(m_in);
-                ArrowReader.checkArrowMagic(m_in, true);
-                m_footer = readFooter(m_in);
-            }
-
+            ArrowReader.checkFileSize(m_in);
+            ArrowReader.checkArrowMagic(m_in, true);
+            m_footer = readFooter(m_in);
             m_dictionariesPerBatch = getDictionariesPerBatch(m_footer);
         }
 
@@ -135,38 +132,34 @@ class ArrowBatchReader extends AbstractArrowBatchReader {
 
         /** Read the record batch for the given index */
         @Override
-        public ArrowRecordBatch readRecordBatch(final int index) throws IOException {
-            synchronized (m_in) {
-                final ArrowBlock block = m_footer.getRecordBatches().get(index);
-                return MappedMessageSerializer.deserializeRecordBatch(m_in, block.getOffset());
-            }
+        public synchronized ArrowRecordBatch readRecordBatch(final int index) throws IOException {
+            final ArrowBlock block = m_footer.getRecordBatches().get(index);
+            return MappedMessageSerializer.deserializeRecordBatch(m_in, block.getOffset());
         }
 
         /** Read the dictionary batches for the given index */
         @Override
-        public ArrowDictionaryBatch[] readDictionaryBatches(final int index) throws IOException {
-            synchronized (m_in) {
-                final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[m_dictionariesPerBatch];
-                final int offset = m_dictionariesPerBatch * index;
-                try {
-                    for (int i = 0; i < m_dictionariesPerBatch; i++) {
-                        final ArrowBlock block = m_footer.getDictionaries().get(i + offset);
-                        @SuppressWarnings("resource") // Resource closed by caller
-                        final ArrowDictionaryBatch batch =
-                            MappedMessageSerializer.deserializeDictionaryBatch(m_in, block.getOffset());
-                        dictionaryBatches[i] = batch;
-                    }
-                } catch (final IOException ex) {
-                    // Close all batches in case of an exception
-                    for (final ArrowDictionaryBatch b : dictionaryBatches) {
-                        if (b != null) {
-                            b.close();
-                        }
-                    }
-                    throw ex;
+        public synchronized ArrowDictionaryBatch[] readDictionaryBatches(final int index) throws IOException {
+            final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[m_dictionariesPerBatch];
+            final int offset = m_dictionariesPerBatch * index;
+            try {
+                for (int i = 0; i < m_dictionariesPerBatch; i++) {
+                    final ArrowBlock block = m_footer.getDictionaries().get(i + offset);
+                    @SuppressWarnings("resource") // Resource closed by caller
+                    final ArrowDictionaryBatch batch =
+                        MappedMessageSerializer.deserializeDictionaryBatch(m_in, block.getOffset());
+                    dictionaryBatches[i] = batch;
                 }
-                return dictionaryBatches;
+            } catch (final IOException ex) {
+                // Close all batches in case of an exception
+                for (final ArrowDictionaryBatch b : dictionaryBatches) {
+                    if (b != null) {
+                        b.close();
+                    }
+                }
+                throw ex;
             }
+            return dictionaryBatches;
         }
 
         @Override

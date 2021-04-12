@@ -100,11 +100,9 @@ class ArrowPartialFileBatchReader extends AbstractArrowBatchReader {
             m_offsetProvider = offsetProvider;
             m_in = new MappableReadChannel(file, "r");
 
-            synchronized (m_in) {
-                ArrowReader.checkFileSize(m_in);
-                ArrowReader.checkArrowMagic(m_in, false);
-                m_schema = readSchema(m_in);
-            }
+            ArrowReader.checkFileSize(m_in);
+            ArrowReader.checkArrowMagic(m_in, false);
+            m_schema = readSchema(m_in);
         }
 
         @Override
@@ -113,36 +111,32 @@ class ArrowPartialFileBatchReader extends AbstractArrowBatchReader {
         }
 
         @Override
-        public ArrowRecordBatch readRecordBatch(final int index) throws IOException {
-            synchronized (m_in) {
-                final long offset = m_offsetProvider.getRecordBatchOffset(index);
-                return MappedMessageSerializer.deserializeRecordBatch(m_in, offset);
-            }
+        public synchronized ArrowRecordBatch readRecordBatch(final int index) throws IOException {
+            final long offset = m_offsetProvider.getRecordBatchOffset(index);
+            return MappedMessageSerializer.deserializeRecordBatch(m_in, offset);
         }
 
         @Override
-        public ArrowDictionaryBatch[] readDictionaryBatches(final int index) throws IOException {
-            synchronized (m_in) {
-                final long[] offsets = m_offsetProvider.getDictionaryBatchOffsets(index);
-                final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[offsets.length];
-                try {
-                    for (int i = 0; i < offsets.length; i++) {
-                        @SuppressWarnings("resource") // Resource closed by caller
-                        final ArrowDictionaryBatch batch =
-                            MappedMessageSerializer.deserializeDictionaryBatch(m_in, offsets[i]);
-                        dictionaryBatches[i] = batch;
-                    }
-                } catch (final IOException ex) {
-                    // Close all batches in case of an exception
-                    for (final ArrowDictionaryBatch b : dictionaryBatches) {
-                        if (b != null) {
-                            b.close();
-                        }
-                    }
-                    throw ex;
+        public synchronized ArrowDictionaryBatch[] readDictionaryBatches(final int index) throws IOException {
+            final long[] offsets = m_offsetProvider.getDictionaryBatchOffsets(index);
+            final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[offsets.length];
+            try {
+                for (int i = 0; i < offsets.length; i++) {
+                    @SuppressWarnings("resource") // Resource closed by caller
+                    final ArrowDictionaryBatch batch =
+                        MappedMessageSerializer.deserializeDictionaryBatch(m_in, offsets[i]);
+                    dictionaryBatches[i] = batch;
                 }
-                return dictionaryBatches;
+            } catch (final IOException ex) {
+                // Close all batches in case of an exception
+                for (final ArrowDictionaryBatch b : dictionaryBatches) {
+                    if (b != null) {
+                        b.close();
+                    }
+                }
+                throw ex;
             }
+            return dictionaryBatches;
         }
 
         @Override
