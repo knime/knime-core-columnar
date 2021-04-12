@@ -53,6 +53,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.arrow.flatbuf.MessageHeader;
 import org.apache.arrow.memory.ArrowBuf;
@@ -62,6 +63,8 @@ import org.apache.arrow.vector.ipc.message.ArrowMessage;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.ipc.message.MessageMetadataResult;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
+
+import com.google.common.util.concurrent.Striped;
 
 /**
  * This class provides utility methods to deserialize {@link ArrowRecordBatch} and {@link ArrowDictionaryBatch} using
@@ -73,22 +76,13 @@ public final class MappedMessageSerializer {
 
     private static final Map<MappedArrowBatchKey, ArrowMessage> MAPPED_BATCHES = new ConcurrentHashMap<>();
 
-    private static final Map<Object, Object> LOCKS = new ConcurrentHashMap<>();
-
-    /** Lock to synchronize all operations with an equal Object o */
-    private static Object getLockFor(final Object o) {
-        return LOCKS.computeIfAbsent(o, k -> new Object());
-    }
+    private static final Striped<Lock> LOCKS = Striped.lock(128);
 
     private MappedMessageSerializer() {
     }
 
     /** DO NOT USE: ONLY FOR TESTING */
     static void assertAllClosed() {
-        if (!LOCKS.isEmpty()) {
-            LOCKS.clear();
-            throw new AssertionError("Mapped Message LOCKS not empty.");
-        }
         if (!MAPPED_BATCHES.isEmpty()) {
             MAPPED_BATCHES.clear();
             throw new AssertionError("Mapped Message BATCHES not empty.");
@@ -109,7 +103,9 @@ public final class MappedMessageSerializer {
     public static ArrowRecordBatch deserializeRecordBatch(final MappableReadChannel in, final long offset)
         throws IOException {
         final MappedArrowBatchKey key = new MappedArrowBatchKey(in.getFile(), offset);
-        synchronized (getLockFor(key)) {
+        final Lock lock = LOCKS.get(key);
+        lock.lock();
+        try {
             final ArrowMessage batch = MAPPED_BATCHES.get(key);
             if (batch != null) {
                 return wrap((ArrowRecordBatch)batch, true);
@@ -138,6 +134,8 @@ public final class MappedMessageSerializer {
                 bodyBuffer.getReferenceManager().release();
                 return wrap(recordBatch, false);
             }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -155,7 +153,9 @@ public final class MappedMessageSerializer {
     public static ArrowDictionaryBatch deserializeDictionaryBatch(final MappableReadChannel in, final long offset)
         throws IOException {
         final MappedArrowBatchKey key = new MappedArrowBatchKey(in.getFile(), offset);
-        synchronized (getLockFor(key)) {
+        final Lock lock = LOCKS.get(key);
+        lock.lock();
+        try {
             final ArrowMessage batch = MAPPED_BATCHES.get(key);
             if (batch != null) {
                 return wrap((ArrowDictionaryBatch)batch, true);
@@ -185,6 +185,8 @@ public final class MappedMessageSerializer {
                 bodyBuffer.getReferenceManager().release();
                 return wrap(dictBatch, false);
             }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -192,16 +194,19 @@ public final class MappedMessageSerializer {
     @SuppressWarnings("resource") // The record batch does not need to be closed. This is only called when the body buffer is closed
     static boolean removeBatch(final MappedReferenceManager refMan) {
         final MappedArrowBatchKey key = refMan.getKey();
-        synchronized (getLockFor(key)) {
+        final Lock lock = LOCKS.get(key);
+        lock.lock();
+        try {
             // RefCount can be > 0 if deserialize(Record|Dictionary)Batch acquired the lock after it dropped to 0 but before the lock was acquired here
             // In this case we do not want to remove the batch because it is used again
             if (refMan.getRefCount() == 0) {
                 MAPPED_BATCHES.remove(key);
-                LOCKS.remove(key);
                 return true;
             } else {
                 return false;
             }
+        } finally {
+            lock.unlock();
         }
     }
 
