@@ -99,44 +99,9 @@ public final class MappedMessageSerializer {
      *         finished with it.
      * @throws IOException if reading the record batch failed
      */
-    @SuppressWarnings("resource")
     public static ArrowRecordBatch deserializeRecordBatch(final MappableReadChannel in, final long offset)
         throws IOException {
-        final MappedArrowBatchKey key = new MappedArrowBatchKey(in.getFile(), offset);
-        final Lock lock = LOCKS.get(key);
-        lock.lock();
-        try {
-            final ArrowMessage batch = MAPPED_BATCHES.get(key);
-            if (batch != null) {
-                return wrap((ArrowRecordBatch)batch, true);
-            } else {
-                // We have to read it
-                in.setPosition(offset);
-                final MessageMetadataResult result = MessageSerializer.readMessage(in);
-
-                // Check that we read a Record batch
-                if (result == null) {
-                    throw new IOException("Unexpected end of input when reading a RecordBatch");
-                }
-                if (result.getMessage().headerType() != MessageHeader.RecordBatch) {
-                    throw new IOException("Expected RecordBatch but header was " + result.getMessage().headerType());
-                }
-
-                // Get the location and size of the body
-                final long bodyLength = result.getMessageBodyLength();
-
-                final ArrowBuf bodyBuffer = mapMessageBody(key, in, bodyLength);
-                // Make sure the buffer is not closed before the batch is added. (For empty buffers)
-                bodyBuffer.getReferenceManager().retain();
-                final ArrowRecordBatch recordBatch =
-                    MessageSerializer.deserializeRecordBatch(result.getMessage(), bodyBuffer);
-                MAPPED_BATCHES.put(key, recordBatch);
-                bodyBuffer.getReferenceManager().release();
-                return wrap(recordBatch, false);
-            }
-        } finally {
-            lock.unlock();
-        }
+        return deserializeBatch(in, offset, MessageHeader.RecordBatch);
     }
 
     /**
@@ -149,45 +114,9 @@ public final class MappedMessageSerializer {
      *         finished with it.
      * @throws IOException if reading the dictionary batch failed
      */
-    @SuppressWarnings("resource")
     public static ArrowDictionaryBatch deserializeDictionaryBatch(final MappableReadChannel in, final long offset)
         throws IOException {
-        final MappedArrowBatchKey key = new MappedArrowBatchKey(in.getFile(), offset);
-        final Lock lock = LOCKS.get(key);
-        lock.lock();
-        try {
-            final ArrowMessage batch = MAPPED_BATCHES.get(key);
-            if (batch != null) {
-                return wrap((ArrowDictionaryBatch)batch, true);
-            } else {
-                // We have to read it
-                in.setPosition(offset);
-                final MessageMetadataResult result = MessageSerializer.readMessage(in);
-
-                // Check that we read a Record batch
-                if (result == null) {
-                    throw new IOException("Unexpected end of input when reading a RecordBatch");
-                }
-                if (result.getMessage().headerType() != MessageHeader.DictionaryBatch) {
-                    throw new IOException(
-                        "Expected DictionaryBatch but header was " + result.getMessage().headerType());
-                }
-
-                // Get the location and size of the body
-                final long bodyLength = result.getMessageBodyLength();
-
-                final ArrowBuf bodyBuffer = mapMessageBody(key, in, bodyLength);
-                // Make sure the buffer is not closed before the batch is added. (For empty buffers)
-                bodyBuffer.getReferenceManager().retain();
-                final ArrowDictionaryBatch dictBatch =
-                    MessageSerializer.deserializeDictionaryBatch(result.getMessage(), bodyBuffer);
-                MAPPED_BATCHES.put(key, dictBatch);
-                bodyBuffer.getReferenceManager().release();
-                return wrap(dictBatch, false);
-            }
-        } finally {
-            lock.unlock();
-        }
+        return deserializeBatch(in, offset, MessageHeader.DictionaryBatch);
     }
 
     /** Remove the batch associated with the reference manager from the map. Returns true if the batch was removed. */
@@ -210,6 +139,65 @@ public final class MappedMessageSerializer {
         }
     }
 
+    /** Deserialize a record batch or dictionary batch from the input channel */
+    @SuppressWarnings("resource")
+    private static <M extends ArrowMessage> M deserializeBatch(final MappableReadChannel in, final long offset,
+        final byte expectedHeaderType) throws IOException {
+        final MappedArrowBatchKey key = new MappedArrowBatchKey(in.getFile(), offset);
+
+        // Acquire the lock for this file+offset combination
+        final Lock lock = LOCKS.get(key);
+        lock.lock();
+
+        try {
+            ArrowMessage batch = MAPPED_BATCHES.get(key);
+            if (batch != null) {
+                // The batch is already mapped. We just need to wrap and retain it again
+                return wrapM(batch, true);
+            } else {
+                // Read the message
+                in.setPosition(offset);
+                final MessageMetadataResult result = MessageSerializer.readMessage(in);
+
+                // Check that we read the expected message
+                if (result == null) {
+                    throw new IOException(
+                        "Unexpected end of input when reading a " + MessageHeader.name(expectedHeaderType));
+                }
+                if (result.getMessage().headerType() != expectedHeaderType) {
+                    throw new IOException("Expected " + MessageHeader.name(expectedHeaderType) + " but header was "
+                        + MessageHeader.name(result.getMessage().headerType()));
+                }
+
+                // Get the location and size of the body
+                final long bodyLength = result.getMessageBodyLength();
+
+                // Map the body to memory
+                final ArrowBuf bodyBuffer = mapMessageBody(key, in, bodyLength);
+
+                // Make sure the buffer is not closed before the batch is added. (For empty buffers)
+                bodyBuffer.getReferenceManager().retain();
+
+                // Deserialize into ArrowRecordBatch or ArrowDictionaryBatch
+                if (expectedHeaderType == MessageHeader.RecordBatch) {
+                    batch = MessageSerializer.deserializeRecordBatch(result.getMessage(), bodyBuffer);
+                } else if (expectedHeaderType == MessageHeader.DictionaryBatch) {
+                    batch = MessageSerializer.deserializeDictionaryBatch(result.getMessage(), bodyBuffer);
+                } else {
+                    throw new IllegalStateException(
+                        "The expected header must be a RecordBatch or DictionaryBatch. Got '"
+                            + MessageHeader.name(expectedHeaderType) + "'.");
+                }
+                // Remember the batch
+                MAPPED_BATCHES.put(key, batch);
+                bodyBuffer.getReferenceManager().release();
+                return wrapM(batch, false);
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
     /** Map the given channel into memory. Associate the resulting buffer with the key. */
     private static ArrowBuf mapMessageBody(final MappedArrowBatchKey key, final MappableReadChannel in,
         final long bodyLength) throws IOException {
@@ -217,6 +205,17 @@ public final class MappedMessageSerializer {
         final long address = MemoryUtil.getByteBufferAddress(mappedBopy);
         final MappedReferenceManager referenceManager = new MappedReferenceManager(bodyLength, key, mappedBopy);
         return new ArrowBuf(referenceManager, null, bodyLength, address);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <M extends ArrowMessage> M wrapM(final ArrowMessage batch, final boolean retain) {
+        if (batch instanceof ArrowRecordBatch) {
+            return (M)wrap((ArrowRecordBatch)batch, retain);
+        } else if (batch instanceof ArrowDictionaryBatch) {
+            return (M)wrap((ArrowDictionaryBatch)batch, retain);
+        }
+        throw new IllegalStateException(
+            "Trying to wrap unsupported message of class " + batch.getClass().getSimpleName());
     }
 
     /** Wraps the given batch into another one. The retuned batch can be closed without closing the given batch */
