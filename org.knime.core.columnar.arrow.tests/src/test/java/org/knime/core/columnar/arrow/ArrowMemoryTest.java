@@ -51,16 +51,16 @@ import java.util.concurrent.Executors;
 
 import org.junit.Ignore;
 import org.junit.Test;
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
 
 /**
  * A long running test allocating, writing and reading many chunks.

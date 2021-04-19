@@ -61,9 +61,9 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
 
 /**
  * Arrow implementation of {@link ObjectWriteData} and {@link ObjectReadData}.

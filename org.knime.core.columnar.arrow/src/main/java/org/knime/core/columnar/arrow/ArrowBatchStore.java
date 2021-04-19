@@ -50,12 +50,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link BatchStore} implementation for Arrow.

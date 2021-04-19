@@ -64,9 +64,9 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.SingletonDictionaryProvider;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
 import org.knime.core.columnar.data.ObjectData.ObjectReadData;
 import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
 
 /**
  * Arrow implementation of {@link ObjectReadData} and {@link ObjectWriteData} using a dictionary.

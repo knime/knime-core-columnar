@@ -65,7 +65,7 @@ import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
+import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany

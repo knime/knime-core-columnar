@@ -66,14 +66,12 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.OutOfMemoryException;
 import org.apache.arrow.memory.RootAllocator;
 import org.junit.Test;
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
@@ -82,6 +80,8 @@ import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
 
 /**
  * Test {@link ArrowColumnStoreFactory}, ArrowColumnReadStore and ArrowColumnStore.

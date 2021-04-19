@@ -61,7 +61,7 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BaseLargeVariableWidthVector;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.LargeVarBinaryVector;
-import org.knime.core.columnar.data.ObjectData.ObjectDataSerializer;
+import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
 
 /**
  * Serializes and deserializes an object of type <T> to a {@link DataOutput} / {@link DataInput}. The {@link DataOutput}

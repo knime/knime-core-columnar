@@ -47,7 +47,6 @@ package org.knime.core.columnar.arrow;
 
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
@@ -67,28 +66,29 @@ import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
-import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
-import org.knime.core.columnar.data.ByteData.ByteDataSpec;
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.DataSpec.Mapper;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
-import org.knime.core.columnar.data.DurationData.DurationDataSpec;
-import org.knime.core.columnar.data.FloatData.FloatDataSpec;
-import org.knime.core.columnar.data.IntData.IntDataSpec;
-import org.knime.core.columnar.data.ListData.ListDataSpec;
-import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
-import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
-import org.knime.core.columnar.data.LongData.LongDataSpec;
-import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
-import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
-import org.knime.core.columnar.data.StructData.StructDataSpec;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
-import org.knime.core.columnar.data.VoidData.VoidDataSpec;
-import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
+import org.knime.core.table.schema.BooleanDataSpec;
+import org.knime.core.table.schema.ByteDataSpec;
+import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.DoubleDataSpec;
+import org.knime.core.table.schema.DurationDataSpec;
+import org.knime.core.table.schema.FloatDataSpec;
+import org.knime.core.table.schema.GenericObjectDataSpec;
+import org.knime.core.table.schema.IntDataSpec;
+import org.knime.core.table.schema.ListDataSpec;
+import org.knime.core.table.schema.LocalDateDataSpec;
+import org.knime.core.table.schema.LocalDateTimeDataSpec;
+import org.knime.core.table.schema.LocalTimeDataSpec;
+import org.knime.core.table.schema.LongDataSpec;
+import org.knime.core.table.schema.PeriodDataSpec;
+import org.knime.core.table.schema.StringDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.VarBinaryDataSpec;
+import org.knime.core.table.schema.VoidDataSpec;
+import org.knime.core.table.schema.ZonedDateTimeDataSpec;
+import org.knime.core.table.schema.DataSpec.Mapper;
 
 /**
  * Utility class to map a {@link ColumnarSchema} to an array of {@link ArrowColumnDataFactory}. The factories can be

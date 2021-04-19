@@ -52,7 +52,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 import org.junit.Test;
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest.DummyByteArraySerializer;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
@@ -73,10 +72,11 @@ import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.ListData.ListDataSpec;
-import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
-import org.knime.core.columnar.data.StructData.StructDataSpec;
+import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.GenericObjectDataSpec;
+import org.knime.core.table.schema.ListDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
 
 /**
  * Test the ArrowSchemaMapper.
