@@ -51,17 +51,17 @@ package org.knime.core.columnar.arrow.data;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.EOFException;
-import java.io.IOException;
 import java.io.UTFDataFormatException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BaseLargeVariableWidthVector;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.LargeVarBinaryVector;
-import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
 
 /**
  * Serializes and deserializes an object of type <T> to a {@link DataOutput} / {@link DataInput}. The {@link DataOutput}
@@ -71,20 +71,13 @@ import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ArrowBufIO<T> {
+final class ArrowBufIO {
+
+    static ArrowBufIO INSTANCE = new ArrowBufIO();
 
     private static ThreadLocal<StringEncoder> ENCODER_FACTORY = ThreadLocal.withInitial(StringEncoder::new);
 
     private static final int OFFSET_WIDTH = BaseLargeVariableWidthVector.OFFSET_WIDTH;
-
-    private final ObjectDataSerializer<T> m_serializer;
-
-    private final LargeVarBinaryVector m_vector;
-
-    ArrowBufIO(final LargeVarBinaryVector vector, final ObjectDataSerializer<T> serializer) {
-        m_serializer = serializer;
-        m_vector = vector;
-    }
 
     /**
      * Looks for an object at the given index and deserializes it. The contract is that this method is never invoked for
@@ -94,20 +87,16 @@ final class ArrowBufIO<T> {
      * @return the deserialized object
      */
     @SuppressWarnings("resource") // Buffers closed by the vector
-    final T deserialize(final int index) {
-        try {
-            // Get the offset for this index
-            final long bufferIndex = getOffset(m_vector, index);
-            final long nextIndex = getOffset(m_vector, index + 1);
+    static final <T> T deserialize(final int index, final LargeVarBinaryVector vector,
+        final Function<DataInput, T> deserializer) {
+        // Get the offset for this index
+        final long bufferIndex = getOffset(vector, index);
+        final long nextIndex = getOffset(vector, index + 1);
 
-            // Deserialize from the data buffer
-            final ArrowBufDataInput buf =
-                new ArrowBufDataInput(m_vector.getDataBuffer(), bufferIndex, nextIndex, ENCODER_FACTORY.get());
-            return m_serializer.deserialize(buf);
-        } catch (final IOException ex) {
-            // TODO should the deserialize method just throw the IOException?
-            throw new IllegalStateException("Error during deserialization", ex);
-        }
+        // Deserialize from the data buffer
+        final ArrowBufDataInput buf =
+            new ArrowBufDataInput(vector.getDataBuffer(), bufferIndex, nextIndex, ENCODER_FACTORY.get());
+        return deserializer.apply(buf);
     }
 
     /**
@@ -118,29 +107,25 @@ final class ArrowBufIO<T> {
      * @param obj the object to serialize
      */
     @SuppressWarnings("resource") // Buffers closed by the vector
-    final void serialize(final int index, final T obj) {
-        try {
-            // Set the value to not null
-            BitVectorHelper.setBit(m_vector.getValidityBuffer(), index);
+    static final <T> void serialize(final int index, final T obj, final LargeVarBinaryVector vector,
+        final BiConsumer<DataOutput, T> serializer) {
+        // Set the value to not null
+        BitVectorHelper.setBit(vector.getValidityBuffer(), index);
 
-            // Get the start of the the new value
-            m_vector.fillEmpties(index);
-            final long startOffset = getOffset(m_vector, index);
-            m_vector.getDataBuffer().writerIndex(startOffset);
+        // Get the start of the the new value
+        vector.fillEmpties(index);
+        final long startOffset = getOffset(vector, index);
+        vector.getDataBuffer().writerIndex(startOffset);
 
-            // Serialize the value to the data buffer
-            m_serializer.serialize(obj, new ArrowBufDataOutput(m_vector, ENCODER_FACTORY.get()));
+        // Serialize the value to the data buffer
+        serializer.accept(new ArrowBufDataOutput(vector, ENCODER_FACTORY.get()), obj);
 
-            // Set the offset for the next element
-            final long nextOffset = m_vector.getDataBuffer().writerIndex();
-            setOffset(m_vector, index + 1, nextOffset);
+        // Set the offset for the next element
+        final long nextOffset = vector.getDataBuffer().writerIndex();
+        setOffset(vector, index + 1, nextOffset);
 
-            // Update the lastSet value of the vector
-            m_vector.setLastSet(index);
-        } catch (final IOException ex) {
-            // TODO should the serialize method just throw the IOException?
-            throw new IllegalStateException("Error during serialization", ex);
-        }
+        // Update the lastSet value of the vector
+        vector.setLastSet(index);
     }
 
     @SuppressWarnings("resource")
@@ -501,4 +486,8 @@ final class ArrowBufIO<T> {
             }
         }
     }
+
+    private ArrowBufIO() {
+    }
+
 }

@@ -48,6 +48,11 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+
 import org.apache.arrow.vector.LargeVarBinaryVector;
 
 import com.google.common.collect.BiMap;
@@ -68,20 +73,21 @@ final class InMemoryDictEncoding<T> {
 
     private final BiMap<Integer, T> m_invInMemDict;
 
-    private final ArrowBufIO<T> m_io;
-
     private final LargeVarBinaryVector m_vector;
 
-    InMemoryDictEncoding(final LargeVarBinaryVector vector, final ArrowBufIO<T> io, final int initialDictSize) {
+    private final BiConsumer<DataOutput, T> m_serializer;
+
+    InMemoryDictEncoding(final LargeVarBinaryVector vector, final int initialDictSize,
+        final BiConsumer<DataOutput, T> serializer, final Function<DataInput, T> deserializer) {
         m_vector = vector;
-        m_io = io;
         m_inMemDict = HashBiMap.create(initialDictSize);
         m_invInMemDict = m_inMemDict.inverse();
         for (int i = 0; i < vector.getValueCount(); i++) {
             if (vector.isSet(i) != 0) {
-                m_invInMemDict.put(i, m_io.deserialize(i));
+                m_invInMemDict.put(i, ArrowBufIO.deserialize(i, vector, deserializer));
             }
         }
+        m_serializer = serializer;
     }
 
     /**
@@ -114,7 +120,7 @@ final class InMemoryDictEncoding<T> {
         }
         // Fill the vector with the encoded values
         for (int i = dictValueCount; i < numDistinctValues; i++) {
-            m_io.serialize(i, m_invInMemDict.get(i));
+            ArrowBufIO.serialize(i, m_invInMemDict.get(i), m_vector, m_serializer);
         }
         m_vector.setValueCount(numDistinctValues);
         return m_vector;

@@ -45,7 +45,11 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -95,6 +99,11 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
+        public <T> void setObject(final int index, final T value, final BiConsumer<DataOutput, T> serializer) {
+            ArrowBufIO.serialize(index, value, m_vector, serializer);
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowVarBinaryWriteData(m_vector, m_offset + start);
         }
@@ -129,6 +138,11 @@ public final class ArrowVarBinaryData {
         @Override
         public byte[] getBytes(final int index) {
             return m_vector.get(m_offset + index);
+        }
+
+        @Override
+        public <T> T getObject(final int index, final Function<DataInput, T> deserializer) {
+            return ArrowBufIO.deserialize(index, m_vector, deserializer);
         }
 
         @Override

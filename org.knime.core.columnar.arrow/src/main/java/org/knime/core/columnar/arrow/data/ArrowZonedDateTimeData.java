@@ -45,8 +45,6 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -78,7 +76,6 @@ import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
-import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
 
 /**
  * Arrow implementation of {@link ZonedDateTimeWriteData} and {@link ZonedDateTimeReadData}.
@@ -87,8 +84,6 @@ import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public final class ArrowZonedDateTimeData {
-
-    private static final ZoneIdSerializer ZONE_ID_SERIALIZER = new ZoneIdSerializer();
 
     private static final int INIT_DICT_SIZE = 8;
 
@@ -117,22 +112,22 @@ public final class ArrowZonedDateTimeData {
     }
 
     private static InMemoryDictEncoding<ZoneId> getInMemoryDict(final LargeVarBinaryVector dict) {
-        return new InMemoryDictEncoding<>(dict, new ArrowBufIO<>(dict, ZONE_ID_SERIALIZER), INIT_DICT_SIZE);
+        return new InMemoryDictEncoding<>(dict, INIT_DICT_SIZE, (output, id) -> {
+            try {
+                output.writeUTF(id.getId());
+            } catch (IOException ex) {
+                throw new IllegalStateException("Unable to serialize zone ID.", ex);
+            }
+        }, input -> {
+            try {
+                return ZoneId.of(input.readUTF());
+            } catch (IOException ex) {
+                throw new IllegalStateException("Unable to deserialize zone ID.", ex);
+            }
+        });
     }
 
     private ArrowZonedDateTimeData() {
-    }
-
-    private static final class ZoneIdSerializer implements ObjectDataSerializer<ZoneId> {
-        @Override
-        public void serialize(final ZoneId obj, final DataOutput output) throws IOException {
-            output.writeUTF(obj.getId());
-        }
-
-        @Override
-        public ZoneId deserialize(final DataInput input) throws IOException {
-            return ZoneId.of(input.readUTF());
-        }
     }
 
     /** Arrow implementation of {@link ZonedDateTimeWriteData}. */

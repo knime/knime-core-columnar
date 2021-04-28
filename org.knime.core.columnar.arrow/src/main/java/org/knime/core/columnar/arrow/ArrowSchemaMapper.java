@@ -49,7 +49,6 @@ import java.util.stream.IntStream;
 
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDurationData.ArrowDurationDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
@@ -59,7 +58,6 @@ import org.knime.core.columnar.arrow.data.ArrowLocalDateData.ArrowLocalDateDataF
 import org.knime.core.columnar.arrow.data.ArrowLocalDateTimeData.ArrowLocalDateTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
@@ -72,10 +70,10 @@ import org.knime.core.table.schema.BooleanDataSpec;
 import org.knime.core.table.schema.ByteDataSpec;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.DataSpec.Mapper;
 import org.knime.core.table.schema.DoubleDataSpec;
 import org.knime.core.table.schema.DurationDataSpec;
 import org.knime.core.table.schema.FloatDataSpec;
-import org.knime.core.table.schema.GenericObjectDataSpec;
 import org.knime.core.table.schema.IntDataSpec;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.LocalDateDataSpec;
@@ -88,7 +86,6 @@ import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.VoidDataSpec;
 import org.knime.core.table.schema.ZonedDateTimeDataSpec;
-import org.knime.core.table.schema.DataSpec.Mapper;
 
 /**
  * Utility class to map a {@link ColumnarSchema} to an array of {@link ArrowColumnDataFactory}. The factories can be
@@ -194,15 +191,6 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
     @Override
     public ArrowVoidDataFactory visit(final VoidDataSpec spec) {
         return ArrowVoidDataFactory.INSTANCE;
-    }
-
-    @Override
-    public ArrowColumnDataFactory visit(final GenericObjectDataSpec<?> spec) {
-        if (!spec.isDictEncoded()) {
-            return new ArrowObjectDataFactory<>(spec.getSerializer());
-        } else {
-            return new ArrowDictEncodedObjectDataFactory<>(spec.getSerializer());
-        }
     }
 
     @Override
