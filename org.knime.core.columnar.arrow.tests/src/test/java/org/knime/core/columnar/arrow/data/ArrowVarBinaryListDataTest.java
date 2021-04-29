@@ -60,24 +60,24 @@ import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListReadData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListWriteData;
-import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectReadData;
-import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectWriteData;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
 
 /**
  * Test {@link ArrowListData} with a list consisting of integer values.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowObjectListDataTest extends AbstractArrowDataTest<ArrowListWriteData, ArrowListReadData> {
+public class ArrowVarBinaryListDataTest extends AbstractArrowDataTest<ArrowListWriteData, ArrowListReadData> {
 
     private static final int MAX_LENGTH = 4;
 
     private static final int MAX_OBJECT_SIZE = 3;
 
     /** Create the test for {@link ArrowListData} */
-    public ArrowObjectListDataTest() {
-        super(new ArrowListDataFactory(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE)));
+    public ArrowVarBinaryListDataTest() {
+        super(new ArrowListDataFactory(ArrowVarBinaryDataFactory.INSTANCE));
     }
 
     @Override
@@ -102,16 +102,16 @@ public class ArrowObjectListDataTest extends AbstractArrowDataTest<ArrowListWrit
 
         final Random random = new Random(seed);
         final int size = random.nextInt(MAX_LENGTH);
-        final ArrowObjectWriteData<byte[]> inner = data.createWriteData(index, size);
+        final ArrowVarBinaryWriteData inner = data.createWriteData(index, size);
         for (int i = 0; i < size; i++) {
             byte[] valueFor = valueFor(random);
-            inner.setObject(i, valueFor);
+            inner.setBytes(i, valueFor);
         }
     }
 
     @Override
     protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
-        final ArrowObjectReadData<byte[]> element = data.createReadData(index);
+        final ArrowVarBinaryReadData element = data.createReadData(index);
         if (seed == 1) {
             assertEquals(0, element.length());
             return;
@@ -122,7 +122,7 @@ public class ArrowObjectListDataTest extends AbstractArrowDataTest<ArrowListWrit
         assertEquals(size, element.length());
 
         for (int i = 0; i < size; i++) {
-            byte[] object = element.getObject(i);
+            byte[] object = element.getBytes(i);
             assertArrayEquals(valueFor(random), object);
         }
     }
@@ -137,8 +137,7 @@ public class ArrowObjectListDataTest extends AbstractArrowDataTest<ArrowListWrit
     protected boolean isReleasedR(final ArrowListReadData data) {
         final ArrowListReadData d = castR(data);
         final ListVector listVector = d.m_vector;
-        @SuppressWarnings("unchecked")
-        final LargeVarBinaryVector bVector = ((ArrowObjectReadData<byte[]>)d.m_data).m_vector;
+        final LargeVarBinaryVector bVector = ((ArrowVarBinaryReadData)d.m_data).m_vector;
 
         final boolean bReleased = bVector.getDataBuffer().capacity() == 0 //
             && bVector.getValidityBuffer().capacity() == 0 //

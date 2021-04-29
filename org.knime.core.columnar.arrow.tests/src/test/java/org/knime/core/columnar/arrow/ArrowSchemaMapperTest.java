@@ -52,10 +52,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 import org.junit.Test;
-import org.knime.core.columnar.arrow.AbstractArrowDataTest.DummyByteArraySerializer;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDurationData.ArrowDurationDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
@@ -65,7 +63,6 @@ import org.knime.core.columnar.arrow.data.ArrowLocalDateData.ArrowLocalDateDataF
 import org.knime.core.columnar.arrow.data.ArrowLocalDateTimeData.ArrowLocalDateTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
@@ -74,7 +71,6 @@ import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.GenericObjectDataSpec;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
 
@@ -126,20 +122,6 @@ public class ArrowSchemaMapperTest {
     @Test
     public void testMapVarBinarySpec() {
         testMapSingleSpec(DataSpec.varBinarySpec(), ArrowVarBinaryDataFactory.INSTANCE);
-    }
-
-    /** Test mapping object specs to a {@link ArrowObjectDataFactory} */
-    @Test
-    public void testMapObjectSpec() {
-        testMapSingleSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
-            new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
-    }
-
-    /** Test mapping dict encoded byte specs to a {@link ArrowDictEncodedObjectDataFactory} */
-    @Test
-    public void testMapDictEncodedSpec() {
-        testMapSingleSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true),
-            new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
     }
 
     /** Test mapping void specs to a {@link ArrowVoidDataFactory} */
@@ -199,14 +181,10 @@ public class ArrowSchemaMapperTest {
 
         // Complex
         testMapSingleSpec(
-            new StructDataSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true),
-                DataSpec.intSpec(),
-                new StructDataSpec(new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, false),
-                    new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true))),
-            new ArrowStructDataFactory(new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
-                ArrowIntDataFactory.INSTANCE,
-                new ArrowStructDataFactory(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
-                    new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE))));
+            new StructDataSpec(DataSpec.stringSpec(), DataSpec.intSpec(),
+                new StructDataSpec(DataSpec.doubleSpec(), DataSpec.longSpec())),
+            new ArrowStructDataFactory(ArrowStringDataFactory.INSTANCE, ArrowIntDataFactory.INSTANCE,
+                new ArrowStructDataFactory(ArrowDoubleDataFactory.INSTANCE, ArrowLongDataFactory.INSTANCE)));
     }
 
     /** Test mapping list specs to a {@link ArrowListDataFactory} */
@@ -218,11 +196,9 @@ public class ArrowSchemaMapperTest {
 
         // Complex
         testMapSingleSpec(
-            new ListDataSpec(new ListDataSpec(new StructDataSpec(
-                new GenericObjectDataSpec<>(DummyByteArraySerializer.INSTANCE, true), DataSpec.doubleSpec()))),
+            new ListDataSpec(new ListDataSpec(new StructDataSpec(DataSpec.stringSpec(), DataSpec.doubleSpec()))),
             new ArrowListDataFactory(new ArrowListDataFactory(
-                new ArrowStructDataFactory(new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
-                    ArrowDoubleDataFactory.INSTANCE))));
+                new ArrowStructDataFactory(ArrowStringDataFactory.INSTANCE, ArrowDoubleDataFactory.INSTANCE))));
     }
 
     // TODO test for other specs when implemented

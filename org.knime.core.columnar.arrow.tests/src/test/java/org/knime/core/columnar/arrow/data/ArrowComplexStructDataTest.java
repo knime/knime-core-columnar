@@ -57,28 +57,35 @@ import java.util.Random;
 import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectReadData;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedObjectData.ArrowDictEncodedObjectWriteData;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleReadData;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleWriteData;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
-import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectReadData;
-import org.knime.core.columnar.arrow.data.ArrowObjectData.ArrowObjectWriteData;
+import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringReadData;
+import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 
 /**
- * Test {@link ArrowStructData} with a struct consisting of a dictionary encoded object, integer, and struct (of object
- * and dictionary encoded object).
+ * Test {@link ArrowStructData} with a struct consisting of a string, integer, and struct (of varbinary
+ * and double).
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
@@ -86,17 +93,11 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
 
     private static final int MAX_LENGTH = 100;
 
-    private static final byte[][] VALUES_0 = createValues(23, 0);
-
-    private static final byte[][] VALUES_21 = createValues(15, 1);
-
     private static ArrowStructDataFactory createFactory() {
-        final ArrowDictEncodedObjectDataFactory<byte[]> child1 =
-            new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE);
+        final ArrowStringDataFactory child1 = ArrowStringDataFactory.INSTANCE;
         final ArrowIntDataFactory child2 = ArrowIntDataFactory.INSTANCE;
-        final ArrowStructDataFactory child3 =
-            new ArrowStructDataFactory(new ArrowObjectDataFactory<>(DummyByteArraySerializer.INSTANCE),
-                new ArrowDictEncodedObjectDataFactory<>(DummyByteArraySerializer.INSTANCE));
+        final ArrowStructDataFactory child3 = new ArrowStructDataFactory(ArrowVarBinaryDataFactory.INSTANCE,
+            ArrowDoubleDataFactory.INSTANCE);
         return new ArrowStructDataFactory(child1, child2, child3);
     }
 
@@ -119,40 +120,40 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
 
     @Override
     protected void setValue(final ArrowStructWriteData data, final int index, final int seed) {
-        final ObjectWriteData<byte[]> data0 = data.getWriteDataAt(0);
-        assertTrue(data0 instanceof ArrowDictEncodedObjectWriteData);
+        final StringWriteData data0 = data.getWriteDataAt(0);
+        assertTrue(data0 instanceof ArrowStringWriteData);
         final IntWriteData data1 = data.getWriteDataAt(1);
         assertTrue(data1 instanceof ArrowIntWriteData);
         final StructWriteData data2 = data.getWriteDataAt(2);
         assertTrue(data2 instanceof ArrowStructWriteData);
-        final ObjectWriteData<byte[]> data20 = data2.getWriteDataAt(0);
-        assertTrue(data20 instanceof ArrowObjectWriteData);
-        final ObjectWriteData<byte[]> data21 = data2.getWriteDataAt(1);
-        assertTrue(data21 instanceof ArrowDictEncodedObjectWriteData);
+        final VarBinaryWriteData data20 = data2.getWriteDataAt(0);
+        assertTrue(data20 instanceof ArrowVarBinaryWriteData);
+        final DoubleWriteData data21 = data2.getWriteDataAt(1);
+        assertTrue(data21 instanceof ArrowDoubleWriteData);
 
-        data0.setObject(index, valueFor0(seed));
+        data0.setString(index, Integer.toString(seed));
         data1.setInt(index, seed);
-        data20.setObject(index, valueFor20(seed));
-        data21.setObject(index, valueFor21(seed));
+        data20.setBytes(index, valueFor20(seed));
+        data21.setDouble(index, seed);
     }
 
     @Override
     protected void checkValue(final ArrowStructReadData data, final int index, final int seed) {
-        final ObjectReadData<byte[]> data0 = data.getReadDataAt(0);
-        assertTrue(data0 instanceof ArrowDictEncodedObjectReadData);
+        final StringReadData data0 = data.getReadDataAt(0);
+        assertTrue(data0 instanceof ArrowStringReadData);
         final IntReadData data1 = data.getReadDataAt(1);
         assertTrue(data1 instanceof ArrowIntReadData);
         final StructReadData data2 = data.getReadDataAt(2);
         assertTrue(data2 instanceof ArrowStructReadData);
-        final ObjectReadData<byte[]> data20 = data2.getReadDataAt(0);
-        assertTrue(data20 instanceof ArrowObjectReadData);
-        final ObjectReadData<byte[]> data21 = data2.getReadDataAt(1);
-        assertTrue(data21 instanceof ArrowDictEncodedObjectReadData);
+        final VarBinaryReadData data20 = data2.getReadDataAt(0);
+        assertTrue(data20 instanceof ArrowVarBinaryReadData);
+        final DoubleReadData data21 = data2.getReadDataAt(1);
+        assertTrue(data21 instanceof ArrowDoubleReadData);
 
-        assertArrayEquals(valueFor0(seed), data0.getObject(index));
+        assertEquals(Integer.toString(seed), data0.getString(index));
         assertEquals(seed, data1.getInt(index));
-        assertArrayEquals(valueFor20(seed), data20.getObject(index));
-        assertArrayEquals(valueFor21(seed), data21.getObject(index));
+        assertArrayEquals(valueFor20(seed), data20.getBytes(index));
+        assertEquals(seed, data21.getDouble(index), 1e-5);
     }
 
     @Override
@@ -165,7 +166,7 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
     protected boolean isReleasedR(final ArrowStructReadData data) {
         final ArrowStructReadData d = castR(data);
         final ArrowStructReadData d2 = d.getReadDataAt(2);
-        final ArrowObjectReadData<byte[]> d20 = d2.getReadDataAt(0);
+        final ArrowVarBinaryReadData d20 = d2.getReadDataAt(0);
 
         // We just check the validity buffer of this data, of the inner struct
         // and of the 2nd level object data
@@ -193,31 +194,10 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
             + capacity * 4; // Dictionary encoded data
     }
 
-    private static byte[] valueFor0(final int seed) {
-        final Random random = new Random(seed);
-        return VALUES_0[random.nextInt(VALUES_0.length)];
-    }
-
     private static byte[] valueFor20(final int seed) {
         final Random random = new Random(seed);
         final byte[] bytes = new byte[random.nextInt(MAX_LENGTH)];
         random.nextBytes(bytes);
         return bytes;
-    }
-
-    private static byte[] valueFor21(final int seed) {
-        final Random random = new Random(seed);
-        return VALUES_21[random.nextInt(VALUES_21.length)];
-    }
-
-    private static byte[][] createValues(final int numDistinct, final long seed) {
-        final byte[][] values = new byte[numDistinct][];
-        final Random random = new Random(seed);
-        for (int i = 0; i < numDistinct; i++) {
-            final byte[] bytes = new byte[random.nextInt(MAX_LENGTH)];
-            random.nextBytes(bytes);
-            values[i] = bytes;
-        }
-        return values;
     }
 }

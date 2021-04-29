@@ -53,10 +53,13 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
+import org.junit.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * Test {@link ArrowVarBinaryData}
@@ -122,5 +125,31 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
         final byte[] bytes = new byte[random.nextInt(MAX_LENGTH)];
         random.nextBytes(bytes);
         return bytes;
+    }
+
+    /**
+     * Test {@link ArrowVarBinaryWriteData#setObject(int, Object, ObjectSerializer)} and
+     * {@link ArrowVarBinaryReadData#getObject(int, ObjectDeserializer)}.
+     */
+    @Test
+    public void testSerialize() {
+        int numValues = 64;
+        final ArrowVarBinaryWriteData writeData = createWrite(numValues);
+        for (int i = 0; i < numValues; i++) {
+            writeData.setObject(i, valueFor(i), (output, object) -> {
+                output.writeInt(object.length);
+                output.write(object);
+            });
+        }
+        final ArrowVarBinaryReadData readData = castR(writeData.close(numValues));
+        for (int i = 0; i < numValues; i++) {
+            final byte[] read = readData.getObject(i, input -> {
+                final byte[] object = new byte[input.readInt()];
+                input.readFully(object);
+                return object;
+            });
+            assertArrayEquals(valueFor(i), read);
+        }
+        readData.release();
     }
 }

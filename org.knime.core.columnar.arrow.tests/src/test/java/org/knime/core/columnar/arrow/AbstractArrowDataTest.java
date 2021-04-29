@@ -50,8 +50,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -78,7 +76,6 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
-import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
 
 /**
  * Abstract test for simple Arrow {@link NullableReadData}, {@link NullableWriteData} implementations.
@@ -160,39 +157,6 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
      * @return the minimum size that should be allocated by data object to store the data
      */
     protected abstract long getMinSize(int valueCount, int capacity);
-
-    /**
-     * Simple serializer implementation which adds one to the bytes on serialization and removes 1 when deserializing
-     * again.
-     */
-    protected static final class DummyByteArraySerializer implements ObjectDataSerializer<byte[]> {
-
-        @SuppressWarnings("javadoc")
-        public static final DummyByteArraySerializer INSTANCE = new DummyByteArraySerializer();
-
-        private DummyByteArraySerializer() {
-        }
-
-        @Override
-        public void serialize(final byte[] obj, final DataOutput output) throws IOException {
-            final byte[] modifiedCopy = obj.clone();
-            output.writeInt(obj.length);
-            for (int i = 0; i < modifiedCopy.length; i++) {
-                modifiedCopy[i]++;
-            }
-            output.write(modifiedCopy);
-        }
-
-        @Override
-        public byte[] deserialize(final DataInput input) throws IOException {
-            final byte[] obj = new byte[input.readInt()];
-            input.readFully(obj);
-            for (int i = 0; i < obj.length; i++) {
-                obj[i]--;
-            }
-            return obj;
-        }
-    }
 
     /** Initialize the root allocator before running a test */
     @Before
