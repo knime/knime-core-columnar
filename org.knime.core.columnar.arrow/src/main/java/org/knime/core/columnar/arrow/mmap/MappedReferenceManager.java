@@ -55,6 +55,7 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.OwnershipTransferResult;
 import org.apache.arrow.memory.ReferenceManager;
+import org.apache.arrow.memory.util.MemoryUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -119,12 +120,8 @@ final class MappedReferenceManager implements ReferenceManager {
             // Note that the batch is not removed if the reference count goes up again before this is finished
             if (MappedMessageSerializer.removeBatch(this)) {
 
-                // TODO close the mapping explicitly
-                // See https://stackoverflow.com/a/19447758 for unmapping without the garbage collector
-                // The solution is different for java 8 and java 11
-                // -> We should do it when the switch to java 11 is finished
-
-                // Delete the reference to the buffer which releases the memory
+                // Close the mapping explicitly by calling the cleaner of the buffer
+                MemoryUtil.UNSAFE.invokeCleaner(m_mappedBuffer);
                 m_mappedBuffer = null;
                 return true;
             }
