@@ -45,11 +45,7 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -63,6 +59,8 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
@@ -99,7 +97,7 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
-        public <T> void setObject(final int index, final T value, final BiConsumer<DataOutput, T> serializer) {
+        public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
             ArrowBufIO.serialize(index, value, m_vector, serializer);
         }
 
@@ -141,7 +139,7 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
-        public <T> T getObject(final int index, final Function<DataInput, T> deserializer) {
+        public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
             return ArrowBufIO.deserialize(index, m_vector, deserializer);
         }
 

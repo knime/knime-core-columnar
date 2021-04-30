@@ -53,11 +53,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.knime.core.columnar.arrow.data.ArrowBufIO.deserialize;
+import static org.knime.core.columnar.arrow.data.ArrowBufIO.serialize;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.EOFException;
-import java.io.IOException;
 
 import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.RootAllocator;
@@ -65,7 +64,8 @@ import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.knime.core.table.schema.GenericObjectDataSpec.ObjectDataSerializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -91,39 +91,37 @@ public class ArrowBufIOTest {
         m_alloc.close();
     }
 
-    private void serdeNull(final ObjectDataSerializer<?> ser) {
+    private void serdeNull(final ObjectSerializer<?> ser, final ObjectDeserializer<?> de) {
         try (final LargeVarBinaryVector vector = new LargeVarBinaryVector("test", m_alloc)) {
             vector.allocateNew(0, 0);
-            final ArrowBufIO<?> bio = new ArrowBufIO<>(vector, ser);
-            bio.serialize(0, null);
-            bio.deserialize(0);
+            serialize(0, null, vector, ser);
+            deserialize(0, vector, de);
         }
     }
 
-    private void serdeString(final String s, final String expect, final ObjectDataSerializer<String> ser) {
+    private void serdeString(final String s, final String expect, final ObjectSerializer<String> ser,
+        final ObjectDeserializer<String> de) {
         try (final LargeVarBinaryVector vector = new LargeVarBinaryVector("test", m_alloc)) {
             vector.allocateNew(0, 0);
-            final ArrowBufIO<String> bio = new ArrowBufIO<>(vector, ser);
-            bio.serialize(0, s);
-            assertEquals(expect, bio.deserialize(0));
+            serialize(0, s, vector, ser);
+            assertEquals(expect, deserialize(0, vector, de));
         }
     }
 
-    private <T> void serdeT(final T obj, final ObjectDataSerializer<T> ser) {
+    private <T> void serdeT(final T obj, final ObjectSerializer<T> ser, final ObjectDeserializer<T> de) {
         try (final LargeVarBinaryVector vector = new LargeVarBinaryVector("test", m_alloc)) {
             vector.allocateNew(0, 0);
-            final ArrowBufIO<T> bio = new ArrowBufIO<>(vector, ser);
-            bio.serialize(0, obj);
-            assertEquals(obj, bio.deserialize(0));
+            serialize(0, obj, vector, ser);
+            assertEquals(obj, deserialize(0, vector, de));
         }
     }
 
-    private void serdeByteArray(final byte[] arr, final ObjectDataSerializer<byte[]> ser) {
+    private void serdeByteArray(final byte[] arr, final ObjectSerializer<byte[]> ser,
+        final ObjectDeserializer<byte[]> de) {
         try (final LargeVarBinaryVector vector = new LargeVarBinaryVector("test", m_alloc)) {
             vector.allocateNew(0, 0);
-            final ArrowBufIO<byte[]> bio = new ArrowBufIO<>(vector, ser);
-            bio.serialize(0, arr);
-            assertArrayEquals(arr, bio.deserialize(0));
+            serialize(0, arr, vector, ser);
+            assertArrayEquals(arr, deserialize(0, vector, de));
         }
     }
 
@@ -131,93 +129,58 @@ public class ArrowBufIOTest {
 
     @Test(expected = NullPointerException.class)
     public void testNPEOnWrite() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException {
-                output.write(null);
-            }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                return new byte[0];
-            }
-        });
+        serdeNull((output, object) -> output.write(null), input -> new byte[0]);
     }
 
     @Test(expected = NullPointerException.class)
     public void testNPEOnReadFully() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException { // NOSONAR
-            }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                input.readFully(null);
-                return new byte[0];
-            }
+        serdeNull((output, object) -> {
+        }, input -> {
+            input.readFully(null);
+            return new byte[0];
         });
     }
 
     @Test
     public void testEOFOnReadFully() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readFully(new byte[1]);
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readFully(new byte[1]);
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return new byte[0];
-            }
+            return new byte[0];
         });
     }
 
     @Test
     public void testWriteReadFully() {
-        final ObjectDataSerializer<byte[]> ser = new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException {
-                output.writeInt(obj.length);
-                output.write(obj);
-            }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                final byte[] result = new byte[input.readInt()];
-                input.readFully(result);
-                return result;
-            }
+        final ObjectSerializer<byte[]> ser = (output, object) -> {
+            output.writeInt(object.length);
+            output.write(object);
+        };
+        final ObjectDeserializer<byte[]> de = input -> {
+            final byte[] result = new byte[input.readInt()];
+            input.readFully(result);
+            return result;
         };
 
-        serdeByteArray(new byte[0], ser);
-        serdeByteArray(new byte[]{Byte.MIN_VALUE, Byte.valueOf((byte)0), Byte.MAX_VALUE}, ser);
+        serdeByteArray(new byte[0], ser, de);
+        serdeByteArray(new byte[]{Byte.MIN_VALUE, Byte.valueOf((byte)0), Byte.MAX_VALUE}, ser, de);
     }
 
     // ##### Tests for skipBytes(int)
 
     @Test
     public void testSkipBytes() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException {
-                output.write(new byte[]{(byte)0, (byte)1, (byte)2});
-            }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                assertEquals(1, input.skipBytes(1));
-                final byte[] b = new byte[2];
-                input.readFully(b);
-                assertArrayEquals(new byte[]{(byte)1, (byte)2}, b);
-                assertEquals(0, input.skipBytes(1));
-                return b;
-            }
+        serdeNull((output, object) -> output.write(new byte[]{(byte)0, (byte)1, (byte)2}), input -> {
+            assertEquals(1, input.skipBytes(1));
+            final byte[] b = new byte[2];
+            input.readFully(b);
+            assertArrayEquals(new byte[]{(byte)1, (byte)2}, b);
+            assertEquals(0, input.skipBytes(1));
+            return b;
         });
     }
 
@@ -225,590 +188,361 @@ public class ArrowBufIOTest {
 
     @Test(expected = NullPointerException.class)
     public void testNPEOnWriteWithOffset() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException {
-                output.write(null, 0, 0);
-            }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                return new byte[0];
-            }
-        });
+        serdeNull((output, object) -> output.write(null, 0, 0), input -> new byte[0]);
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testOOBOnWriteWithOffset() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException {
-                output.write(new byte[0], 0, 1);
-            }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                return new byte[0];
-            }
-        });
+        serdeNull((output, object) -> output.write(new byte[0], 0, 1), input -> new byte[0]);
     }
 
     @Test(expected = NullPointerException.class)
     public void testNPEOnReadFullyWithOffset() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException { // NOSONAR
-            }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                input.readFully(null, 0, 0);
-                return new byte[0];
-            }
+        serdeNull((output, object) -> {
+        }, input -> {
+            input.readFully(null, 0, 0);
+            return new byte[0];
         });
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testOOBOnReadFullyWithOffset() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException { // NOSONAR
-            }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                input.readFully(new byte[0], 0, 1);
-                return new byte[0];
-            }
+        serdeNull((output, object) -> {
+        }, input -> {
+            input.readFully(new byte[0], 0, 1);
+            return new byte[0];
         });
     }
 
     @Test
     public void testEOFOnReadFullyWithOffset() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readFully(new byte[1], 0, 1);
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readFully(new byte[1], 0, 1);
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return new byte[0];
-            }
+            return new byte[0];
         });
     }
 
     @Test
     public void testWriteWithOffsetReadFullyWithOffset() {
-        serdeByteArray(new byte[]{Byte.MIN_VALUE, Byte.valueOf((byte)0), Byte.MAX_VALUE},
-            new ObjectDataSerializer<byte[]>() {
-                @Override
-                public void serialize(final byte[] obj, final DataOutput output) throws IOException {
-                    output.writeInt(obj.length);
-                    output.write(obj, obj.length - 1, 1);
-                    output.write(obj, 0, obj.length - 1);
-                }
-
-                @Override
-                public byte[] deserialize(final DataInput input) throws IOException {
-                    final byte[] result = new byte[input.readInt()];
-                    input.readFully(result, result.length - 1, 1);
-                    input.readFully(result, 0, result.length - 1);
-                    return result;
-                }
-            });
+        serdeByteArray(new byte[]{Byte.MIN_VALUE, Byte.valueOf((byte)0), Byte.MAX_VALUE}, (output, object) -> {
+            output.writeInt(object.length);
+            output.write(object, object.length - 1, 1);
+            output.write(object, 0, object.length - 1);
+        }, input -> {
+            final byte[] result = new byte[input.readInt()];
+            input.readFully(result, result.length - 1, 1);
+            input.readFully(result, 0, result.length - 1);
+            return result;
+        });
     }
 
     // ##### Tests for writeBoolean(boolean) and readBoolean()
 
     @Test
     public void testEOFOnReadBoolean() {
-        serdeNull(new ObjectDataSerializer<Boolean>() {
-            @Override
-            public void serialize(final Boolean obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readBoolean();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Boolean deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readBoolean();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return Boolean.FALSE;
-            }
+            return Boolean.FALSE;
         });
     }
 
     @Test
     public void testWriteBooleanReadBoolean() {
-        final ObjectDataSerializer<Boolean> ser = new ObjectDataSerializer<Boolean>() {
-            @Override
-            public void serialize(final Boolean obj, final DataOutput output) throws IOException {
-                output.writeBoolean(obj.booleanValue());
-            }
+        final ObjectSerializer<Boolean> ser = (output, object) -> output.writeBoolean(object.booleanValue());
+        final ObjectDeserializer<Boolean> de = input -> Boolean.valueOf(input.readBoolean());
 
-            @Override
-            public Boolean deserialize(final DataInput input) throws IOException {
-                return Boolean.valueOf(input.readBoolean());
-            }
-        };
-
-        serdeT(Boolean.FALSE, ser);
-        serdeT(Boolean.TRUE, ser);
+        serdeT(Boolean.FALSE, ser, de);
+        serdeT(Boolean.TRUE, ser, de);
     }
 
     // ##### Tests for writeByte(int) and readByte()
 
     @Test
     public void testEOFOnReadByte() {
-        serdeNull(new ObjectDataSerializer<Byte>() {
-            @Override
-            public void serialize(final Byte obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readByte();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Byte deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readByte();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return -1;
-            }
+            return -1;
         });
     }
 
     @Test
     public void testWriteByteReadByte() {
-        final ObjectDataSerializer<Byte> ser = new ObjectDataSerializer<Byte>() {
-            @Override
-            public void serialize(final Byte obj, final DataOutput output) throws IOException {
-                output.writeByte(obj.byteValue());
-            }
+        final ObjectSerializer<Byte> ser = (output, object) -> output.writeByte(object.byteValue());
+        final ObjectDeserializer<Byte> de = input -> Byte.valueOf(input.readByte());
 
-            @Override
-            public Byte deserialize(final DataInput input) throws IOException {
-                return Byte.valueOf(input.readByte());
-            }
-        };
-
-        serdeT(Byte.MIN_VALUE, ser);
-        serdeT(Byte.valueOf((byte)-1), ser);
-        serdeT(Byte.valueOf((byte)0), ser);
-        serdeT(Byte.valueOf((byte)1), ser);
-        serdeT(Byte.MAX_VALUE, ser);
+        serdeT(Byte.MIN_VALUE, ser, de);
+        serdeT(Byte.valueOf((byte)-1), ser, de);
+        serdeT(Byte.valueOf((byte)0), ser, de);
+        serdeT(Byte.valueOf((byte)1), ser, de);
+        serdeT(Byte.MAX_VALUE, ser, de);
     }
 
     // ##### Tests for write(int) and readUnsignedByte()
 
     @Test
     public void testEOFOnReadUnsignedByte() {
-        serdeNull(new ObjectDataSerializer<Byte>() {
-            @Override
-            public void serialize(final Byte obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readUnsignedByte();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Byte deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readUnsignedByte();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return -1;
-            }
+            return -1;
         });
     }
 
     @Test
     public void testWriteReadUnsignedByte() {
-        final ObjectDataSerializer<Integer> ser = new ObjectDataSerializer<Integer>() {
-            @Override
-            public void serialize(final Integer obj, final DataOutput output) throws IOException {
-                output.write(obj.byteValue());
-            }
+        final ObjectSerializer<Integer> ser = (output, object) -> output.write(object.byteValue());
+        final ObjectDeserializer<Integer> de = input -> Integer.valueOf(input.readUnsignedByte());
 
-            @Override
-            public Integer deserialize(final DataInput input) throws IOException {
-                return Integer.valueOf(input.readUnsignedByte());
-            }
-        };
-
-        serdeT(Integer.valueOf(0), ser);
-        serdeT(Integer.valueOf(Byte.MAX_VALUE), ser);
-        serdeT(Integer.valueOf((1 << 8) - 1), ser);
+        serdeT(Integer.valueOf(0), ser, de);
+        serdeT(Integer.valueOf(Byte.MAX_VALUE), ser, de);
+        serdeT(Integer.valueOf((1 << 8) - 1), ser, de);
     }
 
     // ##### Tests for writeShort(int) and readShort()
 
     @Test
     public void testEOFOnReadShort() {
-        serdeNull(new ObjectDataSerializer<Short>() {
-            @Override
-            public void serialize(final Short obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readShort();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Short deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readShort();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return -1;
-            }
+            return -1;
         });
     }
 
     @Test
     public void testWriteShortReadShort() {
-        final ObjectDataSerializer<Short> ser = new ObjectDataSerializer<Short>() {
-            @Override
-            public void serialize(final Short obj, final DataOutput output) throws IOException {
-                output.writeShort(obj.shortValue());
-            }
+        final ObjectSerializer<Short> ser = (output, object) -> output.writeShort(object.shortValue());
+        final ObjectDeserializer<Short> de = input -> Short.valueOf(input.readShort());
 
-            @Override
-            public Short deserialize(final DataInput input) throws IOException {
-                return Short.valueOf(input.readShort());
-            }
-        };
-
-        serdeT(Short.MIN_VALUE, ser);
-        serdeT((short)-1, ser);
-        serdeT((short)0, ser);
-        serdeT((short)1, ser);
-        serdeT(Short.MAX_VALUE, ser);
+        serdeT(Short.MIN_VALUE, ser, de);
+        serdeT((short)-1, ser, de);
+        serdeT((short)0, ser, de);
+        serdeT((short)1, ser, de);
+        serdeT(Short.MAX_VALUE, ser, de);
     }
 
     // ##### Tests for readUnsignedShort()
 
     @Test
     public void testEOFOnReadUnsignedShort() {
-        serdeNull(new ObjectDataSerializer<Short>() {
-            @Override
-            public void serialize(final Short obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readUnsignedShort();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Short deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readUnsignedShort();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return -1;
-            }
+            return -1;
         });
     }
 
     @Test
     public void testReadUnsignedShort() {
-        final ObjectDataSerializer<Integer> ser = new ObjectDataSerializer<Integer>() {
-            @Override
-            public void serialize(final Integer obj, final DataOutput output) throws IOException {
-                output.writeShort(obj.shortValue());
-            }
+        final ObjectSerializer<Integer> ser = (output, object) -> output.writeShort(object.shortValue());
+        final ObjectDeserializer<Integer> de = input -> Integer.valueOf(input.readUnsignedShort());
 
-            @Override
-            public Integer deserialize(final DataInput input) throws IOException {
-                return Integer.valueOf(input.readUnsignedShort());
-            }
-        };
-
-        serdeT(Integer.valueOf(0), ser);
-        serdeT(Integer.valueOf(Short.MAX_VALUE), ser);
-        serdeT(Integer.valueOf((1 << 16) - 1), ser);
+        serdeT(Integer.valueOf(0), ser, de);
+        serdeT(Integer.valueOf(Short.MAX_VALUE), ser, de);
+        serdeT(Integer.valueOf((1 << 16) - 1), ser, de);
     }
 
     // ##### Tests for writeChar(int) and readChar()
 
     @Test
     public void testEOFOnReadChar() {
-        serdeNull(new ObjectDataSerializer<Character>() {
-            @Override
-            public void serialize(final Character obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readChar();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Character deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readChar();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return (char)-1;
-            }
+            return (char)-1;
         });
     }
 
     @Test
     public void testWriteCharReadChar() {
-        final ObjectDataSerializer<Character> ser = new ObjectDataSerializer<Character>() {
-            @Override
-            public void serialize(final Character obj, final DataOutput output) throws IOException {
-                output.writeChar(obj.charValue());
-            }
+        final ObjectSerializer<Character> ser = (output, object) -> output.writeChar(object.charValue());
+        final ObjectDeserializer<Character> de = input -> Character.valueOf(input.readChar());
 
-            @Override
-            public Character deserialize(final DataInput input) throws IOException {
-                return Character.valueOf(input.readChar());
-            }
-        };
-
-        serdeT((char)Short.MIN_VALUE, ser);
-        serdeT((char)0, ser);
-        serdeT((char)Short.MAX_VALUE, ser);
+        serdeT((char)Short.MIN_VALUE, ser, de);
+        serdeT((char)0, ser, de);
+        serdeT((char)Short.MAX_VALUE, ser, de);
     }
 
     // ##### Tests for writeInt(int) and readInt()
 
     @Test
     public void testEOFOnReadInt() {
-        serdeNull(new ObjectDataSerializer<Integer>() {
-            @Override
-            public void serialize(final Integer obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readInt();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Integer deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readInt();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return -1;
-            }
+            return -1;
         });
     }
 
     @Test
     public void testWriteIntReadInt() {
-        final ObjectDataSerializer<Integer> ser = new ObjectDataSerializer<Integer>() {
-            @Override
-            public void serialize(final Integer obj, final DataOutput output) throws IOException {
-                output.writeInt(obj.intValue());
-            }
+        final ObjectSerializer<Integer> ser = (output, object) -> output.writeInt(object.intValue());
+        final ObjectDeserializer<Integer> de = input -> Integer.valueOf(input.readInt());
 
-            @Override
-            public Integer deserialize(final DataInput input) throws IOException {
-                return Integer.valueOf(input.readInt());
-            }
-        };
-
-        serdeT(Integer.MIN_VALUE, ser);
-        serdeT(Integer.valueOf(-1), ser);
-        serdeT(Integer.valueOf(0), ser);
-        serdeT(Integer.valueOf(1), ser);
-        serdeT(Integer.MAX_VALUE, ser);
+        serdeT(Integer.MIN_VALUE, ser, de);
+        serdeT(Integer.valueOf(-1), ser, de);
+        serdeT(Integer.valueOf(0), ser, de);
+        serdeT(Integer.valueOf(1), ser, de);
+        serdeT(Integer.MAX_VALUE, ser, de);
     }
 
     // ##### Tests for writeLong(long) and readLong()
 
     @Test
     public void testEOFOnReadLong() {
-        serdeNull(new ObjectDataSerializer<Long>() {
-            @Override
-            public void serialize(final Long obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readLong();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Long deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readLong();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return -1L;
-            }
+            return -1L;
         });
     }
 
     @Test
     public void testWriteLongReadLong() {
-        final ObjectDataSerializer<Long> ser = new ObjectDataSerializer<Long>() {
-            @Override
-            public void serialize(final Long obj, final DataOutput output) throws IOException {
-                output.writeLong(obj.longValue());
-            }
+        final ObjectSerializer<Long> ser = (output, object) -> output.writeLong(object.longValue());
+        final ObjectDeserializer<Long> de = input -> Long.valueOf(input.readLong());
 
-            @Override
-            public Long deserialize(final DataInput input) throws IOException {
-                return Long.valueOf(input.readLong());
-            }
-        };
-
-        serdeT(Long.MIN_VALUE, ser);
-        serdeT(Long.valueOf(-1L), ser);
-        serdeT(Long.valueOf(0L), ser);
-        serdeT(Long.valueOf(1L), ser);
-        serdeT(Long.MAX_VALUE, ser);
+        serdeT(Long.MIN_VALUE, ser, de);
+        serdeT(Long.valueOf(-1L), ser, de);
+        serdeT(Long.valueOf(0L), ser, de);
+        serdeT(Long.valueOf(1L), ser, de);
+        serdeT(Long.MAX_VALUE, ser, de);
     }
 
     // ##### Tests for writeFloat(float) and readFloat()
 
     @Test
     public void testEOFOnReadFloat() {
-        serdeNull(new ObjectDataSerializer<Float>() {
-            @Override
-            public void serialize(final Float obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readFloat();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Float deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readFloat();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return -1F;
-            }
+            return -1F;
         });
     }
 
     @Test
     public void testWriteFloatReadFloat() {
-        final ObjectDataSerializer<Float> ser = new ObjectDataSerializer<Float>() {
-            @Override
-            public void serialize(final Float obj, final DataOutput output) throws IOException {
-                output.writeFloat(obj.floatValue());
-            }
+        final ObjectSerializer<Float> ser = (output, object) -> output.writeFloat(object.floatValue());
+        final ObjectDeserializer<Float> de = input -> Float.valueOf(input.readFloat());
 
-            @Override
-            public Float deserialize(final DataInput input) throws IOException {
-                return Float.valueOf(input.readFloat());
-            }
-        };
-
-        serdeT(Float.MIN_VALUE, ser);
-        serdeT(Float.valueOf(0F), ser);
-        serdeT(Float.MAX_VALUE, ser);
+        serdeT(Float.MIN_VALUE, ser, de);
+        serdeT(Float.valueOf(0F), ser, de);
+        serdeT(Float.MAX_VALUE, ser, de);
     }
 
     // ##### Tests for writeDouble(double) and readDouble()
 
     @Test
     public void testEOFOnReadDouble() {
-        serdeNull(new ObjectDataSerializer<Double>() {
-            @Override
-            public void serialize(final Double obj, final DataOutput output) throws IOException { // NOSONAR
+        serdeNull((output, object) -> {
+        }, input -> {
+            try {
+                input.readDouble();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public Double deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readDouble();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return -1D;
-            }
+            return -1D;
         });
     }
 
     @Test
     public void testWriteDoubleReadDouble() {
-        final ObjectDataSerializer<Double> ser = new ObjectDataSerializer<Double>() {
-            @Override
-            public void serialize(final Double obj, final DataOutput output) throws IOException {
-                output.writeDouble(obj.doubleValue());
-            }
+        final ObjectSerializer<Double> ser = (output, object) -> output.writeDouble(object.doubleValue());
+        final ObjectDeserializer<Double> de = input -> Double.valueOf(input.readDouble());
 
-            @Override
-            public Double deserialize(final DataInput input) throws IOException {
-                return Double.valueOf(input.readDouble());
-            }
-        };
-
-        serdeT(Double.MIN_VALUE, ser);
-        serdeT(Double.valueOf(0D), ser);
-        serdeT(Double.MAX_VALUE, ser);
+        serdeT(Double.MIN_VALUE, ser, de);
+        serdeT(Double.valueOf(0D), ser, de);
+        serdeT(Double.MAX_VALUE, ser, de);
     }
 
     // ##### Tests for writeBytes(String)
 
     @Test(expected = NullPointerException.class)
     public void testNPEOnWriteBytes() {
-        serdeNull(new ObjectDataSerializer<String>() {
-            @Override
-            public void serialize(final String obj, final DataOutput output) throws IOException {
-                output.writeBytes(null);
-            }
-
-            @Override
-            public String deserialize(final DataInput input) throws IOException {
-                return null;
-            }
-        });
+        serdeNull((output, object) -> output.writeBytes(null), input -> null);
     }
 
     @Test
     public void testWriteBytes() {
-        final ObjectDataSerializer<String> ser = new ObjectDataSerializer<String>() {
-            @Override
-            public void serialize(final String obj, final DataOutput output) throws IOException {
-                output.writeInt(obj.length());
-                output.writeBytes(obj);
+        final ObjectSerializer<String> ser = (output, object) -> {
+            output.writeInt(object.length());
+            output.writeBytes(object);
+        };
+        final ObjectDeserializer<String> de = input -> {
+            final byte[] b = new byte[input.readInt()];
+            input.readFully(b);
+            final char[] c = new char[b.length];
+            for (int i = 0; i < b.length; i++) {
+                c[i] = (char)(b[i] & 0xFF);
             }
-
-            @Override
-            public String deserialize(final DataInput input) throws IOException {
-                final byte[] b = new byte[input.readInt()];
-                input.readFully(b);
-                final char[] c = new char[b.length];
-                for (int i = 0; i < b.length; i++) {
-                    c[i] = (char)(b[i] & 0xFF);
-                }
-                return String.valueOf(c);
-            }
+            return String.valueOf(c);
         };
 
-        serdeString("foo", "foo", ser);
+        serdeString("foo", "foo", ser, de);
         serdeString(String.valueOf(new char[]{'\u0000', '\u00ff', '\uffff', '\uff00'}),
-            String.valueOf(new char[]{'\u0000', '\u00ff', '\u00ff', '\u0000'}), ser);
+            String.valueOf(new char[]{'\u0000', '\u00ff', '\u00ff', '\u0000'}), ser, de);
     }
 
     // ##### Tests for writeChars(String) and readLine()
 
     @Test(expected = NullPointerException.class)
     public void testNPEOnWriteChars() {
-        serdeNull(new ObjectDataSerializer<String>() {
-            @Override
-            public void serialize(final String obj, final DataOutput output) throws IOException {
-                output.writeChars(null);
-            }
-
-            @Override
-            public String deserialize(final DataInput input) throws IOException {
-                return null;
-            }
-        });
+        serdeNull((output, object) -> output.writeChars(null), input -> null);
     }
 
     @Test
     public void testWriteBytesReadLine() {
-        final ObjectDataSerializer<String> ser = new ObjectDataSerializer<String>() {
-            @Override
-            public void serialize(final String obj, final DataOutput output) throws IOException {
-                output.writeBytes(obj);
-            }
+        final ObjectSerializer<String> ser = (output, object) -> output.writeBytes(object);
+        final ObjectDeserializer<String> de = input -> input.readLine();
 
-            @Override
-            public String deserialize(final DataInput input) throws IOException {
-                return input.readLine();
-            }
-        };
-
-        serdeString("", null, ser); // NOSONAR
-        serdeString("foo", "foo", ser); // NOSONAR
-        serdeString("foo\rbar", "foobar", ser);
-        serdeString("foo\r\nbar", "foo", ser);
-        serdeString("foo\nbar", "foo", ser);
+        serdeString("", null, ser, de); // NOSONAR
+        serdeString("foo", "foo", ser, de); // NOSONAR
+        serdeString("foo\rbar", "foobar", ser, de);
+        serdeString("foo\r\nbar", "foo", ser, de);
+        serdeString("foo\nbar", "foo", ser, de);
     }
 
     // TODO: write test for writeChars(String)
@@ -817,65 +551,38 @@ public class ArrowBufIOTest {
 
     @Test(expected = NullPointerException.class)
     public void testNPEOnWriteUTF() {
-        serdeNull(new ObjectDataSerializer<String>() {
-            @Override
-            public void serialize(final String obj, final DataOutput output) throws IOException {
-                output.writeUTF(null);
-            }
-
-            @Override
-            public String deserialize(final DataInput input) throws IOException {
-                return null;
-            }
-        });
+        serdeNull((output, object) -> output.writeUTF(null), input -> null);
     }
 
     @Test
     public void testEOFOnReadUTF() {
-        serdeNull(new ObjectDataSerializer<byte[]>() {
-            @Override
-            public void serialize(final byte[] obj, final DataOutput output) throws IOException { // NOSONAR
-                output.writeInt(1);
+        serdeNull((output, object) -> output.writeInt(1), input -> {
+            try {
+                input.readUTF();
+                failOnUnthrownEOFException();
+            } catch (EOFException e) { // NOSONAR
             }
-
-            @Override
-            public byte[] deserialize(final DataInput input) throws IOException {
-                try {
-                    input.readUTF();
-                    failOnUnthrownEOFException();
-                } catch (EOFException e) { // NOSONAR
-                }
-                return new byte[0];
-            }
+            return new byte[0];
         });
     }
 
     @Test
     public void testWriteUTFReadUTF() {
-        final ObjectDataSerializer<String> ser = new ObjectDataSerializer<String>() {
-            @Override
-            public void serialize(final String obj, final DataOutput output) throws IOException {
-                output.writeUTF(obj);
-            }
+        final ObjectSerializer<String> ser = (output, object) -> output.writeUTF(object);
+        final ObjectDeserializer<String> de = input -> input.readUTF();
 
-            @Override
-            public String deserialize(final DataInput input) throws IOException {
-                return input.readUTF();
-            }
-        };
-
-        serdeT("", ser);
-        serdeT(String.valueOf(Character.toChars(0x0000)), ser);
-        serdeT(String.valueOf(Character.toChars(0x0001)), ser);
-        serdeT(String.valueOf(Character.toChars(0x007F)), ser);
-        serdeT(String.valueOf(Character.toChars(0x0080)), ser);
-        serdeT(String.valueOf(Character.toChars(0x07FF)), ser);
-        serdeT(String.valueOf(Character.toChars(0x0800)), ser);
-        serdeT(String.valueOf(Character.toChars(0xFFFF)), ser);
-        serdeT(String.valueOf(Character.toChars(0x10000)), ser);
-        serdeT(String.valueOf(Character.toChars(0x10FFFF)), ser);
-        serdeT(String.valueOf(new char[65535]), ser);
-        serdeT(String.valueOf(new char[65536]), ser);
+        serdeT("", ser, de);
+        serdeT(String.valueOf(Character.toChars(0x0000)), ser, de);
+        serdeT(String.valueOf(Character.toChars(0x0001)), ser, de);
+        serdeT(String.valueOf(Character.toChars(0x007F)), ser, de);
+        serdeT(String.valueOf(Character.toChars(0x0080)), ser, de);
+        serdeT(String.valueOf(Character.toChars(0x07FF)), ser, de);
+        serdeT(String.valueOf(Character.toChars(0x0800)), ser, de);
+        serdeT(String.valueOf(Character.toChars(0xFFFF)), ser, de);
+        serdeT(String.valueOf(Character.toChars(0x10000)), ser, de);
+        serdeT(String.valueOf(Character.toChars(0x10FFFF)), ser, de);
+        serdeT(String.valueOf(new char[65535]), ser, de);
+        serdeT(String.valueOf(new char[65536]), ser, de);
     }
 
     // ##### Tests for serialize(int, Object) and deserialize(int)
@@ -884,20 +591,11 @@ public class ArrowBufIOTest {
     public void testSerializeDeserialize() {
         try (final LargeVarBinaryVector vector = new LargeVarBinaryVector("test", m_alloc)) {
             vector.allocateNew(0, 0);
-            final ArrowBufIO<Integer> bio = new ArrowBufIO<>(vector, new ObjectDataSerializer<Integer>() {
-                @Override
-                public void serialize(final Integer obj, final DataOutput output) throws IOException {
-                    output.writeInt(obj.intValue());
-                }
+            final ObjectSerializer<Integer> ser = (output, object) -> output.writeInt(object.intValue());
+            final ObjectDeserializer<Integer> de = input -> Integer.valueOf(input.readInt());
 
-                @Override
-                public Integer deserialize(final DataInput input) throws IOException {
-                    return Integer.valueOf(input.readInt());
-                }
-            });
-
-            bio.serialize(1, 1);
-            bio.serialize(3, 3);
+            serialize(1, 1, vector, ser);
+            serialize(3, 3, vector, ser);
 
             assertTrue(vector.isNull(0));
             assertFalse(vector.isNull(1));
@@ -905,8 +603,8 @@ public class ArrowBufIOTest {
             assertFalse(vector.isNull(3));
             assertTrue(vector.isNull(4));
 
-            assertEquals(Integer.valueOf(1), bio.deserialize(1));
-            assertEquals(Integer.valueOf(3), bio.deserialize(3));
+            assertEquals(Integer.valueOf(1), deserialize(1, vector, de));
+            assertEquals(Integer.valueOf(3), deserialize(3, vector, de));
         }
     }
 

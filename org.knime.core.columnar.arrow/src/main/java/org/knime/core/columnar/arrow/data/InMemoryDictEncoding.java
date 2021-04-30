@@ -48,12 +48,9 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-
 import org.apache.arrow.vector.LargeVarBinaryVector;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -75,10 +72,10 @@ final class InMemoryDictEncoding<T> {
 
     private final LargeVarBinaryVector m_vector;
 
-    private final BiConsumer<DataOutput, T> m_serializer;
+    private final ObjectSerializer<T> m_serializer;
 
     InMemoryDictEncoding(final LargeVarBinaryVector vector, final int initialDictSize,
-        final BiConsumer<DataOutput, T> serializer, final Function<DataInput, T> deserializer) {
+        final ObjectSerializer<T> serializer, final ObjectDeserializer<T> deserializer) {
         m_vector = vector;
         m_inMemDict = HashBiMap.create(initialDictSize);
         m_invInMemDict = m_inMemDict.inverse();

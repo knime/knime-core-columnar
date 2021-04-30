@@ -112,19 +112,8 @@ public final class ArrowZonedDateTimeData {
     }
 
     private static InMemoryDictEncoding<ZoneId> getInMemoryDict(final LargeVarBinaryVector dict) {
-        return new InMemoryDictEncoding<>(dict, INIT_DICT_SIZE, (output, id) -> {
-            try {
-                output.writeUTF(id.getId());
-            } catch (IOException ex) {
-                throw new IllegalStateException("Unable to serialize zone ID.", ex);
-            }
-        }, input -> {
-            try {
-                return ZoneId.of(input.readUTF());
-            } catch (IOException ex) {
-                throw new IllegalStateException("Unable to deserialize zone ID.", ex);
-            }
-        });
+        return new InMemoryDictEncoding<>(dict, INIT_DICT_SIZE, (output, id) -> output.writeUTF(id.getId()),
+            input -> ZoneId.of(input.readUTF()));
     }
 
     private ArrowZonedDateTimeData() {

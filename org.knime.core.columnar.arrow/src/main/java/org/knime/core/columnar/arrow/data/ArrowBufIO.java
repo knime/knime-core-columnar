@@ -51,17 +51,18 @@ package org.knime.core.columnar.arrow.data;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.EOFException;
+import java.io.IOException;
 import java.io.UTFDataFormatException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BaseLargeVariableWidthVector;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.LargeVarBinaryVector;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * Serializes and deserializes an object of type <T> to a {@link DataOutput} / {@link DataInput}. The {@link DataOutput}
@@ -88,7 +89,7 @@ final class ArrowBufIO {
      */
     @SuppressWarnings("resource") // Buffers closed by the vector
     static final <T> T deserialize(final int index, final LargeVarBinaryVector vector,
-        final Function<DataInput, T> deserializer) {
+        final ObjectDeserializer<T> deserializer) {
         // Get the offset for this index
         final long bufferIndex = getOffset(vector, index);
         final long nextIndex = getOffset(vector, index + 1);
@@ -96,7 +97,12 @@ final class ArrowBufIO {
         // Deserialize from the data buffer
         final ArrowBufDataInput buf =
             new ArrowBufDataInput(vector.getDataBuffer(), bufferIndex, nextIndex, ENCODER_FACTORY.get());
-        return deserializer.apply(buf);
+        try {
+            return deserializer.deserialize(buf);
+        } catch (IOException ex) {
+            // TODO should the deserialize method just throw the IOException?
+            throw new IllegalStateException("Error during deserialization", ex);
+        }
     }
 
     /**
@@ -108,7 +114,7 @@ final class ArrowBufIO {
      */
     @SuppressWarnings("resource") // Buffers closed by the vector
     static final <T> void serialize(final int index, final T obj, final LargeVarBinaryVector vector,
-        final BiConsumer<DataOutput, T> serializer) {
+        final ObjectSerializer<T> serializer) {
         // Set the value to not null
         BitVectorHelper.setBit(vector.getValidityBuffer(), index);
 
@@ -118,7 +124,12 @@ final class ArrowBufIO {
         vector.getDataBuffer().writerIndex(startOffset);
 
         // Serialize the value to the data buffer
-        serializer.accept(new ArrowBufDataOutput(vector, ENCODER_FACTORY.get()), obj);
+        try {
+            serializer.serialize(new ArrowBufDataOutput(vector, ENCODER_FACTORY.get()), obj);
+        } catch (IOException ex) {
+            // TODO should the serialize method just throw the IOException?
+            throw new IllegalStateException("Error during serialization", ex);
+        }
 
         // Set the offset for the next element
         final long nextOffset = vector.getDataBuffer().writerIndex();
