@@ -49,8 +49,7 @@ import java.time.LocalDate;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.table.schema.LocalDateDataSpec;
 
 /**
  * Class holding {@link LocalDateWriteData}, {@link LocalDateReadData}, and {@link LocalDateDataSpec} for data holding
@@ -66,9 +65,9 @@ public final class LocalDateData {
     }
 
     /**
-     * {@link ObjectWriteData} holding LocalDate elements.
+     * {@link WriteData} holding LocalDate elements.
      */
-    public static interface LocalDateWriteData extends ObjectWriteData<LocalDate> {
+    public static interface LocalDateWriteData extends NullableWriteData {
 
         /**
          * Assigns a LocalDate value to the element at the given index. The contract is that values are only ever set
@@ -81,19 +80,14 @@ public final class LocalDateData {
         void setLocalDate(int index, LocalDate val);
 
         @Override
-        default void setObject(final int index, final LocalDate obj) {
-            setLocalDate(index, obj);
-        }
-
-        @Override
         LocalDateReadData close(int length);
 
     }
 
     /**
-     * {@link ObjectReadData} holding LocalDate elements.
+     * {@link ReadData} holding LocalDate elements.
      */
-    public static interface LocalDateReadData extends ObjectReadData<LocalDate> {
+    public static interface LocalDateReadData extends NullableReadData {
 
         /**
          * Obtains the LocalDate value at the given index. It is the responsibility of the client calling this method to
@@ -103,28 +97,6 @@ public final class LocalDateData {
          * @return the LocalDate element at the given index
          */
         LocalDate getLocalDate(int index);
-
-        @Override
-        default LocalDate getObject(final int index) {
-            return getLocalDate(index);
-        }
-
-    }
-
-    /**
-     * {@link DataSpec} for LocalDate data.
-     */
-    public static final class LocalDateDataSpec implements DataSpec {
-
-        static final LocalDateDataSpec INSTANCE = new LocalDateDataSpec();
-
-        private LocalDateDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

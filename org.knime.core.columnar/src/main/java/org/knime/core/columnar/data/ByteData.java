@@ -50,6 +50,7 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.ByteDataSpec;
 
 /**
  * Class holding {@link ByteWriteData}, {@link ByteReadData}, and {@link ByteDataSpec} for data holding byte elements.
@@ -95,23 +96,6 @@ public final class ByteData {
          * @return the byte element at the given index
          */
         byte getByte(int index);
-
-    }
-
-    /**
-     * {@link DataSpec} for byte data.
-     */
-    public static final class ByteDataSpec implements DataSpec {
-
-        static final ByteDataSpec INSTANCE = new ByteDataSpec();
-
-        private ByteDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

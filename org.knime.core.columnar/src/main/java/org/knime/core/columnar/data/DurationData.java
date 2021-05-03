@@ -49,8 +49,7 @@ import java.time.Duration;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.table.schema.DurationDataSpec;
 
 /**
  * Class holding {@link DurationWriteData}, {@link DurationReadData}, and {@link DurationDataSpec} for data holding
@@ -66,9 +65,9 @@ public final class DurationData {
     }
 
     /**
-     * {@link ObjectWriteData} holding Duration elements.
+     * {@link WriteData} holding Duration elements.
      */
-    public static interface DurationWriteData extends ObjectWriteData<Duration> {
+    public static interface DurationWriteData extends NullableWriteData {
 
         /**
          * Assigns a Duration value to the element at the given index. The contract is that values are only ever set for
@@ -81,19 +80,14 @@ public final class DurationData {
         void setDuration(int index, Duration val);
 
         @Override
-        default void setObject(final int index, final Duration obj) {
-            setDuration(index, obj);
-        }
-
-        @Override
         DurationReadData close(int length);
 
     }
 
     /**
-     * {@link ObjectReadData} holding Duration elements.
+     * {@link ReadData} holding Duration elements.
      */
-    public static interface DurationReadData extends ObjectReadData<Duration> {
+    public static interface DurationReadData extends NullableReadData {
 
         /**
          * Obtains the Duration value at the given index. It is the responsibility of the client calling this method to
@@ -103,28 +97,6 @@ public final class DurationData {
          * @return the Duration element at the given index
          */
         Duration getDuration(int index);
-
-        @Override
-        default Duration getObject(final int index) {
-            return getDuration(index);
-        }
-
-    }
-
-    /**
-     * {@link DataSpec} for Duration data.
-     */
-    public static final class DurationDataSpec implements DataSpec {
-
-        static final DurationDataSpec INSTANCE = new DurationDataSpec();
-
-        private DurationDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

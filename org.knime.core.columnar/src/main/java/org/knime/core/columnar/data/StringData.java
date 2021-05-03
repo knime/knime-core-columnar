@@ -50,8 +50,7 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.table.schema.StringDataSpec;
 
 /**
  * Class holding {@link StringWriteData}, {@link StringReadData}, and {@link StringDataSpec} for data holding String
@@ -66,11 +65,11 @@ public final class StringData {
     }
 
     /**
-     * {@link ObjectWriteData} holding String elements.
+     * {@link WriteData} holding String elements.
      *
      * @author Marc Bux, KNIME GmbH, Berlin, Germany
      */
-    public interface StringWriteData extends ObjectWriteData<String> {
+    public interface StringWriteData extends NullableWriteData {
 
         /**
          * Assigns a String value to the element at the given index. The contract is that values are only ever set for
@@ -83,21 +82,16 @@ public final class StringData {
         void setString(int index, String val);
 
         @Override
-        default void setObject(final int index, final String obj) {
-            setString(index, obj);
-        }
-
-        @Override
         StringReadData close(int length);
 
     }
 
     /**
-     * {@link ObjectReadData} holding String elements.
+     * {@link ReadData} holding String elements.
      *
      * @author Marc Bux, KNIME GmbH, Berlin, Germany
      */
-    public interface StringReadData extends ObjectReadData<String> {
+    public interface StringReadData extends NullableReadData {
 
         /**
          * Obtains the String value at the given index. It is the responsibility of the client calling this method to
@@ -108,29 +102,6 @@ public final class StringData {
          */
         String getString(int index);
 
-        @Override
-        default String getObject(final int index) {
-            return getString(index);
-        }
-
-    }
-
-    /**
-     * {@link DataSpec} for String data.
-     *
-     * @author Marc Bux, KNIME GmbH, Berlin, Germany
-     */
-    public static final class StringDataSpec implements DataSpec {
-
-        static final StringDataSpec INSTANCE = new StringDataSpec();
-
-        private StringDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
     }
 
 }

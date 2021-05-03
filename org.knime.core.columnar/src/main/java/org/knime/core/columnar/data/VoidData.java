@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.data;
 
+import org.knime.core.table.schema.VoidDataSpec;
+
 /**
  * Class holding {@link VoidWriteData}, {@link VoidReadData}, and {@link VoidDataSpec} for data holding
  * no elements (i.e., all elements are missing).
@@ -90,23 +92,6 @@ public final class VoidData {
 
         @Override
         default void retain() {
-        }
-
-    }
-
-    /**
-     * {@link DataSpec} for void data.
-     */
-    public static final class VoidDataSpec implements DataSpec {
-
-        static final VoidDataSpec INSTANCE = new VoidDataSpec();
-
-        private VoidDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
         }
 
     }

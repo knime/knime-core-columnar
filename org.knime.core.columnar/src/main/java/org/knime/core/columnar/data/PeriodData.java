@@ -49,8 +49,7 @@ import java.time.Period;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.table.schema.PeriodDataSpec;
 
 /**
  * Class holding {@link PeriodWriteData}, {@link PeriodReadData}, and {@link PeriodDataSpec} for data holding Period
@@ -66,9 +65,9 @@ public final class PeriodData {
     }
 
     /**
-     * {@link ObjectWriteData} holding Period elements.
+     * {@link WriteData} holding Period elements.
      */
-    public static interface PeriodWriteData extends ObjectWriteData<Period> {
+    public static interface PeriodWriteData extends NullableWriteData {
 
         /**
          * Assigns a Period value to the element at the given index. The contract is that values are only ever set for
@@ -81,19 +80,14 @@ public final class PeriodData {
         void setPeriod(int index, Period val);
 
         @Override
-        default void setObject(final int index, final Period obj) {
-            setPeriod(index, obj);
-        }
-
-        @Override
         PeriodReadData close(int length);
 
     }
 
     /**
-     * {@link ObjectReadData} holding Period elements.
+     * {@link ReadData} holding Period elements.
      */
-    public static interface PeriodReadData extends ObjectReadData<Period> {
+    public static interface PeriodReadData extends NullableReadData {
 
         /**
          * Obtains the Period value at the given index. It is the responsibility of the client calling this method to
@@ -103,28 +97,6 @@ public final class PeriodData {
          * @return the Period element at the given index
          */
         Period getPeriod(int index);
-
-        @Override
-        default Period getObject(final int index) {
-            return getPeriod(index);
-        }
-
-    }
-
-    /**
-     * {@link DataSpec} for Period data.
-     */
-    public static final class PeriodDataSpec implements DataSpec {
-
-        static final PeriodDataSpec INSTANCE = new PeriodDataSpec();
-
-        private PeriodDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

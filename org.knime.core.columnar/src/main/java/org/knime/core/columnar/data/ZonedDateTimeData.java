@@ -49,8 +49,7 @@ import java.time.ZonedDateTime;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.table.schema.ZonedDateTimeDataSpec;
 
 /**
  * Class holding {@link ZonedDateTimeWriteData}, {@link ZonedDateTimeReadData}, and {@link ZonedDateTimeDataSpec} for
@@ -66,9 +65,9 @@ public final class ZonedDateTimeData {
     }
 
     /**
-     * {@link ObjectWriteData} holding ZonedDateTime elements.
+     * {@link WriteData} holding ZonedDateTime elements.
      */
-    public static interface ZonedDateTimeWriteData extends ObjectWriteData<ZonedDateTime> {
+    public static interface ZonedDateTimeWriteData extends NullableWriteData {
 
         /**
          * Assigns a ZonedDateTime value to the element at the given index. The contract is that values are only ever
@@ -81,19 +80,14 @@ public final class ZonedDateTimeData {
         void setZonedDateTime(int index, ZonedDateTime val);
 
         @Override
-        default void setObject(final int index, final ZonedDateTime obj) {
-            setZonedDateTime(index, obj);
-        }
-
-        @Override
         ZonedDateTimeReadData close(int length);
 
     }
 
     /**
-     * {@link ObjectReadData} holding ZonedDateTime elements.
+     * {@link ReadData} holding ZonedDateTime elements.
      */
-    public static interface ZonedDateTimeReadData extends ObjectReadData<ZonedDateTime> {
+    public static interface ZonedDateTimeReadData extends NullableReadData {
 
         /**
          * Obtains the ZonedDateTime value at the given index. It is the responsibility of the client calling this
@@ -104,27 +98,6 @@ public final class ZonedDateTimeData {
          * @return the ZonedDateTime element at the given index
          */
         ZonedDateTime getZonedDateTime(int index);
-
-        @Override
-        default ZonedDateTime getObject(final int index) {
-            return getZonedDateTime(index);
-        }
-    }
-
-    /**
-     * {@link DataSpec} for ZonedDateTime data.
-     */
-    public static final class ZonedDateTimeDataSpec implements DataSpec {
-
-        static final ZonedDateTimeDataSpec INSTANCE = new ZonedDateTimeDataSpec();
-
-        private ZonedDateTimeDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

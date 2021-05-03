@@ -47,6 +47,9 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.VarBinaryDataSpec;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * Class holding {@link VarBinaryWriteData}, {@link VarBinaryReadData}, and {@link VarBinaryDataSpec} for data holding
@@ -75,6 +78,18 @@ public final class VarBinaryData {
          */
         void setBytes(int index, byte[] val);
 
+        /**
+         * Assigns an object to the element at the given index. The contract is that values are only ever set for
+         * ascending indices. It is the responsibility of the client calling this method to make sure that the provied
+         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         *
+         * @param <T> the type of object to set
+         * @param index the index at which to set the object
+         * @param value the object to set
+         * @param serializer capable of serializing the provided object
+         */
+        <T> void setObject(int index, T value, ObjectSerializer<T> serializer);
+
         @Override
         VarBinaryReadData close(int length);
 
@@ -94,22 +109,16 @@ public final class VarBinaryData {
          */
         byte[] getBytes(int index);
 
-    }
-
-    /**
-     * {@link DataSpec} for byte array data.
-     */
-    public static final class VarBinaryDataSpec implements DataSpec {
-
-        static final VarBinaryDataSpec INSTANCE = new VarBinaryDataSpec();
-
-        private VarBinaryDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
+        /**
+         * Obtains the object stored at the given index. It is the responsibility of the client calling this method
+         * to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         *
+         * @param <T> the type of read object
+         * @param index the index at which to obtain the object element
+         * @param deserializer {@link ObjectDeserializer} capable of deserializing the object
+         * @return the object at the given index
+         */
+        <T> T getObject(int index, ObjectDeserializer<T> deserializer);
 
     }
 

@@ -49,6 +49,8 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.StructDataSpec;
 
 /**
  * Class holding {@link StructWriteData}, {@link StructReadData}, and {@link StructDataSpec} for data holding struct
@@ -101,37 +103,6 @@ public final class StructData {
          * @return the {@link NullableReadData} at the given index in the struct
          */
         <C extends NullableReadData> C getReadDataAt(int index);
-
-    }
-
-    /**
-     * The {@link DataSpec} for struct data.
-     */
-    public static final class StructDataSpec implements DataSpec {
-
-        private final DataSpec[] m_inner;
-
-        /**
-         * Create a spec for struct data, in which structs hold objects according to a given array of
-         * {@link DataSpec ColumnDataSpecs}.
-         *
-         * @param inner the specs for the elements the structs consist of
-         */
-        public StructDataSpec(final DataSpec... inner) {
-            m_inner = inner;
-        }
-
-        /**
-         * @return the array of {@link DataSpec ColumnDataSpecs} of the elements the structs consist of
-         */
-        public final DataSpec[] getInner() {
-            return m_inner;
-        }
-
-        @Override
-        public final <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

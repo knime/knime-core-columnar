@@ -50,6 +50,7 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.DoubleDataSpec;
 
 /**
  * Class holding {@link DoubleWriteData}, {@link DoubleReadData}, and {@link DoubleDataSpec} for data holding double
@@ -96,23 +97,6 @@ public final class DoubleData {
          * @return the double element at the given index
          */
         double getDouble(int index);
-
-    }
-
-    /**
-     * ColumnDataSpec for double data.
-     */
-    public static final class DoubleDataSpec implements DataSpec {
-
-        static final DoubleDataSpec INSTANCE = new DoubleDataSpec();
-
-        private DoubleDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

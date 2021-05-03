@@ -47,6 +47,7 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.BooleanDataSpec;
 
 /**
  * Class holding {@link BooleanWriteData}, {@link BooleanReadData}, and {@link BooleanDataSpec} for data holding
@@ -93,23 +94,6 @@ public final class BooleanData {
          * @return the boolean element at the given index
          */
         boolean getBoolean(int index);
-
-    }
-
-    /**
-     * {@link DataSpec} for boolean data.
-     */
-    public static final class BooleanDataSpec implements DataSpec {
-
-        static final BooleanDataSpec INSTANCE = new BooleanDataSpec();
-
-        private BooleanDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

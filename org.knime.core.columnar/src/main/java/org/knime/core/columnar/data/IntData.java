@@ -50,6 +50,7 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.IntDataSpec;
 
 /**
  * Class holding {@link IntWriteData}, {@link IntReadData}, and {@link IntDataSpec} for data holding int elements.
@@ -95,23 +96,6 @@ public final class IntData {
          * @return the int element at the given index
          */
         int getInt(int index);
-
-    }
-
-    /**
-     * {@link DataSpec} for int data.
-     */
-    public static final class IntDataSpec implements DataSpec {
-
-        static final IntDataSpec INSTANCE = new IntDataSpec();
-
-        private IntDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

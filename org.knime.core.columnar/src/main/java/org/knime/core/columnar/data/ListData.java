@@ -49,6 +49,7 @@
 package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.ListDataSpec;
 
 /**
  * Class holding {@link ListWriteData}, {@link ListReadData}, and {@link ListDataSpec} for data holding list elements.
@@ -102,36 +103,6 @@ public final class ListData {
          * @return a {@link NullableReadData} that represents the list
          */
         <C extends NullableReadData> C createReadData(int index);
-
-    }
-
-    /**
-     * The {@link DataSpec} for list data.
-     */
-    public static final class ListDataSpec implements DataSpec {
-
-        private final DataSpec m_inner;
-
-        /**
-         * Create a spec for list data, in which lists can hold objects according to a given {@link DataSpec}.
-         *
-         * @param inner the spec for the elements the lists consist of
-         */
-        public ListDataSpec(final DataSpec inner) {
-            m_inner = inner;
-        }
-
-        /**
-         * @return the {@link DataSpec} of the elements the lists consist of
-         */
-        public DataSpec getInner() {
-            return m_inner;
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

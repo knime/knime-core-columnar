@@ -50,6 +50,7 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.LongDataSpec;
 
 /**
  * Class holding {@link LongWriteData}, {@link LongReadData}, and {@link LongDataSpec} for data holding long elements.
@@ -95,23 +96,6 @@ public final class LongData {
          * @return the long element at the given index
          */
         long getLong(int index);
-
-    }
-
-    /**
-     * {@link DataSpec} for long data.
-     */
-    public static final class LongDataSpec implements DataSpec {
-
-        static final LongDataSpec INSTANCE = new LongDataSpec();
-
-        private LongDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 

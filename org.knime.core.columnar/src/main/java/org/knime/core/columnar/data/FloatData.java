@@ -50,6 +50,7 @@ package org.knime.core.columnar.data;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.table.schema.FloatDataSpec;
 
 /**
  * Class holding {@link FloatWriteData}, {@link FloatReadData}, and {@link FloatDataSpec} for data holding float
@@ -96,23 +97,6 @@ public final class FloatData {
          * @return the float element at the given index
          */
         float getFloat(int index);
-
-    }
-
-    /**
-     * {@link DataSpec} for float data.
-     */
-    public static final class FloatDataSpec implements DataSpec {
-
-        static final FloatDataSpec INSTANCE = new FloatDataSpec();
-
-        private FloatDataSpec() {
-        }
-
-        @Override
-        public <R> R accept(final Mapper<R> v) {
-            return v.visit(this);
-        }
 
     }
 
