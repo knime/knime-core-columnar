@@ -156,11 +156,12 @@ public class ColumnarCursorFactory {
 
         @Override
         public boolean forward() {
-            if (!canForward()) {
+            if (m_index >= m_maxIndex) {
                 return false;
+            } else {
+                m_index++;
+                return true;
             }
-            m_index++;
-            return true;
         }
 
         @Override
@@ -275,12 +276,11 @@ public class ColumnarCursorFactory {
         private void readCurrentBatch() throws IOException {
             m_currentBatch = m_reader.readRetained(m_currentBatchIndex);
             m_currentData = m_currentBatch.getUnsafe();
-            IntStream indices = IntStream.range(0, m_numColumns);
-            if (m_selection != null) {
-                indices = indices.filter(m_selection::isSelected);
+            for (int i = 0; i < m_numColumns; i++) {
+                if (m_selection == null || m_selection.isSelected(i)) {
+                    m_accesses[i].setData(m_currentData[i]);
+                }
             }
-            indices.forEach(i -> m_accesses[i].setData(m_currentData[i]));
-
             if (m_currentBatchIndex != m_lastBatchIndex) {
                 m_lastIndexInCurrentBatch = m_currentBatch.length() - 1;
             } else {
