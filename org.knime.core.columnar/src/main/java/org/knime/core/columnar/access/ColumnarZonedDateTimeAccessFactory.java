@@ -14,7 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *  aInt with this program; if not, see <http://www.gnu.org/licenses>.
  *
  *  Additional permission under GNU GPL version 3 section 7:
  *
@@ -42,67 +42,62 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   Oct 12, 2020 (dietzc): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.VoidData.VoidReadData;
-import org.knime.core.columnar.data.VoidData.VoidWriteData;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidReadAccess;
-import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidWriteAccess;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
+import java.time.ZonedDateTime;
 
-/**
- * VoidValueFactory to create VoidData.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- */
-final class ColumnarVoidAccessFactory
-    implements ColumnarAccessFactory<VoidReadData, VoidReadAccess, VoidWriteData, VoidWriteAccess> {
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
+import org.knime.core.table.access.ZonedDateTimeAccess.ZonedDateTimeReadAccess;
+import org.knime.core.table.access.ZonedDateTimeAccess.ZonedDateTimeWriteAccess;
 
-    /** Singleton instance on Void **/
-    static final ColumnarVoidAccessFactory INSTANCE = new ColumnarVoidAccessFactory();
+final class ColumnarZonedDateTimeAccessFactory
+    implements ColumnarAccessFactory {
 
-    private ColumnarVoidAccessFactory() {
+    /** INSTANCE **/
+    static final ColumnarZonedDateTimeAccessFactory INSTANCE = new ColumnarZonedDateTimeAccessFactory();
+
+    private ColumnarZonedDateTimeAccessFactory() {
     }
 
     @Override
-    public VoidWriteAccess createWriteAccess(final VoidWriteData data, final ColumnDataIndex index) {
-        return VoidWriteAccess.WRITE_ACCESS_INSTANCE;
+    public final ColumnarZonedDateTimeReadAccess createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarZonedDateTimeReadAccess(index);
     }
 
     @Override
-    public VoidReadAccess createReadAccess(final VoidReadData data, final ColumnDataIndex index) {
-        return VoidReadAccess.READ_ACCESS_INSTANCE;
+    public final ColumnarZonedDateTimeWriteAccess createWriteAccess(final ColumnDataIndex index) {
+        return new ColumnarZonedDateTimeWriteAccess(index);
     }
 
-    @Override
-    public DataSpec getColumnDataSpec() {
-        return DataSpec.voidSpec();
-    }
+    static final class ColumnarZonedDateTimeReadAccess extends AbstractReadAccess<ZonedDateTimeReadData> implements ZonedDateTimeReadAccess {
 
-    static final class VoidReadAccess implements ReadAccess {
+        ColumnarZonedDateTimeReadAccess(final ColumnDataIndex index) {
+            super(index);
+        }
 
-        private static final VoidReadAccess READ_ACCESS_INSTANCE = new VoidReadAccess();
+        @Override
+        public ZonedDateTime getZonedDateTimeValue() {
+            return m_data.getZonedDateTime(m_index.getIndex());
+        }
 
         @Override
         public boolean isMissing() {
-            return true;
+            return m_data.isMissing(m_index.getIndex());
         }
 
     }
 
-    static final class VoidWriteAccess implements WriteAccess {
+    static final class ColumnarZonedDateTimeWriteAccess extends AbstractWriteAccess<ZonedDateTimeWriteData> implements ZonedDateTimeWriteAccess {
 
-        private static final VoidWriteAccess WRITE_ACCESS_INSTANCE = new VoidWriteAccess();
+        ColumnarZonedDateTimeWriteAccess(final ColumnDataIndex index) {
+            super(index);
+        }
 
         @Override
-        public void setMissing() { // NOSONAR
+        public void setZonedDateTimeValue(final ZonedDateTime value) {
+            m_data.setZonedDateTime(m_index.getIndex(), value);
         }
 
     }

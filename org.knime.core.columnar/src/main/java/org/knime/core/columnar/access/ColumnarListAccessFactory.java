@@ -46,83 +46,66 @@
  * History
  *   Oct 12, 2020 (benjamin): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.data.DataValue;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.v2.ReadValue;
-import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.WriteValue;
-import org.knime.core.data.v2.access.ListAccess.ListAccessSpec;
-import org.knime.core.data.v2.access.ListAccess.ListReadAccess;
-import org.knime.core.data.v2.access.ListAccess.ListWriteAccess;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
+import org.knime.core.table.access.ListAccess.ListReadAccess;
+import org.knime.core.table.access.ListAccess.ListWriteAccess;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.WriteAccess;
+import org.knime.core.table.schema.ListDataSpec;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link ListReadData} / {@link ListWriteData} as {@link ListReadAccess}
  * / {@link ListWriteAccess}
  *
  * @param <R> type of the {@link ReadData} for the list elements
- * @param <RA> type of the {@link ReadAccess} for the list elements
  * @param <W> type of the {@link WriteData} for the list elements
- * @param <WA> type of the {@link WriteAccess} for the list elements
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ColumnarListAccessFactory<R extends NullableReadData, RA extends ReadAccess, // NOSONAR
-        W extends NullableWriteData, WA extends WriteAccess> // NOSONAR
-    implements ColumnarAccessFactory<ListReadData, ListReadAccess, ListWriteData, ListWriteAccess> {
+final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
+        W extends NullableWriteData> // NOSONAR
+    implements ColumnarAccessFactory {
 
-    private final ValueFactory<RA, WA> m_innerValueFactory;
+    private final ColumnarAccessFactory m_innerAccessFactory;
 
-    private final ColumnarAccessFactory<R, RA, W, WA> m_innerAccessFactory;
-
-    ColumnarListAccessFactory(final ListAccessSpec<RA, WA> listAccessSpec) {
-        m_innerValueFactory = listAccessSpec.getInnerValueFactory();
-        @SuppressWarnings("unchecked")
-        final ColumnarAccessFactory<R, RA, W, WA> innerAccessFactory =
-            (ColumnarAccessFactory<R, RA, W, WA>)listAccessSpec.getInnerSpecs()
-                .accept(ColumnarAccessFactoryMapper.INSTANCE);
+    ColumnarListAccessFactory(final ListDataSpec listAccessSpec) {
+        final ColumnarAccessFactory innerAccessFactory =
+            ColumnarAccessFactoryMapper.createAccessFactory(listAccessSpec.getInner());
         m_innerAccessFactory = innerAccessFactory;
     }
 
     @Override
-    public ListWriteAccess createWriteAccess(final ListWriteData data, final ColumnDataIndex index) {
-        return new DefaultListWriteAccess(data, index);
+    public ColumnarListWriteAccess<W> createWriteAccess(final ColumnDataIndex index) {
+        return new ColumnarListWriteAccess<>(index, m_innerAccessFactory);
     }
 
     @Override
-    public ListReadAccess createReadAccess(final ListReadData data, final ColumnDataIndex index) {
-        return new DefaultListReadAccess(data, index);
+    public ColumnarListReadAccess<R> createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarListReadAccess<>(index, m_innerAccessFactory);
     }
 
-    @Override
-    public DataSpec getColumnDataSpec() {
-        return new ListDataSpec(m_innerAccessFactory.getColumnDataSpec());
-    }
-
-    private final class DefaultListReadAccess extends AbstractAccess<ListReadData> implements ListReadAccess {
+    static final class ColumnarListReadAccess<R extends NullableReadData> extends AbstractReadAccess<ListReadData>
+        implements ListReadAccess {
 
         private int m_lastIndex;
 
         private int m_innerIndex;
 
-        private ReadValue m_value;
-
         private R m_innerData;
 
-        DefaultListReadAccess(final ListReadData data, final ColumnDataIndex index) {
-            super(data, index);
+        private final ColumnarReadAccess m_readAccess;
+
+        ColumnarListReadAccess(final ColumnDataIndex index, final ColumnarAccessFactory innerAccessFactory) {
+            super(index);
             m_lastIndex = -1;
+            m_readAccess = innerAccessFactory.createReadAccess(() -> m_innerIndex);
         }
 
         /** Update the m_value if we are at a new index */
@@ -132,8 +115,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
             if (index != m_lastIndex) {
                 m_lastIndex = index;
                 m_innerData = m_data.createReadData(index);
-                final RA readAccess = m_innerAccessFactory.createReadAccess(m_innerData, () -> m_innerIndex);
-                m_value = m_innerValueFactory.createReadValue(readAccess);
+                m_readAccess.setData(m_innerData);
             }
         }
 
@@ -143,11 +125,11 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
         }
 
         @Override
-        public <RV extends ReadValue> RV getReadValue(final int index) { // NOSONAR
+        public <A extends ReadAccess> A getReadAccess(final int index) { // NOSONAR
             updateReadValue();
             m_innerIndex = index;
             @SuppressWarnings("unchecked")
-            final RV v = (RV)m_value;
+            final A v = (A)m_readAccess;
             return v;
         }
 
@@ -165,36 +147,32 @@ final class ColumnarListAccessFactory<R extends NullableReadData, RA extends Rea
 
     }
 
-    private final class DefaultListWriteAccess extends AbstractAccess<ListWriteData> implements ListWriteAccess {
+    static final class ColumnarListWriteAccess<W extends NullableWriteData> extends AbstractWriteAccess<ListWriteData>
+        implements ListWriteAccess {
 
-        private WriteValue<?> m_value;
+        private final ColumnarWriteAccess m_writeAccess;
 
         private int m_innerIndex;
 
-        DefaultListWriteAccess(final ListWriteData data, final ColumnDataIndex index) {
-            super(data, index);
+        ColumnarListWriteAccess(final ColumnDataIndex index, final ColumnarAccessFactory innerAccessFactory) {
+            super(index);
+            m_writeAccess = innerAccessFactory.createWriteAccess(() -> m_innerIndex);
         }
 
         @Override
-        public void setMissing() {
-            m_data.setMissing(m_index.getIndex());
-        }
-
-        @Override
-        public <D extends DataValue, WV extends WriteValue<D>> WV getWriteValue(final int index) { // NOSONAR
+        public <A extends WriteAccess> A getWriteAccess(final int index) { // NOSONAR
             m_innerIndex = index;
-            // NB: m_value is always the value for the current index
+            // NB: m_writeAccess is always the value for the current index
             // because users must call #create at an index first
             @SuppressWarnings("unchecked")
-            final WV v = (WV)m_value;
+            final A v = (A)m_writeAccess;
             return v;
         }
 
         @Override
         public void create(final int size) {
             final W writeData = m_data.createWriteData(m_index.getIndex(), size);
-            final WA writeAccess = m_innerAccessFactory.createWriteAccess(writeData, () -> m_innerIndex);
-            m_value = m_innerValueFactory.createWriteValue(writeAccess);
+            m_writeAccess.setData(writeData);
         }
 
     }

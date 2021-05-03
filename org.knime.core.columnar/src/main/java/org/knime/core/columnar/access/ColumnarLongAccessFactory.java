@@ -43,28 +43,22 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.LongData.LongDataSpec;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
-import org.knime.core.data.DataCell;
-import org.knime.core.data.LongValue;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.def.LongCell;
-import org.knime.core.data.v2.access.LongAccess.LongReadAccess;
-import org.knime.core.data.v2.access.LongAccess.LongWriteAccess;
+import org.knime.core.table.access.LongAccess.LongReadAccess;
+import org.knime.core.table.access.LongAccess.LongWriteAccess;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link LongReadData} / {@link LongWriteData} as {@link LongReadAccess}
  * / {@link LongWriteAccess}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ColumnarLongAccessFactory
-    implements ColumnarAccessFactory<LongReadData, LongReadAccess, LongWriteData, LongWriteAccess> {
+final class ColumnarLongAccessFactory implements ColumnarAccessFactory {
 
     /** Instance **/
     static final ColumnarLongAccessFactory INSTANCE = new ColumnarLongAccessFactory();
@@ -73,24 +67,19 @@ final class ColumnarLongAccessFactory
     }
 
     @Override
-    public LongDataSpec getColumnDataSpec() {
-        return DataSpec.longSpec();
+    public ColumnarLongReadAccess createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarLongReadAccess(index);
     }
 
     @Override
-    public LongReadAccess createReadAccess(final LongReadData data, final ColumnDataIndex index) {
-        return new DefaultLongReadAccess(data, index);
+    public ColumnarLongWriteAccess createWriteAccess(final ColumnDataIndex index) {
+        return new ColumnarLongWriteAccess(index);
     }
 
-    @Override
-    public LongWriteAccess createWriteAccess(final LongWriteData data, final ColumnDataIndex index) {
-        return new DefaultLongWriteAccess(data, index);
-    }
+    static final class ColumnarLongReadAccess extends AbstractReadAccess<LongReadData> implements LongReadAccess {
 
-    private static final class DefaultLongReadAccess extends AbstractAccess<LongReadData> implements LongReadAccess {
-
-        DefaultLongReadAccess(final LongReadData data, final ColumnDataIndex index) {
-            super(data, index);
+        ColumnarLongReadAccess(final ColumnDataIndex index) {
+            super(index);
         }
 
         @Override
@@ -103,77 +92,18 @@ final class ColumnarLongAccessFactory
             return m_data.isMissing(m_index.getIndex());
         }
 
-        @Override
-        public double getDoubleValue() {
-            return m_data.getLong(m_index.getIndex());
-        }
-
-        @Override
-        public DataCell getDataCell() {
-            return new LongCell(m_data.getLong(m_index.getIndex()));
-        }
-
-        @Override
-        public double getRealValue() {
-            return m_data.getLong(m_index.getIndex());
-        }
-
-        @Override
-        public double getImaginaryValue() {
-            return 0;
-        }
-
-        @Override
-        public double getMinSupport() {
-            return m_data.getLong(m_index.getIndex());
-        }
-
-        @Override
-        public double getCore() {
-            return m_data.getLong(m_index.getIndex());
-        }
-
-        @Override
-        public double getMaxSupport() {
-            return m_data.getLong(m_index.getIndex());
-        }
-
-        @Override
-        public double getMinCore() {
-            return m_data.getLong(m_index.getIndex());
-        }
-
-        @Override
-        public double getMaxCore() {
-            return m_data.getLong(m_index.getIndex());
-        }
-
-        @Override
-        public double getCenterOfGravity() {
-            return m_data.getLong(m_index.getIndex());
-        }
-
     }
 
-    private static final class DefaultLongWriteAccess extends AbstractAccess<LongWriteData> implements LongWriteAccess {
+    static final class ColumnarLongWriteAccess extends AbstractWriteAccess<LongWriteData>
+        implements LongWriteAccess {
 
-        DefaultLongWriteAccess(final LongWriteData data, final ColumnDataIndex index) {
-            super(data, index);
+        ColumnarLongWriteAccess(final ColumnDataIndex index) {
+            super(index);
         }
 
         @Override
         public void setLongValue(final long value) {
             m_data.setLong(m_index.getIndex(), value);
-        }
-
-        @Override
-        public void setMissing() {
-            m_data.setMissing(m_index.getIndex());
-        }
-
-        @Override
-        public void setValue(final LongValue value) {
-            m_data.setLong(m_index.getIndex(), value.getLongValue());
         }
 
     }

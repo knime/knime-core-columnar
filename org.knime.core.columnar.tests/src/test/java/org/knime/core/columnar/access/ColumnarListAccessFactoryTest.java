@@ -46,7 +46,7 @@
  * History
  *   8 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -62,21 +62,17 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.ListData.ListDataSpec;
+import org.knime.core.columnar.access.ColumnarListAccessFactory.ColumnarListReadAccess;
+import org.knime.core.columnar.access.ColumnarListAccessFactory.ColumnarListWriteAccess;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.testing.data.TestListData;
 import org.knime.core.columnar.testing.data.TestListData.TestListDataFactory;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
-import org.knime.core.data.v2.access.ListAccess.ListAccessSpec;
-import org.knime.core.data.v2.access.ListAccess.ListReadAccess;
-import org.knime.core.data.v2.access.ListAccess.ListWriteAccess;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectReadAccess;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectWriteAccess;
-import org.knime.core.data.v2.value.StringValueFactory;
-import org.knime.core.data.v2.value.StringValueFactory.StringReadValue;
-import org.knime.core.data.v2.value.StringValueFactory.StringWriteValue;
+import org.knime.core.table.access.StringAccess.StringReadAccess;
+import org.knime.core.table.access.StringAccess.StringWriteAccess;
+import org.knime.core.table.schema.ListDataSpec;
+import org.knime.core.table.schema.StringDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -100,18 +96,18 @@ public class ColumnarListAccessFactoryTest {
     @Test
     public void testAccesses() {
 
-        final ListAccessSpec<ObjectReadAccess<String>, ObjectWriteAccess<String>> spec =
-            new ListAccessSpec<>(StringValueFactory.INSTANCE);
+        final ListDataSpec spec = new ListDataSpec(StringDataSpec.INSTANCE);
         @SuppressWarnings("unchecked")
-        final ColumnarListAccessFactory<StringReadData, ObjectReadAccess<String>, StringWriteData, ObjectWriteAccess<String>> accessFactory =
-            (ColumnarListAccessFactory<StringReadData, ObjectReadAccess<String>, StringWriteData, ObjectWriteAccess<String>>)ColumnarAccessFactoryMapper.INSTANCE
+        final ColumnarListAccessFactory<StringReadData, StringWriteData> accessFactory =
+            (ColumnarListAccessFactory<StringReadData, StringWriteData>)ColumnarAccessFactoryMapper.INSTANCE
                 .visit(spec);
-        assertEquals(DataSpec.stringSpec(), ((ListDataSpec)accessFactory.getColumnDataSpec()).getInner());
         final TestListDataFactory dataFactory = new TestListDataFactory(TestStringDataFactory.INSTANCE);
 
         final TestListData listData = dataFactory.createWriteData(1);
-        final ListWriteAccess listWriteAccess = accessFactory.createWriteAccess(listData, () -> 0);
-        final ListReadAccess listReadAccess = accessFactory.createReadAccess(listData, () -> 0);
+        final ColumnarListWriteAccess<StringWriteData> listWriteAccess = accessFactory.createWriteAccess(() -> 0);
+        listWriteAccess.setData(listData);
+        final ColumnarListReadAccess<StringReadData> listReadAccess = accessFactory.createReadAccess(() -> 0);
+        listReadAccess.setData(listData);
 
         assertTrue(listReadAccess.isMissing());
         listWriteAccess.setMissing();
@@ -122,10 +118,10 @@ public class ColumnarListAccessFactoryTest {
         assertEquals(m_values.size(), listReadAccess.size());
 
         for (int i = 0; i < m_values.size(); i++) {
-            final StringWriteValue writeValue = listWriteAccess.getWriteValue(i);
-            assertEquals(writeValue, listWriteAccess.getWriteValue(i));
-            final StringReadValue readValue = listReadAccess.getReadValue(i);
-            assertEquals(readValue, listReadAccess.getReadValue(i));
+            final StringWriteAccess writeValue = listWriteAccess.getWriteAccess(i);
+            assertEquals(writeValue, listWriteAccess.getWriteAccess(i));
+            final StringReadAccess readValue = listReadAccess.getReadAccess(i);
+            assertEquals(readValue, listReadAccess.getReadAccess(i));
 
             assertTrue(listReadAccess.isMissing(i));
             assertNull(readValue.getStringValue());

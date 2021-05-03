@@ -46,18 +46,19 @@
  * History
  *   Oct 9, 2020 (dietzc): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.StructData.StructDataSpec;
+import java.util.Arrays;
+
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.v2.access.AccessSpec;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.StructAccess.StructReadAccess;
-import org.knime.core.data.v2.access.StructAccess.StructWriteAccess;
-import org.knime.core.data.v2.access.WriteAccess;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.StructAccess.StructReadAccess;
+import org.knime.core.table.access.StructAccess.StructWriteAccess;
+import org.knime.core.table.access.WriteAccess;
+import org.knime.core.table.schema.DataSpec;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link StructReadData} / {@link StructWriteData} as
@@ -65,54 +66,43 @@ import org.knime.core.data.v2.access.WriteAccess;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarStructAccessFactory
-    implements ColumnarAccessFactory<StructReadData, StructReadAccess, StructWriteData, StructWriteAccess> {
+final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
 
-    private final ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;
-
-    private final DataSpec m_spec;
+    private final ColumnarAccessFactory[] m_inner;
 
     /**
      * @param inner the specs of the inner elements
      */
-    ColumnarStructAccessFactory(final AccessSpec<?, ?>... inner) {
-        m_inner = new ColumnarAccessFactory<?, ?, ?, ?>[inner.length];
-        final DataSpec[] specs = new DataSpec[inner.length];
-        for (int i = 0; i < inner.length; i++) {
-            m_inner[i] = inner[i].accept(ColumnarAccessFactoryMapper.INSTANCE);
-            specs[i] = m_inner[i].getColumnDataSpec();
+    ColumnarStructAccessFactory(final DataSpec... specs) {
+        m_inner = new ColumnarAccessFactory[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            m_inner[i] = ColumnarAccessFactoryMapper.createAccessFactory(specs[i]);
         }
-        m_spec = new StructDataSpec(specs);
     }
 
     @Override
-    public StructWriteAccess createWriteAccess(final StructWriteData data, final ColumnDataIndex index) {
-        return new DefaultStructWriteAccess(data, m_inner, index);
+    public ColumnarStructWriteAccess createWriteAccess(final ColumnDataIndex index) {
+        final ColumnarWriteAccess[] inner = Arrays.stream(m_inner)//
+            .map(f -> f.createWriteAccess(index))//
+            .toArray(ColumnarWriteAccess[]::new);
+        return new ColumnarStructWriteAccess(inner, index);
     }
 
     @Override
-    public StructReadAccess createReadAccess(final StructReadData data, final ColumnDataIndex index) {
-        return new DefaultStructReadAccess(data, m_inner, index);
+    public ColumnarStructReadAccess createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarStructReadAccess(m_inner, index);
     }
 
-    @Override
-    public DataSpec getColumnDataSpec() {
-        return m_spec;
-    }
+    static final class ColumnarStructReadAccess extends AbstractReadAccess<StructReadData>
+        implements StructReadAccess {
 
-    private static final class DefaultStructReadAccess implements StructReadAccess {
+        private final ColumnarReadAccess[] m_inner;
 
-        private final ColumnDataIndex m_index;
-
-        private final StructReadData m_data;
-
-        private final ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;
-
-        private DefaultStructReadAccess(final StructReadData data, final ColumnarAccessFactory<?, ?, ?, ?>[] inner,
-            final ColumnDataIndex index) {
-            m_index = index;
-            m_data = data;
-            m_inner = inner;
+        private ColumnarStructReadAccess(final ColumnarAccessFactory[] inner, final ColumnDataIndex index) {
+            super(index);
+            m_inner = Arrays.stream(inner)//
+                .map(f -> f.createReadAccess(index))//
+                .toArray(ColumnarReadAccess[]::new);
         }
 
         @Override
@@ -123,37 +113,45 @@ final class ColumnarStructAccessFactory
         @Override
         public <R extends ReadAccess> R getInnerReadAccessAt(final int index) {
             @SuppressWarnings("unchecked")
-            final R cast = (R)m_inner[index].createReadAccess(m_data.getReadDataAt(index), m_index);
+            final R cast = (R)m_inner[index];
             return cast;
+        }
+
+        @Override
+        public void setData(final NullableReadData data) {
+            super.setData(data);
+            // super casts the data to the right type for us
+            for (int i = 0; i < m_inner.length; i++) {
+                m_inner[i].setData(m_data.getReadDataAt(i));
+            }
         }
 
     }
 
-    private static final class DefaultStructWriteAccess implements StructWriteAccess {
+    static final class ColumnarStructWriteAccess extends AbstractWriteAccess<StructWriteData>
+        implements StructWriteAccess {
 
-        private final ColumnDataIndex m_index;
+        private ColumnarWriteAccess[] m_inner;
 
-        private ColumnarAccessFactory<?, ?, ?, ?>[] m_inner;
-
-        private final StructWriteData m_data;
-
-        private DefaultStructWriteAccess(final StructWriteData data, final ColumnarAccessFactory<?, ?, ?, ?>[] inner,
-            final ColumnDataIndex index) {
-            m_index = index;
-            m_data = data;
+        private ColumnarStructWriteAccess(final ColumnarWriteAccess[] inner, final ColumnDataIndex index) {
+            super(index);
             m_inner = inner;
-        }
-
-        @Override
-        public void setMissing() {
-            m_data.setMissing(m_index.getIndex());
         }
 
         @Override
         public <W extends WriteAccess> W getWriteAccessAt(final int index) {
             @SuppressWarnings("unchecked")
-            final W cast = (W)m_inner[index].createWriteAccess(m_data.getWriteDataAt(index), m_index);
+            final W cast = (W)m_inner[index];
             return cast;
+        }
+
+        @Override
+        public void setData(final NullableWriteData data) {
+            super.setData(data);
+            // the super class does the cast for us
+            for (int i = 0; i < m_inner.length; i++) {
+                m_inner[i].setData(m_data.getWriteDataAt(0));
+            }
         }
 
     }

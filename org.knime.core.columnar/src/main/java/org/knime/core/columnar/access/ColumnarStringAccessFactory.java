@@ -14,7 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *  aInt with this program; if not, see <http://www.gnu.org/licenses>.
  *
  *  Additional permission under GNU GPL version 3 section 7:
  *
@@ -43,27 +43,61 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.table.access.StringAccess.StringReadAccess;
+import org.knime.core.table.access.StringAccess.StringWriteAccess;
 
-/**
- * Abstract implementation for {@link ReadAccess ReadAccesses} and {@link WriteAccess WriteAccesses}.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
- */
-abstract class AbstractAccess<T> { // NOSONAR
+final class ColumnarStringAccessFactory
+    implements ColumnarAccessFactory {
 
-    final T m_data;
+    /** INSTANCE **/
+    static final ColumnarStringAccessFactory INSTANCE = new ColumnarStringAccessFactory();
 
-    final ColumnDataIndex m_index;
+    private ColumnarStringAccessFactory() {
+    }
 
-    AbstractAccess(final T data, final ColumnDataIndex index) {
-        m_data = data;
-        m_index = index;
+    @Override
+    public final ColumnarStringReadAccess createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarStringReadAccess(index);
+    }
+
+    @Override
+    public final ColumnarStringWriteAccess createWriteAccess(final ColumnDataIndex index) {
+        return new ColumnarStringWriteAccess(index);
+    }
+
+    static final class ColumnarStringReadAccess extends AbstractReadAccess<StringReadData> implements StringReadAccess {
+
+        ColumnarStringReadAccess(final ColumnDataIndex index) {
+            super(index);
+        }
+
+        @Override
+        public String getStringValue() {
+            return m_data.getString(m_index.getIndex());
+        }
+
+        @Override
+        public boolean isMissing() {
+            return m_data.isMissing(m_index.getIndex());
+        }
+
+    }
+
+    static final class ColumnarStringWriteAccess extends AbstractWriteAccess<StringWriteData> implements StringWriteAccess {
+
+        ColumnarStringWriteAccess(final ColumnDataIndex index) {
+            super(index);
+        }
+
+        @Override
+        public void setStringValue(final String value) {
+            m_data.setString(m_index.getIndex(), value);
+        }
+
     }
 
 }

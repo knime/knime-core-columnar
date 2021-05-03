@@ -46,7 +46,7 @@
  * History
  *   8 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -54,17 +54,15 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.StructData.StructDataSpec;
+import org.knime.core.columnar.access.ColumnarStructAccessFactory.ColumnarStructReadAccess;
+import org.knime.core.columnar.access.ColumnarStructAccessFactory.ColumnarStructWriteAccess;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
 import org.knime.core.columnar.testing.data.TestStructData;
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectReadAccess;
-import org.knime.core.data.v2.access.ObjectAccess.ObjectWriteAccess;
-import org.knime.core.data.v2.access.ObjectAccess.StringAccessSpec;
-import org.knime.core.data.v2.access.StructAccess.StructAccessSpec;
-import org.knime.core.data.v2.access.StructAccess.StructReadAccess;
-import org.knime.core.data.v2.access.StructAccess.StructWriteAccess;
+import org.knime.core.table.access.StringAccess.StringReadAccess;
+import org.knime.core.table.access.StringAccess.StringWriteAccess;
+import org.knime.core.table.schema.StringDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -75,34 +73,35 @@ public class ColumnarStructAccessFactoryTest {
     @Test
     public void testAccesses() {
 
-        final StructAccessSpec spec = new StructAccessSpec(StringAccessSpec.INSTANCE);
+        final StructDataSpec spec = new StructDataSpec(StringDataSpec.INSTANCE);
         final ColumnarStructAccessFactory accessFactory =
             (ColumnarStructAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
-        assertEquals(DataSpec.stringSpec(), ((StructDataSpec)accessFactory.getColumnDataSpec()).getInner()[0]);
         final TestStructDataFactory dataFactory = new TestStructDataFactory(TestStringDataFactory.INSTANCE);
 
         final TestStructData structData = dataFactory.createWriteData(1);
-        final StructWriteAccess structWriteAccess = accessFactory.createWriteAccess(structData, () -> 0);
-        final StructReadAccess structReadAccess = accessFactory.createReadAccess(structData, () -> 0);
+        final ColumnarStructWriteAccess structWriteAccess = accessFactory.createWriteAccess(() -> 0);
+        structWriteAccess.setData(structData);
+        final ColumnarStructReadAccess structReadAccess = accessFactory.createReadAccess(() -> 0);
+        structReadAccess.setData(structData);
 
         assertTrue(structReadAccess.isMissing());
         structWriteAccess.setMissing();
         assertTrue(structReadAccess.isMissing());
 
-        final ObjectWriteAccess<String> writeAccess = structWriteAccess.getWriteAccessAt(0);
-        final ObjectReadAccess<String> readAccess = structReadAccess.getInnerReadAccessAt(0);
+        final StringWriteAccess writeAccess = structWriteAccess.getWriteAccessAt(0);
+        final StringReadAccess readAccess = structReadAccess.getInnerReadAccessAt(0);
 
         final String value = "test";
         assertTrue(readAccess.isMissing());
-        assertNull(readAccess.getObject());
+        assertNull(readAccess.getStringValue());
 
-        writeAccess.setObject(value);
+        writeAccess.setStringValue(value);
         assertFalse(readAccess.isMissing());
-        assertEquals(value, readAccess.getObject());
+        assertEquals(value, readAccess.getStringValue());
 
         writeAccess.setMissing();
         assertTrue(readAccess.isMissing());
-        assertNull(readAccess.getObject());
+        assertNull(readAccess.getStringValue());
 
         structWriteAccess.setMissing();
         assertTrue(structReadAccess.isMissing());

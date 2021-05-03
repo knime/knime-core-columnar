@@ -46,7 +46,7 @@
  * History
  *   8 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -60,14 +60,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.access.ColumnarLongAccessFactory.ColumnarLongReadAccess;
+import org.knime.core.columnar.access.ColumnarLongAccessFactory.ColumnarLongWriteAccess;
 import org.knime.core.columnar.testing.data.TestLongData;
 import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
-import org.knime.core.data.def.LongCell;
-import org.knime.core.data.def.LongCell.LongCellFactory;
-import org.knime.core.data.v2.access.LongAccess.LongAccessSpec;
-import org.knime.core.data.v2.access.LongAccess.LongReadAccess;
-import org.knime.core.data.v2.access.LongAccess.LongWriteAccess;
+import org.knime.core.table.schema.LongDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -90,23 +87,24 @@ public class ColumnarLongAccessFactoryTest {
     @Test
     public void testAccesses() {
 
-        final LongAccessSpec spec = LongAccessSpec.INSTANCE;
-        final ColumnarLongAccessFactory factory = (ColumnarLongAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
-        assertEquals(DataSpec.longSpec(), factory.getColumnDataSpec());
+        final LongDataSpec spec = LongDataSpec.INSTANCE;
+        final ColumnarLongAccessFactory factory =
+            (ColumnarLongAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
         final TestLongData data = TestLongDataFactory.INSTANCE.createWriteData(1);
-        final LongWriteAccess writeAccess = factory.createWriteAccess(data, () -> 0);
-        final LongReadAccess readAccess = factory.createReadAccess(data, () -> 0);
+        final ColumnarLongWriteAccess writeAccess = factory.createWriteAccess(() -> 0);
+        writeAccess.setData(data);
+        final ColumnarLongReadAccess readAccess = factory.createReadAccess(() -> 0);
+        readAccess.setData(data);
 
-        final LongCell cell = (LongCell)LongCellFactory.create(m_value);
-
-        // set cell
         assertTrue(readAccess.isMissing());
         try {
             readAccess.getLongValue();
             fail();
         } catch (NullPointerException e) {
         }
-        writeAccess.setValue(cell);
+
+        // set value
+        writeAccess.setLongValue(m_value);
         assertFalse(readAccess.isMissing());
         assertEquals(m_value, readAccess.getLongValue());
 
@@ -118,20 +116,6 @@ public class ColumnarLongAccessFactoryTest {
             fail();
         } catch (NullPointerException e) {
         }
-
-        // set value
-        writeAccess.setLongValue(m_value);
-        assertFalse(readAccess.isMissing());
-        assertEquals(cell, readAccess.getDataCell());
-        assertEquals(cell.getDoubleValue(), readAccess.getDoubleValue(), 0d);
-        assertEquals(cell.getRealValue(), readAccess.getRealValue(), 0d);
-        assertEquals(cell.getImaginaryValue(), readAccess.getImaginaryValue(), 0d);
-        assertEquals(cell.getMinSupport(), readAccess.getMinSupport(), 0d);
-        assertEquals(cell.getCore(), readAccess.getCore(), 0d);
-        assertEquals(cell.getMaxSupport(), readAccess.getMaxSupport(), 0d);
-        assertEquals(cell.getMinCore(), readAccess.getMinCore(), 0d);
-        assertEquals(cell.getMaxCore(), readAccess.getMaxCore(), 0d);
-        assertEquals(cell.getCenterOfGravity(), readAccess.getCenterOfGravity(), 0d);
     }
 
 }

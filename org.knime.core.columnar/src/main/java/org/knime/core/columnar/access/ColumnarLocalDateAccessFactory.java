@@ -14,7 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *  aInt with this program; if not, see <http://www.gnu.org/licenses>.
  *
  *  Additional permission under GNU GPL version 3 section 7:
  *
@@ -43,50 +43,64 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
+import java.time.LocalDate;
 
-/**
- * Columnar wrapper around a {@link ValueFactory}.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
- */
-interface ColumnarAccessFactory<R extends NullableReadData, RA extends ReadAccess, // NOSONAR
-        W extends NullableWriteData, WA extends WriteAccess> { // NOSONAR
+import org.knime.core.columnar.data.LocalDateData.LocalDateReadData;
+import org.knime.core.columnar.data.LocalDateData.LocalDateWriteData;
+import org.knime.core.table.access.LocalDateAccess.LocalDateReadAccess;
+import org.knime.core.table.access.LocalDateAccess.LocalDateWriteAccess;
 
-    /**
-     * Creates an access on a {@link NullableWriteData}. The actual value of the created access depends on
-     * {@link ColumnDataIndex}.
-     *
-     * @param data the actual {@link NullableWriteData}
-     * @param index data index pointing into {@link NullableWriteData}
-     *
-     * @return a {@link WriteAccess} backed by {@link NullableWriteData}.
-     */
-    WA createWriteAccess(W data, ColumnDataIndex index);
+final class ColumnarLocalDateAccessFactory implements ColumnarAccessFactory {
 
-    /**
-     * Creates an access on a {@link NullableReadData}. The actual value of the created access depends on
-     * {@link ColumnDataIndex}.
-     *
-     * @param data the actual {@link NullableReadData}
-     * @param index data index pointing into {@link NullableReadData}
-     *
-     * @return a {@link ReadAccess} backed by {@link NullableReadData}.
-     */
-    RA createReadAccess(R data, ColumnDataIndex index);
+    /** INSTANCE **/
+    static final ColumnarLocalDateAccessFactory INSTANCE = new ColumnarLocalDateAccessFactory();
 
-    /**
-     * @return the underlying {@link DataSpec}
-     */
-    DataSpec getColumnDataSpec();
+    private ColumnarLocalDateAccessFactory() {
+    }
+
+    @Override
+    public final ColumnarLocalDateReadAccess createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarLocalDateReadAccess(index);
+    }
+
+    @Override
+    public final ColumnarLocalDateWriteAccess createWriteAccess(final ColumnDataIndex index) {
+        return new ColumnarLocalDateWriteAccess(index);
+    }
+
+    static final class ColumnarLocalDateReadAccess extends AbstractReadAccess<LocalDateReadData>
+        implements LocalDateReadAccess {
+
+        ColumnarLocalDateReadAccess(final ColumnDataIndex index) {
+            super(index);
+        }
+
+        @Override
+        public LocalDate getLocalDateValue() {
+            return m_data.getLocalDate(m_index.getIndex());
+        }
+
+        @Override
+        public boolean isMissing() {
+            return m_data.isMissing(m_index.getIndex());
+        }
+
+    }
+
+    static final class ColumnarLocalDateWriteAccess extends AbstractWriteAccess<LocalDateWriteData>
+        implements LocalDateWriteAccess {
+
+        ColumnarLocalDateWriteAccess(final ColumnDataIndex index) {
+            super(index);
+        }
+
+        @Override
+        public void setLocalDateValue(final LocalDate value) {
+            m_data.setLocalDate(m_index.getIndex(), value);
+        }
+
+    }
 
 }

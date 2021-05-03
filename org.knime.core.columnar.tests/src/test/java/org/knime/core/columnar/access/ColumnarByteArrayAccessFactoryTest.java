@@ -46,12 +46,12 @@
  * History
  *   8 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -60,81 +60,62 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.testing.data.TestIntData;
-import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
-import org.knime.core.data.def.IntCell;
-import org.knime.core.data.def.IntCell.IntCellFactory;
-import org.knime.core.data.v2.access.IntAccess.IntAccessSpec;
-import org.knime.core.data.v2.access.IntAccess.IntReadAccess;
-import org.knime.core.data.v2.access.IntAccess.IntWriteAccess;
+import org.knime.core.columnar.access.ColumnarByteArrayAccessFactory.ColumnarVarBinaryReadAccess;
+import org.knime.core.columnar.access.ColumnarByteArrayAccessFactory.ColumnarVarBinaryWriteAccess;
+import org.knime.core.columnar.testing.data.TestVarBinaryData;
+import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
+import org.knime.core.table.schema.VarBinaryDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @RunWith(Parameterized.class)
 @SuppressWarnings("javadoc")
-public class ColumnarIntAccessFactoryTest {
+public class ColumnarByteArrayAccessFactoryTest {
 
     @Parameters
     public static Collection<Object[]> data() {
-        return Arrays.asList(new Object[][]{{Integer.MIN_VALUE}, {0}, {1}, {Integer.MAX_VALUE}}); // NOSONAR
+        return Arrays.asList(new Object[][]{{new byte[0]}, // NOSONAR
+            {new byte[]{Byte.MIN_VALUE, (byte)-1, (byte)0, Byte.MAX_VALUE}}});
     }
 
-    private int m_value;
+    private byte[] m_value;
 
-    public ColumnarIntAccessFactoryTest(final int value) {
+    public ColumnarByteArrayAccessFactoryTest(final byte[] value) {
         m_value = value;
     }
 
     @Test
     public void testAccesses() {
 
-        final IntAccessSpec spec = IntAccessSpec.INSTANCE;
-        final ColumnarIntAccessFactory factory =
-            (ColumnarIntAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
-        assertEquals(DataSpec.intSpec(), factory.getColumnDataSpec());
-        final TestIntData data = TestIntDataFactory.INSTANCE.createWriteData(1);
-        final IntWriteAccess writeAccess = factory.createWriteAccess(data, () -> 0);
-        final IntReadAccess readAccess = factory.createReadAccess(data, () -> 0);
+        final VarBinaryDataSpec spec = VarBinaryDataSpec.INSTANCE;
+        final ColumnarByteArrayAccessFactory factory =
+            (ColumnarByteArrayAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
+        final TestVarBinaryData data = TestVarBinaryDataFactory.INSTANCE.createWriteData(1);
+        final ColumnarVarBinaryWriteAccess writeAccess = factory.createWriteAccess(() -> 0);
+        writeAccess.setData(data);
+        final ColumnarVarBinaryReadAccess readAccess = factory.createReadAccess(() -> 0);
+        readAccess.setData(data);
 
-        final IntCell cell = (IntCell)IntCellFactory.create(m_value);
-
-        // set cell
         assertTrue(readAccess.isMissing());
-        try {
-            readAccess.getIntValue();
-            fail();
-        } catch (NullPointerException e) {
-        }
-        writeAccess.setValue(cell);
-        assertFalse(readAccess.isMissing());
-        assertEquals(m_value, readAccess.getIntValue());
+        assertNull(readAccess.getByteArray());
 
-        // set missing
+        writeAccess.setByteArray(m_value);
+        assertFalse(readAccess.isMissing());
+        assertArrayEquals(m_value, readAccess.getByteArray());
+
+        if (m_value.length > 2) {
+            writeAccess.setByteArray(m_value, 1, m_value.length - 2);
+            final byte[] subArray = new byte[m_value.length - 2];
+            System.arraycopy(m_value, 1, subArray, 0, m_value.length - 2);
+            assertFalse(readAccess.isMissing());
+            assertArrayEquals(subArray, readAccess.getByteArray());
+        }
+
         writeAccess.setMissing();
         assertTrue(readAccess.isMissing());
-        try {
-            readAccess.getIntValue();
-            fail();
-        } catch (NullPointerException e) {
-        }
+        assertNull(readAccess.getByteArray());
 
-        // set value
-        writeAccess.setIntValue(m_value);
-        assertFalse(readAccess.isMissing());
-        assertEquals(cell, readAccess.getDataCell());
-        assertEquals(cell.getIntValue(), readAccess.getIntValue());
-        assertEquals(cell.getDoubleValue(), readAccess.getDoubleValue(), 0d);
-        assertEquals(cell.getLongValue(), readAccess.getLongValue());
-        assertEquals(cell.getRealValue(), readAccess.getRealValue(), 0d);
-        assertEquals(cell.getImaginaryValue(), readAccess.getImaginaryValue(), 0d);
-        assertEquals(cell.getMinSupport(), readAccess.getMinSupport(), 0d);
-        assertEquals(cell.getMaxSupport(), readAccess.getMaxSupport(), 0d);
-        assertEquals(cell.getCore(), readAccess.getCore(), 0d);
-        assertEquals(cell.getMinCore(), readAccess.getMinCore(), 0d);
-        assertEquals(cell.getMaxCore(), readAccess.getMaxCore(), 0d);
-        assertEquals(cell.getCenterOfGravity(), readAccess.getCenterOfGravity(), 0d);
     }
 
 }

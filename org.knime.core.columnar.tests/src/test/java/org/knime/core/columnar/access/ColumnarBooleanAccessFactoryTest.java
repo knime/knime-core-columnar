@@ -46,7 +46,7 @@
  * History
  *   8 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -60,14 +60,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.knime.core.columnar.data.DataSpec;
+import org.knime.core.columnar.access.ColumnarBooleanAccessFactory.ColumnarBooleanReadAccess;
+import org.knime.core.columnar.access.ColumnarBooleanAccessFactory.ColumnarBooleanWriteAccess;
 import org.knime.core.columnar.testing.data.TestBooleanData;
 import org.knime.core.columnar.testing.data.TestBooleanData.TestBooleanDataFactory;
-import org.knime.core.data.def.BooleanCell;
-import org.knime.core.data.def.BooleanCell.BooleanCellFactory;
-import org.knime.core.data.v2.access.BooleanAccess.BooleanAccessSpec;
-import org.knime.core.data.v2.access.BooleanAccess.BooleanReadAccess;
-import org.knime.core.data.v2.access.BooleanAccess.BooleanWriteAccess;
+import org.knime.core.table.schema.BooleanDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -90,24 +87,24 @@ public class ColumnarBooleanAccessFactoryTest {
     @Test
     public void testAccesses() {
 
-        final BooleanAccessSpec spec = BooleanAccessSpec.INSTANCE;
+        final BooleanDataSpec spec = BooleanDataSpec.INSTANCE;
         final ColumnarBooleanAccessFactory factory =
             (ColumnarBooleanAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
-        assertEquals(DataSpec.booleanSpec(), factory.getColumnDataSpec());
         final TestBooleanData data = TestBooleanDataFactory.INSTANCE.createWriteData(1);
-        final BooleanWriteAccess writeAccess = factory.createWriteAccess(data, () -> 0);
-        final BooleanReadAccess readAccess = factory.createReadAccess(data, () -> 0);
+        final ColumnarBooleanWriteAccess writeAccess = factory.createWriteAccess(() -> 0);
+        writeAccess.setData(data);
+        final ColumnarBooleanReadAccess readAccess = factory.createReadAccess(() -> 0);
+        readAccess.setData(data);
 
-        final BooleanCell cell = (BooleanCell)BooleanCellFactory.create(m_value);
-
-        // set cell
         assertTrue(readAccess.isMissing());
         try {
             readAccess.getBooleanValue();
             fail();
         } catch (NullPointerException e) {
         }
-        writeAccess.setValue(cell);
+
+        // set value
+        writeAccess.setBooleanValue(m_value);
         assertFalse(readAccess.isMissing());
         assertEquals(m_value, readAccess.getBooleanValue());
 
@@ -119,23 +116,6 @@ public class ColumnarBooleanAccessFactoryTest {
         } catch (NullPointerException e) {
         }
         assertTrue(readAccess.isMissing());
-
-        // set value
-        writeAccess.setBooleanValue(m_value);
-        assertFalse(readAccess.isMissing());
-        assertEquals(cell, readAccess.getDataCell());
-        assertEquals(cell.getBooleanValue(), readAccess.getBooleanValue());
-        assertEquals(cell.getDoubleValue(), readAccess.getDoubleValue(), 0d);
-        assertEquals(cell.getLongValue(), readAccess.getLongValue());
-        assertEquals(cell.getIntValue(), readAccess.getIntValue());
-        assertEquals(cell.getRealValue(), readAccess.getRealValue(), 0d);
-        assertEquals(cell.getImaginaryValue(), readAccess.getImaginaryValue(), 0d);
-        assertEquals(cell.getMinSupport(), readAccess.getMinSupport(), 0d);
-        assertEquals(cell.getCore(), readAccess.getCore(), 0d);
-        assertEquals(cell.getMaxSupport(), readAccess.getMaxSupport(), 0d);
-        assertEquals(cell.getMinCore(), readAccess.getMinCore(), 0d);
-        assertEquals(cell.getMaxCore(), readAccess.getMaxCore(), 0d);
-        assertEquals(cell.getCenterOfGravity(), readAccess.getCenterOfGravity(), 0d);
     }
 
 }

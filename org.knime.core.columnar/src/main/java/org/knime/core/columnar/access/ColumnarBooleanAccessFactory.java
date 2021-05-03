@@ -43,36 +43,68 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.WriteValue;
+import org.knime.core.columnar.data.BooleanData.BooleanReadData;
+import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
+import org.knime.core.table.access.BooleanAccess.BooleanReadAccess;
+import org.knime.core.table.access.BooleanAccess.BooleanWriteAccess;
 
 /**
- * {@link ColumnarWriteValueFactory ColumnarWriteValueFactorys} typically wrap a {@link ValueFactory} and allow to
- * create {@link WriteValue WriteValues} based on {@link NullableWriteData} in conjunction with a
- * {@link ColumnDataIndex}.
- *
- * @param <W> type of ColumnWriteData
+ * A ColumnarValueFactory implementation wrapping {@link BooleanReadData} / {@link BooleanWriteData} as
+ * {@link BooleanReadAccess} / {@link BooleanWriteAccess}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public interface ColumnarWriteValueFactory<W extends NullableWriteData> {
+final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory {
 
-    /**
-     * Create a new {@link WriteValue}. Note that the destination of content written via the write value depends on the
-     * {@link ColumnDataIndex}.
-     *
-     * @param data the underlying {@link NullableWriteData}
-     * @param index pointer to position in {@link NullableWriteData}
-     *
-     * @return a {@link WriteValue} representing the value at the {@link ColumnDataIndex} in the
-     *         {@link NullableReadData}.
-     */
-    WriteValue<?> createWriteValue(W data, ColumnDataIndex index); // NOSONAR
+    static final ColumnarBooleanAccessFactory INSTANCE = new ColumnarBooleanAccessFactory();
+
+    private ColumnarBooleanAccessFactory() {
+    }
+
+    @Override
+    public ColumnarBooleanReadAccess createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarBooleanReadAccess(index);
+    }
+
+    @Override
+    public ColumnarBooleanWriteAccess createWriteAccess(final ColumnDataIndex index) {
+        return new ColumnarBooleanWriteAccess(index);
+    }
+
+    static final class ColumnarBooleanReadAccess extends AbstractReadAccess<BooleanReadData>
+        implements BooleanReadAccess {
+
+        ColumnarBooleanReadAccess(final ColumnDataIndex index) {
+            super(index);
+        }
+
+        @Override
+        public boolean getBooleanValue() {
+            return m_data.getBoolean(m_index.getIndex());
+        }
+
+        @Override
+        public boolean isMissing() {
+            return m_data.isMissing(m_index.getIndex());
+        }
+
+    }
+
+    static final class ColumnarBooleanWriteAccess extends AbstractWriteAccess<BooleanWriteData>
+        implements BooleanWriteAccess {
+
+        ColumnarBooleanWriteAccess(final ColumnDataIndex index) {
+            super(index);
+        }
+
+        @Override
+        public void setBooleanValue(final boolean value) {
+            m_data.setBoolean(m_index.getIndex(), value);
+        }
+
+    }
 
 }

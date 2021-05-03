@@ -14,13 +14,13 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  aVoid with this program; if not, see <http://www.gnu.org/licenses>.
+ *  aInt with this program; if not, see <http://www.gnu.org/licenses>.
  *
  *  Additional permission under GNU GPL version 3 section 7:
  *
- *  KNIME Voideroperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+ *  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
  *  Hence, KNIME and ECLIPSE are both independent programs and are not
- *  derived from each other. Should, however, the Voiderpretation of the
+ *  derived from each other. Should, however, the interpretation of the
  *  GNU GPL Version 3 ("License") under any applicable laws result in
  *  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
  *  you the additional permission to use and propagate KNIME together with
@@ -31,56 +31,91 @@
  *
  *  Additional permission relating to nodes for KNIME that extend the Node
  *  Extension (and in particular that are based on subclasses of NodeModel,
- *  NodeDialog, and NodeView) and that only Voideroperate with KNIME through
+ *  NodeDialog, and NodeView) and that only interoperate with KNIME through
  *  standard APIs ("Nodes"):
  *  Nodes are deemed to be separate and independent programs and to not be
  *  covered works.  Notwithstanding anything to the contrary in the
  *  License, the License does not apply to Nodes, you are not required to
  *  license Nodes under the License, and you are granted a license to
  *  prepare and propagate Nodes, in each case even if such Nodes are
- *  propagated with or for Voideroperation with KNIME.  The owner of a Node
+ *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
- *  when such Node is propagated with or for Voideroperation with KNIME.
+ *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  *
  * History
  *   8 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.util.Arrays;
+import java.util.Collection;
 
 import org.junit.Test;
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.testing.data.TestVoidData;
-import org.knime.core.columnar.testing.data.TestVoidData.TestVoidDataFactory;
-import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidReadAccess;
-import org.knime.core.data.columnar.schema.ColumnarVoidAccessFactory.VoidWriteAccess;
-import org.knime.core.data.v2.access.VoidAccess.VoidAccessSpec;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+import org.knime.core.columnar.access.ColumnarIntAccessFactory.ColumnarIntReadAccess;
+import org.knime.core.columnar.access.ColumnarIntAccessFactory.ColumnarIntWriteAccess;
+import org.knime.core.columnar.testing.data.TestIntData;
+import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
+import org.knime.core.table.schema.IntDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
+@RunWith(Parameterized.class)
 @SuppressWarnings("javadoc")
-public class ColumnarVoidAccessFactoryTest {
+public class ColumnarIntAccessFactoryTest {
+
+    @Parameters
+    public static Collection<Object[]> data() {
+        return Arrays.asList(new Object[][]{{Integer.MIN_VALUE}, {0}, {1}, {Integer.MAX_VALUE}}); // NOSONAR
+    }
+
+    private int m_value;
+
+    public ColumnarIntAccessFactoryTest(final int value) {
+        m_value = value;
+    }
 
     @Test
     public void testAccesses() {
 
-        final VoidAccessSpec spec = VoidAccessSpec.INSTANCE;
-        final ColumnarVoidAccessFactory factory =
-            (ColumnarVoidAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
-        assertEquals(DataSpec.voidSpec(), factory.getColumnDataSpec());
-        final TestVoidData data = TestVoidDataFactory.INSTANCE.createWriteData(1);
-        final VoidWriteAccess writeAccess = factory.createWriteAccess(data, () -> 0);
-        final VoidReadAccess readAccess = factory.createReadAccess(data, () -> 0);
+        final IntDataSpec spec = IntDataSpec.INSTANCE;
+        final ColumnarIntAccessFactory factory =
+            (ColumnarIntAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
+        final TestIntData data = TestIntDataFactory.INSTANCE.createWriteData(1);
+        final ColumnarIntWriteAccess writeAccess = factory.createWriteAccess(() -> 0);
+        writeAccess.setData(data);
+        final ColumnarIntReadAccess readAccess = factory.createReadAccess(() -> 0);
+        readAccess.setData(data);
 
-        // set cell
         assertTrue(readAccess.isMissing());
+        try {
+            readAccess.getIntValue();
+            fail();
+        } catch (NullPointerException e) {
+        }
+
+        // set value
+        writeAccess.setIntValue(m_value);
+        assertFalse(readAccess.isMissing());
+        assertEquals(m_value, readAccess.getIntValue());
+
+        // set missing
         writeAccess.setMissing();
         assertTrue(readAccess.isMissing());
-
+        try {
+            readAccess.getIntValue();
+            fail();
+        } catch (NullPointerException e) {
+        }
     }
 
 }

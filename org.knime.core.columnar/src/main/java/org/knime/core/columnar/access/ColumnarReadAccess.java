@@ -42,18 +42,26 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Apr 30, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar;
+package org.knime.core.columnar.access;
+
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.table.access.ReadAccess;
 
 /**
- * DataIndex provides an index (or pointer) into ColumnWrite- or ColumnReadData.
+ * {@link ReadAccess} that can be pointed to new {@link NullableReadData}.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public interface ColumnDataIndex {
+public interface ColumnarReadAccess extends ReadAccess {
 
     /**
-     * @return the current index.
+     * Points the access to a new chunk of data.
+     *
+     * @param data  the {@link NullableReadData} to read from
      */
-    int getIndex();
+    void setData(final NullableReadData data);
 }

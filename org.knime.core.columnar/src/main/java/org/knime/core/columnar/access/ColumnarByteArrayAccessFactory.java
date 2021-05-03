@@ -46,14 +46,14 @@
  * History
  *   10 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.v2.access.ByteArrayAccess.VarBinaryReadAccess;
-import org.knime.core.data.v2.access.ByteArrayAccess.VarBinaryWriteAccess;
+import org.knime.core.table.access.ByteArrayAccess.VarBinaryReadAccess;
+import org.knime.core.table.access.ByteArrayAccess.VarBinaryWriteAccess;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link VarBinaryReadData} / {@link VarBinaryWriteData} as
@@ -61,8 +61,7 @@ import org.knime.core.data.v2.access.ByteArrayAccess.VarBinaryWriteAccess;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarByteArrayAccessFactory
-    implements ColumnarAccessFactory<VarBinaryReadData, VarBinaryReadAccess, VarBinaryWriteData, VarBinaryWriteAccess> {
+final class ColumnarByteArrayAccessFactory implements ColumnarAccessFactory {
 
     /** Instance **/
     static final ColumnarByteArrayAccessFactory INSTANCE = new ColumnarByteArrayAccessFactory();
@@ -71,30 +70,20 @@ final class ColumnarByteArrayAccessFactory
     }
 
     @Override
-    public DataSpec getColumnDataSpec() {
-        return DataSpec.varBinarySpec();
+    public ColumnarVarBinaryWriteAccess createWriteAccess(final ColumnDataIndex index) {
+        return new ColumnarVarBinaryWriteAccess(index);
     }
 
     @Override
-    public VarBinaryWriteAccess createWriteAccess(final VarBinaryWriteData data, final ColumnDataIndex index) {
-        return new DefaultVarBinaryWriteAccess(data, index);
+    public ColumnarVarBinaryReadAccess createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarVarBinaryReadAccess(index);
     }
 
-    @Override
-    public VarBinaryReadAccess createReadAccess(final VarBinaryReadData data, final ColumnDataIndex index) {
-        return new DefaultVarBinaryReadAccess(data, index);
-    }
-
-    private static final class DefaultVarBinaryWriteAccess extends AbstractAccess<VarBinaryWriteData>
+    static final class ColumnarVarBinaryWriteAccess extends AbstractWriteAccess<VarBinaryWriteData>
         implements VarBinaryWriteAccess {
 
-        DefaultVarBinaryWriteAccess(final VarBinaryWriteData data, final ColumnDataIndex index) {
-            super(data, index);
-        }
-
-        @Override
-        public void setMissing() {
-            m_data.setMissing(m_index.getIndex());
+        ColumnarVarBinaryWriteAccess(final ColumnDataIndex index) {
+            super(index);
         }
 
         @Override
@@ -109,13 +98,18 @@ final class ColumnarByteArrayAccessFactory
             m_data.setBytes(m_index.getIndex(), subArray);
         }
 
+        @Override
+        public <T> void setObject(final T value, final ObjectSerializer<T> serializer) {
+            m_data.setObject(m_index.getIndex(), value, serializer);
+        }
+
     }
 
-    private static final class DefaultVarBinaryReadAccess extends AbstractAccess<VarBinaryReadData>
+    static final class ColumnarVarBinaryReadAccess extends AbstractReadAccess<VarBinaryReadData>
         implements VarBinaryReadAccess {
 
-        DefaultVarBinaryReadAccess(final VarBinaryReadData data, final ColumnDataIndex index) {
-            super(data, index);
+        ColumnarVarBinaryReadAccess(final ColumnDataIndex index) {
+            super(index);
         }
 
         @Override
@@ -126,6 +120,11 @@ final class ColumnarByteArrayAccessFactory
         @Override
         public byte[] getByteArray() {
             return m_data.getBytes(m_index.getIndex());
+        }
+
+        @Override
+        public <T> T getObject(final ObjectDeserializer<T> deserializer) {
+            return m_data.getObject(m_index.getIndex(), deserializer);
         }
 
     }

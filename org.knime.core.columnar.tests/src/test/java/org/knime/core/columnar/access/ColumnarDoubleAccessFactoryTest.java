@@ -14,7 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  aInt with this program; if not, see <http://www.gnu.org/licenses>.
+ *  aDouble with this program; if not, see <http://www.gnu.org/licenses>.
  *
  *  Additional permission under GNU GPL version 3 section 7:
  *
@@ -46,13 +46,12 @@
  * History
  *   8 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -61,62 +60,63 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.testing.data.TestVarBinaryData;
-import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
-import org.knime.core.data.v2.access.ByteArrayAccess.ByteArrayAccessSpec;
-import org.knime.core.data.v2.access.ByteArrayAccess.VarBinaryReadAccess;
-import org.knime.core.data.v2.access.ByteArrayAccess.VarBinaryWriteAccess;
+import org.knime.core.columnar.access.ColumnarDoubleAccessFactory.ColumnarDoubleReadAccess;
+import org.knime.core.columnar.access.ColumnarDoubleAccessFactory.ColumnarDoubleWriteAccess;
+import org.knime.core.columnar.testing.data.TestDoubleData;
+import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
+import org.knime.core.table.schema.DoubleDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @RunWith(Parameterized.class)
 @SuppressWarnings("javadoc")
-public class ColumnarByteArrayAccessFactoryTest {
+public class ColumnarDoubleAccessFactoryTest {
 
     @Parameters
     public static Collection<Object[]> data() {
-        return Arrays.asList(new Object[][]{{new byte[0]}, // NOSONAR
-            {new byte[]{Byte.MIN_VALUE, (byte)-1, (byte)0, Byte.MAX_VALUE}}});
+        return Arrays.asList(new Object[][]{{Double.NEGATIVE_INFINITY}, {Double.MIN_VALUE}, {0d}, // NOSONAR
+            {Double.MIN_NORMAL}, {1d}, {Double.MAX_VALUE}, {Double.POSITIVE_INFINITY}});
     }
 
-    private byte[] m_value;
+    private double m_value;
 
-    public ColumnarByteArrayAccessFactoryTest(final byte[] value) {
+    public ColumnarDoubleAccessFactoryTest(final double value) {
         m_value = value;
     }
 
     @Test
     public void testAccesses() {
 
-        final ByteArrayAccessSpec spec = ByteArrayAccessSpec.INSTANCE;
-        final ColumnarByteArrayAccessFactory factory =
-            (ColumnarByteArrayAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
-        assertEquals(DataSpec.varBinarySpec(), factory.getColumnDataSpec());
-        final TestVarBinaryData data = TestVarBinaryDataFactory.INSTANCE.createWriteData(1);
-        final VarBinaryWriteAccess writeAccess = factory.createWriteAccess(data, () -> 0);
-        final VarBinaryReadAccess readAccess = factory.createReadAccess(data, () -> 0);
+        final DoubleDataSpec spec = DoubleDataSpec.INSTANCE;
+        final ColumnarDoubleAccessFactory factory =
+            (ColumnarDoubleAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
+        final TestDoubleData data = TestDoubleDataFactory.INSTANCE.createWriteData(1);
+        final ColumnarDoubleWriteAccess writeAccess = factory.createWriteAccess(() -> 0);
+        writeAccess.setData(data);
+        final ColumnarDoubleReadAccess readAccess = factory.createReadAccess(() -> 0);
+        readAccess.setData(data);
 
         assertTrue(readAccess.isMissing());
-        assertNull(readAccess.getByteArray());
-
-        writeAccess.setByteArray(m_value);
-        assertFalse(readAccess.isMissing());
-        assertArrayEquals(m_value, readAccess.getByteArray());
-
-        if (m_value.length > 2) {
-            writeAccess.setByteArray(m_value, 1, m_value.length - 2);
-            final byte[] subArray = new byte[m_value.length - 2];
-            System.arraycopy(m_value, 1, subArray, 0, m_value.length - 2);
-            assertFalse(readAccess.isMissing());
-            assertArrayEquals(subArray, readAccess.getByteArray());
+        try {
+            readAccess.getDoubleValue();
+            fail();
+        } catch (NullPointerException e) {
         }
 
-        writeAccess.setMissing();
-        assertTrue(readAccess.isMissing());
-        assertNull(readAccess.getByteArray());
+        // set value
+        writeAccess.setDoubleValue(m_value);
+        assertFalse(readAccess.isMissing());
+        assertEquals(m_value, readAccess.getDoubleValue(), 0d);
 
+        // set missing
+        writeAccess.setMissing();
+        try {
+            readAccess.getDoubleValue();
+            fail();
+        } catch (NullPointerException e) {
+        }
+        assertTrue(readAccess.isMissing());
     }
 
 }

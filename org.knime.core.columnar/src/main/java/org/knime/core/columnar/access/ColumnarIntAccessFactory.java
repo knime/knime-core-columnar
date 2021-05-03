@@ -43,18 +43,12 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.columnar.access;
 
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.IntData.IntDataSpec;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
-import org.knime.core.data.DataCell;
-import org.knime.core.data.IntValue;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.def.IntCell;
-import org.knime.core.data.v2.access.IntAccess.IntReadAccess;
-import org.knime.core.data.v2.access.IntAccess.IntWriteAccess;
+import org.knime.core.table.access.IntAccess.IntReadAccess;
+import org.knime.core.table.access.IntAccess.IntWriteAccess;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link IntReadData} / {@link IntWriteData} as {@link IntReadAccess} /
@@ -64,7 +58,7 @@ import org.knime.core.data.v2.access.IntAccess.IntWriteAccess;
  * @since 4.3
  */
 final class ColumnarIntAccessFactory
-    implements ColumnarAccessFactory<IntReadData, IntReadAccess, IntWriteData, IntWriteAccess> {
+    implements ColumnarAccessFactory {
 
     /** INSTANCE **/
     static final ColumnarIntAccessFactory INSTANCE = new ColumnarIntAccessFactory();
@@ -73,24 +67,19 @@ final class ColumnarIntAccessFactory
     }
 
     @Override
-    public IntDataSpec getColumnDataSpec() {
-        return DataSpec.intSpec();
+    public final ColumnarIntReadAccess createReadAccess(final ColumnDataIndex index) {
+        return new ColumnarIntReadAccess(index);
     }
 
     @Override
-    public final IntReadAccess createReadAccess(final IntReadData data, final ColumnDataIndex index) {
-        return new DefaultIntReadAccess(data, index);
+    public final ColumnarIntWriteAccess createWriteAccess(final ColumnDataIndex index) {
+        return new ColumnarIntWriteAccess(index);
     }
 
-    @Override
-    public final IntWriteAccess createWriteAccess(final IntWriteData data, final ColumnDataIndex index) {
-        return new DefaultIntWriteAccess(data, index);
-    }
+    static final class ColumnarIntReadAccess extends AbstractReadAccess<IntReadData> implements IntReadAccess {
 
-    private static final class DefaultIntReadAccess extends AbstractAccess<IntReadData> implements IntReadAccess {
-
-        DefaultIntReadAccess(final IntReadData data, final ColumnDataIndex index) {
-            super(data, index);
+        ColumnarIntReadAccess(final ColumnDataIndex index) {
+            super(index);
         }
 
         @Override
@@ -103,82 +92,17 @@ final class ColumnarIntAccessFactory
             return m_data.isMissing(m_index.getIndex());
         }
 
-        @Override
-        public DataCell getDataCell() {
-            return new IntCell(m_data.getInt(m_index.getIndex()));
-        }
-
-        @Override
-        public double getDoubleValue() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-        @Override
-        public double getRealValue() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-        @Override
-        public double getImaginaryValue() {
-            return 0;
-        }
-
-        @Override
-        public double getMinSupport() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-        @Override
-        public double getCore() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-        @Override
-        public double getMaxSupport() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-        @Override
-        public double getMinCore() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-        @Override
-        public double getMaxCore() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-        @Override
-        public double getCenterOfGravity() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-        @Override
-        public long getLongValue() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
     }
 
-    private static final class DefaultIntWriteAccess extends AbstractAccess<IntWriteData> implements IntWriteAccess {
+    static final class ColumnarIntWriteAccess extends AbstractWriteAccess<IntWriteData> implements IntWriteAccess {
 
-        DefaultIntWriteAccess(final IntWriteData data, final ColumnDataIndex index) {
-            super(data, index);
+        ColumnarIntWriteAccess(final ColumnDataIndex index) {
+            super(index);
         }
 
         @Override
         public void setIntValue(final int value) {
             m_data.setInt(m_index.getIndex(), value);
-        }
-
-        @Override
-        public void setMissing() {
-            m_data.setMissing(m_index.getIndex());
-        }
-
-        @Override
-        public void setValue(final IntValue value) {
-            m_data.setInt(m_index.getIndex(), value.getIntValue());
         }
 
     }
