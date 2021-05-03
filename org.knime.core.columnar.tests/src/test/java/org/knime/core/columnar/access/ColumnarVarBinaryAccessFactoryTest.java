@@ -60,8 +60,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.knime.core.columnar.access.ColumnarByteArrayAccessFactory.ColumnarVarBinaryReadAccess;
-import org.knime.core.columnar.access.ColumnarByteArrayAccessFactory.ColumnarVarBinaryWriteAccess;
+import org.knime.core.columnar.access.ColumnarVarBinaryAccessFactory.ColumnarVarBinaryReadAccess;
+import org.knime.core.columnar.access.ColumnarVarBinaryAccessFactory.ColumnarVarBinaryWriteAccess;
 import org.knime.core.columnar.testing.data.TestVarBinaryData;
 import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
 import org.knime.core.table.schema.VarBinaryDataSpec;
@@ -71,7 +71,7 @@ import org.knime.core.table.schema.VarBinaryDataSpec;
  */
 @RunWith(Parameterized.class)
 @SuppressWarnings("javadoc")
-public class ColumnarByteArrayAccessFactoryTest {
+public class ColumnarVarBinaryAccessFactoryTest {
 
     @Parameters
     public static Collection<Object[]> data() {
@@ -81,7 +81,7 @@ public class ColumnarByteArrayAccessFactoryTest {
 
     private byte[] m_value;
 
-    public ColumnarByteArrayAccessFactoryTest(final byte[] value) {
+    public ColumnarVarBinaryAccessFactoryTest(final byte[] value) {
         m_value = value;
     }
 
@@ -89,8 +89,8 @@ public class ColumnarByteArrayAccessFactoryTest {
     public void testAccesses() {
 
         final VarBinaryDataSpec spec = VarBinaryDataSpec.INSTANCE;
-        final ColumnarByteArrayAccessFactory factory =
-            (ColumnarByteArrayAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
+        final ColumnarVarBinaryAccessFactory factory =
+            (ColumnarVarBinaryAccessFactory)ColumnarAccessFactoryMapper.INSTANCE.visit(spec);
         final TestVarBinaryData data = TestVarBinaryDataFactory.INSTANCE.createWriteData(1);
         final ColumnarVarBinaryWriteAccess writeAccess = factory.createWriteAccess(() -> 0);
         writeAccess.setData(data);

@@ -122,7 +122,7 @@ public final class ColumnarAccessFactoryMapper implements DataSpec.Mapper<Column
 
     @Override
     public ColumnarAccessFactory visit(final VarBinaryDataSpec spec) {
-        return ColumnarByteArrayAccessFactory.INSTANCE;
+        return ColumnarVarBinaryAccessFactory.INSTANCE;
     }
 
     @Override

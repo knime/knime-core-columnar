@@ -50,8 +50,8 @@ package org.knime.core.columnar.access;
 
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
-import org.knime.core.table.access.ByteArrayAccess.VarBinaryReadAccess;
-import org.knime.core.table.access.ByteArrayAccess.VarBinaryWriteAccess;
+import org.knime.core.table.access.VarBinaryAccess.VarBinaryReadAccess;
+import org.knime.core.table.access.VarBinaryAccess.VarBinaryWriteAccess;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
@@ -61,12 +61,12 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarByteArrayAccessFactory implements ColumnarAccessFactory {
+final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
 
     /** Instance **/
-    static final ColumnarByteArrayAccessFactory INSTANCE = new ColumnarByteArrayAccessFactory();
+    static final ColumnarVarBinaryAccessFactory INSTANCE = new ColumnarVarBinaryAccessFactory();
 
-    private ColumnarByteArrayAccessFactory() {
+    private ColumnarVarBinaryAccessFactory() {
     }
 
     @Override
