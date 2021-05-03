@@ -46,6 +46,8 @@
 
 package org.knime.core.data.columnar.table;
 
+import java.io.IOException;
+
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.data.RowKeyValue;
@@ -55,6 +57,7 @@ import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.WriteAccessRow;
 
@@ -66,6 +69,8 @@ import org.knime.core.table.row.WriteAccessRow;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
+
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteCursor.class);
 
     // the maximum capacity (in number of held elements) of a single chunk
     // subtract 750 since arrow rounds up to the next power of 2 anyways
@@ -145,7 +150,13 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
 
     @Override
     public final void close() {
-        m_accessCursor.close();
+        try {
+            m_accessCursor.close();
+        } catch (IOException ex) {
+            // This exception is usually not critical, since we are done with m_accessCursor.
+            // It could be a ClosedByInterruptException as a consequence of the thread being interrupted on node cancel.
+            LOGGER.warn("Closing the write access cursor failed.", ex);
+        }
     }
 
     long size() {
@@ -153,7 +164,12 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
     }
 
     void finish() {
-        m_accessCursor.finish();
+        try {
+            m_accessCursor.finish();
+        } catch (IOException ex) {
+            // This exception is usually not critical, similar to #close()
+            LOGGER.warn("Finishing writing failed because closing the write access cursor failed.", ex);
+        }
     }
 
 }

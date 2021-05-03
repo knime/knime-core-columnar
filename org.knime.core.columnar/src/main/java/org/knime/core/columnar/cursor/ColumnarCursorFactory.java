@@ -311,16 +311,10 @@ public class ColumnarCursorFactory {
         }
 
         @Override
-        public void close() {
+        public void close() throws IOException {
             if (m_currentBatch != null) {
                 m_currentBatch.release();
-                try {
-                    closeReader();
-                } catch (IOException ex) {
-                    final String error = "Exception while closing batch reader.";
-                    LOGGER.error(error, ex);
-                    throw new IllegalStateException(error, ex);
-                }
+                closeReader();
                 m_currentBatch = null;
                 m_currentIndexInCurrentBatch = m_lastIndexInCurrentBatch + 1;
                 m_currentBatchIndex = m_lastBatchIndex;

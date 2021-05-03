@@ -63,8 +63,6 @@ import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Static factory class for {@link WriteCursor WriteCursors} that write to a {@link BatchStore}.
@@ -72,8 +70,6 @@ import org.slf4j.LoggerFactory;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public final class ColumnarWriteCursorFactory {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(ColumnarWriteCursorFactory.class);
 
     private ColumnarWriteCursorFactory() {
         // static factory class
@@ -169,18 +165,12 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public final void close() {
+        public final void close() throws IOException {
             if (m_currentBatch != null) {
                 m_currentBatch.release();
                 m_currentBatch = null;
             }
-            try {
-                m_writer.close();
-            } catch (IOException ex) {
-                // This exception is usually not critical, since we are done with the m_writer.
-                // It could be a ClosedByInterruptException as a consequence of the thread being interrupted on node cancel.
-                LOGGER.warn("Closing the batch writer failed.", ex);
-            }
+            m_writer.close();
         }
 
         @Override
@@ -189,7 +179,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public void finish() {
+        public void finish() throws IOException {
             writeCurrentBatch(m_currentIndex + 1);
             close();
         }

@@ -64,6 +64,7 @@ import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
@@ -75,6 +76,8 @@ import org.knime.core.table.row.ReadAccessRow;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 final class ColumnarRowCursorFactory {
+
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowCursorFactory.class);
 
     private static final class EmptyRowCursor implements RowCursor {
 
@@ -155,7 +158,13 @@ final class ColumnarRowCursorFactory {
             // Finalizer could have already been closed in AbstractColumnarContainerTable::clear
             if (!m_finalizer.isClosed()) {
                 m_finalizer.close();
-                m_delegate.close();
+                try {
+                    m_delegate.close();
+                } catch (IOException ex) {
+                    final String error = "Exception while closing batch reader.";
+                    LOGGER.error(error, ex);
+                    throw new IllegalStateException(error, ex);
+                }
                 m_openCursorFinalizers.remove(m_finalizer);
             }
         }
