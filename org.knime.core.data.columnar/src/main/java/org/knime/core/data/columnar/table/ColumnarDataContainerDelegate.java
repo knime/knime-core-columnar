@@ -53,8 +53,8 @@ import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
-import org.knime.core.data.v2.Cursor;
 import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 
 /**
@@ -62,7 +62,7 @@ import org.knime.core.data.v2.WriteValue;
  */
 final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
-    private final Cursor<RowWrite> m_delegateCursor;
+    private final RowWriteCursor m_delegateCursor;
 
     private final DataTableSpec m_spec;
 

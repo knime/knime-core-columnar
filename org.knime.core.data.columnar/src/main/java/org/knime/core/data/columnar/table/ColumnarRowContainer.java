@@ -110,7 +110,7 @@ final class ColumnarRowContainer implements RowContainer {
 
         m_path = DataContainer.createTempFile(".knable").toPath();
         m_store = new CachedDomainBatchStore(m_storeFactory.createStore(schema, m_path), schema, settings);
-        m_delegate = new ColumnarRowWriteCursor(m_store, schema.getWriteValueFactories());
+        m_delegate = new ColumnarRowWriteCursor(m_store, m_schema.getValueFactories());
     }
 
     @Override

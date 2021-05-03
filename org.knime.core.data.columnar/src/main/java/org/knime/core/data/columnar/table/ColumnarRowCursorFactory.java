@@ -50,25 +50,23 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.cursor.ColumnarCursorFactory;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
-import org.knime.core.node.NodeLogger;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.row.ReadAccessRow;
 
 /**
  * Columnar implementations of {@link RowCursor} for reading data from columnar table backend.
@@ -108,56 +106,48 @@ final class ColumnarRowCursorFactory {
 
     }
 
-    private static final class SingleBatchRowCursor implements RowCursor, RowRead, ColumnDataIndex {
+    private static final class DefaultRowCursor implements RowCursor, RowRead {
 
-        private final NullableReadData[] m_data;
+        private final LookaheadCursor<ReadAccessRow> m_delegate;
+
+        private final ReadValue[] m_values;
+
+        private final ReadAccess[] m_accesses;
 
         private final ColumnarValueSchema m_schema;
 
         private final Set<Finalizer> m_openCursorFinalizers;
 
-        private final int m_maxIndex;
-
-        private final RowKeyValue m_rowKeyValue;
-
-        private final ReadBatch m_batch;
-
-        private final ReadValue[] m_values;
-
         // effectively final
         private Finalizer m_finalizer;
 
-        private int m_index;
-
-        private SingleBatchRowCursor(final BatchReadStore store, final ColumnarValueSchema schema, final int batchIndex,
-            final int firstIndexInBatch, final int lastIndexInBatch, final Set<Finalizer> openCursorFinalizers,
-            final int[] selection) throws IOException {
-
+        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate,
+            final Set<Finalizer> openCursorFinalizers, final ColumnarValueSchema schema) throws IOException {
+            m_delegate = delegate;
             m_schema = schema;
+            ReadAccessRow access = delegate.access();
+            m_accesses = IntStream.range(0, access.getNumColumns())//
+                .mapToObj(access::getAccess)//
+                .toArray(ReadAccess[]::new);
+            final var facs = schema.getValueFactories();
+            m_values = IntStream.range(0, access.getNumColumns())
+                .mapToObj(i -> facs[i].createReadValue(access.getAccess(i))).toArray(ReadValue[]::new);
             m_openCursorFinalizers = openCursorFinalizers;
-            m_index = firstIndexInBatch;
-            m_maxIndex = lastIndexInBatch;
-
-            try (@SuppressWarnings("resource")
-            final RandomAccessBatchReader reader = selection == null ? store.createReader()
-                : store.createReader(new FilteredColumnSelection(schema.numColumns(), selection))) {
-                m_batch = reader.readRetained(batchIndex);
-            }
-            m_data = m_batch.getUnsafe();
-            m_values = selection == null ? createReadValues(m_batch, m_schema, this)
-                : createReadValues(m_batch, m_schema, this, selection);
-            m_rowKeyValue = (RowKeyValue)m_values[0];
-        }
-
-        @Override
-        public RowRead forward() {
-            m_index++;
-            return m_index <= m_maxIndex ? this : null;
         }
 
         @Override
         public boolean canForward() {
-            return m_index < m_maxIndex;
+            return m_delegate.canForward();
+        }
+
+        @Override
+        public RowRead forward() {
+            return m_delegate.forward() ? this : null;
+        }
+
+        @Override
+        public int getNumColumns() {
+            return m_schema.numColumns() - 1;
         }
 
         @Override
@@ -165,14 +155,9 @@ final class ColumnarRowCursorFactory {
             // Finalizer could have already been closed in AbstractColumnarContainerTable::clear
             if (!m_finalizer.isClosed()) {
                 m_finalizer.close();
-                m_batch.release();
+                m_delegate.close();
                 m_openCursorFinalizers.remove(m_finalizer);
             }
-        }
-
-        @Override
-        public int getNumColumns() {
-            return m_schema.numColumns() - 1;
         }
 
         @Override
@@ -184,167 +169,15 @@ final class ColumnarRowCursorFactory {
 
         @Override
         public boolean isMissing(final int index) {
-            return m_data[index + 1].isMissing(m_index);
-        }
-
-        @Override
-        public int getIndex() {
-            return m_index;
+            return m_accesses[index + 1].isMissing();
         }
 
         @Override
         public RowKeyValue getRowKey() {
-            return m_rowKeyValue;
+            return (RowKeyReadValue)m_values[0];
         }
 
     }
-
-    private static final class MultiBatchRowCursor implements RowCursor, RowRead, ColumnDataIndex {
-
-        private final RandomAccessBatchReader m_reader;
-
-        private final ResourceWithRelease m_readerRelease;
-
-        private final int[] m_selection;
-
-        private final ColumnarValueSchema m_schema;
-
-        private final Set<Finalizer> m_openCursorFinalizers;
-
-        private Finalizer m_finalizer;
-
-        private ReadBatch m_currentBatch;
-
-        private ReadValue[] m_currentValues;
-
-        private final int m_lastBatchIndex;
-
-        private final int m_lastIndexInLastBatch;
-
-        private int m_currentBatchIndex;
-
-        private int m_currentIndexInCurrentBatch;
-
-        private int m_lastIndexInCurrentBatch;
-
-        private NullableReadData[] m_currentData;
-
-        private MultiBatchRowCursor(final BatchReadStore store, final ColumnarValueSchema schema, // NOSONAR
-            final int firstBatchIndex, final int lastBatchIndex, final int firstIndexInFirstBatch,
-            final int lastIndexInLastBatch, final Set<Finalizer> openCursorFinalizers, final int[] selection) {
-            m_selection = selection;
-            @SuppressWarnings("resource")
-            final RandomAccessBatchReader reader = selection == null ? store.createReader()
-                : store.createReader(new FilteredColumnSelection(schema.numColumns(), selection));
-            m_reader = reader;
-            m_readerRelease = new ResourceWithRelease(m_reader);
-            m_schema = schema;
-            m_openCursorFinalizers = openCursorFinalizers;
-            m_currentBatchIndex = firstBatchIndex;
-            m_lastBatchIndex = lastBatchIndex;
-            m_currentIndexInCurrentBatch = firstIndexInFirstBatch;
-            m_lastIndexInLastBatch = lastIndexInLastBatch;
-        }
-
-        @Override
-        public RowRead forward() {
-            m_currentIndexInCurrentBatch++;
-            if (m_currentIndexInCurrentBatch > m_lastIndexInCurrentBatch) {
-                if (m_currentBatchIndex >= m_lastBatchIndex) {
-                    return null;
-                }
-                m_currentBatch.release();
-                m_finalizer.close();
-                m_openCursorFinalizers.remove(m_finalizer);
-                m_currentBatchIndex++;
-                readCurrentBatch();
-                m_currentIndexInCurrentBatch = 0;
-            }
-            return this;
-        }
-
-        @Override
-        public boolean canForward() {
-            return m_currentIndexInCurrentBatch < m_lastIndexInCurrentBatch || m_currentBatchIndex < m_lastBatchIndex;
-        }
-
-        @Override
-        public RowKeyValue getRowKey() {
-            return (RowKeyReadValue)m_currentValues[0];
-        }
-
-        @Override
-        public int getNumColumns() {
-            return m_schema.numColumns() - 1;
-        }
-
-        @Override
-        public <V extends DataValue> V getValue(final int index) {
-            @SuppressWarnings("unchecked")
-            final V cast = (V)m_currentValues[index + 1];
-            return cast;
-        }
-
-        @Override
-        public boolean isMissing(final int index) {
-            return m_currentData[index + 1].isMissing(m_currentIndexInCurrentBatch);
-        }
-
-        private void closeReader() {
-            try {
-                m_reader.close();
-            } catch (IOException e) {
-                final String error = "Exception while closing ColumnarRowCursor.";
-                LOGGER.error(error, e);
-                throw new IllegalStateException(error, e);
-            }
-        }
-
-        @Override
-        public void close() {
-            // Finalizer could have already been closed in AbstractColumnarContainerTable::clear
-            if (!m_finalizer.isClosed()) {
-                m_finalizer.close();
-                m_currentBatch.release();
-                m_openCursorFinalizers.remove(m_finalizer);
-                closeReader();
-            }
-        }
-
-        @Override
-        public final int getIndex() {
-            return m_currentIndexInCurrentBatch;
-        }
-
-        private void readCurrentBatch() {
-            try {
-                m_currentBatch = m_reader.readRetained(m_currentBatchIndex);
-            } catch (IOException e) {
-                final String error = "Exception while reading batch from store.";
-                LOGGER.error(error, e);
-                throw new IllegalStateException(error, e);
-            }
-            m_currentData = m_currentBatch.getUnsafe();
-            m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this,
-                new ResourceWithRelease(m_currentBatch, ReadBatch::release), m_readerRelease);
-            m_openCursorFinalizers.add(m_finalizer);
-            if (m_selection == null) {
-                m_currentValues = createReadValues(m_currentBatch, m_schema, this);
-            } else {
-                m_currentValues = createReadValues(m_currentBatch, m_schema, this, m_selection);
-            }
-
-            if (m_currentBatchIndex != m_lastBatchIndex) {
-                m_lastIndexInCurrentBatch = m_currentBatch.length() - 1;
-            } else {
-                m_lastIndexInCurrentBatch = m_lastIndexInLastBatch;
-                closeReader();
-            }
-        }
-
-    }
-
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowCursorFactory.class);
 
     static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size,
         final Set<Finalizer> openCursorFinalizers) throws IOException {
@@ -364,12 +197,7 @@ final class ColumnarRowCursorFactory {
             return new EmptyRowCursor(schema);
         }
 
-        final Optional<Set<Integer>> materializeColumnIndices =
-            filter != null ? filter.getMaterializeColumnIndices() : Optional.empty();
-        final int[] selection = materializeColumnIndices.isPresent() ? IntStream
-            // prepend index of row key column to selection
-            .concat(IntStream.of(0), materializeColumnIndices.get().stream().sorted().mapToInt(i -> i.intValue() + 1))
-            .toArray() : null;
+        final ColumnSelection selection = createColumnSelection(filter, schema.numColumns());
 
         final int maxLength = store.batchLength();
         if (maxLength < 1) {
@@ -379,9 +207,7 @@ final class ColumnarRowCursorFactory {
 
         final int firstBatchIndex = (int)(fromRowIndex / maxLength);
         final int lastBatchIndex = (int)(toRowIndex / maxLength);
-        // we eventually have to forward once to access the first element (i.e., the element at fromRowIndex)
-        // therefore, the first index in the first batch must be set to the the index of the first element minus 1
-        final int firstIndexInFirstBatch = (int)(fromRowIndex % maxLength) - 1;
+        final int firstIndexInFirstBatch = (int)(fromRowIndex % maxLength);
         final int lastIndexInLastBatch = (int)(toRowIndex % maxLength);
 
         final int numBatches = store.numBatches();
@@ -390,46 +216,36 @@ final class ColumnarRowCursorFactory {
                 lastBatchIndex, numBatches - 1));
         }
 
-        if (firstBatchIndex == lastBatchIndex) {
-            final SingleBatchRowCursor cursor = new SingleBatchRowCursor(store, schema, firstBatchIndex,
-                firstIndexInFirstBatch, lastIndexInLastBatch, openCursorFinalizers, selection);
-            cursor.m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(cursor,
-                new ResourceWithRelease(cursor.m_batch, ReferencedData::release));
-            openCursorFinalizers.add(cursor.m_finalizer);
-            return cursor;
+        var cursor = new DefaultRowCursor(ColumnarCursorFactory.create(store, selection, firstBatchIndex,
+            lastBatchIndex, firstIndexInFirstBatch, lastIndexInLastBatch), openCursorFinalizers, schema);
+        // can't invoke this in the constructor since it passes a reference to itself to the ResourceLeakDetector
+        cursor.m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(cursor, cursor.m_delegate);
+        openCursorFinalizers.add(cursor.m_finalizer);
+        return cursor;
+    }
+
+    private static ColumnSelection createColumnSelection(final TableFilter filter, final int numColumns) {
+        if (filter == null) {
+            return new DefaultColumnSelection(numColumns);
         } else {
-            final MultiBatchRowCursor cursor = new MultiBatchRowCursor(store, schema, firstBatchIndex, // NOSONAR
-                lastBatchIndex, firstIndexInFirstBatch, lastIndexInLastBatch, openCursorFinalizers, selection);
-            // can't invoke this in the constructor since it passes a reference to itself to the ResourceLeakDetector
-            cursor.readCurrentBatch();
-            return cursor;
+            final Optional<int[]> selection =
+                filter.getMaterializeColumnIndices().map(ColumnarRowCursorFactory::translateMaterializedColumnIndices);
+            if (selection.isPresent()) {
+                return new FilteredColumnSelection(numColumns, selection.get());
+            } else {
+                return new DefaultColumnSelection(numColumns);
+            }
         }
     }
 
-    private static ReadValue[] createReadValues(final ReadBatch batch, final ColumnarValueSchema schema,
-        final ColumnDataIndex index) {
-        final ColumnarReadValueFactory<?>[] factories = schema.getReadValueFactories();
-        final ReadValue[] values = new ReadValue[schema.numColumns()];
-        for (int i = 0; i < values.length; i++) {
-            @SuppressWarnings("unchecked")
-            final ColumnarReadValueFactory<NullableReadData> cast =
-                ((ColumnarReadValueFactory<NullableReadData>)factories[i]);
-            values[i] = cast.createReadValue(batch.get(i), index);
-        }
-        return values;
-    }
-
-    private static final ReadValue[] createReadValues(final ReadBatch batch, final ColumnarValueSchema schema,
-        final ColumnDataIndex index, final int[] selection) {
-        final ColumnarReadValueFactory<?>[] factories = schema.getReadValueFactories();
-        final ReadValue[] values = new ReadValue[schema.numColumns()];
-        for (int i = 0; i < selection.length; i++) {
-            @SuppressWarnings("unchecked")
-            final ColumnarReadValueFactory<NullableReadData> cast =
-                ((ColumnarReadValueFactory<NullableReadData>)factories[selection[i]]);
-            values[selection[i]] = cast.createReadValue(batch.get(selection[i]), index);
-        }
-        return values;
+    private static int[] translateMaterializedColumnIndices(final Set<Integer> materialized) {
+        return IntStream.concat(
+            // prepend index of row key column to selection
+            IntStream.of(0), //
+            materialized.stream()//
+                .sorted()//
+                .mapToInt(i -> i.intValue() + 1))// increment by one to accommodate row key column
+            .toArray();
     }
 
     private ColumnarRowCursorFactory() {

@@ -46,93 +46,57 @@
 
 package org.knime.core.data.columnar.table;
 
-import java.io.IOException;
-
-import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.ColumnDataIndex;
-import org.knime.core.data.columnar.schema.ColumnarWriteValueFactory;
 import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
-import org.knime.core.node.NodeLogger;
+import org.knime.core.table.cursor.WriteCursor;
+import org.knime.core.table.row.WriteAccessRow;
 
 /**
  * Columnar implementation of {@link RowWriteCursor} for writing data to a columnar table backend.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, RowWrite {
-
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteCursor.class);
-
-    // the initial capacity (in number of held elements) of a single chunk
-    // arrow has a minimum capacity of 2
-    private static final int CAPACITY_INIT_DEF = 2;
-
-    private static final String CAPACITY_INIT_PROPERTY = "knime.columnar.capacity.initial";
-
-    private static final int CAPACITY_INIT = Integer.getInteger(CAPACITY_INIT_PROPERTY, CAPACITY_INIT_DEF);
+final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
 
     // the maximum capacity (in number of held elements) of a single chunk
     // subtract 750 since arrow rounds up to the next power of 2 anyways
     static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
 
-    private static final String CAPACITY_MAX_PROPERTY = "knime.columnar.capacity.max";
-
-    private static final int CAPACITY_MAX = Integer.getInteger(CAPACITY_MAX_PROPERTY, CAPACITY_MAX_DEF);
-
-    // the target size (in bytes) of a full batch
-    private static final long BATCH_SIZE_TARGET_DEF = 1L << 26; // 64 MB
-
-    private static final String BATCH_SIZE_TARGET_PROPERTY = "knime.columnar.batch.size.target";
-
-    private static final long BATCH_SIZE_TARGET = Long.getLong(BATCH_SIZE_TARGET_PROPERTY, BATCH_SIZE_TARGET_DEF);
-
-    private final BatchWriter m_writer;
-
-    private final ColumnarWriteValueFactory<?>[] m_factories;
+    private final WriteCursor<WriteAccessRow> m_accessCursor;
 
     private final WriteValue<?>[] m_values;
 
-    private RowKeyWriteValue m_rowKeyValue;
+    private final RowKeyWriteValue m_rowKeyValue;
 
-    private WriteBatch m_currentBatch;
-
-    private int m_currentMaxIndex;
-
-    private int m_currentIndex;
+    private final WriteAccessRow m_access;
 
     private long m_size = 0;
 
-    private NullableWriteData[] m_currentData;
+    ColumnarRowWriteCursor(final BatchStore store, final ValueFactory<?, ?>[] factories) {
 
-    private boolean m_adjusting;
-
-    ColumnarRowWriteCursor(final BatchStore store, final ColumnarWriteValueFactory<?>[] factories) {
-        m_writer = store.getWriter();
-        m_factories = factories;
-        m_adjusting = true;
-        m_values = new WriteValue[m_factories.length];
-
-        switchToNextData();
-        m_currentIndex = -1;
+        m_accessCursor = ColumnarWriteCursorFactory.createWriteCursor(store);
+        m_access = m_accessCursor.access();
+        m_values = new WriteValue[factories.length];
+        assert factories.length == m_access.getNumColumns();
+        for (int i = 0; i < m_values.length; i++) {
+            m_values[i] = factories[i].createWriteValue(m_access.getAccess(i));
+        }
+        m_rowKeyValue = (RowKeyWriteValue)m_values[0];
     }
 
     @Override
     public final RowWrite forward() {
-        m_currentIndex++;
-        if (m_currentIndex > m_currentMaxIndex) {
-            switchToNextData();
-        }
-        return this;
+        m_size++;
+        return m_accessCursor.forward() ? this : null;
     }
 
     @Override
@@ -144,7 +108,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     @Override
     public final void setMissing(final int index) {
-        m_currentData[index + 1].setMissing(m_currentIndex);
+        m_access.getAccess(index + 1).setMissing();
     }
 
     @Override
@@ -181,22 +145,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
 
     @Override
     public final void close() {
-        if (m_currentBatch != null) {
-            m_currentBatch.release();
-            m_currentBatch = null;
-        }
-        try {
-            m_writer.close();
-        } catch (IOException ex) {
-            // This exception is usually not critical, since we are done with the m_writer.
-            // It could be a ClosedByInterruptException as a consequence of the thread being interrupted on node cancel.
-            LOGGER.warn(ex);
-        }
-    }
-
-    @Override
-    public final int getIndex() {
-        return m_currentIndex;
+        m_accessCursor.close();
     }
 
     long size() {
@@ -204,75 +153,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, ColumnDataIndex, R
     }
 
     void finish() {
-        writeCurrentBatch(m_currentIndex + 1);
-        close();
-    }
-
-    private void writeCurrentBatch(final int numValues) {
-        if (m_currentBatch != null) {
-
-            // handle empty tables (fwd was never called)
-            final ReadBatch readBatch = m_currentBatch.close(numValues);
-            try {
-                m_writer.write(readBatch);
-            } catch (final IOException e) {
-                throw new IllegalStateException("Problem occurred when writing column data.", e);
-            } finally {
-                readBatch.release();
-                m_currentBatch = null;
-                m_size += numValues;
-                m_currentIndex = 0;
-            }
-        }
-    }
-
-    private void switchToNextData() {
-        if (m_adjusting && m_currentBatch != null) {
-            final int curCapacity = m_currentBatch.capacity();
-            final long curBatchSize = m_currentBatch.sizeOf();
-
-            final int newCapacity;
-            if (curBatchSize > 0) {
-                // we want to avoid too much serialization overhead for capacities > 100
-                // 100 rows should give us a good estimate for the capacity, though
-                long factor = BATCH_SIZE_TARGET / curBatchSize;
-                if (curCapacity <= 100) {
-                    factor = Math.min(8, factor);
-                }
-                newCapacity = (int)Math.min(CAPACITY_MAX, curCapacity * factor); // can't exceed Integer.MAX_VALUE
-            } else {
-                newCapacity = CAPACITY_MAX;
-            }
-
-            if (curCapacity < newCapacity) { // if factor < 1, then curCapacity > newCapacity
-                m_currentBatch.expand(newCapacity);
-                m_currentMaxIndex = m_currentBatch.capacity() - 1;
-                if (newCapacity >= CAPACITY_MAX) {
-                    m_adjusting = false;
-                }
-                return;
-            } else {
-                m_adjusting = false;
-            }
-        }
-
-        final int chunkSize = m_currentBatch == null ? CAPACITY_INIT : m_currentBatch.capacity();
-        writeCurrentBatch(m_currentIndex);
-
-        m_currentBatch = m_writer.create(chunkSize);
-        m_currentData = m_currentBatch.getUnsafe();
-        updateWriteValues(m_currentBatch);
-        m_currentMaxIndex = m_currentBatch.capacity() - 1;
-    }
-
-    private void updateWriteValues(final WriteBatch batch) {
-        for (int i = 0; i < m_values.length; i++) {
-            @SuppressWarnings("unchecked")
-            final ColumnarWriteValueFactory<NullableWriteData> cast =
-                ((ColumnarWriteValueFactory<NullableWriteData>)m_factories[i]);
-            m_values[i] = cast.createWriteValue(batch.get(i), this);
-        }
-        m_rowKeyValue = (RowKeyWriteValue)m_values[0];
+        m_accessCursor.finish();
     }
 
 }
