@@ -51,7 +51,7 @@ package org.knime.core.data.columnar.domain;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
@@ -65,7 +65,7 @@ import org.knime.core.data.def.StringCell;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 final class ColumnarStringDomainCalculator
-    implements ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain> {
+    implements ColumnarDomainCalculator<StringReadData, DataColumnDomain> {
 
     private final int m_maxNumValues;
 
@@ -76,12 +76,12 @@ final class ColumnarStringDomainCalculator
     }
 
     @Override
-    public void update(final ObjectReadData<String> data) {
+    public void update(final StringReadData data) {
         if (m_values == null) {
             return;
         }
         for (int i = 0; i < data.length(); i++) {
-            if (!data.isMissing(i) && m_values.add(data.getObject(i)) && m_values.size() > m_maxNumValues) {
+            if (!data.isMissing(i) && m_values.add(data.getString(i)) && m_values.size() > m_maxNumValues) {
                 m_values = null;
                 return;
             }

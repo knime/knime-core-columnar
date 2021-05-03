@@ -49,8 +49,10 @@
 package org.knime.core.data.columnar.domain;
 
 import org.junit.Test;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.data.DataCell;
 import org.knime.core.data.def.StringCell;
+import org.knime.core.data.v2.ReadValue;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -58,9 +60,14 @@ import org.knime.core.data.def.StringCell;
 @SuppressWarnings("javadoc")
 public class ColumnarNominalDomainCalculatorTest {
 
-    private static ColumnarNominalDomainCalculator<ObjectReadData<String>> createCalculator(final int maxNumvalues) {
-        return new ColumnarNominalDomainCalculator<>(
-            (data, index) -> () -> new StringCell(data.getObject(index.getIndex())), maxNumvalues);
+    private static ColumnarNominalDomainCalculator<StringReadData> createCalculator(final int maxNumvalues) {
+        return new ColumnarNominalDomainCalculator<>((data, index) -> new ReadValue() {
+
+            @Override
+            public DataCell getDataCell() {
+                return new StringCell(data.getString(index.getIndex()));
+            }
+        }, maxNumvalues);
     }
 
     @Test

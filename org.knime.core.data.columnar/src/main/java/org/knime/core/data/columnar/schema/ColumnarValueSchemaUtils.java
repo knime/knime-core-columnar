@@ -47,14 +47,12 @@ package org.knime.core.data.columnar.schema;
 
 import java.util.Map;
 
-import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.ValueSchema;
-import org.knime.core.data.v2.access.AccessSpec;
 
 /**
  * Utility class to work with {@link ColumnarValueSchema}s.
@@ -67,14 +65,11 @@ public final class ColumnarValueSchemaUtils {
     }
 
     /**
-     * Create a new {@link ColumnarValueSchema} based on the provided {@link ValueSchema}. All {@link AccessSpec}s in
-     * the {@link ValueSchema} must have a matching {@link DataSpec}.
+     * Create a new {@link ColumnarValueSchema} based on the provided {@link ValueSchema}.
      *
      * @param source the underlying {@link ValueSchema}.
      *
      * @return a new {@link ColumnarValueSchema}.
-     *
-     * @throws IllegalArgumentException thrown if {@link AccessSpec} can't be translated to {@link DataSpec}.
      */
     public static final ColumnarValueSchema create(final ValueSchema source) {
         return new DefaultColumnarValueSchema(source);

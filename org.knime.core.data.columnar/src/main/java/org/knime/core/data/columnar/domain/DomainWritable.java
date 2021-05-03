@@ -53,7 +53,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Stream;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -62,6 +61,7 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.node.NodeLogger;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link BatchWritable} for calculating domains for individual columns.

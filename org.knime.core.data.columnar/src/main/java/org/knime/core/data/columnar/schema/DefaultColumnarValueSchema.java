@@ -47,15 +47,11 @@ package org.knime.core.data.columnar.schema;
 
 import java.util.stream.Stream;
 
-import org.knime.core.columnar.data.DataSpec;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueSchema;
-import org.knime.core.data.v2.access.ReadAccess;
-import org.knime.core.data.v2.access.WriteAccess;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.table.schema.DataSpec;
 
 /**
  * Default implementation of a {@link ColumnarValueSchema}.
@@ -66,32 +62,11 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ValueSchema m_source;
 
-    private final ColumnarAccessFactory<NullableReadData, ReadAccess, NullableWriteData, WriteAccess>[] m_factories;
-
-    private final ColumnarWriteValueFactory<?>[] m_writeFactories;
-
-    private final ColumnarReadValueFactory<?>[] m_readFactories;
+    private final DataSpec[] m_specs;
 
     DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
-        @SuppressWarnings("unchecked")
-        final ColumnarAccessFactory<NullableReadData, ReadAccess, NullableWriteData, WriteAccess>[] factories =
-            Stream.of(source.getValueFactories()) //
-                .map(ValueFactory::getSpec)//
-                .map(spec -> spec.accept(ColumnarAccessFactoryMapper.INSTANCE)) //
-                .toArray(ColumnarAccessFactory[]::new);
-        m_factories = factories;
-
-        m_writeFactories = new ColumnarWriteValueFactory[m_factories.length];
-        m_readFactories = new ColumnarReadValueFactory[m_factories.length];
-        final ValueFactory<?, ?>[] sourceFactories = source.getValueFactories();
-        for (int i = 0; i < sourceFactories.length; i++) {
-            @SuppressWarnings("unchecked")
-            final ValueFactory<ReadAccess, WriteAccess> sourceFactory =
-                (ValueFactory<ReadAccess, WriteAccess>)sourceFactories[i];
-            m_writeFactories[i] = new DefaultWriteValueFactory<>(m_factories[i], sourceFactory);
-            m_readFactories[i] = new DefaultReadValueFactory<>(m_factories[i], sourceFactory);
-        }
+        m_specs = Stream.of(source.getValueFactories()).map(ValueFactory::getSpec).toArray(DataSpec[]::new);
     }
 
     @Override
@@ -105,17 +80,12 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
                     numColumns() - 1));
         }
 
-        return m_factories[index].getColumnDataSpec();
+        return m_specs[index];
     }
 
     @Override
-    public ColumnarWriteValueFactory<?>[] getWriteValueFactories() {
-        return m_writeFactories;
-    }
-
-    @Override
-    public ColumnarReadValueFactory<?>[] getReadValueFactories() {
-        return m_readFactories;
+    public ValueFactory<?, ?>[] getValueFactories() {
+        return m_source.getValueFactories();
     }
 
     @Override
@@ -130,7 +100,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     @Override
     public int numColumns() {
-        return m_factories.length;
+        return m_specs.length;
     }
 
 }

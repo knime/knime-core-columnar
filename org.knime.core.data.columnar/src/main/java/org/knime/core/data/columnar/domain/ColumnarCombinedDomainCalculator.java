@@ -56,7 +56,6 @@ import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.NominalValue;
-import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 
 /**
  * Columnar domain calculator for arbitrary data that is both {@link BoundedValue bounded} and {@link NominalValue

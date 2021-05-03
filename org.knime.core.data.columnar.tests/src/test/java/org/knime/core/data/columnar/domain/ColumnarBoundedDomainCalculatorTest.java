@@ -50,8 +50,10 @@ package org.knime.core.data.columnar.domain;
 
 import org.junit.Test;
 import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.data.DataCell;
 import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.def.IntCell;
+import org.knime.core.data.v2.ReadValue;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -60,8 +62,13 @@ import org.knime.core.data.def.IntCell;
 public class ColumnarBoundedDomainCalculatorTest {
 
     private static ColumnarBoundedDomainCalculator<IntReadData> createCalculator() {
-        return new ColumnarBoundedDomainCalculator<>((data, index) -> () -> new IntCell(data.getInt(index.getIndex())),
-            new DataValueComparatorDelegator<>(IntCell.TYPE.getComparator()));
+        return new ColumnarBoundedDomainCalculator<>((data, index) -> new ReadValue() {
+
+            @Override
+            public DataCell getDataCell() {
+                return new IntCell(data.getInt(index.getIndex()));
+            }
+        }, new DataValueComparatorDelegator<>(IntCell.TYPE.getComparator()));
     }
 
     @Test

@@ -43,34 +43,35 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.data.columnar.domain;
 
-import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.data.columnar.ColumnDataIndex;
+import org.knime.core.columnar.access.ColumnDataIndex;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.data.DataValue;
+import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.WriteValue;
-import org.knime.core.data.v2.access.WriteAccess;
 
 /**
- * Default Implementation of {@link ColumnarWriteValueFactory}.
+ * ColumnarReadValueFactorys typically wrap a {@link ValueFactory} and allow to create {@link ReadValue ReadValues}
+ * based on {@link NullableReadData} in conjunction with a {@link ColumnDataIndex}.
+ *
+ * @param <R> type of ColumnReadData
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @since 4.3
  */
-final class DefaultWriteValueFactory<W extends NullableWriteData, WA extends WriteAccess> // NOSONAR
-    implements ColumnarWriteValueFactory<W> {
+interface ColumnarReadValueFactory<R extends NullableReadData> {
 
-    private final ColumnarAccessFactory<?, ?, W, WA> m_factory;
-
-    private final ValueFactory<?, WA> m_delegate;
-
-    DefaultWriteValueFactory(final ColumnarAccessFactory<?, ?, W, WA> factory, final ValueFactory<?, WA> delegate) {
-        m_factory = factory;
-        m_delegate = delegate;
-    }
-
-    @Override
-    public WriteValue<?> createWriteValue(final W data, final ColumnDataIndex index) {
-        return m_delegate.createWriteValue(m_factory.createWriteAccess(data, index));
-    }
+    /**
+     * Create a new {@link ReadValue}. Note, the content of the read value is mutable, i.e. changes with the provided
+     * {@link ColumnDataIndex}.
+     *
+     * @param data the underlying {@link NullableReadData}
+     * @param index pointer to position in {@link NullableReadData}
+     *
+     * @return DataValueSupplier supplying a {@link DataValue} representing the value at the {@link ColumnDataIndex} in
+     *         the {@link NullableReadData}.
+     */
+    ReadValue createReadValue(R data, ColumnDataIndex index);
 
 }

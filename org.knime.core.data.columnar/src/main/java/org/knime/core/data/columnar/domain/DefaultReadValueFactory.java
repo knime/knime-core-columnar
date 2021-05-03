@@ -43,34 +43,37 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.data.columnar.schema;
+package org.knime.core.data.columnar.domain;
 
+import org.knime.core.columnar.access.ColumnDataIndex;
+import org.knime.core.columnar.access.ColumnarAccessFactory;
+import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.data.columnar.ColumnDataIndex;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.access.ReadAccess;
+import org.knime.core.table.access.ReadAccess;
 
 /**
- * Default Implementation of {@link ColumnarReadValueFactory}.
+ * Default Implementation of ColumnarReadValueFactory.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
 final class DefaultReadValueFactory<R extends NullableReadData, RA extends ReadAccess> // NOSONAR
     implements ColumnarReadValueFactory<R> {
 
-    private final ColumnarAccessFactory<R, RA, ?, ?> m_factory;
+    private final ColumnarAccessFactory m_factory;
 
     private final ValueFactory<RA, ?> m_delegate;
 
-    DefaultReadValueFactory(final ColumnarAccessFactory<R, RA, ?, ?> factory, final ValueFactory<RA, ?> delegate) {
-        m_factory = factory;
+    DefaultReadValueFactory(final ValueFactory<RA, ?> delegate) {
+        m_factory = ColumnarAccessFactoryMapper.createAccessFactory(delegate.getSpec());
         m_delegate = delegate;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public ReadValue createReadValue(final R data, final ColumnDataIndex index) {
-        return m_delegate.createReadValue(m_factory.createReadAccess(data, index));
+        return m_delegate.createReadValue((RA)m_factory.createReadAccess(index));
     }
 
 }

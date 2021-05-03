@@ -48,7 +48,6 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.knime.core.data.columnar.schema.DefaultColumnarValueSchemaTest.createDefaultColumnarValueSchema;
@@ -98,20 +97,6 @@ public class UpdatedColumnarValueSchemaTest {
         final UpdatedColumnarValueSchema updated = new UpdatedColumnarValueSchema(updatedSpec, delegate);
         assertEquals(delegateSpec, delegate.getSourceSpec());
         assertEquals(updatedSpec, updated.getSourceSpec());
-    }
-
-    @Test
-    public void testGetReadValueFactories() {
-        final ColumnarValueSchema delegate = createDefaultColumnarValueSchema(createSpec(1));
-        final UpdatedColumnarValueSchema updated = new UpdatedColumnarValueSchema(createSpec(1), delegate);
-        assertArrayEquals(delegate.getReadValueFactories(), updated.getReadValueFactories());
-    }
-
-    @Test
-    public void testGetWriteValueFactories() {
-        final ColumnarValueSchema delegate = createDefaultColumnarValueSchema(createSpec(1));
-        final UpdatedColumnarValueSchema updated = new UpdatedColumnarValueSchema(createSpec(1), delegate);
-        assertArrayEquals(delegate.getWriteValueFactories(), updated.getWriteValueFactories());
     }
 
     @Test

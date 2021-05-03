@@ -57,7 +57,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.Test;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
@@ -83,7 +83,7 @@ public class ColumnarStringDomainCalculatorTest {
     }
 
     static void
-        testUpdateWithDataInternal(final ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain> calc) {
+        testUpdateWithDataInternal(final ColumnarDomainCalculator<StringReadData, DataColumnDomain> calc) {
         calc.update(TestStringDataFactory.INSTANCE.createReadData(new String[]{null}));
         assertEquals(Collections.emptySet(), calc.createDomain().getValues());
 
@@ -107,7 +107,7 @@ public class ColumnarStringDomainCalculatorTest {
         testUpdateVoidInternal(new ColumnarStringDomainCalculator(60));
     }
 
-    static void testUpdateVoidInternal(final ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain> calc) {
+    static void testUpdateVoidInternal(final ColumnarDomainCalculator<StringReadData, DataColumnDomain> calc) {
         calc.update(new DataColumnDomainCreator().createDomain());
         assertEquals(Collections.emptySet(), calc.createDomain().getValues());
     }
@@ -117,7 +117,7 @@ public class ColumnarStringDomainCalculatorTest {
         testUpdateInternal(new ColumnarStringDomainCalculator(1));
     }
 
-    static void testUpdateInternal(final ColumnarDomainCalculator<ObjectReadData<String>, DataColumnDomain> calc) {
+    static void testUpdateInternal(final ColumnarDomainCalculator<StringReadData, DataColumnDomain> calc) {
         final DataColumnDomainCreator creator = new DataColumnDomainCreator();
 
         creator.setValues(Stream.of(MISSING_CELL).collect(Collectors.toSet()));

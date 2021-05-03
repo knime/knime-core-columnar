@@ -57,10 +57,12 @@ import java.util.stream.Stream;
 import org.junit.Test;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
+import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnDomainCreator;
 import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.def.IntCell;
+import org.knime.core.data.v2.ReadValue;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -75,8 +77,13 @@ public class ColumnarCombinedDomainCalculatorTest {
     private static final IntCell I2 = new IntCell(2);
 
     private static ColumnarCombinedDomainCalculator<IntReadData> createCalculator(final int maxNumvalues) {
-        return new ColumnarCombinedDomainCalculator<>((data, index) -> () -> new IntCell(data.getInt(index.getIndex())),
-            new DataValueComparatorDelegator<>(IntCell.TYPE.getComparator()), maxNumvalues);
+        return new ColumnarCombinedDomainCalculator<>((data, index) -> new ReadValue() {
+
+            @Override
+            public DataCell getDataCell() {
+                return new IntCell(data.getInt(index.getIndex()));
+            }
+        }, new DataValueComparatorDelegator<>(IntCell.TYPE.getComparator()), maxNumvalues);
     }
 
     @Test

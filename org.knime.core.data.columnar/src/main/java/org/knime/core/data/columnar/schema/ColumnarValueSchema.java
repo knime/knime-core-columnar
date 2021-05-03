@@ -46,6 +46,7 @@
 package org.knime.core.data.columnar.schema;
 
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -64,22 +65,10 @@ public interface ColumnarValueSchema extends ColumnarSchema {
     DataTableSpec getSourceSpec();
 
     /**
-     * Create a {@link ColumnarReadValueFactory} given the spec at the provided column index.
-     *
-     * @param colIndex the column index.
-     *
-     * @return factory to create read values.
+     * @return the {@link ValueFactory ValueFactories} for the columns in {@link DataTableSpec} plus the row key column
      */
-    ColumnarReadValueFactory<?>[] getReadValueFactories();
+    ValueFactory<?, ?>[] getValueFactories();
 
-    /**
-     * Create a {@link ColumnarWriteValueFactory} given the spec at the provided column index.
-     *
-     * @param colIndex the column index.
-     *
-     * @return factory to create write values.
-     */
-    ColumnarWriteValueFactory<?>[] getWriteValueFactories();
 
     /**
     * Saves the wrapped {@link ValueSchema} to the provided settings.

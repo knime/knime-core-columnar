@@ -45,6 +45,7 @@
  */
 package org.knime.core.data.columnar.domain;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,7 +60,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.NominalValue;
-import org.knime.core.data.columnar.schema.ColumnarReadValueFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
@@ -104,6 +104,8 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
 
     private final boolean m_initDomains;
 
+    private final ColumnarReadValueFactory<?>[] m_readValueFactories;
+
     private Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnMetaData[]>> m_metadataCalculators;
 
     private Map<Integer, ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain>> m_domainCalculators;
@@ -116,6 +118,9 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
     public DefaultDomainWritableConfig(final ColumnarValueSchema schema, final int maxPossibleNominalDomainValues,
         final boolean initializeDomains) {
         m_schema = schema;
+        m_readValueFactories = Arrays.stream(schema.getValueFactories())//
+                .map(f -> new DefaultReadValueFactory<>(f))//
+                .toArray(ColumnarReadValueFactory[]::new);
         m_initDomains = initializeDomains;
         m_maxNumValues = maxPossibleNominalDomainValues;
     }
@@ -131,11 +136,10 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
         if (m_domainCalculators == null) {
             m_domainCalculators = new ConcurrentHashMap<>();
             final DataTableSpec spec = m_schema.getSourceSpec();
-            final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
             for (int i = 1; i < m_schema.numColumns(); i++) {
                 final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
                 final ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain> calculator =
-                    createDomainCalculator(colSpec, factories[i]);
+                    createDomainCalculator(colSpec, m_readValueFactories[i]);
                 if (calculator != null) {
                     if (m_initDomains) { // NOSONAR
                         calculator.update(colSpec.getDomain());
@@ -184,7 +188,6 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
         if (m_metadataCalculators == null) {
             m_metadataCalculators = new ConcurrentHashMap<>();
             final DataTableSpec spec = m_schema.getSourceSpec();
-            final ColumnarReadValueFactory<?>[] factories = m_schema.getReadValueFactories();
             for (int i = 1; i < m_schema.numColumns(); i++) {
                 final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
                 final Collection<DataColumnMetaDataCreator<?>> metadataCreators =
@@ -195,7 +198,7 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
                     m_metadataCalculators.put(i,
                         new ColumnarMetadataCalculator<>(
                             metadataCreators.toArray(new DataColumnMetaDataCreator[metadataCreators.size()]),
-                            (ColumnarReadValueFactory<NullableReadData>)factories[i]));
+                            (ColumnarReadValueFactory<NullableReadData>)m_readValueFactories[i]));
                 }
             }
         }

@@ -63,6 +63,7 @@ import org.knime.core.data.DataCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.meta.DataColumnMetaDataCreator;
+import org.knime.core.data.v2.ReadValue;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -113,9 +114,15 @@ public class ColumnarMetadataDomainCalculatorTest {
     }
 
     private static ColumnarMetadataCalculator<IntReadData> createCalculator() {
+
         return new ColumnarMetadataCalculator<>(
-            new TestDataColumnMetaDataCreator[]{new TestDataColumnMetaDataCreator()},
-            (data, index) -> () -> new IntCell(((IntReadData)data).getInt(index.getIndex())));
+            new TestDataColumnMetaDataCreator[]{new TestDataColumnMetaDataCreator()}, (data, index) -> new ReadValue() {
+
+                @Override
+                public DataCell getDataCell() {
+                    return new IntCell(((IntReadData)data).getInt(index.getIndex()));
+                }
+            });
     }
 
     @Test
