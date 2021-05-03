@@ -52,7 +52,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -69,6 +68,7 @@ import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.data.v2.value.IntValueFactory.IntWriteValue;
 import org.knime.core.node.ExecutionContext;
+import org.knime.core.table.schema.ColumnarSchema;
 
 final class ColumnarTableTestUtils {
 

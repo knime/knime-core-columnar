@@ -77,31 +77,43 @@ import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
-import org.knime.core.columnar.data.DataSpec;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.columnar.data.DurationData.DurationReadData;
+import org.knime.core.columnar.data.DurationData.DurationWriteData;
 import org.knime.core.columnar.data.FloatData.FloatReadData;
 import org.knime.core.columnar.data.FloatData.FloatWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
-import org.knime.core.columnar.data.ListData.ListDataSpec;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
+import org.knime.core.columnar.data.LocalDateData.LocalDateReadData;
+import org.knime.core.columnar.data.LocalDateData.LocalDateWriteData;
+import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeReadData;
+import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeWriteData;
+import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
+import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
-import org.knime.core.columnar.data.StructData.StructDataSpec;
+import org.knime.core.columnar.data.PeriodData.PeriodReadData;
+import org.knime.core.columnar.data.PeriodData.PeriodWriteData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
+import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.columnar.testing.data.TestData;
+import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.ListDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -214,18 +226,15 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void setData(final NullableWriteData data, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectWriteData<Duration> objectData = ((ObjectWriteData<Duration>)data);
-                    objectData.setObject(index, Duration.ofMillis(runningInt++)); // NOSONAR
+                    final DurationWriteData objectData = ((DurationWriteData)data);
+                    objectData.setDuration(index, Duration.ofMillis(runningInt++)); // NOSONAR
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<Duration> refObjectData = (ObjectReadData<Duration>)refData;
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<Duration> readObjectData = (ObjectReadData<Duration>)readData;
-                    assertEquals(refObjectData.getObject(index), readObjectData.getObject(index));
+                    final DurationReadData refObjectData = (DurationReadData)refData;
+                    final DurationReadData readObjectData = (DurationReadData)readData;
+                    assertEquals(refObjectData.getDuration(index), readObjectData.getDuration(index));
                 }
             },
 
@@ -292,18 +301,15 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void setData(final NullableWriteData data, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectWriteData<LocalDate> objectData = ((ObjectWriteData<LocalDate>)data);
-                    objectData.setObject(index, LocalDate.ofEpochDay(runningInt++)); // NOSONAR
+                    final LocalDateWriteData objectData = ((LocalDateWriteData)data);
+                    objectData.setLocalDate(index, LocalDate.ofEpochDay(runningInt++)); // NOSONAR
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<LocalDate> refObjectData = (ObjectReadData<LocalDate>)refData;
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<LocalDate> readObjectData = (ObjectReadData<LocalDate>)readData;
-                    assertEquals(refObjectData.getObject(index), readObjectData.getObject(index));
+                    final LocalDateReadData refObjectData = (LocalDateReadData)refData;
+                    final LocalDateReadData readObjectData = (LocalDateReadData)readData;
+                    assertEquals(refObjectData.getLocalDate(index), readObjectData.getLocalDate(index));
                 }
             },
 
@@ -315,19 +321,16 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void setData(final NullableWriteData data, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectWriteData<LocalDateTime> objectData = ((ObjectWriteData<LocalDateTime>)data);
-                    objectData.setObject(index,
+                    final LocalDateTimeWriteData objectData = ((LocalDateTimeWriteData)data);
+                    objectData.setLocalDateTime(index,
                         LocalDateTime.of(LocalDate.ofEpochDay(runningInt++), LocalTime.ofNanoOfDay(runningInt++))); // NOSONAR
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<LocalDateTime> refObjectData = (ObjectReadData<LocalDateTime>)refData;
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<LocalDateTime> readObjectData = (ObjectReadData<LocalDateTime>)readData;
-                    assertEquals(refObjectData.getObject(index), readObjectData.getObject(index));
+                    final LocalDateTimeReadData refObjectData = (LocalDateTimeReadData)refData;
+                    final LocalDateTimeReadData readObjectData = (LocalDateTimeReadData)readData;
+                    assertEquals(refObjectData.getLocalDateTime(index), readObjectData.getLocalDateTime(index));
                 }
             },
 
@@ -339,18 +342,15 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void setData(final NullableWriteData data, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectWriteData<LocalTime> objectData = ((ObjectWriteData<LocalTime>)data);
-                    objectData.setObject(index, LocalTime.ofNanoOfDay(runningInt++)); // NOSONAR
+                    final LocalTimeWriteData objectData = ((LocalTimeWriteData)data);
+                    objectData.setLocalTime(index, LocalTime.ofNanoOfDay(runningInt++)); // NOSONAR
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<LocalTime> refObjectData = (ObjectReadData<LocalTime>)refData;
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<LocalTime> readObjectData = (ObjectReadData<LocalTime>)readData;
-                    assertEquals(refObjectData.getObject(index), readObjectData.getObject(index));
+                    final LocalTimeReadData refObjectData = (LocalTimeReadData)refData;
+                    final LocalTimeReadData readObjectData = (LocalTimeReadData)readData;
+                    assertEquals(refObjectData.getLocalTime(index), readObjectData.getLocalTime(index));
                 }
             },
 
@@ -388,29 +388,6 @@ public final class TestBatchStoreUtils {
                 }
             },
 
-            OBJECT {
-                @Override
-                DataSpec getSpec() {
-                    return new GenericObjectDataSpec<Integer>(null, false);
-                }
-
-                @Override
-                void setData(final NullableWriteData data, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectWriteData<Integer> objectData = ((ObjectWriteData<Integer>)data);
-                    objectData.setObject(index, Integer.valueOf(runningInt++)); // NOSONAR
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<Integer> refObjectData = (ObjectReadData<Integer>)refData;
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<Integer> readObjectData = (ObjectReadData<Integer>)readData;
-                    assertEquals(refObjectData.getObject(index), readObjectData.getObject(index));
-                }
-            },
-
             PERIOD {
                 @Override
                 DataSpec getSpec() {
@@ -419,18 +396,15 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void setData(final NullableWriteData data, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectWriteData<Period> objectData = ((ObjectWriteData<Period>)data);
-                    objectData.setObject(index, Period.ofDays(runningInt++)); // NOSONAR
+                    final PeriodWriteData objectData = ((PeriodWriteData)data);
+                    objectData.setPeriod(index, Period.ofDays(runningInt++)); // NOSONAR
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<Period> refObjectData = (ObjectReadData<Period>)refData;
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<Period> readObjectData = (ObjectReadData<Period>)readData;
-                    assertEquals(refObjectData.getObject(index), readObjectData.getObject(index));
+                    final PeriodReadData refObjectData = (PeriodReadData)refData;
+                    final PeriodReadData readObjectData = (PeriodReadData)readData;
+                    assertEquals(refObjectData.getPeriod(index), readObjectData.getPeriod(index));
                 }
             },
 
@@ -442,18 +416,15 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void setData(final NullableWriteData data, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectWriteData<String> objectData = ((ObjectWriteData<String>)data);
-                    objectData.setObject(index, Integer.toString(runningInt++)); // NOSONAR
+                    final StringWriteData objectData = ((StringWriteData)data);
+                    objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<String> refObjectData = (ObjectReadData<String>)refData;
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<String> readObjectData = (ObjectReadData<String>)readData;
-                    assertEquals(refObjectData.getObject(index), readObjectData.getObject(index));
+                    final StringReadData refObjectData = (StringReadData)refData;
+                    final StringReadData readObjectData = (StringReadData)readData;
+                    assertEquals(refObjectData.getString(index), readObjectData.getString(index));
                 }
             },
 
@@ -503,19 +474,16 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void setData(final NullableWriteData data, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectWriteData<ZonedDateTime> objectData = ((ObjectWriteData<ZonedDateTime>)data);
-                    objectData.setObject(index, ZonedDateTime.of(LocalDate.ofEpochDay(runningInt++), // NOSONAR
+                    final ZonedDateTimeWriteData objectData = (ZonedDateTimeWriteData)data;
+                    objectData.setZonedDateTime(index, ZonedDateTime.of(LocalDate.ofEpochDay(runningInt++), // NOSONAR
                         LocalTime.ofNanoOfDay(runningInt++), ZoneId.of("Z"))); // NOSONAR
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<ZonedDateTime> refObjectData = (ObjectReadData<ZonedDateTime>)refData;
-                    @SuppressWarnings("unchecked")
-                    final ObjectReadData<ZonedDateTime> readObjectData = (ObjectReadData<ZonedDateTime>)readData;
-                    assertEquals(refObjectData.getObject(index), readObjectData.getObject(index));
+                    final ZonedDateTimeReadData refObjectData = (ZonedDateTimeReadData)refData;
+                    final ZonedDateTimeReadData readObjectData = (ZonedDateTimeReadData)readData;
+                    assertEquals(refObjectData.getZonedDateTime(index), readObjectData.getZonedDateTime(index));
                 }
             };
 
@@ -642,7 +610,7 @@ public final class TestBatchStoreUtils {
 
     public static boolean tableInStore(final RandomAccessBatchReadable store, final TestDataTable table)
         throws IOException {
-        try (final RandomAccessBatchReader reader = store.createReader()) { // NOSONAR
+        try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) { // NOSONAR
         } catch (IllegalStateException e) { // NOSONAR
             return false;
         }
@@ -658,8 +626,8 @@ public final class TestBatchStoreUtils {
 
     @SuppressWarnings("resource")
     private static RandomAccessBatchReader createReader(final RandomAccessBatchReadable store, final int[] indices) {
-        return indices == null ? store.createReader()
-            : store.createReader(new FilteredColumnSelection(store.getSchema().numColumns(), indices));
+        return indices == null ? store.createRandomAccessReader()
+            : store.createRandomAccessReader(new FilteredColumnSelection(store.getSchema().numColumns(), indices));
     }
 
     public static TestDataTable readSelectionAndCompareTable(final RandomAccessBatchReadable store,
@@ -730,8 +698,8 @@ public final class TestBatchStoreUtils {
 
     public static void readTwiceAndCompareTable(final RandomAccessBatchReadable store, final int numBatches)
         throws IOException {
-        try (final RandomAccessBatchReader reader1 = store.createReader();
-                final RandomAccessBatchReader reader2 = store.createReader()) {
+        try (final RandomAccessBatchReader reader1 = store.createRandomAccessReader();
+                final RandomAccessBatchReader reader2 = store.createRandomAccessReader()) {
             for (int i = 0; i < numBatches; i++) {
                 final ReadBatch batch1 = reader1.readRetained(i);
                 final ReadBatch batch2 = reader2.readRetained(i);

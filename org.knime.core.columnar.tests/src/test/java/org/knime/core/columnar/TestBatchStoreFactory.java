@@ -51,6 +51,7 @@ import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.columnar.testing.TestBatchStore;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany

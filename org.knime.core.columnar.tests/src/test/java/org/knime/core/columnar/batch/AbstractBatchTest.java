@@ -54,11 +54,11 @@ import static org.junit.Assert.assertEquals;
 import java.util.Arrays;
 
 import org.junit.Test;
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.TestBatchStoreUtils;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.columnar.testing.data.TestData;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany

@@ -61,8 +61,8 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.data.DataColumnSpecCreator;
@@ -98,19 +98,18 @@ public final class TestDataBatchStoreUtils {
             .toArray(WriteBatch[]::new);
     }
 
-    @SuppressWarnings("unchecked")
     public static void writeRowKeys(final WriteBatch[] batches, final String... rowKeys) {
         int i = 0;
         int j = 0;
-        ObjectWriteData<String> data = (ObjectWriteData<String>)batches[i].get(0);
+        StringWriteData data = (StringWriteData)batches[i].get(0);
         i++;
         for (String rowKey : rowKeys) {
             if (j >= data.capacity()) {
-                data = (ObjectWriteData<String>)batches[i].get(0);
+                data = (StringWriteData)batches[i].get(0);
                 i++;
                 j = 0;
             }
-            data.setObject(j, rowKey);
+            data.setString(j, rowKey);
             j++;
         }
     }
@@ -131,19 +130,18 @@ public final class TestDataBatchStoreUtils {
         }
     }
 
-    @SuppressWarnings("unchecked")
     public static void writeStrings(final WriteBatch[] batches, final String... strings) {
         int i = 0;
         int j = 0;
-        ObjectWriteData<String> data = (ObjectWriteData<String>)batches[i].get(2);
+        StringWriteData data = (StringWriteData)batches[i].get(2);
         i++;
         for (String string : strings) {
             if (j >= data.capacity()) {
-                data = (ObjectWriteData<String>)batches[i].get(2);
+                data = (StringWriteData)batches[i].get(2);
                 i++;
                 j = 0;
             }
-            data.setObject(j, string);
+            data.setString(j, string);
             j++;
         }
     }
@@ -159,11 +157,10 @@ public final class TestDataBatchStoreUtils {
         }
     }
 
-    @SuppressWarnings("unchecked")
     static void readCompareReleaseRowKeys(final RandomAccessBatchReadable store, final String... rowKeys)
         throws IOException {
         try (final RandomAccessBatchReader reader =
-            store.createReader(new DefaultColumnSelection(store.getSchema().numColumns()))) {
+            store.createRandomAccessReader(new DefaultColumnSelection(store.getSchema().numColumns()))) {
             int i = 0;
             int j = 0;
             ReadBatch batch = reader.readRetained(i);
@@ -175,7 +172,7 @@ public final class TestDataBatchStoreUtils {
                     i++;
                     j = 0;
                 }
-                assertEquals(rowKey, ((ObjectReadData<String>)batch.get(0)).getObject(j));
+                assertEquals(rowKey, ((StringReadData)batch.get(0)).getString(j));
                 j++;
             }
             batch.release();
@@ -185,7 +182,7 @@ public final class TestDataBatchStoreUtils {
     static void readCompareReleaseIntegers(final RandomAccessBatchReadable store, final int... integers)
         throws IOException {
         try (final RandomAccessBatchReader reader =
-            store.createReader(new FilteredColumnSelection(store.getSchema().numColumns(), 1))) {
+            store.createRandomAccessReader(new FilteredColumnSelection(store.getSchema().numColumns(), 1))) {
             int i = 0;
             int j = 0;
             IntReadData data = (IntReadData)reader.readRetained(i).get(1);
@@ -204,23 +201,22 @@ public final class TestDataBatchStoreUtils {
         }
     }
 
-    @SuppressWarnings("unchecked")
     static void readCompareReleaseStrings(final RandomAccessBatchReadable store, final String... strings)
         throws IOException {
         try (final RandomAccessBatchReader reader =
-            store.createReader(new FilteredColumnSelection(store.getSchema().numColumns(), 2))) {
+            store.createRandomAccessReader(new FilteredColumnSelection(store.getSchema().numColumns(), 2))) {
             int i = 0;
             int j = 0;
-            ObjectReadData<String> data = (ObjectReadData<String>)reader.readRetained(i).get(2);
+            StringReadData data = (StringReadData)reader.readRetained(i).get(2);
             i++;
             for (String string : strings) {
                 if (j >= data.length()) {
                     data.release();
-                    data = (ObjectReadData<String>)reader.readRetained(i).get(2);
+                    data = (StringReadData)reader.readRetained(i).get(2);
                     i++;
                     j = 0;
                 }
-                assertEquals(string, data.getObject(j));
+                assertEquals(string, data.getString(j));
                 j++;
             }
             data.release();

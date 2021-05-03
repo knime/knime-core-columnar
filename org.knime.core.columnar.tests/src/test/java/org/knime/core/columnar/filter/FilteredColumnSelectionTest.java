@@ -59,13 +59,13 @@ import java.util.NoSuchElementException;
 import java.util.stream.IntStream;
 
 import org.junit.Test;
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.TestBatchStoreUtils;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.columnar.testing.data.TestData;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany

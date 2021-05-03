@@ -12,9 +12,9 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell;
-import org.knime.core.data.v2.Cursor;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.value.DoubleValueFactory.DoubleWriteValue;
 import org.knime.core.node.BufferedDataContainer;
 import org.knime.core.node.BufferedDataTable;
@@ -79,7 +79,7 @@ public class ColumnarTableSourceNodeModel extends NodeModel {
             final int nrCols = m_nrColsModel.getIntValue();
             final long nrRows = m_nrRowsModel.getLongValue();
             try (final RowContainer container = exec.createRowContainer(m_spec);
-                    final Cursor<RowWrite> cursor = container.createCursor()) {
+                    final RowWriteCursor cursor = container.createCursor()) {
                 for (long i = 0; i < nrRows; i++) {
                     final RowWrite row = cursor.forward();
                     row.setRowKey("Row" + i);

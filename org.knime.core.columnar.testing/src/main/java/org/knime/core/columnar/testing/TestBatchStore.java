@@ -52,7 +52,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
@@ -63,6 +62,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.testing.data.TestData;
 import org.knime.core.columnar.testing.data.TestDataFactory;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -234,7 +234,7 @@ public final class TestBatchStore implements BatchStore {
     }
 
     @Override
-    public RandomAccessBatchReader createReader(final ColumnSelection selection) {
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         if (!m_writerClosed) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }

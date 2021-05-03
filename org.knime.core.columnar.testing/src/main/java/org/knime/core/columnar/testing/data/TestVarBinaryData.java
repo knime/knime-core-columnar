@@ -45,8 +45,18 @@
  */
 package org.knime.core.columnar.testing.data;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -97,6 +107,27 @@ public final class TestVarBinaryData extends TestData implements VarBinaryWriteD
     public void setBytes(final int index, final byte[] val) {
         get()[index] = val;
 
+    }
+
+    @Override
+    public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
+        final DataInput input = new DataInputStream(new ByteArrayInputStream(getBytes(index)));
+        try {
+            return deserializer.deserialize(input);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Error during deserialization", ex);
+        }
+    }
+
+    @Override
+    public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
+        final ByteArrayOutputStream bs = new ByteArrayOutputStream();
+        final DataOutput output = new DataOutputStream(bs);
+        try {
+            serializer.serialize(output, value);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Error during serialization", ex);
+        }
     }
 
 }

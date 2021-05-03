@@ -50,32 +50,12 @@ package org.knime.core.columnar.testing;
 
 import java.util.Arrays;
 
-import org.knime.core.columnar.data.BooleanData.BooleanDataSpec;
-import org.knime.core.columnar.data.ByteData.ByteDataSpec;
-import org.knime.core.columnar.data.DataSpec.Mapper;
-import org.knime.core.columnar.data.DoubleData.DoubleDataSpec;
-import org.knime.core.columnar.data.DurationData.DurationDataSpec;
-import org.knime.core.columnar.data.FloatData.FloatDataSpec;
-import org.knime.core.columnar.data.IntData.IntDataSpec;
-import org.knime.core.columnar.data.ListData.ListDataSpec;
-import org.knime.core.columnar.data.LocalDateData.LocalDateDataSpec;
-import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeDataSpec;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeDataSpec;
-import org.knime.core.columnar.data.LongData.LongDataSpec;
-import org.knime.core.columnar.data.ObjectData.GenericObjectDataSpec;
-import org.knime.core.columnar.data.PeriodData.PeriodDataSpec;
-import org.knime.core.columnar.data.StringData.StringDataSpec;
-import org.knime.core.columnar.data.StructData.StructDataSpec;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryDataSpec;
-import org.knime.core.columnar.data.VoidData.VoidDataSpec;
-import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeDataSpec;
 import org.knime.core.columnar.testing.data.TestBooleanData.TestBooleanDataFactory;
 import org.knime.core.columnar.testing.data.TestByteData.TestByteDataFactory;
 import org.knime.core.columnar.testing.data.TestDataFactory;
 import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
 import org.knime.core.columnar.testing.data.TestDurationData.TestDurationDataFactory;
 import org.knime.core.columnar.testing.data.TestFloatData.TestFloatDataFactory;
-import org.knime.core.columnar.testing.data.TestGenericObjectData.TestGenericObjectDataFactory;
 import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
 import org.knime.core.columnar.testing.data.TestListData.TestListDataFactory;
 import org.knime.core.columnar.testing.data.TestLocalDateData.TestLocalDateDataFactory;
@@ -88,6 +68,24 @@ import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory
 import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
 import org.knime.core.columnar.testing.data.TestVoidData.TestVoidDataFactory;
 import org.knime.core.columnar.testing.data.TestZonedDateTimeData.TestZonedDateTimeDataFactory;
+import org.knime.core.table.schema.BooleanDataSpec;
+import org.knime.core.table.schema.ByteDataSpec;
+import org.knime.core.table.schema.DataSpec.Mapper;
+import org.knime.core.table.schema.DoubleDataSpec;
+import org.knime.core.table.schema.DurationDataSpec;
+import org.knime.core.table.schema.FloatDataSpec;
+import org.knime.core.table.schema.IntDataSpec;
+import org.knime.core.table.schema.ListDataSpec;
+import org.knime.core.table.schema.LocalDateDataSpec;
+import org.knime.core.table.schema.LocalDateTimeDataSpec;
+import org.knime.core.table.schema.LocalTimeDataSpec;
+import org.knime.core.table.schema.LongDataSpec;
+import org.knime.core.table.schema.PeriodDataSpec;
+import org.knime.core.table.schema.StringDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.VarBinaryDataSpec;
+import org.knime.core.table.schema.VoidDataSpec;
+import org.knime.core.table.schema.ZonedDateTimeDataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -162,11 +160,6 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
     @Override
     public TestDataFactory visit(final VoidDataSpec spec) {
         return TestVoidDataFactory.INSTANCE;
-    }
-
-    @Override
-    public TestDataFactory visit(final GenericObjectDataSpec<?> spec) {
-        return TestGenericObjectDataFactory.INSTANCE;
     }
 
     @Override

@@ -9,11 +9,10 @@ import org.knime.core.data.DoubleValue;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell;
-import org.knime.core.data.v2.Cursor;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
-import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.node.BufferedDataContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -56,7 +55,7 @@ public class ColumnarTableCopyNodeModel extends NodeModel {
             // ### New API:
             try (final RowCursor inCursor = inData[0].cursor();
                     final RowContainer container = exec.createRowContainer(inData[0].getDataTableSpec());
-                    final Cursor<RowWrite> outCursor = container.createCursor()) {
+                    final RowWriteCursor outCursor = container.createCursor()) {
                 // can actually be parallelized later
                 RowRead row = null;
                 while ((row = inCursor.forward()) != null) {
