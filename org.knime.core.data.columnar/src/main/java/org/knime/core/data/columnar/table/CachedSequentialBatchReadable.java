@@ -50,7 +50,6 @@ package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -62,6 +61,7 @@ import org.knime.core.columnar.cache.object.ObjectCache;
 import org.knime.core.columnar.cache.object.ObjectReadCache;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link SequentialBatchReadable} that delegates operations through an {@link ObjectCache} and a
@@ -101,13 +101,13 @@ final class CachedSequentialBatchReadable implements SequentialBatchReadable {
             if (m_index > index) {
                 m_delegateReader.close();
                 m_index = 0;
-                m_delegateReader = m_delegateReadable.createReader(m_selection);
+                m_delegateReader = m_delegateReadable.createSequentialReader(m_selection);
             }
             for (; m_index < index; m_index++) {
-                m_delegateReader.readRetained().release();
+                m_delegateReader.forward().release();
             }
             m_index++;
-            m_loadedBatch = m_delegateReader.readRetained();
+            m_loadedBatch = m_delegateReader.forward();
             return m_loadedBatch;
         }
 
@@ -140,7 +140,7 @@ final class CachedSequentialBatchReadable implements SequentialBatchReadable {
         }
 
         @Override
-        public RandomAccessBatchReader createReader(final ColumnSelection selection) {
+        public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
             return new SequentialDelegateRandomAccessBatchReader(m_delegateReadable, selection);
         }
 
@@ -159,11 +159,11 @@ final class CachedSequentialBatchReadable implements SequentialBatchReadable {
 
         RandomAccessDelegateSequentialBatchReader(final RandomAccessBatchReadable delegateReadable,
             final ColumnSelection selection) {
-            m_delegateReader = delegateReadable.createReader(selection);
+            m_delegateReader = delegateReadable.createRandomAccessReader(selection);
         }
 
         @Override
-        public ReadBatch readRetained() throws IOException {
+        public ReadBatch forward() throws IOException {
             try {
                 final ReadBatch batch = m_delegateReader.readRetained(m_index);
                 m_index++;
@@ -198,7 +198,7 @@ final class CachedSequentialBatchReadable implements SequentialBatchReadable {
     }
 
     @Override
-    public SequentialBatchReader createReader(final ColumnSelection selection) {
+    public SequentialBatchReader createSequentialReader(final ColumnSelection selection) {
         return new RandomAccessDelegateSequentialBatchReader(m_delegateReadable, selection);
     }
 

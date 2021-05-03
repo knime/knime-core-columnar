@@ -49,7 +49,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
@@ -60,6 +59,7 @@ import org.knime.core.columnar.cache.EvictingCache.Evictor;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link RandomAccessBatchReadable} that reads {@link ReadData} from a delegate and places it in a fixed-size
@@ -81,7 +81,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
         ReadDataReadCacheReader(final ColumnSelection selection) {
             m_batchLoader = new BufferedBatchLoader();
-            m_readerDelegate = m_reabableDelegate.createReader(selection);
+            m_readerDelegate = m_reabableDelegate.createRandomAccessReader(selection);
             m_selection = selection;
         }
 
@@ -133,7 +133,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
     }
 
     @Override
-    public RandomAccessBatchReader createReader(final ColumnSelection selection) {
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         return new ReadDataReadCacheReader(selection);
     }
 

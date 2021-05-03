@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.BatchWritable;
@@ -61,6 +60,7 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.EvictingCache;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link BatchWritable} and {@link RandomAccessBatchReadable} that stores all written {@link ReadData} in a
@@ -233,7 +233,7 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
     }
 
     @Override
-    public RandomAccessBatchReader createReader(final ColumnSelection selection) {
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         final ReadBatches cached = m_globalCache.getRetained(BatchWritableCache.this);
         if (cached != null) {
             // cache hit
@@ -245,7 +245,7 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
             // (2) it might not be read fully by the reader, so by putting it back into the cache, we would read
             // unnecessarily much data
             m_writer.waitForDelegateWriter();
-            return m_reabableDelegate.createReader(selection);
+            return m_reabableDelegate.createRandomAccessReader(selection);
         }
     }
 

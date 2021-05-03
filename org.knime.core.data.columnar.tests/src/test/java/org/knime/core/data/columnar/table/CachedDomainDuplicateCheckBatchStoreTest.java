@@ -170,7 +170,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderWhileWriterOpen() throws IOException {
         try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
-            try (final RandomAccessBatchReader reader = store.createReader()) { // NOSONAR
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) { // NOSONAR
             }
         }
     }
@@ -180,7 +180,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
         try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
             store.close(); // NOSONAR
-            try (final RandomAccessBatchReader reader = store.createReader()) { // NOSONAR
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) { // NOSONAR
             }
         }
     }
@@ -189,7 +189,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
     public void exceptionOnReadAfterReaderClose() throws IOException {
         try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
-            try (final RandomAccessBatchReader reader = store.createReader()) {
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.close(); // NOSONAR
                 reader.readRetained(0);
             }
@@ -200,7 +200,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
     public void exceptionOnReadAfterStoreClose() throws IOException {
         try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
-            try (final RandomAccessBatchReader reader = store.createReader()) {
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 store.close(); // NOSONAR
                 reader.readRetained(0);
             }
@@ -211,7 +211,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
     public void exceptionOnReadIndexOutOfBoundsLower() throws IOException {
         try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
-            try (final RandomAccessBatchReader reader = store.createReader()) {
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.readRetained(-1);
             }
         }
@@ -221,7 +221,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
     public void exceptionOnReadIndexOutOfBoundsUpper() throws IOException {
         try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
-            try (final RandomAccessBatchReader reader = store.createReader()) {
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.readRetained(Integer.MAX_VALUE);
             }
         }

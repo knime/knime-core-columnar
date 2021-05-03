@@ -48,8 +48,7 @@ package org.knime.core.columnar.cache.object;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.knime.core.columnar.data.ObjectData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.StringData.StringReadData;
 
 /**
  * Wrapper around {@link ObjectData} for in-heap caching.
@@ -57,15 +56,15 @@ import org.knime.core.columnar.data.ObjectData.ObjectReadData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class CachedObjectLoadingReadData<T> implements ObjectReadData<T> {
+final class CachedStringLoadingReadData implements StringReadData {
 
     private final AtomicInteger m_refCounter = new AtomicInteger(1);
 
-    private final ObjectReadData<T> m_delegate;
+    private final StringReadData m_delegate;
 
-    private Object[] m_data;
+    private String[] m_data;
 
-    CachedObjectLoadingReadData(final ObjectReadData<T> delegate, final Object[] data) {
+    CachedStringLoadingReadData(final StringReadData delegate, final String[] data) {
         m_delegate = delegate;
         m_data = data;
     }
@@ -99,13 +98,12 @@ final class CachedObjectLoadingReadData<T> implements ObjectReadData<T> {
         return m_delegate.sizeOf();
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public T getObject(final int index) {
+    public String getString(final int index) {
         if (m_data[index] == null) {
-            m_data[index] = m_delegate.getObject(index);
+            m_data[index] = m_delegate.getString(index);
         }
-        return (T)m_data[index];
+        return m_data[index];
     }
 
 }

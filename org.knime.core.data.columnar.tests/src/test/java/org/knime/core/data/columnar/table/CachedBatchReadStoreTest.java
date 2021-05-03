@@ -81,7 +81,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
     public void exceptionOnCreateReaderAfterStoreClose() throws IOException {
         try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
             store.close();
-            try (final RandomAccessBatchReader reader = store.createReader()) { // NOSONAR
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) { // NOSONAR
             }
         }
     }
@@ -89,7 +89,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws IOException {
         try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
-            try (final RandomAccessBatchReader reader = store.createReader()) {
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.close(); // NOSONAR
                 reader.readRetained(0);
             }
@@ -99,7 +99,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws IOException {
         try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
-            try (final RandomAccessBatchReader reader = store.createReader()) {
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 store.close();
                 reader.readRetained(0);
             }
@@ -109,7 +109,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
     @Test(expected = IndexOutOfBoundsException.class)
     public void exceptionOnReadIndexOutOfBoundsLower() throws IOException {
         try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
-            try (final RandomAccessBatchReader reader = store.createReader()) {
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.readRetained(-1);
             }
         }
@@ -118,7 +118,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
     @Test(expected = IndexOutOfBoundsException.class)
     public void exceptionOnReadIndexOutOfBoundsUpper() throws IOException {
         try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
-            try (final RandomAccessBatchReader reader = store.createReader()) {
+            try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.readRetained(Integer.MAX_VALUE);
             }
         }

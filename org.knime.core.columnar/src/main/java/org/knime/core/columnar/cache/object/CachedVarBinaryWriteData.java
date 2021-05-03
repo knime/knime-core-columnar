@@ -47,25 +47,29 @@
 package org.knime.core.columnar.cache.object;
 
 import java.util.Arrays;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class CachedObjectWriteData<T> implements ObjectWriteData<T> {
+final class CachedVarBinaryWriteData implements VarBinaryWriteData {
 
-    final class CachedObjectReadData implements ObjectReadData<T> {
+    final class CachedVarBinaryReadData implements VarBinaryReadData {
 
-        private ObjectReadData<T> m_readDelegate;
+        private VarBinaryReadData m_readDelegate;
 
         private final int m_length;
 
         private int m_numRetainsPriorSerialize = 0;
 
-        CachedObjectReadData(final int length) {
+        CachedVarBinaryReadData(final int length) {
             m_length = length;
         }
 
@@ -97,7 +101,7 @@ final class CachedObjectWriteData<T> implements ObjectWriteData<T> {
                     // as per contract, the HeapCachedWriteData's ref count was at 1 when it was closed
                     // therefore, the reference count would drop to 0 here and we have to release the HeapCachedWriteData
                     // this means that a subsequent call to serialize should and will fail
-                    CachedObjectWriteData.this.release();
+                    CachedVarBinaryWriteData.this.release();
                 } else {
                     m_numRetainsPriorSerialize--;
                 }
@@ -106,12 +110,17 @@ final class CachedObjectWriteData<T> implements ObjectWriteData<T> {
 
         @Override
         public synchronized long sizeOf() {
-            return m_readDelegate != null ? m_readDelegate.sizeOf() : CachedObjectWriteData.this.sizeOf();
+            return m_readDelegate != null ? m_readDelegate.sizeOf() : CachedVarBinaryWriteData.this.sizeOf();
+        }
+
+        @Override
+        public byte[] getBytes(final int index) {
+            return (byte[])m_data[index];
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public T getObject(final int index) {
+        public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
             return (T)m_data[index];
         }
 
@@ -119,10 +128,10 @@ final class CachedObjectWriteData<T> implements ObjectWriteData<T> {
             return m_data;
         }
 
-        synchronized ObjectReadData<T> serialize() {
-            CachedObjectWriteData.this.serialize(m_length);
+        synchronized VarBinaryReadData serialize() {
+            CachedVarBinaryWriteData.this.serialize();
 
-            m_readDelegate = CachedObjectWriteData.this.getDelegate().close(m_length);
+            m_readDelegate = CachedVarBinaryWriteData.this.getDelegate().close(m_length);
             if (m_numRetainsPriorSerialize > 0) {
                 for (int i = 0; i < m_numRetainsPriorSerialize; i++) {
                     m_readDelegate.retain();
@@ -134,7 +143,7 @@ final class CachedObjectWriteData<T> implements ObjectWriteData<T> {
 
     }
 
-    private final ObjectWriteData<T> m_delegate;
+    private final VarBinaryWriteData m_delegate;
 
     // We should not need a thread-safe data structure (i.e., an AtomicReferenceArray) here.
     // Reasoning: In Java, there is a happens-before relation between one thread starting another.
@@ -142,9 +151,9 @@ final class CachedObjectWriteData<T> implements ObjectWriteData<T> {
     // one that starts the serialization thread in HeapCachedColumnStore#writeInternal(ReadBatch).
     private Object[] m_data;
 
-    private int m_serializeFromIndex = 0;
+    private Queue<Runnable> m_serialization = new ConcurrentLinkedQueue<>();
 
-    CachedObjectWriteData(final ObjectWriteData<T> delegate) {
+    CachedVarBinaryWriteData(final VarBinaryWriteData delegate) {
         m_delegate = delegate;
         m_data = new Object[delegate.capacity()];
     }
@@ -171,10 +180,7 @@ final class CachedObjectWriteData<T> implements ObjectWriteData<T> {
 
     @Override
     public long sizeOf() {
-        // Instead of flushing to the capacity, we could also remember the largest set index and only flush until there.
-        // But that would cost us an additional operation per value, even if sizeof is never called.
-        // So we are probably better of this way.
-        serialize(capacity());
+        serialize();
         return m_delegate.sizeOf();
     }
 
@@ -185,29 +191,30 @@ final class CachedObjectWriteData<T> implements ObjectWriteData<T> {
     }
 
     @Override
-    public void setObject(final int index, final T obj) {
-        m_data[index] = obj;
+    public void setBytes(final int index, final byte[] val) {
+        m_data[index] = val;
+        m_serialization.add(() -> m_delegate.setBytes(index, val));
     }
 
     @Override
-    public ObjectReadData<T> close(final int length) {
-        return new CachedObjectReadData(length);
+    public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
+        m_data[index] = value;
+        m_serialization.add(() -> m_delegate.setObject(index, value, serializer));
     }
 
-    void serialize(final int length) {
-        for (int i = m_serializeFromIndex; i < length; i++) {
-            @SuppressWarnings("unchecked")
-            final T t = (T)m_data[i];
-            if (t != null) {
-                m_delegate.setObject(i, t);
-                // The value that has been serialized last will have to be serialized again in the next invocation of
-                // serialize, since it might have been updated or set to missing in the meantime.
-                m_serializeFromIndex = i;
-            }
+    @Override
+    public VarBinaryReadData close(final int length) {
+        return new CachedVarBinaryReadData(length);
+    }
+
+    void serialize() {
+        Runnable r;
+        while ((r = m_serialization.poll()) != null) {
+            r.run();
         }
     }
 
-    ObjectWriteData<T> getDelegate() {
+    VarBinaryWriteData getDelegate() {
         return m_delegate;
     }
 

@@ -56,7 +56,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultReadBatch;
@@ -68,14 +67,16 @@ import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
-import org.knime.core.columnar.data.ObjectData.ObjectWriteData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.table.schema.ColumnarSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A {@link BatchWritable} and {@link RandomAccessBatchReadable} that intercepts {@link ObjectReadData} for in-heap
+ * A {@link BatchWritable} and {@link RandomAccessBatchReadable} that intercepts {@link VarBinaryReadData} for in-heap
  * caching of objects.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -106,9 +107,12 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             final NullableWriteData[] data = new NullableWriteData[getSchema().numColumns()];
 
             for (int i = 0; i < data.length; i++) {
-                if (m_objectData.isSelected(i)) {
-                    final ObjectWriteData<?> columnWriteData = (ObjectWriteData<?>)batch.get(i);
-                    data[i] = new CachedObjectWriteData<>(columnWriteData);
+                if (m_varBinaryData.isSelected(i)) {
+                    final VarBinaryWriteData columnWriteData = (VarBinaryWriteData)batch.get(i);
+                    data[i] = new CachedVarBinaryWriteData(columnWriteData);
+                } else if (m_stringData.isSelected(i)) {
+                    final StringWriteData columnWriteData = (StringWriteData)batch.get(i);
+                    data[i] = new CachedStringWriteData(columnWriteData);
                 } else {
                     data[i] = batch.get(i);
                 }
@@ -134,9 +138,16 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             final CompletableFuture<NullableReadData>[] futures = new CompletableFuture[numColumns];
 
             for (int i = 0; i < numColumns; i++) {
-                if (m_objectData.isSelected(i)) {
-                    final CachedObjectWriteData<?>.CachedObjectReadData heapCachedData =
-                        (CachedObjectWriteData<?>.CachedObjectReadData)batch.get(i);
+                if (m_varBinaryData.isSelected(i)) {
+                    final CachedVarBinaryWriteData.CachedVarBinaryReadData heapCachedData =
+                        (CachedVarBinaryWriteData.CachedVarBinaryReadData)batch.get(i);
+                    futures[i] = CompletableFuture.supplyAsync(heapCachedData::serialize, m_executor);
+                    final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
+                    m_cache.put(ccuid, heapCachedData.getData());
+                    m_cachedData.add(ccuid);
+                } else if (m_stringData.isSelected(i)) {
+                    final CachedStringWriteData.CachedStringReadData heapCachedData =
+                        (CachedStringWriteData.CachedStringReadData)batch.get(i);
                     futures[i] = CompletableFuture.supplyAsync(heapCachedData::serialize, m_executor);
                     final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
                     m_cache.put(ccuid, heapCachedData.getData());
@@ -188,7 +199,9 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private final ObjectReadCache m_readStore;
 
-    private final ColumnSelection m_objectData;
+    private final ColumnSelection m_varBinaryData;
+
+    private final ColumnSelection m_stringData;
 
     private final Map<ColumnDataUniqueId, Object[]> m_cache;
 
@@ -203,8 +216,9 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     public <D extends BatchWritable & RandomAccessBatchReadable> ObjectCache(final D delegate,
         final SharedObjectCache cache, final ExecutorService executor) {
         m_writer = new ObjectCacheWriter(delegate.getWriter());
-        m_objectData = HeapCacheUtils.getObjectDataIndices(delegate.getSchema());
-        m_readStore = new ObjectReadCache(delegate, m_objectData, cache, m_cachedData);
+        m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(delegate.getSchema());
+        m_stringData = HeapCacheUtils.getStringIndices(delegate.getSchema());
+        m_readStore = new ObjectReadCache(delegate, m_varBinaryData, m_stringData, cache, m_cachedData);
         m_cache = cache.getCache();
         m_executor = executor;
     }
@@ -215,8 +229,8 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     }
 
     @Override
-    public RandomAccessBatchReader createReader(final ColumnSelection config) {
-        return m_readStore.createReader(config);
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
+        return m_readStore.createRandomAccessReader(config);
     }
 
     @Override

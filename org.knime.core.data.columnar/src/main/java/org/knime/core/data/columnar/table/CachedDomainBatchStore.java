@@ -54,7 +54,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -77,6 +76,7 @@ import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.CachedBatchReadStore.WrappedRandomAccessBatchReader;
 import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.util.DuplicateChecker;
 
 /**
@@ -284,7 +284,7 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
     }
 
     @Override
-    public final RandomAccessBatchReader createReader(final ColumnSelection selection) {
+    public final RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         if (!m_writerClosed.get()) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
         }

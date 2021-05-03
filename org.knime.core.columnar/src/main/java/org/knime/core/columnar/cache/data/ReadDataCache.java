@@ -54,7 +54,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
@@ -68,6 +67,7 @@ import org.knime.core.columnar.cache.EvictingCache.Evictor;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.table.schema.ColumnarSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -212,7 +212,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                     try {
                         waitForAndHandleFuture();
                         if (m_readerDelegate == null) {
-                            m_readerDelegate = m_reabableDelegate.createReader(m_selection);
+                            m_readerDelegate = m_reabableDelegate.createRandomAccessReader(m_selection);
                         }
                     } catch (InterruptedException e) {
                         // Restore interrupted state...
@@ -298,7 +298,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
     }
 
     @Override
-    public RandomAccessBatchReader createReader(final ColumnSelection selection) {
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         return new ReadDataCacheReader(selection);
     }
 

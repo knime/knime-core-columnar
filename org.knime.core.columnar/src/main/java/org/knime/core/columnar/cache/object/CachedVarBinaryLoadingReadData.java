@@ -43,71 +43,77 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  *
- * History
- *   Oct 9, 2020 (dietzc): created
  */
 package org.knime.core.columnar.cache.object;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.FilteredColumnSelection;
-import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.StringDataSpec;
-import org.knime.core.table.schema.VarBinaryDataSpec;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 
 /**
- * Utility class.
+ * Wrapper around {@link ObjectData} for in-heap caching.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class HeapCacheUtils {
+final class CachedVarBinaryLoadingReadData implements VarBinaryReadData {
 
-    private HeapCacheUtils() {
+    private final AtomicInteger m_refCounter = new AtomicInteger(1);
+
+    private final VarBinaryReadData m_delegate;
+
+    private Object[] m_data;
+
+    CachedVarBinaryLoadingReadData(final VarBinaryReadData delegate, final Object[] data) {
+        m_delegate = delegate;
+        m_data = data;
     }
 
-    /**
-     * Get the indices of all VarBinaryData in the ColumnStoreSchema.
-     *
-     * @param schema the ColumnStoreSchema
-     * @return indices of ObjectData in the schema
-     */
-    public static final ColumnSelection getVarBinaryIndices(final ColumnarSchema schema) {
-        final List<Integer> indices = new ArrayList<>();
-        final int length = schema.numColumns();
-        for (int i = 0; i < length; i++) {
-            // NB: We only cache data which are expensive to serialize/deserialize
-            // * For Strings we need to do UTF-8 encoding and decoding
-            // * For Generic object we need to call a serializer which might be expensive
-            final DataSpec columnDataSpec = schema.getSpec(i);
-            if (columnDataSpec instanceof VarBinaryDataSpec) {
-                indices.add(i);
-            }
-        }
-        return new FilteredColumnSelection(length, indices.stream().mapToInt(Integer::intValue).toArray());
+    @Override
+    public boolean isMissing(final int index) {
+        return m_delegate.isMissing(index);
     }
 
-    /**
-     * Get the indices of all StringData in the ColumnStoreSchema.
-     *
-     * @param schema the ColumnStoreSchema
-     * @return indices of ObjectData in the schema
-     */
-    public static final ColumnSelection getStringIndices(final ColumnarSchema schema) {
-        final List<Integer> indices = new ArrayList<>();
-        final int length = schema.numColumns();
-        for (int i = 0; i < length; i++) {
-            // NB: We only cache data which are expensive to serialize/deserialize
-            // * For Strings we need to do UTF-8 encoding and decoding
-            // * For Generic object we need to call a serializer which might be expensive
-            final DataSpec columnDataSpec = schema.getSpec(i);
-            if (columnDataSpec instanceof StringDataSpec) {
-                indices.add(i);
-            }
+    @Override
+    public int length() {
+        return m_delegate.length();
+    }
+
+    @Override
+    public void retain() {
+        m_refCounter.getAndIncrement();
+        m_delegate.retain();
+    }
+
+    @Override
+    public void release() {
+        if (m_refCounter.decrementAndGet() == 0) {
+            m_data = null;
         }
-        return new FilteredColumnSelection(length, indices.stream().mapToInt(Integer::intValue).toArray());
+        m_delegate.release();
+    }
+
+    @Override
+    public long sizeOf() {
+        return m_delegate.sizeOf();
+    }
+
+    @Override
+    public byte[] getBytes(final int index) {
+        if (m_data[index] == null) {
+            m_data[index] = m_delegate.getBytes(index);
+        }
+        return (byte[])m_data[index];
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
+        if (m_data[index] == null) {
+            m_data[index] = m_delegate.getObject(index, deserializer);
+        }
+        return (T)m_data[index];
     }
 
 }

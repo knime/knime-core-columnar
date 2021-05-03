@@ -51,7 +51,6 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -62,6 +61,7 @@ import org.knime.core.columnar.cache.object.ObjectReadCache;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link BatchReadStore} that delegates operations through an {@link ObjectCache} and a {@link ReadDataCache}.
@@ -86,7 +86,7 @@ final class CachedBatchReadStore implements BatchReadStore {
 
         /**
          * @param store a delegating store from which to obtain the delegate reader
-         * @param selection see {@link BatchReadStore#createReader(ColumnSelection)}
+         * @param selection see {@link BatchReadStore#createRandomAccessReader(ColumnSelection)}
          */
         WrappedRandomAccessBatchReader(final RandomAccessBatchReadable wrappedDelegateReadable,
             final ColumnSelection selection, final AtomicBoolean storeClosed, final int numBatches) {
@@ -127,7 +127,7 @@ final class CachedBatchReadStore implements BatchReadStore {
 
         private final RandomAccessBatchReader initAndGetDelegate() {
             if (m_delegateReader == null) {
-                m_delegateReader = m_delegateReadable.createReader(m_selection);
+                m_delegateReader = m_delegateReadable.createRandomAccessReader(m_selection);
             }
             return m_delegateReader;
         }
@@ -156,7 +156,7 @@ final class CachedBatchReadStore implements BatchReadStore {
     }
 
     @Override
-    public final RandomAccessBatchReader createReader(final ColumnSelection selection) {
+    public final RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         if (m_closed.get()) {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }

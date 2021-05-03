@@ -54,17 +54,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
-import org.knime.core.columnar.data.ObjectData;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.VarBinaryData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * A {@link RandomAccessBatchReadable} that for in-heap caching of {@link ObjectData}.
+ * A {@link RandomAccessBatchReadable} that for in-heap caching of {@link VarBinaryData}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -79,26 +80,44 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
         private final ColumnSelection m_selection;
 
         private ObjectReadCacheReader(final ColumnSelection selection) {
-            m_readerDelegate = m_reabableDelegate.createReader(selection);
+            m_readerDelegate = m_reabableDelegate.createRandomAccessReader(selection);
             m_selection = selection;
         }
 
         @Override
         public ReadBatch readRetained(final int index) throws IOException {
             final ReadBatch batch = m_readerDelegate.readRetained(index);
-            return m_selection.createBatch(i -> m_objectData.isSelected(i) ? wrap(batch, index, i) : batch.get(i));
+            return m_selection.createBatch(i -> {
+                if (m_varBinaryData.isSelected(i)) {
+                    return wrapVarBinary(batch, index, i);
+                } else if (m_stringData.isSelected(i)) {
+                    return wrapString(batch, index, i);
+                } else {
+                    return batch.get(i);
+                }
+            });
         }
 
-        @SuppressWarnings("unchecked")
-        private <T> CachedObjectLoadingReadData<T> wrap(final ReadBatch batch, final int batchIndex,
+        private CachedVarBinaryLoadingReadData wrapVarBinary(final ReadBatch batch, final int batchIndex,
             final int columnIndex) {
-            final ObjectReadData<T> columnReadData = (ObjectReadData<T>)batch.get(columnIndex);
+            final VarBinaryReadData columnReadData = (VarBinaryReadData)batch.get(columnIndex);
             final Object[] array =
                 m_cache.computeIfAbsent(new ColumnDataUniqueId(ObjectReadCache.this, columnIndex, batchIndex), k -> {
                     m_cachedData.add(k);
                     return new Object[columnReadData.length()];
                 });
-            return new CachedObjectLoadingReadData<>(columnReadData, array);
+            return new CachedVarBinaryLoadingReadData(columnReadData, array);
+        }
+
+        private CachedStringLoadingReadData wrapString(final ReadBatch batch, final int batchIndex,
+            final int columnIndex) {
+            final StringReadData columnReadData = (StringReadData)batch.get(columnIndex);
+            final String[] array =
+                (String[])m_cache.computeIfAbsent(new ColumnDataUniqueId(ObjectReadCache.this, columnIndex, batchIndex), k -> {
+                    m_cachedData.add(k);
+                    return new String[columnReadData.length()];
+                });
+            return new CachedStringLoadingReadData(columnReadData, array);
         }
 
         @Override
@@ -110,7 +129,9 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
 
     private final RandomAccessBatchReadable m_reabableDelegate;
 
-    private final ColumnSelection m_objectData;
+    private final ColumnSelection m_varBinaryData;
+
+    private final ColumnSelection m_stringData;
 
     private final Map<ColumnDataUniqueId, Object[]> m_cache;
 
@@ -121,20 +142,22 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
      * @param cache the delegate from which to read object data in case of a cache miss
      */
     public ObjectReadCache(final RandomAccessBatchReadable delegate, final SharedObjectCache cache) {
-        this(delegate, HeapCacheUtils.getObjectDataIndices(delegate.getSchema()), cache,
+        this(delegate, HeapCacheUtils.getVarBinaryIndices(delegate.getSchema()),
+            HeapCacheUtils.getStringIndices(delegate.getSchema()), cache,
             Collections.newSetFromMap(new ConcurrentHashMap<>()));
     }
 
-    ObjectReadCache(final RandomAccessBatchReadable reabableDelegate, final ColumnSelection selection,
-        final SharedObjectCache cache, final Set<ColumnDataUniqueId> cachedData) {
+    ObjectReadCache(final RandomAccessBatchReadable reabableDelegate, final ColumnSelection varBinaryData,
+        final ColumnSelection stringData, final SharedObjectCache cache, final Set<ColumnDataUniqueId> cachedData) {
         m_reabableDelegate = reabableDelegate;
-        m_objectData = selection;
+        m_varBinaryData = varBinaryData;
+        m_stringData = stringData;
         m_cache = cache.getCache();
         m_cachedData = cachedData;
     }
 
     @Override
-    public RandomAccessBatchReader createReader(final ColumnSelection selection) {
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         return new ObjectReadCacheReader(selection);
     }
 
