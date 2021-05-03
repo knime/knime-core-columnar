@@ -48,7 +48,7 @@
  */
 package org.knime.core.columnar.batch;
 
-import org.knime.core.columnar.ColumnarSchema;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A data structure into which columnar data can be written. Its life cycle is as follows:

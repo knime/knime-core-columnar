@@ -45,10 +45,10 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.columnar.ColumnarSchema;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * Columnar wrapper around a {@link ValueSchema}.

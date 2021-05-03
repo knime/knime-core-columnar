@@ -47,7 +47,7 @@ package org.knime.core.columnar.store;
 
 import java.nio.file.Path;
 
-import org.knime.core.columnar.ColumnarSchema;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A factory for creating {@link BatchStore BatchStores} and {@link BatchReadStore BatchReadStores}.

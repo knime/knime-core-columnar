@@ -59,7 +59,7 @@ import org.knime.core.columnar.batch.RandomAccessBatchReader;
  * <li>Batches can only be {@link BatchWriter#create(int) created} or
  * {@link BatchWriter#write(org.knime.core.columnar.batch.ReadBatch) written} as long as both the store and the writer
  * are unclosed.
- * <li>{@link RandomAccessBatchReader Readers} can only be {@link #createReader() created} as long as the writer is
+ * <li>{@link RandomAccessBatchReader Readers} can only be {@link #createRandomAccessReader() created} as long as the writer is
  * closed and the store is unclosed.
  * <li>Batches can only be {@link RandomAccessBatchReader#readRetained(int) read} as long as both the store and the
  * reader are unclosed.

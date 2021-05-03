@@ -50,7 +50,7 @@ package org.knime.core.columnar.batch;
 
 import java.io.Closeable;
 
-import org.knime.core.columnar.ColumnarSchema;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
