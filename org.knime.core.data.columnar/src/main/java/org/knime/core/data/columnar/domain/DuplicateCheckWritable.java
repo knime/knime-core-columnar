@@ -54,7 +54,7 @@ import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.ObjectData.ObjectReadData;
+import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.util.DuplicateChecker;
@@ -83,7 +83,6 @@ public final class DuplicateCheckWritable implements BatchWritable {
             return m_writerDelegate.create(capacity);
         }
 
-        @SuppressWarnings("unchecked")
         @Override
         public synchronized void write(final ReadBatch batch) throws IOException {
 
@@ -97,12 +96,12 @@ public final class DuplicateCheckWritable implements BatchWritable {
                 return;
             }
 
-            final ObjectReadData<String> rowKeyData = (ObjectReadData<String>)batch.get(0);
+            final StringReadData rowKeyData = (StringReadData)batch.get(0);
             rowKeyData.retain();
             m_future = m_future.thenRunAsync(() -> { // NOSONAR
                 try {
                     for (int i = 0; i < rowKeyData.length(); i++) {
-                        m_duplicateChecker.addKey(rowKeyData.getObject(i));
+                        m_duplicateChecker.addKey(rowKeyData.getString(i));
                     }
                 } catch (IOException e) {
                     throw new IllegalStateException("Failure while checking for duplicate row IDs", e);
