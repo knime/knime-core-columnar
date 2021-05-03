@@ -67,6 +67,6 @@ public interface SequentialBatchReader extends Closeable {
      * @return the next batch from which data can be obtained, or null if there are no more batches available
      * @throws IOException if any I/O problem occurs
      */
-    ReadBatch readRetained() throws IOException;
+    ReadBatch forward() throws IOException;
 
 }

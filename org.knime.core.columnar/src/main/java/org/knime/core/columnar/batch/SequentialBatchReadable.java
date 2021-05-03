@@ -64,7 +64,7 @@ public interface SequentialBatchReadable extends BatchReadable {
      *            batches read by the reader
      * @return a new reader
      */
-    SequentialBatchReader createReader(ColumnSelection selection);
+    SequentialBatchReader createSequentialReader(ColumnSelection selection);
 
     /**
      * Creates a new {@link SequentialBatchReader} that reads {@link ReadBatch ReadBatches} in which all columns are
@@ -72,8 +72,8 @@ public interface SequentialBatchReadable extends BatchReadable {
      *
      * @return a new batch reader
      */
-    default SequentialBatchReader createReader() {
-        return createReader(new DefaultColumnSelection(getSchema().numColumns()));
+    default SequentialBatchReader createSequentialReader() {
+        return createSequentialReader(new DefaultColumnSelection(getSchema().numColumns()));
     }
 
 }

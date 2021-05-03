@@ -53,10 +53,11 @@ import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 
 /**
- * A data structure that provides random access to {@link ReadBatch ReadBatches} via {@link #createReader() created}
- * {@link RandomAccessBatchReader RandomAccessBatchReaders}. Its life cycle is as follows:
+ * A data structure that provides random access to {@link ReadBatch ReadBatches} via {@link #createRandomAccessReader()
+ * created} {@link RandomAccessBatchReader RandomAccessBatchReaders}. Its life cycle is as follows:
  * <ol>
- * <li>Any number of {@link RandomAccessBatchReader readers} are {@link #createReader(ColumnSelection) created}.</li>
+ * <li>Any number of {@link RandomAccessBatchReader readers} are {@link #createRandomAccessReader(ColumnSelection)
+ * created}.</li>
  * <li>Data is read independently by each of these readers by iterating over the following steps:
  * <ol>
  * <li>A {@link ReadBatch} is {@link RandomAccessBatchReader#readRetained(int) retained and read}.</li>
@@ -78,7 +79,7 @@ public interface RandomAccessBatchReadable extends BatchReadable {
      *            batches read by the reader
      * @return a new reader
      */
-    RandomAccessBatchReader createReader(ColumnSelection selection);
+    RandomAccessBatchReader createRandomAccessReader(ColumnSelection selection);
 
     /**
      * Creates a new {@link RandomAccessBatchReader} that reads {@link ReadBatch ReadBatches} in which all columns are
@@ -86,8 +87,8 @@ public interface RandomAccessBatchReadable extends BatchReadable {
      *
      * @return a new batch reader
      */
-    default RandomAccessBatchReader createReader() {
-        return createReader(new DefaultColumnSelection(getSchema().numColumns()));
+    default RandomAccessBatchReader createRandomAccessReader() {
+        return createRandomAccessReader(new DefaultColumnSelection(getSchema().numColumns()));
     }
 
 }

@@ -66,6 +66,7 @@ public interface RandomAccessBatchReader extends Closeable {
      * @throws IOException if any I/O problem occurs
      * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the number of batches
      */
+    // TODO return null instead of throwing IndexOutOfBoundsException
     ReadBatch readRetained(int index) throws IOException;
 
 }
