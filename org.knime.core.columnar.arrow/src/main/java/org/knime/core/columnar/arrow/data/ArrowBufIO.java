@@ -74,8 +74,6 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
  */
 final class ArrowBufIO {
 
-    static ArrowBufIO INSTANCE = new ArrowBufIO();
-
     private static ThreadLocal<StringEncoder> ENCODER_FACTORY = ThreadLocal.withInitial(StringEncoder::new);
 
     private static final int OFFSET_WIDTH = BaseLargeVariableWidthVector.OFFSET_WIDTH;
