@@ -80,7 +80,6 @@ final class MappedReferenceManager implements ReferenceManager {
     private final MappedArrowBatchKey m_key;
 
     // We need to keep a reference to the MappedByteBuffer to keep it mapped
-    @SuppressWarnings("unused")
     private MappedByteBuffer m_mappedBuffer;
 
     /**

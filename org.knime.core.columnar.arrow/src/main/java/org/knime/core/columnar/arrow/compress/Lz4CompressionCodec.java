@@ -61,10 +61,14 @@ public class Lz4CompressionCodec implements CompressionCodec {
 
     private LZ4FastDecompressor decompressor;
 
+    /**
+     * Compression codec
+     */
     public Lz4CompressionCodec() {
         factory = LZ4Factory.nativeInstance();
     }
 
+    @SuppressWarnings("resource")
     @Override
     public ArrowBuf compress(final BufferAllocator allocator, final ArrowBuf uncompressedBuffer) {
         Preconditions.checkArgument(uncompressedBuffer.writerIndex() <= Integer.MAX_VALUE,
@@ -113,6 +117,7 @@ public class Lz4CompressionCodec implements CompressionCodec {
         return compressedBuffer;
     }
 
+    @SuppressWarnings("resource")
     @Override
     public ArrowBuf decompress(final BufferAllocator allocator, final ArrowBuf compressedBuffer) {
         Preconditions.checkArgument(compressedBuffer.writerIndex() <= Integer.MAX_VALUE,
