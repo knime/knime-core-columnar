@@ -59,6 +59,7 @@ import org.knime.core.columnar.cache.EvictingCache.Evictor;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -73,15 +74,9 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
         private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
 
-        private final BufferedBatchLoader m_batchLoader;
-
-        private final RandomAccessBatchReader m_readerDelegate;
-
         private final ColumnSelection m_selection;
 
         ReadDataReadCacheReader(final ColumnSelection selection) {
-            m_batchLoader = new BufferedBatchLoader();
-            m_readerDelegate = m_reabableDelegate.createRandomAccessReader(selection);
             m_selection = selection;
         }
 
@@ -97,9 +92,9 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
                         return cachedData;
                     }
 
-                    try {
-                        final NullableReadData data = m_batchLoader.loadBatch(m_readerDelegate, index).get(i);
-                        data.retain();
+                    try (RandomAccessBatchReader reader = m_reabableDelegate
+                        .createRandomAccessReader(new FilteredColumnSelection(m_selection.numColumns(), i))) {
+                        final NullableReadData data = reader.readRetained(index).get(i);
                         m_globalCache.put(ccUID, data, m_evictor);
                         return data;
                     } catch (IOException e) {
@@ -111,8 +106,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
         @Override
         public void close() throws IOException {
-            m_batchLoader.close();
-            m_readerDelegate.close();
+            // no resources held
         }
 
     }

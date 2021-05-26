@@ -67,6 +67,7 @@ import org.knime.core.columnar.cache.EvictingCache.Evictor;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -185,15 +186,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
         private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
 
-        private final BufferedBatchLoader m_batchLoader;
-
         private final ColumnSelection m_selection;
 
-        // initialized lazily, since we might actually be able to read everything from the cache
-        private RandomAccessBatchReader m_readerDelegate;
-
         ReadDataCacheReader(final ColumnSelection selection) {
-            m_batchLoader = new BufferedBatchLoader();
             m_selection = selection;
         }
 
@@ -211,9 +206,6 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
                     try {
                         waitForAndHandleFuture();
-                        if (m_readerDelegate == null) {
-                            m_readerDelegate = m_reabableDelegate.createRandomAccessReader(m_selection);
-                        }
                     } catch (InterruptedException e) {
                         // Restore interrupted state...
                         Thread.currentThread().interrupt();
@@ -221,9 +213,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                         // this way, the cache stays in a consistent state
                         throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
                     }
-                    try {
-                        final NullableReadData data = m_batchLoader.loadBatch(m_readerDelegate, index).get(i);
-                        data.retain();
+                    try (RandomAccessBatchReader reader = m_reabableDelegate
+                        .createRandomAccessReader(new FilteredColumnSelection(m_selection.numColumns(), i))) {
+                        final NullableReadData data = reader.readRetained(index).get(i);
                         m_globalCache.put(ccUID, data, m_evictor);
                         return data;
                     } catch (IOException e) {
@@ -235,10 +227,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
         @Override
         public void close() throws IOException {
-            m_batchLoader.close();
-            if (m_readerDelegate != null) {
-                m_readerDelegate.close();
-            }
+            // no resources held
         }
 
     }
