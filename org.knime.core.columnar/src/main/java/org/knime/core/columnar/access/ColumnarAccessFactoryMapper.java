@@ -77,13 +77,12 @@ public final class ColumnarAccessFactoryMapper implements DataSpec.Mapper<Column
 
     static final ColumnarAccessFactoryMapper INSTANCE = new ColumnarAccessFactoryMapper();
 
-    private ColumnarAccessFactoryMapper() {
-    }
+    private ColumnarAccessFactoryMapper() {}
 
     /**
      * Creates a {@link ColumnarAccessFactory} for the provided {@link DataSpec}.
      *
-     * @param dataSpec  {@link DataSpec} to create an {@link ColumnarAccessFactory} for
+     * @param dataSpec {@link DataSpec} to create an {@link ColumnarAccessFactory} for
      * @return the {@link ColumnarAccessFactory} for {@link DataSpec}
      */
     public static ColumnarAccessFactory createAccessFactory(final DataSpec dataSpec) {
@@ -167,12 +166,12 @@ public final class ColumnarAccessFactoryMapper implements DataSpec.Mapper<Column
 
     @Override
     public ColumnarAccessFactory visit(final ByteDataSpec spec) {
-        throw new UnsupportedOperationException("NYI");
+        return ColumnarByteAccessFactory.INSTANCE;
     }
 
     @Override
     public ColumnarAccessFactory visit(final FloatDataSpec spec) {
-        throw new UnsupportedOperationException("NYI");
+        return ColumnarFloatAccessFactory.INSTANCE;
     }
 
 }
