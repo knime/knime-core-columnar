@@ -51,6 +51,7 @@ import org.knime.core.columnar.data.PeriodData.PeriodReadData;
 import org.knime.core.columnar.data.PeriodData.PeriodWriteData;
 import org.knime.core.table.access.PeriodAccess.PeriodReadAccess;
 import org.knime.core.table.access.PeriodAccess.PeriodWriteAccess;
+import org.knime.core.table.access.ReadAccess;
 
 final class ColumnarPeriodAccessFactory
     implements ColumnarAccessFactory {
@@ -82,11 +83,6 @@ final class ColumnarPeriodAccessFactory
             return m_data.getPeriod(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarPeriodWriteAccess extends AbstractWriteAccess<PeriodWriteData> implements PeriodWriteAccess {
@@ -100,6 +96,10 @@ final class ColumnarPeriodAccessFactory
             m_data.setPeriod(m_index.getIndex(), value);
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setPeriod(m_index.getIndex(), ((PeriodReadAccess)access).getPeriodValue());
+        }
 
+    }
 }

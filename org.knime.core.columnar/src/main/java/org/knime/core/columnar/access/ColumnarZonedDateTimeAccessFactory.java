@@ -49,6 +49,7 @@ import java.time.ZonedDateTime;
 
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
+import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.ZonedDateTimeAccess.ZonedDateTimeReadAccess;
 import org.knime.core.table.access.ZonedDateTimeAccess.ZonedDateTimeWriteAccess;
 
@@ -82,11 +83,6 @@ final class ColumnarZonedDateTimeAccessFactory
             return m_data.getZonedDateTime(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarZonedDateTimeWriteAccess extends AbstractWriteAccess<ZonedDateTimeWriteData> implements ZonedDateTimeWriteAccess {
@@ -100,6 +96,10 @@ final class ColumnarZonedDateTimeAccessFactory
             m_data.setZonedDateTime(m_index.getIndex(), value);
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setZonedDateTime(m_index.getIndex(), ((ZonedDateTimeReadAccess)access).getZonedDateTimeValue());
+        }
 
+    }
 }

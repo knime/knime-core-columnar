@@ -51,6 +51,7 @@ import org.knime.core.columnar.data.DurationData.DurationReadData;
 import org.knime.core.columnar.data.DurationData.DurationWriteData;
 import org.knime.core.table.access.DurationAccess.DurationReadAccess;
 import org.knime.core.table.access.DurationAccess.DurationWriteAccess;
+import org.knime.core.table.access.ReadAccess;
 
 final class ColumnarDurationAccessFactory
     implements ColumnarAccessFactory {
@@ -82,11 +83,6 @@ final class ColumnarDurationAccessFactory
             return m_data.getDuration(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarDurationWriteAccess extends AbstractWriteAccess<DurationWriteData> implements DurationWriteAccess {
@@ -100,6 +96,10 @@ final class ColumnarDurationAccessFactory
             m_data.setDuration(m_index.getIndex(), value);
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setDuration(m_index.getIndex(), ((DurationReadAccess)access).getDurationValue());
+        }
 
+    }
 }

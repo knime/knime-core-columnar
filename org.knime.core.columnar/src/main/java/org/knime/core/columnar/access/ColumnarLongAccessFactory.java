@@ -49,6 +49,7 @@ import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
 import org.knime.core.table.access.LongAccess.LongReadAccess;
 import org.knime.core.table.access.LongAccess.LongWriteAccess;
+import org.knime.core.table.access.ReadAccess;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link LongReadData} / {@link LongWriteData} as {@link LongReadAccess}
@@ -87,11 +88,6 @@ final class ColumnarLongAccessFactory implements ColumnarAccessFactory {
             return m_data.getLong(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarLongWriteAccess extends AbstractWriteAccess<LongWriteData>
@@ -106,6 +102,10 @@ final class ColumnarLongAccessFactory implements ColumnarAccessFactory {
             m_data.setLong(m_index.getIndex(), value);
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setLong(m_index.getIndex(), ((LongReadAccess)access).getLongValue());
+        }
 
+    }
 }

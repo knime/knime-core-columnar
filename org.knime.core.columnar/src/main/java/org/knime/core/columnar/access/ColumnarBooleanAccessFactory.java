@@ -49,6 +49,7 @@ import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 import org.knime.core.table.access.BooleanAccess.BooleanReadAccess;
 import org.knime.core.table.access.BooleanAccess.BooleanWriteAccess;
+import org.knime.core.table.access.ReadAccess;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link BooleanReadData} / {@link BooleanWriteData} as
@@ -86,11 +87,6 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory {
             return m_data.getBoolean(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarBooleanWriteAccess extends AbstractWriteAccess<BooleanWriteData>
@@ -105,6 +101,10 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory {
             m_data.setBoolean(m_index.getIndex(), value);
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setBoolean(m_index.getIndex(), ((BooleanReadAccess)access).getBooleanValue());
+        }
 
+    }
 }

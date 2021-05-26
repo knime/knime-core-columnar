@@ -47,6 +47,7 @@ package org.knime.core.columnar.access;
 
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.StringAccess.StringReadAccess;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
 
@@ -80,11 +81,6 @@ final class ColumnarStringAccessFactory
             return m_data.getString(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarStringWriteAccess extends AbstractWriteAccess<StringWriteData> implements StringWriteAccess {
@@ -98,6 +94,10 @@ final class ColumnarStringAccessFactory
             m_data.setString(m_index.getIndex(), value);
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setString(m_index.getIndex(), ((StringReadAccess)access).getStringValue());
+        }
 
+    }
 }

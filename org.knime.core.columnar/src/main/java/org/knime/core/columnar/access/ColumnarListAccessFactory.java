@@ -108,6 +108,21 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
             m_readAccess = innerAccessFactory.createReadAccess(() -> m_innerIndex);
         }
 
+        @Override
+        public int size() {
+            updateReadValue();
+            return m_innerData.length();
+        }
+
+        @Override
+        public <A extends ReadAccess> A getReadAccess(final int index) { // NOSONAR
+            updateReadValue();
+            m_innerIndex = index;
+            @SuppressWarnings("unchecked")
+            final A v = (A)m_readAccess;
+            return v;
+        }
+
         /** Update the m_value if we are at a new index */
         private void updateReadValue() {
             final int index = m_index.getIndex();
@@ -120,29 +135,8 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
-        @Override
-        public <A extends ReadAccess> A getReadAccess(final int index) { // NOSONAR
-            updateReadValue();
-            m_innerIndex = index;
-            @SuppressWarnings("unchecked")
-            final A v = (A)m_readAccess;
-            return v;
-        }
-
-        @Override
         public boolean isMissing(final int index) {
-            updateReadValue();
             return m_innerData.isMissing(index);
-        }
-
-        @Override
-        public int size() {
-            updateReadValue();
-            return m_innerData.length();
         }
 
     }
@@ -160,6 +154,12 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
+        public void create(final int size) {
+            final W writeData = m_data.createWriteData(m_index.getIndex(), size);
+            m_writeAccess.setData(writeData);
+        }
+
+        @Override
         public <A extends WriteAccess> A getWriteAccess(final int index) { // NOSONAR
             m_innerIndex = index;
             // NB: m_writeAccess is always the value for the current index
@@ -170,11 +170,14 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
-        public void create(final int size) {
-            final W writeData = m_data.createWriteData(m_index.getIndex(), size);
-            m_writeAccess.setData(writeData);
+        public void setFromNonMissing(final ReadAccess access) {
+            final ListReadAccess listAccess = (ListReadAccess)access;
+            final int listSize = listAccess.size();
+            create(listSize);
+            for (int i = 0; i < listSize; i++) {
+                getWriteAccess(i).setFrom(listAccess.getReadAccess(i));
+            }
         }
 
     }
-
 }

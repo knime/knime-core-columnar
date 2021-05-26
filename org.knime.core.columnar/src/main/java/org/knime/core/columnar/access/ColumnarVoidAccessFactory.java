@@ -50,6 +50,7 @@ package org.knime.core.columnar.access;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.table.access.ReadAccess;
 
 /**
  * VoidValueFactory to create VoidData.
@@ -95,7 +96,8 @@ final class ColumnarVoidAccessFactory implements ColumnarAccessFactory {
         private static final VoidWriteAccess WRITE_ACCESS_INSTANCE = new VoidWriteAccess();
 
         @Override
-        public void setMissing() { // NOSONAR
+        public void setMissing() {
+            // there is no actual data
         }
 
         @Override
@@ -103,6 +105,10 @@ final class ColumnarVoidAccessFactory implements ColumnarAccessFactory {
             // there is no actual data
         }
 
-    }
+        @Override
+        public void setFrom(final ReadAccess access) {
+            // there is no actual data
+        }
 
+    }
 }

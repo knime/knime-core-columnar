@@ -49,6 +49,7 @@ import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.table.access.IntAccess.IntReadAccess;
 import org.knime.core.table.access.IntAccess.IntWriteAccess;
+import org.knime.core.table.access.ReadAccess;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link IntReadData} / {@link IntWriteData} as {@link IntReadAccess} /
@@ -87,11 +88,6 @@ final class ColumnarIntAccessFactory
             return m_data.getInt(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarIntWriteAccess extends AbstractWriteAccess<IntWriteData> implements IntWriteAccess {
@@ -105,6 +101,10 @@ final class ColumnarIntAccessFactory
             m_data.setInt(m_index.getIndex(), value);
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setInt(m_index.getIndex(), ((IntReadAccess)access).getIntValue());
+        }
 
+    }
 }

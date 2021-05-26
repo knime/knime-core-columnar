@@ -46,16 +46,12 @@
 package org.knime.core.columnar.access;
 
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.table.access.ReadAccess;
-import org.knime.core.table.access.WriteAccess;
 
 /**
- * Abstract implementation for {@link ReadAccess ReadAccesses} and {@link WriteAccess WriteAccesses}.
- *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-abstract class AbstractReadAccess<T> implements ColumnarReadAccess { // NOSONAR
+abstract class AbstractReadAccess<T extends NullableReadData> implements ColumnarReadAccess {
 
     T m_data;
 
@@ -65,10 +61,16 @@ abstract class AbstractReadAccess<T> implements ColumnarReadAccess { // NOSONAR
         m_index = index;
     }
 
-    @SuppressWarnings("unchecked")
+    @Override
+    public boolean isMissing() {
+        return m_data.isMissing(m_index.getIndex());
+    }
+
     @Override
     public void setData(final NullableReadData data) {
-        m_data = (T)data;
+        @SuppressWarnings("unchecked")
+        final T casted = (T)data;
+        m_data = casted;
     }
 
 }

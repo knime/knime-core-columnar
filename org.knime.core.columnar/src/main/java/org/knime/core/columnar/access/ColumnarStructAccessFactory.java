@@ -106,8 +106,8 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
         }
 
         @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
+        public int numInnerReadAccesses() {
+            return m_inner.length;
         }
 
         @Override
@@ -139,6 +139,11 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
         }
 
         @Override
+        public int numInnerWriteAccesses() {
+            return m_inner.length;
+        }
+
+        @Override
         public <W extends WriteAccess> W getWriteAccessAt(final int index) {
             @SuppressWarnings("unchecked")
             final W cast = (W)m_inner[index];
@@ -154,6 +159,14 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
             }
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            final StructReadAccess structAccess = (StructReadAccess)access;
+            final int numInnerReadAccesses = structAccess.numInnerReadAccesses();
+            for (int i = 0; i < numInnerReadAccesses; i++) {
+                m_inner[i].setFrom(structAccess.getInnerReadAccessAt(i));
+            }
+        }
 
+    }
 }

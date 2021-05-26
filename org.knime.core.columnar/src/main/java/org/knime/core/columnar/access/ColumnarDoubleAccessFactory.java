@@ -49,6 +49,7 @@ import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.table.access.DoubleAccess.DoubleReadAccess;
 import org.knime.core.table.access.DoubleAccess.DoubleWriteAccess;
+import org.knime.core.table.access.ReadAccess;
 
 /**
  * A ColumnarValueFactory implementation wrapping {@link DoubleReadData} / {@link DoubleWriteData} as
@@ -87,11 +88,6 @@ final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
             return m_data.getDouble(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarDoubleWriteAccess extends AbstractWriteAccess<DoubleWriteData>
@@ -106,6 +102,9 @@ final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
             m_data.setDouble(m_index.getIndex(), value);
         }
 
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setDouble(m_index.getIndex(), ((DoubleReadAccess)access).getDoubleValue());
+        }
     }
-
 }

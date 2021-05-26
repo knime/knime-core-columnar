@@ -51,6 +51,7 @@ import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
 import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
 import org.knime.core.table.access.LocalTimeAccess.LocalTimeReadAccess;
 import org.knime.core.table.access.LocalTimeAccess.LocalTimeWriteAccess;
+import org.knime.core.table.access.ReadAccess;
 
 final class ColumnarLocalTimeAccessFactory
     implements ColumnarAccessFactory {
@@ -82,11 +83,6 @@ final class ColumnarLocalTimeAccessFactory
             return m_data.getLocalTime(m_index.getIndex());
         }
 
-        @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
     }
 
     static final class ColumnarLocalTimeWriteAccess extends AbstractWriteAccess<LocalTimeWriteData> implements LocalTimeWriteAccess {
@@ -100,6 +96,10 @@ final class ColumnarLocalTimeAccessFactory
             m_data.setLocalTime(m_index.getIndex(), value);
         }
 
-    }
+        @Override
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setLocalTime(m_index.getIndex(), ((LocalTimeReadAccess)access).getLocalTimeValue());
+        }
 
+    }
 }

@@ -50,6 +50,7 @@ package org.knime.core.columnar.access;
 
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.VarBinaryAccess.VarBinaryReadAccess;
 import org.knime.core.table.access.VarBinaryAccess.VarBinaryWriteAccess;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
@@ -79,6 +80,25 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
         return new ColumnarVarBinaryReadAccess(index);
     }
 
+    static final class ColumnarVarBinaryReadAccess extends AbstractReadAccess<VarBinaryReadData>
+        implements VarBinaryReadAccess {
+
+        ColumnarVarBinaryReadAccess(final ColumnDataIndex index) {
+            super(index);
+        }
+
+        @Override
+        public byte[] getByteArray() {
+            return m_data.getBytes(m_index.getIndex());
+        }
+
+        @Override
+        public <T> T getObject(final ObjectDeserializer<T> deserializer) {
+            return m_data.getObject(m_index.getIndex(), deserializer);
+        }
+
+    }
+
     static final class ColumnarVarBinaryWriteAccess extends AbstractWriteAccess<VarBinaryWriteData>
         implements VarBinaryWriteAccess {
 
@@ -103,30 +123,10 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
             m_data.setObject(m_index.getIndex(), value, serializer);
         }
 
-    }
-
-    static final class ColumnarVarBinaryReadAccess extends AbstractReadAccess<VarBinaryReadData>
-        implements VarBinaryReadAccess {
-
-        ColumnarVarBinaryReadAccess(final ColumnDataIndex index) {
-            super(index);
-        }
-
         @Override
-        public boolean isMissing() {
-            return m_data.isMissing(m_index.getIndex());
-        }
-
-        @Override
-        public byte[] getByteArray() {
-            return m_data.getBytes(m_index.getIndex());
-        }
-
-        @Override
-        public <T> T getObject(final ObjectDeserializer<T> deserializer) {
-            return m_data.getObject(m_index.getIndex(), deserializer);
+        public void setFromNonMissing(final ReadAccess access) {
+            m_data.setBytes(m_index.getIndex(), ((VarBinaryReadAccess)access).getByteArray());
         }
 
     }
-
 }
