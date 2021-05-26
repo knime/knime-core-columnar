@@ -93,7 +93,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
         m_values = new WriteValue[factories.length];
         assert factories.length == m_access.getNumColumns();
         for (int i = 0; i < m_values.length; i++) {
-            m_values[i] = factories[i].createWriteValue(m_access.getAccess(i));
+            m_values[i] = factories[i].createWriteValue(m_access.getWriteAccess(i));
         }
         m_rowKeyValue = (RowKeyWriteValue)m_values[0];
     }
@@ -113,7 +113,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
 
     @Override
     public final void setMissing(final int index) {
-        m_access.getAccess(index + 1).setMissing();
+        m_access.getWriteAccess(index + 1).setMissing();
     }
 
     @Override

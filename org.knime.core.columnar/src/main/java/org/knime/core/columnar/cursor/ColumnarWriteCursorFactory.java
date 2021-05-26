@@ -61,6 +61,7 @@ import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.cursor.WriteCursor;
+import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
 
@@ -160,11 +161,6 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public boolean canForward() {
-            return true;
-        }
-
-        @Override
         public final void close() throws IOException {
             if (m_currentBatch != null) {
                 m_currentBatch.release();
@@ -247,8 +243,15 @@ public final class ColumnarWriteCursorFactory {
 
         @SuppressWarnings("unchecked")
         @Override
-        public <A extends WriteAccess> A getAccess(final int index) {
+        public <A extends WriteAccess> A getWriteAccess(final int index) {
             return (A)m_accesses[index];
+        }
+
+        @Override
+        public void setFrom(final ReadAccessRow row) {
+            for (int i = 0; i < m_accesses.length; i++) {
+                m_accesses[i].setFrom(row.getAccess(i));
+            }
         }
 
         @Override
