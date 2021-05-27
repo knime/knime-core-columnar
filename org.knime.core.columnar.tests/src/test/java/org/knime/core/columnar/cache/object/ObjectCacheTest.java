@@ -84,6 +84,7 @@ import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.data.TestStringData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.DefaultColumnarSchema;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -149,17 +150,7 @@ public class ObjectCacheTest {
     }
 
     private static ColumnarSchema createSingleStringColumnSchema() {
-        return new ColumnarSchema() {
-            @Override
-            public int numColumns() {
-                return 1;
-            }
-
-            @Override
-            public DataSpec getSpec(final int index) {
-                return DataSpec.stringSpec();
-            }
-        };
+        return new DefaultColumnarSchema(DataSpec.stringSpec());
     }
 
     private static CountDownLatch blockSerialization() {

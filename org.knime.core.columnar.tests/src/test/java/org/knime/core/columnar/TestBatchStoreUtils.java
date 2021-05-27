@@ -113,6 +113,7 @@ import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.columnar.testing.data.TestData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
 
@@ -500,17 +501,9 @@ public final class TestBatchStoreUtils {
     }
 
     public static ColumnarSchema createSchema(final int numColumns) {
-        return new ColumnarSchema() {
-            @Override
-            public int numColumns() {
-                return numColumns;
-            }
-
-            @Override
-            public DataSpec getSpec(final int index) {
-                return indexToTypeT(index).getSpec();
-            }
-        };
+        final List<DataSpec> columnSpecs =
+            IntStream.range(0, numColumns).mapToObj(i -> indexToTypeT(i).getSpec()).collect(Collectors.toList());
+        return new DefaultColumnarSchema(columnSpecs);
     }
 
     private static ColumnarSchema createDefaultSchema() {
