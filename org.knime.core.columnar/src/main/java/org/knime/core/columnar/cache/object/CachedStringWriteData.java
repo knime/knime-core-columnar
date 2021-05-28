@@ -46,10 +46,6 @@
  */
 package org.knime.core.columnar.cache.object;
 
-import java.util.Arrays;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 
@@ -57,58 +53,13 @@ import org.knime.core.columnar.data.StringData.StringWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class CachedStringWriteData implements StringWriteData {
+final class CachedStringWriteData extends CachedWriteData<StringWriteData, StringReadData, String>
+    implements StringWriteData {
 
-    final class CachedStringReadData implements StringReadData {
-
-        private StringReadData m_readDelegate;
-
-        private final int m_length;
-
-        private int m_numRetainsPriorSerialize = 0;
+    final class CachedStringReadData extends CachedReadData implements StringReadData {
 
         CachedStringReadData(final int length) {
-            m_length = length;
-        }
-
-        @Override
-        public boolean isMissing(final int index) {
-            return m_data[index] == null;
-        }
-
-        @Override
-        public int length() {
-            return m_length;
-        }
-
-        @Override
-        public synchronized void retain() {
-            if (m_readDelegate != null) {
-                m_readDelegate.retain();
-            } else {
-                m_numRetainsPriorSerialize++;
-            }
-        }
-
-        @Override
-        public synchronized void release() {
-            if (m_readDelegate != null) {
-                m_readDelegate.release();
-            } else {
-                if (m_numRetainsPriorSerialize == 0) {
-                    // as per contract, the HeapCachedWriteData's ref count was at 1 when it was closed
-                    // therefore, the reference count would drop to 0 here and we have to release the HeapCachedWriteData
-                    // this means that a subsequent call to serialize should and will fail
-                    CachedStringWriteData.this.release();
-                } else {
-                    m_numRetainsPriorSerialize--;
-                }
-            }
-        }
-
-        @Override
-        public synchronized long sizeOf() {
-            return m_readDelegate != null ? m_readDelegate.sizeOf() : CachedStringWriteData.this.sizeOf();
+            super(length);
         }
 
         @Override
@@ -116,76 +67,16 @@ final class CachedStringWriteData implements StringWriteData {
             return m_data[index];
         }
 
-        Object[] getData() {
-            return m_data;
-        }
-
-        synchronized StringReadData serialize() {
-            CachedStringWriteData.this.serialize();
-
-            m_readDelegate = CachedStringWriteData.this.getDelegate().close(m_length);
-            if (m_numRetainsPriorSerialize > 0) {
-                for (int i = 0; i < m_numRetainsPriorSerialize; i++) {
-                    m_readDelegate.retain();
-                }
-            }
-
-            return m_readDelegate;
-        }
-
     }
-
-    private final StringWriteData m_delegate;
-
-    // We should not need a thread-safe data structure (i.e., an AtomicReferenceArray) here.
-    // Reasoning: In Java, there is a happens-before relation between one thread starting another.
-    // Here, the "writer thread", i.e., the thread that creates the data and calls setObject() should be the same as the
-    // one that starts the serialization thread in HeapCachedColumnStore#writeInternal(ReadBatch).
-    private String[] m_data;
-
-    private Queue<Runnable> m_serialization = new ConcurrentLinkedQueue<>();
 
     CachedStringWriteData(final StringWriteData delegate) {
-        m_delegate = delegate;
-        m_data = new String[delegate.capacity()];
-    }
-
-    @Override
-    public void setMissing(final int index) {
-        m_data[index] = null;
-    }
-
-    @Override
-    public int capacity() {
-        return m_delegate.capacity();
-    }
-
-    @Override
-    public void retain() {
-        m_delegate.retain();
-    }
-
-    @Override
-    public void release() {
-        m_delegate.release();
-    }
-
-    @Override
-    public long sizeOf() {
-        serialize();
-        return m_delegate.sizeOf();
-    }
-
-    @Override
-    public void expand(final int minimumCapacity) {
-        m_delegate.expand(minimumCapacity);
-        m_data = Arrays.copyOf(m_data, m_delegate.capacity());
+        super(delegate, new String[delegate.capacity()]);
     }
 
     @Override
     public void setString(final int index, final String val) {
         m_data[index] = val;
-        m_serialization.add(() -> m_delegate.setString(index, val));
+        enqueueRunnable(() -> m_delegate.setString(index, val));
     }
 
     @Override
@@ -193,15 +84,9 @@ final class CachedStringWriteData implements StringWriteData {
         return new CachedStringReadData(length);
     }
 
-    void serialize() {
-        Runnable r;
-        while ((r = m_serialization.poll()) != null) {
-            r.run();
-        }
-    }
-
-    StringWriteData getDelegate() {
-        return m_delegate;
+    @Override
+    StringReadData closeDelegate(final int length) {
+        return m_delegate.close(length);
     }
 
 }
