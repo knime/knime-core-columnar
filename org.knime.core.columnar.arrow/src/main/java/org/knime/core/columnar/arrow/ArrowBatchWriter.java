@@ -47,6 +47,7 @@ package org.knime.core.columnar.arrow;
 
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY;
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_FACTORY_VERSIONS_KEY;
+import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_LZ4_BLOCK_FEATURE_KEY;
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_BYTES;
 
 import java.io.File;
@@ -86,6 +87,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -268,6 +270,13 @@ class ArrowBatchWriter implements BatchWriter {
             .map(f -> f.getVersion().toString()) //
             .collect(Collectors.joining(","));
         metadata.put(ARROW_FACTORY_VERSIONS_KEY, factoryVersions);
+
+        // Using the block compression feature
+        // Later versions can check for this metadata key and decide if they can handle LZ4_BLOCK compression
+        if (m_compression.getCompressionType() == ArrowCompressionUtil.ARROW_LZ4_BLOCK_COMPRESSION
+            .getCompressionType()) {
+            metadata.put(ARROW_LZ4_BLOCK_FEATURE_KEY, "true");
+        }
         return metadata;
     }
 

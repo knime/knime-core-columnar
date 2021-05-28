@@ -81,6 +81,9 @@ public final class ArrowReaderWriterUtils {
     /** Key for the metadata element holding the factory versions */
     static final String ARROW_FACTORY_VERSIONS_KEY = "KNIME:basic:factoryVersions";
 
+    /** Key for the metadata element holding the factory versions */
+    static final String ARROW_LZ4_BLOCK_FEATURE_KEY = "KNIME:basic:usingLz4Block";
+
     /**
      * Compress the given buffers using the given compression coded. The input buffers are not closed. Also the output
      * buffers need to be closed by the caller.
