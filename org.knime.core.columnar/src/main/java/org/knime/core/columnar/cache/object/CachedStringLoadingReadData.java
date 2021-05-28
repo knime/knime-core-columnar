@@ -46,8 +46,6 @@
  */
 package org.knime.core.columnar.cache.object;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.knime.core.columnar.data.StringData.StringReadData;
 
 /**
@@ -56,46 +54,11 @@ import org.knime.core.columnar.data.StringData.StringReadData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class CachedStringLoadingReadData implements StringReadData {
-
-    private final AtomicInteger m_refCounter = new AtomicInteger(1);
-
-    private final StringReadData m_delegate;
-
-    private String[] m_data;
+final class CachedStringLoadingReadData extends CachedLoadingReadData<StringReadData, String>
+    implements StringReadData {
 
     CachedStringLoadingReadData(final StringReadData delegate, final String[] data) {
-        m_delegate = delegate;
-        m_data = data;
-    }
-
-    @Override
-    public boolean isMissing(final int index) {
-        return m_delegate.isMissing(index);
-    }
-
-    @Override
-    public int length() {
-        return m_delegate.length();
-    }
-
-    @Override
-    public void retain() {
-        m_refCounter.getAndIncrement();
-        m_delegate.retain();
-    }
-
-    @Override
-    public void release() {
-        if (m_refCounter.decrementAndGet() == 0) {
-            m_data = null;
-        }
-        m_delegate.release();
-    }
-
-    @Override
-    public long sizeOf() {
-        return m_delegate.sizeOf();
+        super(delegate, data);
     }
 
     @Override

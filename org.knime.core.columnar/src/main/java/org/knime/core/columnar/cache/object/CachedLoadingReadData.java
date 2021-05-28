@@ -43,40 +43,58 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  *
+ * History
+ *   28 May 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.cache.object;
 
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
-import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
- * Wrapper around {@link ObjectData} for in-heap caching.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class CachedVarBinaryLoadingReadData extends CachedLoadingReadData<VarBinaryReadData, Object>
-    implements VarBinaryReadData {
+abstract class CachedLoadingReadData<R extends NullableReadData, T> implements NullableReadData {
 
-    CachedVarBinaryLoadingReadData(final VarBinaryReadData delegate, final Object[] data) {
-        super(delegate, data);
+    private final AtomicInteger m_refCounter = new AtomicInteger(1);
+
+    final R m_delegate;
+
+    T[] m_data;
+
+    CachedLoadingReadData(final R delegate, final T[] data) {
+        m_delegate = delegate;
+        m_data = data;
     }
 
     @Override
-    public byte[] getBytes(final int index) {
-        if (m_data[index] == null) {
-            m_data[index] = m_delegate.getBytes(index);
-        }
-        return (byte[])m_data[index];
+    public boolean isMissing(final int index) {
+        return m_delegate.isMissing(index);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-        if (m_data[index] == null) {
-            m_data[index] = m_delegate.getObject(index, deserializer);
+    public int length() {
+        return m_delegate.length();
+    }
+
+    @Override
+    public void retain() {
+        m_refCounter.getAndIncrement();
+        m_delegate.retain();
+    }
+
+    @Override
+    public void release() {
+        if (m_refCounter.decrementAndGet() == 0) {
+            m_data = null;
         }
-        return (T)m_data[index];
+        m_delegate.release();
+    }
+
+    @Override
+    public long sizeOf() {
+        return m_delegate.sizeOf();
     }
 
 }
