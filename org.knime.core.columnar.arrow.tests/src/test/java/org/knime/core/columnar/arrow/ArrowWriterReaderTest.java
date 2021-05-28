@@ -53,7 +53,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.arrow.ArrowTestUtils.createTmpKNIMEArrowPath;
-import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_LZ4_COMPRESSION;
+import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_LZ4_BLOCK_COMPRESSION;
 import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_NO_COMPRESSION;
 
 import java.io.IOException;
@@ -141,7 +141,7 @@ public class ArrowWriterReaderTest {
     @Test
     public void testSimpleReadWriteOneBatchOneColumnCompressed() throws IOException {
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory()};
-        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false), ARROW_LZ4_COMPRESSION);
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(false), ARROW_LZ4_BLOCK_COMPRESSION);
     }
 
     /**
@@ -163,7 +163,7 @@ public class ArrowWriterReaderTest {
     @Test
     public void testSimpleReadWriteOneBatchOneColumnMissingCompressed() throws IOException {
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new SimpleDataFactory()};
-        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(true), ARROW_LZ4_COMPRESSION);
+        testReadWrite(64, 64, 1, 1, factories, new SimpleDataChecker(true), ARROW_LZ4_BLOCK_COMPRESSION);
     }
 
     /**
@@ -211,7 +211,7 @@ public class ArrowWriterReaderTest {
     @Test
     public void testDictionaryReadWriteOneBatchOneColumnCompressed() throws IOException {
         final ArrowColumnDataFactory[] factory = new ArrowColumnDataFactory[]{new DictionaryEncodedDataFactory()};
-        testReadWrite(16, 16, 1, 1, factory, new DictionaryEncodedDataChecker(), ARROW_LZ4_COMPRESSION);
+        testReadWrite(16, 16, 1, 1, factory, new DictionaryEncodedDataChecker(), ARROW_LZ4_BLOCK_COMPRESSION);
     }
 
     /**

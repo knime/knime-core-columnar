@@ -47,7 +47,7 @@ import net.jpountz.lz4.LZ4FastDecompressor;
 /**
  * Compression codec for the LZ4 algorithm.
  */
-public class Lz4CompressionCodec implements CompressionCodec {
+public class Lz4BlockCompressionCodec implements CompressionCodec {
 
     private static final boolean LITTLE_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
 
@@ -64,7 +64,7 @@ public class Lz4CompressionCodec implements CompressionCodec {
     /**
      * Compression codec
      */
-    public Lz4CompressionCodec() {
+    public Lz4BlockCompressionCodec() {
         factory = LZ4Factory.nativeInstance();
     }
 

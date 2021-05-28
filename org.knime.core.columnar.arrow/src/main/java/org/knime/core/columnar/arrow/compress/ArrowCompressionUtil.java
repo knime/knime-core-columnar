@@ -70,13 +70,17 @@ public final class ArrowCompressionUtil {
 
     private static final String PROPERTY_COMPRESSION_NONE = "NONE";
 
+    // NOTE:
+    // Now this means LZ4 block compression but when frame compression is implemented it will use frame compression
+    // This is not a problem because reading block compression will still be possible
     private static final String PROPERTY_COMPRESSION_LZ4 = "LZ4";
 
-    /** Config for LZ4 buffer compression using the lz4-java library */
-    public static final ArrowLz4Compression ARROW_LZ4_COMPRESSION = new ArrowLz4Compression();
+    // TODO(lz4_frame) deprecate when LZ4_FRAME compression is implemented
+    /** Config for LZ4 block buffer compression using the lz4-java library */
+    public static final ArrowCompression ARROW_LZ4_BLOCK_COMPRESSION = new ArrowLz4BlockCompression();
 
     /** Config for not using any compression */
-    public static final ArrowNoCompression ARROW_NO_COMPRESSION = new ArrowNoCompression();
+    public static final ArrowCompression ARROW_NO_COMPRESSION = new ArrowNoCompression();
 
     private static ArrowCompression defaultCompression = null;
 
@@ -93,7 +97,7 @@ public final class ArrowCompressionUtil {
             if (compressionName == null || PROPERTY_COMPRESSION_NONE.equals(compressionName)) {
                 defaultCompression = ARROW_NO_COMPRESSION;
             } else if (PROPERTY_COMPRESSION_LZ4.equals(compressionName)) {
-                defaultCompression = ARROW_LZ4_COMPRESSION;
+                defaultCompression = ARROW_LZ4_BLOCK_COMPRESSION;
             } else {
                 LOGGER.error(
                     "Invalid Arrow compression format '{}'. Valid options are ({}|{}). Using the default '{}'.",
@@ -112,8 +116,8 @@ public final class ArrowCompressionUtil {
      * @return the {@link ArrowCompression} to use
      */
     public static ArrowCompression getCompressionForType(final byte type) {
-        if (type == ARROW_LZ4_COMPRESSION.getCompressionType()) {
-            return ARROW_LZ4_COMPRESSION;
+        if (type == ARROW_LZ4_BLOCK_COMPRESSION.getCompressionType()) {
+            return ARROW_LZ4_BLOCK_COMPRESSION;
         } else if (type == ARROW_NO_COMPRESSION.getCompressionType()) {
             return ARROW_NO_COMPRESSION;
         } else {
@@ -121,14 +125,14 @@ public final class ArrowCompressionUtil {
         }
     }
 
-    private static final class ArrowLz4Compression implements ArrowCompression {
+    private static final class ArrowLz4BlockCompression implements ArrowCompression {
 
-        private ArrowLz4Compression() {
+        private ArrowLz4BlockCompression() {
         }
 
         @Override
         public CompressionCodec getCompressionCodec() {
-            return new Lz4CompressionCodec();
+            return new Lz4BlockCompressionCodec();
         }
 
         @Override
@@ -138,7 +142,10 @@ public final class ArrowCompressionUtil {
 
         @Override
         public byte getCompressionType() {
-            return CompressionType.LZ4_FRAME;
+            // NOTE: LZ4_BLOCK is not part of the Arrow format
+            // We use -2 because it will be never used for another CompressionType
+            // and -1 is used for no compression
+            return -2;
         }
     }
 
