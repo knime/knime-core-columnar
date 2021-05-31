@@ -46,6 +46,7 @@
  */
 package org.knime.core.columnar.cache.object;
 
+import java.io.Flushable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -83,7 +84,7 @@ import org.slf4j.LoggerFactory;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @since 4.3
  */
-public final class ObjectCache implements BatchWritable, RandomAccessBatchReadable {
+public final class ObjectCache implements BatchWritable, RandomAccessBatchReadable, Flushable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ObjectCache.class);
 
@@ -109,10 +110,14 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             for (int i = 0; i < data.length; i++) {
                 if (m_varBinaryData.isSelected(i)) {
                     final VarBinaryWriteData columnWriteData = (VarBinaryWriteData)batch.get(i);
-                    data[i] = new CachedVarBinaryWriteData(columnWriteData);
+                    final var cachedData = new CachedVarBinaryWriteData(columnWriteData);
+                    m_unclosedData.add(cachedData);
+                    data[i] = cachedData;
                 } else if (m_stringData.isSelected(i)) {
                     final StringWriteData columnWriteData = (StringWriteData)batch.get(i);
-                    data[i] = new CachedStringWriteData(columnWriteData);
+                    final var cachedData = new CachedStringWriteData(columnWriteData);
+                    m_unclosedData.add(cachedData);
+                    data[i] = cachedData;
                 } else {
                     data[i] = batch.get(i);
                 }
@@ -138,17 +143,12 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             final CompletableFuture<NullableReadData>[] futures = new CompletableFuture[numColumns];
 
             for (int i = 0; i < numColumns; i++) {
-                if (m_varBinaryData.isSelected(i)) {
-                    final CachedVarBinaryWriteData.CachedVarBinaryReadData heapCachedData =
-                        (CachedVarBinaryWriteData.CachedVarBinaryReadData)batch.get(i);
-                    futures[i] = CompletableFuture.supplyAsync(heapCachedData::serialize, m_executor);
-                    final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
-                    m_cache.put(ccuid, heapCachedData.getData());
-                    m_cachedData.add(ccuid);
-                } else if (m_stringData.isSelected(i)) {
-                    final CachedStringWriteData.CachedStringReadData heapCachedData =
-                        (CachedStringWriteData.CachedStringReadData)batch.get(i);
-                    futures[i] = CompletableFuture.supplyAsync(heapCachedData::serialize, m_executor);
+                if (m_varBinaryData.isSelected(i) || m_stringData.isSelected(i)) {
+                    final var heapCachedData = (CachedWriteData<?, ?, ?>.CachedReadData)batch.get(i);
+                    futures[i] = CompletableFuture.supplyAsync(() -> {
+                        m_unclosedData.remove(heapCachedData.getWriteData());
+                        return heapCachedData.close();
+                    }, m_executor);
                     final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
                     m_cache.put(ccuid, heapCachedData.getData());
                     m_cachedData.add(ccuid);
@@ -205,6 +205,8 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private final Map<ColumnDataUniqueId, Object[]> m_cache;
 
+    private final Set<CachedWriteData<?, ?, ?>> m_unclosedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
     private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /**
@@ -236,6 +238,24 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     @Override
     public ColumnarSchema getSchema() {
         return m_readStore.getSchema();
+    }
+
+    @Override
+    public void flush() throws IOException {
+    	// serialize any currently unclosed data (in the current batch)
+        for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
+            data.serialize();
+        }
+
+        // wait for the pending serialization of the previous batch
+        try {
+            m_writer.waitForPrevBatch();
+        } catch (InterruptedException e) {
+            // Restore interrupted state...
+            Thread.currentThread().interrupt();
+            LOGGER.info(ERROR_ON_INTERRUPT, e);
+            return;
+        }
     }
 
     @Override

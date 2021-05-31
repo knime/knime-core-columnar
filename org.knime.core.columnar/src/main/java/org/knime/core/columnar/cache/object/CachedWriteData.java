@@ -58,7 +58,8 @@ import org.knime.core.columnar.data.NullableWriteData;
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-abstract class CachedWriteData<W extends NullableWriteData, R extends NullableReadData, T> implements NullableWriteData {
+abstract class CachedWriteData<W extends NullableWriteData, R extends NullableReadData, T>
+    implements NullableWriteData {
 
     abstract class CachedReadData implements NullableReadData {
 
@@ -116,7 +117,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
             return m_data;
         }
 
-        synchronized R serialize() {
+        synchronized R close() {
             CachedWriteData.this.serialize();
 
             m_readDelegate = closeDelegate(m_length);
@@ -127,6 +128,10 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
             }
 
             return m_readDelegate;
+        }
+
+        CachedWriteData<W, R, T> getWriteData() {
+            return CachedWriteData.this;
         }
 
     }
@@ -182,7 +187,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
         m_serialization.add(r);
     }
 
-    void serialize() {
+    synchronized void serialize() {
         Runnable r;
         while ((r = m_serialization.poll()) != null) {
             r.run();

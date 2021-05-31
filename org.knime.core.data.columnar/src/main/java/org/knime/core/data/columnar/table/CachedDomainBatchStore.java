@@ -171,6 +171,8 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
 
     private final ReadDataCache m_dataCached;
 
+    private final ObjectCache m_objectCached;
+
     private final DomainWritable m_domainCalculated;
 
     private final BatchWritable m_wrappedDelegateWritable;
@@ -206,18 +208,17 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
             m_smallCached = null;
         }
 
-        final ObjectCache heapCached;
         final SharedObjectCache heapCache = ColumnarPreferenceUtils.getHeapCache();
         final ExecutorService executor = ColumnarPreferenceUtils.getSerializeExecutor();
         if (m_smallCached != null) {
-            heapCached = new ObjectCache(m_smallCached, heapCache, executor);
+            m_objectCached = new ObjectCache(m_smallCached, heapCache, executor);
         } else if (m_dataCached != null) {
-            heapCached = new ObjectCache(m_dataCached, heapCache, executor);
+            m_objectCached = new ObjectCache(m_dataCached, heapCache, executor);
         } else {
-            heapCached = new ObjectCache(store, heapCache, executor);
+            m_objectCached = new ObjectCache(store, heapCache, executor);
         }
 
-        BatchWritable wrappedWritable = heapCached;
+        BatchWritable wrappedWritable = m_objectCached;
         if (settings.isCheckDuplicateRowKeys()) {
             wrappedWritable = new DuplicateCheckWritable(wrappedWritable, new DuplicateChecker(),
                 ColumnarPreferenceUtils.getDuplicateCheckExecutor());
@@ -229,7 +230,7 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
         wrappedWritable = m_domainCalculated;
 
         m_wrappedDelegateWritable = wrappedWritable;
-        m_wrappedDelegateReadable = heapCached;
+        m_wrappedDelegateReadable = m_objectCached;
 
         m_writer = new WrappedBatchWriter(m_wrappedDelegateWritable, m_storeClosed, m_writerClosed);
     }
@@ -267,8 +268,13 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        m_smallCached.flush();
-        m_dataCached.flush();
+        if (m_smallCached != null) {
+            m_smallCached.flush();
+        }
+        if (m_dataCached != null) {
+            m_dataCached.flush();
+        }
+        m_objectCached.flush();
     }
 
     final DataColumnDomain getDomain(final int colIndex) {
