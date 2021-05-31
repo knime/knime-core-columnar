@@ -76,6 +76,10 @@ import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.CachedBatchReadStore.WrappedRandomAccessBatchReader;
 import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.data.util.memory.MemoryAlert;
+import org.knime.core.data.util.memory.MemoryAlertListener;
+import org.knime.core.data.util.memory.MemoryAlertSystem;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.util.DuplicateChecker;
 
@@ -159,6 +163,8 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
 
     }
 
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(CachedDomainBatchStore.class);
+
     private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
     private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
@@ -172,6 +178,8 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
     private final ReadDataCache m_dataCached;
 
     private final ObjectCache m_objectCached;
+
+    private final MemoryAlertListener m_memListener;
 
     private final DomainWritable m_domainCalculated;
 
@@ -217,6 +225,19 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
         } else {
             m_objectCached = new ObjectCache(store, heapCache, executor);
         }
+        m_memListener = new MemoryAlertListener() {
+            @Override
+            protected boolean memoryAlert(final MemoryAlert alert) {
+                try {
+                    m_objectCached.flush();
+                } catch (IOException ex) {
+                    LOGGER.error("Error during enforced premature serialization of object data.", ex);
+                    return true;
+                }
+                return false;
+            }
+        };
+        MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
 
         BatchWritable wrappedWritable = m_objectCached;
         if (settings.isCheckDuplicateRowKeys()) {
@@ -307,6 +328,7 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
             m_domainCalculated.close();
             m_writer.close();
             m_wrappedDelegateReadable.close();
+            MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
         }
     }
 
