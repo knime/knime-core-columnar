@@ -49,6 +49,7 @@
 package org.knime.core.columnar.cache.object;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.knime.core.columnar.TestBatchStoreUtils.createDefaultTestColumnStore;
 import static org.knime.core.columnar.TestBatchStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestBatchStoreUtils.readSelectionAndCompareTable;
@@ -66,9 +67,14 @@ import java.util.concurrent.Executors;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.testing.TestBatchStore;
+import org.knime.core.columnar.testing.data.TestStringData;
+import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -136,6 +142,53 @@ public class ObjectCacheTest {
                 final BatchWriter writer1 = store.getWriter();
                 final BatchWriter writer2 = store.getWriter()) {
             assertEquals(writer1, writer2);
+        }
+    }
+
+    @Test
+    public void testFlush() throws IOException, InterruptedException {
+        final ColumnarSchema schema = new ColumnarSchema() {
+            @Override
+            public int numColumns() {
+                return 1;
+            }
+
+            @Override
+            public DataSpec getSpec(final int index) {
+                return DataSpec.stringSpec();
+            }
+        };
+
+        try (final BatchStore delegate = TestBatchStore.create(schema);
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), EXECUTOR);
+                final BatchWriter writer = store.getWriter()) {
+            final WriteBatch batch = writer.create(2);
+            final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
+            final TestStringData delegateData = (TestStringData)data.m_delegate;
+
+            store.flush();
+
+            // test that data is serialized after flush
+            data.setString(0, "0");
+            assertNull(delegateData.getString(0));
+            store.flush();
+            assertEquals("0", delegateData.getString(0));
+
+            // test that data is serialized after closing the writer
+            data.setString(1, "1");
+            assertEquals("0", delegateData.getString(0));
+            assertNull(delegateData.getString(1));
+            writer.write(batch.close(1));
+            writer.close();
+            assertEquals("0", delegateData.getString(0));
+            assertEquals("1", delegateData.getString(1));
+
+            // test that further invocations of flush have no effect
+            store.flush();
+            assertEquals("0", delegateData.getString(0));
+            assertEquals("1", delegateData.getString(1));
+
+            data.release();
         }
     }
 
