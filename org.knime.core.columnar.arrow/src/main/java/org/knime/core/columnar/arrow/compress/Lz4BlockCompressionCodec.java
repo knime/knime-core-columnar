@@ -20,12 +20,12 @@ package org.knime.core.columnar.arrow.compress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.apache.arrow.flatbuf.CompressionType;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.util.MemoryUtil;
 import org.apache.arrow.util.Preconditions;
 import org.apache.arrow.vector.compression.CompressionCodec;
+import org.apache.arrow.vector.compression.CompressionUtil.CodecType;
 
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
@@ -161,8 +161,10 @@ public class Lz4BlockCompressionCodec implements CompressionCodec {
     }
 
     @Override
-    public String getCodecName() {
-        return CompressionType.name(CompressionType.LZ4_FRAME);
+    public CodecType getCodecType() {
+        // NOTE: This is not called by in our code
+        throw new IllegalStateException("This is an implementation error. "
+            + "The Lz4BlockCompressionCodec is not supported by the format and has therefore no value in CodecType");
     }
 
     /** Process compression by compressing the buffer as is. */
