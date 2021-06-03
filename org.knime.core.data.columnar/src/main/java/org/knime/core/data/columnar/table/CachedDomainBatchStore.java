@@ -228,12 +228,13 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
         m_memListener = new MemoryAlertListener() {
             @Override
             protected boolean memoryAlert(final MemoryAlert alert) {
-                try {
-                    m_objectCached.flush();
-                } catch (IOException ex) {
-                    LOGGER.error("Error during enforced premature serialization of object data.", ex);
-                    return true;
-                }
+                new Thread(() -> {
+                    try {
+                        m_objectCached.flush();
+                    } catch (IOException ex) {
+                        LOGGER.error("Error during enforced premature serialization of object data.", ex);
+                    }
+                }).start();
                 return false;
             }
         };
