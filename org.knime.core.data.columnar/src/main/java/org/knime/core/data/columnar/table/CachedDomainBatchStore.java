@@ -217,7 +217,7 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
         }
 
         final SharedObjectCache heapCache = ColumnarPreferenceUtils.getHeapCache();
-        final ExecutorService executor = ColumnarPreferenceUtils.getSerializeExecutor();
+        final ExecutorService executor = ColumnarPreferenceUtils.getPersistExecutor();
         if (m_smallCached != null) {
             m_objectCached = new ObjectCache(m_smallCached, heapCache, executor);
         } else if (m_dataCached != null) {

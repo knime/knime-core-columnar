@@ -65,7 +65,7 @@ public class SoftReferencedObjectCacheTest {
 
     @Test
     public void testWriteMultiRead() {
-        final Map<ColumnDataUniqueId, Object[]> cache = (new SoftReferencedObjectCache()).getCache();
+        final Map<ColumnDataUniqueId, Object[]> cache = (new SoftReferencedObjectCache(1)).getCache();
         @SuppressWarnings("resource")
         final ColumnDataUniqueId id = new ColumnDataUniqueId(TestBatchStoreUtils.createDefaultTestColumnStore(), 0, 0);
         Object[] val = new Object[0];

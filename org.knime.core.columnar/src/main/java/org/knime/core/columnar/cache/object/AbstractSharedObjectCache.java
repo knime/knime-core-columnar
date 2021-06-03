@@ -44,63 +44,48 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   15 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   2 Jun 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.columnar.cache.object;
 
-import java.lang.ref.SoftReference;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import org.knime.core.columnar.cache.ColumnDataUniqueId;
-
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
- * Implementation of an {@link SharedObjectCache} in which values are softly referenced. As per contract of
- * {@link SoftReference SoftReferences}, cached object data that is only
- * <a href="package-summary.html#reachability">softly reachable</a> is guaranteed to have been cleared before the
- * virtual machine throws an <code>OutOfMemoryError</code>. Additionally, this cache allows for manual invalidation,
- * i.e., removal of all entries.
- *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class SoftReferencedObjectCache extends AbstractSharedObjectCache {
+abstract class AbstractSharedObjectCache implements SharedObjectCache {
 
-    private final Cache<ColumnDataUniqueId, Object[]> m_cache;
+    private final List<BlockingQueue<Runnable>> m_queues;
 
-    /**
-     * Creates a new cache.
-     *
-     * @param nThreads number of threads for asynchronous serialization
-     */
-    public SoftReferencedObjectCache(final int nThreads) {
-        super(nThreads);
-        final RemovalListener<ColumnDataUniqueId, Object[]> removalListener = removalNotification -> {
-            if (removalNotification.wasEvicted()) {
-                final ColumnDataUniqueId ccuid = removalNotification.getKey();
-                @SuppressWarnings("resource")
-                final ObjectReadCache store = (ObjectReadCache)ccuid.getReadable();
-                store.onEviction(ccuid);
-            }
-        };
+    private int m_nextQueueIndex = 0;
 
-        m_cache = CacheBuilder.newBuilder().softValues().removalListener(removalListener)
-            .expireAfterAccess(60, TimeUnit.SECONDS).build();
+    AbstractSharedObjectCache(final int nThreads) {
+        m_queues = IntStream.range(0, nThreads).mapToObj(i -> new LinkedBlockingDeque<Runnable>())
+            .collect(Collectors.toList());
+        for (int i = 0; i < nThreads; i++) {
+            final BlockingQueue<Runnable> queue = m_queues.get(i);
+            new Thread(() -> {
+                while (true) {
+                    try {
+                        queue.take().run();
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }, String.format("KNIME-ObjectSerializer-%d", i + 1)).start();
+        }
     }
 
     @Override
-    public Map<ColumnDataUniqueId, Object[]> getCache() {
-        return m_cache.asMap();
-    }
-
-    /**
-     * Invalidate the cache, i.e., remove all entries.
-     */
-    public void invalidate() {
-        m_cache.invalidateAll();
+    public Queue<Runnable> getSerializationQueue() {
+        final Queue<Runnable> queue = m_queues.get(m_nextQueueIndex);
+        m_nextQueueIndex = (m_nextQueueIndex + 1) % m_queues.size();
+        return queue;
     }
 
 }

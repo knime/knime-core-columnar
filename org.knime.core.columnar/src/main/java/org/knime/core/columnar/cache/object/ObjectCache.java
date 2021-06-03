@@ -50,7 +50,6 @@ import java.io.Flushable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -86,7 +85,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class ObjectCache implements BatchWritable, RandomAccessBatchReadable, Flushable {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ObjectCache.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(ObjectCache.class);
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
@@ -110,12 +109,13 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             for (int i = 0; i < data.length; i++) {
                 if (m_varBinaryData.isSelected(i)) {
                     final VarBinaryWriteData columnWriteData = (VarBinaryWriteData)batch.get(i);
-                    final var cachedData = new CachedVarBinaryWriteData(columnWriteData);
+                    final var cachedData =
+                        new CachedVarBinaryWriteData(columnWriteData, m_cache.getSerializationQueue());
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else if (m_stringData.isSelected(i)) {
                     final StringWriteData columnWriteData = (StringWriteData)batch.get(i);
-                    final var cachedData = new CachedStringWriteData(columnWriteData);
+                    final var cachedData = new CachedStringWriteData(columnWriteData, m_cache.getSerializationQueue());
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else {
@@ -134,8 +134,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             } catch (InterruptedException e) {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
-                LOGGER.info(ERROR_ON_INTERRUPT, e);
-                return;
+                LOGGER.error(ERROR_ON_INTERRUPT, e);
             }
 
             final int numColumns = batch.size();
@@ -150,7 +149,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                         return heapCachedData.close();
                     }, m_executor);
                     final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
-                    m_cache.put(ccuid, heapCachedData.getData());
+                    m_cache.getCache().put(ccuid, heapCachedData.getData());
                     m_cachedData.add(ccuid);
                 } else {
                     futures[i] = CompletableFuture.completedFuture(batch.get(i));
@@ -173,7 +172,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
         @Override
         public synchronized void close() throws IOException {
-            try {
+        	try {
                 waitForPrevBatch();
             } catch (InterruptedException e) {
                 // Restore interrupted state...
@@ -193,17 +192,17 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     }
 
-    private final ObjectCacheWriter m_writer;
+	private final ObjectCacheWriter m_writer;
 
-    private final ExecutorService m_executor;
+	private final ExecutorService m_executor;
 
-    private final ObjectReadCache m_readStore;
+	private final ObjectReadCache m_readStore;
 
-    private final ColumnSelection m_varBinaryData;
+	private final ColumnSelection m_varBinaryData;
 
-    private final ColumnSelection m_stringData;
+	private final ColumnSelection m_stringData;
 
-    private final Map<ColumnDataUniqueId, Object[]> m_cache;
+    private final SharedObjectCache m_cache;
 
     private final Set<CachedWriteData<?, ?, ?>> m_unclosedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -221,7 +220,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(delegate.getSchema());
         m_stringData = HeapCacheUtils.getStringIndices(delegate.getSchema());
         m_readStore = new ObjectReadCache(delegate, m_varBinaryData, m_stringData, cache, m_cachedData);
-        m_cache = cache.getCache();
+        m_cache = cache;
         m_executor = executor;
     }
 
@@ -240,28 +239,28 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         return m_readStore.getSchema();
     }
 
-    @Override
-    public void flush() throws IOException {
-    	// serialize any currently unclosed data (in the current batch)
-        for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
-            data.serialize();
-        }
+	@Override
+	public void flush() throws IOException {
+		// serialize any currently unclosed data (in the current batch)
+		for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
+			data.serialize();
+		}
 
-        // wait for the pending serialization of the previous batch
-        try {
-            m_writer.waitForPrevBatch();
-        } catch (InterruptedException e) {
-            // Restore interrupted state...
-            Thread.currentThread().interrupt();
-            LOGGER.info(ERROR_ON_INTERRUPT, e);
-            return;
-        }
-    }
+		// wait for the pending serialization of the previous batch
+		try {
+			m_writer.waitForPrevBatch();
+		} catch (InterruptedException e) {
+			// Restore interrupted state...
+			Thread.currentThread().interrupt();
+			LOGGER.info(ERROR_ON_INTERRUPT, e);
+			return;
+		}
+	}
 
-    @Override
-    public synchronized void close() throws IOException {
-        m_readStore.close();
-        m_cachedData = null;
-    }
+	@Override
+	public synchronized void close() throws IOException {
+		m_readStore.close();
+		m_cachedData = null;
+	}
 
 }

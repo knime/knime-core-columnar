@@ -46,6 +46,8 @@
  */
 package org.knime.core.columnar.cache.object;
 
+import java.util.Queue;
+
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
@@ -77,20 +79,30 @@ final class CachedVarBinaryWriteData extends CachedWriteData<VarBinaryWriteData,
 
     }
 
-    CachedVarBinaryWriteData(final VarBinaryWriteData delegate) {
-        super(delegate, new Object[delegate.capacity()]);
+    CachedVarBinaryWriteData(final VarBinaryWriteData delegate, final Queue<Runnable> serializationQueue) {
+        super(delegate, new Object[delegate.capacity()], serializationQueue);
     }
 
     @Override
-    public void setBytes(final int index, final byte[] val) {
+    public synchronized void setBytes(final int index, final byte[] val) {
         m_data[index] = val;
-        enqueueRunnable(() -> m_delegate.setBytes(index, val));
+        enqueueSerializionRunnable(new SerializationRunnable() {
+            @Override
+            void serialize() {
+                m_delegate.setBytes(index, val);
+            }
+        });
     }
 
     @Override
-    public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
+    public synchronized <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
         m_data[index] = value;
-        enqueueRunnable(() -> m_delegate.setObject(index, value, serializer));
+        enqueueSerializionRunnable(new SerializationRunnable() {
+            @Override
+            void serialize() {
+                m_delegate.setObject(index, value, serializer);
+            }
+        });
     }
 
     @Override

@@ -103,14 +103,14 @@ public final class ColumnarPreferenceUtils {
             WEAK {
                 @Override
                 SharedObjectCache createCache() {
-                    return new WeakReferencedObjectCache();
+                    return new WeakReferencedObjectCache(getNumThreads());
                 }
             },
 
             SOFT {
                 @Override
                 SharedObjectCache createCache() {
-                    final SoftReferencedObjectCache cache = new SoftReferencedObjectCache();
+                    final SoftReferencedObjectCache cache = new SoftReferencedObjectCache(getNumThreads());
 
                     MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
                         @Override
@@ -150,11 +150,6 @@ public final class ColumnarPreferenceUtils {
 
     // lazily initialized
     private static SharedObjectCache heapCache;
-
-    private static final AtomicLong SERIALIZE_THREAD_COUNT = new AtomicLong();
-
-    // lazily initialized
-    private static ExecutorService serializeExecutor;
 
     // lazily initialized
     private static SharedBatchWritableCache smallTableCache;
@@ -264,17 +259,6 @@ public final class ColumnarPreferenceUtils {
             heapCache = HeapCache.valueOf(getHeapCacheName()).createCache();
         }
         return heapCache;
-    }
-
-    /**
-     * @return the executor for serialization of object data
-     */
-    public static synchronized ExecutorService getSerializeExecutor() {
-        if (serializeExecutor == null) {
-            serializeExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
-                r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
-        }
-        return serializeExecutor;
     }
 
     static int getSmallTableCacheSize() {

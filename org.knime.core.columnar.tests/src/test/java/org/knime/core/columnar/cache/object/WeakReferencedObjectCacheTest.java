@@ -65,7 +65,7 @@ public class WeakReferencedObjectCacheTest {
 
     @Test
     public void testWriteMultiRead() {
-        final Map<ColumnDataUniqueId, Object[]> cache = (new WeakReferencedObjectCache()).getCache();
+        final Map<ColumnDataUniqueId, Object[]> cache = (new WeakReferencedObjectCache(1)).getCache();
         @SuppressWarnings("resource")
         final ColumnDataUniqueId id = new ColumnDataUniqueId(TestBatchStoreUtils.createDefaultTestColumnStore(), 0, 0);
         Object[] val = new Object[0];

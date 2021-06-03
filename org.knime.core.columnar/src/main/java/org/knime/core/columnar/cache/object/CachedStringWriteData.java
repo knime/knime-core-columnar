@@ -46,6 +46,8 @@
  */
 package org.knime.core.columnar.cache.object;
 
+import java.util.Queue;
+
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 
@@ -69,14 +71,19 @@ final class CachedStringWriteData extends CachedWriteData<StringWriteData, Strin
 
     }
 
-    CachedStringWriteData(final StringWriteData delegate) {
-        super(delegate, new String[delegate.capacity()]);
+    CachedStringWriteData(final StringWriteData delegate, final Queue<Runnable> serializationQueue) {
+        super(delegate, new String[delegate.capacity()], serializationQueue);
     }
 
     @Override
-    public void setString(final int index, final String val) {
+    public synchronized void setString(final int index, final String val) {
         m_data[index] = val;
-        enqueueRunnable(() -> m_delegate.setString(index, val));
+        enqueueSerializionRunnable(new SerializationRunnable() {
+            @Override
+            void serialize() {
+                m_delegate.setString(index, val);
+            }
+        });
     }
 
     @Override

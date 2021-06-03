@@ -58,8 +58,10 @@ import static org.knime.core.columnar.TestBatchStoreUtils.releaseTable;
 import static org.knime.core.columnar.TestBatchStoreUtils.writeDefaultTable;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -82,7 +84,9 @@ import org.knime.core.table.schema.DataSpec;
 @SuppressWarnings("javadoc")
 public class ObjectCacheTest {
 
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
+	private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
+
+	private static final Queue<Runnable> QUEUE = new LinkedList<>();
 
     @AfterClass
     public static void tearDownTests() {
@@ -97,6 +101,11 @@ public class ObjectCacheTest {
             @Override
             public Map<ColumnDataUniqueId, Object[]> getCache() {
                 return m_cache;
+            }
+
+            @Override
+            public Queue<Runnable> getSerializationQueue() {
+                return QUEUE;
             }
         };
     }

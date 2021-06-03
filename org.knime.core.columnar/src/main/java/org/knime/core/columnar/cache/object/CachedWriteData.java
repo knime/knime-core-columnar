@@ -50,7 +50,7 @@ package org.knime.core.columnar.cache.object;
 
 import java.util.Arrays;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Phaser;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -136,6 +136,26 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     }
 
+    abstract class SerializationRunnable implements Runnable {
+        SerializationRunnable() {
+            m_phaser.register();
+        }
+
+        @Override
+        public void run() {
+            try {
+                serialize();
+            } finally {
+                m_phaser.arriveAndDeregister();
+            }
+        }
+
+        abstract void serialize();
+    }
+
+    // required for serialization, where we have to wait for all enqueued serialization runnables to conclude
+    private final Phaser m_phaser = new Phaser(1);
+
     final W m_delegate;
 
     // We should not need a thread-safe data structure (i.e., an AtomicReferenceArray) here.
@@ -144,16 +164,19 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
     // one that starts the serialization thread in HeapCachedColumnStore#writeInternal(ReadBatch).
     T[] m_data;
 
-    private Queue<Runnable> m_serialization = new ConcurrentLinkedQueue<>();
+    private final Queue<Runnable> m_queue;
 
-    CachedWriteData(final W delegate, final T[] data) {
+    CachedWriteData(final W delegate, final T[] data, final Queue<Runnable> serializationQueue) {
         m_delegate = delegate;
         m_data = data;
+        m_queue = serializationQueue;
     }
 
     @Override
     public void setMissing(final int index) {
         m_data[index] = null;
+        // TODO do we even have to set m_data[index] to null here?
+        // If so, wouldn't we also have to enqueue a serialization runnable calling m_delegate.setMissing(index)?
     }
 
     @Override
@@ -179,19 +202,29 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     @Override
     public void expand(final int minimumCapacity) {
+        // TODO do we need to serialize here?
         m_delegate.expand(minimumCapacity);
         m_data = Arrays.copyOf(m_data, m_delegate.capacity());
     }
 
-    void enqueueRunnable(final Runnable r) {
-        m_serialization.add(r);
+    /**
+     * This method, along with methods enqueuing additional serialization runnables, such as
+     * CachedStringWriteData::setString or CachedVarBinaryWriteData::setObject, are synchronized such that no additional
+     * serialization runnables are enqueued while we are awaiting serialization to conclude.
+     */
+    synchronized void serialize() {
+        m_phaser.arriveAndAwaitAdvance();
     }
 
-    synchronized void serialize() {
-        Runnable r;
-        while ((r = m_serialization.poll()) != null) {
-            r.run();
-        }
+    /**
+     * As per contract, serialization methods such as StringWriteData::setString or VarBinaryWriteData::setObject must
+     * only ever be called for ascending indices. It is therefore mandatory that enqueued serialization runnables are
+     * executed one after the other.
+     *
+     * @param r a serialization runnable that is to be enqueued and asynchronously run
+     */
+    void enqueueSerializionRunnable(final SerializationRunnable r) {
+        m_queue.add(r);
     }
 
     abstract R closeDelegate(int length);
