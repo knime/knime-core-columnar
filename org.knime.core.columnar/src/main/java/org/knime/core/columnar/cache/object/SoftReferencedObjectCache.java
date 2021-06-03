@@ -56,7 +56,6 @@ import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
 
 /**
  * Implementation of an {@link SharedObjectCache} in which values are softly referenced. As per contract of
@@ -78,17 +77,7 @@ public final class SoftReferencedObjectCache extends AbstractSharedObjectCache {
      */
     public SoftReferencedObjectCache(final int nThreads) {
         super(nThreads);
-        final RemovalListener<ColumnDataUniqueId, Object[]> removalListener = removalNotification -> {
-            if (removalNotification.wasEvicted()) {
-                final ColumnDataUniqueId ccuid = removalNotification.getKey();
-                @SuppressWarnings("resource")
-                final ObjectReadCache store = (ObjectReadCache)ccuid.getReadable();
-                store.onEviction(ccuid);
-            }
-        };
-
-        m_cache = CacheBuilder.newBuilder().softValues().removalListener(removalListener)
-            .expireAfterAccess(60, TimeUnit.SECONDS).build();
+        m_cache = CacheBuilder.newBuilder().softValues().expireAfterAccess(60, TimeUnit.SECONDS).build();
     }
 
     @Override

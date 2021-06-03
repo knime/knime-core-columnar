@@ -142,18 +142,11 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
      * @param cache the delegate from which to read object data in case of a cache miss
      */
     public ObjectReadCache(final RandomAccessBatchReadable delegate, final SharedObjectCache cache) {
-        this(delegate, HeapCacheUtils.getVarBinaryIndices(delegate.getSchema()),
-            HeapCacheUtils.getStringIndices(delegate.getSchema()), cache,
-            Collections.newSetFromMap(new ConcurrentHashMap<>()));
-    }
-
-    ObjectReadCache(final RandomAccessBatchReadable reabableDelegate, final ColumnSelection varBinaryData,
-        final ColumnSelection stringData, final SharedObjectCache cache, final Set<ColumnDataUniqueId> cachedData) {
-        m_reabableDelegate = reabableDelegate;
-        m_varBinaryData = varBinaryData;
-        m_stringData = stringData;
+        m_reabableDelegate = delegate;
+        m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(delegate.getSchema());
+        m_stringData = HeapCacheUtils.getStringIndices(delegate.getSchema());
         m_cache = cache.getCache();
-        m_cachedData = cachedData;
+        m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
     }
 
     @Override
@@ -172,10 +165,6 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
         m_cachedData.clear();
         m_cachedData = null;
         m_reabableDelegate.close();
-    }
-
-    void onEviction(final ColumnDataUniqueId ccuid) {
-        m_cachedData.remove(ccuid);
     }
 
 }

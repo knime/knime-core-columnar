@@ -67,6 +67,7 @@ import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
@@ -85,7 +86,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class ObjectCache implements BatchWritable, RandomAccessBatchReadable, Flushable {
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(ObjectCache.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ObjectCache.class);
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
@@ -128,9 +129,17 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         @Override
         public synchronized void write(final ReadBatch batch) throws IOException {
 
+            /* We have to retain this batch, since we are passing it onward to the delegate reader asynchronously. We
+             * then wait for the previous (retained, but not yet delegated to the underlying writer) batch. If we would
+             * not wait and if the serialization threads are lagging behind the main thread filling the batches, we
+             * would end up with multiple retained batches. While the heap memory is monitored by KNIME's memory alert
+             * system, the off-heap region is not, so we could run out of off-heap memory eventually. Note that the
+             * underlying ReadDataCache, which caches batches off-heap and makes sure not to take up too much off-heap
+             * memory, does not have this batch cached yet. If we wanted to cache it, we would have to invoke
+             * Batch::sizeOf. This, in turn, would lead to serialization of the data, so we would still have to wait. */
             batch.retain();
             try {
-                waitForPrevBatch();
+                waitForAndHandleFuture();
             } catch (InterruptedException e) {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
@@ -148,7 +157,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                         m_unclosedData.remove(heapCachedData.getWriteData());
                         return heapCachedData.close();
                     }, m_executor);
-                    final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(m_readStore, i, m_numBatches);
+                    final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(ObjectCache.this, i, m_numBatches);
                     m_cache.getCache().put(ccuid, heapCachedData.getData());
                     m_cachedData.add(ccuid);
                 } else {
@@ -172,17 +181,18 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
         @Override
         public synchronized void close() throws IOException {
-        	try {
-                waitForPrevBatch();
-            } catch (InterruptedException e) {
-                // Restore interrupted state...
-                Thread.currentThread().interrupt();
-                LOGGER.info(ERROR_ON_INTERRUPT, e);
-            }
-            m_writerDelegate.close();
+            handleDoneFuture();
+
+            m_future = m_future.thenRun(() -> {
+                try {
+                    m_writerDelegate.close();
+                } catch (IOException e) {
+                    throw new IllegalStateException("Failed to close writer.", e);
+                }
+            });
         }
 
-        private void waitForPrevBatch() throws InterruptedException, IOException {
+        private void waitForAndHandleFuture() throws InterruptedException, IOException {
             try {
                 m_future.get();
             } catch (ExecutionException e) {
@@ -190,17 +200,91 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             }
         }
 
+        private void handleDoneFuture() throws IOException {
+            if (m_future.isDone()) {
+                try {
+                    waitForAndHandleFuture();
+                } catch (InterruptedException e) {
+                    // Restore interrupted state
+                    Thread.currentThread().interrupt();
+                    // since we just checked whether the future is done, we likely never end up in this code block
+                    LOGGER.info(ERROR_ON_INTERRUPT, e);
+                }
+            }
+        }
+
     }
 
-	private final ObjectCacheWriter m_writer;
+    private final class ObjectCacheReader implements RandomAccessBatchReader {
 
-	private final ExecutorService m_executor;
+        private final RandomAccessBatchReader m_readerDelegate;
 
-	private final ObjectReadCache m_readStore;
+        private final ColumnSelection m_selection;
 
-	private final ColumnSelection m_varBinaryData;
+        private ObjectCacheReader(final ColumnSelection selection) {
+            m_readerDelegate = m_reabableDelegate.createRandomAccessReader(selection);
+            m_selection = selection;
+        }
 
-	private final ColumnSelection m_stringData;
+        @Override
+        public ReadBatch readRetained(final int index) throws IOException {
+            // when reading the last batch, we'll have to wait for that last batch to be serialized
+            if (index == m_writer.m_numBatches - 1) {
+                try {
+                    m_writer.waitForAndHandleFuture();
+                } catch (InterruptedException e) {
+                    // Restore interrupted state...
+                    Thread.currentThread().interrupt();
+                    LOGGER.error(ERROR_ON_INTERRUPT, e);
+                }
+            }
+
+            final ReadBatch batch = m_readerDelegate.readRetained(index);
+            return m_selection.createBatch(i -> {
+                if (m_varBinaryData.isSelected(i)) {
+                    return wrapVarBinary(batch, index, i);
+                } else if (m_stringData.isSelected(i)) {
+                    return wrapString(batch, index, i);
+                } else {
+                    return batch.get(i);
+                }
+            });
+        }
+
+        private CachedVarBinaryLoadingReadData wrapVarBinary(final ReadBatch batch, final int batchIndex,
+            final int columnIndex) {
+            final VarBinaryReadData columnReadData = (VarBinaryReadData)batch.get(columnIndex);
+            final Object[] array =
+                m_cache.getCache().computeIfAbsent(new ColumnDataUniqueId(ObjectCache.this, columnIndex, batchIndex),
+                    k -> new Object[columnReadData.length()]);
+            return new CachedVarBinaryLoadingReadData(columnReadData, array);
+        }
+
+        private CachedStringLoadingReadData wrapString(final ReadBatch batch, final int batchIndex,
+            final int columnIndex) {
+            final StringReadData columnReadData = (StringReadData)batch.get(columnIndex);
+            final String[] array = (String[])m_cache.getCache().computeIfAbsent(
+                new ColumnDataUniqueId(ObjectCache.this, columnIndex, batchIndex),
+                k -> new String[columnReadData.length()]);
+            return new CachedStringLoadingReadData(columnReadData, array);
+        }
+
+        @Override
+        public void close() throws IOException {
+            m_readerDelegate.close();
+        }
+
+    }
+
+    private final ObjectCacheWriter m_writer;
+
+    private final ExecutorService m_executor;
+
+    private final RandomAccessBatchReadable m_reabableDelegate;
+
+    private final ColumnSelection m_varBinaryData;
+
+    private final ColumnSelection m_stringData;
 
     private final SharedObjectCache m_cache;
 
@@ -211,7 +295,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     /**
      * @param delegate the delegate to which to write
      * @param cache the in-heap cache for storing object data
-     * @param executor the executor to which to submit asynchronous serialization tasks
+     * @param executor the executor to which to submit asynchronous persist tasks
      */
     @SuppressWarnings("resource")
     public <D extends BatchWritable & RandomAccessBatchReadable> ObjectCache(final D delegate,
@@ -219,7 +303,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         m_writer = new ObjectCacheWriter(delegate.getWriter());
         m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(delegate.getSchema());
         m_stringData = HeapCacheUtils.getStringIndices(delegate.getSchema());
-        m_readStore = new ObjectReadCache(delegate, m_varBinaryData, m_stringData, cache, m_cachedData);
+        m_reabableDelegate = delegate;
         m_cache = cache;
         m_executor = executor;
     }
@@ -230,37 +314,38 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     }
 
     @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
-        return m_readStore.createRandomAccessReader(config);
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+        return new ObjectCacheReader(selection);
     }
 
     @Override
     public ColumnarSchema getSchema() {
-        return m_readStore.getSchema();
+        return m_reabableDelegate.getSchema();
     }
 
-	@Override
-	public void flush() throws IOException {
-		// serialize any currently unclosed data (in the current batch)
-		for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
-			data.serialize();
-		}
+    @Override
+    public void flush() throws IOException {
+        // serialize any currently unclosed data (in the current batch)
+        for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
+            data.serialize();
+        }
 
-		// wait for the pending serialization of the previous batch
-		try {
-			m_writer.waitForPrevBatch();
-		} catch (InterruptedException e) {
-			// Restore interrupted state...
-			Thread.currentThread().interrupt();
-			LOGGER.info(ERROR_ON_INTERRUPT, e);
-			return;
-		}
-	}
+        // wait for the pending serialization of the previous batch
+        try {
+            m_writer.waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            // Restore interrupted state...
+            Thread.currentThread().interrupt();
+            LOGGER.error(ERROR_ON_INTERRUPT, e);
+        }
+    }
 
-	@Override
-	public synchronized void close() throws IOException {
-		m_readStore.close();
-		m_cachedData = null;
-	}
+    @Override
+    public synchronized void close() throws IOException {
+        m_cache.getCache().keySet().removeAll(m_cachedData);
+        m_cachedData.clear();
+        m_cachedData = null;
+        m_reabableDelegate.close();
+    }
 
 }
