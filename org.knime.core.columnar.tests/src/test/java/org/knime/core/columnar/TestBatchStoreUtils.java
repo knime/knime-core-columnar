@@ -108,6 +108,7 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
+import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.columnar.testing.data.TestData;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -518,6 +519,10 @@ public final class TestBatchStoreUtils {
 
     public static TestBatchStore createDefaultTestColumnStore() {
         return TestBatchStore.create(createDefaultSchema());
+    }
+
+    public static TestBatchBuffer createDefaultTestBatchBuffer() {
+        return TestBatchBuffer.create(createDefaultSchema());
     }
 
     private static NullableWriteData[] createBatch(final BatchWritable store) {

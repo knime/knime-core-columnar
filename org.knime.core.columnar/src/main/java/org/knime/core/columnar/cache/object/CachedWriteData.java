@@ -138,7 +138,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     abstract class SerializationRunnable implements Runnable {
         SerializationRunnable() {
-            m_phaser.register();
+            m_serializationPhaser.register();
         }
 
         @Override
@@ -146,22 +146,21 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
             try {
                 serialize();
             } finally {
-                m_phaser.arriveAndDeregister();
+                m_serializationPhaser.arriveAndDeregister();
             }
         }
 
         abstract void serialize();
     }
 
-    // required for serialization, where we have to wait for all enqueued serialization runnables to conclude
-    private final Phaser m_phaser = new Phaser(1);
+    // required to make sure that postSet blocks while enforced serialization / flush is ongoing
+    private final Object m_flushLock = new Object();
+
+    // required for whenever we have to wait for the serialization thread to finish
+    private final Phaser m_serializationPhaser = new Phaser(1);
 
     final W m_delegate;
 
-    // We should not need a thread-safe data structure (i.e., an AtomicReferenceArray) here.
-    // Reasoning: In Java, there is a happens-before relation between one thread starting another.
-    // Here, the "writer thread", i.e., the thread that creates the data and calls setObject() should be the same as the
-    // one that starts the serialization thread in HeapCachedColumnStore#writeInternal(ReadBatch).
     T[] m_data;
 
     private final Queue<Runnable> m_queue;
@@ -174,9 +173,8 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     @Override
     public void setMissing(final int index) {
-        m_data[index] = null;
-        // TODO do we even have to set m_data[index] to null here?
-        // If so, wouldn't we also have to enqueue a serialization runnable calling m_delegate.setMissing(index)?
+        // as per contract, setObject / setMissing is only ever called for ascending indices
+        // m_data[index] is already null; no need to explicitly set it to null here
     }
 
     @Override
@@ -202,29 +200,22 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     @Override
     public void expand(final int minimumCapacity) {
-        // TODO do we need to serialize here?
         m_delegate.expand(minimumCapacity);
         m_data = Arrays.copyOf(m_data, m_delegate.capacity());
     }
 
-    /**
-     * This method, along with methods enqueuing additional serialization runnables, such as
-     * CachedStringWriteData::setString or CachedVarBinaryWriteData::setObject, are synchronized such that no additional
-     * serialization runnables are enqueued while we are awaiting serialization to conclude.
-     */
-    synchronized void serialize() {
-        m_phaser.arriveAndAwaitAdvance();
+    void serialize() {
+        synchronized (m_flushLock) {
+            m_serializationPhaser.arriveAndAwaitAdvance();
+        }
     }
 
-    /**
-     * As per contract, serialization methods such as StringWriteData::setString or VarBinaryWriteData::setObject must
-     * only ever be called for ascending indices. It is therefore mandatory that enqueued serialization runnables are
-     * executed one after the other.
-     *
-     * @param r a serialization runnable that is to be enqueued and asynchronously run
-     */
-    void enqueueSerializionRunnable(final SerializationRunnable r) {
-        m_queue.add(r);
+    void onSet(final SerializationRunnable r) {
+        synchronized (m_flushLock) {
+            // As per contract, serialization methods such as StringWriteData::setString may only ever be called for
+            // ascending indices. It is therefore mandatory that enqueued runnables are executed one after the other.
+            m_queue.add(r);
+        }
     }
 
     abstract R closeDelegate(int length);

@@ -84,9 +84,9 @@ final class CachedVarBinaryWriteData extends CachedWriteData<VarBinaryWriteData,
     }
 
     @Override
-    public synchronized void setBytes(final int index, final byte[] val) {
+    public void setBytes(final int index, final byte[] val) {
         m_data[index] = val;
-        enqueueSerializionRunnable(new SerializationRunnable() {
+        onSet(new SerializationRunnable() {
             @Override
             void serialize() {
                 m_delegate.setBytes(index, val);
@@ -95,9 +95,9 @@ final class CachedVarBinaryWriteData extends CachedWriteData<VarBinaryWriteData,
     }
 
     @Override
-    public synchronized <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
+    public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
         m_data[index] = value;
-        enqueueSerializionRunnable(new SerializationRunnable() {
+        onSet(new SerializationRunnable() {
             @Override
             void serialize() {
                 m_delegate.setObject(index, value, serializer);

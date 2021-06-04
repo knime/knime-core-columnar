@@ -50,7 +50,7 @@ package org.knime.core.columnar.cache.object;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.knime.core.columnar.TestBatchStoreUtils.createDefaultTestColumnStore;
+import static org.knime.core.columnar.TestBatchStoreUtils.createDefaultTestBatchBuffer;
 import static org.knime.core.columnar.TestBatchStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestBatchStoreUtils.readSelectionAndCompareTable;
 import static org.knime.core.columnar.TestBatchStoreUtils.readTwiceAndCompareTable;
@@ -58,22 +58,29 @@ import static org.knime.core.columnar.TestBatchStoreUtils.releaseTable;
 import static org.knime.core.columnar.TestBatchStoreUtils.writeDefaultTable;
 
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.columnar.testing.TestBatchStore;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.data.TestStringData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
@@ -84,13 +91,38 @@ import org.knime.core.table.schema.DataSpec;
 @SuppressWarnings("javadoc")
 public class ObjectCacheTest {
 
-	private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
+    private static final Runnable SERIALIZATION_POISON_PILL = () -> {
+    };
 
-	private static final Queue<Runnable> QUEUE = new LinkedList<>();
+    private static final ExecutorService SERIALIZATION_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    private static final ExecutorService PERSIST_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    private static final BlockingQueue<Runnable> QUEUE = new LinkedBlockingDeque<>();
+
+    @BeforeClass
+    public static void before() {
+        SERIALIZATION_EXECUTOR.execute(() -> {
+            while (true) {
+                try {
+                    final Runnable r = QUEUE.take();
+                    if (r == SERIALIZATION_POISON_PILL) {
+                        return;
+                    }
+                    r.run();
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+    }
 
     @AfterClass
-    public static void tearDownTests() {
-        EXECUTOR.shutdown();
+    public static void after() {
+        QUEUE.add(SERIALIZATION_POISON_PILL);
+        SERIALIZATION_EXECUTOR.shutdown();
+        PERSIST_EXECUTOR.shutdown();
     }
 
     static SharedObjectCache generateCache() {
@@ -112,8 +144,41 @@ public class ObjectCacheTest {
 
     @SuppressWarnings("resource")
     private static ObjectCache generateDefaultHeapCachedStore() {
-        final BatchStore delegate = createDefaultTestColumnStore();
-        return new ObjectCache(delegate, generateCache(), EXECUTOR);
+        final TestBatchBuffer delegate = createDefaultTestBatchBuffer();
+        return new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR);
+    }
+
+    private static ColumnarSchema createSingleStringColumnSchema() {
+        return new ColumnarSchema() {
+            @Override
+            public int numColumns() {
+                return 1;
+            }
+
+            @Override
+            public DataSpec getSpec(final int index) {
+                return DataSpec.stringSpec();
+            }
+        };
+    }
+
+    private static CountDownLatch blockSerialization() {
+        final CountDownLatch blockLatch = new CountDownLatch(1);
+        QUEUE.add(() -> {
+            try {
+                blockLatch.await();
+            } catch (InterruptedException ex) {
+                Assert.fail();
+            }
+        });
+        return blockLatch;
+    }
+
+    private static void resumeAndWaitForSerialization(final CountDownLatch blockLatch) throws InterruptedException {
+        blockLatch.countDown();
+        final CountDownLatch waitLatch = new CountDownLatch(1);
+        QUEUE.add(() -> waitLatch.countDown());
+        waitLatch.await();
     }
 
     @Test
@@ -156,20 +221,8 @@ public class ObjectCacheTest {
 
     @Test
     public void testFlush() throws IOException, InterruptedException {
-        final ColumnarSchema schema = new ColumnarSchema() {
-            @Override
-            public int numColumns() {
-                return 1;
-            }
-
-            @Override
-            public DataSpec getSpec(final int index) {
-                return DataSpec.stringSpec();
-            }
-        };
-
-        try (final BatchStore delegate = TestBatchStore.create(schema);
-                final ObjectCache store = new ObjectCache(delegate, generateCache(), EXECUTOR);
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR);
                 final BatchWriter writer = store.getWriter()) {
             final WriteBatch batch = writer.create(2);
             final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
@@ -197,7 +250,65 @@ public class ObjectCacheTest {
             assertEquals("0", delegateData.getString(0));
             assertEquals("1", delegateData.getString(1));
 
-            data.release();
+            batch.release();
+        }
+    }
+
+    @Test
+    public void testSerializeAsync() throws IOException, InterruptedException {
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR);
+                final BatchWriter writer = store.getWriter()) {
+            final WriteBatch batch = writer.create(1);
+            final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
+            final TestStringData delegateData = (TestStringData)data.m_delegate;
+
+            final CountDownLatch blockLatch = blockSerialization();
+            try {
+                data.setString(0, "0");
+                assertNull(delegateData.getString(0));
+            } finally {
+                resumeAndWaitForSerialization(blockLatch);
+            }
+            assertEquals("0", delegateData.getString(0));
+
+            batch.release();
+        }
+    }
+
+    @Test
+    public void testCloseDoesNotBlock() throws IOException, InterruptedException {
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR);
+                final BatchWriter writer = store.getWriter()) {
+
+            final WriteBatch writeBatch1 = writer.create(1);
+            final StringWriteData writeData1 = (StringWriteData)writeBatch1.get(0);
+            writeData1.setString(0, "0");
+            final ReadBatch writeReadBatch1 = writeBatch1.close(1);
+            writer.write(writeReadBatch1);
+            writeReadBatch1.release();
+
+            final CountDownLatch blockLatch = blockSerialization();
+
+            try {
+                final WriteBatch writeBatch2 = writer.create(1);
+                final StringWriteData writeData2 = (StringWriteData)writeBatch2.get(0);
+                writeData2.setString(0, "1");
+                final ReadBatch writeReadBatch2 = writeBatch2.close(1);
+                writer.write(writeReadBatch2);
+                writeReadBatch2.release();
+
+                try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
+                    final ReadBatch readBatch1 = reader.readRetained(0);
+                    final StringReadData readData1 = (StringReadData)readBatch1.get(0);
+                    assertEquals("0", readData1.getString(0));
+                    readBatch1.release();
+                }
+
+            } finally {
+                resumeAndWaitForSerialization(blockLatch);
+            }
         }
     }
 

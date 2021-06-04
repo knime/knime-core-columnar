@@ -76,9 +76,9 @@ final class CachedStringWriteData extends CachedWriteData<StringWriteData, Strin
     }
 
     @Override
-    public synchronized void setString(final int index, final String val) {
+    public void setString(final int index, final String val) {
         m_data[index] = val;
-        enqueueSerializionRunnable(new SerializationRunnable() {
+        onSet(new SerializationRunnable() {
             @Override
             void serialize() {
                 m_delegate.setString(index, val);
