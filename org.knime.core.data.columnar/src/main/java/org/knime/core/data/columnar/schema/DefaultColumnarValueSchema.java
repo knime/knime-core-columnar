@@ -45,13 +45,19 @@
  */
 package org.knime.core.data.columnar.schema;
 
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+
+import com.google.common.collect.Iterators;
 
 /**
  * Default implementation of a {@link ColumnarValueSchema}.
@@ -62,11 +68,11 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ValueSchema m_source;
 
-    private final DataSpec[] m_specs;
+    private final List<DataSpec> m_specs;
 
     DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
-        m_specs = Stream.of(source.getValueFactories()).map(ValueFactory::getSpec).toArray(DataSpec[]::new);
+        m_specs = Stream.of(source.getValueFactories()).map(ValueFactory::getSpec).collect(Collectors.toList());
     }
 
     @Override
@@ -80,7 +86,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
                     numColumns() - 1));
         }
 
-        return m_specs[index];
+        return m_specs.get(index);
     }
 
     @Override
@@ -100,7 +106,29 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     @Override
     public int numColumns() {
-        return m_specs.length;
+        return m_specs.size();
+    }
+
+    @Override
+    public Iterator<DataSpec> iterator() {
+        return m_specs.iterator();
+    }
+
+    @Override
+    public int hashCode() {
+        return m_specs.hashCode();
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (!(obj instanceof ColumnarSchema)) { // NOSONAR
+            return false;
+        }
+        final ColumnarSchema other = (ColumnarSchema)obj;
+        if (numColumns() != other.numColumns()) {
+            return false;
+        }
+        return Iterators.elementsEqual(iterator(), other.iterator());
     }
 
 }

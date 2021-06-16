@@ -48,6 +48,8 @@
  */
 package org.knime.core.data.columnar.schema;
 
+import java.util.Iterator;
+
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.node.NodeSettingsWO;
@@ -92,6 +94,21 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     @Override
     public ValueFactory<?, ?>[] getValueFactories() {
         return m_delegate.getValueFactories();
+    }
+
+    @Override
+    public Iterator<DataSpec> iterator() {
+        return m_delegate.iterator();
+    }
+
+    @Override
+    public int hashCode() {
+        return m_delegate.hashCode();
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        return m_delegate.equals(obj);
     }
 
 }
