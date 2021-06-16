@@ -214,7 +214,7 @@ public final class ColumnarCursorFactory {
         }
 
         @Override
-        public int getNumColumns() {
+        public int size() {
             return m_numColumns;
         }
 

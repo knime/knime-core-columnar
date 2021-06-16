@@ -156,7 +156,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public int getNumColumns() {
+        public int size() {
             return m_accesses.length;
         }
 

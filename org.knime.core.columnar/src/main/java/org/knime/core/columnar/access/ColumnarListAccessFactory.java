@@ -115,7 +115,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
-        public <A extends ReadAccess> A getReadAccess(final int index) { // NOSONAR
+        public <A extends ReadAccess> A getAccess(final int index) { // NOSONAR
             updateReadValue();
             m_innerIndex = index;
             @SuppressWarnings("unchecked")
@@ -175,7 +175,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
             final int listSize = listAccess.size();
             create(listSize);
             for (int i = 0; i < listSize; i++) {
-                getWriteAccess(i).setFrom(listAccess.getReadAccess(i));
+                getWriteAccess(i).setFrom(listAccess.getAccess(i));
             }
         }
 

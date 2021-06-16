@@ -88,8 +88,8 @@ public class ColumnarStructAccessFactoryTest {
         structWriteAccess.setMissing();
         assertTrue(structReadAccess.isMissing());
 
-        final StringWriteAccess writeAccess = structWriteAccess.getWriteAccessAt(0);
-        final StringReadAccess readAccess = structReadAccess.getInnerReadAccessAt(0);
+        final StringWriteAccess writeAccess = structWriteAccess.getWriteAccess(0);
+        final StringReadAccess readAccess = structReadAccess.getAccess(0);
 
         final String value = "test";
         assertTrue(readAccess.isMissing());

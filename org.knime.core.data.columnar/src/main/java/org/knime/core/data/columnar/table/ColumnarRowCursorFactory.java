@@ -132,10 +132,10 @@ final class ColumnarRowCursorFactory {
             ReadAccessRow access = delegate.access();
 
             // TODO support efficient wide tables
-            m_accesses = new ReadAccess[access.getNumColumns()];
-            m_values = new ReadValue[access.getNumColumns()];
+            m_accesses = new ReadAccess[access.size()];
+            m_values = new ReadValue[access.size()];
             final var facs = schema.getValueFactories();
-            for (int i = 0; i < access.getNumColumns(); i++) {
+            for (int i = 0; i < access.size(); i++) {
                 if (selection.isSelected(i)) {
                     m_accesses[i] = access.getAccess(i);
                     m_values[i] = facs[i].createReadValue(access.getAccess(i));
