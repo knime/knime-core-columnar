@@ -342,6 +342,10 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     @Override
     public synchronized void close() throws IOException {
+    	// Need to flush (i.e, finish serialization) here.
+    	// Otherwise, there could still be pending SerializationRunnables that would fail ungracefully.
+        flush();
+
         m_cache.getCache().keySet().removeAll(m_cachedData);
         m_cachedData.clear();
         m_cachedData = null;
