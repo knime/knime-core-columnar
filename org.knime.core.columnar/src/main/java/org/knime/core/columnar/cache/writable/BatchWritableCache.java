@@ -80,6 +80,8 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
 
         private final BatchWriter m_writerDelegate;
 
+        private final CountDownLatch m_closed = new CountDownLatch(1);
+
         private final CountDownLatch m_delegateClosed = new CountDownLatch(1);
 
         private ReadBatches m_table = new ReadBatches();
@@ -113,22 +115,26 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
 
         @Override
         public synchronized void close() throws IOException {
-            if (m_table != null) {
-                m_globalCache.put(BatchWritableCache.this, m_table, (store, table) -> {
+            try {
+                if (m_table != null) {
+                    m_globalCache.put(BatchWritableCache.this, m_table, (store, table) -> {
+                        try {
+                            flush(table, true);
+                        } catch (IOException e) {
+                            throw new IllegalStateException(ERROR_MESSAGE_ON_FLUSH, e);
+                        }
+                    });
+                    m_table.release(); // from here on out, the cache is responsible for retaining
+                    m_table = null;
+                } else {
                     try {
-                        flush(table, true);
-                    } catch (IOException e) {
-                        throw new IllegalStateException(ERROR_MESSAGE_ON_FLUSH, e);
+                        m_writerDelegate.close();
+                    } finally {
+                        m_delegateClosed.countDown();
                     }
-                });
-                m_table.release(); // from here on out, the cache is responsible for retaining
-                m_table = null;
-            } else {
-                try {
-                    m_writerDelegate.close();
-                } finally {
-                    m_delegateClosed.countDown();
                 }
+            } finally {
+                m_closed.countDown();
             }
         }
 
@@ -150,12 +156,13 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
                         final ReadBatch batch = table.getBatch(i);
                         m_writerDelegate.write(batch);
                     }
-                    if (close) {
-                        m_writerDelegate.close();
-                    }
                 } finally {
                     if (close) {
-                        m_delegateClosed.countDown();
+                        try {
+                            m_writerDelegate.close();
+                        } finally {
+                            m_delegateClosed.countDown();
+                        }
                     }
                 }
             }
@@ -223,6 +230,12 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
 
     @Override
     public void flush() throws IOException {
+        // if writer unclosed
+        if (m_writer.m_closed.getCount() == 1) {
+            // nothing to flush
+            return;
+        }
+
         final ReadBatches cached = m_globalCache.getRetained(BatchWritableCache.this);
         if (cached != null) {
             m_writer.flush(cached, true);
@@ -234,6 +247,17 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+        // Wait for writer to be closed. While the writer is not closed, neither will the table have been placed in the
+        // cache nor will the delegate writer have been closed.
+        // TODO: this needs review when this class is adjusted to allow reading while writing (AP-15959)
+        try {
+            m_writer.m_closed.await();
+        } catch (InterruptedException e) {
+            // Restore interrupted state
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+        }
+
         final ReadBatches cached = m_globalCache.getRetained(BatchWritableCache.this);
         if (cached != null) {
             // cache hit
