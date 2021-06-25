@@ -48,6 +48,7 @@ package org.knime.core.data.columnar.domain;
 import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.access.ColumnarAccessFactory;
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
+import org.knime.core.columnar.access.ColumnarReadAccess;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
@@ -73,7 +74,9 @@ final class DefaultReadValueFactory<R extends NullableReadData, RA extends ReadA
     @SuppressWarnings("unchecked")
     @Override
     public ReadValue createReadValue(final R data, final ColumnDataIndex index) {
-        return m_delegate.createReadValue((RA)m_factory.createReadAccess(index));
+        final ColumnarReadAccess cra = m_factory.createReadAccess(index);
+        cra.setData(data);
+        return m_delegate.createReadValue((RA)cra);
     }
 
 }
