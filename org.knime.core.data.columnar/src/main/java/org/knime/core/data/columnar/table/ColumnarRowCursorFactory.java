@@ -125,16 +125,22 @@ final class ColumnarRowCursorFactory {
         private Finalizer m_finalizer;
 
         private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate,
-            final Set<Finalizer> openCursorFinalizers, final ColumnarValueSchema schema) throws IOException {
+            final Set<Finalizer> openCursorFinalizers, final ColumnarValueSchema schema,
+            final ColumnSelection selection) throws IOException {
             m_delegate = delegate;
             m_schema = schema;
             ReadAccessRow access = delegate.access();
-            m_accesses = IntStream.range(0, access.getNumColumns())//
-                .mapToObj(access::getAccess)//
-                .toArray(ReadAccess[]::new);
+
+            // TODO support efficient wide tables
+            m_accesses = new ReadAccess[access.getNumColumns()];
+            m_values = new ReadValue[access.getNumColumns()];
             final var facs = schema.getValueFactories();
-            m_values = IntStream.range(0, access.getNumColumns())
-                .mapToObj(i -> facs[i].createReadValue(access.getAccess(i))).toArray(ReadValue[]::new);
+            for (int i = 0; i < access.getNumColumns(); i++) {
+                if (selection.isSelected(i)) {
+                    m_accesses[i] = access.getAccess(i);
+                    m_values[i] = facs[i].createReadValue(access.getAccess(i));
+                }
+            }
             m_openCursorFinalizers = openCursorFinalizers;
         }
 
@@ -226,7 +232,7 @@ final class ColumnarRowCursorFactory {
         }
 
         var cursor = new DefaultRowCursor(ColumnarCursorFactory.create(store, selection, firstBatchIndex,
-            lastBatchIndex, firstIndexInFirstBatch, lastIndexInLastBatch), openCursorFinalizers, schema);
+            lastBatchIndex, firstIndexInFirstBatch, lastIndexInLastBatch), openCursorFinalizers, schema, selection);
         // can't invoke this in the constructor since it passes a reference to itself to the ResourceLeakDetector
         cursor.m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(cursor, cursor.m_delegate);
         openCursorFinalizers.add(cursor.m_finalizer);
