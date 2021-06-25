@@ -165,7 +165,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                 }
             }
 
-            m_future = CompletableFuture.allOf(futures).thenRun(() -> { // NOSONAR
+            m_future = CompletableFuture.allOf(futures).thenRunAsync(() -> { // NOSONAR
                 try {
                     m_writerDelegate.write(new DefaultReadBatch(
                         Arrays.stream(futures).map(CompletableFuture::join).toArray(NullableReadData[]::new)));
@@ -174,7 +174,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                 } finally {
                     batch.release();
                 }
-            });
+            }, m_executor);
 
             m_numBatches++;
         }
@@ -183,13 +183,13 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         public synchronized void close() throws IOException {
             handleDoneFuture();
 
-            m_future = m_future.thenRun(() -> {
+            m_future = m_future.thenRunAsync(() -> {
                 try {
                     m_writerDelegate.close();
                 } catch (IOException e) {
                     throw new IllegalStateException("Failed to close writer.", e);
                 }
-            });
+            }, m_executor);
         }
 
         private void waitForAndHandleFuture() throws InterruptedException, IOException {
