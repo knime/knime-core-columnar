@@ -125,8 +125,9 @@ public final class DomainWritable implements BatchWritable, Closeable {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
                 LOGGER.info(ERROR_ON_INTERRUPT, e);
+            } finally {
+                m_writerDelegate.close();
             }
-            m_writerDelegate.close();
         }
 
         private void waitForPrevBatch() throws InterruptedException, IOException {
