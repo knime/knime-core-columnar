@@ -59,17 +59,17 @@ import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadD
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
 
 /**
- * Test {@link ArrowVarBinaryData}
+ * Test {@link ArrowVarBinaryData} with the setObject and getObject methods
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinaryWriteData, ArrowVarBinaryReadData> {
+public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowVarBinaryWriteData, ArrowVarBinaryReadData> {
 
     private static final int MAX_LENGTH = 100;
 
     /** Create the test for {@link ArrowVarBinaryData} */
-    public ArrowVarBinaryDataTest() {
+    public ArrowObjectDataTest() {
         super(ArrowVarBinaryDataFactory.INSTANCE);
     }
 
@@ -87,12 +87,20 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
 
     @Override
     protected void setValue(final ArrowVarBinaryWriteData data, final int index, final int seed) {
-        data.setBytes(index, valueFor(seed));
+        data.setObject(index, valueFor(seed), (output, object) -> {
+            output.writeInt(object.length);
+            output.write(object);
+        });
     }
 
     @Override
     protected void checkValue(final ArrowVarBinaryReadData data, final int index, final int seed) {
-        assertArrayEquals(valueFor(seed), data.getBytes(index));
+        final byte[] read = data.getObject(index, input -> {
+            final byte[] object = new byte[input.readInt()];
+            input.readFully(object);
+            return object;
+        });
+        assertArrayEquals(valueFor(seed), read);
     }
 
     @Override

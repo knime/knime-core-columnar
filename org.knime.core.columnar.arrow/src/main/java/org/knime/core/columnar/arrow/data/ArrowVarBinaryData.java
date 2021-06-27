@@ -98,7 +98,7 @@ public final class ArrowVarBinaryData {
 
         @Override
         public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
-            ArrowBufIO.serialize(index, value, m_vector, serializer);
+            ArrowBufIO.serialize(m_offset + index, value, m_vector, serializer);
         }
 
         @Override
@@ -140,7 +140,7 @@ public final class ArrowVarBinaryData {
 
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-            return ArrowBufIO.deserialize(index, m_vector, deserializer);
+            return ArrowBufIO.deserialize(m_offset + index, m_vector, deserializer);
         }
 
         @Override
