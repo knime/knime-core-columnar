@@ -151,17 +151,7 @@ public final class ArrowStructData {
                 childValidtiyBuffers[i] = child.getValidityBuffer();
             }
 
-            // Loop over the buffers and set the validity buffer to the result of a bitwise or operation
-            // NB: We assume our buffer is padded to a multiple of 4
-            final int bytesToSet = (int)Math.ceil(length / 8.0);
-            for (int bufferPosition = 0; bufferPosition < bytesToSet; bufferPosition += 4) {
-                int validity = 0;
-                // NB: if validity is -1 all bits are set and we do not need to check the other buffers
-                for (int i = 0; i < childValidtiyBuffers.length && validity != -1; i++) {
-                    validity = validity | childValidtiyBuffers[i].getInt(bufferPosition);
-                }
-                validityBuffer.setInt(bufferPosition, validity);
-            }
+            setValidityFromChildren(validityBuffer, childValidtiyBuffers, length);
 
             return new ArrowStructReadData(closeWithLength(length),
                 MissingValues.forValidityBuffer(validityBuffer, length), readChildren);
@@ -170,6 +160,42 @@ public final class ArrowStructData {
         @Override
         protected void closeResources() {
             ArrowStructData.closeResources(m_vector, m_children);
+        }
+
+        /**
+         * Set the validity buffer from the validity buffers of the children. If at least one child is set, the parent
+         * is set.
+         */
+        private static void setValidityFromChildren(final ArrowBuf buf, final ArrowBuf[] childBufs, final int length) {
+            final int bytesToSet = (int)Math.ceil(length / 8.0);
+            int bufferPosition = 0;
+
+            // TODO check if there is a performance improvement by using int
+            // The idea is:
+            // * Less loop iterations are needed
+            // * Java promotes bitwise operators to int anyway
+
+            // Using int (4 bytes at a time)
+            while (bufferPosition + 4 <= bytesToSet) {
+                int validity = 0;
+                // NB: if validity is -1 all bits are set and we do not need to check the other buffers
+                for (int i = 0; i < childBufs.length && validity != -1; i++) {
+                    validity |= childBufs[i].getInt(bufferPosition);
+                }
+                buf.setInt(bufferPosition, validity);
+                bufferPosition += 4;
+            }
+
+            // Using bytes (1 byte at a time)
+            while (bufferPosition < bytesToSet) {
+                byte validity = 0;
+                // NB: if validity is -1 all bits are set and we do not need to check the other buffers
+                for (int i = 0; i < childBufs.length && validity != -1; i++) {
+                    validity |= childBufs[i].getByte(bufferPosition);
+                }
+                buf.setByte(bufferPosition, validity);
+                bufferPosition += 1;
+            }
         }
     }
 

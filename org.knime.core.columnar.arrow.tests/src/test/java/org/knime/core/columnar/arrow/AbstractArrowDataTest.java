@@ -161,7 +161,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     /** Initialize the root allocator before running a test */
     @Before
     public void before() {
-        final int segmentSize = 4;
+        final int segmentSize = 1;
         m_alloc = new RootAllocator(AllocationListener.NOOP, Long.MAX_VALUE,
             requestSize -> (requestSize + (segmentSize - 1)) / segmentSize * segmentSize);
     }
