@@ -150,7 +150,7 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
             super.setData(data);
             // the super class does the cast for us
             for (int i = 0; i < m_inner.length; i++) {
-                m_inner[i].setData(m_data.getWriteDataAt(0));
+                m_inner[i].setData(m_data.getWriteDataAt(i));
             }
         }
 
