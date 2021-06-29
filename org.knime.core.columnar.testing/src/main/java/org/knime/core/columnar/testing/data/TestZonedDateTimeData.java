@@ -69,19 +69,24 @@ public final class TestZonedDateTimeData extends TestData implements ZonedDateTi
         }
 
         @Override
-        public TestZonedDateTimeData createReadData(final Object data) {
-            return new TestZonedDateTimeData((ZonedDateTime[])data);
+        public TestZonedDateTimeData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestZonedDateTimeData createReadData(final Object[] data, final int length) {
+            return new TestZonedDateTimeData(data, length);
         }
 
     }
 
     TestZonedDateTimeData(final int capacity) {
-        super(new ZonedDateTime[capacity]);
+        super(capacity);
     }
 
-    TestZonedDateTimeData(final ZonedDateTime[] zonedDateTimes) {
+    TestZonedDateTimeData(final Object[] zonedDateTimes, final int length) {
         super(zonedDateTimes);
-        close(zonedDateTimes.length);
+        close(length);
     }
 
     @Override

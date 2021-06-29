@@ -69,19 +69,24 @@ public final class TestDurationData extends TestData implements DurationWriteDat
         }
 
         @Override
-        public TestDurationData createReadData(final Object data) {
-            return new TestDurationData((Duration[])data);
+        public TestDurationData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestDurationData createReadData(final Object[] data, final int length) {
+            return new TestDurationData(data, length);
         }
 
     }
 
     TestDurationData(final int capacity) {
-        super(new Duration[capacity]);
+        super(capacity);
     }
 
-    TestDurationData(final Duration[] durations) {
+    TestDurationData(final Object[] durations, final int length) {
         super(durations);
-        close(durations.length);
+        close(length);
     }
 
     @Override

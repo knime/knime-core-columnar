@@ -69,19 +69,24 @@ public final class TestLocalDateData extends TestData implements LocalDateWriteD
         }
 
         @Override
-        public TestLocalDateData createReadData(final Object data) {
-            return new TestLocalDateData((LocalDate[])data);
+        public TestLocalDateData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestLocalDateData createReadData(final Object[] data, final int length) {
+            return new TestLocalDateData(data, length);
         }
 
     }
 
     TestLocalDateData(final int capacity) {
-        super(new LocalDate[capacity]);
+        super(capacity);
     }
 
-    TestLocalDateData(final LocalDate[] localDates) {
+    TestLocalDateData(final Object[] localDates, final int length) {
         super(localDates);
-        close(localDates.length);
+        close(length);
     }
 
     @Override

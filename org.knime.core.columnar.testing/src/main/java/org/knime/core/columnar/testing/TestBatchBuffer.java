@@ -74,8 +74,6 @@ public final class TestBatchBuffer implements BatchWritable, RandomAccessBatchRe
 
     final class TestBatchWriter implements BatchWriter {
 
-        private int m_maxDataLength;
-
         @Override
         public WriteBatch create(final int capacity) {
             waitForLatch();
@@ -91,7 +89,7 @@ public final class TestBatchBuffer implements BatchWritable, RandomAccessBatchRe
         @Override
         public void write(final ReadBatch batch) {
             waitForLatch();
-            final Object[] data = new Object[batch.size()];
+            final Object[][] data = new Object[batch.size()][];
             for (int i = 0; i < data.length; i++) {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();
@@ -123,9 +121,9 @@ public final class TestBatchBuffer implements BatchWritable, RandomAccessBatchRe
         @Override
         public ReadBatch readRetained(final int chunkIndex) {
             waitForLatch();
-            final Object[] data = m_batches.get(chunkIndex);
+            final Object[][] data = m_batches.get(chunkIndex);
             return m_selection.createBatch(i -> {
-                final TestData testData = m_factories[i].createReadData(data[i]);
+                final TestData testData = m_factories[i].createReadData(data[i], m_maxDataLength);
                 m_tracker.add(testData);
                 return testData;
             });
@@ -144,9 +142,11 @@ public final class TestBatchBuffer implements BatchWritable, RandomAccessBatchRe
 
     private final TestBatchWriter m_writer = new TestBatchWriter();
 
-    private final List<Object[]> m_batches = new ArrayList<>();
+    private final List<Object[][]> m_batches = new ArrayList<>();
 
     private final List<TestData> m_tracker = new ArrayList<>();
+
+    private int m_maxDataLength = -1;
 
     private CountDownLatch m_latch;
 

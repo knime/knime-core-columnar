@@ -56,6 +56,12 @@ public interface TestDataFactory {
 
     TestData createWriteData(int capacity);
 
-    TestData createReadData(Object data);
+    TestData createReadData(final Object[] data);
+
+    /**
+     * @param length supports cases where the capacity {@code data.length} and the actual number of populated entries
+     *            {@code length} in {@code data} differ
+     */
+    TestData createReadData(Object[] data, int length);
 
 }

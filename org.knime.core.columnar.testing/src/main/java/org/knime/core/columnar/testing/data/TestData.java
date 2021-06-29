@@ -60,6 +60,10 @@ public abstract class TestData implements NullableWriteData, NullableReadData {
 
     private Object[] m_values;
 
+    TestData(final int capacity) {
+        this(new Object[capacity]);
+    }
+
     TestData(final Object[] objects) {
         this(objects, objects.length);
     }

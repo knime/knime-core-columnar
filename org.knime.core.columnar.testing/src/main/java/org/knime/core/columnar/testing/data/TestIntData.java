@@ -67,19 +67,24 @@ public final class TestIntData extends TestData implements IntWriteData, IntRead
         }
 
         @Override
-        public TestIntData createReadData(final Object data) {
-            return new TestIntData((Integer[])data);
+        public TestIntData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestIntData createReadData(final Object[] data, final int length) {
+            return new TestIntData(data, length);
         }
 
     }
 
     TestIntData(final int capacity) {
-        super(new Integer[capacity]);
+        super(capacity);
     }
 
-    TestIntData(final Integer[] ints) {
+    TestIntData(final Object[] ints, final int length) {
         super(ints);
-        close(ints.length);
+        close(length);
     }
 
     @Override

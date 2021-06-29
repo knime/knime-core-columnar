@@ -46,6 +46,7 @@
 package org.knime.core.columnar.testing.data;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
@@ -68,24 +69,28 @@ public final class TestListData extends TestData implements ListWriteData, ListR
 
         @Override
         public TestListData createWriteData(final int capacity) {
-            return new TestListData(
-                new TestData[capacity], m_inner, false);
+            return new TestListData(new TestData[capacity], m_inner, -1, false);
         }
 
         @Override
-        public TestListData createReadData(final Object data) {
-            return new TestListData((TestData[])data, m_inner, true);
+        public TestListData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestListData createReadData(final Object[] data, final int length) {
+            return new TestListData(data, m_inner, length, true);
         }
 
     }
 
     private final TestDataFactory m_inner;
 
-    TestListData(final TestData[] lists, final TestDataFactory inner, final boolean close) {
+    TestListData(final Object[] lists, final TestDataFactory inner, final int length, final boolean close) {
         super(lists);
         m_inner = inner;
         if (close) {
-            close(lists.length);
+            close(length);
         }
     }
 
@@ -97,7 +102,7 @@ public final class TestListData extends TestData implements ListWriteData, ListR
 
     @Override
     public long sizeOf() {
-        return Arrays.stream(get()).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
+        return Arrays.stream(get()).filter(Objects::nonNull).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
     }
 
     @SuppressWarnings("unchecked")

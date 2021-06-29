@@ -67,19 +67,24 @@ public final class TestLongData extends TestData implements LongWriteData, LongR
         }
 
         @Override
-        public TestLongData createReadData(final Object data) {
-            return new TestLongData((Long[])data);
+        public TestLongData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestLongData createReadData(final Object[] data, final int length) {
+            return new TestLongData(data, length);
         }
 
     }
 
     TestLongData(final int capacity) {
-        super(new Long[capacity]);
+        super(capacity);
     }
 
-    TestLongData(final Long[] longs) {
+    TestLongData(final Object[] longs, final int length) {
         super(longs);
-        close(longs.length);
+        close(length);
     }
 
     @Override

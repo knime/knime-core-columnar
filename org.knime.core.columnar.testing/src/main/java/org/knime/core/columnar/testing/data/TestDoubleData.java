@@ -68,19 +68,24 @@ public final class TestDoubleData extends TestData implements DoubleWriteData, D
         }
 
         @Override
-        public TestDoubleData createReadData(final Object data) {
-            return new TestDoubleData((Double[])data);
+        public TestDoubleData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestDoubleData createReadData(final Object[] data, final int length) {
+            return new TestDoubleData(data, length);
         }
 
     }
 
     TestDoubleData(final int capacity) {
-        super(new Double[capacity]);
+        super(capacity);
     }
 
-    TestDoubleData(final Double[] doubles) {
+    TestDoubleData(final Object[] doubles, final int length) {
         super(doubles);
-        close(doubles.length);
+        close(length);
     }
 
     @Override

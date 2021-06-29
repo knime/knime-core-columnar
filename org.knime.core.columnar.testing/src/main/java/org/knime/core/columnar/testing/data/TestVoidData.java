@@ -70,19 +70,24 @@ public final class TestVoidData extends TestData implements VoidWriteData, VoidR
         }
 
         @Override
-        public TestVoidData createReadData(final Object data) {
-            return new TestVoidData((Object[])data);
+        public TestVoidData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestVoidData createReadData(final Object[] data, final int length) {
+            return new TestVoidData(data, length);
         }
 
     }
 
     TestVoidData(final int capacity) {
-        super(new Object[capacity]);
+        super(capacity);
     }
 
-    TestVoidData(final Object[] voids) {
+    TestVoidData(final Object[] voids, final int length) {
         super(voids);
-        close(voids.length);
+        close(length);
     }
 
     @Override

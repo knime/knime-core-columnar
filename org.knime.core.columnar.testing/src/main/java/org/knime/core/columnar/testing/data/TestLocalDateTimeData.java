@@ -69,19 +69,24 @@ public final class TestLocalDateTimeData extends TestData implements LocalDateTi
         }
 
         @Override
-        public TestLocalDateTimeData createReadData(final Object data) {
-            return new TestLocalDateTimeData((LocalDateTime[])data);
+        public TestLocalDateTimeData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestLocalDateTimeData createReadData(final Object[] data, final int length) {
+            return new TestLocalDateTimeData(data, length);
         }
 
     }
 
     TestLocalDateTimeData(final int capacity) {
-        super(new LocalDateTime[capacity]);
+        super(capacity);
     }
 
-    TestLocalDateTimeData(final LocalDateTime[] localDateTimes) {
+    TestLocalDateTimeData(final Object[] localDateTimes, final int length) {
         super(localDateTimes);
-        close(localDateTimes.length);
+        close(length);
     }
 
     @Override

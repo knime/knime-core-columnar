@@ -69,19 +69,24 @@ public final class TestPeriodData extends TestData implements PeriodWriteData, P
         }
 
         @Override
-        public TestPeriodData createReadData(final Object data) {
-            return new TestPeriodData((Period[])data);
+        public TestPeriodData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestPeriodData createReadData(final Object[] data, final int length) {
+            return new TestPeriodData(data, length);
         }
 
     }
 
     TestPeriodData(final int capacity) {
-        super(new Period[capacity]);
+        super(capacity);
     }
 
-    TestPeriodData(final Period[] periods) {
+    TestPeriodData(final Object[] periods, final int length) {
         super(periods);
-        close(periods.length);
+        close(length);
     }
 
     @Override

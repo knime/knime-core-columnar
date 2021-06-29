@@ -67,19 +67,24 @@ public final class TestBooleanData extends TestData implements BooleanWriteData,
         }
 
         @Override
-        public TestBooleanData createReadData(final Object data) {
-            return new TestBooleanData((Boolean[])data);
+        public TestBooleanData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestBooleanData createReadData(final Object[] data, final int length) {
+            return new TestBooleanData(data, length);
         }
 
     }
 
     TestBooleanData(final int capacity) {
-        super(new Boolean[capacity]);
+        super(capacity);
     }
 
-    TestBooleanData(final Boolean[] booleans) {
+    TestBooleanData(final Object[] booleans, final int length) {
         super(booleans);
-        close(booleans.length);
+        close(length);
     }
 
     @Override

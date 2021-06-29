@@ -64,6 +64,8 @@ import org.knime.core.columnar.testing.data.TestData;
 import org.knime.core.columnar.testing.data.TestDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 
+// TODO: this class duplicates code from TestBatchBuffer. Consolidate!
+
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -80,8 +82,6 @@ public final class TestBatchStore implements BatchStore {
     private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
     final class TestBatchWriter implements BatchWriter {
-
-        private int m_maxDataLength;
 
         @Override
         public WriteBatch create(final int capacity) {
@@ -112,7 +112,7 @@ public final class TestBatchStore implements BatchStore {
             }
 
             waitForLatch();
-            final Object[] data = new Object[batch.size()];
+            final Object[][] data = new Object[batch.size()][];
             for (int i = 0; i < data.length; i++) {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();
@@ -154,9 +154,9 @@ public final class TestBatchStore implements BatchStore {
             }
 
             waitForLatch();
-            final Object[] data = m_batches.get(chunkIndex);
+            final Object[][] data = m_batches.get(chunkIndex);
             return m_selection.createBatch(i -> {
-                final TestData testData = m_factories[i].createReadData(data[i]);
+                final TestData testData = m_factories[i].createReadData(data[i], m_maxDataLength);
                 m_tracker.add(testData);
                 return testData;
             });
@@ -176,9 +176,11 @@ public final class TestBatchStore implements BatchStore {
 
     private final TestBatchWriter m_writer = new TestBatchWriter();
 
-    private final List<Object[]> m_batches = new ArrayList<>();
+    private final List<Object[][]> m_batches = new ArrayList<>();
 
     private final List<TestData> m_tracker = new ArrayList<>();
+
+    private int m_maxDataLength = -1;
 
     // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
     private volatile boolean m_writerClosed;
@@ -271,7 +273,7 @@ public final class TestBatchStore implements BatchStore {
 
     @Override
     public int batchLength() {
-        return m_writer.m_maxDataLength;
+        return m_maxDataLength;
     }
 
 }

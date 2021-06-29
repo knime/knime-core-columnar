@@ -46,6 +46,7 @@
 package org.knime.core.columnar.testing.data;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -69,20 +70,25 @@ public final class TestStructData extends TestData implements StructWriteData, S
         @Override
         public TestStructData createWriteData(final int capacity) {
             return new TestStructData(
-                Arrays.stream(m_inner).map(f -> f.createWriteData(capacity)).toArray(TestData[]::new), false);
+                Arrays.stream(m_inner).map(f -> f.createWriteData(capacity)).toArray(TestData[]::new), capacity, -1, false);
         }
 
         @Override
-        public TestStructData createReadData(final Object data) {
-            return new TestStructData((TestData[])data, true);
+        public TestStructData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestStructData createReadData(final Object[] data, final int length) {
+            return new TestStructData(data, data.length, length, true);
         }
 
     }
 
-    TestStructData(final TestData[] structs, final boolean close) {
-        super(structs, structs[0].capacity());
+    TestStructData(final Object[] structs, final int capacity, final int length, final boolean close) {
+        super(structs, capacity);
         if (close) {
-            close(structs[0].length());
+            close(length);
         }
     }
 
@@ -94,7 +100,7 @@ public final class TestStructData extends TestData implements StructWriteData, S
 
     @Override
     public long sizeOf() {
-        return Arrays.stream(get()).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
+        return Arrays.stream(get()).filter(Objects::nonNull).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
     }
 
     @Override

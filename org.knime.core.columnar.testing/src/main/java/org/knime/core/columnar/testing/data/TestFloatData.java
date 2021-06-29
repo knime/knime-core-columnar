@@ -67,19 +67,24 @@ public final class TestFloatData extends TestData implements FloatWriteData, Flo
         }
 
         @Override
-        public TestFloatData createReadData(final Object data) {
-            return new TestFloatData((Float[])data);
+        public TestFloatData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestFloatData createReadData(final Object[] data, final int length) {
+            return new TestFloatData(data, length);
         }
 
     }
 
     TestFloatData(final int capacity) {
-        super(new Float[capacity]);
+        super(capacity);
     }
 
-    TestFloatData(final Float[] floats) {
+    TestFloatData(final Object[] floats, final int length) {
         super(floats);
-        close(floats.length);
+        close(length);
     }
 
     @Override

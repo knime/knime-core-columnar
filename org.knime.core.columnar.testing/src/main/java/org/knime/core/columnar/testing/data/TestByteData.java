@@ -67,19 +67,24 @@ public final class TestByteData extends TestData implements ByteWriteData, ByteR
         }
 
         @Override
-        public TestByteData createReadData(final Object data) {
-            return new TestByteData((Byte[])data);
+        public TestByteData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestByteData createReadData(final Object[] data, final int length) {
+            return new TestByteData(data, length);
         }
 
     }
 
     TestByteData(final int capacity) {
-        super(new Byte[capacity]);
+        super(capacity);
     }
 
-    TestByteData(final Byte[] bytes) {
+    TestByteData(final Object[] bytes, final int length) {
         super(bytes);
-        close(bytes.length);
+        close(length);
     }
 
     @Override

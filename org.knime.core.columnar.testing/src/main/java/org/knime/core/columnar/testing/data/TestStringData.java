@@ -67,19 +67,24 @@ public final class TestStringData extends TestData implements StringWriteData, S
         }
 
         @Override
-        public TestStringData createReadData(final Object data) {
-            return new TestStringData((String[])data);
+        public TestStringData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestStringData createReadData(final Object[] data, final int length) {
+            return new TestStringData(data, length);
         }
 
     }
 
     TestStringData(final int capacity) {
-        super(new String[capacity]);
+        super(capacity);
     }
 
-    TestStringData(final String[] strings) {
+    TestStringData(final Object[] strings, final int length) {
         super(strings);
-        close(strings.length);
+        close(length);
     }
 
     @Override

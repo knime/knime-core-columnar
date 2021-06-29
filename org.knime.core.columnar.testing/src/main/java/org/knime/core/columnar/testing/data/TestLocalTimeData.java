@@ -69,19 +69,24 @@ public final class TestLocalTimeData extends TestData implements LocalTimeWriteD
         }
 
         @Override
-        public TestLocalTimeData createReadData(final Object data) {
-            return new TestLocalTimeData((LocalTime[])data);
+        public TestLocalTimeData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestLocalTimeData createReadData(final Object[] data, final int length) {
+            return new TestLocalTimeData(data, length);
         }
 
     }
 
     TestLocalTimeData(final int capacity) {
-        super(new LocalTime[capacity]);
+        super(capacity);
     }
 
-    TestLocalTimeData(final LocalTime[] localTimes) {
+    TestLocalTimeData(final Object[] localTimes, final int length) {
         super(localTimes);
-        close(localTimes.length);
+        close(length);
     }
 
     @Override

@@ -77,19 +77,24 @@ public final class TestVarBinaryData extends TestData implements VarBinaryWriteD
         }
 
         @Override
-        public TestVarBinaryData createReadData(final Object data) {
-            return new TestVarBinaryData((byte[][])data);
+        public TestVarBinaryData createReadData(final Object[] data) {
+            return createReadData(data, data.length);
+        }
+
+        @Override
+        public TestVarBinaryData createReadData(final Object[] data, final int length) {
+            return new TestVarBinaryData(data, length);
         }
 
     }
 
     TestVarBinaryData(final int capacity) {
-        super(new byte[capacity][]);
+        super(capacity);
     }
 
-    TestVarBinaryData(final byte[][] varBinaries) {
+    TestVarBinaryData(final Object[] varBinaries, final int length) {
         super(varBinaries);
-        close(varBinaries.length);
+        close(length);
     }
 
     @Override
