@@ -21,4 +21,5 @@ Require-Bundle: org.knime.core.columnar;bundle-version="[4.2.0,5.0.0)",
  com.google.flatbuffers.java;bundle-version="[1.12.0,2.0.0)",
  org.apache.commons.io;bundle-version="[2.6.0,3.0.0)",
  lz4-java;bundle-version="[1.4.0,2.0.0)"
-Export-Package: org.knime.core.columnar.arrow
+Export-Package: org.knime.core.columnar.arrow,
+ org.knime.core.columnar.arrow.compress

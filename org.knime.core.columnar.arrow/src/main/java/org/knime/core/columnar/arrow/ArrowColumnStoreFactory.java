@@ -94,10 +94,25 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
      */
     public ArrowColumnStoreFactory(final BufferAllocator allocator, final long initReservation,
         final long maxAllocation) {
+        this(allocator, initReservation, maxAllocation, ArrowCompressionUtil.getDefaultCompression());
+    }
+
+    /**
+     * Create a {@link ColumnStoreFactory} for Arrow using the given allocator. For each {@link BatchStore} and
+     * {@link BatchReadStore} the allocator is used to create a child allocator with the given initial reservation and
+     * max allocation.
+     *
+     * @param allocator the allocator to use
+     * @param initReservation the initial reservation for a child allocator
+     * @param maxAllocation the maximum alloaction for the child allocator
+     * @param compression the compression to use for the store
+     */
+    public ArrowColumnStoreFactory(final BufferAllocator allocator, final long initReservation,
+        final long maxAllocation, final ArrowCompression compression) {
         m_allocator = allocator;
         m_initReservation = initReservation;
         m_maxAllocation = maxAllocation;
-        m_compression = ArrowCompressionUtil.getDefaultCompression();
+        m_compression = compression;
     }
 
     @Override
