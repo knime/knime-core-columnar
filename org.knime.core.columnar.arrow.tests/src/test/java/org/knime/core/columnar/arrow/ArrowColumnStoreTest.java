@@ -82,6 +82,7 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.DefaultColumnarSchema;
 
 /**
  * Test {@link ArrowColumnStoreFactory}, ArrowColumnReadStore and ArrowColumnStore.
@@ -150,7 +151,7 @@ public class ArrowColumnStoreTest {
     @Test
     public void testReadBeforeFullyWritten() throws IOException {
         final int chunkSize = 64;
-        final ColumnarSchema schema = ArrowTestUtils.createSchema(DataSpec.intSpec());
+        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec());
         final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
 
         // Use the write store to write some data
@@ -313,7 +314,7 @@ public class ArrowColumnStoreTest {
     @SuppressWarnings("resource")
     private static void testCreateWriterReader(final ColumnStoreFactory factory) throws IOException {
         final int chunkSize = 64;
-        final ColumnarSchema schema = ArrowTestUtils.createSchema(DataSpec.doubleSpec());
+        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.doubleSpec());
 
         final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
         final Path readPath = ArrowTestUtils.createTmpKNIMEArrowPath();

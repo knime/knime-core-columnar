@@ -59,7 +59,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -87,8 +86,7 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
-
-import com.google.common.collect.Iterators;
+import org.knime.core.table.schema.DefaultColumnarSchema;
 
 /**
  * A static class with utility methods for arrow tests.
@@ -115,50 +113,6 @@ public final class ArrowTestUtils {
     }
 
     /**
-     * Create a schema with the given types for test purposes.
-     *
-     * @param types the types of the columns
-     * @return the schema
-     */
-    public static ColumnarSchema createSchema(final DataSpec... types) {
-        final List<DataSpec> list = Arrays.asList(types);
-        return new ColumnarSchema() {
-
-            @Override
-            public int numColumns() {
-                return list.size();
-            }
-
-            @Override
-            public DataSpec getSpec(final int index) {
-                return list.get(index);
-            }
-
-            @Override
-            public Iterator<DataSpec> iterator() {
-                return list.iterator();
-            }
-
-            @Override
-            public int hashCode() {
-                return list.hashCode();
-            }
-
-            @Override
-            public boolean equals(final Object obj) {
-                if (!(obj instanceof ColumnarSchema)) { // NOSONAR
-                    return false;
-                }
-                final ColumnarSchema other = (ColumnarSchema)obj;
-                if (numColumns() != other.numColumns()) {
-                    return false;
-                }
-                return Iterators.elementsEqual(iterator(), other.iterator());
-            }
-        };
-    }
-
-    /**
      * Create a schema with the given type multiple times.
      *
      * @param type the type of the columns
@@ -170,7 +124,7 @@ public final class ArrowTestUtils {
         for (int i = 0; i < width; i++) {
             types[i] = type;
         }
-        return createSchema(types);
+        return new DefaultColumnarSchema(types);
     }
 
     /**

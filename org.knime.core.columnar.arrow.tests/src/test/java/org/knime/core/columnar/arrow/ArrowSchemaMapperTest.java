@@ -71,6 +71,7 @@ import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
 
@@ -206,7 +207,7 @@ public class ArrowSchemaMapperTest {
     /** Test mapping multiple columns of different specs. */
     @Test
     public void testMappingMultipleColumns() {
-        final ColumnarSchema schema = ArrowTestUtils.createSchema( //
+        final ColumnarSchema schema = new DefaultColumnarSchema( //
             DataSpec.doubleSpec(), //
             DataSpec.longSpec(), //
             DataSpec.doubleSpec(), //
@@ -222,7 +223,7 @@ public class ArrowSchemaMapperTest {
 
     /** Test mapping a single column of the given spec. */
     private static void testMapSingleSpec(final DataSpec spec, final ArrowColumnDataFactory expectedFactory) {
-        final ColumnarSchema schema = ArrowTestUtils.createSchema(spec);
+        final ColumnarSchema schema = new DefaultColumnarSchema(spec);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
         assertEquals(expectedFactory, factories[0]);
