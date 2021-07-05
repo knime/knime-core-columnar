@@ -110,21 +110,20 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
 
         @Override
         public int size() {
-            updateReadValue();
+            updateInnerData();
             return m_innerData.length();
         }
 
         @Override
         public <A extends ReadAccess> A getAccess(final int index) { // NOSONAR
-            updateReadValue();
+            updateInnerData();
             m_innerIndex = index;
             @SuppressWarnings("unchecked")
             final A v = (A)m_readAccess;
             return v;
         }
 
-        /** Update the m_value if we are at a new index */
-        private void updateReadValue() {
+        private void updateInnerData() {
             final int index = m_index.getIndex();
             // If we got the same index we don't need to create a new access and value
             if (index != m_lastIndex) {
