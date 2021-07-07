@@ -200,7 +200,7 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
 
     private final BatchWritableCacheWriter m_writer;
 
-    private final RandomAccessBatchReadable m_reabableDelegate;
+    private final RandomAccessBatchReadable m_readableDelegate;
 
     private final int m_smallTableThreshold;
 
@@ -218,7 +218,7 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
     public <D extends BatchWritable & RandomAccessBatchReadable> BatchWritableCache(final D delegate,
         final SharedBatchWritableCache cache) {
         m_writer = new BatchWritableCacheWriter(delegate.getWriter());
-        m_reabableDelegate = delegate;
+        m_readableDelegate = delegate;
         m_globalCache = cache.getCache();
         m_smallTableThreshold = cache.getSizeThreshold();
     }
@@ -269,13 +269,13 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
             // (2) it might not be read fully by the reader, so by putting it back into the cache, we would read
             // unnecessarily much data
             m_writer.waitForDelegateWriter();
-            return m_reabableDelegate.createRandomAccessReader(selection);
+            return m_readableDelegate.createRandomAccessReader(selection);
         }
     }
 
     @Override
     public ColumnarSchema getSchema() {
-        return m_reabableDelegate.getSchema();
+        return m_readableDelegate.getSchema();
     }
 
     @Override
@@ -284,7 +284,7 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
         if (removed != null) {
             removed.release();
         }
-        m_reabableDelegate.close();
+        m_readableDelegate.close();
     }
 
 }

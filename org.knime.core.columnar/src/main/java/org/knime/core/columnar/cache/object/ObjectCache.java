@@ -236,7 +236,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         private final ColumnSelection m_selection;
 
         private ObjectCacheReader(final ColumnSelection selection) {
-            m_readerDelegate = m_reabableDelegate.createRandomAccessReader(selection);
+            m_readerDelegate = m_readableDelegate.createRandomAccessReader(selection);
             m_selection = selection;
         }
 
@@ -296,7 +296,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private final ExecutorService m_serializationExecutor;
 
-    private final RandomAccessBatchReadable m_reabableDelegate;
+    private final RandomAccessBatchReadable m_readableDelegate;
 
     private final ColumnSelection m_varBinaryData;
 
@@ -323,7 +323,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         m_writer = new ObjectCacheWriter(delegate.getWriter());
         m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(delegate.getSchema());
         m_stringData = HeapCacheUtils.getStringIndices(delegate.getSchema());
-        m_reabableDelegate = delegate;
+        m_readableDelegate = delegate;
         m_cache = cache;
         m_executor = persistExecutor;
         m_serializationExecutor = serializationExecutor;
@@ -341,7 +341,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     @Override
     public ColumnarSchema getSchema() {
-        return m_reabableDelegate.getSchema();
+        return m_readableDelegate.getSchema();
     }
 
     private synchronized void writeUnclosedData() {
@@ -392,7 +392,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         m_cachedData = null;
 
         try {
-            m_reabableDelegate.close();
+            m_readableDelegate.close();
         } catch (IOException ex) {
             LOGGER.error(ERROR_ON_READABLE_CLOSE, ex);
         }
