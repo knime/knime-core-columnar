@@ -49,8 +49,10 @@ import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -101,16 +103,34 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
     public ArrowBatchStore createStore(final ColumnarSchema schema, final Path path) {
-        final BufferAllocator allocator =
-            m_allocator.newChildAllocator("ArrowColumnStore", m_initReservation, m_maxAllocation);
-        return new ArrowBatchStore(schema, path, m_compression, allocator);
+        return new ArrowBatchStore(schema, path, m_compression, newChildAllocator("ArrowColumnStore"));
     }
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
     public ArrowBatchReadStore createReadStore(final ColumnarSchema schema, final Path path) {
-        final BufferAllocator allocator =
-            m_allocator.newChildAllocator("ArrowColumnReadStore", m_initReservation, m_maxAllocation);
-        return new ArrowBatchReadStore(schema, path, allocator);
+        return new ArrowBatchReadStore(schema, path, newChildAllocator("ArrowColumnReadStore"));
+    }
+
+    /**
+     * Create a new {@link RandomAccessBatchReadable}, reading data from the provided Arrow IPC file that has not been
+     * written completely. The offsets to the record batches and dictionary batches in the file must be provided via a
+     * {@link OffsetProvider}.
+     *
+     * @param schema the columnar schema of the to-be-created store
+     * @param path from which data is read
+     * @param offsetProvider a provider for the offsets of the record batches and dictionary batches in the Arrow IPC
+     *            file
+     * @return a newly created readable
+     */
+    @SuppressWarnings("resource") // Allocator closed by store
+    public ArrowPartialFileBatchReadable createPartialFileReadable(final ColumnarSchema schema, final Path path,
+        final OffsetProvider offsetProvider) {
+        return new ArrowPartialFileBatchReadable(schema, path, offsetProvider,
+            newChildAllocator("ArrowPartialFileBatchReadStore"));
+    }
+
+    private BufferAllocator newChildAllocator(final String name) {
+        return m_allocator.newChildAllocator(name, m_initReservation, m_maxAllocation);
     }
 }

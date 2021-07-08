@@ -311,6 +311,104 @@ public class ArrowColumnStoreTest {
         }
     }
 
+    /**
+     * Test reading from an Arrow file before it is completely written (including dictionaries).
+     *
+     * @throws IOException
+     */
+    @Test
+    public void testPartialFileBatchReadable() throws IOException {
+        final int chunkSize = 64;
+        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec());
+        final Path path = ArrowTestUtils.createTmpKNIMEArrowPath();
+
+        try (final RootAllocator allocator = new RootAllocator()) {
+            final ArrowColumnStoreFactory factory =
+                new ArrowColumnStoreFactory(allocator, 0, allocator.getLimit(), ARROW_NO_COMPRESSION);
+
+            // Use the write store to write some data
+            @SuppressWarnings("resource")
+            final var writeStore = factory.createStore(schema, path);
+
+            assertEquals(0, writeStore.numBatches());
+            assertThrows(IllegalStateException.class, writeStore::batchLength);
+
+            @SuppressWarnings("resource")
+            final BatchWriter writer = writeStore.getWriter();
+            ReadBatch batch;
+
+            // Write batch 0
+            batch = fillBatch(writer.create(chunkSize), chunkSize, 0);
+            writer.write(batch);
+            batch.release();
+            assertEquals(1, writeStore.numBatches());
+            assertEquals(chunkSize, writeStore.batchLength());
+
+            // Write batch 1
+            batch = fillBatch(writer.create(chunkSize), chunkSize, 1);
+            writer.write(batch);
+            batch.release();
+            assertEquals(2, writeStore.numBatches());
+
+            // Create the partial readable
+            @SuppressWarnings("resource")
+            final ArrowPartialFileBatchReadable readable =
+                factory.createPartialFileReadable(schema, path, writeStore.getOffsetProvider());
+            @SuppressWarnings("resource")
+            final RandomAccessBatchReader reader = readable.createRandomAccessReader();
+
+            // Read back batch 1 already
+            batch = reader.readRetained(1);
+            assertBatchData(batch, chunkSize, 1);
+            batch.release();
+
+            // Write batch 2
+            batch = fillBatch(writer.create(chunkSize), chunkSize, 2);
+            writer.write(batch);
+            batch.release();
+            assertEquals(3, writeStore.numBatches());
+
+            // Write batch 3
+            batch = fillBatch(writer.create(chunkSize), chunkSize, 3);
+            writer.write(batch);
+            batch.release();
+            assertEquals(4, writeStore.numBatches());
+
+            // Read back batch 0
+            batch = reader.readRetained(0);
+            assertBatchData(batch, chunkSize, 0);
+            batch.release();
+
+            // Read back batch 3
+            batch = reader.readRetained(3);
+            assertBatchData(batch, chunkSize, 3);
+            batch.release();
+
+            // Write batch 4
+            batch = fillBatch(writer.create(chunkSize), chunkSize, 4);
+            writer.write(batch);
+            batch.release();
+            assertEquals(5, writeStore.numBatches());
+
+            // Close the writer
+            writer.close();
+
+            // Read back batch 4
+            batch = reader.readRetained(3);
+            assertBatchData(batch, chunkSize, 3);
+            batch.release();
+
+            // Close the reader
+            reader.close();
+
+            assertEquals(5, writeStore.numBatches());
+            assertEquals(chunkSize, writeStore.batchLength());
+
+            writeStore.close();
+            readable.close();
+        }
+    }
+
     @SuppressWarnings("resource")
     private static void testCreateWriterReader(final ColumnStoreFactory factory) throws IOException {
         final int chunkSize = 64;
