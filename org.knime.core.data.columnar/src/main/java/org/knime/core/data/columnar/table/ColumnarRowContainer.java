@@ -53,8 +53,14 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.knime.core.columnar.batch.BatchWritable;
+import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
+import org.knime.core.data.columnar.domain.DomainWritable;
+import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
@@ -65,6 +71,7 @@ import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.NodeLogger;
+import org.knime.core.util.DuplicateChecker;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -90,7 +97,11 @@ final class ColumnarRowContainer implements RowContainer {
 
     private final ColumnStoreFactory m_storeFactory;
 
-    private final CachedDomainBatchStore m_store;
+    private final DomainWritable m_domainWritable;
+
+    private final CachedBatchWritableReadable<BatchStore> m_cached;
+
+    private final BatchStore m_store;
 
     private final ColumnarValueSchema m_schema;
 
@@ -109,7 +120,17 @@ final class ColumnarRowContainer implements RowContainer {
         m_storeFactory = storeFactory;
 
         m_path = DataContainer.createTempFile(".knable").toPath();
-        m_store = new CachedDomainBatchStore(m_storeFactory.createStore(schema, m_path), schema, settings);
+
+        m_cached = new CachedBatchWritableReadable<BatchStore>(m_storeFactory.createStore(schema, m_path));
+        final BatchWritable wrappedWritable = settings.isCheckDuplicateRowKeys() ? new DuplicateCheckWritable(m_cached,
+            new DuplicateChecker(), ColumnarPreferenceUtils.getDuplicateCheckExecutor()) : m_cached;
+
+        m_domainWritable = new DomainWritable(wrappedWritable, new DefaultDomainWritableConfig(schema,
+            settings.getMaxPossibleNominalDomainValues(), settings.isInitializeDomains()),
+            ColumnarPreferenceUtils.getDomainCalcExecutor());
+
+        m_store = new WrappedBatchStore(m_domainWritable, m_cached);
+
         m_delegate = new ColumnarRowWriteCursor(m_store, m_schema.getValueFactories());
     }
 
@@ -154,12 +175,13 @@ final class ColumnarRowContainer implements RowContainer {
             final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
             final int numColumns = m_schema.numColumns();
             for (int i = 1; i < numColumns; i++) {
-                domains.put(i, m_store.getDomain(i));
-                metadata.put(i, m_store.getMetadata(i));
+                domains.put(i, m_domainWritable.getDomain(i));
+                metadata.put(i, m_domainWritable.getMetadata(i));
             }
 
             m_table = UnsavedColumnarContainerTable.create(m_path, m_id, m_storeFactory,
-                ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_delegate.size());
+                ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_cached,
+                m_delegate.size());
         }
         return m_table;
     }
@@ -172,7 +194,7 @@ final class ColumnarRowContainer implements RowContainer {
      * @apiNote No API.
      */
     void setMaxPossibleValues(final int maxPossibleValues) {
-        m_store.setMaxPossibleValues(maxPossibleValues);
+        m_domainWritable.setMaxPossibleValues(maxPossibleValues);
     }
 
 }

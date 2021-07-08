@@ -69,7 +69,7 @@ import org.knime.core.data.v2.ValueSchema;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
+public class WrappedBatchStoreTest extends ColumnarTest {
 
     private static ColumnarValueSchema generateDefaultSchema() {
         final DataTableSpec spec = createSpec();
@@ -79,16 +79,16 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
     }
 
     @SuppressWarnings("resource")
-    private static CachedDomainBatchStore generateDefaultWrappedBatchStore() {
-        return new CachedDomainBatchStore(TestBatchStore.create(SCHEMA), SCHEMA,
-            new ColumnarRowContainerSettings(true, 60, true));
+    private static WrappedBatchStore generateDefaultWrappedBatchStore() {
+        final TestBatchStore delegate = TestBatchStore.create(SCHEMA);
+        return new WrappedBatchStore(delegate, delegate);
     }
 
     static final ColumnarValueSchema SCHEMA = generateDefaultSchema();
 
     @Test
     public void testWriteRead() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
             readDefaultTable(store);
             readDefaultTable(store);
@@ -97,7 +97,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterWriterClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             try (final BatchWriter writer = store.getWriter()) {
                 writer.close(); // NOSONAR
                 writer.create(SCHEMA.numColumns());
@@ -107,7 +107,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateAfterStoreClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             try (final BatchWriter writer = store.getWriter()) {
                 store.close(); // NOSONAR
                 writer.create(SCHEMA.numColumns());
@@ -117,7 +117,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test
     public void testWriterSingleton() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore();
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore();
                 final BatchWriter writer1 = store.getWriter();
                 final BatchWriter writer2 = store.getWriter()) {
             assertEquals(writer1, writer2);
@@ -126,7 +126,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterWriterClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
@@ -136,7 +136,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnGetWriterAfterStoreClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             store.close(); // NOSONAR
             try (final BatchWriter writer = store.getWriter()) { // NOSONAR
             }
@@ -145,7 +145,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterWriterClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             @SuppressWarnings("resource")
             final BatchWriter writer = store.getWriter();
             final ReadBatch batch = writer.create(0).close(0);
@@ -157,7 +157,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnWriteAfterStoreClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             @SuppressWarnings("resource")
             final BatchWriter writer = store.getWriter();
             final ReadBatch batch = writer.create(0).close(0);
@@ -169,7 +169,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderWhileWriterOpen() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) { // NOSONAR
             }
         }
@@ -177,7 +177,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderAfterStoreClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
             store.close(); // NOSONAR
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) { // NOSONAR
@@ -187,7 +187,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.close(); // NOSONAR
@@ -198,7 +198,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 store.close(); // NOSONAR
@@ -209,7 +209,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void exceptionOnReadIndexOutOfBoundsLower() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.readRetained(-1);
@@ -219,7 +219,7 @@ public class CachedDomainDuplicateCheckBatchStoreTest extends ColumnarTest {
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void exceptionOnReadIndexOutOfBoundsUpper() throws IOException {
-        try (final CachedDomainBatchStore store = generateDefaultWrappedBatchStore()) {
+        try (final WrappedBatchStore store = generateDefaultWrappedBatchStore()) {
             writeDefaultTable(store);
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.readRetained(Integer.MAX_VALUE);

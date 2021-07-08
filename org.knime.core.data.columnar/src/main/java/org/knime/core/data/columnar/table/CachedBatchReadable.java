@@ -44,56 +44,60 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   22 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   17 Nov 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.data.columnar.table;
 
-import java.io.File;
-import java.io.Flushable;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
-import org.knime.core.columnar.store.BatchReadStore;
-import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.ExecutionMonitor;
-import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.columnar.batch.RandomAccessBatchReadable;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.cache.data.ReadDataCache;
+import org.knime.core.columnar.cache.data.ReadDataReadCache;
+import org.knime.core.columnar.cache.data.SharedReadDataCache;
+import org.knime.core.columnar.cache.object.ObjectCache;
+import org.knime.core.columnar.cache.object.ObjectReadCache;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * ColumnarContainerTable which has not yet been saved, i.e. all data is still in-memory or temporarily persisted in the
- * temp directory.
+ * A {@link RandomAccessBatchReadable} that delegates operations through an {@link ObjectCache} and a
+ * {@link ReadDataCache}.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
+final class CachedBatchReadable implements RandomAccessBatchReadable {
 
-    private final Flushable m_flushable;
+    private final RandomAccessBatchReadable m_delegate;
 
-    private final Path m_path;
+    private final ObjectReadCache m_objectCached;
 
-    static UnsavedColumnarContainerTable create(final Path path, final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final BatchReadStore store, final Flushable flushable, final long size) {
-        final UnsavedColumnarContainerTable table =
-            new UnsavedColumnarContainerTable(path, tableId, factory, schema, store, flushable, size);
-        table.initStoreCloser();
-        return table;
-    }
+    @SuppressWarnings("resource")
+    CachedBatchReadable(final RandomAccessBatchReadable delegate) {
+        m_delegate = delegate;
 
-    private UnsavedColumnarContainerTable(final Path path, final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final BatchReadStore store, final Flushable flushable, final long size) {
-        super(tableId, factory, schema, store, size);
-        m_path = path;
-        m_flushable = flushable;
+        final SharedReadDataCache columnDataCache = ColumnarPreferenceUtils.getColumnDataCache();
+        final ReadDataReadCache dataCached =
+            columnDataCache.getMaxSizeInBytes() > 0 ? new ReadDataReadCache(delegate, columnDataCache) : null;
+
+        m_objectCached = dataCached != null ? new ObjectReadCache(dataCached, ColumnarPreferenceUtils.getHeapCache())
+            : new ObjectReadCache(delegate, ColumnarPreferenceUtils.getHeapCache());
     }
 
     @Override
-    protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
-        throws IOException, CanceledExecutionException {
-        super.saveToFileOverwrite(f, settings, exec);
-        m_flushable.flush();
-        Files.copy(m_path, f.toPath());
+    public final RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+        return m_objectCached.createRandomAccessReader(selection);
+    }
+
+    @Override
+    public final ColumnarSchema getSchema() {
+        return m_delegate.getSchema();
+    }
+
+    @Override
+    public final void close() throws IOException {
+        m_objectCached.close();
     }
 
 }

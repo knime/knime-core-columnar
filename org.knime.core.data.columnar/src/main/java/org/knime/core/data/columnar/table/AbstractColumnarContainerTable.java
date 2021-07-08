@@ -130,8 +130,11 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
         m_schema = ColumnarValueSchemaUtils
             .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
-        m_readStore =
-            new CachedBatchReadStore(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath()));
+
+        final BatchReadStore store = m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath());
+        final CachedBatchReadable cached = new CachedBatchReadable(store);
+
+        m_readStore = new WrappedBatchReadStore(cached, store.numBatches(), store.batchLength());
     }
 
     AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory, final ColumnarValueSchema schema,

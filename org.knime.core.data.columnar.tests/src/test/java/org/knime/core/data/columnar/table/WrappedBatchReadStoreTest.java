@@ -47,7 +47,7 @@ package org.knime.core.data.columnar.table;
 
 import static org.knime.core.data.columnar.TestDataBatchStoreUtils.readDefaultTable;
 import static org.knime.core.data.columnar.TestDataBatchStoreUtils.writeDefaultTable;
-import static org.knime.core.data.columnar.table.CachedDomainDuplicateCheckBatchStoreTest.SCHEMA;
+import static org.knime.core.data.columnar.table.WrappedBatchStoreTest.SCHEMA;
 
 import java.io.IOException;
 
@@ -61,25 +61,25 @@ import org.knime.core.columnar.testing.TestBatchStore;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class CachedBatchReadStoreTest extends ColumnarTest {
+public class WrappedBatchReadStoreTest extends ColumnarTest {
 
     @SuppressWarnings("resource")
-    private static CachedBatchReadStore generateDefaultWrappedBatchReadStore() throws IOException {
+    private static WrappedBatchReadStore generateDefaultWrappedBatchReadStore() throws IOException {
         final BatchStore store = TestBatchStore.create(SCHEMA);
         writeDefaultTable(store);
-        return new CachedBatchReadStore(store);
+        return new WrappedBatchReadStore(store, store.numBatches(), store.batchLength());
     }
 
     @Test
     public void testRead() throws IOException {
-        try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
+        try (final WrappedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
             readDefaultTable(store);
         }
     }
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnCreateReaderAfterStoreClose() throws IOException {
-        try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
+        try (final WrappedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
             store.close();
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) { // NOSONAR
             }
@@ -88,7 +88,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterReaderClose() throws IOException {
-        try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
+        try (final WrappedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.close(); // NOSONAR
                 reader.readRetained(0);
@@ -98,7 +98,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void exceptionOnReadAfterStoreClose() throws IOException {
-        try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
+        try (final WrappedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 store.close();
                 reader.readRetained(0);
@@ -108,7 +108,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void exceptionOnReadIndexOutOfBoundsLower() throws IOException {
-        try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
+        try (final WrappedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.readRetained(-1);
             }
@@ -117,7 +117,7 @@ public class CachedBatchReadStoreTest extends ColumnarTest {
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void exceptionOnReadIndexOutOfBoundsUpper() throws IOException {
-        try (final CachedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
+        try (final WrappedBatchReadStore store = generateDefaultWrappedBatchReadStore()) {
             try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
                 reader.readRetained(Integer.MAX_VALUE);
             }

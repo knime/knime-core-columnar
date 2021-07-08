@@ -48,9 +48,7 @@
  */
 package org.knime.core.data.columnar.table;
 
-import java.io.Flushable;
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -60,42 +58,17 @@ import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.cache.data.ReadDataCache;
-import org.knime.core.columnar.cache.data.SharedReadDataCache;
-import org.knime.core.columnar.cache.object.ObjectCache;
-import org.knime.core.columnar.cache.object.SharedObjectCache;
-import org.knime.core.columnar.cache.writable.BatchWritableCache;
-import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
-import org.knime.core.data.columnar.domain.DomainWritable;
-import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
-import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.table.CachedBatchReadStore.WrappedRandomAccessBatchReader;
-import org.knime.core.data.meta.DataColumnMetaData;
-import org.knime.core.data.util.memory.MemoryAlert;
-import org.knime.core.data.util.memory.MemoryAlertListener;
-import org.knime.core.data.util.memory.MemoryAlertSystem;
-import org.knime.core.node.NodeLogger;
+import org.knime.core.data.columnar.table.WrappedBatchReadStore.WrappedRandomAccessBatchReader;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.util.DuplicateChecker;
 
 /**
- * A {@link BatchStore} that delegates operations through
- * <ul>
- * <li>A {@link DomainWritable},</li>
- * <li>a {@link DuplicateCheckWritable},</li>
- * <li>an {@link ObjectCache},</li>
- * <li>a {@link BatchWritableCache}, and</li>
- * <li>a {@link ReadDataCache}.</li>
- * </ul>
+ * A {@link BatchStore} that delegates operations to a {@link BatchWritable} and a {@link RandomAccessBatchReadable}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class CachedDomainBatchStore implements BatchStore, Flushable {
+final class WrappedBatchStore implements BatchStore {
 
     private static final class WrappedBatchWriter implements BatchWriter {
 
@@ -163,29 +136,15 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
 
     }
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(CachedDomainBatchStore.class);
-
     private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
 
     private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
 
     private static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
 
-    private final BatchStore m_unwrappedDelegateStore;
+    private final BatchWritable m_writable;
 
-    private final BatchWritableCache m_smallCached;
-
-    private final ReadDataCache m_dataCached;
-
-    private final ObjectCache m_objectCached;
-
-    private final MemoryAlertListener m_memListener;
-
-    private final DomainWritable m_domainCalculated;
-
-    private final BatchWritable m_wrappedDelegateWritable;
-
-    private final RandomAccessBatchReadable m_wrappedDelegateReadable;
+    private final RandomAccessBatchReadable m_readable;
 
     private final AtomicBoolean m_storeClosed = new AtomicBoolean();
 
@@ -193,73 +152,15 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
 
     private final WrappedBatchWriter m_writer;
 
-    CachedDomainBatchStore(final BatchStore store, final ColumnarValueSchema schema,
-        final ColumnarRowContainerSettings settings) {
-        m_unwrappedDelegateStore = store;
-
-        final SharedReadDataCache columnDataCache = ColumnarPreferenceUtils.getColumnDataCache();
-        final SharedBatchWritableCache smallTableCache = ColumnarPreferenceUtils.getSmallTableCache();
-
-        if (columnDataCache.getMaxSizeInBytes() > 0) {
-            m_dataCached = new ReadDataCache(store, columnDataCache, ColumnarPreferenceUtils.getPersistExecutor());
-        } else {
-            m_dataCached = null;
-        }
-
-        if (smallTableCache.getCacheSize() > 0) {
-            if (m_dataCached != null) {
-                m_smallCached = new BatchWritableCache(m_dataCached, smallTableCache);
-            } else {
-                m_smallCached = new BatchWritableCache(store, smallTableCache);
-            }
-        } else {
-            m_smallCached = null;
-        }
-
-        final SharedObjectCache heapCache = ColumnarPreferenceUtils.getHeapCache();
-        final ExecutorService executor = ColumnarPreferenceUtils.getPersistExecutor();
-        if (m_smallCached != null) {
-            m_objectCached = new ObjectCache(m_smallCached, heapCache, executor);
-        } else if (m_dataCached != null) {
-            m_objectCached = new ObjectCache(m_dataCached, heapCache, executor);
-        } else {
-            m_objectCached = new ObjectCache(store, heapCache, executor);
-        }
-        m_memListener = new MemoryAlertListener() {
-            @Override
-            protected boolean memoryAlert(final MemoryAlert alert) {
-                new Thread(() -> {
-                    try {
-                        m_objectCached.flush();
-                    } catch (IOException ex) {
-                        LOGGER.error("Error during enforced premature serialization of object data.", ex);
-                    }
-                }).start();
-                return false;
-            }
-        };
-        MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
-
-        BatchWritable wrappedWritable = m_objectCached;
-        if (settings.isCheckDuplicateRowKeys()) {
-            wrappedWritable = new DuplicateCheckWritable(wrappedWritable, new DuplicateChecker(),
-                ColumnarPreferenceUtils.getDuplicateCheckExecutor());
-        }
-
-        m_domainCalculated = new DomainWritable(wrappedWritable, new DefaultDomainWritableConfig(schema,
-            settings.getMaxPossibleNominalDomainValues(), settings.isInitializeDomains()),
-            ColumnarPreferenceUtils.getDomainCalcExecutor());
-        wrappedWritable = m_domainCalculated;
-
-        m_wrappedDelegateWritable = wrappedWritable;
-        m_wrappedDelegateReadable = m_objectCached;
-
-        m_writer = new WrappedBatchWriter(m_wrappedDelegateWritable, m_storeClosed, m_writerClosed);
+    WrappedBatchStore(final BatchWritable writable, final RandomAccessBatchReadable readable) {
+        m_writable = writable;
+        m_readable = readable;
+        m_writer = new WrappedBatchWriter(m_writable, m_storeClosed, m_writerClosed);
     }
 
     @Override
     public final ColumnarSchema getSchema() {
-        return m_unwrappedDelegateStore.getSchema();
+        return m_readable.getSchema();
     }
 
     @Override
@@ -285,33 +186,6 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
     }
 
     @Override
-    public final void flush() throws IOException {
-        if (m_storeClosed.get()) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
-        if (m_smallCached != null) {
-            m_smallCached.flush();
-        }
-        if (m_dataCached != null) {
-            m_dataCached.flush();
-        }
-        m_objectCached.flush();
-    }
-
-    final DataColumnDomain getDomain(final int colIndex) {
-        return m_domainCalculated.getDomain(colIndex);
-    }
-
-    final DataColumnMetaData[] getMetadata(final int colIndex) {
-        return m_domainCalculated.getMetadata(colIndex);
-    }
-
-    void setMaxPossibleValues(final int maxPossibleValues) {
-        m_domainCalculated.setMaxPossibleValues(maxPossibleValues);
-    }
-
-    @Override
     public final RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         if (!m_writerClosed.get()) {
             throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
@@ -320,16 +194,14 @@ final class CachedDomainBatchStore implements BatchStore, Flushable {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        return new WrappedRandomAccessBatchReader(m_wrappedDelegateReadable, selection, m_storeClosed, numBatches());
+        return new WrappedRandomAccessBatchReader(m_readable, selection, m_storeClosed, numBatches());
     }
 
     @Override
     public final void close() throws IOException {
         if (!m_storeClosed.getAndSet(true)) {
-            m_domainCalculated.close();
             m_writer.close();
-            m_wrappedDelegateReadable.close();
-            MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
+            m_readable.close();
         }
     }
 

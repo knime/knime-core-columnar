@@ -54,21 +54,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.cache.data.ReadDataCache;
-import org.knime.core.columnar.cache.data.ReadDataReadCache;
-import org.knime.core.columnar.cache.object.ObjectCache;
-import org.knime.core.columnar.cache.object.ObjectReadCache;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
-import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * A {@link BatchReadStore} that delegates operations through an {@link ObjectCache} and a {@link ReadDataCache}.
+ * A {@link BatchReadStore} that delegates operations to a {@link RandomAccessBatchReadable}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class CachedBatchReadStore implements BatchReadStore {
+final class WrappedBatchReadStore implements BatchReadStore {
 
     static final class WrappedRandomAccessBatchReader implements RandomAccessBatchReader {
 
@@ -138,21 +133,18 @@ final class CachedBatchReadStore implements BatchReadStore {
 
     private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
 
-    private final BatchReadStore m_unwrappedDelegateStore;
+    private final RandomAccessBatchReadable m_readable;
 
-    private final RandomAccessBatchReadable m_wrappedDelegateReadable;
+    private final int m_numBatches;
+
+    private final int m_batchLength;
 
     private final AtomicBoolean m_closed = new AtomicBoolean();
 
-    @SuppressWarnings("resource")
-    CachedBatchReadStore(final BatchReadStore store) {
-        m_unwrappedDelegateStore = store;
-
-        RandomAccessBatchReadable wrapped = store;
-        if (ColumnarPreferenceUtils.getColumnDataCacheSize() > 0) {
-            wrapped = new ReadDataReadCache(wrapped, ColumnarPreferenceUtils.getColumnDataCache());
-        }
-        m_wrappedDelegateReadable = new ObjectReadCache(wrapped, ColumnarPreferenceUtils.getHeapCache());
+    WrappedBatchReadStore(final RandomAccessBatchReadable readable, final int numBatches, final int batchLength) {
+        m_readable = readable;
+        m_numBatches = numBatches;
+        m_batchLength = batchLength;
     }
 
     @Override
@@ -161,28 +153,28 @@ final class CachedBatchReadStore implements BatchReadStore {
             throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
         }
 
-        return new WrappedRandomAccessBatchReader(m_wrappedDelegateReadable, selection, m_closed, numBatches());
+        return new WrappedRandomAccessBatchReader(m_readable, selection, m_closed, numBatches());
     }
 
     @Override
     public final ColumnarSchema getSchema() {
-        return m_unwrappedDelegateStore.getSchema();
+        return m_readable.getSchema();
     }
 
     @Override
     public int numBatches() {
-        return m_unwrappedDelegateStore.numBatches();
+        return m_numBatches;
     }
 
     @Override
     public int batchLength() {
-        return m_unwrappedDelegateStore.batchLength();
+        return m_batchLength;
     }
 
     @Override
     public final void close() throws IOException {
         if (!m_closed.getAndSet(true)) {
-            m_wrappedDelegateReadable.close();
+            m_readable.close();
         }
     }
 
