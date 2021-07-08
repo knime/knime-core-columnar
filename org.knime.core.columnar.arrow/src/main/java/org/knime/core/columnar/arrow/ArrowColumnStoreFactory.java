@@ -80,7 +80,17 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
      * Create a {@link ColumnStoreFactory} for Arrow using the default root allocator.
      */
     public ArrowColumnStoreFactory() {
-        this(ROOT, 0, ROOT.getLimit());
+        this(ROOT);
+    }
+
+    /**
+     * Create a {@link ColumnStoreFactory} for Arrow using the given allocator. For each {@link BatchStore} and
+     * {@link BatchReadStore} the allocator is used to create a child allocator.
+     *
+     * @param allocator the allocator to use
+     */
+    public ArrowColumnStoreFactory(final BufferAllocator allocator) {
+        this(allocator, 0, allocator.getLimit());
     }
 
     /**
