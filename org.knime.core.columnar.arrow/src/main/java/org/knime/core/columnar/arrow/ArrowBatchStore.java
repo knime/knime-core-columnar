@@ -50,6 +50,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
@@ -63,7 +64,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-final class ArrowBatchStore implements BatchStore {
+public final class ArrowBatchStore implements BatchStore, ArrowIpcFileStore {
 
     private final ColumnarSchema m_schema;
 
@@ -108,6 +109,20 @@ final class ArrowBatchStore implements BatchStore {
     @Override
     public int batchLength() {
         return m_writer.batchLength();
+    }
+
+    @Override
+    public Path getPath() {
+        return m_path;
+    }
+
+    /**
+     * @return an object that can provide the offsets of record batches and dictionary batches in an Arrow IPC file. If
+     *         new batches are written to the file after this method was called, the object will also provide offsets to
+     *         the newly written batches.
+     */
+    public OffsetProvider getOffsetProvider() {
+        return m_writer.getOffsetProvider();
     }
 
     @Override

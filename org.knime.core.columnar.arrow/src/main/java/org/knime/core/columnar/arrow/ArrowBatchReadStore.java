@@ -61,7 +61,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-final class ArrowBatchReadStore implements BatchReadStore {
+public final class ArrowBatchReadStore implements BatchReadStore, ArrowIpcFileStore {
 
     private final BufferAllocator m_allocator;
 
@@ -132,4 +132,8 @@ final class ArrowBatchReadStore implements BatchReadStore {
         return m_maxLength.get();
     }
 
+    @Override
+    public Path getPath() {
+        return m_path;
+    }
 }
