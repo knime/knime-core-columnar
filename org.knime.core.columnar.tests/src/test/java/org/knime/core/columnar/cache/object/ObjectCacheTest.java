@@ -60,17 +60,13 @@ import static org.knime.core.columnar.TestBatchStoreUtils.writeDefaultTable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingDeque;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
@@ -92,38 +88,11 @@ import org.knime.core.table.schema.DefaultColumnarSchema;
 @SuppressWarnings("javadoc")
 public class ObjectCacheTest {
 
-    private static final Runnable SERIALIZATION_POISON_PILL = () -> {
-    };
-
     private static final ExecutorService SERIALIZATION_EXECUTOR = Executors.newSingleThreadExecutor();
-
-    private static final ExecutorService PERSIST_EXECUTOR = Executors.newSingleThreadExecutor();
-
-    private static final BlockingQueue<Runnable> QUEUE = new LinkedBlockingDeque<>();
-
-    @BeforeClass
-    public static void before() {
-        SERIALIZATION_EXECUTOR.execute(() -> {
-            while (true) {
-                try {
-                    final Runnable r = QUEUE.take();
-                    if (r == SERIALIZATION_POISON_PILL) {
-                        return;
-                    }
-                    r.run();
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        });
-
-    }
 
     @AfterClass
     public static void after() {
-        QUEUE.add(SERIALIZATION_POISON_PILL);
         SERIALIZATION_EXECUTOR.shutdown();
-        PERSIST_EXECUTOR.shutdown();
     }
 
     static SharedObjectCache generateCache() {
@@ -135,18 +104,13 @@ public class ObjectCacheTest {
             public Map<ColumnDataUniqueId, Object[]> getCache() {
                 return m_cache;
             }
-
-            @Override
-            public Queue<Runnable> getSerializationQueue() {
-                return QUEUE;
-            }
         };
     }
 
     @SuppressWarnings("resource")
     private static ObjectCache generateDefaultHeapCachedStore() {
         final TestBatchBuffer delegate = createDefaultTestBatchBuffer();
-        return new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR);
+        return new ObjectCache(delegate, generateCache(), SERIALIZATION_EXECUTOR);
     }
 
     private static ColumnarSchema createSingleStringColumnSchema() {
@@ -155,7 +119,7 @@ public class ObjectCacheTest {
 
     private static CountDownLatch blockSerialization() {
         final CountDownLatch blockLatch = new CountDownLatch(1);
-        QUEUE.add(() -> {
+        SERIALIZATION_EXECUTOR.submit(() -> {
             try {
                 blockLatch.await();
             } catch (InterruptedException ex) {
@@ -168,7 +132,7 @@ public class ObjectCacheTest {
     private static void resumeAndWaitForSerialization(final CountDownLatch blockLatch) throws InterruptedException {
         blockLatch.countDown();
         final CountDownLatch waitLatch = new CountDownLatch(1);
-        QUEUE.add(() -> waitLatch.countDown());
+        SERIALIZATION_EXECUTOR.submit(() -> waitLatch.countDown());
         waitLatch.await();
     }
 
@@ -213,7 +177,7 @@ public class ObjectCacheTest {
     @Test
     public void testFlush() throws IOException, InterruptedException {
         try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
-                final ObjectCache store = new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR);
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), SERIALIZATION_EXECUTOR);
                 final BatchWriter writer = store.getWriter()) {
             final WriteBatch batch = writer.create(2);
             final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
@@ -248,7 +212,7 @@ public class ObjectCacheTest {
     @Test
     public void testSerializeAsync() throws IOException, InterruptedException {
         try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
-                final ObjectCache store = new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR);
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), SERIALIZATION_EXECUTOR);
                 final BatchWriter writer = store.getWriter()) {
             final WriteBatch batch = writer.create(1);
             final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
@@ -257,6 +221,7 @@ public class ObjectCacheTest {
             final CountDownLatch blockLatch = blockSerialization();
             try {
                 data.setString(0, "0");
+                batch.close(1);
                 assertNull(delegateData.getString(0));
             } finally {
                 resumeAndWaitForSerialization(blockLatch);
@@ -270,7 +235,7 @@ public class ObjectCacheTest {
     @Test
     public void testCloseDoesNotBlock() throws IOException, InterruptedException {
         try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
-                final ObjectCache store = new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR);
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), SERIALIZATION_EXECUTOR);
                 final BatchWriter writer = store.getWriter()) {
 
             final WriteBatch writeBatch1 = writer.create(1);

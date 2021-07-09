@@ -63,17 +63,14 @@ import com.google.common.cache.CacheBuilder;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class WeakReferencedObjectCache extends AbstractSharedObjectCache {
+public final class WeakReferencedObjectCache implements SharedObjectCache {
 
     private final Cache<ColumnDataUniqueId, Object[]> m_cache;
 
     /**
      * Creates a new cache.
-     *
-     * @param nThreads number of threads for asynchronous serialization
      */
-    public WeakReferencedObjectCache(final int nThreads) {
-        super(nThreads);
+    public WeakReferencedObjectCache() {
         m_cache = CacheBuilder.newBuilder().weakValues().build();
     }
 

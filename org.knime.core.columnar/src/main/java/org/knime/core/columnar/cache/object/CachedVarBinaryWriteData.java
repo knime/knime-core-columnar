@@ -46,7 +46,8 @@
  */
 package org.knime.core.columnar.cache.object;
 
-import java.util.Queue;
+import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
@@ -77,36 +78,59 @@ final class CachedVarBinaryWriteData extends CachedWriteData<VarBinaryWriteData,
             return (T)m_data[index];
         }
 
+        @Override
+        synchronized VarBinaryReadData close() {
+            VarBinaryReadData out = super.close();
+            m_serializers = null;
+            return out;
+        }
+
     }
 
-    CachedVarBinaryWriteData(final VarBinaryWriteData delegate, final Queue<Runnable> serializationQueue) {
-        super(delegate, new Object[delegate.capacity()], serializationQueue);
+    private ObjectSerializer<?>[] m_serializers;
+
+    CachedVarBinaryWriteData(final VarBinaryWriteData delegate, final ExecutorService executor) {
+        super(delegate, new Object[delegate.capacity()], executor);
+        m_serializers = new ObjectSerializer<?>[delegate.capacity()];
+    }
+
+    @Override
+    public void expand(final int minimumCapacity) {
+        super.expand(minimumCapacity);
+        m_serializers = Arrays.copyOf(m_serializers, m_delegate.capacity());
     }
 
     @Override
     public void setBytes(final int index, final byte[] val) {
         m_data[index] = val;
-        onSet(new SerializationRunnable() {
-            @Override
-            void serialize() {
-                m_delegate.setBytes(index, val);
-            }
-        });
+        onSet(index);
     }
 
     @Override
     public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
         m_data[index] = value;
-        onSet(new SerializationRunnable() {
-            @Override
-            void serialize() {
-                m_delegate.setObject(index, value, serializer);
-            }
-        });
+        m_serializers[index] = serializer;
+        onSet(index);
+    }
+
+    @Override
+    void serializeAt(final int index) {
+        final ObjectSerializer<?> serializer = m_serializers[index];
+        if (serializer != null) {
+            serializeObject(index, m_data[index], serializer);
+        } else {
+            m_delegate.setBytes(index, (byte[])m_data[index]);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void serializeObject(final int index, final Object value, final ObjectSerializer<?> serializer) {
+        m_delegate.setObject(index, (T)value, (ObjectSerializer<T>)serializer);
     }
 
     @Override
     public VarBinaryReadData close(final int length) {
+        onClose();
         return new CachedVarBinaryReadData(length);
     }
 

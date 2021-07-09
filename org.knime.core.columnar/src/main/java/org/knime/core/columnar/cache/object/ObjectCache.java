@@ -50,7 +50,6 @@ import java.io.Flushable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -107,18 +106,17 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         public WriteBatch create(final int capacity) {
             final WriteBatch batch = m_writerDelegate.create(capacity);
             final NullableWriteData[] data = new NullableWriteData[getSchema().numColumns()];
-            final Queue<Runnable> serializationQueue = m_cache.getSerializationQueue();
 
             for (int i = 0; i < data.length; i++) {
                 if (m_varBinaryData.isSelected(i)) {
                     final VarBinaryWriteData columnWriteData = (VarBinaryWriteData)batch.get(i);
                     final var cachedData =
-                        new CachedVarBinaryWriteData(columnWriteData, serializationQueue);
+                        new CachedVarBinaryWriteData(columnWriteData, m_executor);
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else if (m_stringData.isSelected(i)) {
                     final StringWriteData columnWriteData = (StringWriteData)batch.get(i);
-                    final var cachedData = new CachedStringWriteData(columnWriteData, serializationQueue);
+                    final var cachedData = new CachedStringWriteData(columnWriteData, m_executor);
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else {
@@ -329,7 +327,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     public void flush() throws IOException {
         // serialize any currently unclosed data (in the current batch)
         for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
-            data.serialize();
+            data.flush();
         }
 
         // wait for the pending serialization of the previous batch

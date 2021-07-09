@@ -66,17 +66,14 @@ import com.google.common.cache.CacheBuilder;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class SoftReferencedObjectCache extends AbstractSharedObjectCache {
+public final class SoftReferencedObjectCache implements SharedObjectCache {
 
     private final Cache<ColumnDataUniqueId, Object[]> m_cache;
 
     /**
      * Creates a new cache.
-     *
-     * @param nThreads number of threads for asynchronous serialization
      */
-    public SoftReferencedObjectCache(final int nThreads) {
-        super(nThreads);
+    public SoftReferencedObjectCache() {
         m_cache = CacheBuilder.newBuilder().softValues().expireAfterAccess(60, TimeUnit.SECONDS).build();
     }
 

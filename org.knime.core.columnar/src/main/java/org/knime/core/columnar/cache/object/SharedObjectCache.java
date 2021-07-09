@@ -49,7 +49,6 @@
 package org.knime.core.columnar.cache.object;
 
 import java.util.Map;
-import java.util.Queue;
 
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
@@ -66,11 +65,5 @@ public interface SharedObjectCache {
      * @return the object data cache
      */
     Map<ColumnDataUniqueId, Object[]> getCache();
-
-    /**
-     * @return a queue in which serialization runnables can be enqueued and from where they will be fetched and run
-     *         asynchronously
-     */
-    Queue<Runnable> getSerializationQueue();
 
 }
