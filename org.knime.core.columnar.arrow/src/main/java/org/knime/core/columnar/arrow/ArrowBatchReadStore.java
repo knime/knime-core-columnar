@@ -61,13 +61,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowBatchReadStore implements BatchReadStore, ArrowIpcFileStore {
-
-    private final BufferAllocator m_allocator;
-
-    private final Path m_path;
-
-    private final ColumnarSchema m_schema;
+public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implements BatchReadStore {
 
     private AtomicInteger m_numBatches;
 
@@ -79,21 +73,9 @@ public final class ArrowBatchReadStore implements BatchReadStore, ArrowIpcFileSt
 
     ArrowBatchReadStore(final ColumnarSchema schema, final Path path, final BufferAllocator allocator,
         final AtomicInteger numBatches, final AtomicInteger maxLength) {
-        m_schema = schema;
-        m_path = path;
-        m_allocator = allocator;
+        super(schema, path, allocator);
         m_numBatches = numBatches;
         m_maxLength = maxLength;
-    }
-
-    @Override
-    public void close() throws IOException {
-        final long allocated = m_allocator.getAllocatedMemory();
-        m_allocator.close();
-        if (allocated > 0) {
-            throw new IOException(
-                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
-        }
     }
 
     @Override
@@ -102,13 +84,9 @@ public final class ArrowBatchReadStore implements BatchReadStore, ArrowIpcFileSt
         return new ArrowBatchReader(m_path.toFile(), m_allocator, factories, config);
     }
 
-    @Override
-    public ColumnarSchema getSchema() {
-        return m_schema;
-    }
-
     private final void initNumBatchesMaxLength() {
-        try (final ArrowBatchReader reader = createRandomAccessReader(new DefaultColumnSelection(m_schema.numColumns()))) {
+        try (final ArrowBatchReader reader =
+            createRandomAccessReader(new DefaultColumnSelection(m_schema.numColumns()))) {
             m_numBatches = new AtomicInteger(reader.numBatches());
             m_maxLength = new AtomicInteger(reader.maxLength());
         } catch (final IOException e) {
@@ -130,10 +108,5 @@ public final class ArrowBatchReadStore implements BatchReadStore, ArrowIpcFileSt
             initNumBatchesMaxLength();
         }
         return m_maxLength.get();
-    }
-
-    @Override
-    public Path getPath() {
-        return m_path;
     }
 }

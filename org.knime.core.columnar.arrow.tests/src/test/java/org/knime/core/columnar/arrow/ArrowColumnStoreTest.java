@@ -443,6 +443,9 @@ public class ArrowColumnStoreTest {
             Files.copy(writePath, readPath);
         }
 
+        // Assert that the file written to does not exist after closing the store
+        assertFalse(Files.exists(writePath));
+
         // Assert that the file for reading exists
         assertTrue(Files.exists(readPath));
         assertTrue(Files.size(readPath) > 0);

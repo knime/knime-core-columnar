@@ -48,7 +48,6 @@
  */
 package org.knime.core.columnar.arrow;
 
-import java.io.IOException;
 import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -63,21 +62,13 @@ import org.knime.core.table.schema.ColumnarSchema;
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowPartialFileBatchReadable implements RandomAccessBatchReadable {
-
-    private final ColumnarSchema m_schema;
-
-    private final Path m_path;
-
-    private final BufferAllocator m_allocator;
+public class ArrowPartialFileBatchReadable extends AbstractArrowBatchReadable implements RandomAccessBatchReadable {
 
     private final OffsetProvider m_offsetProvider;
 
     ArrowPartialFileBatchReadable(final ColumnarSchema schema, final Path path, final OffsetProvider offsetProvider,
         final BufferAllocator allocator) {
-        m_schema = schema;
-        m_path = path;
-        m_allocator = allocator;
+        super(schema, path, allocator);
         m_offsetProvider = offsetProvider;
     }
 
@@ -85,20 +76,5 @@ public class ArrowPartialFileBatchReadable implements RandomAccessBatchReadable 
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
         return new ArrowPartialFileBatchReader(m_path.toFile(), m_allocator, factories, selection, m_offsetProvider);
-    }
-
-    @Override
-    public ColumnarSchema getSchema() {
-        return m_schema;
-    }
-
-    @Override
-    public void close() throws IOException {
-        final long allocated = m_allocator.getAllocatedMemory();
-        m_allocator.close();
-        if (allocated > 0) {
-            throw new IOException(
-                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
-        }
     }
 }

@@ -42,74 +42,61 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jul 14, 2021 (benjamin): created
  */
 package org.knime.core.columnar.arrow;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.arrow.compress.ArrowCompression;
-import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.batch.BatchReadable;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * A {@link BatchStore} implementation for Arrow.
+ * Abstract implementation of a {@link BatchReadable} for Arrow IPC files. Holds the {@link ColumnarSchema schema},
+ * {@link Path path} and {@link BufferAllocator allocator}. On #close() the allocator is closed but an
+ * {@link IOException} is thrown if there is still memory allocated by the allocator.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowBatchStore extends AbstractArrowBatchReadable implements BatchStore {
+abstract class AbstractArrowBatchReadable implements BatchReadable, ArrowIpcFileStore {
 
-    private final ArrowColumnDataFactory[] m_factories;
+    protected final ColumnarSchema m_schema;
 
-    private final ArrowBatchWriter m_writer;
+    protected final Path m_path;
 
-    ArrowBatchStore(final ColumnarSchema schema, final Path path, final ArrowCompression compression,
-        final BufferAllocator allocator) {
-        super(schema, path, allocator);
-        m_factories = ArrowSchemaMapper.map(schema);
-        m_writer = new ArrowBatchWriter(path.toFile(), m_factories, compression, m_allocator);
+    protected final BufferAllocator m_allocator;
+
+    AbstractArrowBatchReadable(final ColumnarSchema schema, final Path path, final BufferAllocator allocator) {
+        m_schema = schema;
+        m_path = path;
+        m_allocator = allocator;
     }
 
     @Override
-    public BatchWriter getWriter() {
-        return m_writer;
+    public Path getPath() {
+        return m_path;
     }
 
     @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
-        return new ArrowPartialFileBatchReader(m_path.toFile(), m_allocator, m_factories, config,
-            m_writer.getOffsetProvider());
+    public ColumnarSchema getSchema() {
+        return m_schema;
     }
 
-    @Override
-    public int numBatches() {
-        return m_writer.numBatches();
-    }
-
-    @Override
-    public int batchLength() {
-        return m_writer.batchLength();
-    }
-
-    /**
-     * @return an object that can provide the offsets of record batches and dictionary batches in an Arrow IPC file. If
-     *         new batches are written to the file after this method was called, the object will also provide offsets to
-     *         the newly written batches.
-     */
-    public OffsetProvider getOffsetProvider() {
-        return m_writer.getOffsetProvider();
+    protected BufferAllocator getAllocator() {
+        return m_allocator;
     }
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(m_path);
-        super.close();
+        final long allocated = m_allocator.getAllocatedMemory();
+        m_allocator.close();
+        if (allocated > 0) {
+            throw new IOException(
+                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
+        }
     }
 }
