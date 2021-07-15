@@ -54,7 +54,7 @@ import org.knime.core.columnar.data.PeriodData.PeriodWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestPeriodData extends TestData implements PeriodWriteData, PeriodReadData {
+public final class TestPeriodData extends AbstractTestData implements PeriodWriteData, PeriodReadData {
 
     public static final class TestPeriodDataFactory implements TestDataFactory {
 

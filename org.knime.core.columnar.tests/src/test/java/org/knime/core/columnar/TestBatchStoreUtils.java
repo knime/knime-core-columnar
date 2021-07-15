@@ -107,15 +107,30 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
 import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
+import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringReadData;
+import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
+import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
+import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.TestBatchStore;
+import org.knime.core.columnar.testing.data.AbstractTestDictEncodedObjectData;
 import org.knime.core.columnar.testing.data.TestData;
+import org.knime.core.columnar.testing.data.TestDictEncodedStringData;
+import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.traits.DataTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
+import org.knime.core.table.schema.traits.DefaultListDataTraits;
+import org.knime.core.table.schema.traits.DefaultStructDataTraits;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -174,8 +189,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     ((BooleanWriteData)data).setBoolean(index, runningInt++ % 2 == 0); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -192,8 +208,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     ((ByteWriteData)data).setByte(index, (byte)runningInt++); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -209,8 +226,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     ((DoubleWriteData)data).setDouble(index, runningInt++); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -227,9 +245,10 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final DurationWriteData objectData = ((DurationWriteData)data);
                     objectData.setDuration(index, Duration.ofMillis(runningInt++)); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -247,8 +266,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     ((FloatWriteData)data).setFloat(index, runningInt++); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -265,8 +285,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     ((IntWriteData)data).setInt(index, runningInt++); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -282,9 +303,15 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                DataTraits getTraits() {
+                    return new DefaultListDataTraits(new DataTrait[0], DefaultDataTraits.EMPTY);
+                }
+
+                @Override
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final IntWriteData intData = ((ListWriteData)data).createWriteData(index, 1);
                     intData.setInt(0, runningInt++); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -302,9 +329,10 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final LocalDateWriteData objectData = ((LocalDateWriteData)data);
                     objectData.setLocalDate(index, LocalDate.ofEpochDay(runningInt++)); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -322,10 +350,11 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final LocalDateTimeWriteData objectData = ((LocalDateTimeWriteData)data);
                     objectData.setLocalDateTime(index,
                         LocalDateTime.of(LocalDate.ofEpochDay(runningInt++), LocalTime.ofNanoOfDay(runningInt++))); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -343,9 +372,10 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final LocalTimeWriteData objectData = ((LocalTimeWriteData)data);
                     objectData.setLocalTime(index, LocalTime.ofNanoOfDay(runningInt++)); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -363,8 +393,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     ((LongWriteData)data).setLong(index, runningInt++); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -380,8 +411,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     ((IntWriteData)data).setMissing(index);
+                    return data;
                 }
 
                 @Override
@@ -397,9 +429,10 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final PeriodWriteData objectData = ((PeriodWriteData)data);
                     objectData.setPeriod(index, Period.ofDays(runningInt++)); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -417,13 +450,53 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final StringWriteData objectData = ((StringWriteData)data);
                     objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
+                    return data;
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    final StringReadData refObjectData = (StringReadData)refData;
+                    final StringReadData readObjectData = (StringReadData)readData;
+                    assertEquals(refObjectData.getString(index), readObjectData.getString(index));
+                }
+            },
+
+            DICTENCODEDSTRING {
+                @Override
+                DataSpec getSpec() {
+                    return DataSpec.stringSpec();
+                }
+
+                @Override
+                DataTraits getTraits() {
+                    return new DefaultDataTraits(new DictEncodingTrait(true));
+                }
+
+                @Override
+                NullableWriteData setData(final NullableWriteData data, final int index) {
+                    if (data instanceof AbstractTestDictEncodedObjectData) {
+                        throw new UnsupportedOperationException("This batch store does not support DictEncoding");
+                    }
+
+                    final StringWriteData objectData = ((StringWriteData)data);
+                    objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
+                    return ((DictDecodedStringWriteData)data).getDelegate();
+                }
+
+                @Override
+                void checkEquals(NullableReadData refData, final NullableReadData readData, final int index) {
+                    if (readData instanceof TestDictEncodedStringData) {
+                        throw new UnsupportedOperationException("This batch store does not support DictEncoding");
+                    }
+
+                    if (refData instanceof TestDictEncodedStringData) {
+                        // for testing we wrap the backend data (TestDictEncodedStringData) again to support String access
+                        refData = new DictDecodedStringReadData((TestDictEncodedStringData)refData);
+                    }
+
                     final StringReadData refObjectData = (StringReadData)refData;
                     final StringReadData readObjectData = (StringReadData)readData;
                     assertEquals(refObjectData.getString(index), readObjectData.getString(index));
@@ -437,9 +510,15 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                DataTraits getTraits() {
+                    return new DefaultStructDataTraits(new DataTrait[0], DefaultDataTraits.EMPTY);
+                }
+
+                @Override
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final IntWriteData intData = ((StructWriteData)data).getWriteDataAt(0);
                     intData.setInt(index, runningInt++); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -457,12 +536,49 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     ((VarBinaryWriteData)data).setBytes(index, new byte[]{(byte)runningInt++}); // NOSONAR
+                    return data;
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
+                        ((VarBinaryReadData)readData).getBytes(index));
+                }
+            },
+
+            DICTENCODEDVARBINARY {
+                @Override
+                DataSpec getSpec() {
+                    return DataSpec.varBinarySpec();
+                }
+
+                @Override
+                DataTraits getTraits() {
+                    return new DefaultDataTraits(new DictEncodingTrait(true));
+                }
+
+                @Override
+                NullableWriteData setData(final NullableWriteData data, final int index) {
+                    if (data instanceof AbstractTestDictEncodedObjectData) {
+                        throw new UnsupportedOperationException("This batch store does not support DictEncoding");
+                    }
+                    ((VarBinaryWriteData)data).setBytes(index, new byte[]{(byte)runningInt++}); // NOSONAR
+                    return ((DictDecodedVarBinaryWriteData)data).getDelegate();
+                }
+
+                @Override
+                void checkEquals(NullableReadData refData, final NullableReadData readData, final int index) {
+                    if (readData instanceof TestDictEncodedVarBinaryData) {
+                        throw new UnsupportedOperationException("This batch store does not support DictEncoding");
+                    }
+
+                    if (refData instanceof TestDictEncodedVarBinaryData) {
+                        // for testing we wrap the backend data (TestDictEncodedVarBinaryData) again to support String access
+                        refData = new DictDecodedVarBinaryReadData((TestDictEncodedVarBinaryData)refData);
+                    }
+
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
                         ((VarBinaryReadData)readData).getBytes(index));
                 }
@@ -475,10 +591,11 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void setData(final NullableWriteData data, final int index) {
+                NullableWriteData setData(final NullableWriteData data, final int index) {
                     final ZonedDateTimeWriteData objectData = (ZonedDateTimeWriteData)data;
                     objectData.setZonedDateTime(index, ZonedDateTime.of(LocalDate.ofEpochDay(runningInt++), // NOSONAR
                         LocalTime.ofNanoOfDay(runningInt++), ZoneId.of("Z"))); // NOSONAR
+                    return data;
                 }
 
                 @Override
@@ -491,7 +608,11 @@ public final class TestBatchStoreUtils {
 
         abstract DataSpec getSpec();
 
-        abstract void setData(NullableWriteData data, int index);
+        DataTraits getTraits() {
+            return DefaultDataTraits.EMPTY;
+        }
+
+        abstract NullableWriteData setData(NullableWriteData data, int index);
 
         abstract void checkEquals(NullableReadData refData, NullableReadData readData, final int index);
     }
@@ -503,7 +624,9 @@ public final class TestBatchStoreUtils {
     public static ColumnarSchema createSchema(final int numColumns) {
         final List<DataSpec> columnSpecs =
             IntStream.range(0, numColumns).mapToObj(i -> indexToTypeT(i).getSpec()).collect(Collectors.toList());
-        return new DefaultColumnarSchema(columnSpecs);
+        final List<DataTraits> columnTraits =
+                IntStream.range(0, numColumns).mapToObj(i -> indexToTypeT(i).getTraits()).collect(Collectors.toList());
+        return new DefaultColumnarSchema(columnSpecs, columnTraits);
     }
 
     private static ColumnarSchema createDefaultSchema() {
@@ -526,8 +649,7 @@ public final class TestBatchStoreUtils {
         for (int i = 0; i < store.getSchema().numColumns(); i++) {
             for (int j = 0; j < batch.capacity(); j++) {
                 final NullableWriteData data1 = batch.get(i);
-                indexToTypeT(i).setData(data1, j);
-                data[i] = data1;
+                data[i] = indexToTypeT(i).setData(data1, j);
             }
         }
 
@@ -578,6 +700,22 @@ public final class TestBatchStoreUtils {
         return refs;
     }
 
+    public static NullableReadData[] wrapDictEncodedData(final NullableReadData[] data) {
+        NullableReadData[] out = new NullableReadData[data.length];
+        for (int i = 0; i < out.length; i++)
+        {
+            if (i == Types.DICTENCODEDSTRING.ordinal()) {
+                out[i] = new DictDecodedStringReadData((DictEncodedStringReadData)data[i]);
+            }
+            else if (i == Types.DICTENCODEDVARBINARY.ordinal()) {
+                out[i] = new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data[i]);
+            } else {
+                out[i] = data[i];
+            }
+        }
+        return out;
+    }
+
     public static List<NullableReadData[]> writeDefaultTable(final BatchWritable store) throws IOException {
         return writeTable(store, createWriteTable(store, DEF_NUM_BATCHES));
     }
@@ -590,7 +728,7 @@ public final class TestBatchStoreUtils {
                 final NullableReadData[] readBatch =
                     Arrays.stream(writeBatch).map(d -> d.close(d.capacity())).toArray(NullableReadData[]::new);
                 result.add(readBatch);
-                writer.write(new DefaultReadBatch(readBatch));
+                writer.write(new DefaultReadBatch(wrapDictEncodedData(readBatch)));
             }
         }
         return result;
@@ -600,7 +738,7 @@ public final class TestBatchStoreUtils {
         try (final BatchWriter writer = store.getWriter()) {
             for (int i = 0; i < table.size(); i++) {
                 final TestData[] batch = table.getBatch(i);
-                writer.write(new DefaultReadBatch(batch));
+                writer.write(new DefaultReadBatch(wrapDictEncodedData(batch)));
             }
         }
     }
@@ -639,16 +777,16 @@ public final class TestBatchStoreUtils {
 
                 assertEquals(written.length, data.length);
 
-                if (indices == null) {
-                    for (int j = 0; j < written.length; j++) { // NOSONAR
-                        data[j] = (TestData)batch.get(j);
-                        assertArrayEquals(written[j].get(), data[j].get());
+                final var loopIndices = indices != null ? indices : IntStream.range(0, written.length).toArray();
+                for (int j : loopIndices) { // NOSONAR
+                    var d = batch.get(j);
+                    if (d instanceof DictDecodedVarBinaryReadData) {
+                        d = ((DictDecodedVarBinaryReadData)d).getDelegate();
+                    } else if (d instanceof DictDecodedStringReadData) {
+                        d = ((DictDecodedStringReadData)d).getDelegate();
                     }
-                } else {
-                    for (int j : indices) { // NOSONAR
-                        data[j] = (TestData)batch.get(j);
-                        assertArrayEquals(written[j].get(), data[j].get());
-                    }
+                    data[j] = (TestData)d;
+                    assertArrayEquals(written[j].get(), data[j].get());
                 }
 
                 result.add(data);

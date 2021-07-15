@@ -53,6 +53,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.knime.core.columnar.data.dictencoding.DictEncodedBatchReadStore;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -131,7 +132,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         m_schema = ColumnarValueSchemaUtils
             .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
 
-        final BatchReadStore store = m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath());
+        final BatchReadStore store = new DictEncodedBatchReadStore(m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath()));
         final CachedBatchReadable cached = new CachedBatchReadable(store);
 
         m_readStore = new WrappedBatchReadStore(cached, store.numBatches(), store.batchLength());

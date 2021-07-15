@@ -19,6 +19,7 @@ Export-Package: org.knime.core.columnar,
  org.knime.core.columnar.cache.writable,
  org.knime.core.columnar.cursor,
  org.knime.core.columnar.data,
+ org.knime.core.columnar.data.dictencoding,
  org.knime.core.columnar.filter,
  org.knime.core.columnar.store
 Automatic-Module-Name: org.knime.core.columnar

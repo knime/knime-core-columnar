@@ -54,7 +54,7 @@ import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestZonedDateTimeData extends TestData implements ZonedDateTimeWriteData, ZonedDateTimeReadData {
+public final class TestZonedDateTimeData extends AbstractTestData implements ZonedDateTimeWriteData, ZonedDateTimeReadData {
 
     public static final class TestZonedDateTimeDataFactory implements TestDataFactory {
 

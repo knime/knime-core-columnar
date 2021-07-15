@@ -42,67 +42,52 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jul 9, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.columnar.data.dictencoding;
 
-import java.time.LocalTime;
-
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public final class TestLocalTimeData extends AbstractTestData implements LocalTimeWriteData, LocalTimeReadData {
+public final class DictEncodedData {
 
-    public static final class TestLocalTimeDataFactory implements TestDataFactory {
-
-        public static final TestLocalTimeDataFactory INSTANCE = new TestLocalTimeDataFactory();
-
-        private TestLocalTimeDataFactory() {
-        }
-
-        @Override
-        public TestLocalTimeData createWriteData(final int capacity) {
-            return new TestLocalTimeData(capacity);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data, final int length) {
-            return new TestLocalTimeData(data, length);
-        }
-
+    private DictEncodedData() {
     }
 
-    TestLocalTimeData(final int capacity) {
-        super(capacity);
+    /**
+     * {@link WriteData} that stores objects using a dictionary encoding
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public interface DictEncodedWriteData extends NullableWriteData {
+        /**
+         * Set the value at the given data index to reference the specified dictionaryIndex
+         * @param dataIndex the position of the value (roughly row-index)
+         * @param dictionaryIndex the index of the dictionary element that should be referenced
+         */
+        public void setReference(final int dataIndex, final int dictionaryIndex);
     }
 
-    TestLocalTimeData(final Object[] localTimes, final int length) {
-        super(localTimes);
-        close(length);
-    }
-
-    @Override
-    public LocalTimeReadData close(final int length) {
-        closeInternal(length);
-        return this;
-    }
-
-    @Override
-    public synchronized LocalTime getLocalTime(final int index) {
-        return (LocalTime)get()[index];
-    }
-
-    @Override
-    public synchronized void setLocalTime(final int index, final LocalTime val) {
-        get()[index] = val;
+    /**
+     * {@link ReadData} holding dictionary encoded objects.
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public interface DictEncodedReadData extends NullableReadData {
+        /**
+         * Get the index of the referenced dictionary entry at the given position in the data
+         * @param dataIndex the position of the value
+         * @return the referenced dictionary entry index
+         */
+        public int getReference(final int dataIndex);
     }
 
 }

@@ -42,67 +42,61 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jul 5, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.columnar.data.dictencoding;
 
-import java.time.LocalTime;
+import java.io.IOException;
 
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * A {@link DictEncodedBatchReadStore} wraps a delegate {@link BatchReadStore},
+ * and wraps created readers in a {@link DictEncodedRandomAccessBatchReader} to
+ * be able to wrap dictionary encoded data coming from the backend and provide
+ * plain-looking Data objects to the frontend.
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public final class TestLocalTimeData extends AbstractTestData implements LocalTimeWriteData, LocalTimeReadData {
+public class DictEncodedBatchReadStore implements BatchReadStore {
 
-    public static final class TestLocalTimeDataFactory implements TestDataFactory {
+    private final BatchReadStore m_delegate;
 
-        public static final TestLocalTimeDataFactory INSTANCE = new TestLocalTimeDataFactory();
-
-        private TestLocalTimeDataFactory() {
-        }
-
-        @Override
-        public TestLocalTimeData createWriteData(final int capacity) {
-            return new TestLocalTimeData(capacity);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data, final int length) {
-            return new TestLocalTimeData(data, length);
-        }
-
-    }
-
-    TestLocalTimeData(final int capacity) {
-        super(capacity);
-    }
-
-    TestLocalTimeData(final Object[] localTimes, final int length) {
-        super(localTimes);
-        close(length);
+    /**
+     * Create with a delegate.
+     * @param delegate The delegate batch store.
+     */
+    public DictEncodedBatchReadStore(final BatchReadStore delegate) {
+        m_delegate = delegate;
     }
 
     @Override
-    public LocalTimeReadData close(final int length) {
-        closeInternal(length);
-        return this;
+    public ColumnarSchema getSchema() {
+        return m_delegate.getSchema();
     }
 
     @Override
-    public synchronized LocalTime getLocalTime(final int index) {
-        return (LocalTime)get()[index];
+    public int numBatches() {
+        return m_delegate.numBatches();
     }
 
     @Override
-    public synchronized void setLocalTime(final int index, final LocalTime val) {
-        get()[index] = val;
+    public int batchLength() {
+        return m_delegate.batchLength();
     }
 
+    @Override
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema());
+    }
+
+    @Override
+    public void close() throws IOException {
+        m_delegate.close();
+    }
 }

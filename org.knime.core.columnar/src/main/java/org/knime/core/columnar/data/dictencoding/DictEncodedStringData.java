@@ -42,67 +42,56 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jun 28, 2021 (chaubold): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.columnar.data.dictencoding;
 
-import java.time.LocalTime;
-
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * Class holding {@link WriteData} and {@link ReadData} for data holding dictionary encoded
+ * elements.
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public final class TestLocalTimeData extends AbstractTestData implements LocalTimeWriteData, LocalTimeReadData {
+public final class DictEncodedStringData {
 
-    public static final class TestLocalTimeDataFactory implements TestDataFactory {
-
-        public static final TestLocalTimeDataFactory INSTANCE = new TestLocalTimeDataFactory();
-
-        private TestLocalTimeDataFactory() {
-        }
-
-        @Override
-        public TestLocalTimeData createWriteData(final int capacity) {
-            return new TestLocalTimeData(capacity);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data, final int length) {
-            return new TestLocalTimeData(data, length);
-        }
-
+    private DictEncodedStringData() {
     }
 
-    TestLocalTimeData(final int capacity) {
-        super(capacity);
+    /**
+     * {@link WriteData} that stores objects using a dictionary encoding
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public interface DictEncodedStringWriteData extends DictEncodedWriteData {
+        /**
+         * Set the dictionary entry for a given index.
+         * Objects MUST BE ADDED BY INCREASING INDEX, or the offset buffer will be corrupted...
+         *
+         * @param dictionaryIndex the index in the dictionary
+         * @param dictEntry the dictionary entry
+         */
+        public void setDictEntry(final int dictionaryIndex, final String dictEntry);
     }
 
-    TestLocalTimeData(final Object[] localTimes, final int length) {
-        super(localTimes);
-        close(length);
-    }
-
-    @Override
-    public LocalTimeReadData close(final int length) {
-        closeInternal(length);
-        return this;
-    }
-
-    @Override
-    public synchronized LocalTime getLocalTime(final int index) {
-        return (LocalTime)get()[index];
-    }
-
-    @Override
-    public synchronized void setLocalTime(final int index, final LocalTime val) {
-        get()[index] = val;
+    /**
+     * {@link ReadData} holding dictionary encoded objects.
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public interface DictEncodedStringReadData extends DictEncodedReadData {
+        /**
+         * Get the dictionary entry with the given dictionary index
+         * @param dictionaryIndex the index of the dictionary entry
+         * @return the dictionary entry
+         */
+        public String getDictEntry(final int dictionaryIndex);
     }
 
 }

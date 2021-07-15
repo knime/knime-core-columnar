@@ -52,7 +52,7 @@ import org.knime.core.columnar.data.ByteData.ByteWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestByteData extends TestData implements ByteWriteData, ByteReadData {
+public final class TestByteData extends AbstractTestData implements ByteWriteData, ByteReadData {
 
     public static final class TestByteDataFactory implements TestDataFactory {
 

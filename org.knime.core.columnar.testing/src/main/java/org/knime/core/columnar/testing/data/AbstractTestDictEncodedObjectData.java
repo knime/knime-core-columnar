@@ -45,89 +45,122 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import java.util.Arrays;
-import java.util.Objects;
+import java.util.HashMap;
+import java.util.Map;
 
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.StructData.StructReadData;
-import org.knime.core.columnar.data.StructData.StructWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestStructData extends AbstractTestData implements StructWriteData, StructReadData {
+public abstract class AbstractTestDictEncodedObjectData implements TestData, DictEncodedWriteData, DictEncodedReadData {
 
-    public static final class TestStructDataFactory implements TestDataFactory {
+    protected Map<Integer, Object> m_dict = new HashMap<>();
 
-        private final TestDataFactory[] m_inner;
+    protected Integer[] m_values;
 
-        public TestStructDataFactory(final TestDataFactory... inner) {
-            m_inner = inner;
-        }
+    private int m_refs = 1;
 
-        @Override
-        public TestStructData createWriteData(final int capacity) {
-            return new TestStructData(
-                Arrays.stream(m_inner).map(f -> f.createWriteData(capacity)).toArray(TestData[]::new), capacity, -1, false);
-        }
+    private int m_size;
 
-        @Override
-        public TestStructData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestStructData createReadData(final Object[] data, final int length) {
-            return new TestStructData(data, data.length, length, true);
-        }
-
+    static Object[] packData(final AbstractTestDictEncodedObjectData data) {
+        var d = new Object[2];
+        d[0] = data.m_values;
+        d[1] = data.m_dict;
+        return d;
     }
 
-    TestStructData(final Object[] structs, final int capacity, final int length, final boolean close) {
-        super(structs, capacity);
-        if (close) {
-            close(length);
+    AbstractTestDictEncodedObjectData(final int capacity) {
+        m_values = new Integer[capacity];
+        m_size = capacity;
+    }
+
+    AbstractTestDictEncodedObjectData(final Integer[] references, final Map<Integer, Object> dictionary) {
+        m_values = references;
+        m_size = references.length;
+        m_dict = dictionary;
+    }
+
+    final void closeInternal(final int length) {
+        if (getRefs() != 1) {
+            throw new IllegalStateException("Closed with outstanding references.");
         }
+        m_size = length;
     }
 
     @Override
-    public StructReadData close(final int length) {
+    public AbstractTestDictEncodedObjectData close(final int length) {
         closeInternal(length);
         return this;
     }
 
     @Override
+    public int getReference(final int dataIndex) {
+        return m_values[dataIndex];
+    }
+
+    @Override
+    public void setReference(final int dataIndex, final int dictionaryIndex) {
+        m_values[dataIndex] = dictionaryIndex;
+    }
+
+    @Override
     public long sizeOf() {
-        return Arrays.stream(get()).filter(Objects::nonNull).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
+        return length();
+    }
+
+    @Override
+    public final int capacity() {
+        return m_size;
     }
 
     @Override
     public void expand(final int minimumCapacity) {
-        Arrays.stream(get()).map(o -> (TestData)(o)).forEach(t -> t.expand(minimumCapacity));
+        final Integer[] expanded = new Integer[minimumCapacity];
+        System.arraycopy(m_values, 0, expanded, 0, capacity());
+        m_values = expanded;
+        m_size = minimumCapacity;
     }
 
     @Override
     public synchronized void setMissing(final int index) {
-        Arrays.stream(get()).map(o -> (TestData)(o)).forEach(t -> t.setMissing(index));
+        m_values[index] = null;
     }
 
     @Override
     public synchronized boolean isMissing(final int index) {
-        return ((NullableReadData)get()[0]).isMissing(index);
+        return m_values[index] == null || m_dict.get(m_values[index]) == null;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public <C extends NullableReadData> C getReadDataAt(final int index) {
-        return (C)get()[index];
+    public final int length() {
+        return m_size;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public <C extends NullableWriteData> C getWriteDataAt(final int index) {
-        return (C)get()[index];
+    public Object[] get() {
+        return packData(this);
+    }
+
+    @Override
+    public final synchronized void release() {
+        m_refs--;
+    }
+
+    @Override
+    public final synchronized void retain() {
+        if (m_refs > 0) {
+            m_refs++;
+        } else {
+            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
+        }
+    }
+
+    @Override
+    public final synchronized int getRefs() {
+        return m_refs;
     }
 
 }

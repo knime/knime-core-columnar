@@ -52,7 +52,7 @@ import org.knime.core.columnar.data.FloatData.FloatWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestFloatData extends TestData implements FloatWriteData, FloatReadData {
+public final class TestFloatData extends AbstractTestData implements FloatWriteData, FloatReadData {
 
     public static final class TestFloatDataFactory implements TestDataFactory {
 

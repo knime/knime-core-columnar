@@ -45,64 +45,58 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import java.time.LocalTime;
+import java.util.Map;
 
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringWriteData;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestLocalTimeData extends AbstractTestData implements LocalTimeWriteData, LocalTimeReadData {
+public final class TestDictEncodedStringData extends AbstractTestDictEncodedObjectData implements DictEncodedStringWriteData, DictEncodedStringReadData {
 
-    public static final class TestLocalTimeDataFactory implements TestDataFactory {
+    public static final class TestDictEncodedStringDataFactory implements TestDataFactory {
 
-        public static final TestLocalTimeDataFactory INSTANCE = new TestLocalTimeDataFactory();
+        public static final TestDictEncodedStringDataFactory INSTANCE = new TestDictEncodedStringDataFactory();
 
-        private TestLocalTimeDataFactory() {
+        private TestDictEncodedStringDataFactory() {
         }
 
         @Override
-        public TestLocalTimeData createWriteData(final int capacity) {
-            return new TestLocalTimeData(capacity);
+        public TestDictEncodedStringData createWriteData(final int capacity) {
+            return new TestDictEncodedStringData(capacity);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public TestDictEncodedStringData createReadData(final Object[] packedData) {
+            return new TestDictEncodedStringData((Integer[])packedData[0], (Map<Integer, Object>)packedData[1]);
         }
 
         @Override
-        public TestLocalTimeData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data, final int length) {
-            return new TestLocalTimeData(data, length);
+        public TestData createReadData(final Object[] data, final int length) {
+            return createReadData(data);
         }
 
     }
 
-    TestLocalTimeData(final int capacity) {
+    TestDictEncodedStringData(final int capacity) {
         super(capacity);
     }
 
-    TestLocalTimeData(final Object[] localTimes, final int length) {
-        super(localTimes);
-        close(length);
+    TestDictEncodedStringData(final Integer[] references, final Map<Integer, Object> dictionary) {
+        super(references, dictionary);
     }
 
     @Override
-    public LocalTimeReadData close(final int length) {
-        closeInternal(length);
-        return this;
+    public String getDictEntry(final int dictionaryIndex) {
+        return (String)m_dict.get(dictionaryIndex);
     }
 
     @Override
-    public synchronized LocalTime getLocalTime(final int index) {
-        return (LocalTime)get()[index];
-    }
-
-    @Override
-    public synchronized void setLocalTime(final int index, final LocalTime val) {
-        get()[index] = val;
+    public void setDictEntry(final int dictionaryIndex, final String obj) {
+        m_dict.put(dictionaryIndex, obj);
     }
 
 }

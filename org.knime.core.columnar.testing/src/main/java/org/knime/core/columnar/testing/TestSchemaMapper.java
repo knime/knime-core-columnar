@@ -53,6 +53,8 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.testing.data.TestBooleanData.TestBooleanDataFactory;
 import org.knime.core.columnar.testing.data.TestByteData.TestByteDataFactory;
 import org.knime.core.columnar.testing.data.TestDataFactory;
+import org.knime.core.columnar.testing.data.TestDictEncodedStringData.TestDictEncodedStringDataFactory;
+import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData.TestDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
 import org.knime.core.columnar.testing.data.TestDurationData.TestDurationDataFactory;
 import org.knime.core.columnar.testing.data.TestFloatData.TestFloatDataFactory;
@@ -88,6 +90,7 @@ import org.knime.core.table.schema.VoidDataSpec;
 import org.knime.core.table.schema.ZonedDateTimeDataSpec;
 import org.knime.core.table.schema.traits.DataTrait;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.DictEncodingTrait;
 import org.knime.core.table.schema.traits.ListDataTraits;
 import org.knime.core.table.schema.traits.StructDataTraits;
 
@@ -158,6 +161,10 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
+        DictEncodingTrait dictEncodingTrait = (DictEncodingTrait)traits.get(DataTrait.Type.DICT_ENCODING);
+        if (dictEncodingTrait != null && dictEncodingTrait.isEnabled()) {
+            return TestDictEncodedVarBinaryDataFactory.INSTANCE;
+        }
         return TestVarBinaryDataFactory.INSTANCE;
     }
 
@@ -186,6 +193,10 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
+        DictEncodingTrait dictEncodingTrait = (DictEncodingTrait)traits.get(DataTrait.Type.DICT_ENCODING);
+        if (dictEncodingTrait != null && dictEncodingTrait.isEnabled()) {
+            return TestDictEncodedStringDataFactory.INSTANCE;
+        }
         return TestStringDataFactory.INSTANCE;
     }
 }

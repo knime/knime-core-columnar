@@ -62,7 +62,7 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestVarBinaryData extends TestData implements VarBinaryWriteData, VarBinaryReadData {
+public final class TestVarBinaryData extends AbstractTestData implements VarBinaryWriteData, VarBinaryReadData {
 
     public static final class TestVarBinaryDataFactory implements TestDataFactory {
 

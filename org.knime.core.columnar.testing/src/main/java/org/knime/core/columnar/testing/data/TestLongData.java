@@ -52,7 +52,7 @@ import org.knime.core.columnar.data.LongData.LongWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestLongData extends TestData implements LongWriteData, LongReadData {
+public final class TestLongData extends AbstractTestData implements LongWriteData, LongReadData {
 
     public static final class TestLongDataFactory implements TestDataFactory {
 

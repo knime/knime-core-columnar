@@ -42,67 +42,64 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jul 6, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.columnar.testing;
 
-import java.time.LocalTime;
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
+import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWriter;
+import org.knime.core.columnar.data.dictencoding.DictEncodedRandomAccessBatchReader;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.testing.data.TestData;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestLocalTimeData extends AbstractTestData implements LocalTimeWriteData, LocalTimeReadData {
+public class TestDictEncodedBatchBuffer implements TestBatchBuffer {
+    private final TestBatchBuffer m_delegate;
 
-    public static final class TestLocalTimeDataFactory implements TestDataFactory {
-
-        public static final TestLocalTimeDataFactory INSTANCE = new TestLocalTimeDataFactory();
-
-        private TestLocalTimeDataFactory() {
-        }
-
-        @Override
-        public TestLocalTimeData createWriteData(final int capacity) {
-            return new TestLocalTimeData(capacity);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data, final int length) {
-            return new TestLocalTimeData(data, length);
-        }
-
-    }
-
-    TestLocalTimeData(final int capacity) {
-        super(capacity);
-    }
-
-    TestLocalTimeData(final Object[] localTimes, final int length) {
-        super(localTimes);
-        close(length);
+    public TestDictEncodedBatchBuffer(final TestBatchBuffer delegate) {
+        m_delegate = delegate;
     }
 
     @Override
-    public LocalTimeReadData close(final int length) {
-        closeInternal(length);
-        return this;
+    public void blockOnCreateWriteRead(final CountDownLatch latch) {
+        m_delegate.blockOnCreateWriteRead(latch);
     }
 
     @Override
-    public synchronized LocalTime getLocalTime(final int index) {
-        return (LocalTime)get()[index];
+    public List<TestData> getData() {
+        return m_delegate.getData();
+    }
+
+    @SuppressWarnings("resource")
+    @Override
+    public BatchWriter getWriter() {
+        return new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema());
     }
 
     @Override
-    public synchronized void setLocalTime(final int index, final LocalTime val) {
-        get()[index] = val;
+    public ColumnarSchema getSchema() {
+        return m_delegate.getSchema();
     }
 
+    @Override
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema());
+    }
+
+    @Override
+    public void close() throws IOException {
+        m_delegate.close();
+    }
 }

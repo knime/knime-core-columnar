@@ -52,7 +52,7 @@ import org.knime.core.columnar.data.IntData.IntWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestIntData extends TestData implements IntWriteData, IntReadData {
+public final class TestIntData extends AbstractTestData implements IntWriteData, IntReadData {
 
     public static final class TestIntDataFactory implements TestDataFactory {
 
