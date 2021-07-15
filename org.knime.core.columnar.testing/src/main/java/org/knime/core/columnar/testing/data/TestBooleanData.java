@@ -52,7 +52,7 @@ import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestBooleanData extends TestData implements BooleanWriteData, BooleanReadData {
+public final class TestBooleanData extends AbstractTestData implements BooleanWriteData, BooleanReadData {
 
     public static final class TestBooleanDataFactory implements TestDataFactory {
 

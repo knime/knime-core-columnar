@@ -45,23 +45,11 @@
  */
 package org.knime.core.columnar.testing;
 
-import static org.junit.Assert.assertEquals;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.stream.IntStream;
 
-import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.DefaultWriteBatch;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.testing.data.TestData;
-import org.knime.core.columnar.testing.data.TestDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 
 // TODO: this class duplicates code from TestBatchBuffer. Consolidate!
@@ -71,210 +59,14 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestBatchStore implements BatchStore {
+public interface TestBatchStore extends BatchStore {
 
-    private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
+    public void blockOnCreateWriteRead(final CountDownLatch latch);
 
-    private static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
+    public List<TestData> getData();
 
-    private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
-
-    private static final String ERROR_MESSAGE_STORE_CLOSED = "Column store has already been closed.";
-
-    final class TestBatchWriter implements BatchWriter {
-
-        @Override
-        public WriteBatch create(final int capacity) {
-            if (m_writerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-
-            waitForLatch();
-            final NullableWriteData[] data = new NullableWriteData[m_schema.numColumns()];
-            for (int i = 0; i < m_factories.length; i++) {
-                final TestData testData = m_factories[i].createWriteData(capacity);
-                data[i] = testData;
-                m_tracker.add(testData);
-            }
-            return new DefaultWriteBatch(data);
-        }
-
-        @Override
-        public void write(final ReadBatch batch) {
-            if (m_writerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_WRITER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-
-            waitForLatch();
-            final Object[][] data = new Object[batch.numData()][];
-            for (int i = 0; i < data.length; i++) {
-                final TestData testData = (TestData)batch.get(i);
-                data[i] = testData.get();
-            }
-            if (m_batches.isEmpty()) {
-                m_maxDataLength = batch.length();
-            }
-            if (m_maxDataLength != batch.length()) {
-                throw new IllegalStateException("All written batches must have same length.");
-            }
-            m_batches.add(data);
-        }
-
-        @Override
-        public void close() {
-            m_writerClosed = true;
-            ColumnarTest.OPEN_CLOSEABLES.remove(TestBatchWriter.this);
-        }
-
-    }
-
-    final class TestBatchReader implements RandomAccessBatchReader {
-
-        private final ColumnSelection m_selection;
-
-        private boolean m_readerClosed;
-
-        TestBatchReader(final ColumnSelection selection) {
-            m_selection = selection;
-        }
-
-        @Override
-        public ReadBatch readRetained(final int chunkIndex) {
-            if (m_readerClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
-            }
-            if (m_storeClosed) {
-                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-            }
-
-            waitForLatch();
-            final Object[][] data = m_batches.get(chunkIndex);
-            return m_selection.createBatch(i -> {
-                final TestData testData = m_factories[i].createReadData(data[i], m_maxDataLength);
-                m_tracker.add(testData);
-                return testData;
-            });
-        }
-
-        @Override
-        public void close() {
-            m_readerClosed = true;
-            ColumnarTest.OPEN_CLOSEABLES.remove(TestBatchReader.this);
-        }
-
-    }
-
-    private final ColumnarSchema m_schema;
-
-    private final TestDataFactory[] m_factories;
-
-    private final TestBatchWriter m_writer = new TestBatchWriter();
-
-    private final List<Object[][]> m_batches = new ArrayList<>();
-
-    private final List<TestData> m_tracker = new ArrayList<>();
-
-    private int m_maxDataLength = -1;
-
-    // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
-    private volatile boolean m_writerClosed;
-
-    // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
-    private volatile boolean m_storeClosed;
-
-    private CountDownLatch m_latch;
-
+    @SuppressWarnings("resource")
     public static TestBatchStore create(final ColumnarSchema schema) {
-        final TestBatchStore store = new TestBatchStore(schema);
-        ColumnarTest.OPEN_CLOSEABLES.add(store);
-        ColumnarTest.OPEN_CLOSEABLES.add(store.m_writer);
-        return store;
+        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema));
     }
-
-    private TestBatchStore(final ColumnarSchema schema) {
-        m_schema = schema;
-        m_factories = IntStream.range(0, schema.numColumns()) //
-            .mapToObj(schema::getSpec) //
-            .map(s -> s.accept(TestSchemaMapper.INSTANCE)) //
-            .toArray(TestDataFactory[]::new);
-    }
-
-    public void blockOnCreateWriteRead(final CountDownLatch latch) {
-        m_latch = latch;
-    }
-
-    private void waitForLatch() {
-        if (m_latch != null) {
-            try {
-                m_latch.await();
-            } catch (InterruptedException e) {
-                // Restore interrupted state
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException(e);
-            }
-        }
-    }
-
-    @Override
-    public ColumnarSchema getSchema() {
-        return m_schema;
-    }
-
-    @Override
-    public BatchWriter getWriter() {
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
-        return m_writer;
-    }
-
-    @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        if (!m_writerClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_WRITER_NOT_CLOSED);
-        }
-        if (m_storeClosed) {
-            throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
-        }
-
-        final TestBatchReader reader = new TestBatchReader(selection);
-        ColumnarTest.OPEN_CLOSEABLES.add(reader);
-        return reader;
-    }
-
-    @Override
-    public void close() {
-        m_writer.close();
-        m_storeClosed = true;
-
-        // check if all memory has been released before closing this store.
-        for (final TestData data : m_tracker) {
-            assertEquals("Data not closed.", 0, data.getRefs());
-        }
-
-        ColumnarTest.OPEN_CLOSEABLES.remove(this);
-        ColumnarTest.STORE_CLOSE_LATCH.countDown();
-    }
-
-    public List<TestData> getData() {
-        return m_tracker;
-    }
-
-    @Override
-    public int numBatches() {
-        return m_batches.size();
-    }
-
-    @Override
-    public int batchLength() {
-        return m_maxDataLength;
-    }
-
 }

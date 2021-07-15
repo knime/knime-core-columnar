@@ -45,64 +45,61 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import java.time.LocalTime;
+import java.util.Map;
 
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryWriteData;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestLocalTimeData extends AbstractTestData implements LocalTimeWriteData, LocalTimeReadData {
+public final class TestDictEncodedVarBinaryData extends AbstractTestDictEncodedObjectData implements DictEncodedVarBinaryWriteData, DictEncodedVarBinaryReadData {
 
-    public static final class TestLocalTimeDataFactory implements TestDataFactory {
+    public static final class TestDictEncodedVarBinaryDataFactory implements TestDataFactory {
 
-        public static final TestLocalTimeDataFactory INSTANCE = new TestLocalTimeDataFactory();
+        public static final TestDictEncodedVarBinaryDataFactory INSTANCE = new TestDictEncodedVarBinaryDataFactory();
 
-        private TestLocalTimeDataFactory() {
+        private TestDictEncodedVarBinaryDataFactory() {
         }
 
         @Override
-        public TestLocalTimeData createWriteData(final int capacity) {
-            return new TestLocalTimeData(capacity);
+        public TestDictEncodedVarBinaryData createWriteData(final int capacity) {
+            return new TestDictEncodedVarBinaryData(capacity);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public TestDictEncodedVarBinaryData createReadData(final Object[] packedData) {
+            return new TestDictEncodedVarBinaryData((Integer[])packedData[0], (Map<Integer, Object>)packedData[1]);
         }
 
         @Override
-        public TestLocalTimeData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data, final int length) {
-            return new TestLocalTimeData(data, length);
+        public TestData createReadData(final Object[] packedData, final int length) {
+            return createReadData(packedData);
         }
 
     }
 
-    TestLocalTimeData(final int capacity) {
+    TestDictEncodedVarBinaryData(final int capacity) {
         super(capacity);
     }
 
-    TestLocalTimeData(final Object[] localTimes, final int length) {
-        super(localTimes);
-        close(length);
+    TestDictEncodedVarBinaryData(final Integer[] references, final Map<Integer, Object> dictionary) {
+        super(references, dictionary);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> T getDictEntry(final int dictionaryIndex, final ObjectDeserializer<T> deserializer) {
+        return (T)m_dict.get(dictionaryIndex);
     }
 
     @Override
-    public LocalTimeReadData close(final int length) {
-        closeInternal(length);
-        return this;
-    }
-
-    @Override
-    public synchronized LocalTime getLocalTime(final int index) {
-        return (LocalTime)get()[index];
-    }
-
-    @Override
-    public synchronized void setLocalTime(final int index, final LocalTime val) {
-        get()[index] = val;
+    public <T> void setDictEntry(final int dictionaryIndex, final T obj, final ObjectSerializer<T> serializer) {
+        m_dict.put(dictionaryIndex, obj);
     }
 
 }

@@ -52,7 +52,7 @@ import org.knime.core.columnar.data.StringData.StringWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestStringData extends TestData implements StringWriteData, StringReadData {
+public final class TestStringData extends AbstractTestData implements StringWriteData, StringReadData {
 
     public static final class TestStringDataFactory implements TestDataFactory {
 

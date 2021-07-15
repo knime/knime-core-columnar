@@ -42,81 +42,119 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jun 28, 2021 (chaubold): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.columnar.data.dictencoding;
 
-import java.util.Arrays;
-import java.util.Objects;
+import java.util.HashMap;
 
-import org.knime.core.columnar.data.ListData.ListReadData;
-import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * Base implementation for DictEncodedData
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public final class TestListData extends AbstractTestData implements ListWriteData, ListReadData {
+final class AbstractDictDecodedObjectData {
+    AbstractDictDecodedObjectData()
+    {
+    }
 
-    public static final class TestListDataFactory implements TestDataFactory {
+    abstract static class AbstractDictDecodedObjectReadData<O> implements NullableReadData
+    {
+        protected final HashMap<Integer, O> m_dict = new HashMap<>();
 
-        private final TestDataFactory m_inner;
+        protected final DictEncodedReadData m_delegate;
 
-        public TestListDataFactory(final TestDataFactory inner) {
-            m_inner = inner;
+        AbstractDictDecodedObjectReadData(final DictEncodedReadData delegate)
+        {
+            m_delegate = delegate;
+        }
+
+        // TODO: allow construction from a non-empty dict and reuse existing entries!
+
+        @Override
+        public boolean isMissing(final int index) {
+            return m_delegate.isMissing(index);
         }
 
         @Override
-        public TestListData createWriteData(final int capacity) {
-            return new TestListData(new TestData[capacity], m_inner, -1, false);
+        public int length() {
+            return m_delegate.length();
         }
 
         @Override
-        public TestListData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
+        public void retain() {
+            m_delegate.retain();
         }
 
         @Override
-        public TestListData createReadData(final Object[] data, final int length) {
-            return new TestListData(data, m_inner, length, true);
+        public void release() {
+            m_delegate.release();
         }
 
-    }
+        @Override
+        public long sizeOf() {
+            return m_delegate.sizeOf();
+        }
 
-    private final TestDataFactory m_inner;
-
-    TestListData(final Object[] lists, final TestDataFactory inner, final int length, final boolean close) {
-        super(lists);
-        m_inner = inner;
-        if (close) {
-            close(length);
+        public NullableReadData getDelegate() {
+            return m_delegate;
         }
     }
 
-    @Override
-    public ListReadData close(final int length) {
-        closeInternal(length);
-        return this;
-    }
+    abstract static class AbstractDictDecodedObjectWriteData<O> implements NullableWriteData
+    {
+        protected final DictEncodedWriteData m_delegate;
 
-    @Override
-    public long sizeOf() {
-        return Arrays.stream(get()).filter(Objects::nonNull).map(o -> (TestData)(o)).mapToLong(TestData::sizeOf).sum();
-    }
+        final HashMap<O, Integer> m_dict = new HashMap<>();
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public <C extends NullableReadData> C createReadData(final int index) {
-        return (C)get()[index];
-    }
+        protected int m_nextDictEntry = 0;
 
-    @Override
-    public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
-        @SuppressWarnings("unchecked")
-        final C data = (C)m_inner.createWriteData(size);
-        get()[index] = data;
-        return data;
-    }
+        AbstractDictDecodedObjectWriteData(final DictEncodedWriteData delegate)
+        {
+            m_delegate = delegate;
+        }
 
+        // TODO: allow construction from a non-empty dict and reuse existing entries?
+
+        @Override
+        public void setMissing(final int index) {
+            m_delegate.setMissing(index);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            m_delegate.expand(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_delegate.capacity();
+        }
+
+        @Override
+        public void retain() {
+            m_delegate.retain();
+        }
+
+        @Override
+        public void release() {
+            m_delegate.release();
+        }
+
+        @Override
+        public long sizeOf() {
+            return m_delegate.sizeOf();
+        }
+
+        public NullableWriteData getDelegate() {
+            return m_delegate;
+        }
+    }
 }

@@ -54,7 +54,7 @@ import org.knime.core.columnar.data.DurationData.DurationWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestDurationData extends TestData implements DurationWriteData, DurationReadData {
+public final class TestDurationData extends AbstractTestData implements DurationWriteData, DurationReadData {
 
     public static final class TestDurationDataFactory implements TestDataFactory {
 

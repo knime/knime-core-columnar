@@ -42,67 +42,64 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jun 28, 2021 (chaubold): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.columnar.data.dictencoding;
 
-import java.time.LocalTime;
+import java.io.DataInput;
+import java.io.DataOutput;
 
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.WriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * Class holding {@link WriteData} and {@link ReadData} for data holding dictionary encoded
+ * elements.
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public final class TestLocalTimeData extends AbstractTestData implements LocalTimeWriteData, LocalTimeReadData {
+public final class DictEncodedVarBinaryData {
 
-    public static final class TestLocalTimeDataFactory implements TestDataFactory {
-
-        public static final TestLocalTimeDataFactory INSTANCE = new TestLocalTimeDataFactory();
-
-        private TestLocalTimeDataFactory() {
-        }
-
-        @Override
-        public TestLocalTimeData createWriteData(final int capacity) {
-            return new TestLocalTimeData(capacity);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data, final int length) {
-            return new TestLocalTimeData(data, length);
-        }
-
+    private DictEncodedVarBinaryData() {
     }
 
-    TestLocalTimeData(final int capacity) {
-        super(capacity);
+    /**
+     * {@link WriteData} that stores objects using a dictionary encoding
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public interface DictEncodedVarBinaryWriteData extends DictEncodedWriteData {
+        /**
+         * Set the dictionary entry for a given index.
+         * Objects MUST BE ADDED BY INCREASING INDEX, or the offset buffer will be corrupted... meh.
+         * @param <T> The type of the dictionary entry
+         * @param dictionaryIndex The dictionary index
+         * @param dictEntry The dictionary entry that will be inserted at the specified index
+         * @param serializer A serializer for the object into a {@link DataOutput}.
+         */
+        public <T> void setDictEntry(final int dictionaryIndex, final T dictEntry, final ObjectSerializer<T> serializer);
     }
 
-    TestLocalTimeData(final Object[] localTimes, final int length) {
-        super(localTimes);
-        close(length);
-    }
-
-    @Override
-    public LocalTimeReadData close(final int length) {
-        closeInternal(length);
-        return this;
-    }
-
-    @Override
-    public synchronized LocalTime getLocalTime(final int index) {
-        return (LocalTime)get()[index];
-    }
-
-    @Override
-    public synchronized void setLocalTime(final int index, final LocalTime val) {
-        get()[index] = val;
+    /**
+     * {@link ReadData} holding dictionary encoded objects.
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public interface DictEncodedVarBinaryReadData extends DictEncodedReadData {
+        /**
+         * Return the dictionary entry for a given index.
+         * @param <T> The type of the dictionary entry
+         * @param dictionaryIndex The dictionary index
+         * @param deserializer A deserializer for the object from a {@link DataInput}.
+         * @return the dictionary entry
+         */
+        public <T> T getDictEntry(final int dictionaryIndex, final ObjectDeserializer<T> deserializer);
     }
 
 }

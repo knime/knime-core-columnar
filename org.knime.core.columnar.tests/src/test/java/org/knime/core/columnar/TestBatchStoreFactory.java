@@ -50,7 +50,8 @@ import java.nio.file.Path;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.testing.TestBatchStore;
+import org.knime.core.columnar.testing.DefaultTestBatchStore;
+import org.knime.core.columnar.testing.TestDictEncodedBatchStore;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -59,9 +60,10 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 public final class TestBatchStoreFactory implements ColumnStoreFactory {
 
+    @SuppressWarnings("resource")
     @Override
     public BatchStore createStore(final ColumnarSchema schema, final Path path) {
-        return TestBatchStore.create(schema);
+        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema));
     }
 
     @Override

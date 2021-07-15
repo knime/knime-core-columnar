@@ -54,7 +54,7 @@ import org.knime.core.columnar.data.LocalDateData.LocalDateWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestLocalDateData extends TestData implements LocalDateWriteData, LocalDateReadData {
+public final class TestLocalDateData extends AbstractTestData implements LocalDateWriteData, LocalDateReadData {
 
     public static final class TestLocalDateDataFactory implements TestDataFactory {
 

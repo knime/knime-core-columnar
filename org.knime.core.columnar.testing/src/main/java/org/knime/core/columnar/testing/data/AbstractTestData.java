@@ -42,67 +42,98 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jul 6, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.testing.data;
 
-import java.time.LocalTime;
-
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
-
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public final class TestLocalTimeData extends AbstractTestData implements LocalTimeWriteData, LocalTimeReadData {
+public abstract class AbstractTestData implements TestData {
+    private int m_refs = 1;
 
-    public static final class TestLocalTimeDataFactory implements TestDataFactory {
+    private int m_size;
 
-        public static final TestLocalTimeDataFactory INSTANCE = new TestLocalTimeDataFactory();
+    private Object[] m_values;
 
-        private TestLocalTimeDataFactory() {
-        }
-
-        @Override
-        public TestLocalTimeData createWriteData(final int capacity) {
-            return new TestLocalTimeData(capacity);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestLocalTimeData createReadData(final Object[] data, final int length) {
-            return new TestLocalTimeData(data, length);
-        }
-
+    AbstractTestData(final int capacity) {
+        this(new Object[capacity]);
     }
 
-    TestLocalTimeData(final int capacity) {
-        super(capacity);
+    AbstractTestData(final Object[] objects) {
+        this(objects, objects.length);
     }
 
-    TestLocalTimeData(final Object[] localTimes, final int length) {
-        super(localTimes);
-        close(length);
+    AbstractTestData(final Object[] objects, final int size) {
+        m_values = objects;
+        m_size = size;
     }
 
     @Override
-    public LocalTimeReadData close(final int length) {
-        closeInternal(length);
-        return this;
+    public final synchronized void release() {
+        m_refs--;
     }
 
     @Override
-    public synchronized LocalTime getLocalTime(final int index) {
-        return (LocalTime)get()[index];
+    public final synchronized void retain() {
+        if (m_refs > 0) {
+            m_refs++;
+        } else {
+            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
+        }
     }
 
     @Override
-    public synchronized void setLocalTime(final int index, final LocalTime val) {
-        get()[index] = val;
+    public final synchronized int getRefs() {
+        return m_refs;
+    }
+
+    @Override
+    public long sizeOf() {
+        return length();
+    }
+
+    @Override
+    public final int capacity() {
+        return m_size;
+    }
+
+    @Override
+    public void expand(final int minimumCapacity) {
+        final Object[] expanded = new Object[minimumCapacity];
+        System.arraycopy(m_values, 0, expanded, 0, capacity());
+        m_values = expanded;
+        m_size = minimumCapacity;
+    }
+
+    @Override
+    public synchronized void setMissing(final int index) {
+        m_values[index] = null;
+    }
+
+    @Override
+    public synchronized boolean isMissing(final int index) {
+        return m_values[index] == null;
+    }
+
+    @Override
+    public final int length() {
+        return m_size;
+    }
+
+    final void closeInternal(final int length) {
+        if (getRefs() != 1) {
+            throw new IllegalStateException("Closed with outstanding references.");
+        }
+        m_size = length;
+    }
+
+    @Override
+    public final Object[] get() {
+        return m_values;
     }
 
 }

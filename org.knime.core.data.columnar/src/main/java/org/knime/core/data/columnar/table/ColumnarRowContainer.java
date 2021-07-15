@@ -56,6 +56,7 @@ import java.util.Map;
 
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.data.dictencoding.DictEncodedBatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
@@ -125,7 +126,8 @@ final class ColumnarRowContainer implements RowContainer {
 
         m_path = DataContainer.createTempFile(".knable").toPath();
 
-        m_cached = new CachedBatchWritableReadable<BatchStore>(m_storeFactory.createStore(schema, m_path));
+        final var dictEncodedBatchStore = new DictEncodedBatchStore(m_storeFactory.createStore(schema, m_path));
+        m_cached = new CachedBatchWritableReadable<BatchStore>(dictEncodedBatchStore);
         final BatchWritable wrappedWritable = settings.isCheckDuplicateRowKeys() ? new DuplicateCheckWritable(m_cached,
             new DuplicateChecker(), ColumnarPreferenceUtils.getDuplicateCheckExecutor()) : m_cached;
 
