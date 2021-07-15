@@ -87,6 +87,7 @@ import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * A static class with utility methods for arrow tests.
@@ -119,12 +120,14 @@ public final class ArrowTestUtils {
      * @param width the number of columns
      * @return the schema
      */
-    public static ColumnarSchema createWideSchema(final DataSpec type, final int width) {
+    public static ColumnarSchema createWideSchema(final DataSpec type, final DataTraits trait, final int width) {
         final DataSpec[] types = new DataSpec[width];
+        final DataTraits[] traits = new DataTraits[width];
         for (int i = 0; i < width; i++) {
             types[i] = type;
+            traits[i] = trait;
         }
-        return new DefaultColumnarSchema(types);
+        return new DefaultColumnarSchema(types, traits);
     }
 
     /**

@@ -51,6 +51,8 @@ package org.knime.core.columnar.arrow;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
+import java.util.Arrays;
+
 import org.junit.Test;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
@@ -74,6 +76,10 @@ import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
+import org.knime.core.table.schema.traits.DefaultListDataTraits;
+import org.knime.core.table.schema.traits.DefaultStructDataTraits;
 
 /**
  * Test the ArrowSchemaMapper.
@@ -207,12 +213,20 @@ public class ArrowSchemaMapperTest {
     /** Test mapping multiple columns of different specs. */
     @Test
     public void testMappingMultipleColumns() {
-        final ColumnarSchema schema = new DefaultColumnarSchema( //
+        final var specs = new DataSpec[] {//
             DataSpec.doubleSpec(), //
             DataSpec.longSpec(), //
             DataSpec.doubleSpec(), //
             DataSpec.intSpec() //
-        );
+        };
+        final var traits = new DataTraits[] {//
+            DefaultDataTraits.EMPTY,
+            DefaultDataTraits.EMPTY,
+            DefaultDataTraits.EMPTY,
+            DefaultDataTraits.EMPTY
+        };
+
+        final ColumnarSchema schema = new DefaultColumnarSchema(specs, traits);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(4, factories.length);
         assertSame(ArrowDoubleDataFactory.INSTANCE, factories[0]);
@@ -223,9 +237,21 @@ public class ArrowSchemaMapperTest {
 
     /** Test mapping a single column of the given spec. */
     private static void testMapSingleSpec(final DataSpec spec, final ArrowColumnDataFactory expectedFactory) {
-        final ColumnarSchema schema = new DefaultColumnarSchema(spec);
+        var traits = createTraitsForSpec(spec);
+        final ColumnarSchema schema = new DefaultColumnarSchema(spec, traits);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
         assertEquals(expectedFactory, factories[0]);
+    }
+
+    private static DataTraits createTraitsForSpec(final DataSpec spec) {
+        if (spec instanceof StructDataSpec) {
+            var innerTraits = Arrays.stream(((StructDataSpec)spec).getInner()).map(ArrowSchemaMapperTest::createTraitsForSpec).toArray(DataTraits[]::new);
+            return new DefaultStructDataTraits(innerTraits);
+        } else if (spec instanceof ListDataSpec) {
+            var innerTraits = createTraitsForSpec(((ListDataSpec)spec).getInner());
+            return new DefaultListDataTraits(innerTraits);
+        }
+        return DefaultDataTraits.EMPTY;
     }
 }

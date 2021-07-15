@@ -61,6 +61,7 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * A long running test allocating, writing and reading many chunks.
@@ -90,7 +91,7 @@ public class ArrowMemoryTest {
             pool.submit(() -> {
                 final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
                 final ColumnarSchema schema =
-                    ArrowTestUtils.createWideSchema(DataSpec.doubleSpec(), numColumns);
+                    ArrowTestUtils.createWideSchema(DataSpec.doubleSpec(), DefaultDataTraits.EMPTY, numColumns);
 
                 try (final BatchStore store =
                     factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowPath())) {

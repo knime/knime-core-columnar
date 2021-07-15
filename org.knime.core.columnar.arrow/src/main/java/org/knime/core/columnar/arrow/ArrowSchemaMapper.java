@@ -49,6 +49,8 @@ import java.util.stream.IntStream;
 
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDurationData.ArrowDurationDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
@@ -70,7 +72,7 @@ import org.knime.core.table.schema.BooleanDataSpec;
 import org.knime.core.table.schema.ByteDataSpec;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.DataSpec.Mapper;
+import org.knime.core.table.schema.DataSpec.MapperWithTraits;
 import org.knime.core.table.schema.DoubleDataSpec;
 import org.knime.core.table.schema.DurationDataSpec;
 import org.knime.core.table.schema.FloatDataSpec;
@@ -86,6 +88,10 @@ import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.VoidDataSpec;
 import org.knime.core.table.schema.ZonedDateTimeDataSpec;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.ListDataTraits;
+import org.knime.core.table.schema.traits.StructDataTraits;
 
 /**
  * Utility class to map a {@link ColumnarSchema} to an array of {@link ArrowColumnDataFactory}. The factories can be
@@ -95,7 +101,7 @@ import org.knime.core.table.schema.ZonedDateTimeDataSpec;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
+final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory> {
 
     private static final ArrowSchemaMapper INSTANCE = new ArrowSchemaMapper();
 
@@ -112,8 +118,7 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
      */
     static ArrowColumnDataFactory[] map(final ColumnarSchema schema) {
         return IntStream.range(0, schema.numColumns()) //
-            .mapToObj(schema::getSpec) //
-            .map(ArrowSchemaMapper::map) //
+            .mapToObj(i -> map(schema.getSpec(i), schema.getTraits(i)))
             .toArray(ArrowColumnDataFactory[]::new);
     }
 
@@ -124,98 +129,105 @@ final class ArrowSchemaMapper implements Mapper<ArrowColumnDataFactory> {
      * @param spec the spec of the column
      * @return the factory
      */
-    static ArrowColumnDataFactory map(final DataSpec spec) {
-        return spec.accept(INSTANCE);
+    static ArrowColumnDataFactory map(final DataSpec spec, final DataTraits traits) {
+        return spec.accept(INSTANCE, traits);
     }
 
     @Override
-    public ArrowBooleanDataFactory visit(final BooleanDataSpec spec) {
+    public ArrowBooleanDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
         return ArrowBooleanDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowByteDataFactory visit(final ByteDataSpec spec) {
+    public ArrowByteDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
         return ArrowByteDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowDoubleDataFactory visit(final DoubleDataSpec spec) {
+    public ArrowDoubleDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
         return ArrowDoubleDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowDurationDataFactory visit(final DurationDataSpec spec) {
+    public ArrowDurationDataFactory visit(final DurationDataSpec spec, final DataTraits traits) {
         return ArrowDurationDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowFloatDataFactory visit(final FloatDataSpec spec) {
+    public ArrowFloatDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
         return ArrowFloatDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowIntDataFactory visit(final IntDataSpec spec) {
+    public ArrowIntDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
         return ArrowIntDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowLocalDateDataFactory visit(final LocalDateDataSpec spec) {
+    public ArrowLocalDateDataFactory visit(final LocalDateDataSpec spec, final DataTraits traits) {
         return ArrowLocalDateDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowLocalDateTimeDataFactory visit(final LocalDateTimeDataSpec spec) {
+    public ArrowLocalDateTimeDataFactory visit(final LocalDateTimeDataSpec spec, final DataTraits traits) {
         return ArrowLocalDateTimeDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowLocalTimeDataFactory visit(final LocalTimeDataSpec spec) {
+    public ArrowLocalTimeDataFactory visit(final LocalTimeDataSpec spec, final DataTraits traits) {
         return ArrowLocalTimeDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowLongDataFactory visit(final LongDataSpec spec) {
+    public ArrowLongDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
         return ArrowLongDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowPeriodDataFactory visit(final PeriodDataSpec spec) {
+    public ArrowPeriodDataFactory visit(final PeriodDataSpec spec, final DataTraits traits) {
         return ArrowPeriodDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowVarBinaryDataFactory visit(final VarBinaryDataSpec spec) {
+    public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
+        if (DictEncodingTrait.isEnabled(traits)) {
+            return ArrowDictEncodedVarBinaryDataFactory.INSTANCE;
+        }
         return ArrowVarBinaryDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowVoidDataFactory visit(final VoidDataSpec spec) {
+    public ArrowVoidDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
         return ArrowVoidDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowStructDataFactory visit(final StructDataSpec spec) {
+    public ArrowStructDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
         final DataSpec[] innerSpecs = spec.getInner();
+        final DataTraits[] innerTraits = traits.getInner();
         final ArrowColumnDataFactory[] innerFactories = new ArrowColumnDataFactory[innerSpecs.length];
         for (int i = 0; i < innerSpecs.length; i++) {
-            innerFactories[i] = ArrowSchemaMapper.map(innerSpecs[i]);
+            innerFactories[i] = ArrowSchemaMapper.map(innerSpecs[i], innerTraits[i]);
         }
         return new ArrowStructDataFactory(innerFactories);
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec) {
-        final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner());
+    public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
+        final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
         return new ArrowListDataFactory(inner);
     }
 
     @Override
-    public ArrowZonedDateTimeDataFactory visit(final ZonedDateTimeDataSpec spec) {
+    public ArrowZonedDateTimeDataFactory visit(final ZonedDateTimeDataSpec spec, final DataTraits traits) {
         return ArrowZonedDateTimeDataFactory.INSTANCE;
     }
 
     @Override
-    public ArrowStringDataFactory visit(final StringDataSpec spec) {
+    public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
+        if (DictEncodingTrait.isEnabled(traits)) {
+            return ArrowDictEncodedStringDataFactory.INSTANCE;
+        }
         return ArrowStringDataFactory.INSTANCE;
     }
 }

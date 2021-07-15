@@ -85,6 +85,7 @@ import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Test {@link ArrowColumnStoreFactory}, ArrowColumnReadStore and ArrowColumnStore.
@@ -178,7 +179,8 @@ public class ArrowColumnStoreTest {
     @Test
     public void testReadBeforeFullyWritten() throws IOException {
         final int chunkSize = 64;
-        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec());
+        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
+        final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
 
         // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator();
@@ -341,7 +343,8 @@ public class ArrowColumnStoreTest {
     @Test
     public void testPartialFileBatchReadable() throws IOException {
         final int chunkSize = 64;
-        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec());
+        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
+        final Path path = ArrowTestUtils.createTmpKNIMEArrowPath();
 
         try (final RootAllocator allocator = new RootAllocator()) {
             final ArrowColumnStoreFactory factory =
@@ -433,7 +436,7 @@ public class ArrowColumnStoreTest {
     @SuppressWarnings("resource")
     private static void testCreateWriterReader(final ColumnStoreFactory factory) throws IOException {
         final int chunkSize = 64;
-        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.doubleSpec());
+        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.doubleSpec(), DefaultDataTraits.EMPTY);
 
         // Use the write store to write some data
         try (final BatchStore writeStore = factory.createStore(schema, writePath)) {
