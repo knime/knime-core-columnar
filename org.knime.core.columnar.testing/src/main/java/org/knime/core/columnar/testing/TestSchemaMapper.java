@@ -48,7 +48,7 @@
  */
 package org.knime.core.columnar.testing;
 
-import java.util.Arrays;
+import java.util.stream.IntStream;
 
 import org.knime.core.columnar.testing.data.TestBooleanData.TestBooleanDataFactory;
 import org.knime.core.columnar.testing.data.TestByteData.TestByteDataFactory;
@@ -70,7 +70,7 @@ import org.knime.core.columnar.testing.data.TestVoidData.TestVoidDataFactory;
 import org.knime.core.columnar.testing.data.TestZonedDateTimeData.TestZonedDateTimeDataFactory;
 import org.knime.core.table.schema.BooleanDataSpec;
 import org.knime.core.table.schema.ByteDataSpec;
-import org.knime.core.table.schema.DataSpec.Mapper;
+import org.knime.core.table.schema.DataSpec.MapperWithTraits;
 import org.knime.core.table.schema.DoubleDataSpec;
 import org.knime.core.table.schema.DurationDataSpec;
 import org.knime.core.table.schema.FloatDataSpec;
@@ -86,11 +86,15 @@ import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.VoidDataSpec;
 import org.knime.core.table.schema.ZonedDateTimeDataSpec;
+import org.knime.core.table.schema.traits.DataTrait;
+import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.ListDataTraits;
+import org.knime.core.table.schema.traits.StructDataTraits;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class TestSchemaMapper implements Mapper<TestDataFactory> {
+final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
 
     static final TestSchemaMapper INSTANCE = new TestSchemaMapper();
 
@@ -98,88 +102,90 @@ final class TestSchemaMapper implements Mapper<TestDataFactory> {
     }
 
     @Override
-    public TestDataFactory visit(final BooleanDataSpec spec) {
+    public TestDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
         return TestBooleanDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final ByteDataSpec spec) {
+    public TestDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
         return TestByteDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final DoubleDataSpec spec) {
+    public TestDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
         return TestDoubleDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final DurationDataSpec spec) {
+    public TestDataFactory visit(final DurationDataSpec spec, final DataTraits traits) {
         return TestDurationDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final FloatDataSpec spec) {
+    public TestDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
         return TestFloatDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final IntDataSpec spec) {
+    public TestDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
         return TestIntDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final LocalDateDataSpec spec) {
+    public TestDataFactory visit(final LocalDateDataSpec spec, final DataTraits traits) {
         return TestLocalDateDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final LocalDateTimeDataSpec spec) {
+    public TestDataFactory visit(final LocalDateTimeDataSpec spec, final DataTraits traits) {
         return TestLocalDateTimeDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final LocalTimeDataSpec spec) {
+    public TestDataFactory visit(final LocalTimeDataSpec spec, final DataTraits traits) {
         return TestLocalTimeDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final LongDataSpec spec) {
+    public TestDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
         return TestLongDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final PeriodDataSpec spec) {
+    public TestDataFactory visit(final PeriodDataSpec spec, final DataTraits traits) {
         return TestPeriodDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final VarBinaryDataSpec spec) {
+    public TestDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         return TestVarBinaryDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final VoidDataSpec spec) {
+    public TestDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
         return TestVoidDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final StructDataSpec spec) {
+    public TestDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
         return new TestStructDataFactory(
-            Arrays.stream(spec.getInner()).map(s -> s.accept(this)).toArray(TestDataFactory[]::new));
+            IntStream.range(0, spec.getInner().length)
+            .mapToObj(i -> spec.getInner()[i].accept(this, traits.getInner()[i]))
+            .toArray(TestDataFactory[]::new));
     }
 
     @Override
-    public TestDataFactory visit(final ListDataSpec listDataSpec) {
-        return new TestListDataFactory(listDataSpec.getInner().accept(this));
+    public TestDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
+        return new TestListDataFactory(listDataSpec.getInner().accept(this, traits.getInner()));
     }
 
     @Override
-    public TestDataFactory visit(final ZonedDateTimeDataSpec spec) {
+    public TestDataFactory visit(final ZonedDateTimeDataSpec spec, final DataTraits traits) {
         return TestZonedDateTimeDataFactory.INSTANCE;
     }
 
     @Override
-    public TestDataFactory visit(final StringDataSpec spec) {
+    public TestDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         return TestStringDataFactory.INSTANCE;
     }
 }

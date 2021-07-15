@@ -56,6 +56,7 @@ import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.traits.DataTraits;
 
 import com.google.common.collect.Iterators;
 
@@ -63,6 +64,7 @@ import com.google.common.collect.Iterators;
  * Default implementation of a {@link ColumnarValueSchema}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
@@ -70,9 +72,12 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final List<DataSpec> m_specs;
 
+    private final List<DataTraits> m_traits;
+
     DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
         m_specs = Stream.of(source.getValueFactories()).map(ValueFactory::getSpec).collect(Collectors.toList());
+        m_traits = Stream.of(source.getValueFactories()).map(ValueFactory::getTraits).collect(Collectors.toList());
     }
 
     @Override
@@ -129,6 +134,20 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
             return false;
         }
         return Iterators.elementsEqual(iterator(), other.iterator());
+    }
+
+    @Override
+    public DataTraits getTraits(final int index) {
+        if (index < 0) {
+            throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
+        }
+        if (index >= numColumns()) {
+            throw new IndexOutOfBoundsException(
+                String.format("Column index %d greater or equal to the reader's largest column index (%d).", index,
+                    numColumns() - 1));
+        }
+
+        return m_traits.get(index);
     }
 
 }

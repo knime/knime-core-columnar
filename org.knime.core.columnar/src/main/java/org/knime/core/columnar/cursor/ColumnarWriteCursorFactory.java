@@ -138,8 +138,7 @@ public final class ColumnarWriteCursorFactory {
 
             final ColumnarSchema schema = store.getSchema();
             m_accesses = IntStream.range(0, schema.numColumns())//
-                .mapToObj(schema::getSpec)//
-                .map(ColumnarAccessFactoryMapper::createAccessFactory)//
+                .mapToObj(i -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(i)))//
                 .map(f -> f.createWriteAccess(this))//
                 .toArray(ColumnarWriteAccess[]::new);
             switchToNextData();
