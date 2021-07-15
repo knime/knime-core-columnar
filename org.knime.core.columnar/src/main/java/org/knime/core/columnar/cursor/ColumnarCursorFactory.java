@@ -93,9 +93,8 @@ public final class ColumnarCursorFactory {
         final int lastIndexInLastBatch) {
 
         final ColumnarSchema schema = store.getSchema();
-        final ColumnarAccessFactory[] accessFactories = IntStream.range(0, schema.numColumns()) //
-            .mapToObj(schema::getSpec) //
-            .map(ColumnarAccessFactoryMapper::createAccessFactory) //
+        final ColumnarAccessFactory[] accessFactories = IntStream.range(0, schema.numColumns())//
+            .mapToObj(i -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(i)))//
             .toArray(ColumnarAccessFactory[]::new);
 
         return new DefaultColumnarCursor(store, selection, accessFactories, firstBatchIndex, lastBatchIndex,

@@ -73,7 +73,7 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
     /**
      * @param inner the specs of the inner elements
      */
-    ColumnarStructAccessFactory(final DataSpec... specs) {
+    ColumnarStructAccessFactory(final DataSpec[] specs) {
         m_inner = new ColumnarAccessFactory[specs.length];
         for (int i = 0; i < specs.length; i++) {
             m_inner[i] = ColumnarAccessFactoryMapper.createAccessFactory(specs[i]);

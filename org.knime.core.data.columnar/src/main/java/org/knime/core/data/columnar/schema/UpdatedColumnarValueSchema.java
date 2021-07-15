@@ -54,6 +54,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * {@link ColumnarValueSchema} that is based on another schema, but has an updated {@link DataTableSpec}.
@@ -109,6 +110,10 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     @Override
     public boolean equals(final Object obj) {
         return m_delegate.equals(obj);
+    }
+    
+    public DataTraits getTraits(final int index) {
+        return m_delegate.getTraits(index);
     }
 
 }
