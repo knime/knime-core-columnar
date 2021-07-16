@@ -629,7 +629,7 @@ public final class TestBatchStoreUtils {
         return new DefaultColumnarSchema(columnSpecs, columnTraits);
     }
 
-    private static ColumnarSchema createDefaultSchema() {
+    public static ColumnarSchema createDefaultSchema() {
         return createSchema(DEF_NUM_COLUMNS);
     }
 
