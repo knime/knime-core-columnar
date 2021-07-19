@@ -60,6 +60,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * {@link CachedWriteData} wraps a delegate data object and performs the serialization asynchronously
+ * using chained {@link CompletableFuture}s. When a {@link CachedWriteData} is closed, it creates a
+ * {@link CachedReadData}, but continues serializing asynchronously if needed. Only when
+ * closeWriteDelegate() is closed we block and wait for the serialization to finish.
+ *
+ * Call flush if you need all data written to the delegate.
+ *
+ * The interface of {@link CachedWriteData} is *not* thread safe, do not call set(), expand(), flush() and close()
+ * concurrently.
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 abstract class CachedWriteData<W extends NullableWriteData, R extends NullableReadData, T>
@@ -130,10 +141,12 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
             return m_data;
         }
 
-        synchronized R close() {
-            CachedWriteData.this.serialize();
+        // MUST BE CALLED!
+        synchronized R closeWriteDelegate() {
 
-            m_readDelegate = closeDelegate(m_length);
+            CachedWriteData.this.waitForAndGetFuture();
+
+            m_readDelegate = CachedWriteData.this.closeDelegate(m_length);
             if (m_numRetainsPriorSerialize > 0) {
                 for (int i = 0; i < m_numRetainsPriorSerialize; i++) {
                     m_readDelegate.retain();
@@ -156,21 +169,16 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
     private final ExecutorService m_executor;
 
     // the index up to which data has been set
-    // this is volatile to ensure happens-before ordering (thread visibility): values visible to the "setter" thread
-    // when setting m_setIndex will also be visible to "serializer" threads when getting m_setIndex
-    private volatile int m_setIndex = -1;
+    private int m_setIndex = -1;
 
-    // the index up to which data has been serialized
-    private int m_serializeIndex = -1;
-
-    // the index at which the next serialization thread is launched
-    private int m_nextSerializationIndex = m_serializeIndex + SERIALIZATION_DELAY;
+    // the index up to which data serialization has been dispatched
+    private int m_highestDispatchedSerializationIndex = -1;
 
     // the serialization future
     private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
-    // a flag that denotes whether we are currently flushing
-    private boolean m_flushing = false;
+    // remember whether this data has been closed already, to prevent double close
+    private boolean m_closed = false;
 
     CachedWriteData(final W delegate, final T[] data, final ExecutorService executor) {
         m_delegate = delegate;
@@ -186,17 +194,18 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     @Override
     public int capacity() {
-        return m_delegate.capacity();
+        // we return m_data.length because that is always in sync with m_delegate.capacity()
+        return m_data.length;
     }
 
     @Override
     public void retain() {
-        m_delegate.retain();
+        m_future = m_future.thenRunAsync(m_delegate::retain, m_executor);
     }
 
     @Override
     public void release() {
-        m_delegate.release();
+        m_future = m_future.thenRunAsync(m_delegate::release, m_executor);
     }
 
     @Override
@@ -207,67 +216,85 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     @Override
     public void expand(final int minimumCapacity) {
-        m_delegate.expand(minimumCapacity);
-        m_data = Arrays.copyOf(m_data, m_delegate.capacity());
+        // we immediately make sure the data array can hold more memory
+        m_data = Arrays.copyOf(m_data, minimumCapacity);
+
+        // But we wait for all current serialization tasks to finish before
+        // expanding (hence reallocating) the delegate data buffer to prevent race conditions.
+        // The range of values that is already queued for serialization must fit into the
+        // delegate at the time expand() is called, so this should be fine.
+        m_future = m_future.thenRunAsync(() -> {
+            if (m_delegate.capacity() < minimumCapacity) {
+                m_delegate.expand(minimumCapacity);
+            }
+        }, m_executor);
     }
 
     @Override
     public void flush() {
-        m_flushing = true;
-        try {
-            // since serialize is synchronized, we wait for a currently running serialization thread (if there is one)
-            serialize();
-        } finally {
-            m_flushing = false;
+        if (m_future.isDone()) {
+            waitForAndGetFuture();
+        }
+        dispatchSerialization();
+        waitForAndGetFuture();
+    }
+
+    /**
+     * Serialize a range of data elements from the m_data cache to the delegate
+     * @param start first index to serialize, inclusive
+     * @param end index one past the last index to serialize = exclusive upper bound
+     */
+    void serializeRange(final int start, final int end) {
+        for (int i = start; i < Math.min(end, m_data.length); i++) {
+            if (m_data[i] != null) {
+                serializeAt(i);
+            }
         }
     }
 
-    synchronized void serialize() {
-        while (m_serializeIndex < m_setIndex) {
-            m_serializeIndex++;
-            if (m_data[m_serializeIndex] != null) {
-                serializeAt(m_serializeIndex);
-            }
+    /**
+     * Dispatch the serialization of the remaining unsaved items
+     */
+    void dispatchSerialization() {
+        if (m_future.isDone()) {
+            waitForAndGetFuture();
         }
+
+        final var highest = m_setIndex;
+        final var lowest = m_highestDispatchedSerializationIndex;
+
+        m_future = m_future.thenRunAsync(() -> serializeRange(lowest + 1, highest + 1), m_executor);
+        m_highestDispatchedSerializationIndex = highest;
     }
 
     abstract void serializeAt(final int index);
 
     void onSet(final int index) {
         m_setIndex = index;
-        if (m_flushing) {
-            // if we are currently flushing, we block here, waiting for the flush to complete
-            serialize();
-        }
-        if (index >= m_nextSerializationIndex) {
-            handleDoneFuture();
-            m_future = CompletableFuture.runAsync(() -> {
-                serialize();
-                m_nextSerializationIndex = m_serializeIndex + SERIALIZATION_DELAY;
-            }, m_executor);
 
-            // prevent another serialization thread to be launched until the current was one has terminated
-            m_nextSerializationIndex = Integer.MAX_VALUE;
+        if (m_setIndex > m_highestDispatchedSerializationIndex + SERIALIZATION_DELAY) {
+            dispatchSerialization();
         }
     }
 
     void onClose() {
-        handleDoneFuture();
-        m_future = m_future.thenRunAsync(this::serialize, m_executor);
+        if (m_closed) {
+            throw new IllegalStateException("Failed to close already closed CachedWriteData");
+        }
+        m_closed = true;
+
+        dispatchSerialization();
     }
 
-    private void handleDoneFuture() {
-        if (m_future.isDone()) {
-            try {
-                m_future.get();
-            } catch (ExecutionException e) {
-                throw new IllegalStateException("Failed to asynchronously serialize object data.", e);
-            } catch (InterruptedException e) {
-                // Restore interrupted state
-                Thread.currentThread().interrupt();
-                // since we just checked whether the future is done, we likely never end up in this code block
-                LOGGER.info(ERROR_ON_INTERRUPT, e);
-            }
+    private synchronized void waitForAndGetFuture() {
+        try {
+            m_future.get();
+        } catch (ExecutionException e) {
+            throw new IllegalStateException("Failed to asynchronously serialize object data.", e);
+        } catch (InterruptedException e) {
+            // Restore interrupted state
+            Thread.currentThread().interrupt();
+            LOGGER.info(ERROR_ON_INTERRUPT, e);
         }
     }
 

@@ -155,7 +155,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                     final var heapCachedData = (CachedWriteData<?, ?, ?>.CachedReadData)batch.get(i);
                     futures[i] = CompletableFuture.supplyAsync(() -> {
                         m_unclosedData.remove(heapCachedData.getWriteData());
-                        return heapCachedData.close();
+                        return heapCachedData.closeWriteDelegate();
                     }, m_executor);
                     final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(ObjectCache.this, i, m_numBatches);
                     m_cache.getCache().put(ccuid, heapCachedData.getData());
@@ -342,10 +342,6 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     @Override
     public synchronized void close() throws IOException {
-    	// Need to flush (i.e, finish serialization) here.
-    	// Otherwise, there could still be pending SerializationRunnables that would fail ungracefully.
-        flush();
-
         m_cache.getCache().keySet().removeAll(m_cachedData);
         m_cachedData.clear();
         m_cachedData = null;

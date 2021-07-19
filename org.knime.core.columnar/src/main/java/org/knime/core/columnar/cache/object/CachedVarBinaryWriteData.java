@@ -79,8 +79,8 @@ final class CachedVarBinaryWriteData extends CachedWriteData<VarBinaryWriteData,
         }
 
         @Override
-        synchronized VarBinaryReadData close() {
-            VarBinaryReadData out = super.close();
+        synchronized VarBinaryReadData closeWriteDelegate() {
+            VarBinaryReadData out = super.closeWriteDelegate();
             m_serializers = null;
             return out;
         }
@@ -96,8 +96,8 @@ final class CachedVarBinaryWriteData extends CachedWriteData<VarBinaryWriteData,
 
     @Override
     public void expand(final int minimumCapacity) {
+        m_serializers = Arrays.copyOf(m_serializers, minimumCapacity);
         super.expand(minimumCapacity);
-        m_serializers = Arrays.copyOf(m_serializers, m_delegate.capacity());
     }
 
     @Override

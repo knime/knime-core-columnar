@@ -63,7 +63,7 @@ final class CachedStringLoadingReadData extends CachedLoadingReadData<StringRead
 
     @Override
     public String getString(final int index) {
-        if (m_data[index] == null) {
+        if (m_data[index] == null && !m_delegate.isMissing(index)) {
             m_data[index] = m_delegate.getString(index);
         }
         return m_data[index];
