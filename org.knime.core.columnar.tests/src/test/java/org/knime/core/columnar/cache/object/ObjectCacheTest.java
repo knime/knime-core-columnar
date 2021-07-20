@@ -131,6 +131,10 @@ public class ObjectCacheTest {
 
     private static void resumeAndWaitForSerialization(final CountDownLatch blockLatch) throws InterruptedException {
         blockLatch.countDown();
+        waitForSerialization();
+    }
+
+    private static void waitForSerialization() throws InterruptedException {
         final CountDownLatch waitLatch = new CountDownLatch(1);
         SERIALIZATION_EXECUTOR.submit(() -> waitLatch.countDown());
         waitLatch.await();
@@ -191,12 +195,14 @@ public class ObjectCacheTest {
             store.flush();
             assertEquals("0", delegateData.getString(0));
 
-            // test that data is serialized after closing the writer
+            // test that data is serialized asynchronously after closing the writer
             data.setString(1, "1");
             assertEquals("0", delegateData.getString(0));
             assertNull(delegateData.getString(1));
             writer.write(batch.close(1));
             writer.close();
+            waitForSerialization();
+
             assertEquals("0", delegateData.getString(0));
             assertEquals("1", delegateData.getString(1));
 
