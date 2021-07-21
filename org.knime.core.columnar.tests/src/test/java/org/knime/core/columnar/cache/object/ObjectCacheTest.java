@@ -50,6 +50,7 @@ package org.knime.core.columnar.cache.object;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestBatchStoreUtils.createDefaultTestBatchBuffer;
 import static org.knime.core.columnar.TestBatchStoreUtils.readAndCompareTable;
 import static org.knime.core.columnar.TestBatchStoreUtils.readSelectionAndCompareTable;
@@ -274,4 +275,46 @@ public class ObjectCacheTest {
         }
     }
 
+    private static String[] generateTestStrings(final int num) {
+        var out = new String[num];
+
+        for (int i = 0; i < num; i++) {
+            out[i] = String.valueOf(Long.MAX_VALUE - num);
+        }
+
+        return out;
+    }
+
+    @Test
+    public void testExtendDuringWrite() throws IOException, InterruptedException {
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), SERIALIZATION_EXECUTOR);
+                final BatchWriter writer = store.getWriter()) {
+
+            final int numStrings = 512;
+            final int initialLength = numStrings / 2;
+            final WriteBatch batch = writer.create(initialLength);
+            final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
+            final TestStringData delegateData = (TestStringData)data.m_delegate;
+
+            final String[] testStrings = generateTestStrings(numStrings);
+
+            for (int i = 0; i < numStrings; i++) {
+                if (i == initialLength) {
+                    data.expand(numStrings);
+                }
+                data.setString(i, testStrings[i]);
+            }
+            batch.close(numStrings);
+            store.flush();
+            assertTrue(data.capacity() >= numStrings);
+
+            assertTrue(delegateData.capacity() >= numStrings);
+            for (int i = 0; i < numStrings; i++) {
+                assertEquals(testStrings[i], delegateData.getString(i));
+            }
+
+            batch.release();
+        }
+    }
 }
