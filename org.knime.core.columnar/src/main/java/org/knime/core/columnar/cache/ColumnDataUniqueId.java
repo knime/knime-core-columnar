@@ -91,10 +91,8 @@ public final class ColumnDataUniqueId {
         if (object == this) {
             return true;
         }
-        if (object == null) {
-            return false;
-        }
-        if (getClass() == object.getClass()) {
+        if (object instanceof ColumnDataUniqueId)
+        {
             final ColumnDataUniqueId other = (ColumnDataUniqueId)object;
             return Objects.equals(m_readable, other.m_readable) && m_columnIndex == other.m_columnIndex
                 && m_batchIndex == other.m_batchIndex;
