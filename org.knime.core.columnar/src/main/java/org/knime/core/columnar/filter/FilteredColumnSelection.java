@@ -132,7 +132,7 @@ public final class FilteredColumnSelection implements ColumnSelection {
 
         @Override
         public boolean isMissing(final int index) {
-            return m_data.containsKey(index);
+            return !m_data.containsKey(index);
         }
 
         /**
