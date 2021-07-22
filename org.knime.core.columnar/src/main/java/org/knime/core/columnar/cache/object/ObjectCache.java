@@ -55,6 +55,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
@@ -90,13 +91,20 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
+    private static final String ERROR_ON_READABLE_CLOSE = "Error while closing readable delegate.";
+
     private final class ObjectCacheWriter implements BatchWriter {
 
         private final BatchWriter m_writerDelegate;
 
         private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
-        private int m_numBatches;
+        /**
+         * The number of batches that are already written. Readers use this value to determine if they are
+         * accessing the currently written batch and need to wait for the serialization to finish.
+         * To make sure numBatches is up to date when a Reader accesses it, we make it volatile.
+         */
+        private volatile int m_numBatches;
 
         private ObjectCacheWriter(final BatchWriter delegate) {
             m_writerDelegate = delegate;
@@ -165,12 +173,13 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                 }
             }
 
+            int currentBatch = m_numBatches;
             m_future = CompletableFuture.allOf(futures).thenRunAsync(() -> { // NOSONAR
                 try {
                     m_writerDelegate.write(new DefaultReadBatch(
                         Arrays.stream(futures).map(CompletableFuture::join).toArray(NullableReadData[]::new)));
                 } catch (IOException e) {
-                    throw new IllegalStateException(String.format("Failed to write batch %d.", m_numBatches), e);
+                    throw new IllegalStateException(String.format("Failed to write batch %d.", currentBatch), e);
                 } finally {
                     batch.release();
                 }
@@ -292,6 +301,8 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+    private final AtomicBoolean m_closed = new AtomicBoolean(false);
+
     /**
      * @param delegate the delegate to which to write
      * @param cache the in-heap cache for storing object data
@@ -323,11 +334,19 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         return m_reabableDelegate.getSchema();
     }
 
-    @Override
-    public void flush() throws IOException {
-        // serialize any currently unclosed data (in the current batch)
+    private synchronized void writeUnclosedData() {
         for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
             data.flush();
+        }
+    }
+
+    @Override
+    public void flush() throws IOException {
+        // If we are closed, then all serialization has been dispatched and we only need to wait for it.
+        // Flush can be invoked by a MemoryAlert while or after close().
+        if (!m_closed.get()) {
+            // serialize any currently unclosed data (in the current batch)
+            writeUnclosedData();
         }
 
         // wait for the pending serialization of the previous batch
@@ -338,14 +357,34 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             Thread.currentThread().interrupt();
             LOGGER.error(ERROR_ON_INTERRUPT, e);
         }
+
     }
 
+    /**
+     * Asynchronously waits for the current write operations to finish and then
+     * disposes of the cache resources and closes its delegate.
+     *
+     * Does not block!
+     */
     @Override
     public synchronized void close() throws IOException {
+        m_closed.set(true);
+        m_writer.close();
+
+        m_writer.m_future = m_writer.m_future.thenRunAsync(this::deferredClose);
+        m_writer.handleDoneFuture();
+    }
+
+    private void deferredClose() {
+        m_unclosedData.clear();
         m_cache.getCache().keySet().removeAll(m_cachedData);
         m_cachedData.clear();
         m_cachedData = null;
-        m_reabableDelegate.close();
-    }
 
+        try {
+            m_reabableDelegate.close();
+        } catch (IOException ex) {
+            LOGGER.error(ERROR_ON_READABLE_CLOSE, ex);
+        }
+    }
 }
