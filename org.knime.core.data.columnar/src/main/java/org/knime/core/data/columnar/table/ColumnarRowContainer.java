@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -166,6 +167,12 @@ final class ColumnarRowContainer implements RowContainer {
                 m_store.close();
             } catch (final IOException e) {
                 LOGGER.error("Exception while closing store.", e);
+            }
+
+            try {
+                Files.deleteIfExists(m_path);
+            } catch (final IOException e) {
+                LOGGER.error("Exception while deleting temporary columnar output file", e);
             }
         }
     }

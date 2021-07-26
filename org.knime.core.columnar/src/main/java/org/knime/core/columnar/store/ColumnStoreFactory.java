@@ -58,11 +58,11 @@ import org.knime.core.table.schema.ColumnarSchema;
 public interface ColumnStoreFactory {
 
     /**
-     * Creates a new {@link BatchStore}, writing data to and reading data from memory and/or the provided file,
-     * depending on its caching strategy and available memory.
+     * Creates a new {@link BatchStore}, writing data to and reading data from the provided file.
+     * Expects that the provided file does not exist yet, if it does, it will be overwritten.
      *
      * @param schema the columnar schema of the to-be-created store
-     * @param path to write data to if out of memory
+     * @param path to write data to
      * @return a newly created store
      */
 

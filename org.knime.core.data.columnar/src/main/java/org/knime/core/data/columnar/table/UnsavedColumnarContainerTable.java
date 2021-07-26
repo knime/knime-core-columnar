@@ -96,4 +96,20 @@ final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable
         Files.copy(m_path, f.toPath());
     }
 
+    @Override
+    public void close() {
+        clear();
+        super.close();
+    }
+
+    @Override
+    public void clear() {
+        super.clear();
+        try {
+            Files.deleteIfExists(m_path);
+        } catch (IOException e) {
+            LOGGER.info("Error when deleting file that backed the UnsavedColumnarContainerTable", e);
+        }
+    }
+
 }

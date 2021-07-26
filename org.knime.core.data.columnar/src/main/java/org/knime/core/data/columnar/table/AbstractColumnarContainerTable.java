@@ -85,7 +85,7 @@ import org.knime.core.node.workflow.WorkflowDataRepository;
  */
 abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(AbstractColumnarContainerTable.class);
+    protected static final NodeLogger LOGGER = NodeLogger.getLogger(AbstractColumnarContainerTable.class);
 
     private static final String CFG_FACTORY_TYPE = "columnstore_factory_type";
 
