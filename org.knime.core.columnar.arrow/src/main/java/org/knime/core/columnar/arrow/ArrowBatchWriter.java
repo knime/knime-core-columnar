@@ -54,6 +54,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -442,6 +443,7 @@ class ArrowBatchWriter implements BatchWriter {
         private final List<ArrowBlock> m_recordBlocks;
 
         private ArrowWriter(final File file, final Schema schema) throws IOException {
+            Files.deleteIfExists(file.toPath());
             @SuppressWarnings("resource") // Channel is closed by close of m_out. The channel closes the file
             final FileChannel channel = new RandomAccessFile(file, "rw").getChannel(); // NOSONAR: See comment above
             m_out = new WriteChannel(channel);

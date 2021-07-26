@@ -46,7 +46,6 @@
 package org.knime.core.columnar.arrow;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -109,7 +108,7 @@ public final class ArrowBatchStore extends AbstractArrowBatchReadable implements
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(m_path);
+        m_writer.close();
         super.close();
     }
 }
