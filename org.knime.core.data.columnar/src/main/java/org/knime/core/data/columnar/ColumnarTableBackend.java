@@ -105,7 +105,8 @@ public final class ColumnarTableBackend implements TableBackend {
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
             final ColumnarRowContainerSettings cursorSettings = new ColumnarRowContainerSettings(
-                settings.getInitializeDomain(), settings.getMaxDomainValues(), settings.isEnableRowKeys());
+                settings.getInitializeDomain(), settings.getMaxDomainValues(), settings.isEnableRowKeys(),
+                settings.isForceSequentialRowHandling());
             return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", e);
@@ -119,7 +120,8 @@ public final class ColumnarTableBackend implements TableBackend {
             final ValueSchema schema =
                 ValueSchema.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
             final ColumnarRowContainerSettings containerSettings = new ColumnarRowContainerSettings(
-                settings.getInitializeDomain(), settings.getMaxDomainValues(), settings.isEnableRowKeys());
+                settings.getInitializeDomain(), settings.getMaxDomainValues(), settings.isEnableRowKeys(),
+                settings.isForceSequentialRowHandling());
             return ColumnarRowContainerUtils.create(context, -1, ColumnarValueSchemaUtils.create(schema),
                 containerSettings);
         } catch (Exception e) {

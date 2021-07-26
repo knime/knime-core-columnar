@@ -52,6 +52,7 @@ import org.knime.core.data.v2.RowContainer;
  * Settings for columnar {@link RowContainer RowContainers}.
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
 public final class ColumnarRowContainerSettings {
@@ -62,17 +63,21 @@ public final class ColumnarRowContainerSettings {
 
     private final boolean m_checkDuplicateRowKeys;
 
+    private final boolean m_forceSynchronousIO;
+
     /**
      * @param initializeDomains if <source>true</source> domains will be initialized via domain values provided through
      *            incoming {@link DataTableSpec}.
      * @param maxPossibleNominalDomainValues maximum number of values for nominal domains.
      * @param checkDuplicateRowKeys whether to check for duplicates among row keys
+     * @param forceSynchronousIO whether close() of the {@link RowContainer} should block until all contents are written
      */
     public ColumnarRowContainerSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
-        final boolean checkDuplicateRowKeys) {
+        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO) {
         m_initializeDomains = initializeDomains;
         m_checkDuplicateRowKeys = checkDuplicateRowKeys;
         m_maxPossibleNominalDomainValues = maxPossibleNominalDomainValues;
+        m_forceSynchronousIO = forceSynchronousIO;
     }
 
     boolean isInitializeDomains() {
@@ -87,4 +92,7 @@ public final class ColumnarRowContainerSettings {
         return m_checkDuplicateRowKeys;
     }
 
+    boolean isForceSynchronousIO() {
+        return m_forceSynchronousIO;
+    }
 }

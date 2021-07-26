@@ -109,7 +109,7 @@ final class ColumnarTableTestUtils {
     }
 
     private static ColumnarRowContainer createColumnarRowContainer(final int nCols, final ExecutionContext exec) {
-        final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(true, 60, true);
+        final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(true, 60, true, false);
         try {
             return ColumnarRowContainer.create(exec, -1, createSchema(nCols), TestColumnStoreFactory.INSTANCE,
                 settings);

@@ -46,6 +46,7 @@
 
 package org.knime.core.data.columnar.table;
 
+import java.io.Flushable;
 import java.io.IOException;
 
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
@@ -86,7 +87,15 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
 
     private long m_size = 0;
 
-    ColumnarRowWriteCursor(final BatchStore store, final ValueFactory<?, ?>[] factories) {
+    private final Flushable m_flushOnForward;
+
+    /**
+     * Create a row write cursor
+     * @param store The batch store to write to
+     * @param factories Value factories for the individual columns
+     * @param flushOnForward An optional {@link Flushable} that will be flushed on each forward operation
+     */
+    ColumnarRowWriteCursor(final BatchStore store, final ValueFactory<?, ?>[] factories, final Flushable flushOnForward) {
 
         m_accessCursor = ColumnarWriteCursorFactory.createWriteCursor(store);
         m_access = m_accessCursor.access();
@@ -96,10 +105,18 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
             m_values[i] = factories[i].createWriteValue(m_access.getWriteAccess(i));
         }
         m_rowKeyValue = (RowKeyWriteValue)m_values[0];
+        m_flushOnForward = flushOnForward;
     }
 
     @Override
     public final RowWrite forward() {
+        if (m_flushOnForward != null) {
+            try {
+                m_flushOnForward.flush();
+            } catch (IOException ex) {
+                LOGGER.error("Could not flush cursor during forward", ex);
+            }
+        }
         m_size++;
         return m_accessCursor.forward() ? this : null;
     }

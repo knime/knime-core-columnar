@@ -107,6 +107,8 @@ final class ColumnarRowContainer implements RowContainer {
 
     private final Path m_path;
 
+    private final boolean m_forceSynchronousIO;
+
     private Finalizer m_finalizer;
 
     private ExtensionTable m_table;
@@ -118,6 +120,7 @@ final class ColumnarRowContainer implements RowContainer {
         m_schema = schema;
         m_context = context;
         m_storeFactory = storeFactory;
+        m_forceSynchronousIO = settings.isForceSynchronousIO();
 
         m_path = DataContainer.createTempFile(".knable").toPath();
 
@@ -131,7 +134,7 @@ final class ColumnarRowContainer implements RowContainer {
 
         m_store = new WrappedBatchStore(m_domainWritable, m_cached);
 
-        m_delegate = new ColumnarRowWriteCursor(m_store, m_schema.getValueFactories());
+        m_delegate = new ColumnarRowWriteCursor(m_store, m_schema.getValueFactories(), m_forceSynchronousIO ? m_cached : null);
     }
 
     @Override
@@ -154,6 +157,7 @@ final class ColumnarRowContainer implements RowContainer {
         // in case m_table was not created, we have to destroy the store. otherwise the
         // m_table has a handle on the store and therefore the store shouldn't be destroyed.
         if (m_table == null) {
+
             m_finalizer.close();
             m_delegate.close();
             // closing the store includes closing the writer
@@ -170,6 +174,12 @@ final class ColumnarRowContainer implements RowContainer {
         if (m_table == null) {
             m_finalizer.close();
             m_delegate.finish();
+
+            try {
+                m_cached.flush();
+            } catch(IOException e) {
+                LOGGER.error("Exception while flushing cache.", e);
+            }
 
             final Map<Integer, DataColumnDomain> domains = new HashMap<>();
             final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
