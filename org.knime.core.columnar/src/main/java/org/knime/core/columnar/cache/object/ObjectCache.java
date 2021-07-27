@@ -81,8 +81,13 @@ import org.slf4j.LoggerFactory;
  * A {@link BatchWritable} and {@link RandomAccessBatchReadable} that intercepts {@link VarBinaryReadData} for in-heap
  * caching of objects.
  *
+ * It performs asynchronous work on two different executors. The persist executor is used to asynchronously store data
+ * in the cache during writing. The serialization executor handles asynchronous serialization of in-heap
+ * data into the delegate batch writer.
+ *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
 public final class ObjectCache implements BatchWritable, RandomAccessBatchReadable, Flushable {
@@ -119,12 +124,12 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                 if (m_varBinaryData.isSelected(i)) {
                     final VarBinaryWriteData columnWriteData = (VarBinaryWriteData)batch.get(i);
                     final var cachedData =
-                        new CachedVarBinaryWriteData(columnWriteData, m_executor);
+                        new CachedVarBinaryWriteData(columnWriteData, m_serializationExecutor);
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else if (m_stringData.isSelected(i)) {
                     final StringWriteData columnWriteData = (StringWriteData)batch.get(i);
-                    final var cachedData = new CachedStringWriteData(columnWriteData, m_executor);
+                    final var cachedData = new CachedStringWriteData(columnWriteData, m_serializationExecutor);
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else {
@@ -289,6 +294,8 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private final ExecutorService m_executor;
 
+    private final ExecutorService m_serializationExecutor;
+
     private final RandomAccessBatchReadable m_reabableDelegate;
 
     private final ColumnSelection m_varBinaryData;
@@ -306,17 +313,20 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     /**
      * @param delegate the delegate to which to write
      * @param cache the in-heap cache for storing object data
-     * @param executor the executor to which to submit asynchronous persist tasks
+     * @param persistExecutor the executor to which to submit asynchronous persist tasks
+     * @param serializationExecutor the executor to use for asynchronous serialization of data
      */
     @SuppressWarnings("resource")
     public <D extends BatchWritable & RandomAccessBatchReadable> ObjectCache(final D delegate,
-        final SharedObjectCache cache, final ExecutorService executor) {
+        final SharedObjectCache cache, final ExecutorService persistExecutor,
+        final ExecutorService serializationExecutor) {
         m_writer = new ObjectCacheWriter(delegate.getWriter());
         m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(delegate.getSchema());
         m_stringData = HeapCacheUtils.getStringIndices(delegate.getSchema());
         m_reabableDelegate = delegate;
         m_cache = cache;
-        m_executor = executor;
+        m_executor = persistExecutor;
+        m_serializationExecutor = serializationExecutor;
     }
 
     @Override

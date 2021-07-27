@@ -121,12 +121,13 @@ final class CachedBatchWritableReadable<D extends BatchWritable & RandomAccessBa
 
         final SharedObjectCache heapCache = ColumnarPreferenceUtils.getHeapCache();
         final ExecutorService executor = ColumnarPreferenceUtils.getPersistExecutor();
+        final ExecutorService serializeExecutor = ColumnarPreferenceUtils.getSerializeExecutor();
         if (m_smallCached != null) {
-            m_objectCached = new ObjectCache(m_smallCached, heapCache, executor);
+            m_objectCached = new ObjectCache(m_smallCached, heapCache, executor, serializeExecutor);
         } else if (m_dataCached != null) {
-            m_objectCached = new ObjectCache(m_dataCached, heapCache, executor);
+            m_objectCached = new ObjectCache(m_dataCached, heapCache, executor, serializeExecutor);
         } else {
-            m_objectCached = new ObjectCache(delegate, heapCache, executor);
+            m_objectCached = new ObjectCache(delegate, heapCache, executor, serializeExecutor);
         }
         m_memListener = new MemoryAlertListener() {
             @Override
