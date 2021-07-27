@@ -65,6 +65,8 @@ import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.OutOfMemoryException;
 import org.apache.arrow.memory.RootAllocator;
+import org.junit.After;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
@@ -91,6 +93,31 @@ import org.knime.core.table.schema.DefaultColumnarSchema;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public class ArrowColumnStoreTest {
+
+    static Path writePath;
+    static Path readPath;
+
+    /**
+     * Before running the tests, we create temporary paths where ArrowBatchStores can write
+     * to, or read from.
+     *
+     * @throws IOException
+     */
+    @BeforeClass
+    public static void beforeClass() throws IOException {
+        writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
+        readPath = ArrowTestUtils.createTmpKNIMEArrowPath();
+    }
+
+    /**
+     * After each test, we clean up the temporary files so the next test can start from scratch
+     * @throws IOException
+     */
+    @After
+    public void after() throws IOException {
+        Files.deleteIfExists(writePath);
+        Files.deleteIfExists(readPath);
+    }
 
     /**
      * Test writing and reading some data using the writer and reader from an ArrowColumnStore and ArrowColumnReadStore.
@@ -152,7 +179,6 @@ public class ArrowColumnStoreTest {
     public void testReadBeforeFullyWritten() throws IOException {
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec());
-        final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
 
         // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator();
@@ -242,11 +268,7 @@ public class ArrowColumnStoreTest {
         final int chunkSize = 64;
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new DictionaryEncodedDataFactory()};
 
-        final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
-        final Path readPath = ArrowTestUtils.createTmpKNIMEArrowPath();
-        Files.delete(readPath);
-
-        // Use the write store to write some data
+                // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator()) {
 
             @SuppressWarnings("resource")
@@ -320,7 +342,6 @@ public class ArrowColumnStoreTest {
     public void testPartialFileBatchReadable() throws IOException {
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec());
-        final Path path = ArrowTestUtils.createTmpKNIMEArrowPath();
 
         try (final RootAllocator allocator = new RootAllocator()) {
             final ArrowColumnStoreFactory factory =
@@ -328,7 +349,7 @@ public class ArrowColumnStoreTest {
 
             // Use the write store to write some data
             @SuppressWarnings("resource")
-            final var writeStore = factory.createStore(schema, path);
+            final var writeStore = factory.createStore(schema, writePath);
 
             assertEquals(0, writeStore.numBatches());
             assertThrows(IllegalStateException.class, writeStore::batchLength);
@@ -353,7 +374,7 @@ public class ArrowColumnStoreTest {
             // Create the partial readable
             @SuppressWarnings("resource")
             final ArrowPartialFileBatchReadable readable =
-                factory.createPartialFileReadable(schema, path, writeStore.getOffsetProvider());
+                factory.createPartialFileReadable(schema, writePath, writeStore.getOffsetProvider());
             @SuppressWarnings("resource")
             final RandomAccessBatchReader reader = readable.createRandomAccessReader();
 
@@ -414,10 +435,6 @@ public class ArrowColumnStoreTest {
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.doubleSpec());
 
-        final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
-        final Path readPath = ArrowTestUtils.createTmpKNIMEArrowPath();
-        Files.delete(readPath);
-
         // Use the write store to write some data
         try (final BatchStore writeStore = factory.createStore(schema, writePath)) {
             assertEquals(schema, writeStore.getSchema());
@@ -443,8 +460,8 @@ public class ArrowColumnStoreTest {
             Files.copy(writePath, readPath);
         }
 
-        // Assert that the file written to does not exist after closing the store
-        assertFalse(Files.exists(writePath));
+        // Assert that the file written to does exist after closing the store
+        assertTrue(Files.exists(writePath));
 
         // Assert that the file for reading exists
         assertTrue(Files.exists(readPath));
