@@ -74,6 +74,13 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private final AtomicBoolean m_closed = new AtomicBoolean();
 
+    // Whether we are still in the closing operation.
+    // We still need to allow adding rows because that could happen asynchronously,
+    // and if some serialization was triggered in the close() method, we prevent
+    // re-triggering this by setting m_closed=true but set m_closing=true as well
+    // to allow serialization to finish.
+    private final AtomicBoolean m_closing = new AtomicBoolean();
+
     private long m_size;
 
     private ContainerTable m_containerTable;
@@ -109,7 +116,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
                 String.format("Cell count in row %s is not equal to length of column names array: %d vs. %d",
                     row.getKey().toString(), row.getNumCells(), m_spec.getNumColumns()));
         }
-        if (m_closed.get()) {
+        if (m_closed.get() && !m_closing.get()) {
             throw new IllegalStateException("Container delegate has already been closed.");
         }
         if (m_cleared.get()) {
@@ -143,8 +150,10 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     @Override
     public void close() {
         if (!m_closed.getAndSet(true)) {
+            m_closing.set(true);
             m_containerTable = m_delegateContainer.finishInternal();
             m_delegateCursor.close();
+            m_closing.set(false);
         }
     }
 
