@@ -216,18 +216,13 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     @Override
     public void expand(final int minimumCapacity) {
-        // we immediately make sure the data array can hold more memory
-        m_data = Arrays.copyOf(m_data, minimumCapacity);
-
-        // But we wait for all current serialization tasks to finish before
-        // expanding (hence reallocating) the delegate data buffer to prevent race conditions.
-        // The range of values that is already queued for serialization must fit into the
-        // delegate at the time expand() is called, so this should be fine.
-        m_future = m_future.thenRunAsync(() -> {
-            if (m_delegate.capacity() < minimumCapacity) {
-                m_delegate.expand(minimumCapacity);
-            }
-        }, m_executor);
+        // We wait for all running serialization tasks to finish before expanding
+        // the underlying buffer and then expand on the main thread to make sure
+        // all data is written *and* the memory allocator of the delegate is not
+        // invoked by multiple threads in parallel, but only from the thread calling expand.
+        waitForAndGetFuture();
+        m_delegate.expand(minimumCapacity);
+        m_data = Arrays.copyOf(m_data, m_delegate.capacity());
     }
 
     @Override

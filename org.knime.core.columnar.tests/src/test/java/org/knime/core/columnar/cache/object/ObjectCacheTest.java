@@ -123,6 +123,10 @@ public class ObjectCacheTest {
         return new DefaultColumnarSchema(DataSpec.stringSpec());
     }
 
+    private static ColumnarSchema createTwoStringColumnsSchema() {
+        return new DefaultColumnarSchema(DataSpec.stringSpec(), DataSpec.stringSpec());
+    }
+
     private static CountDownLatch blockSerialization() {
         final CountDownLatch blockLatch = new CountDownLatch(1);
         SERIALIZATION_EXECUTOR.submit(() -> {
@@ -374,5 +378,55 @@ public class ObjectCacheTest {
             // we wait for the thread on which this closing happens.
             waitForPersist();
         }
+    }
+
+    @Test
+    public void testConcurrentExpand() throws IOException, InterruptedException {
+        final ExecutorService persistExecutor = Executors.newSingleThreadExecutor();
+        final ExecutorService serializationExecutor = Executors.newFixedThreadPool(2);
+
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createTwoStringColumnsSchema());
+                final ObjectCache store = new ObjectCache(delegate, generateCache(), persistExecutor, serializationExecutor);
+                final BatchWriter writer = store.getWriter()) {
+
+            final int numStrings = 512;
+            final int initialLength = numStrings / 2;
+            final WriteBatch batch = writer.create(initialLength);
+
+            final CachedStringWriteData data0 = (CachedStringWriteData)batch.get(0);
+            final TestStringData delegateData0 = (TestStringData)data0.m_delegate;
+
+            final CachedStringWriteData data1 = (CachedStringWriteData)batch.get(1);
+            final TestStringData delegateData1 = (TestStringData)data1.m_delegate;
+
+            final String[] testStrings = generateTestStrings(numStrings);
+
+            for (int i = 0; i < numStrings; i++) {
+                if (i == initialLength) {
+                    data0.expand(numStrings);
+                    data1.expand(numStrings);
+                }
+                data0.setString(i, testStrings[i]);
+                data1.setString(i, testStrings[i]);
+            }
+
+            batch.close(numStrings);
+
+            final CountDownLatch waitLatch = new CountDownLatch(5);
+            for (int i = 0; i < 5; i++) {
+                serializationExecutor.submit(() -> waitLatch.countDown());
+            }
+            waitLatch.await();
+
+            for (int i = 0; i < numStrings; i++) {
+                assertEquals(testStrings[i], delegateData0.getString(i));
+                assertEquals(testStrings[i], delegateData1.getString(i));
+            }
+
+            batch.release();
+        }
+
+        persistExecutor.shutdownNow();
+        serializationExecutor.shutdownNow();
     }
 }

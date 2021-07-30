@@ -96,8 +96,8 @@ final class CachedVarBinaryWriteData extends CachedWriteData<VarBinaryWriteData,
 
     @Override
     public void expand(final int minimumCapacity) {
-        m_serializers = Arrays.copyOf(m_serializers, minimumCapacity);
         super.expand(minimumCapacity);
+        m_serializers = Arrays.copyOf(m_serializers, super.capacity());
     }
 
     @Override
