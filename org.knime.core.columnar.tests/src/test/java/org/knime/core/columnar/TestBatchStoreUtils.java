@@ -530,7 +530,6 @@ public final class TestBatchStoreUtils {
                 data[i] = data1;
             }
         }
-        batch.close(batch.capacity());
 
         return data;
     }
