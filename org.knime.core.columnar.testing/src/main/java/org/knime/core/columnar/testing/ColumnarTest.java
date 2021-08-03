@@ -54,6 +54,7 @@ import java.io.Closeable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.After;
 import org.junit.Before;
@@ -67,13 +68,24 @@ public class ColumnarTest {
     static final Set<Closeable> OPEN_CLOSEABLES =
         Collections.synchronizedSet(Collections.newSetFromMap(new HashMap<>()));
 
+    static CountDownLatch STORE_CLOSE_LATCH;
+
     @Before
     public void setup() {
+        STORE_CLOSE_LATCH = new CountDownLatch(1);
         OPEN_CLOSEABLES.clear();
     }
 
     @After
     public void tearDown() {
+        // We wait for the TestBatchStore to close before we check which closeables are left over.
+        // This is necessary because close() of a cached batch store closes its delegates asynchronously.
+        try {
+        STORE_CLOSE_LATCH.await();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+
         assertEquals("Unclosed Closeables.", 0, OPEN_CLOSEABLES.size());
     }
 

@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
 
 import org.junit.Test;
-import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.data.TestDoubleData;
 import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
 
@@ -61,7 +60,7 @@ import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class SizeBoundLruCacheTest extends ColumnarTest {
+public class SizeBoundLruCacheTest {
 
     @Test
     public void testPutGet() {
