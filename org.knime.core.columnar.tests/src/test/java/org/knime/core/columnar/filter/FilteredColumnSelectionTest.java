@@ -163,7 +163,7 @@ public class FilteredColumnSelectionTest {
         @SuppressWarnings("resource")
         final DefaultReadBatch batch =
             new DefaultReadBatch(createTestTable(TestBatchStore.create(createSchema(numColumns)), 1).get(0));
-        assertEquals(numColumns, batch.size());
+        assertEquals(numColumns, batch.numData());
         assertEquals(TestBatchStoreUtils.DEF_BATCH_LENGTH, batch.length());
     }
 

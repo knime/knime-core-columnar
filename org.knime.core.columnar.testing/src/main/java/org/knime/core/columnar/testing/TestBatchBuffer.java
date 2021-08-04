@@ -89,7 +89,7 @@ public final class TestBatchBuffer implements BatchWritable, RandomAccessBatchRe
         @Override
         public void write(final ReadBatch batch) {
             waitForLatch();
-            final Object[][] data = new Object[batch.size()][];
+            final Object[][] data = new Object[batch.numData()][];
             for (int i = 0; i < data.length; i++) {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();

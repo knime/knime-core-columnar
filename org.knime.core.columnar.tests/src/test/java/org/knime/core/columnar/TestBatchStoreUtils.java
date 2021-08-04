@@ -670,7 +670,7 @@ public final class TestBatchStoreUtils {
                 final NullableReadData[] refBatch = table.get(i);
                 final ReadBatch readBatch = reader.readRetained(i);
 
-                assertEquals(refBatch.length, readBatch.size());
+                assertEquals(refBatch.length, readBatch.numData());
                 assertEquals(refBatch[0].length(), readBatch.length());
                 final int[] indicesNonNull =
                     indices == null ? IntStream.range(0, store.getSchema().numColumns()).toArray() : indices;
@@ -701,9 +701,9 @@ public final class TestBatchStoreUtils {
                 final ReadBatch batch1 = reader1.readRetained(i);
                 final ReadBatch batch2 = reader2.readRetained(i);
 
-                assertEquals(batch1.size(), batch2.size());
+                assertEquals(batch1.numData(), batch2.numData());
                 assertEquals(batch1.length(), batch2.length());
-                for (int j = 0; j < batch1.size(); j++) {
+                for (int j = 0; j < batch1.numData(); j++) {
                     final NullableReadData data1 = batch1.get(j);
                     final NullableReadData data2 = batch2.get(j);
                     compareData(data1, data2, j);

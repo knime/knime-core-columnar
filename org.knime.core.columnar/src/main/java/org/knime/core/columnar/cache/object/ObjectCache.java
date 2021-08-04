@@ -159,7 +159,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                 LOGGER.error(ERROR_ON_INTERRUPT, e);
             }
 
-            final int numColumns = batch.size();
+            final int numColumns = batch.numData();
             @SuppressWarnings("unchecked")
             final CompletableFuture<NullableReadData>[] futures = new CompletableFuture[numColumns];
 

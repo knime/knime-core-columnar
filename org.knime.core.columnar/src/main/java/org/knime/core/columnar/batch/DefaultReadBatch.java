@@ -83,9 +83,4 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
         return m_length;
     }
 
-    @Override
-    public int size() {
-        return m_data.length;
-    }
-
 }

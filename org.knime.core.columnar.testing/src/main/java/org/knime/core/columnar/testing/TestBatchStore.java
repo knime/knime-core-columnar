@@ -112,7 +112,7 @@ public final class TestBatchStore implements BatchStore {
             }
 
             waitForLatch();
-            final Object[][] data = new Object[batch.size()][];
+            final Object[][] data = new Object[batch.numData()][];
             for (int i = 0; i < data.length; i++) {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();

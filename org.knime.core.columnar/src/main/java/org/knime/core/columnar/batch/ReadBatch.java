@@ -74,11 +74,6 @@ public interface ReadBatch extends Batch<NullableReadData>, NullableReadData {
     NullableReadData get(int index);
 
     /**
-     * @return the number of valid indices in this batch
-     */
-    int size();
-
-    /**
      * The {@link ReadData#length() length} of any data in this batch, or zero if the batch holds no data.
      */
     @Override

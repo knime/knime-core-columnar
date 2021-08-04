@@ -59,6 +59,11 @@ import org.knime.core.columnar.ReferencedData;
 public interface Batch<D extends ReferencedData> extends ReferencedData {
 
     /**
+     * @return the number of valid indices in this batch
+     */
+    int numData();
+
+    /**
      * Obtains the {@link ReferencedData} at a certain index.
      *
      * @param index the index at which to look for the data

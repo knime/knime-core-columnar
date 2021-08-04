@@ -173,7 +173,7 @@ public final class FilteredColumnSelection implements ColumnSelection {
         }
 
         @Override
-        public int size() {
+        public int numData() {
             return m_size;
         }
 

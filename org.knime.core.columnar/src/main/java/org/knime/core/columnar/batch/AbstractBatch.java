@@ -88,4 +88,8 @@ abstract class AbstractBatch<D extends ReferencedData> implements Batch<D> {
         return m_data;
     }
 
+    @Override
+    public final int numData() {
+        return m_data.length;
+    }
 }
