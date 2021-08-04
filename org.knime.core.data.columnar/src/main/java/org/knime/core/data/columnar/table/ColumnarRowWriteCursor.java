@@ -180,12 +180,16 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
         return m_size;
     }
 
-    void finish() {
+    /**
+     * Make sure the current contents of this {@link ColumnarRowWriteCursor} have been
+     * written to disk. Blocks until this is true. Does not close this cursor.
+     */
+    void flush() {
         try {
-            m_accessCursor.finish();
+            m_accessCursor.flush();
         } catch (IOException ex) {
             // This exception is usually not critical, similar to #close()
-            LOGGER.warn("Finishing writing failed because closing the write access cursor failed.", ex);
+            LOGGER.warn("Finishing writing failed because flushing the write access cursor failed.", ex);
         }
     }
 

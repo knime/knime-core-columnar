@@ -180,7 +180,8 @@ final class ColumnarRowContainer implements RowContainer {
     ExtensionTable finishInternal() {
         if (m_table == null) {
             m_finalizer.close();
-            m_delegate.finish();
+            m_delegate.flush();
+            m_delegate.close();
 
             try {
                 m_cached.flush();
