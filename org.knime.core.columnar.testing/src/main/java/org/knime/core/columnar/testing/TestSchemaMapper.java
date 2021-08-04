@@ -88,9 +88,8 @@ import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.VoidDataSpec;
 import org.knime.core.table.schema.ZonedDateTimeDataSpec;
-import org.knime.core.table.schema.traits.DataTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTraits;
-import org.knime.core.table.schema.traits.DictEncodingTrait;
 import org.knime.core.table.schema.traits.ListDataTraits;
 import org.knime.core.table.schema.traits.StructDataTraits;
 
@@ -161,8 +160,7 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
-        DictEncodingTrait dictEncodingTrait = (DictEncodingTrait)traits.get(DataTrait.Type.DICT_ENCODING);
-        if (dictEncodingTrait != null && dictEncodingTrait.isEnabled()) {
+        if (DictEncodingTrait.isEnabled(traits)) {
             return TestDictEncodedVarBinaryDataFactory.INSTANCE;
         }
         return TestVarBinaryDataFactory.INSTANCE;
@@ -193,8 +191,7 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
-        DictEncodingTrait dictEncodingTrait = (DictEncodingTrait)traits.get(DataTrait.Type.DICT_ENCODING);
-        if (dictEncodingTrait != null && dictEncodingTrait.isEnabled()) {
+        if (DictEncodingTrait.isEnabled(traits)) {
             return TestDictEncodedStringDataFactory.INSTANCE;
         }
         return TestStringDataFactory.INSTANCE;

@@ -65,8 +65,7 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEn
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
-import org.knime.core.table.schema.traits.DataTrait;
-import org.knime.core.table.schema.traits.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 
 
 /**
@@ -105,8 +104,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
         for (int i = 0; i < data.length; i++) {
             final NullableWriteData d = batch.get(i);
 
-            DictEncodingTrait dictEncodingTrait = (DictEncodingTrait)m_schema.getTraits(i).get(DataTrait.Type.DICT_ENCODING);
-            if (dictEncodingTrait != null && dictEncodingTrait.isEnabled()) {
+            if (DictEncodingTrait.isEnabled(m_schema.getTraits(i))) {
                 data[i] = wrapDictEncodedData(i, d);
             } else {
                 data[i] = d;

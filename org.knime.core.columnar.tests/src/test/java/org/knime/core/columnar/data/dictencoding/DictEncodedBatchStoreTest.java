@@ -70,8 +70,7 @@ import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
-import org.knime.core.table.schema.traits.DataTrait;
-import org.knime.core.table.schema.traits.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 
 /**
  *
@@ -101,9 +100,7 @@ public class DictEncodedBatchStoreTest {
     private static void checkDictEncodedWriteData(final ColumnarSchema columnarSchema, final WriteBatch baseBatch,
         final WriteBatch wrappedBatch) {
         for (int c = 0; c < columnarSchema.numColumns(); c++) {
-            var dictEncodingTrait = (DictEncodingTrait)columnarSchema.getTraits(c).get(DataTrait.Type.DICT_ENCODING);
-            if (dictEncodingTrait != null && dictEncodingTrait.isEnabled())
-            {
+            if (DictEncodingTrait.isEnabled(columnarSchema.getTraits(c))) {
                 if (columnarSchema.getSpec(c) == StringDataSpec.INSTANCE) {
                     assertEquals(baseBatch.get(c).getClass(), TestDictEncodedStringData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedStringWriteData.class);
@@ -122,9 +119,7 @@ public class DictEncodedBatchStoreTest {
     private static void checkDictEncodedReadData(final ColumnarSchema columnarSchema, final ReadBatch baseBatch,
         final ReadBatch wrappedBatch) {
         for (int c = 0; c < columnarSchema.numColumns(); c++) {
-            var dictEncodingTrait = (DictEncodingTrait)columnarSchema.getTraits(c).get(DataTrait.Type.DICT_ENCODING);
-            if (dictEncodingTrait != null && dictEncodingTrait.isEnabled())
-            {
+            if (DictEncodingTrait.isEnabled(columnarSchema.getTraits(c))) {
                 if (columnarSchema.getSpec(c) == StringDataSpec.INSTANCE) {
                     assertEquals(baseBatch.get(c).getClass(), TestDictEncodedStringData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedStringReadData.class);
