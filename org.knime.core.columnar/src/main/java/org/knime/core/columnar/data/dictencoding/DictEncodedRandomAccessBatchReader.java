@@ -62,8 +62,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
-import org.knime.core.table.schema.traits.DataTrait;
-import org.knime.core.table.schema.traits.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 
 /**
  * Wraps a delegate{@link RandomAccessBatchReader} and upon access
@@ -105,8 +104,7 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
     private NullableReadData wrapDictEncodedData(final ReadBatch batch, final int index) {
         final var data = batch.get(index);
 
-        DictEncodingTrait dictEncodingTrait = (DictEncodingTrait)m_schema.getTraits(index).get(DataTrait.Type.DICT_ENCODING);
-        if (dictEncodingTrait != null && dictEncodingTrait.isEnabled()) {
+        if (DictEncodingTrait.isEnabled(m_schema.getTraits(index))) {
             if (m_schema.getSpec(index) instanceof StringDataSpec && !(data instanceof DictDecodedStringReadData)) {
                 if (!(data instanceof DictEncodedStringReadData)) {
                     throw new IllegalArgumentException("Expected DictEncodedStringReadData to construct DictDecodedStringReadData");

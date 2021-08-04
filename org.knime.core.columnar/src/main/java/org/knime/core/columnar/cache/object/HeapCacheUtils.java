@@ -57,8 +57,7 @@ import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
-import org.knime.core.table.schema.traits.DataTrait;
-import org.knime.core.table.schema.traits.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 
 /**
  * Utility class.
@@ -84,8 +83,7 @@ public final class HeapCacheUtils {
             // * For Strings we need to do UTF-8 encoding and decoding
             // * For Generic object we need to call a serializer which might be expensive
             final DataSpec columnDataSpec = schema.getSpec(i);
-            DictEncodingTrait dictEncodingTrait = (DictEncodingTrait)schema.getTraits(i).get(DataTrait.Type.DICT_ENCODING);
-            final boolean isDictEncoded = dictEncodingTrait != null && dictEncodingTrait.isEnabled();
+            final boolean isDictEncoded = DictEncodingTrait.isEnabled(schema.getTraits(i));
             if (columnDataSpec instanceof VarBinaryDataSpec && !isDictEncoded) {
                 indices.add(i);
             }
@@ -107,8 +105,7 @@ public final class HeapCacheUtils {
             // * For Strings we need to do UTF-8 encoding and decoding
             // * For Generic object we need to call a serializer which might be expensive
             final DataSpec columnDataSpec = schema.getSpec(i);
-            DictEncodingTrait dictEncodingTrait = (DictEncodingTrait)schema.getTraits(i).get(DataTrait.Type.DICT_ENCODING);
-            final boolean isDictEncoded = dictEncodingTrait != null && dictEncodingTrait.isEnabled();
+            final boolean isDictEncoded = DictEncodingTrait.isEnabled(schema.getTraits(i));
             if (columnDataSpec instanceof StringDataSpec && !isDictEncoded) {
                 indices.add(i);
             }
