@@ -53,7 +53,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchReadStore;
+import org.knime.core.columnar.filter.DefaultBatchRange;
+import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -63,6 +66,7 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
+import org.knime.core.data.columnar.table.virtual.CloseableTrackingSupplier;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -77,6 +81,11 @@ import org.knime.core.node.NodeLogger;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.WorkflowDataRepository;
+import org.knime.core.table.cursor.Cursor;
+import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.row.ReadAccessRow;
+import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * Implementation of an {@link ExtensionTable}. This table is managed by the KNIME framework and allows to access data
@@ -118,7 +127,10 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+    // TODO AP-17236 would allow to implement a BatchReadStoreRowAccessible that lives in org.knime.core.columnar
+    // this class would then simply wrap one of these
     private final BatchReadStore m_readStore;
+
 
     // effectively final
     private Finalizer m_storeCloser;
@@ -138,8 +150,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         m_readStore = new WrappedBatchReadStore(cached, store.numBatches(), store.batchLength());
     }
 
-    AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory, final ColumnarValueSchema schema,
-        final BatchReadStore store, final long size) {
+    AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final BatchReadStore store, final long size) {
         m_tableId = tableId;
         m_factory = factory;
         m_schema = schema;
@@ -165,6 +177,10 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     @Override
     public DataTableSpec getDataTableSpec() {
         return m_schema.getSourceSpec();
+    }
+
+    ColumnarValueSchema getSchema() {
+        return m_schema;
     }
 
     @Override
@@ -267,6 +283,38 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         return materializeColumnIndices.isPresent()
             ? FilteredColumnarRowIteratorFactory.create(cursor(filter), materializeColumnIndices.get())
             : new ColumnarRowIterator(cursor(filter));
+    }
+
+    RowAccessible asRowAccessible() {
+        return new ColumnarContainerRowAccessible();
+    }
+
+    private final class ColumnarContainerRowAccessible implements RowAccessible {
+
+        private final CloseableTrackingSupplier<Cursor<ReadAccessRow>> m_cursors =
+            new CloseableTrackingSupplier<>(this::createCursorInternal);
+
+        @Override
+        public void close() throws IOException {
+            m_cursors.close();
+        }
+
+        @Override
+        public ColumnarSchema getSchema() {
+            return m_schema;
+        }
+
+        @Override
+        public Cursor<ReadAccessRow> createCursor() {
+            return m_cursors.get();
+        }
+
+        private LookaheadCursor<ReadAccessRow> createCursorInternal() {
+            final int lastIndexInLastBatch = (int)((m_size - 1) % m_readStore.batchLength());
+            final var batchRange = new DefaultBatchRange(0, 0, m_readStore.numBatches() - 1, lastIndexInLastBatch);
+            return ColumnarCursorFactory.create(m_readStore, new DefaultColumnSelection(m_schema.numColumns()),
+                batchRange);
+        }
     }
 
 }

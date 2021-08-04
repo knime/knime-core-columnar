@@ -7,6 +7,9 @@
       <ExtensionTableLoader
             extensionTableLoader="org.knime.core.data.columnar.table.ColumnarContainerTableLoader">
       </ExtensionTableLoader>
+      <ExtensionTableLoader
+            extensionTableLoader="org.knime.core.data.columnar.table.VirtualTableExtensionTableLoader">
+      </ExtensionTableLoader>
    </extension>
    <extension
          point="org.knime.core.TableBackend">
