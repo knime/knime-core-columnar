@@ -49,6 +49,8 @@ package org.knime.core.data.columnar;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
@@ -59,16 +61,27 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarRowContainerSettings;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
+import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
+import org.knime.core.data.container.ColumnRearranger;
+import org.knime.core.data.container.ColumnRearrangerUtils;
+import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.container.ILocalDataRepository;
+import org.knime.core.data.container.RearrangeColumnsTable;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.node.BufferedDataTable;
+import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
+import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionContext;
+import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeLogger;
+import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
+import org.knime.core.table.virtual.spec.TableTransformSpec;
 
 /**
  * Columnar {@link TableBackend} implementation.
@@ -148,6 +161,50 @@ public final class ColumnarTableBackend implements TableBackend {
             nonNull.addToRepository(repository);
         }
         return nonNull;
+    }
+
+    @Override
+    public KnowsRowCountTable concatenate(final ExecutionMonitor exec, final IWriteFileStoreHandler filestoreHandler,
+        final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables)
+        throws CanceledExecutionException {
+        if (duplicatesPreCheck && rowKeyDuplicateSuffix == null) {
+            TableTransformUtils.checkForDuplicateKeys(exec, tables);
+            final DataTableSpec concatenateSpec = TableTransformUtils.concatenateSpec(tables);
+            final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
+            return new VirtualTableExtensionTable(tables, filestoreHandler, List.of(new ConcatenateTransformSpec()),
+                concatenateSpec, concatenatedSize);
+        } else {
+            return ConcatenateTable.create(exec, Optional.ofNullable(rowKeyDuplicateSuffix), duplicatesPreCheck,
+                tables);
+        }
+    }
+
+    @Override
+    public KnowsRowCountTable append(final ExecutionMonitor exec, final IWriteFileStoreHandler filestoreHandler,
+        final BufferedDataTable left, final BufferedDataTable right) throws CanceledExecutionException {
+        final BufferedDataTable[] tables = {left, right};
+        TableTransformUtils.checkRowKeysMatch(exec, tables);
+        final long appendSize = TableTransformUtils.appendSize(tables);
+        final DataTableSpec appendedSpec = TableTransformUtils.appendSpec(tables);
+        return new VirtualTableExtensionTable(tables, filestoreHandler,
+            TableTransformUtils.createAppendTransformations(tables), appendedSpec, appendSize);
+    }
+
+    @Override
+    public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor,
+        final IWriteFileStoreHandler filestoreHandler, final ColumnRearranger columnRearranger,
+        final BufferedDataTable table, final ExecutionContext context) throws CanceledExecutionException {
+        ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
+        if (ColumnRearrangerUtils.addsNoNewColumns(columnRearranger)) {
+            List<TableTransformSpec> transformations = TableTransformUtils.createRearrangeTransformations(
+                ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger),
+                table.getDataTableSpec().getNumColumns());
+            return new VirtualTableExtensionTable(new BufferedDataTable[]{table}, filestoreHandler, transformations,
+                columnRearranger.createSpec(), table.size());
+        } else {
+            // TODO replace fallback with fast tables based implementation once we have map functionality
+            return RearrangeColumnsTable.create(columnRearranger, table, progressMonitor, context);
+        }
     }
 
 }

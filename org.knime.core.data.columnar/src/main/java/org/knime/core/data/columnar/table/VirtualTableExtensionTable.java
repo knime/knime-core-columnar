@@ -224,7 +224,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return strings;
     }
 
-    VirtualTable getVirtualTable() {
+    private synchronized VirtualTable getVirtualTable() {
         // lazily setup graph once
         if (m_virtualTable == null) {
             m_virtualTable = initializeVirtualTable();
@@ -330,7 +330,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return VirtualTableUtils.createColumnarRowCursor(m_schema, getOutput().createCursor());
     }
 
-    private RowAccessible getOutput() {
+    private synchronized RowAccessible getOutput() {
         if (m_cachedOutputs == null) {
             m_cachedOutputs = runComputationGraph();
         }
@@ -422,6 +422,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         @Override
         public TableTransform getParent() {
             if (m_table.hasCachedOutput()) {
+                assert m_id == null;
                 m_id = UUID.randomUUID();
                 // TODO discuss if we should always take this route
                 // it would have the benefit that upstream nodes wouldn't have to run the comp graph again if a
