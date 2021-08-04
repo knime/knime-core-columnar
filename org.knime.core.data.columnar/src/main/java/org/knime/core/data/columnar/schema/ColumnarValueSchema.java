@@ -49,6 +49,8 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -65,10 +67,12 @@ public interface ColumnarValueSchema extends ColumnarSchema {
     DataTableSpec getSourceSpec();
 
     /**
-     * @return the {@link ValueFactory ValueFactories} for the columns in {@link DataTableSpec} plus the row key column
+     * @param <R> the type of {@link ReadAccess}
+     * @param <W> the type of {@link WriteAccess}
+     * @param index of the column (including the row key column)
+     * @return the {@link ValueFactory} for the provided column index
      */
-    ValueFactory<?, ?>[] getValueFactories();
-
+    <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(int index);
 
     /**
     * Saves the wrapped {@link ValueSchema} to the provided settings.

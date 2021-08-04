@@ -45,12 +45,12 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
+import java.util.stream.IntStream;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.BoundedValue;
@@ -118,9 +118,10 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
     public DefaultDomainWritableConfig(final ColumnarValueSchema schema, final int maxPossibleNominalDomainValues,
         final boolean initializeDomains) {
         m_schema = schema;
-        m_readValueFactories = Arrays.stream(schema.getValueFactories())//
-                .map(f -> new DefaultReadValueFactory<>(f))//
-                .toArray(ColumnarReadValueFactory[]::new);
+        m_readValueFactories = IntStream.range(0, schema.numColumns())//
+            .mapToObj(schema::getValueFactory)//
+            .map(DefaultReadValueFactory::new)//
+            .toArray(ColumnarReadValueFactory[]::new);
         m_initDomains = initializeDomains;
         m_maxNumValues = maxPossibleNominalDomainValues;
     }

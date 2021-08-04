@@ -49,10 +49,13 @@
 package org.knime.core.data.columnar.schema;
 
 import java.util.Iterator;
+import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.traits.DataTraits;
 
@@ -93,11 +96,6 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public ValueFactory<?, ?>[] getValueFactories() {
-        return m_delegate.getValueFactories();
-    }
-
-    @Override
     public Iterator<DataSpec> iterator() {
         return m_delegate.iterator();
     }
@@ -111,9 +109,20 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     public boolean equals(final Object obj) {
         return m_delegate.equals(obj);
     }
-    
+
+    @Override
     public DataTraits getTraits(final int index) {
         return m_delegate.getTraits(index);
+    }
+
+    @Override
+    public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
+        return m_delegate.getValueFactory(index);
+    }
+
+    @Override
+    public Stream<DataSpec> specStream() {
+        return m_delegate.specStream();
     }
 
 }

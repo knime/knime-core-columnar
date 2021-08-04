@@ -54,6 +54,8 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.traits.DataTraits;
@@ -92,11 +94,6 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
         }
 
         return m_specs.get(index);
-    }
-
-    @Override
-    public ValueFactory<?, ?>[] getValueFactories() {
-        return m_source.getValueFactories();
     }
 
     @Override
@@ -148,6 +145,17 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
         }
 
         return m_traits.get(index);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
+        return (ValueFactory<R, W>)m_source.getValueFactories()[index];
+    }
+
+    @Override
+    public Stream<DataSpec> specStream() {
+        return m_specs.stream();
     }
 
 }
