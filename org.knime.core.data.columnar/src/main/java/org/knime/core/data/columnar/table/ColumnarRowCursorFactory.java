@@ -46,26 +46,23 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.IntStream;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
+import org.knime.core.columnar.filter.BatchRange;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.DefaultBatchRange;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
-import org.knime.core.data.DataValue;
-import org.knime.core.data.RowKeyValue;
+import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
+import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.container.filter.TableFilter;
-import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.node.NodeLogger;
-import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
 
@@ -109,15 +106,11 @@ final class ColumnarRowCursorFactory {
 
     }
 
-    private static final class DefaultRowCursor implements RowCursor, RowRead {
+    private static final class DefaultRowCursor implements RowCursor {
 
         private final LookaheadCursor<ReadAccessRow> m_delegate;
 
-        private final ReadValue[] m_values;
-
-        private final ReadAccess[] m_accesses;
-
-        private final ColumnarValueSchema m_schema;
+        private final RowRead m_rowRead;
 
         private final Set<Finalizer> m_openCursorFinalizers;
 
@@ -126,21 +119,10 @@ final class ColumnarRowCursorFactory {
 
         private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate,
             final Set<Finalizer> openCursorFinalizers, final ColumnarValueSchema schema,
-            final ColumnSelection selection) throws IOException {
+            final ColumnSelection selection) {
             m_delegate = delegate;
-            m_schema = schema;
             ReadAccessRow access = delegate.access();
-
-            // TODO support efficient wide tables
-            m_accesses = new ReadAccess[access.size()];
-            m_values = new ReadValue[access.size()];
-            final var facs = schema.getValueFactories();
-            for (int i = 0; i < access.size(); i++) {
-                if (selection.isSelected(i)) {
-                    m_accesses[i] = access.getAccess(i);
-                    m_values[i] = facs[i].createReadValue(access.getAccess(i));
-                }
-            }
+            m_rowRead = VirtualTableUtils.createRowRead(schema, access, selection);
             m_openCursorFinalizers = openCursorFinalizers;
         }
 
@@ -151,12 +133,12 @@ final class ColumnarRowCursorFactory {
 
         @Override
         public RowRead forward() {
-            return m_delegate.forward() ? this : null;
+            return m_delegate.forward() ? m_rowRead : null;
         }
 
         @Override
         public int getNumColumns() {
-            return m_schema.numColumns() - 1;
+            return m_rowRead.getNumColumns();
         }
 
         @Override
@@ -175,23 +157,6 @@ final class ColumnarRowCursorFactory {
             }
         }
 
-        @Override
-        public <D extends DataValue> D getValue(final int index) {
-            @SuppressWarnings("unchecked")
-            final D cast = (D)m_values[index + 1];
-            return cast;
-        }
-
-        @Override
-        public boolean isMissing(final int index) {
-            return m_accesses[index + 1].isMissing();
-        }
-
-        @Override
-        public RowKeyValue getRowKey() {
-            return (RowKeyReadValue)m_values[0];
-        }
-
     }
 
     static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size,
@@ -201,66 +166,57 @@ final class ColumnarRowCursorFactory {
 
     static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size, // NOSONAR
         final Set<Finalizer> openCursorFinalizers, final TableFilter filter) throws IOException {
-
-        final long maxRowIndex = size - 1;
-        // filter.getFromRowIndex() is guaranteed to return a value >= 0
-        final long fromRowIndex = filter != null ? filter.getFromRowIndex().orElse(0L) : 0L;
-        // filter.getToRowIndex() is guaranteed to return a value >= fromRowIndex >= 0
-        final long toRowIndex = filter != null ? filter.getToRowIndex().orElse(maxRowIndex) : maxRowIndex;
-
         if (size < 1) {
             return new EmptyRowCursor(schema);
         }
-
-        final ColumnSelection selection = createColumnSelection(filter, schema.numColumns());
-
         final int maxLength = store.batchLength();
         if (maxLength < 1) {
             throw new IllegalStateException(
                 String.format("Length of table is %d, but maximum batch length is %d.", size, maxLength));
         }
 
-        final int firstBatchIndex = (int)(fromRowIndex / maxLength);
-        final int lastBatchIndex = (int)(toRowIndex / maxLength);
-        final int firstIndexInFirstBatch = (int)(fromRowIndex % maxLength);
-        final int lastIndexInLastBatch = (int)(toRowIndex % maxLength);
-
+        final var batchRange = createBatchRange(filter, size, maxLength);
         final int numBatches = store.numBatches();
-        if (lastBatchIndex >= numBatches) {
+        if (batchRange.getLastBatch() >= numBatches) {
             throw new IllegalStateException(String.format("Last batch index is %d, but maximum batch index is %d.",
-                lastBatchIndex, numBatches - 1));
+                batchRange.getLastBatch(), numBatches - 1));
         }
 
-        var cursor = new DefaultRowCursor(ColumnarCursorFactory.create(store, selection, firstBatchIndex,
-            lastBatchIndex, firstIndexInFirstBatch, lastIndexInLastBatch), openCursorFinalizers, schema, selection);
+        final var selection = createColumnSelection(filter, schema.numColumns());
+
+        var cursor = new DefaultRowCursor(ColumnarCursorFactory.create(store, selection, batchRange),
+            openCursorFinalizers, schema, selection);
         // can't invoke this in the constructor since it passes a reference to itself to the ResourceLeakDetector
         cursor.m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(cursor, cursor.m_delegate);
         openCursorFinalizers.add(cursor.m_finalizer);
         return cursor;
     }
 
+    private static BatchRange createBatchRange(final TableFilter filter, final long size, final int batchLength) {
+        final long maxRowIndex = size - 1;
+        // filter.getFromRowIndex() is guaranteed to return a value >= 0
+        final long fromRowIndex = filter != null ? TableFilterUtils.extractFromIndex(filter) : 0L;
+        // filter.getToRowIndex() is guaranteed to return a value >= fromRowIndex >= 0
+        final long toRowIndex = filter != null ? TableFilterUtils.extractToIndex(filter, size) : maxRowIndex;
+
+        final int firstBatchIndex = (int)(fromRowIndex / batchLength);
+        final int lastBatchIndex = (int)(toRowIndex / batchLength);
+        final int firstIndexInFirstBatch = (int)(fromRowIndex % batchLength);
+        final int lastIndexInLastBatch = (int)(toRowIndex % batchLength);
+        return new DefaultBatchRange(firstBatchIndex, firstIndexInFirstBatch, lastBatchIndex, lastIndexInLastBatch);
+    }
+
     private static ColumnSelection createColumnSelection(final TableFilter filter, final int numColumns) {
         if (filter == null) {
             return new DefaultColumnSelection(numColumns);
         } else {
-            final Optional<int[]> selection =
-                filter.getMaterializeColumnIndices().map(ColumnarRowCursorFactory::translateMaterializedColumnIndices);
-            if (selection.isPresent()) {
-                return new FilteredColumnSelection(numColumns, selection.get());
+            if (TableFilterUtils.definesColumnFilter(filter)) {
+                return new FilteredColumnSelection(numColumns,
+                    TableFilterUtils.extractPhysicalColumnIndices(filter, numColumns));
             } else {
                 return new DefaultColumnSelection(numColumns);
             }
         }
-    }
-
-    private static int[] translateMaterializedColumnIndices(final Set<Integer> materialized) {
-        return IntStream.concat(
-            // prepend index of row key column to selection
-            IntStream.of(0), //
-            materialized.stream()//
-                .sorted()//
-                .mapToInt(i -> i.intValue() + 1))// increment by one to accommodate row key column
-            .toArray();
     }
 
     private ColumnarRowCursorFactory() {

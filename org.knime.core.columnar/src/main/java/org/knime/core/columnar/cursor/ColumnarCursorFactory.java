@@ -60,6 +60,7 @@ import org.knime.core.columnar.access.ColumnarReadAccess;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.filter.BatchRange;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.table.access.ReadAccess;
@@ -81,24 +82,18 @@ public final class ColumnarCursorFactory {
      *
      * @param store to read from
      * @param selection the columns to read
-     * @param firstBatchIndex index of the first batch to read
-     * @param lastBatchIndex index of the last batch to read
-     * @param firstIndexInFirstBatch first index to read in the first batch
-     * @param lastIndexInLastBatch last index to read in the last batch. Can be {@code -1} in which case the last batch
-     *            is read fully.
+     * @param batchRange the range of batches and rows to read
      * @return a {@link LookaheadCursor} that reads from {@link BatchReadStore store}
      */
     public static LookaheadCursor<ReadAccessRow> create(final BatchReadStore store, final ColumnSelection selection,
-        final int firstBatchIndex, final int lastBatchIndex, final int firstIndexInFirstBatch,
-        final int lastIndexInLastBatch) {
+        final BatchRange batchRange) {
 
         final ColumnarSchema schema = store.getSchema();
         final ColumnarAccessFactory[] accessFactories = IntStream.range(0, schema.numColumns())//
             .mapToObj(i -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(i)))//
             .toArray(ColumnarAccessFactory[]::new);
 
-        return new DefaultColumnarCursor(store, selection, accessFactories, firstBatchIndex, lastBatchIndex,
-            firstIndexInFirstBatch, lastIndexInLastBatch);
+        return new DefaultColumnarCursor(store, selection, accessFactories, batchRange);
     }
 
     private ColumnarCursorFactory() {}
@@ -131,8 +126,7 @@ public final class ColumnarCursorFactory {
         private int m_currentIndexInCurrentBatch;
 
         private DefaultColumnarCursor(final BatchReadStore store, final ColumnSelection selection,
-            final ColumnarAccessFactory[] accessFactories, final int firstBatchIndex, final int lastBatchIndex,
-            final int firstIndexInFirstBatch, final int lastIndexInLastBatch) {
+            final ColumnarAccessFactory[] accessFactories, final BatchRange batchSelection) {
             m_numColumns = store.getSchema().numColumns();
             m_selection = selection;
             m_accesses = Arrays.stream(accessFactories) //
@@ -145,15 +139,15 @@ public final class ColumnarCursorFactory {
                 : store.createRandomAccessReader(selection);
             m_reader = reader;
 
-            m_firstBatchIndex = firstBatchIndex;
-            m_firstIndexInFirstBatch = firstIndexInFirstBatch;
+            m_firstBatchIndex = batchSelection.getFirstBatch();
+            m_firstIndexInFirstBatch = batchSelection.getFirstRowInFirstBatch();
             // Special case for stores that contain only empty batches: don't even bother trying to iterate over them,
             // this would only complicate the index-handling logic in the methods below.
-            m_lastBatchIndex = store.batchLength() > 0 ? lastBatchIndex : -1;
-            m_lastIndexInLastBatch = lastIndexInLastBatch;
+            m_lastBatchIndex = store.batchLength() > 0 ? batchSelection.getLastBatch() : -1;
+            m_lastIndexInLastBatch = batchSelection.getLastRowInLastBatch();
 
-            m_currentBatchIndex = firstBatchIndex - 1;
-            m_currentIndexInCurrentBatch = firstIndexInFirstBatch - 1;
+            m_currentBatchIndex = m_firstBatchIndex - 1;
+            m_currentIndexInCurrentBatch = m_firstIndexInFirstBatch - 1;
         }
 
         @Override
