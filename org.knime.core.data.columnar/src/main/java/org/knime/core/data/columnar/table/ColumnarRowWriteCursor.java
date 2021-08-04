@@ -51,13 +51,10 @@ import java.io.IOException;
 
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.v2.RowKeyWriteValue;
-import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.virtual.WriteAccessRowWrite;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
-import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.WriteAccessRow;
@@ -69,21 +66,17 @@ import org.knime.core.table.row.WriteAccessRow;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
-
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteCursor.class);
+final class ColumnarRowWriteCursor implements RowWriteCursor {
 
     // the maximum capacity (in number of held elements) of a single chunk
     // subtract 750 since arrow rounds up to the next power of 2 anyways
     static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
 
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteCursor.class);
+
     private final WriteCursor<WriteAccessRow> m_accessCursor;
 
-    private final WriteValue<?>[] m_values;
-
-    private final RowKeyWriteValue m_rowKeyValue;
-
-    private final WriteAccessRow m_access;
+    private final RowWrite m_rowWrite;
 
     private long m_size = 0;
 
@@ -95,17 +88,11 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
      * @param factories Value factories for the individual columns
      * @param flushOnForward An optional {@link Flushable} that will be flushed on each forward operation
      */
-    ColumnarRowWriteCursor(final BatchStore store, final ValueFactory<?, ?>[] factories, final Flushable flushOnForward) {
+    ColumnarRowWriteCursor(final BatchStore store, final ColumnarValueSchema schema, final Flushable flushOnForward) {
 
         m_accessCursor = ColumnarWriteCursorFactory.createWriteCursor(store);
-        m_access = m_accessCursor.access();
-        m_values = new WriteValue[factories.length];
-        assert factories.length == m_access.size();
-        for (int i = 0; i < m_values.length; i++) {
-            m_values[i] = factories[i].createWriteValue(m_access.getWriteAccess(i));
-        }
-        m_rowKeyValue = (RowKeyWriteValue)m_values[0];
         m_flushOnForward = flushOnForward;
+        m_rowWrite = new WriteAccessRowWrite(schema, m_accessCursor.access());
     }
 
     @Override
@@ -118,46 +105,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
             }
         }
         m_size++;
-        return m_accessCursor.forward() ? this : null;
-    }
-
-    @Override
-    public final <W extends WriteValue<?>> W getWriteValue(final int index) {
-        @SuppressWarnings("unchecked")
-        final W value = (W)m_values[index + 1];
-        return value;
-    }
-
-    @Override
-    public final void setMissing(final int index) {
-        m_access.getWriteAccess(index + 1).setMissing();
-    }
-
-    @Override
-    public final void setFrom(final RowRead access) {
-        setRowKey(access.getRowKey());
-        for (int i = 0; i < m_values.length - 1; i++) {
-            if (access.isMissing(i)) {
-                setMissing(i);
-            } else {
-                m_values[i + 1].setValue(access.getValue(i));
-            }
-        }
-    }
-
-    @Override
-    public int getNumColumns() {
-        return m_values.length - 1;
-    }
-
-    @Override
-    public void setRowKey(final String rowKey) {
-        m_rowKeyValue.setRowKey(rowKey);
-    }
-
-    @Override
-    public void setRowKey(final RowKeyValue rowKey) {
-        m_rowKeyValue.setRowKey(rowKey);
+        return m_accessCursor.forward() ? m_rowWrite : null;
     }
 
     @Override
@@ -191,6 +139,10 @@ final class ColumnarRowWriteCursor implements RowWriteCursor, RowWrite {
             // This exception is usually not critical, similar to #close()
             LOGGER.warn("Finishing writing failed because flushing the write access cursor failed.", ex);
         }
+    }
+
+    int getNumColumns() {
+        return m_rowWrite.getNumColumns();
     }
 
 }

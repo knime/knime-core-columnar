@@ -138,7 +138,7 @@ final class ColumnarRowContainer implements RowContainer {
 
         m_store = new WrappedBatchStore(m_domainWritable, m_cached);
 
-        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema.getValueFactories(), m_forceSynchronousIO ? m_cached : null);
+        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, m_forceSynchronousIO ? m_cached : null);
     }
 
     @Override
