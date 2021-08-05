@@ -49,6 +49,7 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -56,22 +57,29 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedRead
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 
 /**
- * Base implementation for DictEncodedData
+ * Base implementation for {@link NullableReadData} and {@link NullableWriteData} that are implemented
+ * using dictionary encoding in the back-end, but feel like "decoded" data objects to the user, hence
+ * the user does not notice whether the back-end uses dictionary encoding or not.
+ *
+ * The {@link AbstractDictDecodedObjectReadData} and {@link AbstractDictDecodedObjectWriteData} hold a
+ * dictionary of generic type and pass on references to the dictionary entries as well as the dictionary
+ * to the back-end. This way we can prevent duplicate serialization of large dictionary entries.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
+@SuppressWarnings("javadoc")
 final class AbstractDictDecodedObjectData {
     AbstractDictDecodedObjectData()
     {
     }
 
-    abstract static class AbstractDictDecodedObjectReadData<O> implements NullableReadData
+    abstract static class AbstractDictDecodedObjectReadData<T, D extends DictEncodedReadData> implements NullableReadData
     {
-        protected final HashMap<Integer, O> m_dict = new HashMap<>();
+        protected final HashMap<Integer, T> m_dict = new HashMap<>();
 
-        protected final DictEncodedReadData m_delegate;
+        protected final D m_delegate;
 
-        AbstractDictDecodedObjectReadData(final DictEncodedReadData delegate)
+        AbstractDictDecodedObjectReadData(final D delegate)
         {
             m_delegate = delegate;
         }
@@ -103,20 +111,25 @@ final class AbstractDictDecodedObjectData {
             return m_delegate.sizeOf();
         }
 
-        public NullableReadData getDelegate() {
+        public D getDelegate() {
             return m_delegate;
         }
     }
 
-    abstract static class AbstractDictDecodedObjectWriteData<O> implements NullableWriteData
+    abstract static class AbstractDictDecodedObjectWriteData<T, D extends DictEncodedWriteData> implements NullableWriteData
     {
-        protected final DictEncodedWriteData m_delegate;
+        protected final D m_delegate;
 
-        final HashMap<O, Integer> m_dict = new HashMap<>();
+        // We use a linked hash map for the dict to ensure that we pass on dictionary
+        // entries to the delegate only with ascending indices. Because we assign dictionary
+        // entry indices in an ascending fashion and only insert a new value if not present yet,
+        // index-ordering equals insertion-ordering of the linked hash map. So iteration over the
+        // linked hash map will also happen with index-ordering.
+        final LinkedHashMap<T, Integer> m_dict = new LinkedHashMap<>();
 
         protected int m_nextDictEntry = 0;
 
-        AbstractDictDecodedObjectWriteData(final DictEncodedWriteData delegate)
+        AbstractDictDecodedObjectWriteData(final D delegate)
         {
             m_delegate = delegate;
         }
@@ -153,7 +166,7 @@ final class AbstractDictDecodedObjectData {
             return m_delegate.sizeOf();
         }
 
-        public NullableWriteData getDelegate() {
+        public D getDelegate() {
             return m_delegate;
         }
     }

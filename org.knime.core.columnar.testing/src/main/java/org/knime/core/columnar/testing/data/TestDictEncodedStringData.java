@@ -99,4 +99,9 @@ public final class TestDictEncodedStringData extends AbstractTestDictEncodedObje
         m_dict.put(dictionaryIndex, obj);
     }
 
+    @Override
+    public DictEncodedStringReadData close(final int length) {
+        closeInternal(length);
+        return this;
+    }
 }

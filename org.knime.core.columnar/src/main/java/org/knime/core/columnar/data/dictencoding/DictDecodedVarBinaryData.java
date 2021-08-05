@@ -76,7 +76,7 @@ public final class DictDecodedVarBinaryData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedObjectWriteData<Object>
+    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedObjectWriteData<Object, DictEncodedVarBinaryWriteData>
         implements VarBinaryWriteData {
 
         final HashMap<Integer, ObjectSerializer<Object>> m_serializers = new HashMap<>();
@@ -101,7 +101,7 @@ public final class DictDecodedVarBinaryData {
 
         private <T> void setDictEncodedObject(final int index, final T obj, final ObjectSerializer<T> serializer) {
             @SuppressWarnings("unchecked")
-            final var dictIndex = m_dict.computeIfAbsent(obj, o -> {
+            final int dictIndex = m_dict.computeIfAbsent(obj, o -> {
                 m_serializers.put(m_nextDictEntry, (ObjectSerializer<Object>)serializer);
                 return m_nextDictEntry++;
             });
@@ -116,12 +116,10 @@ public final class DictDecodedVarBinaryData {
         @Override
         public VarBinaryReadData close(final int length) {
             // write all dict entries:
-            m_dict.entrySet().stream().sorted((a, b) -> Integer.compare(a.getValue(), b.getValue()))
-                .forEach(e -> ((DictEncodedVarBinaryWriteData)m_delegate).setDictEntry(e.getValue(), e.getKey(),
-                    m_serializers.get(e.getValue())));
+            m_dict.forEach((k, v) -> m_delegate.setDictEntry(v, k, m_serializers.get(v)));
 
             // now we can close
-            return new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)m_delegate.close(length));
+            return new DictDecodedVarBinaryReadData(m_delegate.close(length));
         }
     }
 
@@ -130,7 +128,7 @@ public final class DictDecodedVarBinaryData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedObjectReadData<Object>
+    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedObjectReadData<Object, DictEncodedVarBinaryReadData>
         implements VarBinaryReadData {
 
         /**
@@ -146,7 +144,7 @@ public final class DictDecodedVarBinaryData {
         @Override
         public byte[] getBytes(final int index) {
             return getDictEncodedObject(index, input -> {
-                final var length = input.readInt();
+                final int length = input.readInt();
                 byte[] buf = new byte[length];
                 input.readFully(buf, 0, length);
                 return buf;
@@ -160,9 +158,8 @@ public final class DictDecodedVarBinaryData {
 
         @SuppressWarnings("unchecked")
         private <T> T getDictEncodedObject(final int index, final ObjectDeserializer<T> deserializer) {
-            final var dictIndex = m_delegate.getReference(index);
-            return (T)m_dict.computeIfAbsent(dictIndex,
-                i -> ((DictEncodedVarBinaryReadData)m_delegate).getDictEntry(i, deserializer));
+            final int dictIndex = m_delegate.getReference(index);
+            return (T)m_dict.computeIfAbsent(dictIndex, i -> m_delegate.getDictEntry(i, deserializer));
         }
     }
 
