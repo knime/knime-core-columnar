@@ -5,7 +5,10 @@ library "knime-pipeline@$BN"
 
 properties([
     pipelineTriggers([
-        upstream("knime-core/${env.BRANCH_NAME.replaceAll('/', '%2F')}")
+        upstream(
+            'knime-core/' + env.BRANCH_NAME.replaceAll('/', '%2F') +
+            ', knime-core-table/' + env.BRANCH_NAME.replaceAll('/', '%2F')
+            )
     ]),
     parameters(workflowTests.getConfigurationsAsParameters()),
     buildDiscarder(logRotator(numToKeepStr: '5')),
@@ -14,6 +17,12 @@ properties([
 
 try {
     knimetools.defaultTychoBuild('org.knime.update.core.columnar')
+    
+    workflowTests.runTests(
+        dependencies: [
+            repositories: ['knime-core-columnar', 'knime-core-arrow', 'knime-core', 'knime-base']
+        ]
+    )
 
     stage('Sonarqube analysis') {
         env.lastStage = env.STAGE_NAME
