@@ -84,6 +84,9 @@ public final class DictEncodedVarBinaryData {
          * @param serializer A serializer for the object into a {@link DataOutput}.
          */
         public <T> void setDictEntry(final int dictionaryIndex, final T dictEntry, final ObjectSerializer<T> serializer);
+
+        @Override
+        public DictEncodedVarBinaryReadData close(int length);
     }
 
     /**

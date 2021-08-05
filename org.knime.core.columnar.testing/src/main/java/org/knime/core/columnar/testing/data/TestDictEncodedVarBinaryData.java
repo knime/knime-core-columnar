@@ -102,4 +102,9 @@ public final class TestDictEncodedVarBinaryData extends AbstractTestDictEncodedO
         m_dict.put(dictionaryIndex, obj);
     }
 
+    @Override
+    public DictEncodedVarBinaryReadData close(final int length) {
+        closeInternal(length);
+        return this;
+    }
 }

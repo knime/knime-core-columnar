@@ -73,7 +73,7 @@ public final class DictDecodedStringData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringWriteData extends AbstractDictDecodedObjectWriteData<String> implements StringWriteData {
+    public static class DictDecodedStringWriteData extends AbstractDictDecodedObjectWriteData<String, DictEncodedStringWriteData> implements StringWriteData {
 
         /**
          * Create a {@link DictDecodedStringWriteData} wrapping a {@link DictEncodedStringWriteData} provided by a backend.
@@ -105,11 +105,10 @@ public final class DictDecodedStringData {
         public StringReadData close(final int length) {
             // write all dict entries:
             m_dict.entrySet().stream()
-                .sorted((a, b) -> Integer.compare(a.getValue(), b.getValue()))
-                .forEach(e -> ((DictEncodedStringWriteData)m_delegate).setDictEntry(e.getValue(), e.getKey()));
+                .forEach(e -> m_delegate.setDictEntry(e.getValue(), e.getKey()));
 
             // now we can close
-            return new DictDecodedStringReadData((DictEncodedStringReadData)m_delegate.close(length));
+            return new DictDecodedStringReadData(m_delegate.close(length));
         }
     }
 
@@ -118,7 +117,8 @@ public final class DictDecodedStringData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringReadData extends AbstractDictDecodedObjectReadData<String> implements StringReadData {
+    public static class DictDecodedStringReadData extends
+        AbstractDictDecodedObjectReadData<String, DictEncodedStringReadData> implements StringReadData {
         /**
          * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a backend.
          * @param delegate The delegate {@link DictEncodedStringReadData}
@@ -141,7 +141,7 @@ public final class DictDecodedStringData {
 
         private String getDictEncodedObject(final int index) {
             final var dictIndex = m_delegate.getReference(index);
-            return m_dict.computeIfAbsent(dictIndex, ((DictEncodedStringReadData)m_delegate)::getDictEntry);
+            return m_dict.computeIfAbsent(dictIndex, m_delegate::getDictEntry);
         }
     }
 

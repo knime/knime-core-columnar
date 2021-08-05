@@ -91,12 +91,6 @@ public abstract class AbstractTestDictEncodedObjectData implements TestData, Dic
     }
 
     @Override
-    public AbstractTestDictEncodedObjectData close(final int length) {
-        closeInternal(length);
-        return this;
-    }
-
-    @Override
     public int getReference(final int dataIndex) {
         return m_values[dataIndex];
     }

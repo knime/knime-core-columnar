@@ -76,7 +76,7 @@ public final class DictDecodedVarBinaryData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedObjectWriteData<Object>
+    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedObjectWriteData<Object, DictEncodedVarBinaryWriteData>
         implements VarBinaryWriteData {
 
         final HashMap<Integer, ObjectSerializer<Object>> m_serializers = new HashMap<>();
@@ -116,12 +116,12 @@ public final class DictDecodedVarBinaryData {
         @Override
         public VarBinaryReadData close(final int length) {
             // write all dict entries:
-            m_dict.entrySet().stream().sorted((a, b) -> Integer.compare(a.getValue(), b.getValue()))
-                .forEach(e -> ((DictEncodedVarBinaryWriteData)m_delegate).setDictEntry(e.getValue(), e.getKey(),
+            m_dict.entrySet().stream()
+                .forEach(e -> m_delegate.setDictEntry(e.getValue(), e.getKey(),
                     m_serializers.get(e.getValue())));
 
             // now we can close
-            return new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)m_delegate.close(length));
+            return new DictDecodedVarBinaryReadData(m_delegate.close(length));
         }
     }
 
@@ -130,7 +130,7 @@ public final class DictDecodedVarBinaryData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedObjectReadData<Object>
+    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedObjectReadData<Object, DictEncodedVarBinaryReadData>
         implements VarBinaryReadData {
 
         /**
@@ -162,7 +162,7 @@ public final class DictDecodedVarBinaryData {
         private <T> T getDictEncodedObject(final int index, final ObjectDeserializer<T> deserializer) {
             final var dictIndex = m_delegate.getReference(index);
             return (T)m_dict.computeIfAbsent(dictIndex,
-                i -> ((DictEncodedVarBinaryReadData)m_delegate).getDictEntry(i, deserializer));
+                i -> m_delegate.getDictEntry(i, deserializer));
         }
     }
 

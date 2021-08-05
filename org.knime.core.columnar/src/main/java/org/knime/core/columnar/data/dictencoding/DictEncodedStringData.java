@@ -78,6 +78,9 @@ public final class DictEncodedStringData {
          * @param dictEntry the dictionary entry
          */
         public void setDictEntry(final int dictionaryIndex, final String dictEntry);
+
+        @Override
+        public DictEncodedStringReadData close(final int length);
     }
 
     /**
