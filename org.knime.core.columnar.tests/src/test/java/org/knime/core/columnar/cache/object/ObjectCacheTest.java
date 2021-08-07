@@ -58,6 +58,7 @@ import static org.knime.core.columnar.TestBatchStoreUtils.readSelectionAndCompar
 import static org.knime.core.columnar.TestBatchStoreUtils.readTwiceAndCompareTable;
 import static org.knime.core.columnar.TestBatchStoreUtils.releaseTable;
 import static org.knime.core.columnar.TestBatchStoreUtils.writeDefaultTable;
+import static org.knime.core.table.schema.DataSpecs.STRING;
 
 import java.io.IOException;
 import java.util.List;
@@ -81,9 +82,6 @@ import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.data.TestStringData;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.DefaultColumnarSchema;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -121,11 +119,11 @@ public class ObjectCacheTest {
     }
 
     private static ColumnarSchema createSingleStringColumnSchema() {
-        return new DefaultColumnarSchema(DataSpec.stringSpec(), DefaultDataTraits.EMPTY);
+        return ColumnarSchema.of(STRING);
     }
 
     private static ColumnarSchema createTwoStringColumnsSchema() {
-        return new DefaultColumnarSchema(DataSpec.stringSpec(), DataSpec.stringSpec());
+        return ColumnarSchema.of(STRING, STRING);
     }
 
     private static CountDownLatch blockSerialization() {
