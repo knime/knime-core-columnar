@@ -45,10 +45,22 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import java.util.Map;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
+import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
+import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
+import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
+import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
@@ -56,55 +68,89 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestDictEncodedVarBinaryData extends AbstractTestDictEncodedObjectData implements DictEncodedVarBinaryWriteData, DictEncodedVarBinaryReadData {
+public final class TestDictEncodedVarBinaryData extends AbstractTestDictEncodedData<Object>
+    implements DictEncodedVarBinaryWriteData, DictEncodedVarBinaryReadData {
 
     public static final class TestDictEncodedVarBinaryDataFactory implements TestDataFactory {
 
         public static final TestDictEncodedVarBinaryDataFactory INSTANCE = new TestDictEncodedVarBinaryDataFactory();
 
+        private final TestStructDataFactory m_delegate;
+
         private TestDictEncodedVarBinaryDataFactory() {
+            m_delegate = new TestStructDataFactory(TestIntDataFactory.INSTANCE, TestLongDataFactory.INSTANCE,
+                TestVarBinaryDataFactory.INSTANCE);
         }
 
         @Override
         public TestDictEncodedVarBinaryData createWriteData(final int capacity) {
-            return new TestDictEncodedVarBinaryData(capacity);
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public TestDictEncodedVarBinaryData createReadData(final Object[] packedData) {
-            return new TestDictEncodedVarBinaryData((Integer[])packedData[0], (Map<Integer, Object>)packedData[1]);
+            return new TestDictEncodedVarBinaryData(m_delegate.createWriteData(capacity));
         }
 
         @Override
-        public TestData createReadData(final Object[] packedData, final int length) {
-            return createReadData(packedData);
+        public TestDictEncodedVarBinaryData createReadData(final Object[] data) {
+            return new TestDictEncodedVarBinaryData(m_delegate.createReadData(data));
+        }
+
+        @Override
+        public TestDictEncodedVarBinaryData createReadData(final Object[] data, final int length) {
+            return new TestDictEncodedVarBinaryData(m_delegate.createReadData(data, length));
         }
 
     }
 
-    TestDictEncodedVarBinaryData(final int capacity) {
-        super(capacity);
-    }
-
-    TestDictEncodedVarBinaryData(final Integer[] references, final Map<Integer, Object> dictionary) {
-        super(references, dictionary);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T> T getDictEntry(final int dictionaryIndex, final ObjectDeserializer<T> deserializer) {
-        return (T)m_dict.get(dictionaryIndex);
+    TestDictEncodedVarBinaryData(final TestStructData delegate) {
+        super(delegate);
     }
 
     @Override
-    public <T> void setDictEntry(final int dictionaryIndex, final T obj, final ObjectSerializer<T> serializer) {
-        m_dict.put(dictionaryIndex, obj);
-    }
-
-    @Override
-    public DictEncodedVarBinaryReadData close(final int length) {
-        closeInternal(length);
+    public TestDictEncodedVarBinaryData close(final int length) {
+        super.close(length);
         return this;
+    }
+
+    @Override
+    public <T> void setObject(final int index, final T val, final ObjectSerializer<T> serializer) {
+        final ByteArrayOutputStream bs = new ByteArrayOutputStream();
+        final DataOutput output = new DataOutputStream(bs);
+        try {
+            serializer.serialize(output, val);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Error during serialization", ex);
+        }
+        setBytes(index, bs.toByteArray());
+    }
+
+    @Override
+    public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
+        final DataInput input = new DataInputStream(new ByteArrayInputStream(getBytes(index)));
+        try {
+            return deserializer.deserialize(input);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Error during deserialization", ex);
+        }
+    }
+
+    @Override
+    public Object[] get() {
+        return m_delegate.get();
+    }
+
+    @Override
+    public void setBytes(final int index, final byte[] val) {
+        int dictKey = m_dictValToKey.computeIfAbsent(val, v -> {
+            ((VarBinaryWriteData)m_delegate.getWriteDataAt(2)).setBytes(index, val);
+            return generateKey(val);
+        });
+
+        setDictKey(index, dictKey);
+    }
+
+    @Override
+    public byte[] getBytes(final int index) {
+        int dictKey = getDictKey(index);
+
+        return (byte[])m_dictKeyToVal.computeIfAbsent(dictKey,
+            k -> ((VarBinaryReadData)m_delegate.getReadDataAt(2)).getBytes(index));
     }
 }

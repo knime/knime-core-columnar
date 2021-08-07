@@ -45,63 +45,80 @@
  */
 package org.knime.core.columnar.testing.data;
 
-import java.util.Map;
-
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringWriteData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
+import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
+import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
+import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
+import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
 
 /**
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestDictEncodedStringData extends AbstractTestDictEncodedObjectData implements DictEncodedStringWriteData, DictEncodedStringReadData {
+public final class TestDictEncodedStringData extends AbstractTestDictEncodedData<String>
+    implements DictEncodedStringWriteData, DictEncodedStringReadData {
 
     public static final class TestDictEncodedStringDataFactory implements TestDataFactory {
 
         public static final TestDictEncodedStringDataFactory INSTANCE = new TestDictEncodedStringDataFactory();
 
+        private final TestStructDataFactory m_delegate;
+
         private TestDictEncodedStringDataFactory() {
+            m_delegate = new TestStructDataFactory(TestIntDataFactory.INSTANCE, TestLongDataFactory.INSTANCE,
+                TestStringDataFactory.INSTANCE);
         }
 
         @Override
         public TestDictEncodedStringData createWriteData(final int capacity) {
-            return new TestDictEncodedStringData(capacity);
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public TestDictEncodedStringData createReadData(final Object[] packedData) {
-            return new TestDictEncodedStringData((Integer[])packedData[0], (Map<Integer, Object>)packedData[1]);
+            return new TestDictEncodedStringData(m_delegate.createWriteData(capacity));
         }
 
         @Override
-        public TestData createReadData(final Object[] data, final int length) {
-            return createReadData(data);
+        public TestDictEncodedStringData createReadData(final Object[] data) {
+            return new TestDictEncodedStringData(m_delegate.createReadData(data));
+        }
+
+        @Override
+        public TestDictEncodedStringData createReadData(final Object[] data, final int length) {
+            return new TestDictEncodedStringData(m_delegate.createReadData(data, length));
         }
 
     }
 
-    TestDictEncodedStringData(final int capacity) {
-        super(capacity);
-    }
-
-    TestDictEncodedStringData(final Integer[] references, final Map<Integer, Object> dictionary) {
-        super(references, dictionary);
+    TestDictEncodedStringData(final TestStructData delegate) {
+        super(delegate);
     }
 
     @Override
-    public String getDictEntry(final int dictionaryIndex) {
-        return (String)m_dict.get(dictionaryIndex);
-    }
-
-    @Override
-    public void setDictEntry(final int dictionaryIndex, final String obj) {
-        m_dict.put(dictionaryIndex, obj);
-    }
-
-    @Override
-    public DictEncodedStringReadData close(final int length) {
-        closeInternal(length);
+    public TestDictEncodedStringData close(final int length) {
+        super.close(length);
         return this;
+    }
+
+    @Override
+    public void setString(final int index, final String val) {
+        int dictKey = m_dictValToKey.computeIfAbsent(val, v -> {
+            ((StringWriteData)m_delegate.getWriteDataAt(2)).setString(index, val);
+            return generateKey(val);
+        });
+
+        setDictKey(index, dictKey);
+    }
+
+    @Override
+    public String getString(final int index) {
+        int dictKey = getDictKey(index);
+
+        return m_dictKeyToVal.computeIfAbsent(dictKey,
+            k -> ((StringReadData)m_delegate.getReadDataAt(2)).getString(index));
+    }
+
+    @Override
+    public Object[] get() {
+        return m_delegate.get();
     }
 }

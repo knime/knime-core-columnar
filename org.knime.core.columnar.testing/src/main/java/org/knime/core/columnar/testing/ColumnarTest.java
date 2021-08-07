@@ -92,7 +92,7 @@ public class ColumnarTest {
         // We wait for the TestBatchStore to close before we check which closeables are left over.
         // This is necessary because close() of a cached batch store closes its delegates asynchronously.
         try {
-        storeCloseLatch.await();
+            storeCloseLatch.await();
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }

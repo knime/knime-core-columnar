@@ -48,16 +48,13 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import java.util.HashMap;
-
-import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectReadData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
+import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedWriteData;
+import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
@@ -72,95 +69,77 @@ public final class DictDecodedVarBinaryData {
     }
 
     /**
-     * {@link WriteData} that stores Strings using a dictionary encoding
+     * {@link DictDecodedVarBinaryWriteData} provides table-wide caching and {@link VarBinaryWriteData} access
+     * to a wrapped {@link DictEncodedVarBinaryWriteData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedObjectWriteData<Object, DictEncodedVarBinaryWriteData>
+    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedWriteData<DictEncodedVarBinaryWriteData>
         implements VarBinaryWriteData {
-
-        final HashMap<Integer, ObjectSerializer<Object>> m_serializers = new HashMap<>();
 
         /**
          * Create a {@link DictDecodedVarBinaryWriteData} wrapping a {@link DictDecodedVarBinaryWriteData} provided by a
-         * backend.
+         * back-end.
          *
          * @param delegate The delegate {@link DictEncodedVarBinaryWriteData}
+         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries, also used to generate global dictionary keys
          */
-        public DictDecodedVarBinaryWriteData(final DictEncodedVarBinaryWriteData delegate) {
-            super(delegate);
+        public DictDecodedVarBinaryWriteData(final DictEncodedVarBinaryWriteData delegate, final ColumnDictElementCache cache) {
+            super(delegate, cache);
         }
 
         @Override
         public void setBytes(final int index, final byte[] val) {
-            setDictEncodedObject(index, val, (output, v) -> {
-                output.writeInt(v.length);
-                output.write(v);
-            });
-        }
-
-        private <T> void setDictEncodedObject(final int index, final T obj, final ObjectSerializer<T> serializer) {
-            @SuppressWarnings("unchecked")
-            final int dictIndex = m_dict.computeIfAbsent(obj, o -> {
-                m_serializers.put(m_nextDictEntry, (ObjectSerializer<Object>)serializer);
-                return m_nextDictEntry++;
-            });
-            m_delegate.setReference(index, dictIndex);
+            m_delegate.setBytes(index, val);
         }
 
         @Override
         public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
-            setDictEncodedObject(index, value, serializer);
+            m_delegate.setObject(index, value, serializer);
         }
 
         @Override
         public VarBinaryReadData close(final int length) {
-            // write all dict entries:
-            m_dict.forEach((k, v) -> m_delegate.setDictEntry(v, k, m_serializers.get(v)));
-
-            // now we can close
-            return new DictDecodedVarBinaryReadData(m_delegate.close(length));
+            return new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)m_delegate.close(length), m_cache);
         }
     }
 
     /**
-     * {@link ReadData} holding String elements.
+     * {@link DictDecodedVarBinaryReadData} provides table-wide caching and {@link VarBinaryReadData} access
+     * to a wrapped {@link DictEncodedVarBinaryReadData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedObjectReadData<Object, DictEncodedVarBinaryReadData>
+    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedReadData<DictEncodedVarBinaryReadData>
         implements VarBinaryReadData {
 
         /**
          * Create a {@link DictDecodedVarBinaryReadData} wrapping a {@link DictDecodedVarBinaryReadData} provided by a
-         * backend.
+         * back-end.
          *
          * @param delegate The delegate {@link DictEncodedVarBinaryReadData}
+         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
-        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData delegate) {
-            super(delegate);
+        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData delegate, final ColumnDictElementCache cache) {
+            super(delegate,cache);
         }
 
         @Override
         public byte[] getBytes(final int index) {
-            return getDictEncodedObject(index, input -> {
-                final int length = input.readInt();
-                byte[] buf = new byte[length];
-                input.readFully(buf, 0, length);
-                return buf;
-            });
+            // TODO: for global dict caching:
+//          int dictKey = m_delegate.getDictEntryKey(index);
+//          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getBytes(index));
+
+            return m_delegate.getBytes(index);
         }
 
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-            return getDictEncodedObject(index, deserializer);
-        }
+            // TODO: for global dict caching:
+//          int dictKey = m_delegate.getDictEntryKey(index);
+//          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getObject(index));
 
-        @SuppressWarnings("unchecked")
-        private <T> T getDictEncodedObject(final int index, final ObjectDeserializer<T> deserializer) {
-            final int dictIndex = m_delegate.getReference(index);
-            return (T)m_dict.computeIfAbsent(dictIndex, i -> m_delegate.getDictEntry(i, deserializer));
+            return m_delegate.getObject(index, deserializer);
         }
     }
-
 }

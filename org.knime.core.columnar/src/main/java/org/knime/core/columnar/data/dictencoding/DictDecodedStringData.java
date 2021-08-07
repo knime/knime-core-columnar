@@ -48,18 +48,18 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectReadData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
+import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
+import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedWriteData;
+import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 
 /**
  * Provide {@link StringWriteData} and {@link StringReadData} access to underlying dictionary encoded data
+ * by allowing to use a table-wide cache.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
@@ -69,18 +69,20 @@ public final class DictDecodedStringData {
     }
 
     /**
-     * {@link DictDecodedStringWriteData} provides {@link StringWriteData} access to underlying {@link DictEncodedStringWriteData}.
+     * {@link DictDecodedStringWriteData} provides table-wide caching and {@link StringWriteData} access
+     * to a wrapped {@link DictEncodedStringWriteData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringWriteData extends AbstractDictDecodedObjectWriteData<String, DictEncodedStringWriteData> implements StringWriteData {
+    public static class DictDecodedStringWriteData extends AbstractDictDecodedWriteData<DictEncodedStringWriteData> implements StringWriteData {
 
         /**
-         * Create a {@link DictDecodedStringWriteData} wrapping a {@link DictEncodedStringWriteData} provided by a backend.
+         * Create a {@link DictDecodedStringWriteData} wrapping a {@link DictEncodedStringWriteData} provided by a back-end.
          * @param delegate The delegate {@link DictEncodedStringWriteData}
+         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries, also used to generate global dictionary keys
          */
-        public DictDecodedStringWriteData(final DictEncodedStringWriteData delegate) {
-            super(delegate);
+        public DictDecodedStringWriteData(final DictEncodedStringWriteData delegate, final ColumnDictElementCache cache) {
+            super(delegate, cache);
         }
 
         /**
@@ -93,54 +95,39 @@ public final class DictDecodedStringData {
          */
         @Override
         public void setString(final int index, final String val) {
-            setDictEncodedObject(index, val);
-        }
-
-        private void setDictEncodedObject(final int index, final String val) {
-            final int dictIndex = m_dict.computeIfAbsent(val, o -> m_nextDictEntry++);
-            m_delegate.setReference(index, dictIndex);
+            m_delegate.setString(index, val);
         }
 
         @Override
         public StringReadData close(final int length) {
-            // write all dict entries:
-            m_dict.forEach((k, v) -> m_delegate.setDictEntry(v, k));
-
-            // now we can close
-            return new DictDecodedStringReadData(m_delegate.close(length));
+            return new DictDecodedStringReadData((DictEncodedStringReadData)m_delegate.close(length), m_cache);
         }
     }
 
     /**
-     * {@link DictDecodedStringReadData} provides {@link StringReadData} access to underlying {@link DictEncodedVarBinaryReadData}.
+     * {@link DictDecodedStringReadData} provides table-wide caching and {@link StringReadData} access
+     * to a wrapped {@link DictEncodedStringReadData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
     public static class DictDecodedStringReadData extends
-        AbstractDictDecodedObjectReadData<String, DictEncodedStringReadData> implements StringReadData {
+        AbstractDictDecodedReadData<DictEncodedStringReadData> implements StringReadData {
         /**
-         * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a backend.
+         * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a back-end.
          * @param delegate The delegate {@link DictEncodedStringReadData}
+         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
-        public DictDecodedStringReadData(final DictEncodedStringReadData delegate) {
-            super(delegate);
+        public DictDecodedStringReadData(final DictEncodedStringReadData delegate, final ColumnDictElementCache cache) {
+            super(delegate, cache);
         }
 
-        /**
-         * Obtains the String value at the given index. It is the responsibility of the client calling this method to
-         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
-         *
-         * @param index the index at which to obtain the String element
-         * @return the String element at the given index
-         */
         @Override
         public String getString(final int index) {
-            return getDictEncodedObject(index);
-        }
+            // TODO: for global dict caching:
+//            int dictKey = m_delegate.getDictEntryKey(index);
+//            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getString(index));
 
-        private String getDictEncodedObject(final int index) {
-            final int dictIndex = m_delegate.getReference(index);
-            return m_dict.computeIfAbsent(dictIndex, m_delegate::getDictEntry);
+            return m_delegate.getString(index);
         }
     }
 

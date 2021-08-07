@@ -54,6 +54,7 @@ import java.util.concurrent.CountDownLatch;
 
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.data.dictencoding.DictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWriter;
 import org.knime.core.columnar.data.dictencoding.DictEncodedRandomAccessBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -67,6 +68,8 @@ import org.knime.core.table.schema.ColumnarSchema;
 @SuppressWarnings("javadoc")
 public class TestDictEncodedBatchBuffer implements TestBatchBuffer {
     private final TestBatchBuffer m_delegate;
+
+    private final DictElementCache m_cache = new DictElementCache();
 
     public TestDictEncodedBatchBuffer(final TestBatchBuffer delegate) {
         m_delegate = delegate;
@@ -85,7 +88,7 @@ public class TestDictEncodedBatchBuffer implements TestBatchBuffer {
     @SuppressWarnings("resource")
     @Override
     public BatchWriter getWriter() {
-        return new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema());
+        return new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema(), m_cache);
     }
 
     @Override
@@ -95,7 +98,7 @@ public class TestDictEncodedBatchBuffer implements TestBatchBuffer {
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema());
+        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema(), m_cache);
     }
 
     @Override

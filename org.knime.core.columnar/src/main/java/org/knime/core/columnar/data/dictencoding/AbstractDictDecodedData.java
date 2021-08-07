@@ -48,43 +48,34 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 
 /**
- * Base implementation for {@link NullableReadData} and {@link NullableWriteData} that are implemented
- * using dictionary encoding in the back-end, but feel like "decoded" data objects to the user, hence
- * the user does not notice whether the back-end uses dictionary encoding or not.
- *
- * The {@link AbstractDictDecodedObjectReadData} and {@link AbstractDictDecodedObjectWriteData} hold a
- * dictionary of generic type and pass on references to the dictionary entries as well as the dictionary
- * to the back-end. This way we can prevent duplicate serialization of large dictionary entries.
+ * {@link AbstractDictDecodedReadData} and {@link AbstractDictDecodedWriteData} wrap
+ * {@link DictEncodedReadData} and {@link DictEncodedWriteData} objects and add table-wide
+ * caching for dictionary entries and table-wide unique dictionary key generation.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-final class AbstractDictDecodedObjectData {
-    AbstractDictDecodedObjectData()
-    {
+final class AbstractDictDecodedData {
+    AbstractDictDecodedData() {
     }
 
-    abstract static class AbstractDictDecodedObjectReadData<T, D extends DictEncodedReadData> implements NullableReadData
-    {
-        protected final HashMap<Integer, T> m_dict = new HashMap<>();
-
+    abstract static class AbstractDictDecodedReadData<D extends DictEncodedReadData>
+        implements NullableReadData {
         protected final D m_delegate;
 
-        AbstractDictDecodedObjectReadData(final D delegate)
-        {
-            m_delegate = delegate;
-        }
+        protected final ColumnDictElementCache m_cache;
 
-        // TODO: allow construction from a non-empty dict and reuse existing entries!
+        AbstractDictDecodedReadData(final D delegate, final ColumnDictElementCache cache) {
+            m_delegate = delegate;
+            m_cache = cache;
+        }
 
         @Override
         public boolean isMissing(final int index) {
@@ -116,25 +107,16 @@ final class AbstractDictDecodedObjectData {
         }
     }
 
-    abstract static class AbstractDictDecodedObjectWriteData<T, D extends DictEncodedWriteData> implements NullableWriteData
-    {
+    abstract static class AbstractDictDecodedWriteData<D extends DictEncodedWriteData>
+        implements NullableWriteData {
         protected final D m_delegate;
 
-        // We use a linked hash map for the dict to ensure that we pass on dictionary
-        // entries to the delegate only with ascending indices. Because we assign dictionary
-        // entry indices in an ascending fashion and only insert a new value if not present yet,
-        // index-ordering equals insertion-ordering of the linked hash map. So iteration over the
-        // linked hash map will also happen with index-ordering.
-        final LinkedHashMap<T, Integer> m_dict = new LinkedHashMap<>();
+        protected final ColumnDictElementCache m_cache;
 
-        protected int m_nextDictEntry = 0;
-
-        AbstractDictDecodedObjectWriteData(final D delegate)
-        {
+        AbstractDictDecodedWriteData(final D delegate, final ColumnDictElementCache cache) {
             m_delegate = delegate;
+            m_cache = cache;
         }
-
-        // TODO: allow construction from a non-empty dict and reuse existing entries?
 
         @Override
         public void setMissing(final int index) {

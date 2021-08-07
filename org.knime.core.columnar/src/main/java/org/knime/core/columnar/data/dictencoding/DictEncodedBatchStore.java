@@ -68,6 +68,8 @@ import org.knime.core.table.schema.ColumnarSchema;
 public class DictEncodedBatchStore implements BatchStore {
     private final BatchStore m_delegate;
 
+    private final DictElementCache m_dictElementCache = new DictElementCache();
+
     /**
      * Create with a delegate
      * @param delegate The delegate batch store
@@ -79,7 +81,7 @@ public class DictEncodedBatchStore implements BatchStore {
     @SuppressWarnings("resource")
     @Override
     public BatchWriter getWriter() {
-        return new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema());
+        return new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema(), m_dictElementCache);
     }
 
     @Override
@@ -99,7 +101,7 @@ public class DictEncodedBatchStore implements BatchStore {
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema());
+        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema(), m_dictElementCache);
     }
 
     @Override

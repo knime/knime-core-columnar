@@ -57,11 +57,11 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectReadData;
+import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
@@ -80,15 +80,18 @@ public class DictEncodedBatchWriter implements BatchWriter {
 
     private final ColumnarSchema m_schema;
 
+    private final DictElementCache m_cache;
+
     /**
      * Create a batch writer
      * @param delegate The delegate BatchWriter
      * @param schema The schema
      */
-    public DictEncodedBatchWriter(final BatchWriter delegate, final ColumnarSchema schema)
+    public DictEncodedBatchWriter(final BatchWriter delegate, final ColumnarSchema schema, final DictElementCache dictElementCache)
     {
         m_delegate = delegate;
         m_schema = schema;
+        m_cache = dictElementCache;
     }
 
     @Override
@@ -120,12 +123,12 @@ public class DictEncodedBatchWriter implements BatchWriter {
             if (!(d instanceof DictEncodedStringWriteData)) {
                 throw new IllegalArgumentException("Expected DictEncodedStringWriteData to construct DictDecodedStringWriteData");
             }
-            return new DictDecodedStringWriteData((DictEncodedStringWriteData)d);
+            return new DictDecodedStringWriteData((DictEncodedStringWriteData)d, m_cache.get(i));
         } else if (m_schema.getSpec(i) instanceof VarBinaryDataSpec  && !(d instanceof DictDecodedVarBinaryWriteData)) {
             if (!(d instanceof DictEncodedVarBinaryWriteData)) {
                 throw new IllegalArgumentException("Expected DictEncodedVarBinaryWriteData to construct DictDecodedVarBinaryWriteData");
             }
-            return  new DictDecodedVarBinaryWriteData((DictEncodedVarBinaryWriteData)d);
+            return new DictDecodedVarBinaryWriteData((DictEncodedVarBinaryWriteData)d, m_cache.get(i));
         }
 
         return d;
@@ -139,8 +142,8 @@ public class DictEncodedBatchWriter implements BatchWriter {
 
         for (int i = 0; i < batch.numData(); i++) {
             data[i] = batch.get(i);
-            if (data[i] instanceof AbstractDictDecodedObjectReadData) {
-                data[i] = ((AbstractDictDecodedObjectReadData)data[i]).getDelegate();
+            if (data[i] instanceof AbstractDictDecodedReadData) {
+                data[i] = ((AbstractDictDecodedReadData)data[i]).getDelegate();
             }
         }
 

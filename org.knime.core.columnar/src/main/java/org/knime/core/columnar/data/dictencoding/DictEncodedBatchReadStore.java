@@ -67,6 +67,8 @@ public class DictEncodedBatchReadStore implements BatchReadStore {
 
     private final BatchReadStore m_delegate;
 
+    private final DictElementCache m_dictElementCache = new DictElementCache();
+
     /**
      * Create with a delegate.
      * @param delegate The delegate batch store.
@@ -92,7 +94,7 @@ public class DictEncodedBatchReadStore implements BatchReadStore {
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema());
+        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema(), m_dictElementCache);
     }
 
     @Override

@@ -48,113 +48,116 @@ package org.knime.core.columnar.testing.data;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
 
 /**
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class AbstractTestDictEncodedObjectData implements TestData, DictEncodedWriteData, DictEncodedReadData {
+public abstract class AbstractTestDictEncodedData<T>
+    implements TestData, DictEncodedReadData, DictEncodedWriteData {
 
-    protected Map<Integer, Object> m_dict = new HashMap<>();
+    protected final TestStructData m_delegate;
 
-    protected Integer[] m_values;
+    private DictKeyGenerator m_keyGenerator;
 
-    private int m_refs = 1;
+    protected final Map<T, Integer> m_dictValToKey = new HashMap<>();
 
-    private int m_size;
+    protected final Map<Integer, T> m_dictKeyToVal = new HashMap<>();
 
-    static Object[] packData(final AbstractTestDictEncodedObjectData data) {
-        var d = new Object[2];
-        d[0] = data.m_values;
-        d[1] = data.m_dict;
-        return d;
-    }
+    private static final class AscendingKeyGenerator implements DictKeyGenerator {
+        private int m_nextDictIndex = 0;
 
-    AbstractTestDictEncodedObjectData(final int capacity) {
-        m_values = new Integer[capacity];
-        m_size = capacity;
-    }
-
-    AbstractTestDictEncodedObjectData(final Integer[] references, final Map<Integer, Object> dictionary) {
-        m_values = references;
-        m_size = references.length;
-        m_dict = dictionary;
-    }
-
-    final void closeInternal(final int length) {
-        if (getRefs() != 1) {
-            throw new IllegalStateException("Closed with outstanding references.");
+        @Override
+        public <T> int generateKey(final T value) {
+            return m_nextDictIndex++;
         }
-        m_size = length;
+    }
+
+    AbstractTestDictEncodedData(final TestStructData delegate) {
+        m_delegate = delegate;
     }
 
     @Override
-    public int getReference(final int dataIndex) {
-        return m_values[dataIndex];
+    public AbstractTestDictEncodedData<T> close(final int length) {
+        m_delegate.close(length);
+        return this;
     }
 
     @Override
-    public void setReference(final int dataIndex, final int dictionaryIndex) {
-        m_values[dataIndex] = dictionaryIndex;
-    }
-
-    @Override
-    public long sizeOf() {
-        return length();
-    }
-
-    @Override
-    public final int capacity() {
-        return m_size;
+    public void setMissing(final int index) {
+        m_delegate.setMissing(index);
     }
 
     @Override
     public void expand(final int minimumCapacity) {
-        final Integer[] expanded = new Integer[minimumCapacity];
-        System.arraycopy(m_values, 0, expanded, 0, capacity());
-        m_values = expanded;
-        m_size = minimumCapacity;
+        m_delegate.expand(minimumCapacity);
     }
 
     @Override
-    public synchronized void setMissing(final int index) {
-        m_values[index] = null;
+    public int capacity() {
+        return m_delegate.capacity();
     }
 
     @Override
-    public synchronized boolean isMissing(final int index) {
-        return m_values[index] == null || m_dict.get(m_values[index]) == null;
+    public void retain() {
+        m_delegate.retain();
     }
 
     @Override
-    public final int length() {
-        return m_size;
+    public void release() {
+        m_delegate.release();
     }
 
     @Override
-    public Object[] get() {
-        return packData(this);
+    public long sizeOf() {
+        return m_delegate.sizeOf();
     }
 
     @Override
-    public final synchronized void release() {
-        m_refs--;
+    public boolean isMissing(final int index) {
+        return m_delegate.isMissing(index);
     }
 
     @Override
-    public final synchronized void retain() {
-        if (m_refs > 0) {
-            m_refs++;
-        } else {
-            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
+    public int length() {
+        return m_delegate.length();
+    }
+
+    @Override
+    public void setDictKey(final int dataIndex, final int dictKey) {
+        ((IntWriteData)m_delegate.getWriteDataAt(0)).setInt(dataIndex, dictKey);
+    }
+
+    @Override
+    public void setKeyGenerator(final DictKeyGenerator keyGenerator) {
+        if (m_keyGenerator != null) {
+            throw new IllegalStateException("Cannot re-set a key generator. Is already configured!");
         }
+
+        m_keyGenerator = keyGenerator;
+    }
+
+    protected int generateKey(final T val) {
+        if (m_keyGenerator == null) {
+            m_keyGenerator = new AscendingKeyGenerator();
+        }
+
+        return m_keyGenerator.generateKey(val);
     }
 
     @Override
-    public final synchronized int getRefs() {
-        return m_refs;
+    public int getDictKey(final int dataIndex) {
+        return ((IntReadData)m_delegate.getReadDataAt(0)).getInt(dataIndex);
+    }
+
+    @Override
+    public int getRefs() {
+        return m_delegate.getRefs();
     }
 
 }

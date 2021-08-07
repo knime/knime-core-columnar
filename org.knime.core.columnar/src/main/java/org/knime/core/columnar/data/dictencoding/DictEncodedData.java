@@ -44,50 +44,85 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jul 9, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
+ *   Aug 12, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 
 /**
+ * Interfaces for dictionary encoded read and write data.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 public final class DictEncodedData {
-
     private DictEncodedData() {
     }
 
     /**
-     * {@link WriteData} that stores objects using a dictionary encoding
+     * Dictionary encoded {@link NullableReadData} that can provide the dictionary
+     * key stored at each index inside the data.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public interface DictEncodedWriteData extends NullableWriteData {
+    public static interface DictEncodedReadData extends NullableReadData {
+
         /**
-         * Set the value at the given data index to reference the specified dictionaryIndex
-         * @param dataIndex the position of the value (roughly row-index)
-         * @param dictionaryIndex the index of the dictionary element that should be referenced
+         * Return the key of the dictionary element at the given data index
+         *
+         * @param dataIndex the index of the element inside this {@link NullableReadData} vector
+         * @return the key of the dictionary element
          */
-        public void setReference(final int dataIndex, final int dictionaryIndex);
+        int getDictKey(final int dataIndex);
     }
 
     /**
-     * {@link ReadData} holding dictionary encoded objects.
+     * Dictionary encoded {@link NullableWriteData} that
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public interface DictEncodedReadData extends NullableReadData {
+    public static interface DictEncodedWriteData extends NullableWriteData {
+
         /**
-         * Get the index of the referenced dictionary entry at the given position in the data
-         * @param dataIndex the position of the value
-         * @return the referenced dictionary entry index
+         * Set the key of the dictionary element that is referenced at the given data index
+         *
+         * @param dataIndex The index into this {@link NullableWriteData} where the dictionary element should be
+         *            referenced
+         * @param dictKey The key of the dictionary entry
          */
-        public int getReference(final int dataIndex);
+        void setDictKey(final int dataIndex, final int dictKey);
     }
 
+    // ------------------------------------------------------------------------------
+    /**
+     * Interface specialization for dictionary encoded {@link StringReadData}
+     */
+    public static interface DictEncodedStringReadData extends DictEncodedReadData, StringReadData {
+
+    }
+
+    /**
+     * Interface specialization for dictionary encoded {@link StringWriteData}
+     */
+    public static interface DictEncodedStringWriteData extends DictEncodedWriteData, StringWriteData {
+
+    }
+
+    // ------------------------------------------------------------------------------
+    /**
+     * Interface specialization for dictionary encoded {@link VarBinaryReadData}
+     */
+    public static interface DictEncodedVarBinaryReadData extends DictEncodedReadData, VarBinaryReadData {
+    }
+
+    /**
+     * Interface specialization for dictionary encoded {@link VarBinaryWriteData}
+     */
+    public static interface DictEncodedVarBinaryWriteData extends DictEncodedWriteData, VarBinaryWriteData {
+    }
 }

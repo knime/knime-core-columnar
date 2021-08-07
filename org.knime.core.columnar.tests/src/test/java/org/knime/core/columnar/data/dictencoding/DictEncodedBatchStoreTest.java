@@ -66,8 +66,6 @@ import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDe
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.DefaultTestBatchStore;
-import org.knime.core.columnar.testing.data.TestDictEncodedStringData;
-import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
@@ -82,9 +80,10 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     @Test
     public void testWrappedWriter() {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
+        var cache = new DictElementCache();
         try (DefaultTestBatchStore batchStore = DefaultTestBatchStore.create(columnarSchema);
                 BatchWriter baseWriter = batchStore.getWriter();
-                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema);
+                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache);
             ) {
             var baseBatch = baseWriter.create(5);
             var wrappedBatch = wrappedWriter.create(5);
@@ -103,10 +102,8 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
         for (int c = 0; c < columnarSchema.numColumns(); c++) {
             if (DictEncodingTrait.isEnabled(columnarSchema.getTraits(c))) {
                 if (columnarSchema.getSpec(c) == StringDataSpec.INSTANCE) {
-                    assertEquals(baseBatch.get(c).getClass(), TestDictEncodedStringData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedStringWriteData.class);
                 } else if (columnarSchema.getSpec(c) == VarBinaryDataSpec.INSTANCE) {
-                    assertEquals(baseBatch.get(c).getClass(), TestDictEncodedVarBinaryData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedVarBinaryWriteData.class);
                 } else {
                     fail("Dict Encoding for type " + columnarSchema.getSpec(c).toString() + " not tested yet");
@@ -122,10 +119,8 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
         for (int c = 0; c < columnarSchema.numColumns(); c++) {
             if (DictEncodingTrait.isEnabled(columnarSchema.getTraits(c))) {
                 if (columnarSchema.getSpec(c) == StringDataSpec.INSTANCE) {
-                    assertEquals(baseBatch.get(c).getClass(), TestDictEncodedStringData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedStringReadData.class);
                 } else if (columnarSchema.getSpec(c) == VarBinaryDataSpec.INSTANCE) {
-                    assertEquals(baseBatch.get(c).getClass(), TestDictEncodedVarBinaryData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedVarBinaryReadData.class);
                 } else {
                     fail("Dict Encoding for type " + columnarSchema.getSpec(c).toString() + " not tested yet");
@@ -140,9 +135,10 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     public void testWrappedReader() {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
         var columnSelection = new DefaultColumnSelection(columnarSchema.numColumns());
+        var cache = new DictElementCache();
         try (DefaultTestBatchStore batchStore = DefaultTestBatchStore.create(columnarSchema)) {
             try(BatchWriter baseWriter = batchStore.getWriter();
-                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema);
+                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache);
                 ) {
                 var wrappedBatch = wrappedWriter.create(5);
                 var readBatch = wrappedBatch.close(5);
@@ -150,7 +146,7 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
                 readBatch.release();
             }
             try(RandomAccessBatchReader baseReader = batchStore.createRandomAccessReader(columnSelection);
-                DictEncodedRandomAccessBatchReader wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, columnSelection, columnarSchema)
+                DictEncodedRandomAccessBatchReader wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, columnSelection, columnarSchema, cache)
             ) {
                 var baseBatch = baseReader.readRetained(0);
                 var wrappedBatch = wrappedReader.readRetained(0);

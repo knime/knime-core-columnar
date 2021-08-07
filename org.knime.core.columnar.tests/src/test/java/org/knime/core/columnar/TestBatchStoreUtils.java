@@ -111,15 +111,13 @@ import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecod
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
+import org.knime.core.columnar.data.dictencoding.DictElementCache;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.TestBatchStore;
-import org.knime.core.columnar.testing.data.AbstractTestDictEncodedObjectData;
 import org.knime.core.columnar.testing.data.TestData;
-import org.knime.core.columnar.testing.data.TestDictEncodedStringData;
-import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
@@ -171,9 +169,11 @@ public final class TestBatchStoreUtils {
 
     private static final int DEF_NUM_COLUMNS = Types.values().length;
 
-    private static final int DEF_NUM_BATCHES = 2;
+    public static final int DEF_NUM_BATCHES = 2;
 
     public static final int DEF_BATCH_LENGTH = 2;
+
+    public static final int DEF_NUM_ADDITIONAL_COLUMNS = 4;
 
     public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * DEF_NUM_COLUMNS * DEF_BATCH_LENGTH;
 
@@ -477,7 +477,7 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 NullableWriteData setData(final NullableWriteData data, final int index) {
-                    if (data instanceof AbstractTestDictEncodedObjectData) {
+                    if (!(data instanceof DictDecodedStringWriteData)) {
                         throw new UnsupportedOperationException("This batch store does not support DictEncoding");
                     }
 
@@ -487,14 +487,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void checkEquals(NullableReadData refData, final NullableReadData readData, final int index) {
-                    if (readData instanceof TestDictEncodedStringData) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    if (!(readData instanceof DictDecodedStringReadData)) {
                         throw new UnsupportedOperationException("This batch store does not support DictEncoding");
-                    }
-
-                    if (refData instanceof TestDictEncodedStringData) {
-                        // for testing we wrap the backend data (TestDictEncodedStringData) again to support String access
-                        refData = new DictDecodedStringReadData((TestDictEncodedStringData)refData);
                     }
 
                     final StringReadData refObjectData = (StringReadData)refData;
@@ -561,7 +556,7 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 NullableWriteData setData(final NullableWriteData data, final int index) {
-                    if (data instanceof AbstractTestDictEncodedObjectData) {
+                    if (!(data instanceof DictDecodedVarBinaryWriteData)) {
                         throw new UnsupportedOperationException("This batch store does not support DictEncoding");
                     }
                     ((VarBinaryWriteData)data).setBytes(index, new byte[]{(byte)runningInt++}); // NOSONAR
@@ -569,14 +564,9 @@ public final class TestBatchStoreUtils {
                 }
 
                 @Override
-                void checkEquals(NullableReadData refData, final NullableReadData readData, final int index) {
-                    if (readData instanceof TestDictEncodedVarBinaryData) {
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    if (!(readData instanceof DictDecodedVarBinaryReadData)) {
                         throw new UnsupportedOperationException("This batch store does not support DictEncoding");
-                    }
-
-                    if (refData instanceof TestDictEncodedVarBinaryData) {
-                        // for testing we wrap the backend data (TestDictEncodedVarBinaryData) again to support String access
-                        refData = new DictDecodedVarBinaryReadData((TestDictEncodedVarBinaryData)refData);
                     }
 
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
@@ -700,15 +690,15 @@ public final class TestBatchStoreUtils {
         return refs;
     }
 
-    public static NullableReadData[] wrapDictEncodedData(final NullableReadData[] data) {
+    public static NullableReadData[] wrapDictEncodedData(final NullableReadData[] data, final DictElementCache cache) {
         NullableReadData[] out = new NullableReadData[data.length];
         for (int i = 0; i < out.length; i++)
         {
             if (i == Types.DICTENCODEDSTRING.ordinal()) {
-                out[i] = new DictDecodedStringReadData((DictEncodedStringReadData)data[i]);
+                out[i] = new DictDecodedStringReadData((DictEncodedStringReadData)data[i], cache.get(i));
             }
             else if (i == Types.DICTENCODEDVARBINARY.ordinal()) {
-                out[i] = new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data[i]);
+                out[i] = new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data[i], cache.get(i));
             } else {
                 out[i] = data[i];
             }
@@ -723,12 +713,13 @@ public final class TestBatchStoreUtils {
     private static List<NullableReadData[]> writeTable(final BatchWritable store, final List<NullableWriteData[]> table)
         throws IOException {
         List<NullableReadData[]> result = new ArrayList<>();
+        var dictElementCache = new DictElementCache();
         try (final BatchWriter writer = store.getWriter()) {
             for (WriteData[] writeBatch : table) {
                 final NullableReadData[] readBatch =
                     Arrays.stream(writeBatch).map(d -> d.close(d.capacity())).toArray(NullableReadData[]::new);
                 result.add(readBatch);
-                writer.write(new DefaultReadBatch(wrapDictEncodedData(readBatch)));
+                writer.write(new DefaultReadBatch(wrapDictEncodedData(readBatch, dictElementCache)));
             }
         }
         return result;
@@ -736,9 +727,10 @@ public final class TestBatchStoreUtils {
 
     public static void writeTable(final BatchWritable store, final TestDataTable table) throws IOException {
         try (final BatchWriter writer = store.getWriter()) {
+            var dictElementCache = new DictElementCache();
             for (int i = 0; i < table.size(); i++) {
                 final TestData[] batch = table.getBatch(i);
-                writer.write(new DefaultReadBatch(wrapDictEncodedData(batch)));
+                writer.write(new DefaultReadBatch(wrapDictEncodedData(batch, dictElementCache)));
             }
         }
     }

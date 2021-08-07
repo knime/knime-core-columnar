@@ -44,57 +44,41 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jun 28, 2021 (chaubold): created
+ *   Aug 12, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Class holding {@link WriteData} and {@link ReadData} for data holding dictionary encoded
- * elements.
+ * This {@link DictElementCache} will be used to cache entries of dictionary-encoded
+ * data across all batches of the table, or at least as long as they do fit in memory.
+ *
+ * TODO: implement the cache in AP-16149
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-public final class DictEncodedStringData {
+public class DictElementCache {
+    public static class ColumnDictElementCache {
+        // TODO: implement this for global caching
+    }
 
-    private DictEncodedStringData() {
+    private Map<Integer, ColumnDictElementCache> m_perColumnCache = new HashMap<>();
+
+    /**
+     * Construct the {@link DictElementCache}.
+     */
+    public DictElementCache() {
+        // TODO: register with MemoryAlertListener
     }
 
     /**
-     * {@link WriteData} that stores objects using a dictionary encoding
-     *
-     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     * Get the cache for a column by column index
+     * @param columnIndex The column for which to get the cache.
+     * @return The cache for that column. Lazily created if this is the first access.
      */
-    public interface DictEncodedStringWriteData extends DictEncodedWriteData {
-        /**
-         * Set the dictionary entry for a given index.
-         * Objects MUST BE ADDED BY INCREASING INDEX, or the offset buffer will be corrupted...
-         *
-         * @param dictionaryIndex the index in the dictionary
-         * @param dictEntry the dictionary entry
-         */
-        public void setDictEntry(final int dictionaryIndex, final String dictEntry);
-
-        @Override
-        public DictEncodedStringReadData close(final int length);
+    public ColumnDictElementCache get(final int columnIndex) {
+        return m_perColumnCache.computeIfAbsent(columnIndex, i -> new ColumnDictElementCache());
     }
-
-    /**
-     * {@link ReadData} holding dictionary encoded objects.
-     *
-     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
-     */
-    public interface DictEncodedStringReadData extends DictEncodedReadData {
-        /**
-         * Get the dictionary entry with the given dictionary index
-         * @param dictionaryIndex the index of the dictionary entry
-         * @return the dictionary entry
-         */
-        public String getDictEntry(final int dictionaryIndex);
-    }
-
 }
