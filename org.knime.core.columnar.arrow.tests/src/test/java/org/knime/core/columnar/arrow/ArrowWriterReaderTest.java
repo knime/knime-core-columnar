@@ -79,9 +79,6 @@ import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory
 import org.knime.core.columnar.arrow.ArrowTestUtils.SimpleData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.SimpleDataFactory;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryReadData;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryWriteData;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -215,17 +212,6 @@ public class ArrowWriterReaderTest {
     public void testDictionaryReadWriteOneBatchOneColumnCompressed() throws IOException {
         final ArrowColumnDataFactory[] factory = new ArrowColumnDataFactory[]{new DictionaryEncodedDataFactory()};
         testReadWrite(16, 16, 1, 1, factory, new DictionaryEncodedDataChecker(), ARROW_LZ4_BLOCK_COMPRESSION);
-    }
-
-    /**
-     * Test writing and reading one column one batch of dictionary encoded data.
-     *
-     * @throws IOException
-     */
-    @Test
-    public void testDictionaryEncodedObjectReadWriteOneBatchOneColumn() throws IOException {
-        final ArrowColumnDataFactory[] factory = new ArrowColumnDataFactory[]{ArrowDictEncodedVarBinaryDataFactory.INSTANCE};
-        testReadWrite(16, 16, 1, 1, factory, new ArrowDictEncodedObjectDataChecker(), ARROW_NO_COMPRESSION);
     }
 
     /**
@@ -763,22 +749,6 @@ public class ArrowWriterReaderTest {
         public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
             assertTrue(data instanceof DictionaryEncodedData);
             ArrowTestUtils.checkData((DictionaryEncodedData)data, count, seed);
-        }
-    }
-
-    private static final class ArrowDictEncodedObjectDataChecker implements DataChecker {
-
-        @Override
-        public NullableReadData fillData(final NullableWriteData data, final int columnIndex, final int count,
-            final long seed) {
-            assertTrue(data instanceof ArrowDictEncodedVarBinaryWriteData);
-            return ArrowTestUtils.fillData((ArrowDictEncodedVarBinaryWriteData)data, count, seed);
-        }
-
-        @Override
-        public void checkData(final NullableReadData data, final int columnIndex, final int count, final long seed) {
-            assertTrue(data instanceof ArrowDictEncodedVarBinaryReadData);
-            ArrowTestUtils.checkData((ArrowDictEncodedVarBinaryReadData)data, count, seed);
         }
     }
 

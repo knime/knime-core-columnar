@@ -42,174 +42,193 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Aug 11, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.LargeVarBinaryVector;
-import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.apache.arrow.vector.types.Types.MinorType;
-import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.SingletonDictionaryProvider;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedReadData;
+import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedWriteData;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
- * Arrow implementation of dictionary encoded data, where dictionary elements can be accessed additional to the
- * referenced indices into the dictionary.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 public final class ArrowDictEncodedVarBinaryData {
-
     private ArrowDictEncodedVarBinaryData() {
     }
 
-    static final int INIT_DICT_BYTE_SIZE = 1024;
-
-    static final int INIT_DICT_NUM_ENTRIES = 20;
-
-    /**
-     * Arrow implementation of {@link DictEncodedVarBinaryWriteData}.
-     */
-    public static final class ArrowDictEncodedVarBinaryWriteData extends AbstractArrowDictEncodedData.ArrowDictEncodedWriteData<LargeVarBinaryVector>
+    public static class ArrowDictEncodedVarBinaryWriteData extends AbstractArrowDictEncodedWriteData<Object>
         implements DictEncodedVarBinaryWriteData {
-        private ArrowDictEncodedVarBinaryWriteData(final IntVector vector, final LargeVarBinaryVector dict) {
-            super(vector, dict);
-        }
 
-        private ArrowDictEncodedVarBinaryWriteData(final IntVector vector, final int offset,
-            final LargeVarBinaryVector dict) {
-            super(vector, offset, dict);
+        private ArrowDictEncodedVarBinaryWriteData(final ArrowStructWriteData delegate) {
+            super(delegate);
         }
 
         @Override
-        public <T> void setDictEntry(final int dictionaryIndex, final T obj, final ObjectSerializer<T> serializer) {
-            while (dictionaryIndex >= m_dictVector.getValueCapacity()) {
-                m_dictVector.reallocValidityAndOffsetBuffers();
-            }
+        public <T> void setObject(final int index, final T val, final ObjectSerializer<T> serializer) {
+            int dictKey = m_dict.computeIfAbsent(val, v -> {
+                ((VarBinaryWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
+                    .setObject(index, val, serializer);
+                return m_nextDictIndex++;
+            });
 
-            if (m_dictVector.isNull(dictionaryIndex)) {
-                ArrowBufIO.serialize(dictionaryIndex, obj, m_dictVector, serializer);
-                m_largestDictionaryIndex = Math.max(m_largestDictionaryIndex, dictionaryIndex);
-            }
+            setDictKey(index, dictKey);
         }
 
         @Override
-        public ArrowWriteData slice(final int start) {
-            return new ArrowDictEncodedVarBinaryWriteData(m_vector, m_offset + start, m_dictVector);
+        public ArrowDictEncodedVarBinaryWriteData slice(final int start) {
+            return new ArrowDictEncodedVarBinaryWriteData(m_delegate.slice(start));
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowDictEncodedVarBinaryReadData close(final int length) {
-            final IntVector vector = closeWithLength(length);
-            m_dictVector.setValueCount(m_largestDictionaryIndex + 1);
-
-            return new ArrowDictEncodedVarBinaryReadData(vector,
-                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length), m_dictVector);
-        }
-    }
-
-    /**
-     * Arrow implementation of {@link DictEncodedVarBinaryReadData}.
-     */
-    public static final class ArrowDictEncodedVarBinaryReadData extends AbstractArrowDictEncodedData.ArrowDictEncodedReadData<LargeVarBinaryVector> implements DictEncodedVarBinaryReadData {
-
-        private ArrowDictEncodedVarBinaryReadData(final IntVector vector, final MissingValues missingValues,
-            final LargeVarBinaryVector dict) {
-            super(vector, missingValues, dict);
-        }
-
-        private ArrowDictEncodedVarBinaryReadData(final IntVector vector, final MissingValues missingValues,
-            final int offset, final int length, final LargeVarBinaryVector dict) {
-            super(vector, missingValues, offset, length, dict);
+            return new ArrowDictEncodedVarBinaryReadData(m_delegate.close(length));
         }
 
         @Override
-        public <T> T getDictEntry(final int dictionaryIndex, final ObjectDeserializer<T> deserializer) {
-            return ArrowBufIO.deserialize(dictionaryIndex, m_dictVector, deserializer);
+        public void setBytes(final int index, final byte[] val) {
+            setObject(index, val, (output, v) -> {
+                output.writeInt(v.length);
+                output.write(v);
+            });
         }
 
         @Override
-        public ArrowReadData slice(final int start, final int length) {
-            return new ArrowDictEncodedVarBinaryReadData(m_vector, m_missingValues, m_offset + start, length, m_dictVector);
+        public String toString() {
+            return "ArrowDictEncodedVarBinaryWriteData["
+                    + "references=" + ((IntWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.REFERENCE_DATA_INDEX)).toString()
+                    + ", hashes=" + ((LongWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.HASH_DATA_INDEX)).toString()
+                    + ", dictionaryEntries=" + ((VarBinaryWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX)).toString()
+                    + "]";
+        }
+
+    }
+
+    public static class ArrowDictEncodedVarBinaryReadData extends AbstractArrowDictEncodedReadData<Object>
+        implements DictEncodedVarBinaryReadData {
+        private ArrowDictEncodedVarBinaryReadData(final ArrowStructReadData delegate) {
+            super(delegate);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
+            final int dictIndex = getDictKey(index);
+            return (T)m_dict.computeIfAbsent(dictIndex,
+                i -> ((VarBinaryReadData)m_delegate
+                    .getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX)).getObject(index,
+                        deserializer));
+        }
+
+        @Override
+        public ArrowDictEncodedVarBinaryReadData slice(final int start, final int length) {
+            return new ArrowDictEncodedVarBinaryReadData(m_delegate.slice(start, length));
+        }
+
+        @Override
+        public byte[] getBytes(final int index) {
+            return getObject(index, input -> {
+                final int length = input.readInt();
+                byte[] buf = new byte[length];
+                input.readFully(buf, 0, length);
+                return buf;
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "ArrowDictEncodedVarBinaryReadData["
+                    + "references=" + ((IntWriteData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.REFERENCE_DATA_INDEX)).toString()
+                    + ", hashes=" + ((LongWriteData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.HASH_DATA_INDEX)).toString()
+                    + ", dictionaryEntries=" + ((VarBinaryWriteData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX)).toString()
+                    + "]";
         }
     }
 
-    /**
-     * Implementation of {@link ArrowColumnDataFactory} for {@link ArrowDictEncodedVarBinaryData}
-     */
     public static final class ArrowDictEncodedVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowDictEncodedVarBinaryDataFactory} */
+        private static final int CURRENT_VERSION = 0;
+
         public static final ArrowDictEncodedVarBinaryDataFactory INSTANCE = new ArrowDictEncodedVarBinaryDataFactory();
 
-        /**
-         *
-         */
+        private final ArrowStructDataFactory m_delegate;
+
         private ArrowDictEncodedVarBinaryDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION));
+            m_delegate = new ArrowStructDataFactory(ArrowIntDataFactory.INSTANCE, ArrowLongDataFactory.INSTANCE,
+                ArrowVarBinaryDataFactory.INSTANCE);
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (!(obj instanceof ArrowDictEncodedVarBinaryDataFactory)) {
+                return false;
+            }
+            return m_delegate.equals(obj);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getVersion()) + 31 * m_delegate.hashCode();
+        }
+
+        @Override
+        public ArrowColumnDataFactoryVersion getVersion() {
+            return ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, m_delegate.m_version);
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            final DictionaryEncoding dictionary = new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);
-            return new Field(name, new FieldType(true, MinorType.INT.getType(), dictionary), null);
+            return m_delegate.getField(name, dictionaryIdSupplier);
         }
 
         @Override
-        @SuppressWarnings("resource") // Vector closed by data object
-        public ArrowDictEncodedVarBinaryWriteData createWrite(final FieldVector vector,
-            final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator, final int capacity) {
-            // Remove the dictionary id for this encoding from the supplier
-            dictionaryIdSupplier.getAsLong();
-            final LargeVarBinaryVector dict = new LargeVarBinaryVector("Dictionary", allocator);
-            dict.allocateNew(INIT_DICT_BYTE_SIZE, INIT_DICT_NUM_ENTRIES);
-            final IntVector v = (IntVector)vector;
-            v.allocateNew(capacity);
-            return new ArrowDictEncodedVarBinaryWriteData(v, dict);
+        public ArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            return new ArrowDictEncodedVarBinaryWriteData(
+                m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity));
         }
 
         @Override
-        public ArrowDictEncodedVarBinaryReadData createRead(final FieldVector vector,
-            final ArrowVectorNullCount nullCount, final DictionaryProvider provider,
-            final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (m_version.equals(version)) {
-                final long dictId = vector.getField().getFieldType().getDictionary().getId();
-                @SuppressWarnings("resource") // Dictionary vector closed by data object
-                final LargeVarBinaryVector dict = (LargeVarBinaryVector)provider.lookup(dictId).getVector();
-                return new ArrowDictEncodedVarBinaryReadData((IntVector)vector,
-                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()), dict);
-            } else {
-                throw new IOException("Cannot read ArrowDictEncodedObjectData data with version " + version
-                    + ". Current version: " + m_version + ".");
-            }
+        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+            return new ArrowDictEncodedVarBinaryReadData(m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)));
         }
 
         @Override
-        @SuppressWarnings("resource") // Dictionary vector closed by data object
+        public FieldVector getVector(final NullableReadData data) {
+            return m_delegate.getVector(data);
+        }
+
+        @Override
         public DictionaryProvider getDictionaries(final NullableReadData data) {
-            final ArrowDictEncodedVarBinaryReadData objData = (ArrowDictEncodedVarBinaryReadData)data;
-            final LargeVarBinaryVector vector = objData.getDictionary();
-            final Dictionary dictionary = new Dictionary(vector, objData.m_vector.getField().getDictionary());
-            return new SingletonDictionaryProvider(dictionary);
+            return m_delegate.getDictionaries(data);
         }
     }
 }

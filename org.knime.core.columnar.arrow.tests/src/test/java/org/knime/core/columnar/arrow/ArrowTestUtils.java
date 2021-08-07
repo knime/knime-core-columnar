@@ -80,8 +80,6 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryReadData;
-import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryWriteData;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -227,60 +225,6 @@ public final class ArrowTestUtils {
             assertEquals(random.nextInt(numDistinct), vector.get(i));
         }
     }
-
-    /**
-     * Set the values of a {@link ArrowDictEncodedVarBinaryWriteData} object and close it.
-     *
-     * @param data the data object
-     * @param count the number of values to write
-     * @param seed the seed defining the values
-     * @return the closed {@link NullableReadData}.
-     */
-    public static ArrowDictEncodedVarBinaryReadData fillData(final ArrowDictEncodedVarBinaryWriteData data, final int count, final long seed) {
-        final Random random = new Random(seed);
-
-        // Set the dictionary
-        final int numDistinct = random.nextInt(10) + 5;
-        for (int i = 0; i < numDistinct; i++) {
-            data.setDictEntry(i, String.valueOf(random.nextLong()), (out, s) -> out.writeUTF(s));
-        }
-
-        // Set the values to indices
-        for (int i = 0; i < count; i++) {
-            data.setReference(i, random.nextInt(numDistinct));
-        }
-        return data.close(count);
-    }
-
-    /**
-     * Check the values in the {@link ArrowDictEncodedVarBinaryReadData}.
-     *
-     * @param data the data object
-     * @param count the number of values to check
-     * @param seed the seed defining the values
-     */
-    public static void checkData(final ArrowDictEncodedVarBinaryReadData data, final int count, final long seed) {
-        final Random random = new Random(seed);
-
-        // Check the dictionary
-        final int numDistinct = random.nextInt(10) + 5;
-
-        for (int i = 0; i < numDistinct; i++) {
-            assertEquals(String.valueOf(random.nextLong()), data.getDictEntry(i, (in) -> in.readUTF()));
-        }
-
-        assertThrows(IndexOutOfBoundsException.class, () -> {
-            data.getDictEntry(numDistinct, (in) -> in.readUTF());
-        });
-
-        // Check the values
-        assertEquals(data.length(), count);
-        for (int i = 0; i < count; i++) {
-            assertFalse(data.isMissing(i));
-            assertEquals(random.nextInt(numDistinct), data.getReference(i));
-        }
-    }
-
 
     /**
      * Set the values of a {@link ComplexData} object and close it.

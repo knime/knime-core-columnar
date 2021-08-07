@@ -42,170 +42,123 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Aug 11, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.apache.arrow.vector.BaseValueVector;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VariableWidthVector;
-import org.apache.arrow.vector.VectorDefinitionSetter;
+import java.util.HashMap;
+
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 
 /**
- * Arrow implementation of dictionary encoded data, where dictionary elements can be accessed additional to the
- * referenced indices into the dictionary.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 public final class AbstractArrowDictEncodedData {
-
     private AbstractArrowDictEncodedData() {
     }
 
-    static final int INIT_DICT_BYTE_SIZE = 1024;
+    static final int REFERENCE_DATA_INDEX = 0;
 
-    static final int INIT_DICT_NUM_ENTRIES = 20;
+    // TODO is the hash used now? Does it take up space (I think it does)
+    static final int HASH_DATA_INDEX = 1;
 
-    /**
-     * Arrow implementation of {@link DictEncodedWriteData}.
-     * @param <T> The type of the Arrow vector storing the dictionary entries
-     */
-    public abstract static class ArrowDictEncodedWriteData<T extends BaseValueVector & VariableWidthVector & FieldVector & VectorDefinitionSetter>
-        extends AbstractArrowWriteData<IntVector> implements DictEncodedWriteData {
+    static final int DICT_ENTRY_DATA_INDEX = 2;
 
-        /**
-         * The dictionary vector
-         */
-        protected T m_dictVector;
+    abstract static class AbstractArrowDictEncodedWriteData<T> implements DictEncodedWriteData, ArrowWriteData {
 
-        /**
-         * The largest dictionary entry index that was set. Needed to set the
-         * value count of the m_dictVector on close().
-         */
-        protected int m_largestDictionaryIndex = 0;
+        protected final ArrowStructWriteData m_delegate;
 
-        /**
-         * Create an {@link ArrowDictEncodedWriteData} object with a vector of references
-         * (an integer for each value referencing into the dictionary), and a vector containing
-         * the dictionary entries, which must have ascending consecutive indices.
-         *
-         * @param vector The vector containing a dictionary element index per value
-         * @param dictVector The vector containing the dictionary entries
-         */
-        protected ArrowDictEncodedWriteData(final IntVector vector, final T dictVector) {
-            super(vector);
-            m_dictVector = dictVector;
-        }
+        protected final HashMap<T, Integer> m_dict = new HashMap<>();
 
-        /**
-         * Create an {@link ArrowDictEncodedWriteData} object with a vector of references
-         * (an integer for each value referencing into the dictionary), and a vector containing
-         * the dictionary entries, which must have ascending consecutive indices.
-         *
-         * @param vector The vector containing a dictionary element index per value
-         * @param offset The offset into the vector
-         * @param dictVector The vector containing the dictionary entries
-         */
-        protected ArrowDictEncodedWriteData(final IntVector vector, final int offset, final T dictVector) {
-            super(vector, offset);
-            m_dictVector = dictVector;
+        protected int m_nextDictIndex = 0;
+
+        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate) {
+            m_delegate = delegate;
         }
 
         @Override
-        public void setReference(final int dataIndex, final int dictionaryIndex) {
-            m_vector.set(m_offset + dataIndex, dictionaryIndex);
+        public void setMissing(final int index) {
+            m_delegate.setMissing(index);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            m_delegate.expand(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_delegate.capacity();
+        }
+
+        @Override
+        public void retain() {
+            m_delegate.retain();
+        }
+
+        @Override
+        public void release() {
+            m_delegate.release();
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector) + ArrowSizeUtils.sizeOfFixedWidth(m_dictVector);
+            return m_delegate.sizeOf();
         }
 
         @Override
-        protected void closeResources() {
-            super.closeResources();
-            m_dictVector.setValueCount(m_largestDictionaryIndex + 1);
-            m_dictVector.close();
-        }
-
-        @Override
-        public String toString() {
-            return super.toString() + " -> " + m_dictVector.toString();
+        public void setDictKey(final int dataIndex, final int dictEntryIndex) {
+            ((IntWriteData)m_delegate.getWriteDataAt(REFERENCE_DATA_INDEX)).setInt(dataIndex, dictEntryIndex);
         }
     }
 
-    /**
-     * Arrow implementation of {@link DictEncodedReadData}.
-     * @param <T> The type of the Arrow vector storing the dictionary entries
-     */
-    public abstract static class ArrowDictEncodedReadData<T extends BaseValueVector & VariableWidthVector & FieldVector & VectorDefinitionSetter>
-        extends AbstractArrowReadData<IntVector> implements DictEncodedReadData {
+    abstract static class AbstractArrowDictEncodedReadData<T> implements DictEncodedReadData, ArrowReadData {
 
-        /**
-         * The dictionary vector
-         */
-        protected final T m_dictVector;
+        protected final HashMap<Integer, T> m_dict = new HashMap<>();
 
-        /**
-         * Create an {@link ArrowDictEncodedReadData} object with a vector of references
-         * (an integer for each value referencing into the dictionary), and a vector containing
-         * the dictionary entries, which must have ascending consecutive indices.
-         *
-         * @param vector The vector containing a dictionary element index per value
-         * @param missingValues The missing values
-         * @param dictVector The vector containing the dictionary entries
-         */
-        protected ArrowDictEncodedReadData(final IntVector vector, final MissingValues missingValues,
-            final T dictVector) {
-            super(vector, missingValues);
-            m_dictVector = dictVector;
-        }
+        protected final ArrowStructReadData m_delegate;
 
-        /**
-         * Create an {@link ArrowDictEncodedReadData} object with a vector of references
-         * (an integer for each value referencing into the dictionary), and a vector containing
-         * the dictionary entries, which must have ascending consecutive indices.
-         *
-         * @param vector The vector containing a dictionary element index per value
-         * @param missingValues The missing values
-         * @param offset The offset into the vector
-         * @param length Length of the vector (not the dictionary)
-         * @param dictVector The vector containing the dictionary entries
-         */
-        protected ArrowDictEncodedReadData(final IntVector vector, final MissingValues missingValues,
-            final int offset, final int length, final T dictVector) {
-            super(vector, missingValues, offset, length);
-            m_dictVector = dictVector;
-        }
-
-        T getDictionary() {
-            return m_dictVector;
+        AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate) {
+            m_delegate = delegate;
         }
 
         @Override
-        public int getReference(final int dataIndex) {
-            return m_vector.get(m_offset + dataIndex);
+        public boolean isMissing(final int index) {
+            return m_delegate.isMissing(index);
         }
 
+        @Override
+        public int length() {
+            return m_delegate.length();
+        }
+
+        @Override
+        public void retain() {
+            m_delegate.retain();
+        }
+
+        @Override
+        public void release() {
+            m_delegate.release();
+        }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector) + ArrowSizeUtils.sizeOfFixedWidth(m_dictVector);
+            return m_delegate.sizeOf();
         }
 
         @Override
-        protected void closeResources() {
-            super.closeResources();
-            m_dictVector.close();
+        public int getDictKey(final int dataIndex) {
+            return ((IntReadData)m_delegate.getReadDataAt(REFERENCE_DATA_INDEX)).getInt(dataIndex);
         }
 
-        @Override
-        public String toString() {
-            return super.toString() + " -> " + m_dictVector.toString();
-        }
     }
 }
