@@ -54,10 +54,9 @@ import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
@@ -106,15 +105,15 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
 
         if (DictEncodingTrait.isEnabled(m_schema.getTraits(index))) {
             if (m_schema.getSpec(index) instanceof StringDataSpec && !(data instanceof DictDecodedStringReadData)) {
-                if (!(data instanceof DictEncodedStringReadData)) {
-                    throw new IllegalArgumentException("Expected DictEncodedStringReadData to construct DictDecodedStringReadData");
+                if (!(data instanceof StructReadData)) {
+                    throw new IllegalArgumentException("Expected StructReadData to construct DictDecodedStringReadData");
                 }
-                return new DictDecodedStringReadData((DictEncodedStringReadData)data);
+                return new DictDecodedStringReadData((StructReadData)data);
             } else if (m_schema.getSpec(index) instanceof VarBinaryDataSpec && !(data instanceof DictDecodedVarBinaryReadData)) {
-                if (!(data instanceof DictEncodedVarBinaryReadData)) {
-                    throw new IllegalArgumentException("Expected DictEncodedVarBinaryReadData to construct DictDecodedVarBinaryReadData");
+                if (!(data instanceof StructReadData)) {
+                    throw new IllegalArgumentException("Expected StructReadData to construct DictDecodedVarBinaryReadData");
                 }
-                return new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data);
+                return new DictDecodedVarBinaryReadData((StructReadData)data);
             }
         }
 

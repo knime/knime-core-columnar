@@ -53,8 +53,6 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.testing.data.TestBooleanData.TestBooleanDataFactory;
 import org.knime.core.columnar.testing.data.TestByteData.TestByteDataFactory;
 import org.knime.core.columnar.testing.data.TestDataFactory;
-import org.knime.core.columnar.testing.data.TestDictEncodedStringData.TestDictEncodedStringDataFactory;
-import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData.TestDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
 import org.knime.core.columnar.testing.data.TestDurationData.TestDurationDataFactory;
 import org.knime.core.columnar.testing.data.TestFloatData.TestFloatDataFactory;
@@ -90,6 +88,8 @@ import org.knime.core.table.schema.VoidDataSpec;
 import org.knime.core.table.schema.ZonedDateTimeDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
+import org.knime.core.table.schema.traits.DefaultStructDataTraits;
 import org.knime.core.table.schema.traits.ListDataTraits;
 import org.knime.core.table.schema.traits.StructDataTraits;
 
@@ -161,7 +161,9 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
     @Override
     public TestDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return TestDictEncodedVarBinaryDataFactory.INSTANCE;
+            var structSpec = new StructDataSpec(LongDataSpec.INSTANCE, LongDataSpec.INSTANCE, VarBinaryDataSpec.INSTANCE);
+            var structTraits = new DefaultStructDataTraits(new DefaultDataTraits(), new DefaultDataTraits(), new DefaultDataTraits());
+            return visit(structSpec, structTraits);
         }
         return TestVarBinaryDataFactory.INSTANCE;
     }
@@ -192,7 +194,9 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
     @Override
     public TestDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return TestDictEncodedStringDataFactory.INSTANCE;
+            var structSpec = new StructDataSpec(LongDataSpec.INSTANCE, LongDataSpec.INSTANCE, StringDataSpec.INSTANCE);
+            var structTraits = new DefaultStructDataTraits(new DefaultDataTraits(), new DefaultDataTraits(), new DefaultDataTraits());
+            return visit(structSpec, structTraits);
         }
         return TestStringDataFactory.INSTANCE;
     }

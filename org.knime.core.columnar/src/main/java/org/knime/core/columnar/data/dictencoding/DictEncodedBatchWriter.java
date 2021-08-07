@@ -57,11 +57,10 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
@@ -117,15 +116,15 @@ public class DictEncodedBatchWriter implements BatchWriter {
 
     private NullableWriteData wrapDictEncodedData(final int i, final NullableWriteData d) {
         if (m_schema.getSpec(i) instanceof StringDataSpec && !(d instanceof DictDecodedStringWriteData)) {
-            if (!(d instanceof DictEncodedStringWriteData)) {
-                throw new IllegalArgumentException("Expected DictEncodedStringWriteData to construct DictDecodedStringWriteData");
+            if (!(d instanceof StructWriteData)) {
+                throw new IllegalArgumentException("Expected StructWriteData to construct DictDecodedStringWriteData");
             }
-            return new DictDecodedStringWriteData((DictEncodedStringWriteData)d);
+            return new DictDecodedStringWriteData((StructWriteData)d);
         } else if (m_schema.getSpec(i) instanceof VarBinaryDataSpec  && !(d instanceof DictDecodedVarBinaryWriteData)) {
-            if (!(d instanceof DictEncodedVarBinaryWriteData)) {
-                throw new IllegalArgumentException("Expected DictEncodedVarBinaryWriteData to construct DictDecodedVarBinaryWriteData");
+            if (!(d instanceof StructWriteData)) {
+                throw new IllegalArgumentException("Expected StructWriteData to construct DictDecodedVarBinaryWriteData");
             }
-            return  new DictDecodedVarBinaryWriteData((DictEncodedVarBinaryWriteData)d);
+            return  new DictDecodedVarBinaryWriteData((StructWriteData)d);
         }
 
         return d;

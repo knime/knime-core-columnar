@@ -65,8 +65,7 @@ import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDe
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.testing.DefaultTestBatchStore;
-import org.knime.core.columnar.testing.data.TestDictEncodedStringData;
-import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData;
+import org.knime.core.columnar.testing.data.TestStructData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
@@ -101,11 +100,10 @@ public class DictEncodedBatchStoreTest {
         final WriteBatch wrappedBatch) {
         for (int c = 0; c < columnarSchema.numColumns(); c++) {
             if (DictEncodingTrait.isEnabled(columnarSchema.getTraits(c))) {
+                assertEquals(baseBatch.get(c).getClass(), TestStructData.class);
                 if (columnarSchema.getSpec(c) == StringDataSpec.INSTANCE) {
-                    assertEquals(baseBatch.get(c).getClass(), TestDictEncodedStringData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedStringWriteData.class);
                 } else if (columnarSchema.getSpec(c) == VarBinaryDataSpec.INSTANCE) {
-                    assertEquals(baseBatch.get(c).getClass(), TestDictEncodedVarBinaryData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedVarBinaryWriteData.class);
                 } else {
                     fail("Dict Encoding for type " + columnarSchema.getSpec(c).toString() + " not tested yet");
@@ -120,11 +118,10 @@ public class DictEncodedBatchStoreTest {
         final ReadBatch wrappedBatch) {
         for (int c = 0; c < columnarSchema.numColumns(); c++) {
             if (DictEncodingTrait.isEnabled(columnarSchema.getTraits(c))) {
+                assertEquals(baseBatch.get(c).getClass(), TestStructData.class);
                 if (columnarSchema.getSpec(c) == StringDataSpec.INSTANCE) {
-                    assertEquals(baseBatch.get(c).getClass(), TestDictEncodedStringData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedStringReadData.class);
                 } else if (columnarSchema.getSpec(c) == VarBinaryDataSpec.INSTANCE) {
-                    assertEquals(baseBatch.get(c).getClass(), TestDictEncodedVarBinaryData.class);
                     assertEquals(wrappedBatch.get(c).getClass(), DictDecodedVarBinaryReadData.class);
                 } else {
                     fail("Dict Encoding for type " + columnarSchema.getSpec(c).toString() + " not tested yet");

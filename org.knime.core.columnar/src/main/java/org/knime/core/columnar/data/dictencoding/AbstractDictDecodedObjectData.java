@@ -53,8 +53,8 @@ import java.util.LinkedHashMap;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
+import org.knime.core.columnar.data.StructData.StructReadData;
+import org.knime.core.columnar.data.StructData.StructWriteData;
 
 /**
  * Base implementation for DictEncodedData
@@ -66,9 +66,9 @@ final class AbstractDictDecodedObjectData {
     {
     }
 
-    abstract static class AbstractDictDecodedObjectReadData<T, D extends DictEncodedReadData> implements NullableReadData
+    abstract static class AbstractDictDecodedObjectReadData<T, D extends StructReadData> implements NullableReadData
     {
-        protected final HashMap<Integer, T> m_dict = new HashMap<>();
+        protected final HashMap<Long, T> m_dict = new HashMap<>();
 
         protected final D m_delegate;
 
@@ -109,7 +109,7 @@ final class AbstractDictDecodedObjectData {
         }
     }
 
-    abstract static class AbstractDictDecodedObjectWriteData<T, D extends DictEncodedWriteData> implements NullableWriteData
+    abstract static class AbstractDictDecodedObjectWriteData<T, D extends StructWriteData> implements NullableWriteData
     {
         protected final D m_delegate;
 
@@ -118,9 +118,9 @@ final class AbstractDictDecodedObjectData {
         // entry indices in an ascending fashion and only insert a new value if not present yet,
         // index-ordering equals insertion-ordering of the linked hash map. So iteration over the
         // linked hash map will also happen with index-ordering.
-        final LinkedHashMap<T, Integer> m_dict = new LinkedHashMap<>();
+        final LinkedHashMap<T, Long> m_dict = new LinkedHashMap<>();
 
-        protected int m_nextDictEntry = 0;
+        protected long m_nextDictEntry = 0;
 
         AbstractDictDecodedObjectWriteData(final D delegate)
         {

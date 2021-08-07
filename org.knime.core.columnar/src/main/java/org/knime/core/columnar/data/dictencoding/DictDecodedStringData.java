@@ -50,13 +50,14 @@ package org.knime.core.columnar.data.dictencoding;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.data.StructData.StructReadData;
+import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectReadData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
 
 /**
  * Provide {@link StringWriteData} and {@link StringReadData} access to underlying dictionary encoded data
@@ -69,17 +70,17 @@ public final class DictDecodedStringData {
     }
 
     /**
-     * {@link DictDecodedStringWriteData} provides {@link StringWriteData} access to underlying {@link DictEncodedStringWriteData}.
+     * {@link DictDecodedStringWriteData} provides {@link StringWriteData} access to underlying {@link StructWriteData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringWriteData extends AbstractDictDecodedObjectWriteData<String, DictEncodedStringWriteData> implements StringWriteData {
+    public static class DictDecodedStringWriteData extends AbstractDictDecodedObjectWriteData<String, StructWriteData> implements StringWriteData {
 
         /**
-         * Create a {@link DictDecodedStringWriteData} wrapping a {@link DictEncodedStringWriteData} provided by a backend.
-         * @param delegate The delegate {@link DictEncodedStringWriteData}
+         * Create a {@link DictDecodedStringWriteData} wrapping a {@link StructWriteData} provided by a backend.
+         * @param delegate The delegate {@link StructWriteData}
          */
-        public DictDecodedStringWriteData(final DictEncodedStringWriteData delegate) {
+        public DictDecodedStringWriteData(final StructWriteData delegate) {
             super(delegate);
         }
 
@@ -97,33 +98,32 @@ public final class DictDecodedStringData {
         }
 
         private void setDictEncodedObject(final int index, final String val) {
-            final var dictIndex = m_dict.computeIfAbsent(val, o -> m_nextDictEntry++);
-            m_delegate.setReference(index, dictIndex);
+            var dictIndex = m_dict.computeIfAbsent(val, v -> {
+                ((StringWriteData)m_delegate.getWriteDataAt(2)).setString(index, val);
+                return m_nextDictEntry++;
+            });
+
+            ((LongWriteData)m_delegate.getWriteDataAt(0)).setLong(index, dictIndex);
         }
 
         @Override
         public StringReadData close(final int length) {
-            // write all dict entries:
-            m_dict.entrySet().stream()
-                .forEach(e -> m_delegate.setDictEntry(e.getValue(), e.getKey()));
-
-            // now we can close
             return new DictDecodedStringReadData(m_delegate.close(length));
         }
     }
 
     /**
-     * {@link DictDecodedStringReadData} provides {@link StringReadData} access to underlying {@link DictEncodedVarBinaryReadData}.
+     * {@link DictDecodedStringReadData} provides {@link StringReadData} access to underlying {@link StructReadData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
     public static class DictDecodedStringReadData extends
-        AbstractDictDecodedObjectReadData<String, DictEncodedStringReadData> implements StringReadData {
+        AbstractDictDecodedObjectReadData<String, StructReadData> implements StringReadData {
         /**
-         * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a backend.
-         * @param delegate The delegate {@link DictEncodedStringReadData}
+         * Create a {@link DictDecodedStringReadData} wrapping a {@link StructReadData} provided by a back-end.
+         * @param delegate The delegate {@link StructReadData}
          */
-        public DictDecodedStringReadData(final DictEncodedStringReadData delegate) {
+        public DictDecodedStringReadData(final StructReadData delegate) {
             super(delegate);
         }
 
@@ -140,8 +140,10 @@ public final class DictDecodedStringData {
         }
 
         private String getDictEncodedObject(final int index) {
-            final var dictIndex = m_delegate.getReference(index);
-            return m_dict.computeIfAbsent(dictIndex, m_delegate::getDictEntry);
+            final var dictIndex = ((LongReadData)m_delegate.getReadDataAt(0)).getLong(index);
+            return m_dict.computeIfAbsent(dictIndex, i -> {
+                return ((StringReadData)m_delegate.getReadDataAt(2)).getString(index);
+            });
         }
     }
 

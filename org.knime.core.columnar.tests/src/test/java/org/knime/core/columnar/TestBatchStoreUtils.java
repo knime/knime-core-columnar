@@ -111,15 +111,10 @@ import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecod
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedStringData.DictEncodedStringReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.TestBatchStore;
-import org.knime.core.columnar.testing.data.AbstractTestDictEncodedObjectData;
 import org.knime.core.columnar.testing.data.TestData;
-import org.knime.core.columnar.testing.data.TestDictEncodedStringData;
-import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
@@ -477,7 +472,7 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 NullableWriteData setData(final NullableWriteData data, final int index) {
-                    if (data instanceof AbstractTestDictEncodedObjectData) {
+                    if (data instanceof StructWriteData) {
                         throw new UnsupportedOperationException("This batch store does not support DictEncoding");
                     }
 
@@ -488,13 +483,13 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void checkEquals(NullableReadData refData, final NullableReadData readData, final int index) {
-                    if (readData instanceof TestDictEncodedStringData) {
+                    if (readData instanceof StructReadData) {
                         throw new UnsupportedOperationException("This batch store does not support DictEncoding");
                     }
 
-                    if (refData instanceof TestDictEncodedStringData) {
-                        // for testing we wrap the backend data (TestDictEncodedStringData) again to support String access
-                        refData = new DictDecodedStringReadData((TestDictEncodedStringData)refData);
+                    if (refData instanceof StructReadData) {
+                        // for testing we wrap the back-end data (StructReadData) again to support String access
+                        refData = new DictDecodedStringReadData((StructReadData)refData);
                     }
 
                     final StringReadData refObjectData = (StringReadData)refData;
@@ -561,7 +556,7 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 NullableWriteData setData(final NullableWriteData data, final int index) {
-                    if (data instanceof AbstractTestDictEncodedObjectData) {
+                    if (data instanceof StructWriteData) {
                         throw new UnsupportedOperationException("This batch store does not support DictEncoding");
                     }
                     ((VarBinaryWriteData)data).setBytes(index, new byte[]{(byte)runningInt++}); // NOSONAR
@@ -570,13 +565,13 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void checkEquals(NullableReadData refData, final NullableReadData readData, final int index) {
-                    if (readData instanceof TestDictEncodedVarBinaryData) {
+                    if (readData instanceof StructReadData) {
                         throw new UnsupportedOperationException("This batch store does not support DictEncoding");
                     }
 
-                    if (refData instanceof TestDictEncodedVarBinaryData) {
-                        // for testing we wrap the backend data (TestDictEncodedVarBinaryData) again to support String access
-                        refData = new DictDecodedVarBinaryReadData((TestDictEncodedVarBinaryData)refData);
+                    if (refData instanceof StructReadData) {
+                        // for testing we wrap the back-end data (StructReadData) again to support VarBinary access
+                        refData = new DictDecodedVarBinaryReadData((StructReadData)refData);
                     }
 
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
@@ -705,10 +700,10 @@ public final class TestBatchStoreUtils {
         for (int i = 0; i < out.length; i++)
         {
             if (i == Types.DICTENCODEDSTRING.ordinal()) {
-                out[i] = new DictDecodedStringReadData((DictEncodedStringReadData)data[i]);
+                out[i] = new DictDecodedStringReadData((StructReadData)data[i]);
             }
             else if (i == Types.DICTENCODEDVARBINARY.ordinal()) {
-                out[i] = new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data[i]);
+                out[i] = new DictDecodedVarBinaryReadData((StructReadData)data[i]);
             } else {
                 out[i] = data[i];
             }

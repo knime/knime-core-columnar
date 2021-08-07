@@ -48,16 +48,16 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import java.util.HashMap;
-
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.WriteData;
+import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.columnar.data.StructData.StructReadData;
+import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectReadData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedObjectData.AbstractDictDecodedObjectWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryReadData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedVarBinaryData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
@@ -72,22 +72,20 @@ public final class DictDecodedVarBinaryData {
     }
 
     /**
-     * {@link WriteData} that stores Strings using a dictionary encoding
+     * {@link WriteData} that stores VarBinary data using a dictionary encoding
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedObjectWriteData<Object, DictEncodedVarBinaryWriteData>
+    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedObjectWriteData<Object, StructWriteData>
         implements VarBinaryWriteData {
-
-        final HashMap<Integer, ObjectSerializer<Object>> m_serializers = new HashMap<>();
 
         /**
          * Create a {@link DictDecodedVarBinaryWriteData} wrapping a {@link DictDecodedVarBinaryWriteData} provided by a
-         * backend.
+         * back-end.
          *
-         * @param delegate The delegate {@link DictEncodedVarBinaryWriteData}
+         * @param delegate The delegate {@link StructWriteData}
          */
-        public DictDecodedVarBinaryWriteData(final DictEncodedVarBinaryWriteData delegate) {
+        public DictDecodedVarBinaryWriteData(final StructWriteData delegate) {
             super(delegate);
         }
 
@@ -100,12 +98,11 @@ public final class DictDecodedVarBinaryData {
         }
 
         private <T> void setDictEncodedObject(final int index, final T obj, final ObjectSerializer<T> serializer) {
-            @SuppressWarnings("unchecked")
             final var dictIndex = m_dict.computeIfAbsent(obj, o -> {
-                m_serializers.put(m_nextDictEntry, (ObjectSerializer<Object>)serializer);
+                ((VarBinaryWriteData)m_delegate.getWriteDataAt(2)).setObject(index, obj, serializer);
                 return m_nextDictEntry++;
             });
-            m_delegate.setReference(index, dictIndex);
+            ((LongWriteData)m_delegate.getWriteDataAt(0)).setLong(index, dictIndex);
         }
 
         @Override
@@ -115,31 +112,25 @@ public final class DictDecodedVarBinaryData {
 
         @Override
         public VarBinaryReadData close(final int length) {
-            // write all dict entries:
-            m_dict.entrySet().stream()
-                .forEach(e -> m_delegate.setDictEntry(e.getValue(), e.getKey(),
-                    m_serializers.get(e.getValue())));
-
-            // now we can close
             return new DictDecodedVarBinaryReadData(m_delegate.close(length));
         }
     }
 
     /**
-     * {@link ReadData} holding String elements.
+     * {@link ReadData} holding VarBinary elements.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedObjectReadData<Object, DictEncodedVarBinaryReadData>
+    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedObjectReadData<Object, StructReadData>
         implements VarBinaryReadData {
 
         /**
          * Create a {@link DictDecodedVarBinaryReadData} wrapping a {@link DictDecodedVarBinaryReadData} provided by a
          * backend.
          *
-         * @param delegate The delegate {@link DictEncodedVarBinaryReadData}
+         * @param delegate The delegate {@link StructReadData}
          */
-        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData delegate) {
+        public DictDecodedVarBinaryReadData(final StructReadData delegate) {
             super(delegate);
         }
 
@@ -160,9 +151,10 @@ public final class DictDecodedVarBinaryData {
 
         @SuppressWarnings("unchecked")
         private <T> T getDictEncodedObject(final int index, final ObjectDeserializer<T> deserializer) {
-            final var dictIndex = m_delegate.getReference(index);
-            return (T)m_dict.computeIfAbsent(dictIndex,
-                i -> m_delegate.getDictEntry(i, deserializer));
+            final var dictIndex = ((LongReadData)m_delegate.getReadDataAt(0)).getLong(index);
+            return (T)m_dict.computeIfAbsent(dictIndex, i -> {
+                return ((VarBinaryReadData)m_delegate.getReadDataAt(2)).getObject(index, deserializer);
+            });
         }
     }
 
