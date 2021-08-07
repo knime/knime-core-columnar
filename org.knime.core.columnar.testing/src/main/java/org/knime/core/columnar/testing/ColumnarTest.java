@@ -68,11 +68,15 @@ public class ColumnarTest {
     static final Set<Closeable> OPEN_CLOSEABLES =
         Collections.synchronizedSet(Collections.newSetFromMap(new HashMap<>()));
 
-    static CountDownLatch STORE_CLOSE_LATCH;
+    static CountDownLatch storeClosedLatch;
+
+    static synchronized void initializeStoreCloseLatch() {
+        storeClosedLatch = new CountDownLatch(1);
+    }
 
     @Before
     public void setup() {
-        STORE_CLOSE_LATCH = new CountDownLatch(1);
+        initializeStoreCloseLatch();
         OPEN_CLOSEABLES.clear();
     }
 
@@ -81,7 +85,7 @@ public class ColumnarTest {
         // We wait for the TestBatchStore to close before we check which closeables are left over.
         // This is necessary because close() of a cached batch store closes its delegates asynchronously.
         try {
-        STORE_CLOSE_LATCH.await();
+            storeClosedLatch.await();
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
