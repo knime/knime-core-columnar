@@ -260,7 +260,7 @@ public final class TestBatchStore implements BatchStore {
         }
 
         ColumnarTest.OPEN_CLOSEABLES.remove(this);
-        ColumnarTest.STORE_CLOSE_LATCH.countDown();
+        ColumnarTest.storeCloseLatch.countDown();
     }
 
     public List<TestData> getData() {

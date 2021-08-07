@@ -208,7 +208,7 @@ public final class TestBatchBuffer implements BatchWritable, RandomAccessBatchRe
         }
 
         ColumnarTest.OPEN_CLOSEABLES.remove(this);
-        ColumnarTest.STORE_CLOSE_LATCH.countDown();
+        ColumnarTest.storeCloseLatch.countDown();
     }
 
     public List<TestData> getData() {
