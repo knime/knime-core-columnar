@@ -51,6 +51,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestBatchStoreUtils.DEF_BATCH_LENGTH;
+import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_ADDITIONAL_COLUMNS;
+import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_BATCHES;
 import static org.knime.core.columnar.TestBatchStoreUtils.DEF_SIZE_OF_TABLE;
 import static org.knime.core.columnar.TestBatchStoreUtils.checkRefs;
 import static org.knime.core.columnar.TestBatchStoreUtils.createDefaultTestColumnStore;
@@ -91,7 +93,7 @@ public class ReadDataCacheTest extends ColumnarTest {
     }
 
     static SharedReadDataCache generateCache(final int numTablesHeld) {
-        return new SharedReadDataCache((long)numTablesHeld * DEF_SIZE_OF_TABLE, 1);
+        return new SharedReadDataCache((long)numTablesHeld * (DEF_SIZE_OF_TABLE + DEF_BATCH_LENGTH * DEF_NUM_BATCHES * DEF_NUM_ADDITIONAL_COLUMNS), 1);
     }
 
     private static ReadDataCache generateDefaultCachedColumnStore(final BatchStore delegate,

@@ -48,6 +48,9 @@ package org.knime.core.columnar.cache.writable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.knime.core.columnar.TestBatchStoreUtils.DEF_BATCH_LENGTH;
+import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_ADDITIONAL_COLUMNS;
+import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_BATCHES;
 import static org.knime.core.columnar.TestBatchStoreUtils.DEF_SIZE_OF_TABLE;
 import static org.knime.core.columnar.TestBatchStoreUtils.checkRefs;
 import static org.knime.core.columnar.TestBatchStoreUtils.createDefaultTestColumnStore;
@@ -80,8 +83,9 @@ import org.knime.core.columnar.testing.TestBatchStore;
 public class BatchWritableCacheTest extends ColumnarTest {
 
     private static SharedBatchWritableCache generateCache() {
-        final SharedBatchWritableCache cache = new SharedBatchWritableCache(DEF_SIZE_OF_TABLE, DEF_SIZE_OF_TABLE, 1);
-        assertEquals(DEF_SIZE_OF_TABLE, cache.getCacheSize());
+        final int cachedSize = DEF_SIZE_OF_TABLE + DEF_BATCH_LENGTH * DEF_NUM_BATCHES * DEF_NUM_ADDITIONAL_COLUMNS;
+        final SharedBatchWritableCache cache = new SharedBatchWritableCache(cachedSize, cachedSize, 1);
+        assertEquals(cachedSize, cache.getCacheSize());
         return cache;
     }
 

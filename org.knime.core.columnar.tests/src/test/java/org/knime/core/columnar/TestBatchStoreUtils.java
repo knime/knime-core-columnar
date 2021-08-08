@@ -166,11 +166,13 @@ public final class TestBatchStoreUtils {
 
     private static final int DEF_NUM_COLUMNS = Types.values().length;
 
-    private static final int DEF_NUM_BATCHES = 2;
+    public static final int DEF_NUM_BATCHES = 2;
 
     public static final int DEF_BATCH_LENGTH = 2;
 
-    public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * DEF_NUM_COLUMNS * DEF_BATCH_LENGTH;
+    public static final int DEF_NUM_ADDITIONAL_COLUMNS = 4;
+
+    public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * (DEF_NUM_COLUMNS) * DEF_BATCH_LENGTH;
 
     private TestBatchStoreUtils() {
         // Utility class
