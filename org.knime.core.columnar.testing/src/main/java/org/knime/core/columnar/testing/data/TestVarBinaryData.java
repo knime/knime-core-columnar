@@ -133,6 +133,7 @@ public final class TestVarBinaryData extends AbstractTestData implements VarBina
         } catch (IOException ex) {
             throw new IllegalStateException("Error during serialization", ex);
         }
+        setBytes(index, bs.toByteArray());
     }
 
 }
