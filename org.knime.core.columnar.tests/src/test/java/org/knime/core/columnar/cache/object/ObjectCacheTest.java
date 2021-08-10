@@ -79,6 +79,7 @@ import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.data.TestStringData;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -88,7 +89,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public class ObjectCacheTest {
+public class ObjectCacheTest extends ColumnarTest {
 
     private static ExecutorService SERIALIZATION_EXECUTOR = Executors.newSingleThreadExecutor();
 

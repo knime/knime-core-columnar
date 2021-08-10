@@ -64,12 +64,13 @@ import org.junit.Test;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.testing.ColumnarTest;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class ObjectReadCacheTest {
+public class ObjectReadCacheTest extends ColumnarTest {
 
     private static final class ObjectReadCacheAndTable implements Closeable {
 
