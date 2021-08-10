@@ -48,7 +48,7 @@
  */
 package org.knime.core.columnar.testing;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.Closeable;
 import java.util.Collections;
@@ -70,13 +70,20 @@ public class ColumnarTest {
 
     static CountDownLatch storeCloseLatch;
 
-    static synchronized void initializeStoreCloseLatch() {
-        storeCloseLatch = new CountDownLatch(1);
+    /**
+     * Sets the number of stores that are expected to be closed.
+     * Use this method if your test opens more than one store.
+     * The case of a single store is already covered by {@link #setup()}.
+     *
+     * @param numberOfStores the number of stores the test opens
+     */
+    protected static synchronized void initializeStoreCloseLatch(final int numberOfStores) {
+        storeCloseLatch = new CountDownLatch(numberOfStores);
     }
 
     @Before
     public void setup() {
-        initializeStoreCloseLatch();
+        initializeStoreCloseLatch(1);
         OPEN_CLOSEABLES.clear();
     }
 
@@ -90,7 +97,7 @@ public class ColumnarTest {
             Thread.currentThread().interrupt();
         }
 
-        assertEquals("Unclosed Closeables. " + OPEN_CLOSEABLES, 0, OPEN_CLOSEABLES.size());
+        assertTrue("Unclosed Closeables. " + OPEN_CLOSEABLES, OPEN_CLOSEABLES.isEmpty());
     }
 
 }
