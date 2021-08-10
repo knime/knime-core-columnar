@@ -123,8 +123,9 @@ public class ArrowMemoryTest {
                         ((DoubleWriteData)data).setDouble(j, j);
                     }
                 }
-                writer.write(batch.close(chunkSize));
-                batch.release();
+                var readBatch = batch.close(chunkSize);
+                writer.write(readBatch);
+                readBatch.release();
             }
         }
     }
