@@ -55,8 +55,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.knime.core.columnar.batch.BatchWritable;
-import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchStore;
+import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
@@ -85,13 +85,13 @@ final class ColumnarRowContainer implements RowContainer {
 
     static ColumnarRowContainer create(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
         final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
-        final ColumnarRowContainer container = new ColumnarRowContainer(context, id, schema, storeFactory, settings);
+        final var container = new ColumnarRowContainer(context, id, schema, storeFactory, settings);
         container.m_finalizer =
-            ResourceLeakDetector.getInstance().createFinalizer(container, container.m_delegate, container.m_store);
+            ResourceLeakDetector.getInstance().createFinalizer(container, container.m_writeCursor, container.m_store);
         return container;
     }
 
-    private final ColumnarRowWriteCursor m_delegate;
+    private final ColumnarRowWriteCursor m_writeCursor;
 
     private final ExecutionContext m_context;
 
@@ -126,8 +126,9 @@ final class ColumnarRowContainer implements RowContainer {
 
         m_path = DataContainer.createTempFile(".knable").toPath();
 
-        final var dictEncodedBatchStore = new DictEncodedBatchStore(m_storeFactory.createStore(schema, m_path));
-        m_cached = new CachedBatchWritableReadable<BatchStore>(dictEncodedBatchStore);
+        final BatchStore lowLevelStore = m_storeFactory.createStore(schema, m_path);
+        final var dictEncodedBatchStore = new DictEncodedBatchStore(lowLevelStore);
+        m_cached = new CachedBatchWritableReadable<>(dictEncodedBatchStore);
         final BatchWritable wrappedWritable = settings.isCheckDuplicateRowKeys() ? new DuplicateCheckWritable(m_cached,
             new DuplicateChecker(), ColumnarPreferenceUtils.getDuplicateCheckExecutor()) : m_cached;
 
@@ -137,12 +138,12 @@ final class ColumnarRowContainer implements RowContainer {
 
         m_store = new WrappedBatchStore(m_domainWritable, m_cached);
 
-        m_delegate = new ColumnarRowWriteCursor(m_store, m_schema.getValueFactories(), m_forceSynchronousIO ? m_cached : null);
+        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema.getValueFactories(), m_forceSynchronousIO ? m_cached : null);
     }
 
     @Override
     public ColumnarRowWriteCursor createCursor() {
-        return m_delegate;
+        return m_writeCursor;
     }
 
     @SuppressWarnings("resource")
@@ -162,7 +163,7 @@ final class ColumnarRowContainer implements RowContainer {
         if (m_table == null) {
 
             m_finalizer.close();
-            m_delegate.close();
+            m_writeCursor.close();
             // closing the store includes closing the writer
             // (but will make sure duplicate checks and domain calculations are halted)
             try {
@@ -182,8 +183,8 @@ final class ColumnarRowContainer implements RowContainer {
     ExtensionTable finishInternal() {
         if (m_table == null) {
             m_finalizer.close();
-            m_delegate.flush();
-            m_delegate.close();
+            m_writeCursor.flush();
+            m_writeCursor.close();
 
             try {
                 m_cached.flush();
@@ -201,7 +202,7 @@ final class ColumnarRowContainer implements RowContainer {
 
             m_table = UnsavedColumnarContainerTable.create(m_path, m_id, m_storeFactory,
                 ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_cached,
-                m_delegate.size());
+                m_writeCursor.size());
         }
         return m_table;
     }

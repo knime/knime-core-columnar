@@ -381,11 +381,14 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         m_closed.set(true);
         m_writer.close();
 
-        m_writer.m_future = m_writer.m_future.thenRunAsync(this::deferredClose);
+        m_writer.m_future = m_writer.m_future.thenRunAsync(this::deferredClose, m_executor);
         m_writer.handleDoneFuture();
     }
 
     private void deferredClose() {
+        // if the cache is closed without a flush, then the CachedWriteDatas might not have released their resources
+        // yet and we need to wait for that to happen
+        m_unclosedData.forEach(CachedWriteData::waitForAndGetFuture);
         m_unclosedData.clear();
         m_cache.getCache().keySet().removeAll(m_cachedData);
         m_cachedData.clear();

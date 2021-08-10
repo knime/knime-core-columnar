@@ -66,6 +66,7 @@ import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
@@ -80,7 +81,7 @@ import org.knime.core.util.DuplicateKeyException;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class DuplicateCheckWritableTest {
+public class DuplicateCheckWritableTest extends ColumnarTest {
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
 

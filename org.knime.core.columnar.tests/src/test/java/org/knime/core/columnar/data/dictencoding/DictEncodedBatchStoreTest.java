@@ -64,6 +64,7 @@ import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecod
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
+import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.DefaultTestBatchStore;
 import org.knime.core.columnar.testing.data.TestDictEncodedStringData;
 import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData;
@@ -77,7 +78,7 @@ import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public class DictEncodedBatchStoreTest {
+public class DictEncodedBatchStoreTest extends ColumnarTest {
     @Test
     public void testWrappedWriter() {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();

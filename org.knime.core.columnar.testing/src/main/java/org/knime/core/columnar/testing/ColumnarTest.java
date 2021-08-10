@@ -90,7 +90,7 @@ public class ColumnarTest {
             Thread.currentThread().interrupt();
         }
 
-        assertEquals("Unclosed Closeables.", 0, OPEN_CLOSEABLES.size());
+        assertEquals("Unclosed Closeables. " + OPEN_CLOSEABLES, 0, OPEN_CLOSEABLES.size());
     }
 
 }

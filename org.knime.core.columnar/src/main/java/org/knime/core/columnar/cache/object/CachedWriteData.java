@@ -73,6 +73,7 @@ import org.slf4j.LoggerFactory;
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
+@SuppressWarnings("javadoc")
 abstract class CachedWriteData<W extends NullableWriteData, R extends NullableReadData, T>
     implements NullableWriteData, Flushable {
 
@@ -281,7 +282,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
         dispatchSerialization();
     }
 
-    private synchronized void waitForAndGetFuture() {
+    synchronized void waitForAndGetFuture() {
         try {
             m_future.get();
         } catch (ExecutionException e) {
