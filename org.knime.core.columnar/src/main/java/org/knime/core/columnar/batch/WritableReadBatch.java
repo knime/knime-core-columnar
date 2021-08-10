@@ -48,39 +48,10 @@
  */
 package org.knime.core.columnar.batch;
 
-import org.knime.core.columnar.data.NullableReadData;
+import java.io.IOException;
 
-/**
- * Default implementation of a {@link ReadBatch} that holds an array of {@link NullableReadData} and guarantees that
- * data is present at all valid indices.
- *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
- */
-public class DefaultReadBatch extends AbstractBatch<NullableReadData> implements ReadBatch {
+public interface WritableReadBatch extends ReadBatch {
 
-    private final int m_length;
-
-    /**
-     * @param data the array of data comprising this batch
-     */
-    public DefaultReadBatch(final NullableReadData[] data) {
-        super(data);
-        int length = 0;
-        for (NullableReadData d : data) {
-            length = Math.max(length, d.length());
-        }
-        m_length = length;
-    }
-
-    @Override
-    public boolean isMissing(final int index) {
-        return false;
-    }
-
-    @Override
-    public int length() {
-        return m_length;
-    }
+    void write() throws IOException;
 
 }

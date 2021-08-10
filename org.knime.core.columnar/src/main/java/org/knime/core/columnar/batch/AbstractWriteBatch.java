@@ -60,14 +60,14 @@ import org.knime.core.columnar.data.NullableWriteData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class DefaultWriteBatch extends AbstractBatch<NullableWriteData> implements WriteBatch {
+public abstract class AbstractWriteBatch extends AbstractBatch<NullableWriteData> implements WriteBatch {
 
     private int m_capacity;
 
     /**
      * @param data the array of data comprising this batch
      */
-    public DefaultWriteBatch(final NullableWriteData[] data) {
+    protected AbstractWriteBatch(final NullableWriteData[] data) {
         super(data);
         m_capacity = Arrays.stream(data).mapToInt(WriteData::capacity).min().orElse(0);
     }
@@ -88,8 +88,9 @@ public final class DefaultWriteBatch extends AbstractBatch<NullableWriteData> im
     }
 
     @Override
-    public ReadBatch close(final int length) {
-        return new DefaultReadBatch(Arrays.stream(m_data).map(d -> d.close(length)).toArray(NullableReadData[]::new));
+    public WritableReadBatch close(final int length) {
+        return closeInternal(Arrays.stream(m_data).map(d -> d.close(length)).toArray(NullableReadData[]::new));
     }
 
+    protected abstract WritableReadBatch closeInternal(NullableReadData[] closedData);
 }

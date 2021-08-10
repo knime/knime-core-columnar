@@ -60,7 +60,7 @@ import org.knime.core.columnar.data.NullableWriteData;
 public interface WriteBatch extends Batch<NullableWriteData>, WriteData {
 
     @Override
-    ReadBatch close(int length);
+    WritableReadBatch close(int length);
 
     /**
      * The minimum {@link WriteData#capacity() capacity} of all data in this batch, or zero if the batch holds no data.

@@ -46,7 +46,6 @@
 package org.knime.core.columnar.batch;
 
 import java.io.Closeable;
-import java.io.IOException;
 
 import org.knime.core.columnar.WriteData;
 
@@ -74,6 +73,6 @@ public interface BatchWriter extends Closeable {
      * @param batch a batch to which data can no longer be written
      * @throws IOException if any I/O problem occurs
      */
-    void write(ReadBatch batch) throws IOException;
+//    void write(ReadBatch batch) throws IOException;
 
 }
