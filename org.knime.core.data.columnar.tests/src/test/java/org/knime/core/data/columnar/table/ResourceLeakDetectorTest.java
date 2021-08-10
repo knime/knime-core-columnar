@@ -78,6 +78,7 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
     @Override
     @Before
     public void setup() {
+        super.setup();
         ResourceLeakDetector.getInstance().clear();
         System.gc(); // NOSONAR
         ResourceLeakDetector.getInstance().poll();
