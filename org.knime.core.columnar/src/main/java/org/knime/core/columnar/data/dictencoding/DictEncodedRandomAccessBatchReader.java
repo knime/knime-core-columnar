@@ -85,6 +85,7 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
      * @param delegate The delegate {@link RandomAccessBatchReadable}
      * @param selection The column selection
      * @param schema The columnar schema
+     * @param cache The table-wide {@link DictElementCache}
      */
     public DictEncodedRandomAccessBatchReader(final RandomAccessBatchReadable delegate, final ColumnSelection selection, final ColumnarSchema schema, final DictElementCache cache) {
         m_delegate = delegate.createRandomAccessReader(selection);

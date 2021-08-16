@@ -86,6 +86,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
      * Create a batch writer
      * @param delegate The delegate BatchWriter
      * @param schema The schema
+     * @param dictElementCache The table-wide {@link DictElementCache}
      */
     public DictEncodedBatchWriter(final BatchWriter delegate, final ColumnarSchema schema, final DictElementCache dictElementCache)
     {

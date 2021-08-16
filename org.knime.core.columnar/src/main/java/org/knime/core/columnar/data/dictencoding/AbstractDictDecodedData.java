@@ -116,6 +116,7 @@ final class AbstractDictDecodedData {
         AbstractDictDecodedWriteData(final D delegate, final ColumnDictElementCache cache) {
             m_delegate = delegate;
             m_cache = cache;
+            m_delegate.setKeyGenerator(cache);
         }
 
         @Override

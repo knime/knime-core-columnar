@@ -48,8 +48,9 @@ package org.knime.core.columnar.testing.data;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.knime.core.columnar.data.IntData.IntReadData;
-import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.AscendingKeyGenerator;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
@@ -65,18 +66,9 @@ public abstract class AbstractTestDictEncodedData<T>
 
     private DictKeyGenerator m_keyGenerator;
 
-    protected final Map<T, Integer> m_dictValToKey = new HashMap<>();
+    protected final Map<T, Long> m_dictValToKey = new HashMap<>();
 
-    protected final Map<Integer, T> m_dictKeyToVal = new HashMap<>();
-
-    private static final class AscendingKeyGenerator implements DictKeyGenerator {
-        private int m_nextDictIndex = 0;
-
-        @Override
-        public <T> int generateKey(final T value) {
-            return m_nextDictIndex++;
-        }
-    }
+    protected final Map<Long, T> m_dictKeyToVal = new HashMap<>();
 
     AbstractTestDictEncodedData(final TestStructData delegate) {
         m_delegate = delegate;
@@ -129,8 +121,8 @@ public abstract class AbstractTestDictEncodedData<T>
     }
 
     @Override
-    public void setDictKey(final int dataIndex, final int dictKey) {
-        ((IntWriteData)m_delegate.getWriteDataAt(0)).setInt(dataIndex, dictKey);
+    public void setDictKey(final int dataIndex, final long dictKey) {
+        ((LongWriteData)m_delegate.getWriteDataAt(0)).setLong(dataIndex, dictKey);
     }
 
     @Override
@@ -142,7 +134,7 @@ public abstract class AbstractTestDictEncodedData<T>
         m_keyGenerator = keyGenerator;
     }
 
-    protected int generateKey(final T val) {
+    protected long generateKey(final T val) {
         if (m_keyGenerator == null) {
             m_keyGenerator = new AscendingKeyGenerator();
         }
@@ -151,8 +143,8 @@ public abstract class AbstractTestDictEncodedData<T>
     }
 
     @Override
-    public int getDictKey(final int dataIndex) {
-        return ((IntReadData)m_delegate.getReadDataAt(0)).getInt(dataIndex);
+    public long getDictKey(final int dataIndex) {
+        return ((LongReadData)m_delegate.getReadDataAt(0)).getLong(dataIndex);
     }
 
     @Override

@@ -49,7 +49,6 @@ import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
-import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
 import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
@@ -68,8 +67,7 @@ public final class TestDictEncodedStringData extends AbstractTestDictEncodedData
         private final TestStructDataFactory m_delegate;
 
         private TestDictEncodedStringDataFactory() {
-            m_delegate = new TestStructDataFactory(TestIntDataFactory.INSTANCE, TestLongDataFactory.INSTANCE,
-                TestStringDataFactory.INSTANCE);
+            m_delegate = new TestStructDataFactory(TestLongDataFactory.INSTANCE, TestStringDataFactory.INSTANCE);
         }
 
         @Override
@@ -101,8 +99,8 @@ public final class TestDictEncodedStringData extends AbstractTestDictEncodedData
 
     @Override
     public void setString(final int index, final String val) {
-        int dictKey = m_dictValToKey.computeIfAbsent(val, v -> {
-            ((StringWriteData)m_delegate.getWriteDataAt(2)).setString(index, val);
+        long dictKey = m_dictValToKey.computeIfAbsent(val, v -> {
+            ((StringWriteData)m_delegate.getWriteDataAt(1)).setString(index, val);
             return generateKey(val);
         });
 
@@ -111,10 +109,10 @@ public final class TestDictEncodedStringData extends AbstractTestDictEncodedData
 
     @Override
     public String getString(final int index) {
-        int dictKey = getDictKey(index);
+        long dictKey = getDictKey(index);
 
         return m_dictKeyToVal.computeIfAbsent(dictKey,
-            k -> ((StringReadData)m_delegate.getReadDataAt(2)).getString(index));
+            k -> ((StringReadData)m_delegate.getReadDataAt(1)).getString(index));
     }
 
     @Override

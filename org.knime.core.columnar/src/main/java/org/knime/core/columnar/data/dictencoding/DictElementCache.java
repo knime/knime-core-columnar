@@ -51,6 +51,8 @@ package org.knime.core.columnar.data.dictencoding;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
+
 /**
  * This {@link DictElementCache} will be used to cache entries of dictionary-encoded
  * data across all batches of the table, or at least as long as they do fit in memory.
@@ -60,8 +62,23 @@ import java.util.Map;
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 public class DictElementCache {
-    public static class ColumnDictElementCache {
-        // TODO: implement this for global caching
+    /**
+     * The cache for the entries of one column in the table.
+     *
+     * Supports the generation of globally unique dictionary keys.
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public static class ColumnDictElementCache implements DictKeyGenerator{
+        private long m_numDictEntries = 0;
+
+        // TODO: implement global caching
+
+        @Override
+        public synchronized <T> long generateKey(final T value) {
+            // synchronized because that could possibly be called from multiple threads?
+            return m_numDictEntries++;
+        }
     }
 
     private Map<Integer, ColumnDictElementCache> m_perColumnCache = new HashMap<>();

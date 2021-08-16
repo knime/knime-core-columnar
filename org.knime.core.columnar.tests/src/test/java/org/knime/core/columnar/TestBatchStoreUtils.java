@@ -173,7 +173,8 @@ public final class TestBatchStoreUtils {
 
     public static final int DEF_BATCH_LENGTH = 2;
 
-    public static final int DEF_NUM_ADDITIONAL_COLUMNS = 4;
+    // Because Struct Dict Encoded data takes up two columns each, once for String and once for VarBinary
+    public static final int DEF_NUM_ADDITIONAL_COLUMNS = 2;
 
     public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * DEF_NUM_COLUMNS * DEF_BATCH_LENGTH;
 

@@ -57,7 +57,6 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
-import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
 import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
 import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
@@ -78,7 +77,7 @@ public final class TestDictEncodedVarBinaryData extends AbstractTestDictEncodedD
         private final TestStructDataFactory m_delegate;
 
         private TestDictEncodedVarBinaryDataFactory() {
-            m_delegate = new TestStructDataFactory(TestIntDataFactory.INSTANCE, TestLongDataFactory.INSTANCE,
+            m_delegate = new TestStructDataFactory(TestLongDataFactory.INSTANCE,
                 TestVarBinaryDataFactory.INSTANCE);
         }
 
@@ -138,8 +137,8 @@ public final class TestDictEncodedVarBinaryData extends AbstractTestDictEncodedD
 
     @Override
     public void setBytes(final int index, final byte[] val) {
-        int dictKey = m_dictValToKey.computeIfAbsent(val, v -> {
-            ((VarBinaryWriteData)m_delegate.getWriteDataAt(2)).setBytes(index, val);
+        long dictKey = m_dictValToKey.computeIfAbsent(val, v -> {
+            ((VarBinaryWriteData)m_delegate.getWriteDataAt(1)).setBytes(index, val);
             return generateKey(val);
         });
 
@@ -148,9 +147,9 @@ public final class TestDictEncodedVarBinaryData extends AbstractTestDictEncodedD
 
     @Override
     public byte[] getBytes(final int index) {
-        int dictKey = getDictKey(index);
+        long dictKey = getDictKey(index);
 
         return (byte[])m_dictKeyToVal.computeIfAbsent(dictKey,
-            k -> ((VarBinaryReadData)m_delegate.getReadDataAt(2)).getBytes(index));
+            k -> ((VarBinaryReadData)m_delegate.getReadDataAt(1)).getBytes(index));
     }
 }
