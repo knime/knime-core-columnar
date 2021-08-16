@@ -214,119 +214,101 @@ public class ObjectCacheTest extends ColumnarTest {
 
     @Test
     public void testFlush() throws IOException, InterruptedException {
-        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema())) {
-            try (final ObjectCache store =
-                new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
-                    final BatchWriter writer = store.getWriter()) {
-                final WriteBatch batch = writer.create(2);
-                final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
-                final TestStringData delegateData = (TestStringData)data.m_delegate;
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
+                final ObjectCache store =
+                    new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+                final BatchWriter writer = store.getWriter()) {
+            final WriteBatch batch = writer.create(2);
+            final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
+            final TestStringData delegateData = (TestStringData)data.m_delegate;
 
-                store.flush();
+            store.flush();
 
-                // test that data is serialized after flush
-                data.setString(0, "0");
-                assertNull(delegateData.getString(0));
-                store.flush();
-                assertEquals("0", delegateData.getString(0));
+            // test that data is serialized after flush
+            data.setString(0, "0");
+            assertNull(delegateData.getString(0));
+            store.flush();
+            assertEquals("0", delegateData.getString(0));
 
-                // test that data is serialized asynchronously after closing the writer
-                data.setString(1, "1");
-                assertEquals("0", delegateData.getString(0));
-                assertNull(delegateData.getString(1));
-                writer.write(batch.close(1));
-                writer.close();
-                waitForSerialization();
+            // test that data is serialized asynchronously after closing the writer
+            data.setString(1, "1");
+            assertEquals("0", delegateData.getString(0));
+            assertNull(delegateData.getString(1));
+            writer.write(batch.close(1));
+            writer.close();
+            waitForSerialization();
 
-                assertEquals("0", delegateData.getString(0));
-                assertEquals("1", delegateData.getString(1));
+            assertEquals("0", delegateData.getString(0));
+            assertEquals("1", delegateData.getString(1));
 
-                // test that further invocations of flush have no effect
-                store.flush();
-                assertEquals("0", delegateData.getString(0));
-                assertEquals("1", delegateData.getString(1));
+            // test that further invocations of flush have no effect
+            store.flush();
+            assertEquals("0", delegateData.getString(0));
+            assertEquals("1", delegateData.getString(1));
 
-                batch.release();
-            }
-
-            // TestBatchBuffer.close() checks whether data has been released completely.
-            // Because the ObjectCache is closed asynchronously,
-            // we wait for the thread on which this closing happens.
-            waitForPersist();
+            batch.release();
         }
     }
 
     @Test
     public void testSerializeAsync() throws IOException, InterruptedException {
-        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema())) {
-            try (final ObjectCache store =
-                new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
-                    final BatchWriter writer = store.getWriter()) {
-                final WriteBatch batch = writer.create(1);
-                final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
-                final TestStringData delegateData = (TestStringData)data.m_delegate;
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
+                final ObjectCache store =
+                    new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+                final BatchWriter writer = store.getWriter()) {
+            final WriteBatch batch = writer.create(1);
+            final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
+            final TestStringData delegateData = (TestStringData)data.m_delegate;
 
-                final CountDownLatch blockLatch = blockSerialization();
-                try {
-                    data.setString(0, "0");
-                    batch.close(1);
-                    assertNull(delegateData.getString(0));
-                } finally {
-                    resumeAndWaitForSerialization(blockLatch);
-                }
-                assertEquals("0", delegateData.getString(0));
-
-                batch.release();
+            final CountDownLatch blockLatch = blockSerialization();
+            try {
+                data.setString(0, "0");
+                batch.close(1);
+                assertNull(delegateData.getString(0));
+            } finally {
+                resumeAndWaitForSerialization(blockLatch);
             }
+            assertEquals("0", delegateData.getString(0));
 
-            // TestBatchBuffer.close() checks whether data has been released completely.
-            // Because the ObjectCache is closed asynchronously,
-            // we wait for the thread on which this closing happens.
-            waitForPersist();
+            batch.release();
         }
     }
 
     @Test
     public void testCloseDoesNotBlock() throws IOException, InterruptedException {
-        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema())) {
-            try (final ObjectCache store =
-                new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
-                    final BatchWriter writer = store.getWriter()) {
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
+                final ObjectCache store =
+                    new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+                final BatchWriter writer = store.getWriter()) {
 
-                final WriteBatch writeBatch1 = writer.create(1);
-                final StringWriteData writeData1 = (StringWriteData)writeBatch1.get(0);
-                writeData1.setString(0, "0");
-                final ReadBatch writeReadBatch1 = writeBatch1.close(1);
-                writer.write(writeReadBatch1);
-                writeReadBatch1.release();
+            final WriteBatch writeBatch1 = writer.create(1);
+            final StringWriteData writeData1 = (StringWriteData)writeBatch1.get(0);
+            writeData1.setString(0, "0");
+            final ReadBatch writeReadBatch1 = writeBatch1.close(1);
+            writer.write(writeReadBatch1);
+            writeReadBatch1.release();
 
-                waitForPersist(); // let all old tasks finish before we block the thread
-                final CountDownLatch blockLatch = blockPersist();
+            waitForPersist(); // let all old tasks finish before we block the thread
+            final CountDownLatch blockLatch = blockPersist();
 
-                try {
-                    final WriteBatch writeBatch2 = writer.create(1);
-                    final StringWriteData writeData2 = (StringWriteData)writeBatch2.get(0);
-                    writeData2.setString(0, "1");
-                    final ReadBatch writeReadBatch2 = writeBatch2.close(1);
-                    writer.write(writeReadBatch2);
-                    writeReadBatch2.release();
+            try {
+                final WriteBatch writeBatch2 = writer.create(1);
+                final StringWriteData writeData2 = (StringWriteData)writeBatch2.get(0);
+                writeData2.setString(0, "1");
+                final ReadBatch writeReadBatch2 = writeBatch2.close(1);
+                writer.write(writeReadBatch2);
+                writeReadBatch2.release();
 
-                    try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
-                        final ReadBatch readBatch1 = reader.readRetained(0);
-                        final StringReadData readData1 = (StringReadData)readBatch1.get(0);
-                        assertEquals("0", readData1.getString(0));
-                        readBatch1.release();
-                    }
-
-                } finally {
-                    resumeAndWaitForPersist(blockLatch);
+                try (final RandomAccessBatchReader reader = store.createRandomAccessReader()) {
+                    final ReadBatch readBatch1 = reader.readRetained(0);
+                    final StringReadData readData1 = (StringReadData)readBatch1.get(0);
+                    assertEquals("0", readData1.getString(0));
+                    readBatch1.release();
                 }
-            }
 
-            // TestBatchBuffer.close() checks whether data has been released completely.
-            // Because the ObjectCache is closed asynchronously,
-            // we wait for the thread on which this closing happens.
-            waitForPersist();
+            } finally {
+                resumeAndWaitForPersist(blockLatch);
+            }
         }
     }
 
@@ -342,41 +324,35 @@ public class ObjectCacheTest extends ColumnarTest {
 
     @Test
     public void testExtendDuringWrite() throws IOException, InterruptedException {
-        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema())) {
-            try (final ObjectCache store =
-                new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
-                    final BatchWriter writer = store.getWriter()) {
+        try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
+                final ObjectCache store =
+                    new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+                final BatchWriter writer = store.getWriter()) {
 
-                final int numStrings = 512;
-                final int initialLength = numStrings / 2;
-                final WriteBatch batch = writer.create(initialLength);
-                final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
-                final TestStringData delegateData = (TestStringData)data.m_delegate;
+            final int numStrings = 512;
+            final int initialLength = numStrings / 2;
+            final WriteBatch batch = writer.create(initialLength);
+            final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
+            final TestStringData delegateData = (TestStringData)data.m_delegate;
 
-                final String[] testStrings = generateTestStrings(numStrings);
+            final String[] testStrings = generateTestStrings(numStrings);
 
-                for (int i = 0; i < numStrings; i++) {
-                    if (i == initialLength) {
-                        data.expand(numStrings);
-                    }
-                    data.setString(i, testStrings[i]);
+            for (int i = 0; i < numStrings; i++) {
+                if (i == initialLength) {
+                    data.expand(numStrings);
                 }
-                batch.close(numStrings);
-                store.flush();
-                assertTrue(data.capacity() >= numStrings);
+                data.setString(i, testStrings[i]);
+            }
+            batch.close(numStrings);
+            store.flush();
+            assertTrue(data.capacity() >= numStrings);
 
-                assertTrue(delegateData.capacity() >= numStrings);
-                for (int i = 0; i < numStrings; i++) {
-                    assertEquals(testStrings[i], delegateData.getString(i));
-                }
-
-                batch.release();
+            assertTrue(delegateData.capacity() >= numStrings);
+            for (int i = 0; i < numStrings; i++) {
+                assertEquals(testStrings[i], delegateData.getString(i));
             }
 
-            // TestBatchBuffer.close() checks whether data has been released completely.
-            // Because the ObjectCache is closed asynchronously,
-            // we wait for the thread on which this closing happens.
-            waitForPersist();
+            batch.release();
         }
     }
 

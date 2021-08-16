@@ -344,19 +344,11 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         return m_readableDelegate.getSchema();
     }
 
-    private synchronized void writeUnclosedData() {
+    @Override
+    public synchronized void flush() throws IOException {
+        // serialize any currently unclosed data (in the current batch)
         for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
             data.flush();
-        }
-    }
-
-    @Override
-    public void flush() throws IOException {
-        // If we are closed, then all serialization has been dispatched and we only need to wait for it.
-        // Flush can be invoked by a MemoryAlert while or after close().
-        if (!m_closed.get()) {
-            // serialize any currently unclosed data (in the current batch)
-            writeUnclosedData();
         }
 
         // wait for the pending serialization of the previous batch
@@ -371,33 +363,31 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     }
 
     /**
-     * Asynchronously waits for the current write operations to finish and then
-     * disposes of the cache resources and closes its delegate.
+     * Wait for the current write operations to finish and then
+     * dispose of the cache resources and close the delegate.
      *
-     * Does not block!
+     * Blocks until closed!
      */
     @Override
     public synchronized void close() throws IOException {
         m_closed.set(true);
-        m_writer.close();
 
-        m_writer.m_future = m_writer.m_future.thenRunAsync(this::deferredClose, m_executor);
-        m_writer.handleDoneFuture();
-    }
-
-    private void deferredClose() {
         // if the cache is closed without a flush, then the CachedWriteDatas might not have released their resources
         // yet and we need to wait for that to happen
         m_unclosedData.forEach(CachedWriteData::waitForAndGetFuture);
         m_unclosedData.clear();
+
+        m_writer.close();
+        try {
+            m_writer.waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            // Note: we're not restoring interrupted state here, close should not be interrupted!
+        }
+
         m_cache.getCache().keySet().removeAll(m_cachedData);
         m_cachedData.clear();
         m_cachedData = null;
 
-        try {
-            m_readableDelegate.close();
-        } catch (IOException ex) {
-            LOGGER.error(ERROR_ON_READABLE_CLOSE, ex);
-        }
+        m_readableDelegate.close();
     }
 }

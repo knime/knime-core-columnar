@@ -82,7 +82,6 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testSingleBatchRowCursorCopy() {
         // we open two stores, so we also need for both of them to close
-        initializeStoreCloseLatch(2);
         try (final ExtensionTable table = createUnsavedColumnarContainerTable(2);
                 final RowCursor cursor = table.cursor(TableFilter.filterRangeOfRows(0, 1));
                 final ColumnarRowContainer copyContainer = createColumnarRowContainer();

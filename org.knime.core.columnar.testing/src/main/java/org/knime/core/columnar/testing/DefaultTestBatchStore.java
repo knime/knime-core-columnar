@@ -257,7 +257,6 @@ public final class DefaultTestBatchStore implements TestBatchStore {
         }
 
         ColumnarTest.OPEN_CLOSEABLES.remove(this);
-        ColumnarTest.storeCloseLatch.countDown();
     }
 
     @Override

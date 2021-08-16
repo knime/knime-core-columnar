@@ -206,7 +206,6 @@ public final class DefaultTestBatchBuffer implements TestBatchBuffer {
         }
 
         ColumnarTest.OPEN_CLOSEABLES.remove(this);
-        ColumnarTest.storeCloseLatch.countDown();
     }
 
     @Override
