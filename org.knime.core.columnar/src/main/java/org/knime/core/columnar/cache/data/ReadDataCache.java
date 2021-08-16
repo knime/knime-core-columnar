@@ -53,6 +53,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.batch.BatchWritable;
@@ -134,10 +135,10 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             final CountDownLatch batchFlushed = new CountDownLatch(1);
             enqueueRunnable(() -> { // NOSONAR
                 try {
-                    synchronized (ReadDataCache.this) {
-                        if (m_cachedData != null) {
-                            m_writerDelegate.write(batch);
-                        }
+                    if (!m_closed.get()) {
+                        // No need to write to delegate if we're closed already.
+                        // If the data was meant to be saved completely, flush should have been called before!
+                        m_writerDelegate.write(batch);
                     }
                 } catch (IOException e) {
                     throw new IllegalStateException(String.format("Failed to write batch %d.", m_numBatches), e);
@@ -242,7 +243,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
     private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
-    private Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
+    private final Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
+
+    private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
     /**
      * @param delegate the delegate to which to write asynchronously and from which to read in case of a cache miss
@@ -298,8 +301,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
     @Override
     public synchronized void close() throws IOException {
-        if (m_cachedData != null) {
+        if (!m_closed.getAndSet(true)) {
             flush();
+            m_writer.close();
 
             for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
                 final NullableReadData removed = m_globalCache.removeRetained(id);
@@ -308,7 +312,6 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 }
             }
             m_cachedData.clear();
-            m_cachedData = null;
             m_reabableDelegate.close();
         }
     }

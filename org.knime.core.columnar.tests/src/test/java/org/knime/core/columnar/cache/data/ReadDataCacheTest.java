@@ -516,4 +516,21 @@ public class ReadDataCacheTest extends ColumnarTest {
         }
     }
 
+    @Test(timeout=2000)
+    public void testNoDeadlockOnCloseWhileWriting() throws IOException, InterruptedException {
+
+        final SharedReadDataCache cache = generateCache(1);
+        try (final TestBatchStore delegate1 = createDefaultTestColumnStore();
+                final ReadDataCache store1 = generateDefaultCachedColumnStore(delegate1, cache);
+                final TestDataTable table1 = createDefaultTestTable(delegate1)) {
+
+            final CountDownLatch latch1 = delayFlush(store1);
+            writeTable(store1, table1);
+            latch1.countDown();
+            // Close and flush are waiting for each other and can lead to a deadlock.
+            // Thus we end this test after 2 seconds with a timeout because that means we're stuck.
+        }
+
+        checkCacheSize(cache, 0);
+    }
 }
