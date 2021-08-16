@@ -56,6 +56,7 @@ import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
 
 /**
  *
@@ -74,11 +75,20 @@ public final class AbstractArrowDictEncodedData {
 
     abstract static class AbstractArrowDictEncodedWriteData<T> implements DictEncodedWriteData, ArrowWriteData {
 
+        private static final class AscendingKeyGenerator implements DictKeyGenerator {
+            private int m_nextDictIndex = 0;
+
+            @Override
+            public <T> int generateKey(final T value) {
+                return m_nextDictIndex++;
+            }
+        }
+
         protected final ArrowStructWriteData m_delegate;
 
         protected final HashMap<T, Integer> m_dict = new HashMap<>();
 
-        protected int m_nextDictIndex = 0;
+        private DictKeyGenerator m_keyGenerator = null;
 
         AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate) {
             m_delegate = delegate;
@@ -117,6 +127,24 @@ public final class AbstractArrowDictEncodedData {
         @Override
         public void setDictKey(final int dataIndex, final int dictEntryIndex) {
             ((IntWriteData)m_delegate.getWriteDataAt(REFERENCE_DATA_INDEX)).setInt(dataIndex, dictEntryIndex);
+        }
+
+        @Override
+        public void setKeyGenerator(final DictKeyGenerator keyGenerator) {
+            if (m_keyGenerator != null) {
+                throw new IllegalStateException(
+                    "The DictKeyGenerator was already configured before, cannot be set again");
+            }
+
+            m_keyGenerator = keyGenerator;
+        }
+
+        protected int generateKey(final T value) {
+            if (m_keyGenerator == null) {
+                m_keyGenerator = new AscendingKeyGenerator();
+            }
+
+            return m_keyGenerator.generateKey(value);
         }
     }
 

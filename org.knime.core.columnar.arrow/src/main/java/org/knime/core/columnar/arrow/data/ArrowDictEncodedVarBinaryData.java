@@ -95,7 +95,7 @@ public final class ArrowDictEncodedVarBinaryData {
             int dictKey = m_dict.computeIfAbsent(val, v -> {
                 ((VarBinaryWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .setObject(index, val, serializer);
-                return m_nextDictIndex++;
+                return generateKey(val);
             });
 
             setDictKey(index, dictKey);

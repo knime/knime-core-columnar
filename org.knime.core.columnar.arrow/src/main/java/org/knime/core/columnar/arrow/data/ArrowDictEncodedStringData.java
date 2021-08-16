@@ -94,7 +94,7 @@ public final class ArrowDictEncodedStringData {
             int dictKey = m_dict.computeIfAbsent(val, v -> {
                 ((StringWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .setString(index, val);
-                return m_nextDictIndex++;
+                return generateKey(val);
             });
 
             setDictKey(index, dictKey);
