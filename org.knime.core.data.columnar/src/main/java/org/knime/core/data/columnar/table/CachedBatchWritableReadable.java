@@ -176,8 +176,8 @@ final class CachedBatchWritableReadable<D extends BatchWritable & RandomAccessBa
     @Override
     public final void close() throws IOException {
         m_writer.close();
-        m_objectCached.close();
         MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
+        m_objectCached.close();
     }
 
 }
