@@ -96,8 +96,6 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
-    private static final String ERROR_ON_READABLE_CLOSE = "Error while closing readable delegate.";
-
     private final class ObjectCacheWriter implements BatchWriter {
 
         private final BatchWriter m_writerDelegate;
@@ -156,7 +154,6 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             } catch (InterruptedException e) {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
-                LOGGER.error(ERROR_ON_INTERRUPT, e);
             }
 
             final int numColumns = batch.numData();
@@ -249,7 +246,6 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                 } catch (InterruptedException e) {
                     // Restore interrupted state...
                     Thread.currentThread().interrupt();
-                    LOGGER.error(ERROR_ON_INTERRUPT, e);
                 }
             }
 
@@ -357,9 +353,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         } catch (InterruptedException e) {
             // Restore interrupted state...
             Thread.currentThread().interrupt();
-            LOGGER.error(ERROR_ON_INTERRUPT, e);
         }
-
     }
 
     /**
