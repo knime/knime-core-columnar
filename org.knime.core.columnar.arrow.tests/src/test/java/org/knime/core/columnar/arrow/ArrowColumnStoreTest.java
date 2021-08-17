@@ -180,7 +180,6 @@ public class ArrowColumnStoreTest {
     public void testReadBeforeFullyWritten() throws IOException {
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
-        final Path writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
 
         // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator();
@@ -344,7 +343,6 @@ public class ArrowColumnStoreTest {
     public void testPartialFileBatchReadable() throws IOException {
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
-        final Path path = ArrowTestUtils.createTmpKNIMEArrowPath();
 
         try (final RootAllocator allocator = new RootAllocator()) {
             final ArrowColumnStoreFactory factory =

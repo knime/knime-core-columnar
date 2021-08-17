@@ -45,6 +45,8 @@
  */
 package org.knime.core.columnar.arrow;
 
+import static org.knime.core.table.schema.DataSpecs.DOUBLE;
+
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -60,8 +62,7 @@ import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
+import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
 
 /**
  * A long running test allocating, writing and reading many chunks.
@@ -90,11 +91,9 @@ public class ArrowMemoryTest {
         for (int l = 0; l < numLoops; l++) {
             pool.submit(() -> {
                 final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
-                final ColumnarSchema schema =
-                    ArrowTestUtils.createWideSchema(DataSpec.doubleSpec(), DefaultDataTraits.EMPTY, numColumns);
+                final ColumnarSchema schema = createWideSchema(DOUBLE, numColumns);
 
-                try (final BatchStore store =
-                    factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowPath())) {
+                try (final BatchStore store = factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowPath())) {
 
                     storeData(numChunks, chunkSize, numColumns, store);
 
@@ -142,5 +141,14 @@ public class ArrowMemoryTest {
                 batch.release();
             }
         }
+    }
+
+    /** Create a schema with the given type multiple times. */
+    private static ColumnarSchema createWideSchema(final DataSpecWithTraits type, final int width) {
+        final DataSpecWithTraits[] types = new DataSpecWithTraits[width];
+        for (int i = 0; i < width; i++) {
+            types[i] = type;
+        }
+        return ColumnarSchema.of(types);
     }
 }

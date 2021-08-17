@@ -86,10 +86,6 @@ import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.DefaultColumnarSchema;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * A static class with utility methods for arrow tests.
@@ -113,23 +109,6 @@ public final class ArrowTestUtils {
         final Path path = Files.createTempFile("KNIME-" + UUID.randomUUID().toString(), ".knarrow");
         path.toFile().deleteOnExit();
         return path;
-    }
-
-    /**
-     * Create a schema with the given type multiple times.
-     *
-     * @param type the type of the columns
-     * @param width the number of columns
-     * @return the schema
-     */
-    public static ColumnarSchema createWideSchema(final DataSpec type, final DataTraits trait, final int width) {
-        final DataSpec[] types = new DataSpec[width];
-        final DataTraits[] traits = new DataTraits[width];
-        for (int i = 0; i < width; i++) {
-            types[i] = type;
-            traits[i] = trait;
-        }
-        return new DefaultColumnarSchema(types, traits);
     }
 
     /**
