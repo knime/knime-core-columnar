@@ -46,6 +46,7 @@
 package org.knime.core.columnar.testing;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -117,14 +118,21 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             if (m_batches.isEmpty()) {
                 m_maxDataLength = batch.length();
             }
-            if (m_maxDataLength != batch.length()) {
-                throw new IllegalStateException("All written batches must have same length.");
-            }
             m_batches.add(data);
         }
 
         @Override
         public void close() {
+            if (!m_batches.isEmpty()) {
+                for (int b = 0; b < m_batches.size()-1; b++) {
+                    assertEquals(m_maxDataLength, m_batches.get(b)[0].length);
+                }
+
+                if (m_batches.size() > 1) {
+                    assertTrue(m_batches.get(m_batches.size() - 1)[0].length <= m_maxDataLength);
+                }
+            }
+
             m_writerClosed = true;
             ColumnarTest.OPEN_CLOSEABLES.remove(TestBatchWriter.this);
         }
