@@ -152,10 +152,21 @@ public final class AbstractArrowDictEncodedData {
 
         protected final HashMap<Integer, T> m_dict = new HashMap<>();
 
+        /**
+         * A vector of the length of this data, containing the index inside this data
+         * where we can look up the value of the referenced dictionary entry.
+         *
+         * E.g. we have values "A" and "B" stored at indices 0 and 1 respectively,
+         * then all following positions in the vector referencing "B" will contain a 1,
+         * such that we can immediately find the dict entry value on random access.
+         */
+        protected final int[] m_dictValueLookupTable;
+
         protected final ArrowStructReadData m_delegate;
 
         AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate) {
             m_delegate = delegate;
+            m_dictValueLookupTable = constructDictKeyIndexMap();
         }
 
         @Override
@@ -188,5 +199,15 @@ public final class AbstractArrowDictEncodedData {
             return ((IntReadData)m_delegate.getReadDataAt(REFERENCE_DATA_INDEX)).getInt(dataIndex);
         }
 
+        private int[] constructDictKeyIndexMap() {
+            var references = new int[m_delegate.length()];
+            var map = new HashMap<Integer, Integer>();
+            for (int i = 0; i < length(); i++) {
+                int key = getDictKey(i);
+                final int index = i;
+                references[i] = map.computeIfAbsent(key, k -> index);
+            }
+            return references;
+        }
     }
 }

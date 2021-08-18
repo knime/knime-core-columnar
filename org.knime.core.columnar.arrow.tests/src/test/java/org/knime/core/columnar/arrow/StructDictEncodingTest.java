@@ -75,7 +75,7 @@ public class StructDictEncodingTest {
     }
 
     @Test
-    public void simple() {
+    public void testSimpleDictCreation() {
         final int numRows = 10;
         final var factory = ArrowDictEncodedStringDataFactory.INSTANCE;
         final var data =
@@ -93,6 +93,28 @@ public class StructDictEncodingTest {
         assertEquals(0, dataR.getDictKey(0));
         assertEquals(1, dataR.getDictKey(1));
         assertEquals(0, dataR.getDictKey(2));
+
+        assertEquals("foo", dataR.getString(0));
+        assertEquals("bar", dataR.getString(1));
+        assertEquals("foo", dataR.getString(2));
+        dataR.release();
+    }
+
+    @Test
+    public void testRandomAccessRead() {
+        final int numRows = 10;
+        final var factory = ArrowDictEncodedStringDataFactory.INSTANCE;
+        final var data =
+            (ArrowDictEncodedStringWriteData)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
+
+        data.setString(0, "foo");
+        data.setString(1, "bar");
+        data.setString(2, "foo");
+
+        ArrowDictEncodedStringReadData dataR = data.close(3);
+        assertEquals("foo", dataR.getString(2)); // we need to look up the value stored at index 0 for this!
+        assertEquals("foo", dataR.getString(0));
+        assertEquals("bar", dataR.getString(1));
         dataR.release();
     }
 }

@@ -131,7 +131,7 @@ public final class ArrowDictEncodedStringData {
             final int dictIndex = getDictKey(index);
             return m_dict.computeIfAbsent(dictIndex,
                 i -> ((StringReadData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
-                    .getString(index));
+                    .getString(m_dictValueLookupTable[index]));
         }
 
         @Override

@@ -142,8 +142,8 @@ public final class ArrowDictEncodedVarBinaryData {
             final int dictIndex = getDictKey(index);
             return (T)m_dict.computeIfAbsent(dictIndex,
                 i -> ((VarBinaryReadData)m_delegate
-                    .getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX)).getObject(index,
-                        deserializer));
+                    .getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
+                    .getObject(m_dictValueLookupTable[index], deserializer));
         }
 
         @Override
