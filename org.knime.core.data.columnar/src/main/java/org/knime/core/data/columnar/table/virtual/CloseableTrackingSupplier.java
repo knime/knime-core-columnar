@@ -54,8 +54,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
-import org.apache.commons.io.IOExceptionList;
-
 /**
  * A {@link Supplier} that keeps track of the objects it created and closes them all if its own {@link #close()} method
  * is invoked.
@@ -92,7 +90,8 @@ public final class CloseableTrackingSupplier<T extends Closeable> implements Clo
             }
         }
         if (!exceptions.isEmpty()) {
-            throw new IOExceptionList(exceptions);
+            // TODO use IOExceptionList once org.apache.commons.io >= 2.7.0 is available in the nightlies
+            throw exceptions.get(0);
         }
     }
 
