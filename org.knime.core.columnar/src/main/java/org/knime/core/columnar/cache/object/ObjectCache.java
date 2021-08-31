@@ -55,6 +55,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.batch.BatchWritable;
@@ -122,12 +123,12 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                 if (m_varBinaryData.isSelected(i)) {
                     final VarBinaryWriteData columnWriteData = (VarBinaryWriteData)batch.get(i);
                     final var cachedData =
-                        new CachedVarBinaryWriteData(columnWriteData, m_serializationExecutor);
+                        new CachedVarBinaryWriteData(columnWriteData, m_serializationExecutor, m_serializationPhaser);
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else if (m_stringData.isSelected(i)) {
                     final StringWriteData columnWriteData = (StringWriteData)batch.get(i);
-                    final var cachedData = new CachedStringWriteData(columnWriteData, m_serializationExecutor);
+                    final var cachedData = new CachedStringWriteData(columnWriteData, m_serializationExecutor, m_serializationPhaser);
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else {
@@ -303,6 +304,8 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private final SharedObjectCache m_cache;
 
+    private final Phaser m_serializationPhaser = new Phaser(1);
+
     private final Set<CachedWriteData<?, ?, ?>> m_unclosedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -375,6 +378,11 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         // yet and we need to wait for that to happen
         m_unclosedData.forEach(CachedWriteData::cancel);
         m_unclosedData.clear();
+
+        // wait for all registered serialization tasks to finish
+        final var phase = m_serializationPhaser.getPhase();
+        m_serializationPhaser.arriveAndDeregister();
+        m_serializationPhaser.awaitAdvance(phase);
 
         m_writer.close();
         try {

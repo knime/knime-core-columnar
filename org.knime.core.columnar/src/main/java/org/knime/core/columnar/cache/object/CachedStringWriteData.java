@@ -47,6 +47,7 @@
 package org.knime.core.columnar.cache.object;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Phaser;
 
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
@@ -71,8 +72,8 @@ final class CachedStringWriteData extends CachedWriteData<StringWriteData, Strin
 
     }
 
-    CachedStringWriteData(final StringWriteData delegate, final ExecutorService executor) {
-        super(delegate, new String[delegate.capacity()], executor);
+    CachedStringWriteData(final StringWriteData delegate, final ExecutorService executor, final Phaser serializationPhaser) {
+        super(delegate, new String[delegate.capacity()], executor, serializationPhaser);
     }
 
     @Override

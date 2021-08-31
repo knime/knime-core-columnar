@@ -48,6 +48,7 @@ package org.knime.core.columnar.cache.object;
 
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Phaser;
 
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
@@ -89,8 +90,8 @@ final class CachedVarBinaryWriteData extends CachedWriteData<VarBinaryWriteData,
 
     private ObjectSerializer<?>[] m_serializers;
 
-    CachedVarBinaryWriteData(final VarBinaryWriteData delegate, final ExecutorService executor) {
-        super(delegate, new Object[delegate.capacity()], executor);
+    CachedVarBinaryWriteData(final VarBinaryWriteData delegate, final ExecutorService executor, final Phaser serializationPhaser) {
+        super(delegate, new Object[delegate.capacity()], executor, serializationPhaser);
         m_serializers = new ObjectSerializer<?>[delegate.capacity()];
     }
 

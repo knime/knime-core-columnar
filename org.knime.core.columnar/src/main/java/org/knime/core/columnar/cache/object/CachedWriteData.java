@@ -53,6 +53,7 @@ import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.data.NullableReadData;
@@ -183,10 +184,16 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     private final AtomicBoolean m_cancelled = new AtomicBoolean(false);
 
-    CachedWriteData(final W delegate, final T[] data, final ExecutorService executor) {
+    // The phaser is used to keep track of the number of asynchronously dispatched tasks to
+    // know when they have really finished. This is used as a barrier to ensure we only close
+    // the back-end once all writing has finished.
+    private final Phaser m_phaser;
+
+    CachedWriteData(final W delegate, final T[] data, final ExecutorService executor, final Phaser phaser) {
         m_delegate = delegate;
         m_data = data;
         m_executor = executor;
+        m_phaser = phaser;
     }
 
     @Override
@@ -251,6 +258,8 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
                 serializeAt(i);
             }
         }
+
+        m_phaser.arriveAndDeregister();
     }
 
     /**
@@ -264,9 +273,11 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
         if (m_cancelled.get()) {
             return;
         }
+
         final var highest = m_setIndex;
         final var lowest = m_highestDispatchedSerializationIndex;
 
+        m_phaser.register();
         m_future = m_future.thenRunAsync(() -> serializeRange(lowest + 1, highest + 1), m_executor);
         m_highestDispatchedSerializationIndex = highest;
     }
