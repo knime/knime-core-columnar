@@ -152,8 +152,11 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             try {
                 waitForAndHandleFuture();
             } catch (InterruptedException e) {
-                // Restore interrupted state...
+                batch.release();
+                // Restore interrupted state and return from function. If writing was interrupted
+                // we don't need to start writing the next batch!
                 Thread.currentThread().interrupt();
+                return;
             }
 
             final int numColumns = batch.numData();
@@ -364,7 +367,9 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
      */
     @Override
     public synchronized void close() throws IOException {
-        m_closed.set(true);
+        if (m_closed.getAndSet(true)) {
+            return;
+        }
 
         // if the cache is closed without a flush, then the CachedWriteDatas might not have released their resources
         // yet and we need to wait for that to happen
@@ -376,6 +381,11 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             m_writer.waitForAndHandleFuture();
         } catch (InterruptedException e) {
             // Note: we're not restoring interrupted state here, close should not be interrupted!
+            try {
+                m_writer.waitForAndHandleFuture();
+            } catch (InterruptedException f) {
+                throw new IOException("Closing the cache got interrupted while waiting for writer to finish.");
+            }
         }
 
         m_cache.getCache().keySet().removeAll(m_cachedData);
