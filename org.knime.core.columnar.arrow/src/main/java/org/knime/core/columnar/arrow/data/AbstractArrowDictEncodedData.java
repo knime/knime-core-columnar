@@ -49,16 +49,19 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
-import org.knime.core.columnar.data.IntData.IntReadData;
-import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.columnar.data.dictencoding.DictEncodedData.AscendingKeyGenerator;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
 
 /**
+ * Base implementations for dictionary encoded data using the Arrow back-end
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
@@ -66,37 +69,32 @@ public final class AbstractArrowDictEncodedData {
     private AbstractArrowDictEncodedData() {
     }
 
-    static final int REFERENCE_DATA_INDEX = 0;
+    static final int DICT_KEY_DATA_INDEX = 0;
 
-    // TODO is the hash used now? Does it take up space (I think it does)
-    static final int HASH_DATA_INDEX = 1;
-
-    static final int DICT_ENTRY_DATA_INDEX = 2;
+    static final int DICT_ENTRY_DATA_INDEX = 1;
 
     abstract static class AbstractArrowDictEncodedWriteData<T> implements DictEncodedWriteData, ArrowWriteData {
 
-        private static final class AscendingKeyGenerator implements DictKeyGenerator {
-            private int m_nextDictIndex = 0;
-
-            @Override
-            public <T> int generateKey(final T value) {
-                return m_nextDictIndex++;
-            }
-        }
-
         protected final ArrowStructWriteData m_delegate;
 
-        protected final HashMap<T, Integer> m_dict = new HashMap<>();
+        protected final ConcurrentHashMap<T, Long> m_dict = new ConcurrentHashMap<>();
 
         private DictKeyGenerator m_keyGenerator = null;
+
+        protected int m_offset = 0;
 
         AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate) {
             m_delegate = delegate;
         }
 
+        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final int offset) {
+            m_delegate = delegate;
+            m_offset = offset;
+        }
+
         @Override
         public void setMissing(final int index) {
-            m_delegate.setMissing(index);
+            m_delegate.setMissing(index + m_offset);
         }
 
         @Override
@@ -125,8 +123,14 @@ public final class AbstractArrowDictEncodedData {
         }
 
         @Override
-        public void setDictKey(final int dataIndex, final int dictEntryIndex) {
-            ((IntWriteData)m_delegate.getWriteDataAt(REFERENCE_DATA_INDEX)).setInt(dataIndex, dictEntryIndex);
+        public String toString() {
+            return "[" + "references=" + m_delegate.getWriteDataAt(DICT_KEY_DATA_INDEX).toString()
+                + ", dictionaryEntries=" + m_delegate.getWriteDataAt(DICT_ENTRY_DATA_INDEX).toString() + "]";
+        }
+
+        @Override
+        public void setDictKey(final int dataIndex, final long dictEntryIndex) {
+            ((LongWriteData)m_delegate.getWriteDataAt(DICT_KEY_DATA_INDEX)).setLong(dataIndex + m_offset, dictEntryIndex);
         }
 
         @Override
@@ -139,7 +143,7 @@ public final class AbstractArrowDictEncodedData {
             m_keyGenerator = keyGenerator;
         }
 
-        protected int generateKey(final T value) {
+        protected long generateKey(final T value) {
             if (m_keyGenerator == null) {
                 m_keyGenerator = new AscendingKeyGenerator();
             }
@@ -150,33 +154,45 @@ public final class AbstractArrowDictEncodedData {
 
     abstract static class AbstractArrowDictEncodedReadData<T> implements DictEncodedReadData, ArrowReadData {
 
-        protected final HashMap<Integer, T> m_dict = new HashMap<>();
+        protected final ConcurrentHashMap<Long, T> m_dict = new ConcurrentHashMap<>();
 
         /**
-         * A vector of the length of this data, containing the index inside this data
-         * where we can look up the value of the referenced dictionary entry.
+         * A vector of the length of this data, containing the index inside this data where we can look up the value of
+         * the referenced dictionary entry.
          *
-         * E.g. we have values "A" and "B" stored at indices 0 and 1 respectively,
-         * then all following positions in the vector referencing "B" will contain a 1,
-         * such that we can immediately find the dict entry value on random access.
+         * E.g. we have values "A" and "B" stored at indices 0 and 1 respectively, then all following positions in the
+         * vector referencing "B" will contain a 1, such that we can immediately find the dict entry value on random
+         * access.
          */
         protected final int[] m_dictValueLookupTable;
 
         protected final ArrowStructReadData m_delegate;
 
+        protected int m_offset = 0;
+
+        private final int m_length;
+
         AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate) {
             m_delegate = delegate;
+            m_length = m_delegate.length();
             m_dictValueLookupTable = constructDictKeyIndexMap();
+        }
+
+        AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate, final int[] dictValueLut, final int offset, final int length) {
+            m_delegate = delegate;
+            m_dictValueLookupTable = dictValueLut;
+            m_offset = offset;
+            m_length = length;
         }
 
         @Override
         public boolean isMissing(final int index) {
-            return m_delegate.isMissing(index);
+            return m_delegate.isMissing(index + m_offset);
         }
 
         @Override
         public int length() {
-            return m_delegate.length();
+            return m_length;
         }
 
         @Override
@@ -195,15 +211,24 @@ public final class AbstractArrowDictEncodedData {
         }
 
         @Override
-        public int getDictKey(final int dataIndex) {
-            return ((IntReadData)m_delegate.getReadDataAt(REFERENCE_DATA_INDEX)).getInt(dataIndex);
+        public String toString() {
+            return "[" + "references=" + m_delegate.getReadDataAt(DICT_KEY_DATA_INDEX).toString()
+                + ", dictionaryEntries=" + m_delegate.getReadDataAt(DICT_ENTRY_DATA_INDEX).toString() + "]";
+        }
+
+        @Override
+        public long getDictKey(final int dataIndex) {
+            return ((LongReadData)m_delegate.getReadDataAt(DICT_KEY_DATA_INDEX)).getLong(dataIndex + m_offset);
         }
 
         private int[] constructDictKeyIndexMap() {
             var references = new int[m_delegate.length()];
-            var map = new HashMap<Integer, Integer>();
+            var map = new HashMap<Long, Integer>();
             for (int i = 0; i < length(); i++) {
-                int key = getDictKey(i);
+                if (isMissing(i)) {
+                    continue;
+                }
+                long key = getDictKey(i);
                 final int index = i;
                 references[i] = map.computeIfAbsent(key, k -> index);
             }

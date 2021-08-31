@@ -49,7 +49,6 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
-import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -60,14 +59,11 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedReadData;
 import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedWriteData;
-import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
-import org.knime.core.columnar.data.IntData.IntWriteData;
-import org.knime.core.columnar.data.LongData.LongWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
@@ -75,6 +71,7 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStri
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 
 /**
+ * Dictionary encoded string data implementation using Arrow as back end.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
@@ -82,18 +79,27 @@ public final class ArrowDictEncodedStringData {
     private ArrowDictEncodedStringData() {
     }
 
-    public static class ArrowDictEncodedStringWriteData extends AbstractArrowDictEncodedWriteData<String>
+    /**
+     * Arrow implementation of {@link DictEncodedStringWriteData};
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public static final class ArrowDictEncodedStringWriteData extends AbstractArrowDictEncodedWriteData<String>
         implements DictEncodedStringWriteData {
 
         private ArrowDictEncodedStringWriteData(final ArrowStructWriteData delegate) {
             super(delegate);
         }
 
+        private ArrowDictEncodedStringWriteData(final ArrowStructWriteData delegate, final int offset) {
+            super(delegate, offset);
+        }
+
         @Override
         public void setString(final int index, final String val) {
-            int dictKey = m_dict.computeIfAbsent(val, v -> {
+            long dictKey = m_dict.computeIfAbsent(val, v -> {
                 ((StringWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
-                    .setString(index, val);
+                    .setString(index + m_offset, val);
                 return generateKey(val);
             });
 
@@ -102,77 +108,62 @@ public final class ArrowDictEncodedStringData {
 
         @Override
         public ArrowDictEncodedStringWriteData slice(final int start) {
-            return new ArrowDictEncodedStringWriteData(m_delegate.slice(start));
+            return new ArrowDictEncodedStringWriteData(m_delegate, start + m_offset);
         }
 
         @Override
         public ArrowDictEncodedStringReadData close(final int length) {
             return new ArrowDictEncodedStringReadData(m_delegate.close(length));
         }
-
-        @Override
-        public String toString() {
-            return "ArrowDictEncodedStringWriteData["
-                    + "references=" + ((IntWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.REFERENCE_DATA_INDEX)).toString()
-                    + ", hashes=" + ((LongWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.HASH_DATA_INDEX)).toString()
-                    + ", dictionaryEntries=" + ((StringWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX)).toString()
-                    + "]";
-        }
     }
 
-    public static class ArrowDictEncodedStringReadData extends AbstractArrowDictEncodedReadData<String>
+    /**
+     * Arrow implementation of {@link DictEncodedStringReadData};
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    public static final class ArrowDictEncodedStringReadData extends AbstractArrowDictEncodedReadData<String>
         implements DictEncodedStringReadData {
         private ArrowDictEncodedStringReadData(final ArrowStructReadData delegate) {
             super(delegate);
         }
 
+        private ArrowDictEncodedStringReadData(final ArrowStructReadData delegate, final int[] dictValueLut, final int offset, final int length) {
+            super(delegate, dictValueLut, offset, length);
+        }
+
         @Override
         public String getString(final int index) {
-            final int dictIndex = getDictKey(index);
+            final long dictIndex = getDictKey(index);
             return m_dict.computeIfAbsent(dictIndex,
                 i -> ((StringReadData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
-                    .getString(m_dictValueLookupTable[index]));
+                    .getString(m_dictValueLookupTable[index + m_offset]));
         }
 
         @Override
         public ArrowDictEncodedStringReadData slice(final int start, final int length) {
-            return new ArrowDictEncodedStringReadData(m_delegate.slice(start, length));
-        }
-
-        @Override
-        public String toString() {
-            return "ArrowDictEncodedStringReadData["
-                    + "references=" + ((IntWriteData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.REFERENCE_DATA_INDEX)).toString()
-                    + ", hashes=" + ((LongWriteData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.HASH_DATA_INDEX)).toString()
-                    + ", dictionaryEntries=" + ((StringWriteData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX)).toString()
-                    + "]";
+            return new ArrowDictEncodedStringReadData(m_delegate, m_dictValueLookupTable, start + m_offset, length);
         }
     }
 
+    /**
+     * Implementation of {@link ArrowColumnDataFactory} for {@link ArrowDictEncodedStringData}
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
     public static final class ArrowDictEncodedStringDataFactory implements ArrowColumnDataFactory {
 
         private static final int CURRENT_VERSION = 0;
 
+        /**
+         * the single instance of a {@link ArrowDictEncodedStringDataFactory}.
+         */
         public static final ArrowDictEncodedStringDataFactory INSTANCE = new ArrowDictEncodedStringDataFactory();
 
         private final ArrowStructDataFactory m_delegate;
 
         private ArrowDictEncodedStringDataFactory() {
-            m_delegate = new ArrowStructDataFactory(ArrowIntDataFactory.INSTANCE, ArrowLongDataFactory.INSTANCE,
-                ArrowStringDataFactory.INSTANCE);
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            if (!(obj instanceof ArrowDictEncodedStringDataFactory)) {
-                return false;
-            }
-            return m_delegate.equals(obj);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(getVersion()) + 31 * m_delegate.hashCode();
+            m_delegate = new ArrowStructDataFactory(ArrowLongDataFactory.INSTANCE, ArrowStringDataFactory.INSTANCE);
         }
 
         @Override
@@ -195,17 +186,18 @@ public final class ArrowDictEncodedStringData {
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            return new ArrowDictEncodedStringReadData(m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)));
+            return new ArrowDictEncodedStringReadData(
+                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)));
         }
 
         @Override
         public FieldVector getVector(final NullableReadData data) {
-            return m_delegate.getVector(data);
+            return m_delegate.getVector(((ArrowDictEncodedStringReadData)data).m_delegate);
         }
 
         @Override
         public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return m_delegate.getDictionaries(data);
+            return m_delegate.getDictionaries(((ArrowDictEncodedStringReadData)data).m_delegate);
         }
     }
 }
