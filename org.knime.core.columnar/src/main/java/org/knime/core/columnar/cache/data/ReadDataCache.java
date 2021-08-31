@@ -95,6 +95,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 if (latch != null) {
                     latch.await();
                 }
+
             } catch (InterruptedException e) {
                 // Restore interrupted state...
                 Thread.currentThread().interrupt();
@@ -302,17 +303,55 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
     @Override
     public synchronized void close() throws IOException {
         if (!m_closed.getAndSet(true)) {
-            flush();
+
+            waitForAllTasksToFinish();
+
             m_writer.close();
 
-            for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
-                final NullableReadData removed = m_globalCache.removeRetained(id);
-                if (removed != null) {
-                    removed.release();
-                }
-            }
+            releaseAllReferencedData();
+
             m_cachedData.clear();
             m_reabableDelegate.close();
+        }
+    }
+
+    private void waitForAllTasksToFinish() throws IOException {
+        // We use a {@link CountDownLatch} to _really_ wait for all tasks to finish because
+        // flush() could be interrupted or pick up that the interrupt flag was set. Unfortunately,
+        // the {@link CompletableFuture}s will still continue to be executed, hence we wait with
+        // a latch that is counted down after everything else.
+        final var closedLatch = new CountDownLatch(1);
+        m_future = m_future.thenRunAsync(closedLatch::countDown, m_executor);
+        try {
+            closedLatch.await();
+        } catch (InterruptedException e) {
+            LOGGER.debug("Interrupted while waiting for tasks to finish");
+        }
+
+        try {
+            waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            throw new IOException("Close should not be interrupted!", e);
+        }
+    }
+
+    private void releaseAllReferencedData() {
+        // Drop all globally cached data referenced by this cache, because "release"-on-evict would
+        // no longer work once the delegate is closed.
+        for (final var ccUID : m_cachedData.keySet()) {
+            final var lock = m_cachedData.get(ccUID);
+            if (lock != null) {
+                try {
+                    lock.await();
+                } catch (InterruptedException ex) {
+                    LOGGER.error("Interrupted while waiting for cached data to be flushed");
+                }
+            }
+
+            final var data = m_globalCache.removeRetained(ccUID);
+            if (data != null) {
+                data.release();
+            }
         }
     }
 
