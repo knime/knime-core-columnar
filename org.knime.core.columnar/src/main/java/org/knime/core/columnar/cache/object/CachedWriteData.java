@@ -202,12 +202,12 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
     }
 
     @Override
-    public void retain() {
+    public synchronized void retain() {
         m_future = m_future.thenRunAsync(m_delegate::retain, m_executor);
     }
 
     @Override
-    public void release() {
+    public synchronized void release() {
         m_future = m_future.thenRunAsync(m_delegate::release, m_executor);
     }
 
@@ -229,7 +229,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
     }
 
     @Override
-    public void flush() {
+    public synchronized void flush() {
         if (m_future.isDone()) {
             waitForAndGetFuture();
         }
@@ -256,7 +256,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
     /**
      * Dispatch the serialization of the remaining unsaved items
      */
-    void dispatchSerialization() {
+    synchronized void dispatchSerialization() {
         if (m_future.isDone()) {
             waitForAndGetFuture();
         }
