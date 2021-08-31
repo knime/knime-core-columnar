@@ -53,6 +53,7 @@ import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -144,7 +145,9 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
         // MUST BE CALLED!
         synchronized R closeWriteDelegate() {
-
+            // we don't need to dispatch any more serialization here, that has happened in
+            // {@link CachedWriteData} onClose() already. But we need to wait for this serialization
+            // to finish.
             CachedWriteData.this.waitForAndGetFuture();
 
             m_readDelegate = CachedWriteData.this.closeDelegate(m_length);
@@ -178,8 +181,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
     // the serialization future
     private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
-    // remember whether this data has been closed already, to prevent double close
-    private boolean m_closed = false;
+    private final AtomicBoolean m_cancelled = new AtomicBoolean(false);
 
     CachedWriteData(final W delegate, final T[] data, final ExecutorService executor) {
         m_delegate = delegate;
@@ -243,6 +245,9 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
     void serializeRange(final int start, final int end) {
         for (int i = start; i < Math.min(end, m_data.length); i++) {
             if (m_data[i] != null) {
+                if (m_cancelled.get()) {
+                    break;
+                }
                 serializeAt(i);
             }
         }
@@ -256,6 +261,9 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
             waitForAndGetFuture();
         }
 
+        if (m_cancelled.get()) {
+            return;
+        }
         final var highest = m_setIndex;
         final var lowest = m_highestDispatchedSerializationIndex;
 
@@ -273,12 +281,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
         }
     }
 
-    void onClose() {
-        if (m_closed) {
-            throw new IllegalStateException("Failed to close already closed CachedWriteData");
-        }
-        m_closed = true;
-
+    synchronized void onClose() {
         dispatchSerialization();
     }
 
@@ -292,6 +295,11 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
             Thread.currentThread().interrupt();
             LOGGER.info(ERROR_ON_INTERRUPT, e);
         }
+    }
+
+    void cancel () {
+        m_cancelled.set(true);
+        waitForAndGetFuture();
     }
 
     abstract R closeDelegate(int length);
