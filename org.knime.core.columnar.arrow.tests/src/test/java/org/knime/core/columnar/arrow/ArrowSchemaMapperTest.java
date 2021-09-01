@@ -50,12 +50,17 @@ package org.knime.core.columnar.arrow;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.knime.core.table.schema.DataSpecs.DICT_ENCODING;
+import static org.knime.core.table.schema.DataSpecs.STRING;
+import static org.knime.core.table.schema.DataSpecs.VARBINARY;
 
 import java.util.Arrays;
 
 import org.junit.Test;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDurationData.ArrowDurationDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
@@ -173,6 +178,18 @@ public class ArrowSchemaMapperTest {
         testMapSingleSpec(DataSpec.zonedDateTimeSpec(), ArrowZonedDateTimeDataFactory.INSTANCE);
     }
 
+    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
+    @Test
+    public void testMapDictEncodedStringDataSpec() {
+        testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING)), ArrowDictEncodedStringDataFactory.INSTANCE);
+    }
+
+    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
+    @Test
+    public void testMapDictEncodedVarBinaryDataSpec() {
+        testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING)), ArrowDictEncodedVarBinaryDataFactory.INSTANCE);
+    }
+
     /** Test mapping String specs to a {@link ArrowStringDataFactory} */
     @Test
     public void testMapStringSpec() {
@@ -239,6 +256,10 @@ public class ArrowSchemaMapperTest {
     private static void testMapSingleSpec(final DataSpec spec, final ArrowColumnDataFactory expectedFactory) {
         var traits = createTraitsForSpec(spec);
         final ColumnarSchema schema = new DefaultColumnarSchema(spec, traits);
+        testMapSchema(schema, expectedFactory);
+    }
+
+    private static void testMapSchema(final ColumnarSchema schema, final ArrowColumnDataFactory expectedFactory) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
         assertEquals(expectedFactory, factories[0]);
