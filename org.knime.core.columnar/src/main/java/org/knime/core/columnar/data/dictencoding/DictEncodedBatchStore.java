@@ -68,20 +68,23 @@ import org.knime.core.table.schema.ColumnarSchema;
 public class DictEncodedBatchStore implements BatchStore {
     private final BatchStore m_delegate;
 
+    private final DictEncodedBatchWriter m_writer;
+
     private final DictElementCache m_dictElementCache = new DictElementCache();
 
     /**
      * Create with a delegate
      * @param delegate The delegate batch store
      */
+    @SuppressWarnings("resource")
     public DictEncodedBatchStore(final BatchStore delegate) {
         m_delegate = delegate;
+        m_writer = new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema(), m_dictElementCache);
     }
 
-    @SuppressWarnings("resource")
     @Override
     public BatchWriter getWriter() {
-        return new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema(), m_dictElementCache);
+        return m_writer;
     }
 
     @Override
