@@ -67,10 +67,9 @@ import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 
-
 /**
- * A {@link DictEncodedBatchWriter} wraps a delegate BatchWriter and converts user-facing
- * data objects into their dictionary encoded representation
+ * A {@link DictEncodedBatchWriter} wraps a delegate BatchWriter and converts user-facing data objects into their
+ * dictionary encoded representation
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
@@ -84,12 +83,13 @@ public class DictEncodedBatchWriter implements BatchWriter {
 
     /**
      * Create a batch writer
+     *
      * @param delegate The delegate BatchWriter
      * @param schema The schema
      * @param dictElementCache The table-wide {@link DictElementCache}
      */
-    public DictEncodedBatchWriter(final BatchWriter delegate, final ColumnarSchema schema, final DictElementCache dictElementCache)
-    {
+    public DictEncodedBatchWriter(final BatchWriter delegate, final ColumnarSchema schema,
+        final DictElementCache dictElementCache) {
         m_delegate = delegate;
         m_schema = schema;
         m_cache = dictElementCache;
@@ -122,12 +122,14 @@ public class DictEncodedBatchWriter implements BatchWriter {
     private NullableWriteData wrapDictEncodedData(final int i, final NullableWriteData d) {
         if (m_schema.getSpec(i) instanceof StringDataSpec && !(d instanceof DictDecodedStringWriteData)) {
             if (!(d instanceof DictEncodedStringWriteData)) {
-                throw new IllegalArgumentException("Expected DictEncodedStringWriteData to construct DictDecodedStringWriteData");
+                throw new IllegalArgumentException(
+                    "Expected DictEncodedStringWriteData to construct DictDecodedStringWriteData");
             }
             return new DictDecodedStringWriteData((DictEncodedStringWriteData)d, m_cache.get(i));
-        } else if (m_schema.getSpec(i) instanceof VarBinaryDataSpec  && !(d instanceof DictDecodedVarBinaryWriteData)) {
+        } else if (m_schema.getSpec(i) instanceof VarBinaryDataSpec && !(d instanceof DictDecodedVarBinaryWriteData)) {
             if (!(d instanceof DictEncodedVarBinaryWriteData)) {
-                throw new IllegalArgumentException("Expected DictEncodedVarBinaryWriteData to construct DictDecodedVarBinaryWriteData");
+                throw new IllegalArgumentException(
+                    "Expected DictEncodedVarBinaryWriteData to construct DictDecodedVarBinaryWriteData");
             }
             return new DictDecodedVarBinaryWriteData((DictEncodedVarBinaryWriteData)d, m_cache.get(i));
         }

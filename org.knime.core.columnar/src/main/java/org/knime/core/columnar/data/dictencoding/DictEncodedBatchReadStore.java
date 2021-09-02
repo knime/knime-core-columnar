@@ -56,10 +56,9 @@ import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * A {@link DictEncodedBatchReadStore} wraps a delegate {@link BatchReadStore},
- * and wraps created readers in a {@link DictEncodedRandomAccessBatchReader} to
- * be able to wrap dictionary encoded data coming from the backend and provide
- * plain-looking Data objects to the frontend.
+ * A {@link DictEncodedBatchReadStore} wraps a delegate {@link BatchReadStore}, and wraps created readers in a
+ * {@link DictEncodedRandomAccessBatchReader} to be able to wrap dictionary encoded data coming from the backend and
+ * provide plain-looking Data objects to the frontend.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
@@ -71,6 +70,7 @@ public class DictEncodedBatchReadStore implements BatchReadStore {
 
     /**
      * Create with a delegate.
+     *
      * @param delegate The delegate batch store.
      */
     public DictEncodedBatchReadStore(final BatchReadStore delegate) {
@@ -94,7 +94,8 @@ public class DictEncodedBatchReadStore implements BatchReadStore {
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema(), m_dictElementCache);
+        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema(),
+            m_dictElementCache);
     }
 
     @Override

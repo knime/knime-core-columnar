@@ -55,9 +55,9 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedRead
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 
 /**
- * {@link AbstractDictDecodedReadData} and {@link AbstractDictDecodedWriteData} wrap
- * {@link DictEncodedReadData} and {@link DictEncodedWriteData} objects and add table-wide
- * caching for dictionary entries and table-wide unique dictionary key generation.
+ * {@link AbstractDictDecodedReadData} and {@link AbstractDictDecodedWriteData} wrap {@link DictEncodedReadData} and
+ * {@link DictEncodedWriteData} objects and add table-wide caching for dictionary entries and table-wide unique
+ * dictionary key generation.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
@@ -66,8 +66,7 @@ final class AbstractDictDecodedData {
     AbstractDictDecodedData() {
     }
 
-    abstract static class AbstractDictDecodedReadData<D extends DictEncodedReadData>
-        implements NullableReadData {
+    abstract static class AbstractDictDecodedReadData<D extends DictEncodedReadData> implements NullableReadData {
         protected final D m_delegate;
 
         protected final ColumnDictElementCache m_cache;
@@ -107,8 +106,7 @@ final class AbstractDictDecodedData {
         }
     }
 
-    abstract static class AbstractDictDecodedWriteData<D extends DictEncodedWriteData>
-        implements NullableWriteData {
+    abstract static class AbstractDictDecodedWriteData<D extends DictEncodedWriteData> implements NullableWriteData {
         protected final D m_delegate;
 
         protected final ColumnDictElementCache m_cache;

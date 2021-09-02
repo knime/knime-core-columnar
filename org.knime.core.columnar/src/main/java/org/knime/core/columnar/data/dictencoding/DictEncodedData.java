@@ -68,8 +68,7 @@ public final class DictEncodedData {
     }
 
     /**
-     * Class that generates a new dictionary key for a value
-     * that was never seen before in the {@link WriteData} of this
+     * Class that generates a new dictionary key for a value that was never seen before in the {@link WriteData} of this
      * batch, but possibly in previous batches.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
@@ -77,12 +76,11 @@ public final class DictEncodedData {
     public static interface DictKeyGenerator {
 
         /**
-         * Generate a new key for a given value. Should only be called
-         * if the value has never been seen before in the current {@link WriteData}.
+         * Generate a new key for a given value. Should only be called if the value has never been seen before in the
+         * current {@link WriteData}.
          *
-         * The generated keys should start at zero and provide ascending keys for
-         * newly seen values. If the value was seen in a previous {@link Batch},
-         * the key of the previous batch should be returned.
+         * The generated keys should start at zero and provide ascending keys for newly seen values. If the value was
+         * seen in a previous {@link Batch}, the key of the previous batch should be returned.
          *
          * @param <T> Type of the value
          * @param value The value for which to generate the new key
@@ -92,8 +90,8 @@ public final class DictEncodedData {
     }
 
     /**
-     * Simple key generator that returns ascending integers on each
-     * call to {@link DictKeyGenerator#generateKey(Object)}.
+     * Simple key generator that returns ascending integers on each call to
+     * {@link DictKeyGenerator#generateKey(Object)}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
@@ -106,10 +104,9 @@ public final class DictEncodedData {
         }
     }
 
-
     /**
-     * Dictionary encoded {@link NullableReadData} that can provide the dictionary
-     * key stored at each index inside the data.
+     * Dictionary encoded {@link NullableReadData} that can provide the dictionary key stored at each index inside the
+     * data.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
@@ -125,14 +122,12 @@ public final class DictEncodedData {
     }
 
     /**
-     * Dictionary encoded {@link NullableWriteData} that records a dictionary key
-     * at each position instead of the real value. The value for each key is only
-     * stored once. The implementation of this dictionary encoding is the responsibility
-     * of the back-end.
+     * Dictionary encoded {@link NullableWriteData} that records a dictionary key at each position instead of the real
+     * value. The value for each key is only stored once. The implementation of this dictionary encoding is the
+     * responsibility of the back-end.
      *
-     * Additionally, a user defined {@link DictKeyGenerator} can be provided which is
-     * queried whenever a new value is seen. By default, zero-based ascending long integers
-     * are used as keys.
+     * Additionally, a user defined {@link DictKeyGenerator} can be provided which is queried whenever a new value is
+     * seen. By default, zero-based ascending long integers are used as keys.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
@@ -149,9 +144,11 @@ public final class DictEncodedData {
 
         /**
          * Set a user defined key generator to influence which dictionary key is used when a new value is encountered
-         * inside this {@link WriteData}. Could be used to provide the same key as that value had in a previous {@link WriteBatch}.
+         * inside this {@link WriteData}. Could be used to provide the same key as that value had in a previous
+         * {@link WriteBatch}.
          *
-         * Note: The key generator can only be set once, and only before any values are stored in this {@link WriteData}.
+         * Note: The key generator can only be set once, and only before any values are stored in this
+         * {@link WriteData}.
          *
          * @param keyGenerator The key generator will be invoked for each value that has not been seen before.
          */

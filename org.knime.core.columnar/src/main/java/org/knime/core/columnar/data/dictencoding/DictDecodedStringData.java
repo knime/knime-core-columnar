@@ -58,8 +58,8 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStri
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 
 /**
- * Provide {@link StringWriteData} and {@link StringReadData} access to underlying dictionary encoded data
- * by allowing to use a table-wide cache.
+ * Provide {@link StringWriteData} and {@link StringReadData} access to underlying dictionary encoded data by allowing
+ * to use a table-wide cache.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
@@ -69,19 +69,24 @@ public final class DictDecodedStringData {
     }
 
     /**
-     * {@link DictDecodedStringWriteData} provides table-wide caching and {@link StringWriteData} access
-     * to a wrapped {@link DictEncodedStringWriteData}.
+     * {@link DictDecodedStringWriteData} provides table-wide caching and {@link StringWriteData} access to a wrapped
+     * {@link DictEncodedStringWriteData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringWriteData extends AbstractDictDecodedWriteData<DictEncodedStringWriteData> implements StringWriteData {
+    public static class DictDecodedStringWriteData extends AbstractDictDecodedWriteData<DictEncodedStringWriteData>
+        implements StringWriteData {
 
         /**
-         * Create a {@link DictDecodedStringWriteData} wrapping a {@link DictEncodedStringWriteData} provided by a back-end.
+         * Create a {@link DictDecodedStringWriteData} wrapping a {@link DictEncodedStringWriteData} provided by a
+         * back-end.
+         *
          * @param delegate The delegate {@link DictEncodedStringWriteData}
-         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries, also used to generate global dictionary keys
+         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries, also used to generate
+         *            global dictionary keys
          */
-        public DictDecodedStringWriteData(final DictEncodedStringWriteData delegate, final ColumnDictElementCache cache) {
+        public DictDecodedStringWriteData(final DictEncodedStringWriteData delegate,
+            final ColumnDictElementCache cache) {
             super(delegate, cache);
         }
 
@@ -105,15 +110,17 @@ public final class DictDecodedStringData {
     }
 
     /**
-     * {@link DictDecodedStringReadData} provides table-wide caching and {@link StringReadData} access
-     * to a wrapped {@link DictEncodedStringReadData}.
+     * {@link DictDecodedStringReadData} provides table-wide caching and {@link StringReadData} access to a wrapped
+     * {@link DictEncodedStringReadData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringReadData extends
-        AbstractDictDecodedReadData<DictEncodedStringReadData> implements StringReadData {
+    public static class DictDecodedStringReadData extends AbstractDictDecodedReadData<DictEncodedStringReadData>
+        implements StringReadData {
         /**
-         * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a back-end.
+         * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a
+         * back-end.
+         *
          * @param delegate The delegate {@link DictEncodedStringReadData}
          * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
@@ -124,8 +131,8 @@ public final class DictDecodedStringData {
         @Override
         public String getString(final int index) {
             // TODO: for global dict caching:
-//            int dictKey = m_delegate.getDictEntryKey(index);
-//            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getString(index));
+            //            int dictKey = m_delegate.getDictEntryKey(index);
+            //            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getString(index));
 
             return m_delegate.getString(index);
         }

@@ -65,9 +65,8 @@ import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 
 /**
- * Wraps a delegate{@link RandomAccessBatchReader} and upon access
- * wraps dictionary encoded data coming from the backend and provides
- * plain-looking Data objects to the frontend.
+ * Wraps a delegate{@link RandomAccessBatchReader} and upon access wraps dictionary encoded data coming from the backend
+ * and provides plain-looking Data objects to the frontend.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
@@ -81,13 +80,16 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
     private final DictElementCache m_cache;
 
     /**
-     * Create a {@link DictEncodedRandomAccessBatchReader} from a delegate, {@link ColumnSelection} and {@link ColumnarSchema}.
+     * Create a {@link DictEncodedRandomAccessBatchReader} from a delegate, {@link ColumnSelection} and
+     * {@link ColumnarSchema}.
+     *
      * @param delegate The delegate {@link RandomAccessBatchReadable}
      * @param selection The column selection
      * @param schema The columnar schema
      * @param cache The table-wide {@link DictElementCache}
      */
-    public DictEncodedRandomAccessBatchReader(final RandomAccessBatchReadable delegate, final ColumnSelection selection, final ColumnarSchema schema, final DictElementCache cache) {
+    public DictEncodedRandomAccessBatchReader(final RandomAccessBatchReadable delegate, final ColumnSelection selection,
+        final ColumnarSchema schema, final DictElementCache cache) {
         m_delegate = delegate.createRandomAccessReader(selection);
         m_selection = selection;
         m_schema = schema;
@@ -111,12 +113,15 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
         if (DictEncodingTrait.isEnabled(m_schema.getTraits(index))) {
             if (m_schema.getSpec(index) instanceof StringDataSpec && !(data instanceof DictDecodedStringReadData)) {
                 if (!(data instanceof DictEncodedStringReadData)) {
-                    throw new IllegalArgumentException("Expected DictEncodedStringReadData to construct DictDecodedStringReadData");
+                    throw new IllegalArgumentException(
+                        "Expected DictEncodedStringReadData to construct DictDecodedStringReadData");
                 }
                 return new DictDecodedStringReadData((DictEncodedStringReadData)data, m_cache.get(index));
-            } else if (m_schema.getSpec(index) instanceof VarBinaryDataSpec && !(data instanceof DictDecodedVarBinaryReadData)) {
+            } else if (m_schema.getSpec(index) instanceof VarBinaryDataSpec
+                && !(data instanceof DictDecodedVarBinaryReadData)) {
                 if (!(data instanceof DictEncodedVarBinaryReadData)) {
-                    throw new IllegalArgumentException("Expected DictEncodedVarBinaryReadData to construct DictDecodedVarBinaryReadData");
+                    throw new IllegalArgumentException(
+                        "Expected DictEncodedVarBinaryReadData to construct DictDecodedVarBinaryReadData");
                 }
                 return new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data, m_cache.get(index));
             }

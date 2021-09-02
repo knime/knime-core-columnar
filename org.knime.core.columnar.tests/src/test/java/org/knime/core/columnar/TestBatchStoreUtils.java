@@ -616,7 +616,7 @@ public final class TestBatchStoreUtils {
         final List<DataSpec> columnSpecs =
             IntStream.range(0, numColumns).mapToObj(i -> indexToTypeT(i).getSpec()).collect(Collectors.toList());
         final List<DataTraits> columnTraits =
-                IntStream.range(0, numColumns).mapToObj(i -> indexToTypeT(i).getTraits()).collect(Collectors.toList());
+            IntStream.range(0, numColumns).mapToObj(i -> indexToTypeT(i).getTraits()).collect(Collectors.toList());
         return new DefaultColumnarSchema(columnSpecs, columnTraits);
     }
 
@@ -693,12 +693,10 @@ public final class TestBatchStoreUtils {
 
     public static NullableReadData[] wrapDictEncodedData(final NullableReadData[] data, final DictElementCache cache) {
         NullableReadData[] out = new NullableReadData[data.length];
-        for (int i = 0; i < out.length; i++)
-        {
+        for (int i = 0; i < out.length; i++) {
             if (i == Types.DICTENCODEDSTRING.ordinal()) {
                 out[i] = new DictDecodedStringReadData((DictEncodedStringReadData)data[i], cache.get(i));
-            }
-            else if (i == Types.DICTENCODEDVARBINARY.ordinal()) {
+            } else if (i == Types.DICTENCODEDVARBINARY.ordinal()) {
                 out[i] = new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data[i], cache.get(i));
             } else {
                 out[i] = data[i];

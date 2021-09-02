@@ -69,22 +69,24 @@ public final class DictDecodedVarBinaryData {
     }
 
     /**
-     * {@link DictDecodedVarBinaryWriteData} provides table-wide caching and {@link VarBinaryWriteData} access
-     * to a wrapped {@link DictEncodedVarBinaryWriteData}.
+     * {@link DictDecodedVarBinaryWriteData} provides table-wide caching and {@link VarBinaryWriteData} access to a
+     * wrapped {@link DictEncodedVarBinaryWriteData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryWriteData extends AbstractDictDecodedWriteData<DictEncodedVarBinaryWriteData>
-        implements VarBinaryWriteData {
+    public static class DictDecodedVarBinaryWriteData
+        extends AbstractDictDecodedWriteData<DictEncodedVarBinaryWriteData> implements VarBinaryWriteData {
 
         /**
          * Create a {@link DictDecodedVarBinaryWriteData} wrapping a {@link DictDecodedVarBinaryWriteData} provided by a
          * back-end.
          *
          * @param delegate The delegate {@link DictEncodedVarBinaryWriteData}
-         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries, also used to generate global dictionary keys
+         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries, also used to generate
+         *            global dictionary keys
          */
-        public DictDecodedVarBinaryWriteData(final DictEncodedVarBinaryWriteData delegate, final ColumnDictElementCache cache) {
+        public DictDecodedVarBinaryWriteData(final DictEncodedVarBinaryWriteData delegate,
+            final ColumnDictElementCache cache) {
             super(delegate, cache);
         }
 
@@ -105,8 +107,8 @@ public final class DictDecodedVarBinaryData {
     }
 
     /**
-     * {@link DictDecodedVarBinaryReadData} provides table-wide caching and {@link VarBinaryReadData} access
-     * to a wrapped {@link DictEncodedVarBinaryReadData}.
+     * {@link DictDecodedVarBinaryReadData} provides table-wide caching and {@link VarBinaryReadData} access to a
+     * wrapped {@link DictEncodedVarBinaryReadData}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
@@ -120,15 +122,16 @@ public final class DictDecodedVarBinaryData {
          * @param delegate The delegate {@link DictEncodedVarBinaryReadData}
          * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
-        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData delegate, final ColumnDictElementCache cache) {
-            super(delegate,cache);
+        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData delegate,
+            final ColumnDictElementCache cache) {
+            super(delegate, cache);
         }
 
         @Override
         public byte[] getBytes(final int index) {
             // TODO: for global dict caching:
-//          int dictKey = m_delegate.getDictEntryKey(index);
-//          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getBytes(index));
+            //          int dictKey = m_delegate.getDictEntryKey(index);
+            //          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getBytes(index));
 
             return m_delegate.getBytes(index);
         }
@@ -136,8 +139,8 @@ public final class DictDecodedVarBinaryData {
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
             // TODO: for global dict caching:
-//          int dictKey = m_delegate.getDictEntryKey(index);
-//          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getObject(index));
+            //          int dictKey = m_delegate.getDictEntryKey(index);
+            //          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getObject(index));
 
             return m_delegate.getObject(index, deserializer);
         }

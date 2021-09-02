@@ -54,8 +54,8 @@ import java.util.Map;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
 
 /**
- * This {@link DictElementCache} will be used to cache entries of dictionary-encoded
- * data across all batches of the table, or at least as long as they do fit in memory.
+ * This {@link DictElementCache} will be used to cache entries of dictionary-encoded data across all batches of the
+ * table, or at least as long as they do fit in memory.
  *
  * TODO: implement the cache in AP-16149
  *
@@ -69,7 +69,7 @@ public class DictElementCache {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class ColumnDictElementCache implements DictKeyGenerator{
+    public static class ColumnDictElementCache implements DictKeyGenerator {
         private long m_numDictEntries = 0;
 
         // TODO: implement global caching
@@ -92,6 +92,7 @@ public class DictElementCache {
 
     /**
      * Get the cache for a column by column index
+     *
      * @param columnIndex The column for which to get the cache.
      * @return The cache for that column. Lazily created if this is the first access.
      */
