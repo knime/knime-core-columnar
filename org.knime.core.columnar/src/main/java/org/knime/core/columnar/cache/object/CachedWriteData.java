@@ -184,6 +184,9 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
 
     private final AtomicBoolean m_cancelled = new AtomicBoolean(false);
 
+    // used to make sure we don't call expand and a realloc during serialization concurrently.
+    private final Object m_expandLock = new Object();
+
     // The phaser is used to keep track of the number of asynchronously dispatched tasks to
     // know when they have really finished. This is used as a barrier to ensure we only close
     // the back-end once all writing has finished.
@@ -230,8 +233,13 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
         // the underlying buffer and then expand on the main thread to make sure
         // all data is written *and* the memory allocator of the delegate is not
         // invoked by multiple threads in parallel, but only from the thread calling expand.
+        // To prevent serialization calling reAlloc of the underlying buffer in parallel,
+        // we synchronize those operations on a lock.
         waitForAndGetFuture();
-        m_delegate.expand(minimumCapacity);
+        synchronized (m_expandLock) {
+            m_delegate.expand(minimumCapacity);
+        }
+
         m_data = Arrays.copyOf(m_data, m_delegate.capacity());
     }
 
@@ -255,7 +263,10 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
                 if (m_cancelled.get()) {
                     break;
                 }
-                serializeAt(i);
+
+                synchronized(m_expandLock) {
+                    serializeAt(i);
+                }
             }
         }
 
