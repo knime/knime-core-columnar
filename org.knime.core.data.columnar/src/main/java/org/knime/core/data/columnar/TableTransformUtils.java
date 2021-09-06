@@ -295,6 +295,17 @@ final class TableTransformUtils {
         private final boolean m_isComplete;
 
         IndexArrayProperties(final int[] indices, final int originalNumColumns) {
+            if (indices.length == 0) {
+                m_isSorted = true;
+                m_isComplete = originalNumColumns == 0;
+            } else {
+                var isSorted = checkSortedAndUnique(indices);
+                m_isComplete = indices.length == originalNumColumns;
+                m_isSorted = isSorted;
+            }
+        }
+
+        private static boolean checkSortedAndUnique(final int[] indices) {
             var isSorted = true;
             var previous = indices[0];
             final TIntSet uniqueIndices = new TIntHashSet(indices.length);
@@ -308,8 +319,7 @@ final class TableTransformUtils {
                     "The provided indices contain the index %s multiple times.", current);
                 previous = current;
             }
-            m_isComplete = indices.length == originalNumColumns;
-            m_isSorted = isSorted;
+            return isSorted;
         }
     }
 

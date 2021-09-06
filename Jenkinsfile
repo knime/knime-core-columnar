@@ -20,7 +20,7 @@ try {
     
     workflowTests.runTests(
         dependencies: [
-            repositories: ['knime-core-columnar', 'knime-core-arrow', 'knime-core', 'knime-base']
+            repositories: ['knime-core-columnar', 'knime-core-arrow', 'knime-datageneration']
         ]
     )
 
