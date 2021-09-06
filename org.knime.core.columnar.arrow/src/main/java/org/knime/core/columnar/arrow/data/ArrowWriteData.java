@@ -53,6 +53,9 @@ import org.knime.core.columnar.data.NullableWriteData;
 /**
  * Arrow implementation of {@link NullableWriteData}. Can be sliced with {@link #slice(int)}.
  *
+ * The API of ArrowWriteData is NOT thread safe, especially expand and set should not be
+ * called at the same time from different threads!
+ *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public interface ArrowWriteData extends NullableWriteData {

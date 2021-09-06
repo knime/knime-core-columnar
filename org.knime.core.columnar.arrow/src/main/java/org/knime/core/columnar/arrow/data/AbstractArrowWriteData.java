@@ -120,6 +120,12 @@ abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractRef
         BitVectorHelper.unsetBit(validityBuffer, m_offset + index);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * This method is not thread-safe. Do not call it concurrently from multiple threads,
+     * and do not call it concurrently with set operations or size queries.
+     */
     @Override
     public void expand(final int minimumCapacity) {
         while (m_vector.getValueCapacity() < minimumCapacity) {
