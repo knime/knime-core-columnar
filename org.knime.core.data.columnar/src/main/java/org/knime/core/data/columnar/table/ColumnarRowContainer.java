@@ -55,7 +55,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.knime.core.columnar.batch.BatchWritable;
-import org.knime.core.columnar.data.dictencoding.DictEncodedBatchStore;
+import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadable;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
@@ -127,10 +127,10 @@ final class ColumnarRowContainer implements RowContainer {
         m_path = DataContainer.createTempFile(".knable").toPath();
 
         final BatchStore lowLevelStore = m_storeFactory.createStore(schema, m_path);
-        final var dictEncodedBatchStore = new DictEncodedBatchStore(lowLevelStore);
-        m_cached = new CachedBatchWritableReadable<>(dictEncodedBatchStore);
-        final BatchWritable wrappedWritable = settings.isCheckDuplicateRowKeys() ? new DuplicateCheckWritable(m_cached,
-            new DuplicateChecker(), ColumnarPreferenceUtils.getDuplicateCheckExecutor()) : m_cached;
+        m_cached = new CachedBatchWritableReadable<>(lowLevelStore);
+        final var dictEncoded = new DictEncodedBatchWritableReadable<>(m_cached);
+        final BatchWritable wrappedWritable = settings.isCheckDuplicateRowKeys() ? new DuplicateCheckWritable(dictEncoded,
+            new DuplicateChecker(), ColumnarPreferenceUtils.getDuplicateCheckExecutor()) : dictEncoded;
 
         m_domainWritable = new DomainWritable(wrappedWritable, new DefaultDomainWritableConfig(schema,
             settings.getMaxPossibleNominalDomainValues(), settings.isInitializeDomains()),

@@ -50,21 +50,25 @@ package org.knime.core.columnar.data.dictencoding;
 
 import java.io.IOException;
 
+import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * A {@link DictEncodedBatchStore} wraps a delegate {@link BatchStore}, and wraps created readers and writers in
- * {@link DictEncodedBatchWriter} and {@link DictEncodedRandomAccessBatchReader} to be able to wrap dictionary encoded
- * data coming from the backend and provide plain-looking Data objects to the frontend and vice versa.
+ * A {@link DictEncodedBatchWritableReadable} wraps a delegate {@link BatchWritable} and
+ * {@link RandomAccessBatchReadable}, and wraps created readers and writers in {@link DictEncodedBatchWriter} and
+ * {@link DictEncodedRandomAccessBatchReader} to be able to wrap dictionary encoded data coming from the backend and
+ * provide plain-looking Data objects to the frontend and vice versa.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+ * @param <D> The type of the underlying {@link BatchWritable} and {@link RandomAccessBatchReadable}
  */
-public class DictEncodedBatchStore implements BatchStore {
-    private final BatchStore m_delegate;
+public class DictEncodedBatchWritableReadable<D extends BatchWritable & RandomAccessBatchReadable>
+    implements BatchWritable, RandomAccessBatchReadable {
+    private final D m_delegate;
 
     private final DictEncodedBatchWriter m_writer;
 
@@ -76,7 +80,7 @@ public class DictEncodedBatchStore implements BatchStore {
      * @param delegate The delegate batch store
      */
     @SuppressWarnings("resource")
-    public DictEncodedBatchStore(final BatchStore delegate) {
+    public DictEncodedBatchWritableReadable(final D delegate) {
         m_delegate = delegate;
         m_writer = new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema(), m_dictElementCache);
     }
@@ -89,16 +93,6 @@ public class DictEncodedBatchStore implements BatchStore {
     @Override
     public ColumnarSchema getSchema() {
         return m_delegate.getSchema();
-    }
-
-    @Override
-    public int numBatches() {
-        return m_delegate.numBatches();
-    }
-
-    @Override
-    public int batchLength() {
-        return m_delegate.batchLength();
     }
 
     @Override

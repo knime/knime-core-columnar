@@ -163,7 +163,7 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     public void testWrappedBatchStore() throws IOException {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
         var columnSelection = new DefaultColumnSelection(columnarSchema.numColumns());
-        try (DictEncodedBatchStore batchStore = new DictEncodedBatchStore(DefaultTestBatchStore.create(columnarSchema))) {
+        try (DictEncodedBatchWritableReadable batchStore = new DictEncodedBatchWritableReadable(DefaultTestBatchStore.create(columnarSchema))) {
             try (var writer = batchStore.getWriter()) {
                 assertEquals(writer.getClass(), DictEncodedBatchWriter.class);
             }
@@ -183,12 +183,12 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
         var columnSelection = new DefaultColumnSelection(columnarSchema.numColumns());
         try (var baseStore = DefaultTestBatchStore.create(columnarSchema);
-                DictEncodedBatchStore batchStore = new DictEncodedBatchStore(baseStore)) {
+                DictEncodedBatchWritableReadable batchStore = new DictEncodedBatchWritableReadable(baseStore)) {
             try (var writer = batchStore.getWriter()) {
                 assertEquals(writer.getClass(), DictEncodedBatchWriter.class);
             }
 
-            try (var readStore = new DictEncodedBatchReadStore(baseStore)) {
+            try (var readStore = new DictEncodedBatchReadable(baseStore)) {
                 try (var reader = batchStore.createRandomAccessReader()) {
                     assertEquals(reader.getClass(), DictEncodedRandomAccessBatchReader.class);
                 }

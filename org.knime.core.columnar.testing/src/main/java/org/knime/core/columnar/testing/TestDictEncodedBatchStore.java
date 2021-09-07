@@ -51,7 +51,7 @@ package org.knime.core.columnar.testing;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-import org.knime.core.columnar.data.dictencoding.DictEncodedBatchStore;
+import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadable;
 import org.knime.core.columnar.testing.data.TestData;
 
 /**
@@ -59,7 +59,7 @@ import org.knime.core.columnar.testing.data.TestData;
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public class TestDictEncodedBatchStore extends DictEncodedBatchStore implements TestBatchStore {
+public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable implements TestBatchStore {
 
     private final TestBatchStore m_testDelegate;
 
@@ -76,5 +76,15 @@ public class TestDictEncodedBatchStore extends DictEncodedBatchStore implements 
     @Override
     public List<TestData> getData() {
         return m_testDelegate.getData();
+    }
+
+    @Override
+    public int numBatches() {
+        return m_testDelegate.numBatches();
+    }
+
+    @Override
+    public int batchLength() {
+        return m_testDelegate.batchLength();
     }
 }
