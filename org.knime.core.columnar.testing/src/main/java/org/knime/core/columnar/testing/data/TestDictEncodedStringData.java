@@ -119,4 +119,11 @@ public final class TestDictEncodedStringData extends AbstractTestDictEncodedData
     public Object[] get() {
         return m_delegate.get();
     }
+
+    @Override
+    public boolean isMissing(final int index) {
+        // In the tests we expect that a value of null means missing, however that is not necessarily true in KNIME,
+        // so we replicate the required test behavior here
+        return m_delegate.isMissing(index) || getString(index) == null;
+    }
 }
