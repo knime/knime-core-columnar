@@ -79,8 +79,11 @@ import org.knime.core.table.schema.ColumnarSchema;
  * </ul>
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @param <D>
+ *
+ * @noreference This class is not intended to be referenced by clients
  */
-final class CachedBatchWritableReadable<D extends BatchWritable & RandomAccessBatchReadable>
+public final class CachedBatchWritableReadable<D extends BatchWritable & RandomAccessBatchReadable>
     implements BatchWritable, RandomAccessBatchReadable, Flushable {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(CachedBatchWritableReadable.class);
@@ -97,7 +100,12 @@ final class CachedBatchWritableReadable<D extends BatchWritable & RandomAccessBa
 
     private final BatchWriter m_writer;
 
-    CachedBatchWritableReadable(final D delegate) {
+    /**
+     * Create a {@link CachedBatchWritableReadable} wrapping the given delegate in a series of caches.
+     *
+     * @param delegate The delegate that provides {@link BatchWritable} and {@link RandomAccessBatchReadable} interfaces.
+     */
+    public CachedBatchWritableReadable(final D delegate) {
         m_delegate = delegate;
 
         final SharedReadDataCache columnDataCache = ColumnarPreferenceUtils.getColumnDataCache();

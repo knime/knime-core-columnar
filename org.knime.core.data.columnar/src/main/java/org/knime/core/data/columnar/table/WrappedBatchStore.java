@@ -67,8 +67,10 @@ import org.knime.core.table.schema.ColumnarSchema;
  * A {@link BatchStore} that delegates operations to a {@link BatchWritable} and a {@link RandomAccessBatchReadable}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ *
+ * @noreference This class is not intended to be referenced by clients
  */
-final class WrappedBatchStore implements BatchStore {
+public final class WrappedBatchStore implements BatchStore {
 
     private static final class WrappedBatchWriter implements BatchWriter {
 
@@ -152,7 +154,12 @@ final class WrappedBatchStore implements BatchStore {
 
     private final WrappedBatchWriter m_writer;
 
-    WrappedBatchStore(final BatchWritable writable, final RandomAccessBatchReadable readable) {
+    /**
+     * Create a wrapped batch store from a {@link BatchWritable} and a {@link RandomAccessBatchReadable}.
+     * @param writable The {@link BatchWritable}
+     * @param readable The {@link RandomAccessBatchReadable}
+     */
+    public WrappedBatchStore(final BatchWritable writable, final RandomAccessBatchReadable readable) {
         m_writable = writable;
         m_readable = readable;
         m_writer = new WrappedBatchWriter(m_writable, m_storeClosed, m_writerClosed);
