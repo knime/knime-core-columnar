@@ -140,6 +140,9 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
 
         private void waitForDelegateWriter() {
             try {
+                // Waits for the delegate to be closed, but can also get here if closing threw an exception.
+                // However, in the exceptional case, close() or flush() would have propagated the exception to
+                // the caller, so it should be clear that this cache has an invalid state.
                 m_delegateClosed.await();
             } catch (InterruptedException e) {
                 // Restore interrupted state
@@ -265,7 +268,7 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
         } else {
             // cache miss
             // we are not putting the small table back into cache here for two reasons:
-            // (1) the CachedColumnStore which this store usually delegates to will already so so
+            // (1) the CachedColumnStore which this store usually delegates to will already do so
             // (2) it might not be read fully by the reader, so by putting it back into the cache, we would read
             // unnecessarily much data
             m_writer.waitForDelegateWriter();

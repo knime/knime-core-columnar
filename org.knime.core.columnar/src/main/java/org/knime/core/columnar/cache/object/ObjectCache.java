@@ -83,8 +83,8 @@ import org.slf4j.LoggerFactory;
  * caching of objects.
  *
  * It performs asynchronous work on two different executors. The persist executor is used to asynchronously store data
- * in the cache during writing. The serialization executor handles asynchronous serialization of in-heap
- * data into the delegate batch writer.
+ * in the cache during writing. The serialization executor handles asynchronous serialization of in-heap data into the
+ * delegate batch writer.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -104,9 +104,9 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
         /**
-         * The number of batches that are already written. Readers use this value to determine if they are
-         * accessing the currently written batch and need to wait for the serialization to finish.
-         * To make sure numBatches is up to date when a Reader accesses it, we make it volatile.
+         * The number of batches that are already written. Readers use this value to determine if they are accessing the
+         * currently written batch and need to wait for the serialization to finish. To make sure numBatches is up to
+         * date when a Reader accesses it, we make it volatile.
          */
         private volatile int m_numBatches;
 
@@ -128,7 +128,8 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                     data[i] = cachedData;
                 } else if (m_stringData.isSelected(i)) {
                     final StringWriteData columnWriteData = (StringWriteData)batch.get(i);
-                    final var cachedData = new CachedStringWriteData(columnWriteData, m_serializationExecutor, m_serializationPhaser);
+                    final var cachedData =
+                        new CachedStringWriteData(columnWriteData, m_serializationExecutor, m_serializationPhaser);
                     m_unclosedData.add(cachedData);
                     data[i] = cachedData;
                 } else {
@@ -363,8 +364,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     }
 
     /**
-     * Wait for the current write operations to finish and then
-     * dispose of the cache resources and close the delegate.
+     * Wait for the current write operations to finish and then dispose of the cache resources and close the delegate.
      *
      * Blocks until closed!
      */
@@ -388,7 +388,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         try {
             m_writer.waitForAndHandleFuture();
         } catch (InterruptedException e) {
-            // Note: we're not restoring interrupted state here, close should not be interrupted!
+            // Note: we're not restoring interrupted state here, close should not be interrupted. Instead we retry waiting.
             try {
                 m_writer.waitForAndHandleFuture();
             } catch (InterruptedException f) {

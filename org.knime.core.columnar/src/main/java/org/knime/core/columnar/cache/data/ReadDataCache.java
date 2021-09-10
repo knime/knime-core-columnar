@@ -307,6 +307,14 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             waitForAllTasksToFinish();
 
             m_writer.close();
+            try {
+                // Wait for close to finish
+                waitForAndHandleFuture();
+            } catch (InterruptedException e) {
+                // The interrupt status should have been reset by some previous wait operation,
+                // so if we get interrupted here, something has gone wrong and we throw an exception.
+                throw new IOException("Close should not be interrupted!", e);
+            }
 
             releaseAllReferencedData();
 
@@ -329,6 +337,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
         }
 
         try {
+            // There should not be any tasks left after the previous block,
+            // so this should return immediately. But we still invoke m_future.get()
+            // to notice whether exceptions were thrown.
             waitForAndHandleFuture();
         } catch (InterruptedException e) {
             throw new IOException("Close should not be interrupted!", e);
@@ -344,7 +355,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 try {
                     lock.await();
                 } catch (InterruptedException ex) {
-                    LOGGER.error("Interrupted while waiting for cached data to be flushed");
+                    LOGGER.error("Interrupted while waiting for cached data to be released");
                 }
             }
 
