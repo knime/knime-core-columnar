@@ -118,9 +118,9 @@ public final class ColumnarTableBackend implements TableBackend {
                 initFileStoreHandler(fileStoreHandler, repository));
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
-            final ColumnarRowContainerSettings cursorSettings = new ColumnarRowContainerSettings(
-                settings.getInitializeDomain(), settings.getMaxDomainValues(), settings.isEnableRowKeys(),
-                settings.isForceSequentialRowHandling());
+            final ColumnarRowContainerSettings cursorSettings =
+                new ColumnarRowContainerSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
+                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling());
             return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", e);
@@ -133,9 +133,9 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final ValueSchema schema =
                 ValueSchema.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
-            final ColumnarRowContainerSettings containerSettings = new ColumnarRowContainerSettings(
-                settings.getInitializeDomain(), settings.getMaxDomainValues(), settings.isEnableRowKeys(),
-                settings.isForceSequentialRowHandling());
+            final ColumnarRowContainerSettings containerSettings =
+                new ColumnarRowContainerSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
+                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling());
             return ColumnarRowContainerUtils.create(context, -1, ColumnarValueSchemaUtils.create(schema),
                 containerSettings);
         } catch (Exception e) {
@@ -166,8 +166,8 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public KnowsRowCountTable concatenate(final ExecutionMonitor exec, final IWriteFileStoreHandler filestoreHandler,
-        final IntSupplier tableIdSupplier, final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables)
-        throws CanceledExecutionException {
+        final IntSupplier tableIdSupplier, final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck,
+        final BufferedDataTable... tables) throws CanceledExecutionException {
         if (duplicatesPreCheck && rowKeyDuplicateSuffix == null) {
             TableTransformUtils.checkForDuplicateKeys(exec, tables);
             final DataTableSpec concatenateSpec = TableTransformUtils.concatenateSpec(tables);
@@ -182,19 +182,22 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public KnowsRowCountTable append(final ExecutionMonitor exec, final IWriteFileStoreHandler filestoreHandler,
-        final IntSupplier tableIdSupplier, final BufferedDataTable left, final BufferedDataTable right) throws CanceledExecutionException {
+        final IntSupplier tableIdSupplier, final BufferedDataTable left, final BufferedDataTable right)
+        throws CanceledExecutionException {
         final BufferedDataTable[] tables = {left, right};
         TableTransformUtils.checkRowKeysMatch(exec, tables);
         final long appendSize = TableTransformUtils.appendSize(tables);
         final DataTableSpec appendedSpec = TableTransformUtils.appendSpec(tables);
         return new VirtualTableExtensionTable(tables, filestoreHandler,
-            TableTransformUtils.createAppendTransformations(tables), appendedSpec, appendSize, tableIdSupplier.getAsInt());
+            TableTransformUtils.createAppendTransformations(tables), appendedSpec, appendSize,
+            tableIdSupplier.getAsInt());
     }
 
     @Override
     public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor,
         final IWriteFileStoreHandler filestoreHandler, final IntSupplier tableIdSupplier,
-        final ColumnRearranger columnRearranger, final BufferedDataTable table, final ExecutionContext context) throws CanceledExecutionException {
+        final ColumnRearranger columnRearranger, final BufferedDataTable table, final ExecutionContext context)
+        throws CanceledExecutionException {
         ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
         if (ColumnRearrangerUtils.addsNoNewColumns(columnRearranger)) {
             List<TableTransformSpec> transformations = TableTransformUtils.createRearrangeTransformations(

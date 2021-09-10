@@ -391,6 +391,17 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     @SuppressWarnings("resource") // we track both the accessibles and the cursor using CloseableTracker
     private RowCursor createdFilteredRowCursor(final TableFilter filter) {
         final var srcId = UUID.randomUUID();
+        var table = createFilteredVirtualTable(filter, srcId);
+        final VirtualTableExecutor exec = new LazyVirtualTableExecutor(table.getProducingTransform());
+        final List<RowAccessible> accessibles = exec.execute(Map.of(srcId, getOutput()));
+        m_filteredAccessibleTracker.trackAll(accessibles);
+        final Cursor<ReadAccessRow> physicalCursor = accessibles.get(0).createCursor();
+        return TableFilterUtils.createColumnSelection(filter, m_schema.numColumns())//
+            .map(s -> VirtualTableUtils.createTableFilterRowCursor(m_schema, physicalCursor, s))//
+            .orElseGet(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, physicalCursor));
+    }
+
+    private VirtualTable createFilteredVirtualTable(final TableFilter filter, final UUID srcId) {
         var table = new VirtualTable(srcId, m_schema);
 
         if (TableFilterUtils.definesRowRange(filter)) {
@@ -401,13 +412,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         if (TableFilterUtils.definesColumnFilter(filter)) {
             table = table.filterColumns(TableFilterUtils.extractPhysicalColumnIndices(filter, m_schema.numColumns()));
         }
-        final VirtualTableExecutor exec = new LazyVirtualTableExecutor(table.getProducingTransform());
-        final List<RowAccessible> accessibles = exec.execute(Map.of(srcId, getOutput()));
-        m_filteredAccessibleTracker.trackAll(accessibles);
-        final Cursor<ReadAccessRow> physicalCursor = accessibles.get(0).createCursor();
-        return TableFilterUtils.createColumnSelection(filter, m_schema.numColumns())//
-            .map(s -> VirtualTableUtils.createTableFilterRowCursor(m_schema, physicalCursor, s))//
-            .orElseGet(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, physicalCursor));
+        return table;
     }
 
     @SuppressWarnings("resource")
