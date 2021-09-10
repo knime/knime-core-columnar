@@ -134,6 +134,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private final long m_size;
 
+    private final int m_tableId;
+
     /**
      * Serialization constructor. Not to be used by clients.
      *
@@ -142,6 +144,9 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
      */
     public VirtualTableExtensionTable(final LoadContext context) throws InvalidSettingsException {
         final NodeSettingsRO settings = context.getSettings();
+        // only relevant for newly created tables that are temporary i.e. not output tables of a node (see AP-15779)
+        // If this table is loaded it means that it must be either an output of some node
+        m_tableId = -1;
         m_schema = ColumnarValueSchemaUtils.create(ValueSchema.Serializer.load(context.getTableSpec(),
             context.getDataRepository(), settings.getNodeSettings(CFG_SCHEMA)));
         m_dataTableSpec = context.getTableSpec();
@@ -183,12 +188,15 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
      * @param specs the transformations to apply
      * @param transformedSpec the {@link DataTableSpec} AFTER the transformations are applied
      * @param size the size of the output table AFTER the transformations are applied
+     * @param tableId the id with which this table is tracked
      */
     public VirtualTableExtensionTable(final BufferedDataTable[] refs, //
         final IWriteFileStoreHandler fsHandler, //
         final List<TableTransformSpec> specs, //
         final DataTableSpec transformedSpec, //
-        final long size) {
+        final long size,//
+        final int tableId) {
+        m_tableId = tableId;
         m_tableTransformSpec = specs;
         m_refTables = refs;
         m_referenceTables = Arrays.stream(refs)//
@@ -252,9 +260,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public int getTableId() {
-        // this table doesn't hold any data of its own, so no BlobCells need to refer to it via the table id
-        // this method is only contained because this is an ExtensionTable and ExtensionTables can hold data
-        return -1;
+        return m_tableId;
     }
 
     @Override

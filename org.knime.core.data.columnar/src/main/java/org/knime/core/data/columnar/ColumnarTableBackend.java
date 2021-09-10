@@ -51,6 +51,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.IntSupplier;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
@@ -165,14 +166,14 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public KnowsRowCountTable concatenate(final ExecutionMonitor exec, final IWriteFileStoreHandler filestoreHandler,
-        final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables)
+        final IntSupplier tableIdSupplier, final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables)
         throws CanceledExecutionException {
         if (duplicatesPreCheck && rowKeyDuplicateSuffix == null) {
             TableTransformUtils.checkForDuplicateKeys(exec, tables);
             final DataTableSpec concatenateSpec = TableTransformUtils.concatenateSpec(tables);
             final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
             return new VirtualTableExtensionTable(tables, filestoreHandler, List.of(new ConcatenateTransformSpec()),
-                concatenateSpec, concatenatedSize);
+                concatenateSpec, concatenatedSize, tableIdSupplier.getAsInt());
         } else {
             return ConcatenateTable.create(exec, Optional.ofNullable(rowKeyDuplicateSuffix), duplicatesPreCheck,
                 tables);
@@ -181,26 +182,26 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public KnowsRowCountTable append(final ExecutionMonitor exec, final IWriteFileStoreHandler filestoreHandler,
-        final BufferedDataTable left, final BufferedDataTable right) throws CanceledExecutionException {
+        final IntSupplier tableIdSupplier, final BufferedDataTable left, final BufferedDataTable right) throws CanceledExecutionException {
         final BufferedDataTable[] tables = {left, right};
         TableTransformUtils.checkRowKeysMatch(exec, tables);
         final long appendSize = TableTransformUtils.appendSize(tables);
         final DataTableSpec appendedSpec = TableTransformUtils.appendSpec(tables);
         return new VirtualTableExtensionTable(tables, filestoreHandler,
-            TableTransformUtils.createAppendTransformations(tables), appendedSpec, appendSize);
+            TableTransformUtils.createAppendTransformations(tables), appendedSpec, appendSize, tableIdSupplier.getAsInt());
     }
 
     @Override
     public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor,
-        final IWriteFileStoreHandler filestoreHandler, final ColumnRearranger columnRearranger,
-        final BufferedDataTable table, final ExecutionContext context) throws CanceledExecutionException {
+        final IWriteFileStoreHandler filestoreHandler, final IntSupplier tableIdSupplier,
+        final ColumnRearranger columnRearranger, final BufferedDataTable table, final ExecutionContext context) throws CanceledExecutionException {
         ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
         if (ColumnRearrangerUtils.addsNoNewColumns(columnRearranger)) {
             List<TableTransformSpec> transformations = TableTransformUtils.createRearrangeTransformations(
                 ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger),
                 table.getDataTableSpec().getNumColumns());
             return new VirtualTableExtensionTable(new BufferedDataTable[]{table}, filestoreHandler, transformations,
-                columnRearranger.createSpec(), table.size());
+                columnRearranger.createSpec(), table.size(), tableIdSupplier.getAsInt());
         } else {
             // TODO replace fallback with fast tables based implementation once we have map functionality
             return RearrangeColumnsTable.create(columnRearranger, table, progressMonitor, context);
