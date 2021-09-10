@@ -66,7 +66,6 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
-import org.knime.core.data.columnar.table.virtual.closeable.CloseableTrackingSupplier;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -82,7 +81,6 @@ import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.WorkflowDataRepository;
 import org.knime.core.table.cursor.Cursor;
-import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -292,12 +290,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final class ColumnarContainerRowAccessible implements RowAccessible {
 
-        private final CloseableTrackingSupplier<Cursor<ReadAccessRow>> m_cursors =
-            new CloseableTrackingSupplier<>(this::createCursorInternal);
-
         @Override
         public void close() throws IOException {
-            m_cursors.close();
+            // nothing to close, the outer class is closed by the node that references it
         }
 
         @Override
@@ -307,15 +302,12 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
         @Override
         public Cursor<ReadAccessRow> createCursor() {
-            return m_cursors.get();
-        }
-
-        private LookaheadCursor<ReadAccessRow> createCursorInternal() {
             final int lastIndexInLastBatch = (int)((m_size - 1) % m_readStore.batchLength());
             final var batchRange = new DefaultBatchRange(0, 0, m_readStore.numBatches() - 1, lastIndexInLastBatch);
             return ColumnarCursorFactory.create(m_readStore, new DefaultColumnSelection(m_schema.numColumns()),
                 batchRange);
         }
+
     }
 
 }

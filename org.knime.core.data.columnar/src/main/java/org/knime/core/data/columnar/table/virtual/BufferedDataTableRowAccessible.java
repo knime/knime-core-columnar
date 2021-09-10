@@ -51,7 +51,6 @@ package org.knime.core.data.columnar.table.virtual;
 import java.io.IOException;
 
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.table.virtual.closeable.CloseableTrackingSupplier;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.row.ReadAccessRow;
@@ -67,16 +66,16 @@ final class BufferedDataTableRowAccessible implements RowAccessible {
 
     private final ColumnarValueSchema m_schema;
 
-    private final CloseableTrackingSupplier<Cursor<ReadAccessRow>> m_cursors;
+    private final BufferedDataTable m_table;
 
     BufferedDataTableRowAccessible(final BufferedDataTable table, final ColumnarValueSchema schema) {
         m_schema = schema;
-        m_cursors = new CloseableTrackingSupplier<>(() -> new RowIteratorCursor(m_schema, table.iterator()));
+        m_table = table;
     }
 
     @Override
     public void close() throws IOException {
-        m_cursors.close();
+        // nothing to close, m_table is cleared by the node it is created by
     }
 
     @Override
@@ -84,8 +83,9 @@ final class BufferedDataTableRowAccessible implements RowAccessible {
         return m_schema;
     }
 
+    @SuppressWarnings("resource") // the returned cursor closes the iterator
     @Override
     public Cursor<ReadAccessRow> createCursor() {
-        return m_cursors.get();
+        return new RowIteratorCursor(m_schema, m_table.iterator());
     }
 }
