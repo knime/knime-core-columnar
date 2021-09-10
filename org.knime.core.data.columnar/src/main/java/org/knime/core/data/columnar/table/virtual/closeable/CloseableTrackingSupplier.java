@@ -46,12 +46,10 @@
  * History
  *   Aug 3, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table.virtual;
+package org.knime.core.data.columnar.table.virtual.closeable;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -65,9 +63,7 @@ public final class CloseableTrackingSupplier<T extends Closeable> implements Clo
 
     private final Supplier<T> m_supplier;
 
-    private final List<T> m_trackedCloseables = new ArrayList<>();
-
-    private boolean m_isClosed;
+    private final CloseableTracker<T, IOException> m_trackedCloseables = new CloseableTracker<>(IOException.class);
 
     /**
      * Constructor.
@@ -80,29 +76,16 @@ public final class CloseableTrackingSupplier<T extends Closeable> implements Clo
 
     @Override
     public synchronized void close() throws IOException {
-        m_isClosed = true;
-        final List<IOException> exceptions = new ArrayList<>();
-        for (T t : m_trackedCloseables) {
-            try {
-                t.close();
-            } catch (IOException ex) {
-                exceptions.add(ex);
-            }
-        }
-        if (!exceptions.isEmpty()) {
-            // TODO use IOExceptionList once org.apache.commons.io >= 2.7.0 is available in the nightlies
-            throw exceptions.get(0);
-        }
+        m_trackedCloseables.close();
     }
 
+    @SuppressWarnings("resource")
     @Override
     public synchronized T get() {
-        if (m_isClosed) {
+        if (m_trackedCloseables.isClosed()) {
             throw new IllegalStateException("Already closed.");
         }
-        final var t = m_supplier.get();
-        m_trackedCloseables.add(t);
-        return t;
+        return m_trackedCloseables.track(m_supplier.get());
     }
 
 }

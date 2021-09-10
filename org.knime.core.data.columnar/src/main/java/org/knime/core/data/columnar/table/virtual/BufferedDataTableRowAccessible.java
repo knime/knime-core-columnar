@@ -51,6 +51,7 @@ package org.knime.core.data.columnar.table.virtual;
 import java.io.IOException;
 
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.virtual.closeable.CloseableTrackingSupplier;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.row.ReadAccessRow;
