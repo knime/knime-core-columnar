@@ -386,14 +386,11 @@ public class ObjectCacheTest extends ColumnarTest {
                 data1.setString(i, testStrings[i]);
             }
 
+            data0.flush();
+            data1.flush();
             batch.close(numStrings);
 
-            final CountDownLatch waitLatch = new CountDownLatch(5);
-            for (int i = 0; i < 5; i++) {
-                serializationExecutor.submit(() -> waitLatch.countDown());
-            }
-            waitLatch.await();
-
+            // No data should be lost if we expand while we're writing asynchronously
             for (int i = 0; i < numStrings; i++) {
                 assertEquals(testStrings[i], delegateData0.getString(i));
                 assertEquals(testStrings[i], delegateData1.getString(i));
