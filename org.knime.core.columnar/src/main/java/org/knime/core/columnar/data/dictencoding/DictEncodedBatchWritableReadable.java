@@ -106,4 +106,10 @@ public class DictEncodedBatchWritableReadable<D extends BatchWritable & RandomAc
         m_delegate.close();
     }
 
+    /**
+     * Clear the dictionary element cache, e.g. due to memory pressure
+     */
+    public void clearCache() {
+        m_dictElementCache.clear();
+    }
 }

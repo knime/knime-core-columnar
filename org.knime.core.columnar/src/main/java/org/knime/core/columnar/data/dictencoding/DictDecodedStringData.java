@@ -130,11 +130,8 @@ public final class DictDecodedStringData {
 
         @Override
         public String getString(final int index) {
-            // TODO: for global dict caching:
-            //            int dictKey = m_delegate.getDictEntryKey(index);
-            //            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getString(index));
-
-            return m_delegate.getString(index);
+            long dictKey = m_delegate.getDictKey(index);
+            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getString(index));
         }
     }
 

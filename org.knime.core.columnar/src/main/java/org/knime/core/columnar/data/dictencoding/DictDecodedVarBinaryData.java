@@ -129,20 +129,14 @@ public final class DictDecodedVarBinaryData {
 
         @Override
         public byte[] getBytes(final int index) {
-            // TODO: for global dict caching:
-            //          int dictKey = m_delegate.getDictEntryKey(index);
-            //          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getBytes(index));
-
-            return m_delegate.getBytes(index);
+            long dictKey = m_delegate.getDictKey(index);
+            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getBytes(index));
         }
 
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-            // TODO: for global dict caching:
-            //          int dictKey = m_delegate.getDictEntryKey(index);
-            //          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getObject(index));
-
-            return m_delegate.getObject(index, deserializer);
+            long dictKey = m_delegate.getDictKey(index);
+            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getObject(index, deserializer));
         }
     }
 }

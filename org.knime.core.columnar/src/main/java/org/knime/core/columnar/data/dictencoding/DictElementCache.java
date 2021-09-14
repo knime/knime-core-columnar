@@ -50,6 +50,7 @@ package org.knime.core.columnar.data.dictencoding;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
 
@@ -65,19 +66,43 @@ public class DictElementCache {
     /**
      * The cache for the entries of one column in the table.
      *
-     * Supports the generation of globally unique dictionary keys.
+     * Supports the generation of globally near-unique dictionary keys.
+     * Near-unique means that we can only provide the same key for a given value
+     * if the value was kept in memory all the time. If it got evicted from the
+     * cache due to a memory alert in the mean time, the value will receive a new key.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
     public static class ColumnDictElementCache implements DictKeyGenerator {
-        private long m_numDictEntries = 0;
+        private long m_nextDictKey = 0;
 
-        // TODO: implement global caching
+        private final Map<Long, Object> m_keyToValue = new HashMap<>();
+        private final Map<Object, Long> m_valueToKey = new HashMap<>();
 
         @Override
         public synchronized <T> long generateKey(final T value) {
-            // synchronized because that could possibly be called from multiple threads?
-            return m_numDictEntries++;
+            final long key = m_valueToKey.computeIfAbsent(value, v -> m_nextDictKey++);
+            m_keyToValue.putIfAbsent(key, value);
+            return key;
+        }
+
+        /**
+         * See {@link HashMap#computeIfAbsent(Object, Function)}
+         * @param <T> The type of the dictionary value
+         * @param key The dictionary key
+         * @param computer A function that computes the value for a given key
+         * @return the value for the given dictionary key
+         */
+        public synchronized <T> T computeIfAbsent(final long key, final Function<Long, T> computer) {
+            @SuppressWarnings("unchecked")
+            final T value = (T)m_keyToValue.computeIfAbsent(key, computer);
+            m_valueToKey.putIfAbsent(value,  key);
+            return value;
+        }
+
+        synchronized void clear() {
+            m_valueToKey.clear();
+            m_keyToValue.clear();
         }
     }
 
@@ -87,7 +112,6 @@ public class DictElementCache {
      * Construct the {@link DictElementCache}.
      */
     public DictElementCache() {
-        // TODO: register with MemoryAlertListener
     }
 
     /**
@@ -98,5 +122,12 @@ public class DictElementCache {
      */
     public ColumnDictElementCache get(final int columnIndex) {
         return m_perColumnCache.computeIfAbsent(columnIndex, i -> new ColumnDictElementCache());
+    }
+
+    /**
+     * Clear this cache to free up memory
+     */
+    public void clear() {
+        m_perColumnCache.values().forEach(ColumnDictElementCache::clear);
     }
 }

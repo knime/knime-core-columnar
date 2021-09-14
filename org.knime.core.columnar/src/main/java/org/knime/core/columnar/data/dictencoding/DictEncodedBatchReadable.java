@@ -92,4 +92,8 @@ public class DictEncodedBatchReadable implements RandomAccessBatchReadable {
     public void close() throws IOException {
         m_delegate.close();
     }
+    
+    public void clearCache() {
+        m_dictElementCache.clear();
+    }
 }

@@ -68,6 +68,9 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.data.util.memory.MemoryAlert;
+import org.knime.core.data.util.memory.MemoryAlertListener;
+import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
@@ -115,6 +118,8 @@ final class ColumnarRowContainer implements RowContainer {
 
     private ExtensionTable m_table;
 
+    private MemoryAlertListener m_memListener;
+
     @SuppressWarnings("resource")
     private ColumnarRowContainer(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
         final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
@@ -129,6 +134,17 @@ final class ColumnarRowContainer implements RowContainer {
         final BatchStore lowLevelStore = m_storeFactory.createStore(schema, m_path);
         m_cached = new CachedBatchWritableReadable<>(lowLevelStore);
         final var dictEncoded = new DictEncodedBatchWritableReadable<>(m_cached);
+
+        // TODO: move into DictEncodedBatchWritableReadable
+        m_memListener = new MemoryAlertListener() {
+            @Override
+            protected boolean memoryAlert(final MemoryAlert alert) {
+                new Thread(dictEncoded::clearCache).start();
+                return false;
+            }
+        };
+        MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
+
         final BatchWritable wrappedWritable = settings.isCheckDuplicateRowKeys() ? new DuplicateCheckWritable(dictEncoded,
             new DuplicateChecker(), ColumnarPreferenceUtils.getDuplicateCheckExecutor()) : dictEncoded;
 
@@ -161,6 +177,7 @@ final class ColumnarRowContainer implements RowContainer {
         // in case m_table was not created, we have to destroy the store. otherwise the
         // m_table has a handle on the store and therefore the store shouldn't be destroyed.
         if (m_table == null) {
+            MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
 
             m_finalizer.close();
             m_writeCursor.close();
@@ -200,6 +217,8 @@ final class ColumnarRowContainer implements RowContainer {
                 metadata.put(i, m_domainWritable.getMetadata(i));
             }
 
+            // this needs to happen inside UnsavedColumnarContainerTable.close():
+            // MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
             m_table = UnsavedColumnarContainerTable.create(m_path, m_id, m_storeFactory,
                 ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_cached,
                 m_writeCursor.size());
