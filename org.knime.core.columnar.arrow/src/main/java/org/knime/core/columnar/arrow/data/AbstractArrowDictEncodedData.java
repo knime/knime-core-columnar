@@ -50,15 +50,31 @@ package org.knime.core.columnar.arrow.data;
 
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
+import org.knime.core.columnar.data.ByteData.ByteReadData;
+import org.knime.core.columnar.data.ByteData.ByteWriteData;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.AscendingKeyGenerator;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
+import org.knime.core.columnar.data.dictencoding.DictKeys;
+import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 /**
  * Base implementations for dictionary encoded data using the Arrow back-end
@@ -73,23 +89,27 @@ public final class AbstractArrowDictEncodedData {
 
     static final int DICT_ENTRY_DATA_INDEX = 1;
 
-    abstract static class AbstractArrowDictEncodedWriteData<T> implements DictEncodedWriteData, ArrowWriteData {
+    abstract static class AbstractArrowDictEncodedWriteData<T, K> implements DictEncodedWriteData<K>, ArrowWriteData {
 
         protected final ArrowStructWriteData m_delegate;
 
-        protected final ConcurrentHashMap<T, Long> m_dict = new ConcurrentHashMap<>();
+        protected final ConcurrentHashMap<T, K> m_dict = new ConcurrentHashMap<>();
 
-        private DictKeyGenerator m_keyGenerator = null;
+        private DictKeyGenerator<K> m_keyGenerator = null;
+
+        protected final KeyType m_keyType;
 
         protected int m_offset = 0;
 
-        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate) {
+        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType) {
             m_delegate = delegate;
+            m_keyType = keyType;
         }
 
-        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final int offset) {
+        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType, final int offset) {
             m_delegate = delegate;
             m_offset = offset;
+            m_keyType = keyType;
         }
 
         @Override
@@ -129,12 +149,21 @@ public final class AbstractArrowDictEncodedData {
         }
 
         @Override
-        public void setDictKey(final int dataIndex, final long dictEntryIndex) {
-            ((LongWriteData)m_delegate.getWriteDataAt(DICT_KEY_DATA_INDEX)).setLong(dataIndex + m_offset, dictEntryIndex);
+        public void setDictKey(final int dataIndex, final K dictEntryIndex) {
+            final int idx = dataIndex + m_offset;
+            final var data = m_delegate.getWriteDataAt(DICT_KEY_DATA_INDEX);
+
+            if (m_keyType == KeyType.BYTE_KEY) {
+                ((ByteWriteData)data).setByte(idx, (Byte)dictEntryIndex);
+            } else if (m_keyType == KeyType.INT_KEY) {
+                ((IntWriteData)data).setInt(idx, (Integer)dictEntryIndex);
+            } else {
+                ((LongWriteData)data).setLong(idx, (Long)dictEntryIndex);
+            }
         }
 
         @Override
-        public void setKeyGenerator(final DictKeyGenerator keyGenerator) {
+        public void setKeyGenerator(final DictKeyGenerator<K> keyGenerator) {
             if (m_keyGenerator != null) {
                 throw new IllegalStateException(
                     "The DictKeyGenerator was already configured before, cannot be set again");
@@ -143,18 +172,18 @@ public final class AbstractArrowDictEncodedData {
             m_keyGenerator = keyGenerator;
         }
 
-        protected long generateKey(final T value) {
+        protected K generateKey(final T value) {
             if (m_keyGenerator == null) {
-                m_keyGenerator = new AscendingKeyGenerator();
+                m_keyGenerator = DictKeys.createAscendingKeyGenerator(m_keyType);
             }
 
             return m_keyGenerator.generateKey(value);
         }
     }
 
-    abstract static class AbstractArrowDictEncodedReadData<T> implements DictEncodedReadData, ArrowReadData {
+    abstract static class AbstractArrowDictEncodedReadData<T, K> implements DictEncodedReadData<K>, ArrowReadData {
 
-        protected final ConcurrentHashMap<Long, T> m_dict = new ConcurrentHashMap<>();
+        protected final ConcurrentHashMap<K, T> m_dict = new ConcurrentHashMap<>();
 
         /**
          * A vector of the length of this data, containing the index inside this data where we can look up the value of
@@ -172,17 +201,22 @@ public final class AbstractArrowDictEncodedData {
 
         private final int m_length;
 
-        AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate) {
+        protected final KeyType m_keyType;
+
+        AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate, final KeyType keyType) {
             m_delegate = delegate;
             m_length = m_delegate.length();
+            m_keyType = keyType;
             m_dictValueLookupTable = constructDictKeyIndexMap();
         }
 
-        AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate, final int[] dictValueLut, final int offset, final int length) {
+        AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate, final KeyType keyType, final int[] dictValueLut,
+            final int offset, final int length) {
             m_delegate = delegate;
             m_dictValueLookupTable = dictValueLut;
             m_offset = offset;
             m_length = length;
+            m_keyType = keyType;
         }
 
         @Override
@@ -216,23 +250,88 @@ public final class AbstractArrowDictEncodedData {
                 + ", dictionaryEntries=" + m_delegate.getReadDataAt(DICT_ENTRY_DATA_INDEX).toString() + "]";
         }
 
+        @SuppressWarnings("unchecked")
         @Override
-        public long getDictKey(final int dataIndex) {
-            return ((LongReadData)m_delegate.getReadDataAt(DICT_KEY_DATA_INDEX)).getLong(dataIndex + m_offset);
+        public K getDictKey(final int dataIndex) {
+            final int idx = dataIndex + m_offset;
+            final var data = m_delegate.getReadDataAt(DICT_KEY_DATA_INDEX);
+
+            if (m_keyType == KeyType.BYTE_KEY) {
+                return (K)Byte.valueOf(((ByteReadData)data).getByte(idx));
+            } else if (m_keyType == KeyType.INT_KEY) {
+                return (K)Integer.valueOf(((IntReadData)data).getInt(idx));
+            } else {
+                return (K)Long.valueOf(((LongReadData)data).getLong(idx));
+            }
         }
 
         private int[] constructDictKeyIndexMap() {
             var references = new int[m_delegate.length()];
-            var map = new HashMap<Long, Integer>();
+            var map = new HashMap<K, Integer>();
             for (int i = 0; i < length(); i++) {
                 if (isMissing(i)) {
                     continue;
                 }
-                long key = getDictKey(i);
+                K key = getDictKey(i);
                 final int index = i;
                 references[i] = map.computeIfAbsent(key, k -> index);
             }
             return references;
+        }
+    }
+
+    /**
+     * Base implementation for dict encoded {@link ArrowColumnDataFactory}.
+     *
+     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     */
+    abstract static class AbstractArrowDictEncodedDataFactory implements ArrowColumnDataFactory {
+
+        protected final ArrowStructDataFactory m_delegate;
+
+        protected final KeyType m_keyType;
+
+        private final int m_version;
+
+        protected AbstractArrowDictEncodedDataFactory(final KeyType keyType, final ArrowColumnDataFactory valueFactory,
+            final int version) {
+            m_keyType = keyType;
+            m_delegate = new ArrowStructDataFactory(createKeyDataFactory(), valueFactory);
+            m_version = version;
+        }
+
+        @Override
+        public ArrowColumnDataFactoryVersion getVersion() {
+            return ArrowColumnDataFactoryVersion.version(m_version, m_delegate.m_version);
+        }
+
+        @Override
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            return m_delegate.getField(name, dictionaryIdSupplier);
+        }
+
+        @SuppressWarnings("rawtypes")
+        @Override
+        public FieldVector getVector(final NullableReadData data) {
+            return m_delegate.getVector(((AbstractArrowDictEncodedReadData)data).m_delegate);
+        }
+
+        @SuppressWarnings("rawtypes")
+        @Override
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
+            return m_delegate.getDictionaries(((AbstractArrowDictEncodedReadData)data).m_delegate);
+        }
+
+        private ArrowColumnDataFactory createKeyDataFactory() {
+            if (m_keyType == KeyType.BYTE_KEY) {
+                return ArrowByteDataFactory.INSTANCE;
+            } else if (m_keyType == KeyType.INT_KEY) {
+                return ArrowIntDataFactory.INSTANCE;
+            } else if (m_keyType == KeyType.LONG_KEY) {
+                return ArrowLongDataFactory.INSTANCE;
+            }
+
+            throw new IllegalArgumentException("Unsupported key type " + m_keyType);
         }
     }
 }

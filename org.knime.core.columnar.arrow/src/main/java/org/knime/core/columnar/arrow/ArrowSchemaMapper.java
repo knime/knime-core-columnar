@@ -191,7 +191,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return ArrowDictEncodedVarBinaryDataFactory.INSTANCE;
+            return ArrowDictEncodedVarBinaryDataFactory.factoryForKeyType(DictEncodingTrait.keyType(traits));
         }
         return ArrowVarBinaryDataFactory.INSTANCE;
     }
@@ -226,7 +226,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return ArrowDictEncodedStringDataFactory.INSTANCE;
+            return ArrowDictEncodedStringDataFactory.factoryForKeyType(DictEncodingTrait.keyType(traits));
         }
         return ArrowStringDataFactory.INSTANCE;
     }

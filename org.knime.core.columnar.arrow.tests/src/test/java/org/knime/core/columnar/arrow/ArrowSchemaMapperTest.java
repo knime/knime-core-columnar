@@ -81,6 +81,7 @@ import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
 import org.knime.core.table.schema.traits.DefaultListDataTraits;
@@ -181,13 +182,57 @@ public class ArrowSchemaMapperTest {
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
     @Test
     public void testMapDictEncodedStringDataSpec() {
-        testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING)), ArrowDictEncodedStringDataFactory.INSTANCE);
+        testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING)),
+            ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.LONG_KEY));
+    }
+
+    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
+    @Test
+    public void testMapDictEncodedStringDataSpec_ByteKey() {
+        testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.BYTE_KEY))),
+            ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.BYTE_KEY));
+    }
+
+    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
+    @Test
+    public void testMapDictEncodedStringDataSpec_IntKey() {
+        testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.INT_KEY))),
+            ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.INT_KEY));
+    }
+
+    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
+    @Test
+    public void testMapDictEncodedStringDataSpec_LongKey() {
+        testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.LONG_KEY))),
+            ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.LONG_KEY));
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec() {
-        testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING)), ArrowDictEncodedVarBinaryDataFactory.INSTANCE);
+        testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING)),
+            ArrowDictEncodedVarBinaryDataFactory.factoryForKeyType(KeyType.LONG_KEY));
+    }
+
+    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
+    @Test
+    public void testMapDictEncodedVarBinaryDataSpec_ByteKey() {
+        testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.BYTE_KEY))),
+            ArrowDictEncodedVarBinaryDataFactory.factoryForKeyType(KeyType.BYTE_KEY));
+    }
+
+    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
+    @Test
+    public void testMapDictEncodedVarBinaryDataSpec_IntKey() {
+        testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.INT_KEY))),
+            ArrowDictEncodedVarBinaryDataFactory.factoryForKeyType(KeyType.INT_KEY));
+    }
+
+    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
+    @Test
+    public void testMapDictEncodedVarBinaryDataSpec_LongKey() {
+        testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.LONG_KEY))),
+            ArrowDictEncodedVarBinaryDataFactory.factoryForKeyType(KeyType.LONG_KEY));
     }
 
     /** Test mapping String specs to a {@link ArrowStringDataFactory} */

@@ -70,6 +70,7 @@ import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 import com.google.common.base.Utf8;
 
@@ -78,7 +79,7 @@ import com.google.common.base.Utf8;
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowDictEncodedStringWriteData, ArrowDictEncodedStringReadData> {
+public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowDictEncodedStringWriteData<Long>, ArrowDictEncodedStringReadData<Long>> {
 
     private static final int MAX_LENGTH = 100;
 
@@ -88,7 +89,7 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
 
     /** Create the test for {@link ArrowDictEncodedStringData} */
     public ArrowDictEncodedStringDataTest() {
-        super(ArrowDictEncodedStringDataFactory.INSTANCE);
+        super(ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.LONG_KEY));
     }
 
     @Override
@@ -209,7 +210,7 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
             if (i < sliceStart + sliceLength) {
                 assertFalse(readData.isMissing(i));
                 assertEquals(testString, readData.getString(i));
-                assertEquals(0, readData.getDictKey(i));
+                assertEquals(Long.MIN_VALUE, readData.getDictKey(i));
             } else {
                 assertTrue(readData.isMissing(i));
             }

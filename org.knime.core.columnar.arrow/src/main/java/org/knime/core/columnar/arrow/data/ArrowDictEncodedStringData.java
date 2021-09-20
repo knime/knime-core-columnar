@@ -54,21 +54,19 @@ import java.util.function.LongSupplier;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedDataFactory;
 import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedReadData;
 import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedWriteData;
-import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
-import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 /**
  * Dictionary encoded string data implementation using Arrow as back end.
@@ -82,22 +80,25 @@ public final class ArrowDictEncodedStringData {
     /**
      * Arrow implementation of {@link DictEncodedStringWriteData};
      *
+     * @param <K> key type instance, should be Byte, Long or Integer
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static final class ArrowDictEncodedStringWriteData extends AbstractArrowDictEncodedWriteData<String>
-        implements DictEncodedStringWriteData {
+    public static final class ArrowDictEncodedStringWriteData<K> extends AbstractArrowDictEncodedWriteData<String, K>
+        implements DictEncodedStringWriteData<K> {
 
-        private ArrowDictEncodedStringWriteData(final ArrowStructWriteData delegate) {
-            super(delegate);
+        private ArrowDictEncodedStringWriteData(final ArrowStructWriteData delegate, final KeyType keyType) {
+            super(delegate, keyType);
         }
 
-        private ArrowDictEncodedStringWriteData(final ArrowStructWriteData delegate, final int offset) {
-            super(delegate, offset);
+        private ArrowDictEncodedStringWriteData(final ArrowStructWriteData delegate, final KeyType keyType,
+            final int offset) {
+            super(delegate, keyType, offset);
         }
 
         @Override
         public void setString(final int index, final String val) {
-            long dictKey = m_dict.computeIfAbsent(val, v -> {
+            K dictKey = m_dict.computeIfAbsent(val, v -> {
                 ((StringWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .setString(index + m_offset, val);
                 return generateKey(val);
@@ -107,42 +108,46 @@ public final class ArrowDictEncodedStringData {
         }
 
         @Override
-        public ArrowDictEncodedStringWriteData slice(final int start) {
-            return new ArrowDictEncodedStringWriteData(m_delegate, start + m_offset);
+        public ArrowDictEncodedStringWriteData<K> slice(final int start) {
+            return new ArrowDictEncodedStringWriteData<>(m_delegate, m_keyType, start + m_offset);
         }
 
         @Override
-        public ArrowDictEncodedStringReadData close(final int length) {
-            return new ArrowDictEncodedStringReadData(m_delegate.close(length));
+        public ArrowDictEncodedStringReadData<K> close(final int length) {
+            return new ArrowDictEncodedStringReadData<>(m_delegate.close(length), m_keyType);
         }
     }
 
     /**
      * Arrow implementation of {@link DictEncodedStringReadData};
      *
+     * @param <K> key type instance, should be Byte, Long or Integer
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static final class ArrowDictEncodedStringReadData extends AbstractArrowDictEncodedReadData<String>
-        implements DictEncodedStringReadData {
-        private ArrowDictEncodedStringReadData(final ArrowStructReadData delegate) {
-            super(delegate);
+    public static final class ArrowDictEncodedStringReadData<K> extends AbstractArrowDictEncodedReadData<String, K>
+        implements DictEncodedStringReadData<K> {
+        private ArrowDictEncodedStringReadData(final ArrowStructReadData delegate, final KeyType keyType) {
+            super(delegate, keyType);
         }
 
-        private ArrowDictEncodedStringReadData(final ArrowStructReadData delegate, final int[] dictValueLut, final int offset, final int length) {
-            super(delegate, dictValueLut, offset, length);
+        private ArrowDictEncodedStringReadData(final ArrowStructReadData delegate, final KeyType keyType,
+            final int[] dictValueLut, final int offset, final int length) {
+            super(delegate, keyType, dictValueLut, offset, length);
         }
 
         @Override
         public String getString(final int index) {
-            final long dictIndex = getDictKey(index);
+            final K dictIndex = getDictKey(index);
             return m_dict.computeIfAbsent(dictIndex,
                 i -> ((StringReadData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .getString(m_dictValueLookupTable[index + m_offset]));
         }
 
         @Override
-        public ArrowDictEncodedStringReadData slice(final int start, final int length) {
-            return new ArrowDictEncodedStringReadData(m_delegate, m_dictValueLookupTable, start + m_offset, length);
+        public ArrowDictEncodedStringReadData<K> slice(final int start, final int length) {
+            return new ArrowDictEncodedStringReadData<>(m_delegate, m_keyType, m_dictValueLookupTable, start + m_offset,
+                length);
         }
     }
 
@@ -151,53 +156,55 @@ public final class ArrowDictEncodedStringData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static final class ArrowDictEncodedStringDataFactory implements ArrowColumnDataFactory {
+    public static final class ArrowDictEncodedStringDataFactory extends AbstractArrowDictEncodedDataFactory {
 
         private static final int CURRENT_VERSION = 0;
 
+        private static final ArrowDictEncodedStringDataFactory BYTE_INSTANCE =
+            new ArrowDictEncodedStringDataFactory(KeyType.BYTE_KEY);
+
+        private static final ArrowDictEncodedStringDataFactory INT_INSTANCE =
+            new ArrowDictEncodedStringDataFactory(KeyType.INT_KEY);
+
+        private static final ArrowDictEncodedStringDataFactory LONG_INSTANCE =
+            new ArrowDictEncodedStringDataFactory(KeyType.LONG_KEY);
+
         /**
-         * the single instance of a {@link ArrowDictEncodedStringDataFactory}.
+         * Get the single instance of a {@link ArrowDictEncodedStringDataFactory} for the given {@link KeyType}
+         *
+         * @param keyType The {@link KeyType} to use for the dictionary
+         * @return The factory instance for the provided key type
          */
-        public static final ArrowDictEncodedStringDataFactory INSTANCE = new ArrowDictEncodedStringDataFactory();
-
-        private final ArrowStructDataFactory m_delegate;
-
-        private ArrowDictEncodedStringDataFactory() {
-            m_delegate = new ArrowStructDataFactory(ArrowLongDataFactory.INSTANCE, ArrowStringDataFactory.INSTANCE);
+        public static ArrowDictEncodedStringDataFactory factoryForKeyType(final KeyType keyType) {
+            if (keyType == KeyType.BYTE_KEY) {
+                return BYTE_INSTANCE;
+            } else if (keyType == KeyType.INT_KEY) {
+                return INT_INSTANCE;
+            } else if (keyType == KeyType.LONG_KEY) {
+                return LONG_INSTANCE;
+            } else {
+                throw new IllegalArgumentException("Invalid key type " + keyType);
+            }
         }
 
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, m_delegate.m_version);
-        }
-
-        @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return m_delegate.getField(name, dictionaryIdSupplier);
+        private ArrowDictEncodedStringDataFactory(final KeyType keyType) {
+            super(keyType, ArrowStringDataFactory.INSTANCE, CURRENT_VERSION);
         }
 
         @Override
         public ArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            return new ArrowDictEncodedStringWriteData(
-                m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity));
+            return new ArrowDictEncodedStringWriteData<>(
+                m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity),
+                m_keyType);
         }
 
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            return new ArrowDictEncodedStringReadData(
-                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)));
-        }
-
-        @Override
-        public FieldVector getVector(final NullableReadData data) {
-            return m_delegate.getVector(((ArrowDictEncodedStringReadData)data).m_delegate);
-        }
-
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return m_delegate.getDictionaries(((ArrowDictEncodedStringReadData)data).m_delegate);
+            return new ArrowDictEncodedStringReadData<>(
+                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)),
+                m_keyType);
         }
     }
 }

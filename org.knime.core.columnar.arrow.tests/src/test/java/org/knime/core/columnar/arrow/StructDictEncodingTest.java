@@ -58,6 +58,7 @@ import org.junit.Test;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 @SuppressWarnings("javadoc")
 public class StructDictEncodingTest {
@@ -77,9 +78,10 @@ public class StructDictEncodingTest {
     @Test
     public void testSimpleDictCreation() {
         final int numRows = 10;
-        final var factory = ArrowDictEncodedStringDataFactory.INSTANCE;
+        final var factory = ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.LONG_KEY);
+        @SuppressWarnings("unchecked")
         final var data =
-            (ArrowDictEncodedStringWriteData)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
+            (ArrowDictEncodedStringWriteData<Long>)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
 
         data.setString(0, "foo");
         // [<0, "foo">]
@@ -89,10 +91,10 @@ public class StructDictEncodingTest {
 
         data.setString(2, "foo");
         // [<0, "foo">, <1, "bar">, <0, null>]
-        ArrowDictEncodedStringReadData dataR = data.close(3);
-        assertEquals(0, dataR.getDictKey(0));
-        assertEquals(1, dataR.getDictKey(1));
-        assertEquals(0, dataR.getDictKey(2));
+        ArrowDictEncodedStringReadData<Long> dataR = data.close(3);
+        assertEquals(0, (long)dataR.getDictKey(0));
+        assertEquals(1, (long)dataR.getDictKey(1));
+        assertEquals(0, (long)dataR.getDictKey(2));
 
         assertEquals("foo", dataR.getString(0));
         assertEquals("bar", dataR.getString(1));
@@ -103,18 +105,45 @@ public class StructDictEncodingTest {
     @Test
     public void testRandomAccessRead() {
         final int numRows = 10;
-        final var factory = ArrowDictEncodedStringDataFactory.INSTANCE;
+        final var factory = ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.BYTE_KEY);
+        @SuppressWarnings("unchecked")
         final var data =
-            (ArrowDictEncodedStringWriteData)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
+            (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
 
         data.setString(0, "foo");
         data.setString(1, "bar");
         data.setString(2, "foo");
 
-        ArrowDictEncodedStringReadData dataR = data.close(3);
+        ArrowDictEncodedStringReadData<Byte> dataR = data.close(3);
         assertEquals("foo", dataR.getString(2)); // we need to look up the value stored at index 0 for this!
         assertEquals("foo", dataR.getString(0));
         assertEquals("bar", dataR.getString(1));
         dataR.release();
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testKeyOverflow(){
+        final int numRows = Byte.MAX_VALUE * 3;
+        final var factory = ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.BYTE_KEY);
+        @SuppressWarnings("unchecked")
+        final var data =
+            (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
+
+        int lastWrittenIndex = 0;
+
+        try {
+            for (int r = 0; r < numRows; r++) {
+                data.setString(r, String.valueOf(r));
+                lastWrittenIndex++;
+            }
+        } finally {
+            ArrowDictEncodedStringReadData<Byte> dataR = data.close(lastWrittenIndex);
+
+            for (int r = 0; r < Byte.MAX_VALUE; r++) {
+                assertEquals(String.valueOf(r), dataR.getString(r));
+            }
+
+            dataR.release();
+        }
     }
 }
