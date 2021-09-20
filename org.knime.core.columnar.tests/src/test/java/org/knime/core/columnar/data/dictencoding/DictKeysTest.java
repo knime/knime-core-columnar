@@ -44,47 +44,60 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jul 6, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
+ *   Sep 21, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.testing;
+package org.knime.core.columnar.data.dictencoding;
 
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
-import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadable;
-import org.knime.core.columnar.testing.data.TestData;
+import org.junit.Ignore;
+import org.junit.Test;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
-/**
- *
- * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
- */
 @SuppressWarnings("javadoc")
-public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable<TestBatchStore> implements TestBatchStore {
+public class DictKeysTest {
 
-    private final TestBatchStore m_testDelegate;
+    @Test
+    public void testByteKeyGenerator() {
+        final var keyGen = DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY);
+        assertTrue(keyGen.generateKey(null) instanceof Byte);
+        assertEquals(Byte.valueOf((byte)1), keyGen.generateKey(null));
 
-    public TestDictEncodedBatchStore(final TestBatchStore delegate) {
-        super(delegate);
-        m_testDelegate = delegate;
+        final int numValues = 253;
+        for (int i = 0; i < numValues; i++) {
+            keyGen.generateKey(null);
+        }
+
+        assertEquals(Byte.valueOf((byte)-1), keyGen.generateKey(null));
+        assertThrows(IllegalStateException.class, () -> {keyGen.generateKey(null);});
     }
 
-    @Override
-    public void blockOnCreateWriteRead(final CountDownLatch latch) {
-        m_testDelegate.blockOnCreateWriteRead(latch);
+    @Test
+    public void testIntKeyGenerator() {
+        final var keyGen = DictKeys.createAscendingKeyGenerator(KeyType.INT_KEY);
+        assertTrue(keyGen.generateKey(null) instanceof Integer);
+        assertEquals(Integer.valueOf(1), keyGen.generateKey(null));
     }
 
-    @Override
-    public List<TestData> getData() {
-        return m_testDelegate.getData();
+    @Test
+    @Ignore("This test runs for ~5sec to enumerate all ints")
+    public void testIntKeyGeneratorOutOfKeys() {
+        final var keyGen = DictKeys.createAscendingKeyGenerator(KeyType.INT_KEY);
+
+        final long numValues = (long)Integer.MAX_VALUE - (long)Integer.MIN_VALUE + 1;
+        for (long i = 0; i < numValues; i++) {
+            keyGen.generateKey(null);
+        }
+
+        assertThrows(IllegalStateException.class, () -> {keyGen.generateKey(null);});
     }
 
-    @Override
-    public int numBatches() {
-        return m_testDelegate.numBatches();
-    }
-
-    @Override
-    public int batchLength() {
-        return m_testDelegate.batchLength();
+    @Test
+    public void testLongKeyGenerator() {
+        final var keyGen = DictKeys.createAscendingKeyGenerator(KeyType.LONG_KEY);
+        assertTrue(keyGen.generateKey(null) instanceof Long);
+        assertEquals(Long.valueOf(1), keyGen.generateKey(null));
     }
 }

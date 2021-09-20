@@ -49,7 +49,6 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.batch.Batch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -57,6 +56,7 @@ import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 
 /**
  * Interfaces for dictionary encoded read and write data.
@@ -68,57 +68,22 @@ public final class DictEncodedData {
     }
 
     /**
-     * Class that generates a new dictionary key for a value that was never seen before in the {@link WriteData} of this
-     * batch, but possibly in previous batches.
-     *
-     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
-     */
-    public static interface DictKeyGenerator {
-
-        /**
-         * Generate a new key for a given value. Should only be called if the value has never been seen before in the
-         * current {@link WriteData}.
-         *
-         * The generated keys should start at zero and provide ascending keys for newly seen values. If the value was
-         * seen in a previous {@link Batch}, the key of the previous batch should be returned.
-         *
-         * @param <T> Type of the value
-         * @param value The value for which to generate the new key
-         * @return newly generated key
-         */
-        <T> long generateKey(final T value);
-    }
-
-    /**
-     * Simple key generator that returns ascending integers on each call to
-     * {@link DictKeyGenerator#generateKey(Object)}.
-     *
-     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
-     */
-    public static final class AscendingKeyGenerator implements DictKeyGenerator {
-        private long m_nextDictIndex = 0;
-
-        @Override
-        public <T> long generateKey(final T value) {
-            return m_nextDictIndex++;
-        }
-    }
-
-    /**
      * Dictionary encoded {@link NullableReadData} that can provide the dictionary key stored at each index inside the
      * data.
      *
+     * @param <K> key type, should be Byte, Long or Integer
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static interface DictEncodedReadData extends NullableReadData {
+    public static interface DictEncodedReadData<K> extends NullableReadData {
 
         /**
          * Return the key of the dictionary element at the given data index
          *
          * @param dataIndex the index of the element inside this {@link NullableReadData} vector
-         * @return the key of the dictionary element
+         * @return the key of the dictionary element, never null
          */
-        long getDictKey(final int dataIndex);
+        K getDictKey(final int dataIndex);
     }
 
     /**
@@ -129,9 +94,11 @@ public final class DictEncodedData {
      * Additionally, a user defined {@link DictKeyGenerator} can be provided which is queried whenever a new value is
      * seen. By default, zero-based ascending long integers are used as keys.
      *
+     * @param <K> key type, should be Byte, Long or Integer
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static interface DictEncodedWriteData extends NullableWriteData {
+    public static interface DictEncodedWriteData<K> extends NullableWriteData {
 
         /**
          * Set the key of the dictionary element that is referenced at the given data index
@@ -140,7 +107,7 @@ public final class DictEncodedData {
          *            referenced
          * @param dictKey The key of the dictionary entry
          */
-        void setDictKey(final int dataIndex, final long dictKey);
+        void setDictKey(final int dataIndex, final K dictKey);
 
         /**
          * Set a user defined key generator to influence which dictionary key is used when a new value is encountered
@@ -152,34 +119,42 @@ public final class DictEncodedData {
          *
          * @param keyGenerator The key generator will be invoked for each value that has not been seen before.
          */
-        void setKeyGenerator(final DictKeyGenerator keyGenerator);
+        void setKeyGenerator(final DictKeyGenerator<K> keyGenerator);
     }
 
     // ------------------------------------------------------------------------------
     /**
      * Interface specialization for dictionary encoded {@link StringReadData}
+     *
+     * @param <K> key type, should be Byte, Long or Integer
      */
-    public static interface DictEncodedStringReadData extends DictEncodedReadData, StringReadData {
+    public static interface DictEncodedStringReadData<K> extends DictEncodedReadData<K>, StringReadData {
 
     }
 
     /**
      * Interface specialization for dictionary encoded {@link StringWriteData}
+     *
+     * @param <K> key type, should be Byte, Long or Integer
      */
-    public static interface DictEncodedStringWriteData extends DictEncodedWriteData, StringWriteData {
+    public static interface DictEncodedStringWriteData<K> extends DictEncodedWriteData<K>, StringWriteData {
 
     }
 
     // ------------------------------------------------------------------------------
     /**
      * Interface specialization for dictionary encoded {@link VarBinaryReadData}
+     *
+     * @param <K> key type, should be Byte, Long or Integer
      */
-    public static interface DictEncodedVarBinaryReadData extends DictEncodedReadData, VarBinaryReadData {
+    public static interface DictEncodedVarBinaryReadData<K> extends DictEncodedReadData<K>, VarBinaryReadData {
     }
 
     /**
      * Interface specialization for dictionary encoded {@link VarBinaryWriteData}
+     *
+     * @param <K> key type, should be Byte, Long or Integer
      */
-    public static interface DictEncodedVarBinaryWriteData extends DictEncodedWriteData, VarBinaryWriteData {
+    public static interface DictEncodedVarBinaryWriteData<K> extends DictEncodedWriteData<K>, VarBinaryWriteData {
     }
 }

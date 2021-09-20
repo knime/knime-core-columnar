@@ -122,9 +122,12 @@ import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.ListDataSpec;
+import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
 import org.knime.core.table.schema.traits.DefaultListDataTraits;
@@ -173,8 +176,8 @@ public final class TestBatchStoreUtils {
 
     public static final int DEF_BATCH_LENGTH = 2;
 
-    // Because Struct Dict Encoded data takes up two columns each, once for String and once for VarBinary
-    public static final int DEF_NUM_ADDITIONAL_COLUMNS = 2;
+    // Because Struct Dict Encoded data takes up two columns each, once for String and once for VarBinary, for Byte, Int and Long keys
+    public static final int DEF_NUM_ADDITIONAL_COLUMNS = 6;
 
     public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * DEF_NUM_COLUMNS * DEF_BATCH_LENGTH;
 
@@ -473,24 +476,98 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 DataTraits getTraits() {
-                    return new DefaultDataTraits(new DictEncodingTrait(true));
+                    return new DefaultDataTraits(new DictEncodingTrait()); // long key by default
                 }
 
                 @Override
                 NullableWriteData setData(final NullableWriteData data, final int index) {
                     if (!(data instanceof DictDecodedStringWriteData)) {
-                        throw new UnsupportedOperationException("This batch store does not support DictEncoding");
+                        throw new UnsupportedOperationException(
+                            "Can only set values for DictDecodedStringWriteData, not " + data.getClass().getName());
                     }
 
                     final StringWriteData objectData = ((StringWriteData)data);
                     objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
-                    return ((DictDecodedStringWriteData)data).getDelegate();
+                    return getStringDelegate(data);
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     if (!(readData instanceof DictDecodedStringReadData)) {
-                        throw new UnsupportedOperationException("This batch store does not support DictEncoding");
+                        throw new UnsupportedOperationException(
+                            "Can only check values of DictDecodedStringReadData, not " + readData.getClass().getName());
+                    }
+
+                    final StringReadData refObjectData = (StringReadData)refData;
+                    final StringReadData readObjectData = (StringReadData)readData;
+                    assertEquals(refObjectData.getString(index), readObjectData.getString(index));
+                }
+            },
+
+            DICTENCODEDSTRING_INTKEY {
+                @Override
+                DataSpec getSpec() {
+                    return DataSpec.stringSpec();
+                }
+
+                @Override
+                DataTraits getTraits() {
+                    return new DefaultDataTraits(new DictEncodingTrait(KeyType.INT_KEY));
+                }
+
+                @Override
+                NullableWriteData setData(final NullableWriteData data, final int index) {
+                    if (!(data instanceof DictDecodedStringWriteData)) {
+                        throw new UnsupportedOperationException(
+                            "Can only set values for DictDecodedStringWriteData, not " + data.getClass().getName());
+                    }
+
+                    final StringWriteData objectData = ((StringWriteData)data);
+                    objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
+                    return getStringDelegate(data);
+                }
+
+                @Override
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    if (!(readData instanceof DictDecodedStringReadData)) {
+                        throw new UnsupportedOperationException(
+                            "Can only check values of DictDecodedStringReadData, not " + readData.getClass().getName());
+                    }
+
+                    final StringReadData refObjectData = (StringReadData)refData;
+                    final StringReadData readObjectData = (StringReadData)readData;
+                    assertEquals(refObjectData.getString(index), readObjectData.getString(index));
+                }
+            },
+
+            DICTENCODEDSTRING_BYTEKEY {
+                @Override
+                DataSpec getSpec() {
+                    return DataSpec.stringSpec();
+                }
+
+                @Override
+                DataTraits getTraits() {
+                    return new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY));
+                }
+
+                @Override
+                NullableWriteData setData(final NullableWriteData data, final int index) {
+                    if (!(data instanceof DictDecodedStringWriteData)) {
+                        throw new UnsupportedOperationException(
+                            "Can only set values for DictDecodedStringWriteData, not " + data.getClass().getName());
+                    }
+
+                    final StringWriteData objectData = ((StringWriteData)data);
+                    objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
+                    return getStringDelegate(data);
+                }
+
+                @Override
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    if (!(readData instanceof DictDecodedStringReadData)) {
+                        throw new UnsupportedOperationException(
+                            "Can only check values of DictDecodedStringReadData, not " + readData.getClass().getName());
                     }
 
                     final StringReadData refObjectData = (StringReadData)refData;
@@ -552,22 +629,93 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 DataTraits getTraits() {
-                    return new DefaultDataTraits(new DictEncodingTrait(true));
+                    return new DefaultDataTraits(new DictEncodingTrait()); // long key by default
                 }
 
                 @Override
                 NullableWriteData setData(final NullableWriteData data, final int index) {
                     if (!(data instanceof DictDecodedVarBinaryWriteData)) {
-                        throw new UnsupportedOperationException("This batch store does not support DictEncoding");
+                        throw new UnsupportedOperationException(
+                            "Can only set values for DictDecodedVarBinaryWriteData, not " + data.getClass().getName());
                     }
+
                     ((VarBinaryWriteData)data).setBytes(index, new byte[]{(byte)runningInt++}); // NOSONAR
-                    return ((DictDecodedVarBinaryWriteData)data).getDelegate();
+                    return getVarBinaryDelegate(data);
                 }
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     if (!(readData instanceof DictDecodedVarBinaryReadData)) {
-                        throw new UnsupportedOperationException("This batch store does not support DictEncoding");
+                        throw new UnsupportedOperationException(
+                            "Can only check values of DictDecodedVarBinaryReadData, not " + readData.getClass().getName());
+                    }
+
+                    assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
+                        ((VarBinaryReadData)readData).getBytes(index));
+                }
+            },
+
+            DICTENCODEDVARBINARY_INTKEY {
+                @Override
+                DataSpec getSpec() {
+                    return DataSpec.varBinarySpec();
+                }
+
+                @Override
+                DataTraits getTraits() {
+                    return new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY));
+                }
+
+                @Override
+                NullableWriteData setData(final NullableWriteData data, final int index) {
+                    if (!(data instanceof DictDecodedVarBinaryWriteData)) {
+                        throw new UnsupportedOperationException(
+                            "Can only set values for DictDecodedVarBinaryWriteData, not " + data.getClass().getName());
+                    }
+
+                    ((VarBinaryWriteData)data).setBytes(index, new byte[]{(byte)runningInt++}); // NOSONAR
+                    return getVarBinaryDelegate(data);
+                }
+
+                @Override
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    if (!(readData instanceof DictDecodedVarBinaryReadData)) {
+                        throw new UnsupportedOperationException(
+                            "Can only check values of DictDecodedVarBinaryReadData, not " + readData.getClass().getName());
+                    }
+
+                    assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
+                        ((VarBinaryReadData)readData).getBytes(index));
+                }
+            },
+
+            DICTENCODEDVARBINARY_BYTEKEY {
+                @Override
+                DataSpec getSpec() {
+                    return DataSpec.varBinarySpec();
+                }
+
+                @Override
+                DataTraits getTraits() {
+                    return new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY));
+                }
+
+                @Override
+                NullableWriteData setData(final NullableWriteData data, final int index) {
+                    if (!(data instanceof DictDecodedVarBinaryWriteData)) {
+                        throw new UnsupportedOperationException(
+                            "Can only set values for DictDecodedVarBinaryWriteData, not " + data.getClass().getName());
+                    }
+
+                    ((VarBinaryWriteData)data).setBytes(index, new byte[]{(byte)runningInt++}); // NOSONAR
+                    return getVarBinaryDelegate(data);
+                }
+
+                @Override
+                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
+                    if (!(readData instanceof DictDecodedVarBinaryReadData)) {
+                        throw new UnsupportedOperationException(
+                            "Can only check values of DictDecodedVarBinaryReadData, not " + readData.getClass().getName());
                     }
 
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
@@ -691,13 +839,50 @@ public final class TestBatchStoreUtils {
         return refs;
     }
 
-    public static NullableReadData[] wrapDictEncodedData(final NullableReadData[] data, final DictElementCache cache) {
+    @SuppressWarnings("unchecked")
+    private static <K> NullableWriteData getStringDelegate(final NullableWriteData data) {
+        return ((DictDecodedStringWriteData<K>)data).getDelegate();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableWriteData getVarBinaryDelegate(final NullableWriteData data) {
+        return ((DictDecodedVarBinaryWriteData<K>)data).getDelegate();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableReadData getStringDelegate(final NullableReadData data) {
+        return ((DictDecodedStringReadData<K>)data).getDelegate();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableReadData getVarBinaryDelegate(final NullableReadData data) {
+        return ((DictDecodedVarBinaryReadData<K>)data).getDelegate();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableReadData wrapDictEncodedString(final NullableReadData data, final int columnIdx,
+        final KeyType keyType, final DictElementCache cache) {
+        return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)data, cache.get(columnIdx, keyType));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableReadData wrapDictEncodedVarBinary(final NullableReadData data, final int columnIdx,
+        final KeyType keyType, final DictElementCache cache) {
+        return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)data,
+            cache.get(columnIdx, keyType));
+    }
+
+    public static NullableReadData[] wrapDictEncodedData(final NullableReadData[] data, final DictElementCache cache,
+        final ColumnarSchema schema) {
         NullableReadData[] out = new NullableReadData[data.length];
         for (int i = 0; i < out.length; i++) {
-            if (i == Types.DICTENCODEDSTRING.ordinal()) {
-                out[i] = new DictDecodedStringReadData((DictEncodedStringReadData)data[i], cache.get(i));
-            } else if (i == Types.DICTENCODEDVARBINARY.ordinal()) {
-                out[i] = new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data[i], cache.get(i));
+            final boolean isDictEncoded = DictEncodingTrait.isEnabled(schema.getTraits(i));
+            final var keyType = DictEncodingTrait.keyType(schema.getTraits(i));
+            final var spec = schema.getSpec(i);
+            if (isDictEncoded && spec instanceof StringDataSpec) {
+                out[i] = wrapDictEncodedString(data[i], i, keyType, cache);
+            } else if (isDictEncoded && spec instanceof VarBinaryDataSpec) {
+                out[i] = wrapDictEncodedVarBinary(data[i], i, keyType, cache);
             } else {
                 out[i] = data[i];
             }
@@ -718,7 +903,7 @@ public final class TestBatchStoreUtils {
                 final NullableReadData[] readBatch =
                     Arrays.stream(writeBatch).map(d -> d.close(d.capacity())).toArray(NullableReadData[]::new);
                 result.add(readBatch);
-                writer.write(new DefaultReadBatch(wrapDictEncodedData(readBatch, dictElementCache)));
+                writer.write(new DefaultReadBatch(wrapDictEncodedData(readBatch, dictElementCache, store.getSchema())));
             }
         }
         return result;
@@ -729,7 +914,7 @@ public final class TestBatchStoreUtils {
             var dictElementCache = new DictElementCache();
             for (int i = 0; i < table.size(); i++) {
                 final TestData[] batch = table.getBatch(i);
-                writer.write(new DefaultReadBatch(wrapDictEncodedData(batch, dictElementCache)));
+                writer.write(new DefaultReadBatch(wrapDictEncodedData(batch, dictElementCache, store.getSchema())));
             }
         }
     }
@@ -772,9 +957,9 @@ public final class TestBatchStoreUtils {
                 for (int j : loopIndices) { // NOSONAR
                     var d = batch.get(j);
                     if (d instanceof DictDecodedVarBinaryReadData) {
-                        d = ((DictDecodedVarBinaryReadData)d).getDelegate();
+                        d = getVarBinaryDelegate(d);
                     } else if (d instanceof DictDecodedStringReadData) {
-                        d = ((DictDecodedStringReadData)d).getDelegate();
+                        d = getStringDelegate(d);
                     }
                     data[j] = (TestData)d;
                     assertArrayEquals(written[j].get(), data[j].get());

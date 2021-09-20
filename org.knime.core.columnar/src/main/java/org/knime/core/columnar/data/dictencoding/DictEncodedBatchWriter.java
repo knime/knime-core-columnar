@@ -60,6 +60,7 @@ import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -120,21 +121,35 @@ public class DictEncodedBatchWriter implements BatchWriter {
     }
 
     private NullableWriteData wrapDictEncodedData(final int i, final NullableWriteData d) {
-        if (m_schema.getSpec(i) instanceof StringDataSpec && !(d instanceof DictDecodedStringWriteData)) {
+        final var spec = m_schema.getSpec(i);
+        final var traits = m_schema.getTraits(i);
+        final var keyType = DictEncodingTrait.keyType(traits);
+
+        if (spec instanceof StringDataSpec && !(d instanceof DictDecodedStringWriteData)) {
             if (!(d instanceof DictEncodedStringWriteData)) {
                 throw new IllegalArgumentException(
                     "Expected DictEncodedStringWriteData to construct DictDecodedStringWriteData");
             }
-            return new DictDecodedStringWriteData((DictEncodedStringWriteData)d, m_cache.get(i));
-        } else if (m_schema.getSpec(i) instanceof VarBinaryDataSpec && !(d instanceof DictDecodedVarBinaryWriteData)) {
+            return wrapDictEncodedStringData(d, m_cache.get(i, keyType));
+        } else if (spec instanceof VarBinaryDataSpec && !(d instanceof DictDecodedVarBinaryWriteData)) {
             if (!(d instanceof DictEncodedVarBinaryWriteData)) {
                 throw new IllegalArgumentException(
                     "Expected DictEncodedVarBinaryWriteData to construct DictDecodedVarBinaryWriteData");
             }
-            return new DictDecodedVarBinaryWriteData((DictEncodedVarBinaryWriteData)d, m_cache.get(i));
+            return wrapDictEncodedVarBinaryData(d, m_cache.get(i, keyType));
         }
 
         return d;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableWriteData wrapDictEncodedStringData(final NullableWriteData data, final ColumnDictElementCache<K> cache) {
+        return new DictDecodedStringWriteData<K>((DictEncodedStringWriteData<K>)data, cache);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableWriteData wrapDictEncodedVarBinaryData(final NullableWriteData data, final ColumnDictElementCache<K> cache) {
+        return new DictDecodedVarBinaryWriteData<K>((DictEncodedVarBinaryWriteData<K>)data, cache);
     }
 
     @SuppressWarnings("rawtypes")

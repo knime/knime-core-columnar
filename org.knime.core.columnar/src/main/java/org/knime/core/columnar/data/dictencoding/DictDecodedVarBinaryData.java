@@ -72,10 +72,12 @@ public final class DictDecodedVarBinaryData {
      * {@link DictDecodedVarBinaryWriteData} provides table-wide caching and {@link VarBinaryWriteData} access to a
      * wrapped {@link DictEncodedVarBinaryWriteData}.
      *
+     * @param <K> key type, should be Byte, Long or Integer
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryWriteData
-        extends AbstractDictDecodedWriteData<DictEncodedVarBinaryWriteData> implements VarBinaryWriteData {
+    public static class DictDecodedVarBinaryWriteData<K>
+        extends AbstractDictDecodedWriteData<K, DictEncodedVarBinaryWriteData<K>> implements VarBinaryWriteData {
 
         /**
          * Create a {@link DictDecodedVarBinaryWriteData} wrapping a {@link DictDecodedVarBinaryWriteData} provided by a
@@ -85,8 +87,8 @@ public final class DictDecodedVarBinaryData {
          * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries, also used to generate
          *            global dictionary keys
          */
-        public DictDecodedVarBinaryWriteData(final DictEncodedVarBinaryWriteData delegate,
-            final ColumnDictElementCache cache) {
+        public DictDecodedVarBinaryWriteData(final DictEncodedVarBinaryWriteData<K> delegate,
+            final ColumnDictElementCache<K> cache) {
             super(delegate, cache);
         }
 
@@ -100,9 +102,10 @@ public final class DictDecodedVarBinaryData {
             m_delegate.setObject(index, value, serializer);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public VarBinaryReadData close(final int length) {
-            return new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)m_delegate.close(length), m_cache);
+            return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)m_delegate.close(length), m_cache);
         }
     }
 
@@ -110,9 +113,11 @@ public final class DictDecodedVarBinaryData {
      * {@link DictDecodedVarBinaryReadData} provides table-wide caching and {@link VarBinaryReadData} access to a
      * wrapped {@link DictEncodedVarBinaryReadData}.
      *
+     * @param <K> key type, should be Byte, Long or Integer
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryReadData extends AbstractDictDecodedReadData<DictEncodedVarBinaryReadData>
+    public static class DictDecodedVarBinaryReadData<K> extends AbstractDictDecodedReadData<K, DictEncodedVarBinaryReadData<K>>
         implements VarBinaryReadData {
 
         /**
@@ -122,8 +127,8 @@ public final class DictDecodedVarBinaryData {
          * @param delegate The delegate {@link DictEncodedVarBinaryReadData}
          * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
-        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData delegate,
-            final ColumnDictElementCache cache) {
+        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData<K> delegate,
+            final ColumnDictElementCache<K> cache) {
             super(delegate, cache);
         }
 

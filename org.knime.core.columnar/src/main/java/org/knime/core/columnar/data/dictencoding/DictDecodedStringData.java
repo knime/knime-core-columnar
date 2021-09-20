@@ -72,9 +72,11 @@ public final class DictDecodedStringData {
      * {@link DictDecodedStringWriteData} provides table-wide caching and {@link StringWriteData} access to a wrapped
      * {@link DictEncodedStringWriteData}.
      *
+     * @param <K> key type, should be Byte, Long or Integer
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringWriteData extends AbstractDictDecodedWriteData<DictEncodedStringWriteData>
+    public static class DictDecodedStringWriteData<K> extends AbstractDictDecodedWriteData<K, DictEncodedStringWriteData<K>>
         implements StringWriteData {
 
         /**
@@ -85,8 +87,8 @@ public final class DictDecodedStringData {
          * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries, also used to generate
          *            global dictionary keys
          */
-        public DictDecodedStringWriteData(final DictEncodedStringWriteData delegate,
-            final ColumnDictElementCache cache) {
+        public DictDecodedStringWriteData(final DictEncodedStringWriteData<K> delegate,
+            final ColumnDictElementCache<K> cache) {
             super(delegate, cache);
         }
 
@@ -103,9 +105,10 @@ public final class DictDecodedStringData {
             m_delegate.setString(index, val);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public StringReadData close(final int length) {
-            return new DictDecodedStringReadData((DictEncodedStringReadData)m_delegate.close(length), m_cache);
+            return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)m_delegate.close(length), m_cache);
         }
     }
 
@@ -113,9 +116,11 @@ public final class DictDecodedStringData {
      * {@link DictDecodedStringReadData} provides table-wide caching and {@link StringReadData} access to a wrapped
      * {@link DictEncodedStringReadData}.
      *
+     * @param <K> key type, should be Byte, Long or Integer
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringReadData extends AbstractDictDecodedReadData<DictEncodedStringReadData>
+    public static class DictDecodedStringReadData<K> extends AbstractDictDecodedReadData<K, DictEncodedStringReadData<K>>
         implements StringReadData {
         /**
          * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a
@@ -124,7 +129,7 @@ public final class DictDecodedStringData {
          * @param delegate The delegate {@link DictEncodedStringReadData}
          * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
-        public DictDecodedStringReadData(final DictEncodedStringReadData delegate, final ColumnDictElementCache cache) {
+        public DictDecodedStringReadData(final DictEncodedStringReadData<K> delegate, final ColumnDictElementCache<K> cache) {
             super(delegate, cache);
         }
 

@@ -48,34 +48,41 @@ package org.knime.core.columnar.testing.data;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.knime.core.columnar.data.ByteData.ByteReadData;
+import org.knime.core.columnar.data.ByteData.ByteWriteData;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.AscendingKeyGenerator;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
+import org.knime.core.columnar.data.dictencoding.DictKeys;
+import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 
 /**
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public abstract class AbstractTestDictEncodedData<T>
-    implements TestData, DictEncodedReadData, DictEncodedWriteData {
+public abstract class AbstractTestDictEncodedData<T, K>
+    implements TestData, DictEncodedReadData<K>, DictEncodedWriteData<K> {
 
     protected final TestStructData m_delegate;
 
-    private DictKeyGenerator m_keyGenerator;
+    private DictKeyGenerator<K> m_keyGenerator;
 
-    protected final Map<T, Long> m_dictValToKey = new HashMap<>();
+    protected final Map<T, K> m_dictValToKey = new HashMap<>();
 
-    protected final Map<Long, T> m_dictKeyToVal = new HashMap<>();
+    protected final Map<K, T> m_dictKeyToVal = new HashMap<>();
 
-    AbstractTestDictEncodedData(final TestStructData delegate) {
+    private final K m_keyInstance;
+
+    AbstractTestDictEncodedData(final TestStructData delegate, final K keyInstance) {
         m_delegate = delegate;
+        m_keyInstance = keyInstance;
     }
 
     @Override
-    public AbstractTestDictEncodedData<T> close(final int length) {
+    public AbstractTestDictEncodedData<T, K> close(final int length) {
         m_delegate.close(length);
         return this;
     }
@@ -121,12 +128,20 @@ public abstract class AbstractTestDictEncodedData<T>
     }
 
     @Override
-    public void setDictKey(final int dataIndex, final long dictKey) {
-        ((LongWriteData)m_delegate.getWriteDataAt(0)).setLong(dataIndex, dictKey);
+    public void setDictKey(final int dataIndex, final K dictKey) {
+        if (dictKey instanceof Long) {
+            ((LongWriteData)m_delegate.getWriteDataAt(0)).setLong(dataIndex, (Long)dictKey);
+        } else if (dictKey instanceof Integer) {
+            ((IntWriteData)m_delegate.getWriteDataAt(0)).setInt(dataIndex, (Integer)dictKey);
+        } else if (dictKey instanceof Byte) {
+            ((ByteWriteData)m_delegate.getWriteDataAt(0)).setByte(dataIndex, (Byte)dictKey);
+        } else {
+            throw new UnsupportedOperationException("Unknown dict key type");
+        }
     }
 
     @Override
-    public void setKeyGenerator(final DictKeyGenerator keyGenerator) {
+    public void setKeyGenerator(final DictKeyGenerator<K> keyGenerator) {
         if (m_keyGenerator != null) {
             throw new IllegalStateException("Cannot re-set a key generator. Is already configured!");
         }
@@ -134,22 +149,31 @@ public abstract class AbstractTestDictEncodedData<T>
         m_keyGenerator = keyGenerator;
     }
 
-    protected long generateKey(final T val) {
+    protected K generateKey(final T val) {
         if (m_keyGenerator == null) {
-            m_keyGenerator = new AscendingKeyGenerator();
+            m_keyGenerator = DictKeys.createAscendingKeyGenerator(m_keyInstance);
         }
 
         return m_keyGenerator.generateKey(val);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public long getDictKey(final int dataIndex) {
-        return ((LongReadData)m_delegate.getReadDataAt(0)).getLong(dataIndex);
+    public K getDictKey(final int dataIndex) {
+
+        if (m_keyInstance instanceof Long) {
+            return (K)Long.valueOf(((LongReadData)m_delegate.getReadDataAt(0)).getLong(dataIndex));
+        } else if (m_keyInstance instanceof Integer) {
+            return (K)Integer.valueOf(((IntReadData)m_delegate.getReadDataAt(0)).getInt(dataIndex));
+        } else if (m_keyInstance instanceof Byte) {
+            return (K)Byte.valueOf(((ByteReadData)m_delegate.getReadDataAt(0)).getByte(dataIndex));
+        } else {
+            throw new UnsupportedOperationException("Unknown dict key type");
+        }
     }
 
     @Override
     public int getRefs() {
         return m_delegate.getRefs();
     }
-
 }

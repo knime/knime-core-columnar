@@ -161,7 +161,7 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
     @Override
     public TestDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return TestDictEncodedVarBinaryDataFactory.INSTANCE;
+            return TestDictEncodedVarBinaryDataFactory.factoryForKeyType(DictEncodingTrait.keyType(traits));
         }
         return TestVarBinaryDataFactory.INSTANCE;
     }
@@ -192,7 +192,7 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
     @Override
     public TestDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return TestDictEncodedStringDataFactory.INSTANCE;
+            return TestDictEncodedStringDataFactory.factoryForKeyType(DictEncodingTrait.keyType(traits));
         }
         return TestStringDataFactory.INSTANCE;
     }

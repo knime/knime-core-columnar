@@ -48,6 +48,11 @@
  */
 package org.knime.core.columnar.testing.data;
 
+import org.knime.core.columnar.testing.data.TestByteData.TestByteDataFactory;
+import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
+import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+
 /**
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
@@ -136,4 +141,29 @@ public abstract class AbstractTestData implements TestData {
         return m_values;
     }
 
+
+    @SuppressWarnings("unchecked")
+    static <K> K createKeyInstance(final KeyType keyType) {
+        if (keyType == KeyType.BYTE_KEY) {
+            return (K)Byte.valueOf((byte)0);
+        } else if (keyType == KeyType.INT_KEY) {
+            return (K)Integer.valueOf(0);
+        } else if (keyType == KeyType.LONG_KEY) {
+            return (K)Long.valueOf(0);
+        }
+
+        throw new IllegalArgumentException("Unsupported key type " + keyType);
+    }
+
+    static TestDataFactory createKeyDataFactory(final KeyType keyType) {
+        if (keyType == KeyType.BYTE_KEY) {
+            return TestByteDataFactory.INSTANCE;
+        } else if (keyType == KeyType.INT_KEY) {
+            return TestIntDataFactory.INSTANCE;
+        } else if (keyType == KeyType.LONG_KEY) {
+            return TestLongDataFactory.INSTANCE;
+        }
+
+        throw new IllegalArgumentException("Unsupported key type " + keyType);
+    }
 }

@@ -49,57 +49,79 @@ import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
-import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 /**
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public final class TestDictEncodedStringData extends AbstractTestDictEncodedData<String>
-    implements DictEncodedStringWriteData, DictEncodedStringReadData {
+public final class TestDictEncodedStringData<K> extends AbstractTestDictEncodedData<String, K>
+    implements DictEncodedStringWriteData<K>, DictEncodedStringReadData<K> {
 
     public static final class TestDictEncodedStringDataFactory implements TestDataFactory {
 
-        public static final TestDictEncodedStringDataFactory INSTANCE = new TestDictEncodedStringDataFactory();
+        public static final TestDictEncodedStringDataFactory BYTE_INSTANCE =
+            new TestDictEncodedStringDataFactory(KeyType.BYTE_KEY);
+
+        public static final TestDictEncodedStringDataFactory INT_INSTANCE =
+            new TestDictEncodedStringDataFactory(KeyType.INT_KEY);
+
+        public static final TestDictEncodedStringDataFactory LONG_INSTANCE =
+            new TestDictEncodedStringDataFactory(KeyType.LONG_KEY);
+
+        public static TestDictEncodedStringDataFactory factoryForKeyType(final KeyType keyType) {
+            if (keyType == KeyType.BYTE_KEY) {
+                return BYTE_INSTANCE;
+            } else if (keyType == KeyType.INT_KEY) {
+                return INT_INSTANCE;
+            } else if (keyType == KeyType.LONG_KEY) {
+                return LONG_INSTANCE;
+            } else {
+                throw new IllegalArgumentException("Invalid key type " + keyType);
+            }
+        }
 
         private final TestStructDataFactory m_delegate;
 
-        private TestDictEncodedStringDataFactory() {
-            m_delegate = new TestStructDataFactory(TestLongDataFactory.INSTANCE, TestStringDataFactory.INSTANCE);
+        private final KeyType m_keyType;
+
+        private TestDictEncodedStringDataFactory(final KeyType keyType) {
+            m_keyType = keyType;
+            m_delegate = new TestStructDataFactory(AbstractTestData.createKeyDataFactory(keyType), TestStringDataFactory.INSTANCE);
         }
 
         @Override
-        public TestDictEncodedStringData createWriteData(final int capacity) {
-            return new TestDictEncodedStringData(m_delegate.createWriteData(capacity));
+        public TestData createWriteData(final int capacity) {
+            return new TestDictEncodedStringData<>(m_delegate.createWriteData(capacity), AbstractTestData.createKeyInstance(m_keyType));
         }
 
         @Override
-        public TestDictEncodedStringData createReadData(final Object[] data) {
-            return new TestDictEncodedStringData(m_delegate.createReadData(data));
+        public TestData createReadData(final Object[] data) {
+            return new TestDictEncodedStringData<>(m_delegate.createReadData(data), AbstractTestData.createKeyInstance(m_keyType));
         }
 
         @Override
-        public TestDictEncodedStringData createReadData(final Object[] data, final int length) {
-            return new TestDictEncodedStringData(m_delegate.createReadData(data, length));
+        public TestData createReadData(final Object[] data, final int length) {
+            return new TestDictEncodedStringData<>(m_delegate.createReadData(data, length), AbstractTestData.createKeyInstance(m_keyType));
         }
 
     }
 
-    TestDictEncodedStringData(final TestStructData delegate) {
-        super(delegate);
+    TestDictEncodedStringData(final TestStructData delegate, final K keyInstance) {
+        super(delegate, keyInstance);
     }
 
     @Override
-    public TestDictEncodedStringData close(final int length) {
+    public TestDictEncodedStringData<K> close(final int length) {
         super.close(length);
         return this;
     }
 
     @Override
     public void setString(final int index, final String val) {
-        long dictKey = m_dictValToKey.computeIfAbsent(val, v -> {
+        K dictKey = m_dictValToKey.computeIfAbsent(val, v -> {
             ((StringWriteData)m_delegate.getWriteDataAt(1)).setString(index, val);
             return generateKey(val);
         });
@@ -109,7 +131,7 @@ public final class TestDictEncodedStringData extends AbstractTestDictEncodedData
 
     @Override
     public String getString(final int index) {
-        long dictKey = getDictKey(index);
+        K dictKey = getDictKey(index);
 
         return m_dictKeyToVal.computeIfAbsent(dictKey,
             k -> ((StringReadData)m_delegate.getReadDataAt(1)).getString(index));

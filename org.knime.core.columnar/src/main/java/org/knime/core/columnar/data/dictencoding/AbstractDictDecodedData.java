@@ -66,12 +66,12 @@ final class AbstractDictDecodedData {
     AbstractDictDecodedData() {
     }
 
-    abstract static class AbstractDictDecodedReadData<D extends DictEncodedReadData> implements NullableReadData {
+    abstract static class AbstractDictDecodedReadData<K, D extends DictEncodedReadData<K>> implements NullableReadData {
         protected final D m_delegate;
 
-        protected final ColumnDictElementCache m_cache;
+        protected final ColumnDictElementCache<K> m_cache;
 
-        AbstractDictDecodedReadData(final D delegate, final ColumnDictElementCache cache) {
+        AbstractDictDecodedReadData(final D delegate, final ColumnDictElementCache<K> cache) {
             m_delegate = delegate;
             m_cache = cache;
         }
@@ -106,12 +106,12 @@ final class AbstractDictDecodedData {
         }
     }
 
-    abstract static class AbstractDictDecodedWriteData<D extends DictEncodedWriteData> implements NullableWriteData {
+    abstract static class AbstractDictDecodedWriteData<K, D extends DictEncodedWriteData<K>> implements NullableWriteData {
         protected final D m_delegate;
 
-        protected final ColumnDictElementCache m_cache;
+        protected final ColumnDictElementCache<K> m_cache;
 
-        AbstractDictDecodedWriteData(final D delegate, final ColumnDictElementCache cache) {
+        AbstractDictDecodedWriteData(final D delegate, final ColumnDictElementCache<K> cache) {
             m_delegate = delegate;
             m_cache = cache;
             m_delegate.setKeyGenerator(cache);

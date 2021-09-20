@@ -51,52 +51,74 @@ package org.knime.core.columnar.data.dictencoding;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictKeyGenerator;
+import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 /**
  * This {@link DictElementCache} will be used to cache entries of dictionary-encoded data across all batches of the
  * table, or at least as long as they do fit in memory.
  *
- * TODO: implement the cache in AP-16149
+ * TODO: implement the cache in AP-17248 and register it with the MemoryAlertListener
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 public class DictElementCache {
+
     /**
      * The cache for the entries of one column in the table.
      *
      * Supports the generation of globally unique dictionary keys.
      *
+     * @param <K> type of dictionary keys
+     *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class ColumnDictElementCache implements DictKeyGenerator {
-        private long m_numDictEntries = 0;
+    public static class ColumnDictElementCache<K> implements DictKeyGenerator<K> {
+        private final DictKeyGenerator<K> m_dictKeyGenerator;
 
-        // TODO: implement global caching
+        /**
+         * Create a {@link ColumnDictElementCache} using the given dictionary key type
+         *
+         * @param keyType The dictionary {@link KeyType} used for this column
+         */
+        public ColumnDictElementCache(final KeyType keyType) {
+            m_dictKeyGenerator = DictKeys.createAscendingKeyGenerator(keyType);
+        }
 
         @Override
-        public synchronized <T> long generateKey(final T value) {
+        public synchronized <T> K generateKey(final T value) {
             // synchronized because that could possibly be called from multiple threads?
-            return m_numDictEntries++;
+            return m_dictKeyGenerator.generateKey(value);
         }
     }
 
-    private Map<Integer, ColumnDictElementCache> m_perColumnCache = new HashMap<>();
+    private Map<Integer, ColumnDictElementCache<Byte>> m_perColumnCacheWithByteKeys = new HashMap<>();
 
-    /**
-     * Construct the {@link DictElementCache}.
-     */
-    public DictElementCache() {
-        // TODO: register with MemoryAlertListener
-    }
+    private Map<Integer, ColumnDictElementCache<Integer>> m_perColumnCacheWithIntKeys = new HashMap<>();
+
+    private Map<Integer, ColumnDictElementCache<Long>> m_perColumnCacheWithLongKeys = new HashMap<>();
 
     /**
      * Get the cache for a column by column index
      *
+     * @param <K> The type used for dictionary keys at the specified column
      * @param columnIndex The column for which to get the cache.
+     * @param keyType The {@link KeyType} used for the dictionary at the requested column
      * @return The cache for that column. Lazily created if this is the first access.
      */
-    public ColumnDictElementCache get(final int columnIndex) {
-        return m_perColumnCache.computeIfAbsent(columnIndex, i -> new ColumnDictElementCache());
+    @SuppressWarnings("unchecked")
+    public <K> ColumnDictElementCache<K> get(final int columnIndex, final KeyType keyType) {
+        if (keyType == KeyType.BYTE_KEY) {
+            return (ColumnDictElementCache<K>)m_perColumnCacheWithByteKeys.computeIfAbsent(columnIndex,
+                i -> new ColumnDictElementCache<Byte>(keyType));
+        } else if (keyType == KeyType.INT_KEY) {
+            return (ColumnDictElementCache<K>)m_perColumnCacheWithIntKeys.computeIfAbsent(columnIndex,
+                i -> new ColumnDictElementCache<Integer>(keyType));
+        } else if (keyType == KeyType.LONG_KEY) {
+            return (ColumnDictElementCache<K>)m_perColumnCacheWithLongKeys.computeIfAbsent(columnIndex,
+                i -> new ColumnDictElementCache<Long>(keyType));
+        } else {
+            throw new UnsupportedOperationException("Cannot create table-wide dictionary cache for " + keyType);
+        }
     }
 }

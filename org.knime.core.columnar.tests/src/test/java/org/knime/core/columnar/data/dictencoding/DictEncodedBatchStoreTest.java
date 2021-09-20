@@ -163,7 +163,8 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     public void testWrappedBatchStore() throws IOException {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
         var columnSelection = new DefaultColumnSelection(columnarSchema.numColumns());
-        try (DictEncodedBatchWritableReadable batchStore = new DictEncodedBatchWritableReadable(DefaultTestBatchStore.create(columnarSchema))) {
+        try (final var batchStore =
+            new DictEncodedBatchWritableReadable<>(DefaultTestBatchStore.create(columnarSchema))) {
             try (var writer = batchStore.getWriter()) {
                 assertEquals(writer.getClass(), DictEncodedBatchWriter.class);
             }
@@ -182,8 +183,8 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     public void testWrappedBatchReadStore() throws IOException {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
         var columnSelection = new DefaultColumnSelection(columnarSchema.numColumns());
-        try (var baseStore = DefaultTestBatchStore.create(columnarSchema);
-                DictEncodedBatchWritableReadable batchStore = new DictEncodedBatchWritableReadable(baseStore)) {
+        try (final var baseStore = DefaultTestBatchStore.create(columnarSchema);
+                final var batchStore = new DictEncodedBatchWritableReadable<>(baseStore)) {
             try (var writer = batchStore.getWriter()) {
                 assertEquals(writer.getClass(), DictEncodedBatchWriter.class);
             }

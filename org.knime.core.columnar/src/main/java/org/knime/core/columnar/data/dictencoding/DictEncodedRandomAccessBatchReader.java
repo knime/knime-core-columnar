@@ -56,6 +56,7 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
+import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -110,23 +111,37 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
     private NullableReadData wrapDictEncodedData(final ReadBatch batch, final int index) {
         final var data = batch.get(index);
 
-        if (DictEncodingTrait.isEnabled(m_schema.getTraits(index))) {
-            if (m_schema.getSpec(index) instanceof StringDataSpec && !(data instanceof DictDecodedStringReadData)) {
+        final var spec = m_schema.getSpec(index);
+        final var traits = m_schema.getTraits(index);
+        final var keyType = DictEncodingTrait.keyType(traits);
+
+        if (DictEncodingTrait.isEnabled(traits)) {
+            if (spec instanceof StringDataSpec && !(data instanceof DictDecodedStringReadData)) {
                 if (!(data instanceof DictEncodedStringReadData)) {
                     throw new IllegalArgumentException(
                         "Expected DictEncodedStringReadData to construct DictDecodedStringReadData");
                 }
-                return new DictDecodedStringReadData((DictEncodedStringReadData)data, m_cache.get(index));
-            } else if (m_schema.getSpec(index) instanceof VarBinaryDataSpec
+                return wrapDictEncodedStringData(data, m_cache.get(index, keyType));
+            } else if (spec instanceof VarBinaryDataSpec
                 && !(data instanceof DictDecodedVarBinaryReadData)) {
                 if (!(data instanceof DictEncodedVarBinaryReadData)) {
                     throw new IllegalArgumentException(
                         "Expected DictEncodedVarBinaryReadData to construct DictDecodedVarBinaryReadData");
                 }
-                return new DictDecodedVarBinaryReadData((DictEncodedVarBinaryReadData)data, m_cache.get(index));
+                return wrapDictEncodedVarBinaryData(data, m_cache.get(index, keyType));
             }
         }
 
         return data;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableReadData wrapDictEncodedStringData(final NullableReadData data, final ColumnDictElementCache<K> cache) {
+        return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)data, cache);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <K> NullableReadData wrapDictEncodedVarBinaryData(final NullableReadData data, final ColumnDictElementCache<K> cache) {
+        return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)data, cache);
     }
 }
