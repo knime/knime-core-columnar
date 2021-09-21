@@ -49,6 +49,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -58,16 +59,16 @@ import java.util.Map;
 import java.util.Random;
 
 import org.apache.arrow.vector.LargeVarBinaryVector;
-import org.apache.arrow.vector.TinyIntVector;
+import org.apache.arrow.vector.UInt1Vector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.junit.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteReadData;
-import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteWriteData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
+import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteReadData;
+import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteWriteData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
@@ -117,7 +118,7 @@ public class ArrowDictEncodedVarBinaryDataTest extends AbstractArrowDataTest<Arr
     @Override
     protected boolean isReleasedW(final ArrowDictEncodedVarBinaryWriteData<Byte> data) {
         return data.m_delegate.m_vector == null &&
-                ((ArrowByteWriteData)data.m_delegate.getWriteDataAt(0)).m_vector == null &&
+                ((ArrowUnsignedByteWriteData)data.m_delegate.getWriteDataAt(0)).m_vector == null &&
                 ((ArrowVarBinaryWriteData)data.m_delegate.getWriteDataAt(1)).m_vector == null;
     }
 
@@ -125,7 +126,7 @@ public class ArrowDictEncodedVarBinaryDataTest extends AbstractArrowDataTest<Arr
     @SuppressWarnings("resource") // Resources handled by vector
     protected boolean isReleasedR(final ArrowDictEncodedVarBinaryReadData<Byte> data) {
         final ArrowStructReadData d = data.m_delegate;
-        final TinyIntVector keyVector = ((ArrowByteReadData)d.getReadDataAt(0)).m_vector;
+        final UInt1Vector keyVector = ((ArrowUnsignedByteReadData)d.getReadDataAt(0)).m_vector;
         final LargeVarBinaryVector valueVector = ((ArrowVarBinaryReadData)d.getReadDataAt(1)).m_vector;
         final StructVector vector = d.m_vector;
 
@@ -215,7 +216,7 @@ public class ArrowDictEncodedVarBinaryDataTest extends AbstractArrowDataTest<Arr
             if (i < sliceStart + sliceLength) {
                 assertFalse(readData.isMissing(i));
                 assertTrue(Arrays.equals(testData, readData.getBytes(i)));
-                assertTrue(Byte.MIN_VALUE == readData.getDictKey(i));
+                assertEquals(0, (byte)readData.getDictKey(i));
             } else {
                 assertTrue(readData.isMissing(i));
             }

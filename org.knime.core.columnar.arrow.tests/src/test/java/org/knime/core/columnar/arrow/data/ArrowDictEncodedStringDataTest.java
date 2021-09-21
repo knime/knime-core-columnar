@@ -56,7 +56,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-import org.apache.arrow.vector.BigIntVector;
+import org.apache.arrow.vector.UInt8Vector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -65,11 +65,11 @@ import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
-import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongReadData;
-import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
+import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongReadData;
+import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongWriteData;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 import com.google.common.base.Utf8;
@@ -92,40 +92,42 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
         super(ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.LONG_KEY));
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    protected ArrowDictEncodedStringWriteData castW(final Object o) {
+    protected ArrowDictEncodedStringWriteData<Long> castW(final Object o) {
         assertTrue(o instanceof ArrowDictEncodedStringWriteData);
-        return (ArrowDictEncodedStringWriteData)o;
+        return (ArrowDictEncodedStringWriteData<Long>)o;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    protected ArrowDictEncodedStringReadData castR(final Object o) {
+    protected ArrowDictEncodedStringReadData<Long> castR(final Object o) {
         assertTrue(o instanceof ArrowDictEncodedStringReadData);
-        return (ArrowDictEncodedStringReadData)o;
+        return (ArrowDictEncodedStringReadData<Long>)o;
     }
 
     @Override
-    protected void setValue(final ArrowDictEncodedStringWriteData data, final int index, final int seed) {
+    protected void setValue(final ArrowDictEncodedStringWriteData<Long> data, final int index, final int seed) {
         data.setString(index, valueFor(seed));
     }
 
     @Override
-    protected void checkValue(final ArrowDictEncodedStringReadData data, final int index, final int seed) {
+    protected void checkValue(final ArrowDictEncodedStringReadData<Long> data, final int index, final int seed) {
         assertEquals(valueFor(seed), data.getString(index));
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowDictEncodedStringWriteData data) {
+    protected boolean isReleasedW(final ArrowDictEncodedStringWriteData<Long> data) {
         return data.m_delegate.m_vector == null &&
-                ((ArrowLongWriteData)data.m_delegate.getWriteDataAt(0)).m_vector == null &&
+                ((ArrowUnsignedLongWriteData)data.m_delegate.getWriteDataAt(0)).m_vector == null &&
                 ((ArrowStringWriteData)data.m_delegate.getWriteDataAt(1)).m_vector == null;
     }
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleasedR(final ArrowDictEncodedStringReadData data) {
+    protected boolean isReleasedR(final ArrowDictEncodedStringReadData<Long> data) {
         final ArrowStructReadData d = data.m_delegate;
-        final BigIntVector keyVector = ((ArrowLongReadData)d.getReadDataAt(0)).m_vector;
+        final UInt8Vector keyVector = ((ArrowUnsignedLongReadData)d.getReadDataAt(0)).m_vector;
         final VarCharVector valueVector = ((ArrowStringReadData)d.getReadDataAt(1)).m_vector;
         final StructVector vector = d.m_vector;
 
@@ -210,7 +212,7 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
             if (i < sliceStart + sliceLength) {
                 assertFalse(readData.isMissing(i));
                 assertEquals(testString, readData.getString(i));
-                assertEquals(Long.MIN_VALUE, readData.getDictKey(i));
+                assertEquals((long)0, (long)readData.getDictKey(i));
             } else {
                 assertTrue(readData.isMissing(i));
             }

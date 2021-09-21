@@ -57,12 +57,12 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
+import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowUnsignedIntData.ArrowUnsignedIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongDataFactory;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
@@ -324,11 +324,11 @@ public final class AbstractArrowDictEncodedData {
 
         private ArrowColumnDataFactory createKeyDataFactory() {
             if (m_keyType == KeyType.BYTE_KEY) {
-                return ArrowByteDataFactory.INSTANCE;
+                return ArrowUnsignedByteDataFactory.INSTANCE;
             } else if (m_keyType == KeyType.INT_KEY) {
-                return ArrowIntDataFactory.INSTANCE;
+                return ArrowUnsignedIntDataFactory.INSTANCE;
             } else if (m_keyType == KeyType.LONG_KEY) {
-                return ArrowLongDataFactory.INSTANCE;
+                return ArrowUnsignedLongDataFactory.INSTANCE;
             }
 
             throw new IllegalArgumentException("Unsupported key type " + m_keyType);
