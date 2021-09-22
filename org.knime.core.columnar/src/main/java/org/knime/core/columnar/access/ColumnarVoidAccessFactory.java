@@ -51,6 +51,8 @@ package org.knime.core.columnar.access;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.VoidDataSpec;
 
 /**
  * VoidValueFactory to create VoidData.
@@ -87,6 +89,11 @@ final class ColumnarVoidAccessFactory implements ColumnarAccessFactory {
         @Override
         public void setData(final NullableReadData data) {
             // there is no actual data
+        }
+
+        @Override
+        public DataSpec getDataSpec() {
+            return VoidDataSpec.INSTANCE;
         }
 
     }
