@@ -286,18 +286,14 @@ public class ArrowSchemaMapperTest {
     /** Test mapping multiple columns of different specs. */
     @Test
     public void testMappingMultipleColumns() {
-        final var specs = new DataSpec[] {//
+        final var specs = new DataSpec[]{//
             DataSpec.doubleSpec(), //
             DataSpec.longSpec(), //
             DataSpec.doubleSpec(), //
             DataSpec.intSpec() //
         };
-        final var traits = new DataTraits[] {//
-            DefaultDataTraits.EMPTY,
-            DefaultDataTraits.EMPTY,
-            DefaultDataTraits.EMPTY,
-            DefaultDataTraits.EMPTY
-        };
+        final var traits = new DataTraits[]{//
+            DefaultDataTraits.EMPTY, DefaultDataTraits.EMPTY, DefaultDataTraits.EMPTY, DefaultDataTraits.EMPTY};
 
         final ColumnarSchema schema = new DefaultColumnarSchema(specs, traits);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
@@ -323,8 +319,10 @@ public class ArrowSchemaMapperTest {
 
     private static DataTraits createTraitsForSpec(final DataSpec spec) {
         if (spec instanceof StructDataSpec) {
-            var innerTraits = Arrays.stream(((StructDataSpec)spec).getInner()).map(ArrowSchemaMapperTest::createTraitsForSpec).toArray(DataTraits[]::new);
-            return new DefaultStructDataTraits(innerTraits);
+            var structSpec = (StructDataSpec)spec;
+            final DataTraits[] dataTraits = new DataTraits[structSpec.size()];
+            Arrays.setAll(dataTraits, i -> createTraitsForSpec(structSpec.getDataSpec(i)));
+            return new DefaultStructDataTraits(dataTraits);
         } else if (spec instanceof ListDataSpec) {
             var innerTraits = createTraitsForSpec(((ListDataSpec)spec).getInner());
             return new DefaultListDataTraits(innerTraits);

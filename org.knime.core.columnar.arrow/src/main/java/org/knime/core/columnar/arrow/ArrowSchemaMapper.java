@@ -203,11 +203,10 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowStructDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
-        final DataSpec[] innerSpecs = spec.getInner();
-        final DataTraits[] innerTraits = traits.getInner();
-        final ArrowColumnDataFactory[] innerFactories = new ArrowColumnDataFactory[innerSpecs.length];
-        for (int i = 0; i < innerSpecs.length; i++) {
-            innerFactories[i] = ArrowSchemaMapper.map(innerSpecs[i], innerTraits[i]);
+
+        final ArrowColumnDataFactory[] innerFactories = new ArrowColumnDataFactory[spec.size()];
+        for (int i = 0; i < spec.size(); i++) {
+            innerFactories[i] = ArrowSchemaMapper.map(spec.getDataSpec(i), traits.getDataTraits(i));
         }
         return new ArrowStructDataFactory(traits, innerFactories);
     }
