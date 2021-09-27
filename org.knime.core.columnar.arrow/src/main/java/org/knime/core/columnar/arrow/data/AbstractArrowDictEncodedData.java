@@ -49,6 +49,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
@@ -74,7 +75,11 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedRead
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys;
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+import org.knime.core.table.schema.traits.DataTraits;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Base implementations for dictionary encoded data using the Arrow back-end
@@ -293,10 +298,12 @@ public final class AbstractArrowDictEncodedData {
 
         private final int m_version;
 
-        protected AbstractArrowDictEncodedDataFactory(final KeyType keyType, final ArrowColumnDataFactory valueFactory,
+        protected AbstractArrowDictEncodedDataFactory(final DataTraits traits, final ArrowColumnDataFactory valueFactory,
             final int version) {
-            m_keyType = keyType;
-            m_delegate = new ArrowStructDataFactory(createKeyDataFactory(), valueFactory);
+            Preconditions.checkArgument(DictEncodingTrait.isEnabled(traits), "The column is not dictionary encoded.");
+            m_keyType = DictEncodingTrait.keyType(traits);
+            // TODO is null correct here, or should this rather create StructDataTraits to delegate any traits down
+            m_delegate = new ArrowStructDataFactory(null, createKeyDataFactory(), valueFactory);
             m_version = version;
         }
 
@@ -333,5 +340,29 @@ public final class AbstractArrowDictEncodedData {
 
             throw new IllegalArgumentException("Unsupported key type " + m_keyType);
         }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(m_version, m_keyType, m_delegate);
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            var other = (AbstractArrowDictEncodedDataFactory)obj;
+            return m_keyType == other.m_keyType //
+                    && m_version == other.m_version
+            && m_delegate.equals(other.m_delegate); //
+        }
+
+
     }
 }

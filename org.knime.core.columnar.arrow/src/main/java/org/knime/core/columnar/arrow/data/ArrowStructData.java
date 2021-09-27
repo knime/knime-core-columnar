@@ -72,6 +72,7 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Arrow implementation of {@link StructWriteData} and {@link StructReadData}.
@@ -282,20 +283,22 @@ public final class ArrowStructData {
         /**
          * Create a new factory for Arrow struct data.
          *
+         * @param traits of the struct
          * @param inner factories to create the inner types
          */
-        public ArrowStructDataFactory(final ArrowColumnDataFactory... inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, getVersions(inner)));
+        public ArrowStructDataFactory(final DataTraits traits, final ArrowColumnDataFactory... inner) {
+            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, getVersions(inner)), traits);
             m_inner = inner;
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
             final List<Field> children = new ArrayList<>(m_inner.length);
-            for (int i = 0; i < m_inner.length; i++) {
+            for (int i = 0; i < m_inner.length; i++) { //NOSONAR
                 children.add(m_inner[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
             }
-            return new Field(name, new FieldType(true, Struct.INSTANCE, null), children);
+            final var arrowType = ValueFactoryExtensionType.wrapIfLogical(Struct.INSTANCE, m_logicalType);
+            return new Field(name, new FieldType(true, arrowType, null), children);
         }
 
         @Override
@@ -352,11 +355,11 @@ public final class ArrowStructData {
 
         @Override
         public boolean equals(final Object obj) {
-            if (!(obj instanceof ArrowStructDataFactory)) {
+            if (!super.equals(obj)) {
                 return false;
             }
             final ArrowStructDataFactory o = (ArrowStructDataFactory)obj;
-            return m_version.equals(o.m_version) && Arrays.equals(m_inner, o.m_inner);
+            return Arrays.equals(m_inner, o.m_inner);
         }
 
         @Override

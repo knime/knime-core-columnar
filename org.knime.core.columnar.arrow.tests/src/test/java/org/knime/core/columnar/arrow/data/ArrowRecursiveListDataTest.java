@@ -62,6 +62,9 @@ import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListReadData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListWriteData;
+import org.knime.core.table.schema.IntDataSpec;
+import org.knime.core.table.schema.ListDataSpec;
+import org.knime.core.table.schema.traits.DataTraitUtils;
 
 /**
  * Test {@link ArrowListData} with a recursive lists.
@@ -76,7 +79,15 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
 
     /** Create the test for {@link ArrowListData} */
     public ArrowRecursiveListDataTest() {
-        super(new ArrowListDataFactory(new ArrowListDataFactory(ArrowIntDataFactory.INSTANCE)));
+        super(createFactory());
+    }
+
+    private static ArrowListDataFactory createFactory() {
+        var inner = new ListDataSpec(IntDataSpec.INSTANCE);
+        var outer = new ListDataSpec(inner);
+        return new ArrowListDataFactory(
+            DataTraitUtils.emptyTraits(outer),
+            new ArrowListDataFactory(DataTraitUtils.emptyTraits(inner), ArrowIntDataFactory.INSTANCE));
     }
 
     @Override

@@ -70,7 +70,9 @@ import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongReadData;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongWriteData;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 import com.google.common.base.Utf8;
 
@@ -89,7 +91,7 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
 
     /** Create the test for {@link ArrowDictEncodedStringData} */
     public ArrowDictEncodedStringDataTest() {
-        super(ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.LONG_KEY));
+        super(new ArrowDictEncodedStringDataFactory(new DefaultDataTraits(new DictEncodingTrait(KeyType.LONG_KEY))));
     }
 
     @SuppressWarnings("unchecked")

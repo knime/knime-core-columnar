@@ -69,6 +69,7 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarB
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Arrow implementation of {@link DictEncodedVarBinaryWriteData} and {@link DictEncodedVarBinaryReadData}
@@ -182,36 +183,8 @@ public final class ArrowDictEncodedVarBinaryData {
 
         private static final int CURRENT_VERSION = 0;
 
-        private static final ArrowDictEncodedVarBinaryDataFactory BYTE_INSTANCE =
-                new ArrowDictEncodedVarBinaryDataFactory(KeyType.BYTE_KEY);
-
-            private static final ArrowDictEncodedVarBinaryDataFactory INT_INSTANCE =
-                new ArrowDictEncodedVarBinaryDataFactory(KeyType.INT_KEY);
-
-            private static final ArrowDictEncodedVarBinaryDataFactory LONG_INSTANCE =
-                new ArrowDictEncodedVarBinaryDataFactory(KeyType.LONG_KEY);
-
-            /**
-             * Get the single instance of a {@link ArrowDictEncodedVarBinaryDataFactory} for the given {@link KeyType}
-             *
-             * @param keyType The {@link KeyType} to use for the dictionary
-             * @return The factory instance for the provided key type
-             */
-            public static ArrowDictEncodedVarBinaryDataFactory factoryForKeyType(final KeyType keyType) {
-                if (keyType == KeyType.BYTE_KEY) {
-                    return BYTE_INSTANCE;
-                } else if (keyType == KeyType.INT_KEY) {
-                    return INT_INSTANCE;
-                } else if (keyType == KeyType.LONG_KEY) {
-                    return LONG_INSTANCE;
-                } else {
-                    throw new IllegalArgumentException("Invalid key type " + keyType);
-                }
-            }
-
-
-        private ArrowDictEncodedVarBinaryDataFactory(final KeyType keyType) {
-            super(keyType, ArrowVarBinaryDataFactory.INSTANCE, CURRENT_VERSION);
+        public ArrowDictEncodedVarBinaryDataFactory(final DataTraits traits) {
+            super(traits, new ArrowVarBinaryDataFactory(traits), CURRENT_VERSION);
         }
 
         @Override

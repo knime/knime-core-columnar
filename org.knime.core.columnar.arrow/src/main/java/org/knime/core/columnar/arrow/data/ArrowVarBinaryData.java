@@ -61,6 +61,7 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
@@ -157,16 +158,17 @@ public final class ArrowVarBinaryData {
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
     public static final class ArrowVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowVarBinaryDataFactory} */
-        public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
-
-        private ArrowVarBinaryDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+        /**
+         * @param traits of the data
+         */
+        public ArrowVarBinaryDataFactory(final DataTraits traits) {
+            super(ArrowColumnDataFactoryVersion.version(0), traits);
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.LARGEVARBINARY.getType());
+            final var arrowType = ValueFactoryExtensionType.wrapIfLogical(MinorType.LARGEVARBINARY.getType(), m_logicalType);
+            return Field.nullable(name, arrowType);
         }
 
         @Override

@@ -48,11 +48,15 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.util.Objects;
+
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.LogicalTypeTrait;
 
 /**
  * Abstract implementation of {@link ArrowColumnDataFactory} for {@link ArrowReadData} which extend
@@ -68,13 +72,28 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
     /** The current version */
     protected final ArrowColumnDataFactoryVersion m_version;
 
+    protected final String m_logicalType;
+
     /**
      * Create a new abstract {@link ArrowColumnDataFactory}.
      *
      * @param version the current version
      */
-    public AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
+    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
+        this(version, null);
+    }
+
+    /**
+     * Create a new abstract {@link ArrowColumnDataFactory}.
+     *
+     * @param version the current version
+     * @param traits of the column factory
+     */
+    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version, final DataTraits traits) {
         m_version = version;
+        m_logicalType = DataTraits.getTrait(traits, LogicalTypeTrait.class)//
+                .map(LogicalTypeTrait::getLogicalType)//
+                .orElse(null);
     }
 
     @Override
@@ -91,4 +110,27 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
     public ArrowColumnDataFactoryVersion getVersion() {
         return m_version;
     }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_version, m_logicalType);
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        AbstractArrowColumnDataFactory other = (AbstractArrowColumnDataFactory)obj;
+        return m_version.equals(other.m_version)
+                && Objects.equals(m_logicalType, other.m_logicalType);
+    }
+
+
 }

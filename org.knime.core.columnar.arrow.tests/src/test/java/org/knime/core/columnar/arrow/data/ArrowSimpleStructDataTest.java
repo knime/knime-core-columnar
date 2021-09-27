@@ -68,6 +68,9 @@ import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.traits.DataTraitUtils;
 
 /**
  * Test {@link ArrowStructData} with a struct consisting of a double and an integer.
@@ -78,7 +81,9 @@ public class ArrowSimpleStructDataTest extends AbstractArrowDataTest<ArrowStruct
 
     /** Create the test for {@link ArrowStructData} */
     public ArrowSimpleStructDataTest() {
-        super(new ArrowStructDataFactory(ArrowDoubleDataFactory.INSTANCE, ArrowIntDataFactory.INSTANCE));
+        super(new ArrowStructDataFactory(
+            DataTraitUtils.emptyTraits(new StructDataSpec(DataSpec.doubleSpec(), DataSpec.intSpec())),
+            ArrowDoubleDataFactory.INSTANCE, ArrowIntDataFactory.INSTANCE));
     }
 
     @Override

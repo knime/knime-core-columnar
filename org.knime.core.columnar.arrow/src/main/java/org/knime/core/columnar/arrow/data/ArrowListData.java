@@ -65,10 +65,11 @@ import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Arrow implementation of {@link ListWriteData} and {@link ListReadData}.
@@ -207,11 +208,11 @@ public final class ArrowListData {
 
         /**
          * Create a new factory for Arrow list data.
-         *
+         * @param traits of the data
          * @param inner the factory to create the type of the list elements
          */
-        public ArrowListDataFactory(final ArrowColumnDataFactory inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, inner.getVersion()));
+        public ArrowListDataFactory(final DataTraits traits, final ArrowColumnDataFactory inner) {
+            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, inner.getVersion()), traits);
             m_inner = inner;
         }
 
@@ -264,11 +265,12 @@ public final class ArrowListData {
 
         @Override
         public boolean equals(final Object obj) {
-            if (!(obj instanceof ArrowListDataFactory)) {
+
+            if (!super.equals(obj)) {
                 return false;
             }
             final ArrowListDataFactory o = (ArrowListDataFactory)obj;
-            return Objects.equals(m_version, o.m_version) && Objects.equals(m_inner, o.m_inner);
+            return Objects.equals(m_inner, o.m_inner);
         }
 
         @Override

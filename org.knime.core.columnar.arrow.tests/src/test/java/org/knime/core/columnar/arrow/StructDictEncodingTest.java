@@ -58,7 +58,9 @@ import org.junit.Test;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 @SuppressWarnings("javadoc")
 public class StructDictEncodingTest {
@@ -75,13 +77,17 @@ public class StructDictEncodingTest {
         m_alloc.close();
     }
 
+    private static ArrowDictEncodedStringDataFactory createFactory(final KeyType keyType) {
+        return new ArrowDictEncodedStringDataFactory(new DefaultDataTraits(new DictEncodingTrait(keyType)));
+    }
+
     @Test
     public void testSimpleDictCreation() {
         final int numRows = 10;
-        final var factory = ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.LONG_KEY);
+        final var factory = createFactory(KeyType.LONG_KEY);
         @SuppressWarnings("unchecked")
-        final var data =
-            (ArrowDictEncodedStringWriteData<Long>)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Long>)ArrowColumnDataFactory.createWrite(factory, "0",
+            m_alloc, numRows);
 
         data.setString(0, "foo");
         // [<0, "foo">]
@@ -105,10 +111,10 @@ public class StructDictEncodingTest {
     @Test
     public void testRandomAccessRead() {
         final int numRows = 10;
-        final var factory = ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.BYTE_KEY);
+        final var factory = createFactory(KeyType.BYTE_KEY);
         @SuppressWarnings("unchecked")
-        final var data =
-            (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0",
+            m_alloc, numRows);
 
         data.setString(0, "foo");
         data.setString(1, "bar");
@@ -124,10 +130,10 @@ public class StructDictEncodingTest {
     @Test(expected = IllegalStateException.class)
     public void testKeyOverflow(){
         final int numRows = Byte.MAX_VALUE * 3;
-        final var factory = ArrowDictEncodedStringDataFactory.factoryForKeyType(KeyType.BYTE_KEY);
+        final var factory = createFactory(KeyType.BYTE_KEY);
         @SuppressWarnings("unchecked")
-        final var data =
-            (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0", m_alloc, numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0",
+            m_alloc, numRows);
 
         int lastWrittenIndex = 0;
 

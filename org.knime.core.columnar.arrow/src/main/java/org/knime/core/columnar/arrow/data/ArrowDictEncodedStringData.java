@@ -66,7 +66,9 @@ import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Dictionary encoded string data implementation using Arrow as back end.
@@ -160,35 +162,14 @@ public final class ArrowDictEncodedStringData {
 
         private static final int CURRENT_VERSION = 0;
 
-        private static final ArrowDictEncodedStringDataFactory BYTE_INSTANCE =
-            new ArrowDictEncodedStringDataFactory(KeyType.BYTE_KEY);
-
-        private static final ArrowDictEncodedStringDataFactory INT_INSTANCE =
-            new ArrowDictEncodedStringDataFactory(KeyType.INT_KEY);
-
-        private static final ArrowDictEncodedStringDataFactory LONG_INSTANCE =
-            new ArrowDictEncodedStringDataFactory(KeyType.LONG_KEY);
-
         /**
-         * Get the single instance of a {@link ArrowDictEncodedStringDataFactory} for the given {@link KeyType}
+         * Constructor.
          *
-         * @param keyType The {@link KeyType} to use for the dictionary
-         * @return The factory instance for the provided key type
+         * @param traits of the data
+         * @throws IllegalArgumentException if traits don't contain {@link DictEncodingTrait}
          */
-        public static ArrowDictEncodedStringDataFactory factoryForKeyType(final KeyType keyType) {
-            if (keyType == KeyType.BYTE_KEY) {
-                return BYTE_INSTANCE;
-            } else if (keyType == KeyType.INT_KEY) {
-                return INT_INSTANCE;
-            } else if (keyType == KeyType.LONG_KEY) {
-                return LONG_INSTANCE;
-            } else {
-                throw new IllegalArgumentException("Invalid key type " + keyType);
-            }
-        }
-
-        private ArrowDictEncodedStringDataFactory(final KeyType keyType) {
-            super(keyType, ArrowStringDataFactory.INSTANCE, CURRENT_VERSION);
+        public ArrowDictEncodedStringDataFactory(final DataTraits traits) {
+            super(traits, ArrowStringDataFactory.INSTANCE, CURRENT_VERSION);
         }
 
         @Override
@@ -206,5 +187,6 @@ public final class ArrowDictEncodedStringData {
                 m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)),
                 m_keyType);
         }
+
     }
 }

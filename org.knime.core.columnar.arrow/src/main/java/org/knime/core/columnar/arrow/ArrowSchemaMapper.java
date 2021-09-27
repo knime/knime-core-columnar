@@ -191,9 +191,9 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return ArrowDictEncodedVarBinaryDataFactory.factoryForKeyType(DictEncodingTrait.keyType(traits));
+            return new ArrowDictEncodedVarBinaryDataFactory(traits);
         }
-        return ArrowVarBinaryDataFactory.INSTANCE;
+        return new ArrowVarBinaryDataFactory(traits);
     }
 
     @Override
@@ -209,13 +209,13 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         for (int i = 0; i < innerSpecs.length; i++) {
             innerFactories[i] = ArrowSchemaMapper.map(innerSpecs[i], innerTraits[i]);
         }
-        return new ArrowStructDataFactory(innerFactories);
+        return new ArrowStructDataFactory(traits, innerFactories);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
         final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
-        return new ArrowListDataFactory(inner);
+        return new ArrowListDataFactory(traits, inner);
     }
 
     @Override
@@ -226,7 +226,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return ArrowDictEncodedStringDataFactory.factoryForKeyType(DictEncodingTrait.keyType(traits));
+            return new ArrowDictEncodedStringDataFactory(traits);
         }
         return ArrowStringDataFactory.INSTANCE;
     }

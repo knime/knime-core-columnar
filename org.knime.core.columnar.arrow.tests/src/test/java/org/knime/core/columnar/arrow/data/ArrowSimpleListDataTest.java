@@ -62,6 +62,9 @@ import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListReadData;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListWriteData;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.ListDataSpec;
+import org.knime.core.table.schema.traits.DataTraitUtils;
 
 /**
  * Test {@link ArrowListData} with a list consisting of integer values.
@@ -74,7 +77,8 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
 
     /** Create the test for {@link ArrowListData} */
     public ArrowSimpleListDataTest() {
-        super(new ArrowListDataFactory(ArrowIntDataFactory.INSTANCE));
+        super(new ArrowListDataFactory(DataTraitUtils.emptyTraits(new ListDataSpec(DataSpec.intSpec())),
+            ArrowIntDataFactory.INSTANCE));
     }
 
     @Override

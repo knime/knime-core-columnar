@@ -63,6 +63,7 @@ import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListWriteData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Test {@link ArrowListData} with a list consisting of integer values.
@@ -77,7 +78,7 @@ public class ArrowVarBinaryListDataTest extends AbstractArrowDataTest<ArrowListW
 
     /** Create the test for {@link ArrowListData} */
     public ArrowVarBinaryListDataTest() {
-        super(new ArrowListDataFactory(ArrowVarBinaryDataFactory.INSTANCE));
+        super(new ArrowListDataFactory(DefaultDataTraits.EMPTY, new ArrowVarBinaryDataFactory(DefaultDataTraits.EMPTY)));
     }
 
     @Override
