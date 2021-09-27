@@ -9,6 +9,7 @@ Bundle-RequiredExecutionEnvironment: JavaSE-11
 Bundle-ActivationPolicy: lazy
 Export-Package: org.knime.core.data.columnar,
  org.knime.core.data.columnar.domain,
+ org.knime.core.data.columnar.schema,
  org.knime.core.data.columnar.table
 Bundle-ClassPath: .
 Require-Bundle: org.knime.core.columnar;bundle-version="[4.2.0,5.0.0)",
