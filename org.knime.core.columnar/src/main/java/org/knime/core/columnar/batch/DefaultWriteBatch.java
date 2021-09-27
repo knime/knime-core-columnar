@@ -89,7 +89,10 @@ public final class DefaultWriteBatch extends AbstractBatch<NullableWriteData> im
 
     @Override
     public ReadBatch close(final int length) {
-        return new DefaultReadBatch(Arrays.stream(m_data).map(d -> d.close(length)).toArray(NullableReadData[]::new));
+        final NullableReadData[] datas = Arrays.stream(m_data)//
+                .map(d -> d.close(length))//
+                .toArray(NullableReadData[]::new);
+        return new DefaultReadBatch(datas);
     }
 
 }
