@@ -67,13 +67,13 @@ import org.knime.core.node.NodeSettingsWO;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
+public final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
 
     private final Flushable m_flushable;
 
     private final Path m_path;
 
-    static UnsavedColumnarContainerTable create(final Path path, final int tableId, final ColumnStoreFactory factory,
+    public static UnsavedColumnarContainerTable create(final Path path, final int tableId, final ColumnStoreFactory factory,
         final ColumnarValueSchema schema, final BatchReadStore store, final Flushable flushable, final long size) {
         final UnsavedColumnarContainerTable table =
             new UnsavedColumnarContainerTable(path, tableId, factory, schema, store, flushable, size);
