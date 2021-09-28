@@ -215,7 +215,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                         // this way, the cache stays in a consistent state
                         throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
                     }
-                    try (RandomAccessBatchReader reader = m_reabableDelegate
+                    try (RandomAccessBatchReader reader = m_readableDelegate
                         .createRandomAccessReader(new FilteredColumnSelection(m_selection.numColumns(), i))) {
                         final NullableReadData data = reader.readRetained(index).get(i);
                         m_globalCache.put(ccUID, data, m_evictor);
@@ -236,7 +236,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
     private final ReadDataCacheWriter m_writer;
 
-    private final RandomAccessBatchReadable m_reabableDelegate;
+    private final RandomAccessBatchReadable m_readableDelegate;
 
     private final ExecutorService m_executor;
 
@@ -297,7 +297,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
     @Override
     public ColumnarSchema getSchema() {
-        return m_reabableDelegate.getSchema();
+        return m_readableDelegate.getSchema();
     }
 
     @Override
@@ -319,7 +319,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             releaseAllReferencedData();
 
             m_cachedData.clear();
-            m_reabableDelegate.close();
+            m_readableDelegate.close();
         }
     }
 
@@ -349,8 +349,10 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
     private void releaseAllReferencedData() {
         // Drop all globally cached data referenced by this cache, because "release"-on-evict would
         // no longer work once the delegate is closed.
-        for (final var ccUID : m_cachedData.keySet()) {
-            final var lock = m_cachedData.get(ccUID);
+        for(final var entry : m_cachedData.entrySet()) {
+            final var ccUID = entry.getKey();
+            final var lock = entry.getValue();
+
             if (lock != null) {
                 try {
                     lock.await();
