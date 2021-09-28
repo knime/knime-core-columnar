@@ -59,12 +59,12 @@ import org.knime.core.columnar.testing.data.TestData;
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable<TestBatchStore> implements TestBatchStore {
+public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable implements TestBatchStore {
 
     private final TestBatchStore m_testDelegate;
 
     public TestDictEncodedBatchStore(final TestBatchStore delegate) {
-        super(delegate);
+        super(delegate, delegate);
         m_testDelegate = delegate;
     }
 

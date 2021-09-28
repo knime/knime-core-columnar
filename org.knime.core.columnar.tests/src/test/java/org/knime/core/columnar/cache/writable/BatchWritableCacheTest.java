@@ -95,7 +95,7 @@ public class BatchWritableCacheTest extends ColumnarTest {
 
     private static BatchWritableCache generateDefaultSmallColumnStore(final BatchStore delegate,
         final SharedBatchWritableCache cache) {
-        return new BatchWritableCache(delegate, cache);
+        return new BatchWritableCache(delegate, delegate, cache);
     }
 
     private static void checkUncached(final TestDataTable table) {

@@ -56,7 +56,7 @@ import org.knime.core.data.meta.DataColumnMetaData;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-interface DomainWritableConfig {
+public interface DomainWritableConfig {
 
     /**
      * @param maxPossibleValues number of maximum possible values for nominal domains

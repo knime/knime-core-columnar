@@ -249,15 +249,18 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
     /**
-     * @param delegate the delegate to which to write asynchronously and from which to read in case of a cache miss
+     * @param writable the delegate to which to write asynchronously
+     * @param readable the delegate from which to read in case of a cache miss
      * @param cache the cache for storing data
      * @param executor the executor to which to submit asynchronous writes to the delegate
      */
     @SuppressWarnings("resource")
-    public <D extends BatchWritable & RandomAccessBatchReadable> ReadDataCache(final D delegate,
+    public ReadDataCache(
+        final BatchWritable writable,
+        final RandomAccessBatchReadable readable,
         final SharedReadDataCache cache, final ExecutorService executor) {
-        m_writer = new ReadDataCacheWriter(delegate.getWriter());
-        m_reabableDelegate = delegate;
+        m_writer = new ReadDataCacheWriter(writable.getWriter());
+        m_readableDelegate = readable;
         m_globalCache = cache.getCache();
         m_executor = executor;
     }

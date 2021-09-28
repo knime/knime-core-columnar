@@ -116,7 +116,7 @@ public class ObjectCacheTest extends ColumnarTest {
     @SuppressWarnings("resource")
     private static ObjectCache generateDefaultHeapCachedStore() {
         final TestBatchBuffer delegate = createDefaultTestBatchBuffer();
-        return new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+        return new ObjectCache(delegate, delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
     }
 
     private static ColumnarSchema createSingleStringColumnSchema() {
@@ -167,7 +167,6 @@ public class ObjectCacheTest extends ColumnarTest {
         waitForPersist();
     }
 
-
     private static void waitForPersist() throws InterruptedException {
         final CountDownLatch waitLatch = new CountDownLatch(1);
         PERSIST_EXECUTOR.submit(() -> waitLatch.countDown());
@@ -216,7 +215,7 @@ public class ObjectCacheTest extends ColumnarTest {
     public void testFlush() throws IOException, InterruptedException {
         try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
                 final ObjectCache store =
-                    new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+                    new ObjectCache(delegate, delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
                 final BatchWriter writer = store.getWriter()) {
             final WriteBatch batch = writer.create(2);
             final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
@@ -254,7 +253,7 @@ public class ObjectCacheTest extends ColumnarTest {
     public void testSerializeAsync() throws IOException, InterruptedException {
         try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
                 final ObjectCache store =
-                    new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+                    new ObjectCache(delegate, delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
                 final BatchWriter writer = store.getWriter()) {
             final WriteBatch batch = writer.create(1);
             final CachedStringWriteData data = (CachedStringWriteData)batch.get(0);
@@ -278,7 +277,7 @@ public class ObjectCacheTest extends ColumnarTest {
     public void testCloseDoesNotBlock() throws IOException, InterruptedException {
         try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
                 final ObjectCache store =
-                    new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+                    new ObjectCache(delegate, delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
                 final BatchWriter writer = store.getWriter()) {
 
             final WriteBatch writeBatch1 = writer.create(1);
@@ -326,7 +325,7 @@ public class ObjectCacheTest extends ColumnarTest {
     public void testExtendDuringWrite() throws IOException, InterruptedException {
         try (final TestBatchBuffer delegate = TestBatchBuffer.create(createSingleStringColumnSchema());
                 final ObjectCache store =
-                    new ObjectCache(delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
+                    new ObjectCache(delegate, delegate, generateCache(), PERSIST_EXECUTOR, SERIALIZATION_EXECUTOR);
                 final BatchWriter writer = store.getWriter()) {
 
             final int numStrings = 512;
@@ -362,7 +361,8 @@ public class ObjectCacheTest extends ColumnarTest {
         final ExecutorService serializationExecutor = Executors.newFixedThreadPool(2);
 
         try (final TestBatchBuffer delegate = TestBatchBuffer.create(createTwoStringColumnsSchema());
-                final ObjectCache store = new ObjectCache(delegate, generateCache(), persistExecutor, serializationExecutor);
+                final ObjectCache store =
+                    new ObjectCache(delegate, delegate, generateCache(), persistExecutor, serializationExecutor);
                 final BatchWriter writer = store.getWriter()) {
 
             final int numStrings = 512;

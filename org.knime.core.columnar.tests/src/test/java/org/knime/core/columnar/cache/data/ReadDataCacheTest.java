@@ -98,7 +98,7 @@ public class ReadDataCacheTest extends ColumnarTest {
 
     private static ReadDataCache generateDefaultCachedColumnStore(final BatchStore delegate,
         final SharedReadDataCache cache) {
-        return new ReadDataCache(delegate, cache, EXECUTOR);
+        return new ReadDataCache(delegate, delegate, cache, EXECUTOR);
     }
 
     private static ReadDataCache generateDefaultCachedColumnStore(final BatchStore delegate) {

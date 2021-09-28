@@ -64,25 +64,26 @@ import org.knime.core.table.schema.ColumnarSchema;
  * provide plain-looking Data objects to the frontend and vice versa.
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
- * @param <D> The type of the underlying {@link BatchWritable} and {@link RandomAccessBatchReadable}
  */
-public class DictEncodedBatchWritableReadable<D extends BatchWritable & RandomAccessBatchReadable>
+public class DictEncodedBatchWritableReadable
     implements BatchWritable, RandomAccessBatchReadable {
-    private final D m_delegate;
+
+    private final RandomAccessBatchReadable m_readDelegate;
 
     private final DictEncodedBatchWriter m_writer;
 
     private final DictElementCache m_dictElementCache = new DictElementCache();
 
     /**
-     * Create with a delegate
+     * Create with writable and readable delegates
+     * @param writable The write delegate
+     * @param readable The read delegate
      *
-     * @param delegate The delegate batch store
      */
     @SuppressWarnings("resource")
-    public DictEncodedBatchWritableReadable(final D delegate) {
-        m_delegate = delegate;
-        m_writer = new DictEncodedBatchWriter(m_delegate.getWriter(), m_delegate.getSchema(), m_dictElementCache);
+    public DictEncodedBatchWritableReadable(final BatchWritable writable, final RandomAccessBatchReadable readable) {
+        m_readDelegate = readable;
+        m_writer = new DictEncodedBatchWriter(writable.getWriter(), readable.getSchema(), m_dictElementCache);
     }
 
     @Override
@@ -92,18 +93,19 @@ public class DictEncodedBatchWritableReadable<D extends BatchWritable & RandomAc
 
     @Override
     public ColumnarSchema getSchema() {
-        return m_delegate.getSchema();
+        return m_readDelegate.getSchema();
     }
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema(),
+        return new DictEncodedRandomAccessBatchReader(m_readDelegate, selection, m_readDelegate.getSchema(),
             m_dictElementCache);
     }
 
     @Override
     public void close() throws IOException {
-        m_delegate.close();
+        m_writer.close();
+        m_readDelegate.close();
     }
 
 }

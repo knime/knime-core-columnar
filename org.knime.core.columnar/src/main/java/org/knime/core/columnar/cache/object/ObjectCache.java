@@ -314,19 +314,21 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
     /**
-     * @param delegate the delegate to which to write
+     * @param writable the delegate to which to write
+     * @param readable the delegate from which to read
      * @param cache the in-heap cache for storing object data
      * @param persistExecutor the executor to which to submit asynchronous persist tasks
      * @param serializationExecutor the executor to use for asynchronous serialization of data
      */
     @SuppressWarnings("resource")
-    public <D extends BatchWritable & RandomAccessBatchReadable> ObjectCache(final D delegate,
+    public ObjectCache(final BatchWritable writable,
+        final RandomAccessBatchReadable readable,
         final SharedObjectCache cache, final ExecutorService persistExecutor,
         final ExecutorService serializationExecutor) {
-        m_writer = new ObjectCacheWriter(delegate.getWriter());
-        m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(delegate.getSchema());
-        m_stringData = HeapCacheUtils.getStringIndices(delegate.getSchema());
-        m_readableDelegate = delegate;
+        m_writer = new ObjectCacheWriter(writable.getWriter());
+        m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(readable.getSchema());
+        m_stringData = HeapCacheUtils.getStringIndices(readable.getSchema());
+        m_readableDelegate = readable;
         m_cache = cache;
         m_executor = persistExecutor;
         m_serializationExecutor = serializationExecutor;

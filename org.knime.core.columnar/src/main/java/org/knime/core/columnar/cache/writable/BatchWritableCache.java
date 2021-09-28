@@ -214,14 +214,15 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
     private final AtomicInteger m_maxLength = new AtomicInteger();
 
     /**
-     * @param delegate the delegate to which to write if the table is not small
+     * @param writable the delegate to which to write if the table is not small
+     * @param readable the delegate from which to read if the table is not cached
      * @param cache the cache for obtaining and storing small tables
      */
     @SuppressWarnings("resource")
-    public <D extends BatchWritable & RandomAccessBatchReadable> BatchWritableCache(final D delegate,
+    public BatchWritableCache(final BatchWritable writable, final RandomAccessBatchReadable readable,
         final SharedBatchWritableCache cache) {
-        m_writer = new BatchWritableCacheWriter(delegate.getWriter());
-        m_readableDelegate = delegate;
+        m_writer = new BatchWritableCacheWriter(writable.getWriter());
+        m_readableDelegate = readable;
         m_globalCache = cache.getCache();
         m_smallTableThreshold = cache.getSizeThreshold();
     }

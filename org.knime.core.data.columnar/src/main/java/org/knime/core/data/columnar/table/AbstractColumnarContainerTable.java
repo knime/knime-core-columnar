@@ -54,7 +54,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
-import org.knime.core.columnar.data.dictencoding.DictEncodedBatchReadable;
 import org.knime.core.columnar.filter.DefaultBatchRange;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
@@ -62,8 +61,10 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.ColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.container.CloseableRowIterator;
@@ -143,10 +144,12 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
             .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
 
         final BatchReadStore store = m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath());
-        final CachedBatchReadable cached = new CachedBatchReadable(store);
-        final DictEncodedBatchReadable dictEncoded = new DictEncodedBatchReadable(cached);
 
-        m_readStore = new WrappedBatchReadStore(dictEncoded, store.numBatches(), store.batchLength());
+        final var builder = new ColumnarBatchReadStoreBuilder(store);
+        builder.enableDictEncoding(true)
+            .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache())
+            .useHeapCache(ColumnarPreferenceUtils.getHeapCache());
+        m_readStore = builder.build();
     }
 
     AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
