@@ -161,6 +161,9 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
 
     @Override
     public synchronized void close() throws IOException {
+        if (m_cachedData == null) {
+            return; // already closed!
+        }
         m_cache.keySet().removeAll(m_cachedData);
         m_cachedData.clear();
         m_cachedData = null;
