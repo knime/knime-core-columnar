@@ -48,6 +48,9 @@
  */
 package org.knime.core.data.columnar.schema;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
 import java.util.stream.IntStream;
 
 import org.junit.Test;
@@ -58,6 +61,7 @@ import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.table.schema.traits.LogicalTypeTrait;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -86,6 +90,16 @@ public class DefaultColumnarValueSchemaTest {
     @Test(expected = IndexOutOfBoundsException.class)
     public void testGetSpecIndexOutOfBoundsUpper() {
         createDefaultColumnarValueSchema(createSpec(0)).getSpec(1);
+    }
+
+    @Test
+    public void testLogicalDataTypePresent() {
+        final var tableSpec = createSpec(1);
+        final var schema = createDefaultColumnarValueSchema(tableSpec);
+        final var traits = schema.getTraits(0);
+        final var logicalType = traits.get(LogicalTypeTrait.class);
+        assertNotNull(logicalType);
+        assertEquals(schema.getValueFactory(0).getClass().getName(), logicalType.getLogicalType());
     }
 
 }

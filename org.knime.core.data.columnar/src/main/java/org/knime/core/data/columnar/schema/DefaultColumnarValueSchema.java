@@ -58,7 +58,9 @@ import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.traits.DataTraitUtils;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.LogicalTypeTrait;
 
 import com.google.common.collect.Iterators;
 
@@ -79,7 +81,9 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
         m_specs = Stream.of(source.getValueFactories()).map(ValueFactory::getSpec).collect(Collectors.toList());
-        m_traits = Stream.of(source.getValueFactories()).map(ValueFactory::getTraits).collect(Collectors.toList());
+        m_traits = Stream.of(source.getValueFactories())
+            .map(vf -> DataTraitUtils.withTrait(vf.getTraits(), new LogicalTypeTrait(vf.getClass().getName())))
+            .collect(Collectors.toList());
     }
 
     @Override
