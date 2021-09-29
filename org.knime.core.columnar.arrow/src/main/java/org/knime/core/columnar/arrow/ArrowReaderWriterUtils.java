@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.arrow;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +59,10 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.compression.CompressionCodec;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.ipc.message.MessageSerializer;
+import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.arrow.AbstractArrowBatchReader.ArrowReader;
+import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
 
 /**
  * Utility class for Arrow.
@@ -83,6 +89,23 @@ public final class ArrowReaderWriterUtils {
 
     /** Key for the metadata element holding the factory versions */
     static final String ARROW_LZ4_BLOCK_FEATURE_KEY = "KNIME:basic:usingLz4Block";
+
+    /**
+     * Reads the Arrow {@link Schema} from an Arrow file.
+     * @param file containing Arrow data
+     * @return the {@link Schema} stored in file
+     */
+    public static Schema readSchema(final File file) {
+        try (var in = new MappableReadChannel(file, "r")) {
+            ArrowReader.checkFileSize(in);
+            ArrowReader.checkArrowMagic(in, false);
+            // Magic number (6 bytes) + empty padding to 8 byte boundary
+            in.setPosition(8);
+            return MessageSerializer.deserializeSchema(in);
+        } catch (IOException ex) {
+            throw new IllegalArgumentException(String.format("Failed to read the schema from '%s'.", file), ex);
+        }
+    }
 
     /**
      * Compress the given buffers using the given compression coded. The input buffers are not closed. Also the output
