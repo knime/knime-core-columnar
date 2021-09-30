@@ -48,9 +48,8 @@
  */
 package org.knime.core.data.columnar.table;
 
-import org.knime.core.columnar.store.BatchReadStore;
-
 /**
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
 public interface ColumnarContainerTable {
@@ -58,5 +57,5 @@ public interface ColumnarContainerTable {
     /**
      * @return the table's underlying data storage
      */
-    BatchReadStore getStore();
+    ColumnarBatchReadStore getStore();
 }

@@ -62,7 +62,7 @@ import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.ColumnarBatchStore.ColumnarBatchStoreBuilder;
+import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.meta.DataColumnMetaData;

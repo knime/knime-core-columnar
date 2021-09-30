@@ -62,7 +62,7 @@ import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.ColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
+import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.columnar.table.virtual.closeable.CloseableTracker;
@@ -126,7 +126,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     // TODO AP-17236 would allow to implement a BatchReadStoreRowAccessible that lives in org.knime.core.columnar
     // this class would then simply wrap one of these
-    private final BatchReadStore m_readStore;
+    private final ColumnarBatchReadStore m_readStore;
 
     // effectively final
     private Finalizer m_storeCloser;
@@ -149,7 +149,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
     }
 
     AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final BatchReadStore store, final long size) {
+        final ColumnarValueSchema schema, final ColumnarBatchReadStore store, final long size) {
         m_tableId = tableId;
         m_factory = factory;
         m_schema = schema;
@@ -234,7 +234,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
     }
 
     @Override
-    public BatchReadStore getStore() {
+    public ColumnarBatchReadStore getStore() {
         return m_readStore;
     }
 
