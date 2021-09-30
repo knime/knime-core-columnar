@@ -70,7 +70,7 @@ import com.google.common.collect.Iterators;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-final class DefaultColumnarValueSchema implements ColumnarValueSchema {
+public final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final ValueSchema m_source;
 
@@ -78,7 +78,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     private final List<DataTraits> m_traits;
 
-    DefaultColumnarValueSchema(final ValueSchema source) {
+    public DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
         m_specs = Stream.of(source.getValueFactories()).map(ValueFactory::getSpec).collect(Collectors.toList());
         m_traits = Stream.of(source.getValueFactories())
