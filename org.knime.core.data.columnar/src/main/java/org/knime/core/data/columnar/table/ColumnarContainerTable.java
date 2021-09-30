@@ -48,8 +48,6 @@
  */
 package org.knime.core.data.columnar.table;
 
-import org.knime.core.columnar.store.BatchReadStore;
-
 /**
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
@@ -58,5 +56,19 @@ public interface ColumnarContainerTable {
     /**
      * @return the table's underlying data storage
      */
-    BatchReadStore getStore();
+    // TODO: use in org.knime.python3.legacy (or 2?):
+    //
+    // final KnowsRowCountTable delegate = table.getDelegate();
+    // BatchReadStore readStore;
+//    if (delegate instanceof ColumnarContainerTable) {
+//        ColumnarBatchReadStore columnarReadStore = ((ColumnarContainerTable)delegate).getStore();
+//
+//            if (columnarReadStore instanceof Flushable) {
+//                // in case it is a ColumnarBatchStore
+//                ((Flushable)columnarReadStore).flush();
+//            }
+//            readStore = columnarReadStore.getDelegateBatchStore();
+//        }
+//    }
+    ColumnarBatchReadStore getStore();
 }

@@ -54,7 +54,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.node.CanceledExecutionException;
@@ -73,8 +73,19 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
 
     private final Path m_path;
 
+    /**
+     * Create an {@link UnsavedColumnarContainerTable} from a given store at a given path
+     * @param path Where the table is saved on disk
+     * @param tableId The table id
+     * @param factory The factory used to create the kind of {@link BatchStore}s used as back end
+     * @param schema The schema of this table
+     * @param store The {@link ColumnarBatchReadStore} used to read data from
+     * @param flushable The {@link Flushable} to flush in case we need to make sure all data is written to disk
+     * @param size The number of rows of the table
+     * @return the newly created {@link UnsavedColumnarContainerTable}
+     */
     public static UnsavedColumnarContainerTable create(final Path path, final int tableId,
-        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final BatchReadStore store,
+        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final ColumnarBatchReadStore store,
         final Flushable flushable, final long size) {
         final UnsavedColumnarContainerTable table =
             new UnsavedColumnarContainerTable(path, tableId, factory, schema, store, flushable, size);
@@ -83,7 +94,7 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     }
 
     private UnsavedColumnarContainerTable(final Path path, final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final BatchReadStore store, final Flushable flushable, final long size) {
+        final ColumnarValueSchema schema, final ColumnarBatchReadStore store, final Flushable flushable, final long size) {
         super(tableId, factory, schema, store, size);
         m_path = path;
         m_flushable = flushable;

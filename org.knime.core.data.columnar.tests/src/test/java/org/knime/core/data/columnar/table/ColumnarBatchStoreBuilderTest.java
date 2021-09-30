@@ -70,7 +70,7 @@ import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.ColumnarBatchStore.ColumnarBatchStoreBuilder;
+import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.ValueSchema;
@@ -95,7 +95,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
             final var builder = new ColumnarBatchStoreBuilder(delegate);
             try (final var wrapped = builder.build()) {
-                assertEquals(delegate, wrapped.getWriteDelegate());
+                assertEquals(delegate, wrapped.getWritableDelegate());
             }
         }
     }
@@ -107,7 +107,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var builder = new ColumnarBatchStoreBuilder(delegate)
                 .useDomainCalculation(new DefaultDomainWritableConfig(SCHEMA, 5, false), exec);
             try (final var wrapped = builder.build()) {
-                assertEquals(DomainWritable.class, wrapped.getWriteDelegate().getClass());
+                assertEquals(DomainWritable.class, wrapped.getWritableDelegate().getClass());
             }
         }
     }
@@ -117,7 +117,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
             final var builder = new ColumnarBatchStoreBuilder(delegate).enableDictEncoding(true);
             try (final var wrapped = builder.build()) {
-                assertEquals(DictEncodedBatchWritableReadable.class, wrapped.getWriteDelegate().getClass());
+                assertEquals(DictEncodedBatchWritableReadable.class, wrapped.getWritableDelegate().getClass());
             }
         }
     }
@@ -128,7 +128,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
             final var builder = new ColumnarBatchStoreBuilder(delegate).useDuplicateChecking(exec);
             try (final var wrapped = builder.build()) {
-                assertEquals(DuplicateCheckWritable.class, wrapped.getWriteDelegate().getClass());
+                assertEquals(DuplicateCheckWritable.class, wrapped.getWritableDelegate().getClass());
             }
         }
     }
@@ -140,7 +140,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var cache = new WeakReferencedObjectCache();
             final var builder = new ColumnarBatchStoreBuilder(delegate).useHeapCache(cache, exec, exec);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(ObjectCache.class, wrappedStore.getWriteDelegate().getClass());
+                assertEquals(ObjectCache.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
@@ -152,7 +152,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var cache = new SharedReadDataCache(64, 2);
             final var builder = new ColumnarBatchStoreBuilder(delegate).useColumnDataCache(cache, exec);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(ReadDataCache.class, wrappedStore.getWriteDelegate().getClass());
+                assertEquals(ReadDataCache.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
@@ -163,7 +163,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var cache = new SharedBatchWritableCache(200, 1000, 2);
             final var builder = new ColumnarBatchStoreBuilder(delegate).useSmallTableCache(cache);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(BatchWritableCache.class, wrappedStore.getWriteDelegate().getClass());
+                assertEquals(BatchWritableCache.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
@@ -177,7 +177,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var builder = new ColumnarBatchStoreBuilder(delegate).useSmallTableCache(smallTableCache)
                 .useColumnDataCache(columnDataCache, exec);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(BatchWritableCache.class, wrappedStore.getWriteDelegate().getClass());
+                assertEquals(BatchWritableCache.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
@@ -191,7 +191,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var builder = new ColumnarBatchStoreBuilder(delegate).useHeapCache(heapCache, exec, exec)
                     .useSmallTableCache(smallTableCache);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(ObjectCache.class, wrappedStore.getWriteDelegate().getClass());
+                assertEquals(ObjectCache.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
@@ -204,7 +204,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var builder =
                 new ColumnarBatchStoreBuilder(delegate).useHeapCache(heapCache, exec, exec).enableDictEncoding(true);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(DictEncodedBatchWritableReadable.class, wrappedStore.getWriteDelegate().getClass());
+                assertEquals(DictEncodedBatchWritableReadable.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
@@ -216,7 +216,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var builder =
                 new ColumnarBatchStoreBuilder(delegate).useDuplicateChecking(exec).enableDictEncoding(true);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(DuplicateCheckWritable.class, wrappedStore.getWriteDelegate().getClass());
+                assertEquals(DuplicateCheckWritable.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
@@ -229,7 +229,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
                 new ColumnarBatchStoreBuilder(delegate).useDuplicateChecking(exec)
                 .useDomainCalculation(new DefaultDomainWritableConfig(SCHEMA, 5, false), exec);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(DomainWritable.class, wrappedStore.getWriteDelegate().getClass());
+                assertEquals(DomainWritable.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
