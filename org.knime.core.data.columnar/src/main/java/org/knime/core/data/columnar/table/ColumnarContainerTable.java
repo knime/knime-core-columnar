@@ -44,73 +44,19 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   22 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   Jul 22, 2021 (marcel): created
  */
 package org.knime.core.data.columnar.table;
 
-import java.io.File;
-import java.io.Flushable;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import org.knime.core.columnar.store.BatchReadStore;
-import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.ExecutionMonitor;
-import org.knime.core.node.NodeSettingsWO;
 
 /**
- * ColumnarContainerTable which has not yet been saved, i.e. all data is still in-memory or temporarily persisted in the
- * temp directory.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
-public final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
+public interface ColumnarContainerTable {
 
-    private final Flushable m_flushable;
-
-    private final Path m_path;
-
-    public static UnsavedColumnarContainerTable create(final Path path, final int tableId,
-        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final BatchReadStore store,
-        final Flushable flushable, final long size) {
-        final UnsavedColumnarContainerTable table =
-            new UnsavedColumnarContainerTable(path, tableId, factory, schema, store, flushable, size);
-        table.initStoreCloser();
-        return table;
-    }
-
-    private UnsavedColumnarContainerTable(final Path path, final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final BatchReadStore store, final Flushable flushable, final long size) {
-        super(tableId, factory, schema, store, size);
-        m_path = path;
-        m_flushable = flushable;
-    }
-
-    @Override
-    protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
-        throws IOException, CanceledExecutionException {
-        super.saveToFileOverwrite(f, settings, exec);
-        m_flushable.flush();
-        Files.copy(m_path, f.toPath());
-    }
-
-    @Override
-    public void close() {
-        clear();
-        super.close();
-    }
-
-    @Override
-    public void clear() {
-        super.clear();
-        try {
-            Files.deleteIfExists(m_path);
-        } catch (IOException e) {
-            LOGGER.info("Error when deleting file that backed the UnsavedColumnarContainerTable", e);
-        }
-    }
-
+    /**
+     * @return the table's underlying data storage
+     */
+    BatchReadStore getStore();
 }

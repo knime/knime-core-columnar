@@ -90,7 +90,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractColumnarContainerTable extends ExtensionTable {
+abstract class AbstractColumnarContainerTable extends ExtensionTable implements ColumnarContainerTable {
 
     protected static final NodeLogger LOGGER = NodeLogger.getLogger(AbstractColumnarContainerTable.class);
 
@@ -231,6 +231,11 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     @Override
     public BufferedDataTable[] getReferenceTables() {
         return new BufferedDataTable[0];
+    }
+
+    @Override
+    public BatchReadStore getStore() {
+        return m_readStore;
     }
 
     @Override
