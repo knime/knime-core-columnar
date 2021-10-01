@@ -54,6 +54,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Bool;
 import org.apache.arrow.vector.types.pojo.ArrowType.Date;
 import org.apache.arrow.vector.types.pojo.ArrowType.Decimal;
 import org.apache.arrow.vector.types.pojo.ArrowType.Duration;
+import org.apache.arrow.vector.types.pojo.ArrowType.ExtensionType;
 import org.apache.arrow.vector.types.pojo.ArrowType.FixedSizeBinary;
 import org.apache.arrow.vector.types.pojo.ArrowType.FloatingPoint;
 import org.apache.arrow.vector.types.pojo.ArrowType.Int;
@@ -67,10 +68,13 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Timestamp;
 import org.apache.arrow.vector.types.pojo.ArrowType.Utf8;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.arrow.data.StructDictEncodedExtensionType;
 import org.knime.core.columnar.arrow.data.ValueFactoryExtensionType;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
 import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
+import org.knime.core.table.schema.traits.DataTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraitUtils;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.LogicalTypeTrait;
@@ -118,6 +122,8 @@ public final class ArrowSchemaUtils {
             return parseStructField(field, type);
         } else if (type instanceof ValueFactoryExtensionType) {
             return parseValueFactoryField(field, (ValueFactoryExtensionType)type);
+        } else if (type instanceof StructDictEncodedExtensionType) {
+            return parseStructDictEncodedField(field, (StructDictEncodedExtensionType)type);
         } else if (type instanceof ArrowType.List) {
             return parseListField(field, type);
         } else {
@@ -127,9 +133,41 @@ public final class ArrowSchemaUtils {
 
     private static DataSpecWithTraits parseValueFactoryField(final Field field, final ValueFactoryExtensionType type) {
         var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactory());
+        return parseStorageAndAddTrait(field, type, logicalTypeTrait);
+    }
+
+    private static DataSpecWithTraits parseStorageAndAddTrait(final Field field, final ExtensionType type, final DataTrait trait) {
         var storageSpecWithTraits = parseField(field, type.storageType());
         return new DataSpecWithTraits(storageSpecWithTraits.spec(),
-            DataTraitUtils.withTrait(storageSpecWithTraits.traits(), logicalTypeTrait));
+            DataTraitUtils.withTrait(storageSpecWithTraits.traits(), trait));
+    }
+
+    private static DataSpecWithTraits parseStructDictEncodedField(final Field field,
+        final StructDictEncodedExtensionType type) {
+        var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
+        return parseStorageAndAddTrait(field, type, dictEncodingTrait);
+    }
+
+    private static KeyType parseKeyType(final Field dictEncodedField) {
+        var children = dictEncodedField.getChildren();
+        Preconditions.checkArgument(!children.isEmpty(), "The struct-dict-encoded field has no children.");
+        var keyField = children.get(0);
+        return parseKeyType(keyField.getType());
+    }
+
+    private static KeyType parseKeyType(final ArrowType keyType) {
+        Preconditions.checkArgument(keyType instanceof Int, "The key type must be an integer type (byte, int, long) but was '%s'.", keyType);
+        var bitWidth = ((Int)keyType).getBitWidth();
+        if (bitWidth == 8) {
+            return KeyType.BYTE_KEY;
+        } else if (bitWidth == 32) {
+            return KeyType.INT_KEY;
+        } else if (bitWidth == 64) {
+            return KeyType.LONG_KEY;
+        } else {
+            throw new IllegalArgumentException(String.format(
+                "Unsupported bit width '%s' for dictionary key type. Supported are 8, 32 and 64 bits.", bitWidth));
+        }
     }
 
     private static DataSpecWithTraits parseStructField(final Field structField, final ArrowType type) {
