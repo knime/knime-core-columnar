@@ -55,7 +55,9 @@ import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
@@ -78,6 +80,7 @@ import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.LogicalTypeTrait;
 
 import com.google.common.base.Preconditions;
 
@@ -298,6 +301,8 @@ public final class AbstractArrowDictEncodedData {
 
         private final int m_version;
 
+        private final String m_logicalType;
+
         protected AbstractArrowDictEncodedDataFactory(final DataTraits traits, final ArrowColumnDataFactory valueFactory,
             final int version) {
             Preconditions.checkArgument(DictEncodingTrait.isEnabled(traits), "The column is not dictionary encoded.");
@@ -305,6 +310,9 @@ public final class AbstractArrowDictEncodedData {
             // TODO is null correct here, or should this rather create StructDataTraits to delegate any traits down
             m_delegate = new ArrowStructDataFactory(null, createKeyDataFactory(), valueFactory);
             m_version = version;
+            m_logicalType = DataTraits.getTrait(traits, LogicalTypeTrait.class)//
+                    .map(LogicalTypeTrait::getLogicalType)//
+                    .orElse(null);
         }
 
         @Override
@@ -314,7 +322,13 @@ public final class AbstractArrowDictEncodedData {
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return m_delegate.getField(name, dictionaryIdSupplier);
+            var delegateField = m_delegate.getField(name, dictionaryIdSupplier);
+            var delegateFieldType = delegateField.getFieldType();
+            ArrowType decoratedType = new StructDictEncodedExtensionType(delegateFieldType.getType());
+            decoratedType = ValueFactoryExtensionType.wrapIfLogical(decoratedType, m_logicalType);
+            var decoratedFieldType = new FieldType(delegateFieldType.isNullable(), decoratedType,
+                delegateFieldType.getDictionary(), delegateFieldType.getMetadata());
+            return new Field(delegateField.getName(), decoratedFieldType, delegateField.getChildren());
         }
 
         @SuppressWarnings("rawtypes")

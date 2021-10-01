@@ -44,7 +44,7 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Aug 16, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Sep 28, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.arrow.data;
 
@@ -57,64 +57,24 @@ import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
 import org.apache.arrow.vector.types.pojo.FieldType;
 
 /**
- * Arrow extension type that stores the value factory as meta data.
+ * Arrow {@link ExtensionType} for struct-dict-encoded data.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-// the super class implements equals and delegates to extensionEquals
-public final class ValueFactoryExtensionType extends ExtensionType { //NOSONAR
+public final class StructDictEncodedExtensionType extends ExtensionType {//NOSONAR
 
     static {
-        ExtensionTypeRegistry.register(new ValueFactoryExtensionType());
+        ExtensionTypeRegistry.register(new StructDictEncodedExtensionType());
     }
 
-    /**
-     * Corresponds to DataSpec in fast tables.
-     */
     private final ArrowType m_storageType;
 
-    /**
-     * E.g. the ValueFactory
-     */
-    private final String m_valueFactory;
-
-    private ValueFactoryExtensionType() {
+    private StructDictEncodedExtensionType() {
         m_storageType = null;
-        m_valueFactory = null;
     }
 
-    /**
-     * Constructor.
-     *
-     * @param valueFactory the fully qualified class name of the value factory this type is associated with
-     * @param storageType the underlying storage type
-     */
-    private ValueFactoryExtensionType(final String valueFactory, final ArrowType storageType) {
-        m_valueFactory = valueFactory;
+    StructDictEncodedExtensionType(final ArrowType storageType) {
         m_storageType = storageType;
-    }
-
-    /**
-     * Convenience method to wrap an {@link ArrowType} into a {@link ValueFactoryExtensionType} if the corresponding
-     * data has a logical type.
-     *
-     * @param storageType underlying {@link ArrowType}
-     * @param logicalType logical type of the data (can be null)
-     * @return either a {@link ValueFactoryExtensionType} if logicalType was not null or storageType
-     */
-    public static ArrowType wrapIfLogical(final ArrowType storageType, final String logicalType) {
-        if (logicalType != null) {
-            return new ValueFactoryExtensionType(logicalType, storageType);
-        } else {
-            return storageType;
-        }
-    }
-
-    /**
-     * @return the value factory name
-     */
-    public String getValueFactory() {
-        return m_valueFactory;
     }
 
     @Override
@@ -124,7 +84,7 @@ public final class ValueFactoryExtensionType extends ExtensionType { //NOSONAR
 
     @Override
     public String extensionName() {
-        return "knime.value_factory";
+        return "knime.struct_dict_encoded";
     }
 
     @Override
@@ -132,34 +92,26 @@ public final class ValueFactoryExtensionType extends ExtensionType { //NOSONAR
         if (other == this) {
             return true;
         }
-        if (other instanceof ValueFactoryExtensionType) {
-            final ValueFactoryExtensionType otherType = (ValueFactoryExtensionType)other;
-            return m_valueFactory.equals(otherType.m_valueFactory) //
-                && m_storageType.equals(otherType.m_storageType);
+        if (other instanceof StructDictEncodedExtensionType) {
+            return m_storageType.equals(((StructDictEncodedExtensionType)other).m_storageType);
         }
         return false;
     }
 
     @Override
     public String serialize() {
-        // in Python we don't get access to the ExtensionType id, so we have to store it also as meta data
-        return m_valueFactory;
+        return "";
     }
 
     @Override
     public ArrowType deserialize(final ArrowType storageType, final String serializedData) {
-        return new ValueFactoryExtensionType(serializedData, storageType);
+        return new StructDictEncodedExtensionType(storageType);
     }
 
     @Override
     public FieldVector getNewVector(final String name, final FieldType fieldType, final BufferAllocator allocator) {
-        // TODO implement a custom ExtensionTypeVector to be fully Arrow conform
-        if (m_storageType instanceof ExtensionType) {
-            return ((ExtensionType)m_storageType).getNewVector(name, fieldType, allocator);
-        } else {
-            var minorStorageType = Types.getMinorTypeForArrowType(m_storageType);
-            return minorStorageType.getNewVector(name, fieldType, allocator, null);
-        }
+        var minorStorageType = Types.getMinorTypeForArrowType(m_storageType);
+        return minorStorageType.getNewVector(name, fieldType, allocator, null);
     }
 
 }
