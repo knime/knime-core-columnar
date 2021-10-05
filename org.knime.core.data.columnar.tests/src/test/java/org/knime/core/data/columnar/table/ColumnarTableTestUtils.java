@@ -59,6 +59,7 @@ import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataType;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.def.IntCell;
@@ -92,9 +93,13 @@ final class ColumnarTableTestUtils {
     }
 
     static ColumnarValueSchema createSchema(final int nCols) {
-        final DataTableSpec spec = new DataTableSpec(IntStream.range(0, nCols)
-            .mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), IntCell.TYPE).createSpec())
-            .toArray(DataColumnSpec[]::new));
+        return createSchema(nCols, IntCell.TYPE);
+    }
+
+    static ColumnarValueSchema createSchema(final int nCols, final DataType type) {
+        final DataTableSpec spec = new DataTableSpec(
+            IntStream.range(0, nCols).mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), type).createSpec())
+                .toArray(DataColumnSpec[]::new));
         final ValueSchema valueSchema =
             ValueSchema.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         return ColumnarValueSchemaUtils.create(valueSchema);
@@ -105,13 +110,14 @@ final class ColumnarTableTestUtils {
     }
 
     static ColumnarRowContainer createColumnarRowContainer(final ExecutionContext exec) {
-        return createColumnarRowContainer(1, exec);
+        return createColumnarRowContainer(1, IntCell.TYPE, exec);
     }
 
-    private static ColumnarRowContainer createColumnarRowContainer(final int nCols, final ExecutionContext exec) {
+    private static ColumnarRowContainer createColumnarRowContainer(final int nCols, final DataType type,
+        final ExecutionContext exec) {
         final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(true, 60, true, false);
         try {
-            return ColumnarRowContainer.create(exec, -1, createSchema(nCols), TestColumnStoreFactory.INSTANCE,
+            return ColumnarRowContainer.create(exec, -1, createSchema(nCols, type), TestColumnStoreFactory.INSTANCE,
                 settings);
         } catch (IOException e) {
             throw new IllegalStateException("Exception when trying to create RowContainer.", e);
@@ -119,16 +125,22 @@ final class ColumnarTableTestUtils {
     }
 
     static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int nRows) {
-        return createUnsavedColumnarContainerTable(1, nRows, null);
+        return createUnsavedColumnarContainerTable(1, nRows);
     }
 
     static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows) {
-        return createUnsavedColumnarContainerTable(nCols, nRows, null);
+        return createUnsavedColumnarContainerTable(nCols, nRows, IntCell.TYPE,
+            (row, j, i) -> row.<IntWriteValue> getWriteValue(j).setIntValue(i), null);
     }
 
-    private static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows,
-        final ExecutionContext exec) {
-        try (final ColumnarRowContainer container = createColumnarRowContainer(nCols, exec);
+    @FunctionalInterface
+    interface RowWriteConsumer {
+        void accept(RowWrite row, int colIdx, int rowIdx);
+    }
+
+    static UnsavedColumnarContainerTable createUnsavedColumnarContainerTable(final int nCols, final int nRows,
+        final DataType type, final RowWriteConsumer setter, final ExecutionContext exec) {
+        try (final ColumnarRowContainer container = createColumnarRowContainer(nCols, type, exec);
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
             for (int i = 0; i < nRows; i++) {
                 final RowWrite row = cursor.forward();
@@ -137,7 +149,7 @@ final class ColumnarTableTestUtils {
                     if (i % 2 == 0) { // NOSONAR
                         row.setMissing(j);
                     } else {
-                        row.<IntWriteValue> getWriteValue(j).setIntValue(i);
+                        setter.accept(row, j, i);
                     }
                 }
             }

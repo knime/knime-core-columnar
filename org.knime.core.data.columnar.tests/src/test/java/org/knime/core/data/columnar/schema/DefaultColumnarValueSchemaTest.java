@@ -50,6 +50,8 @@ package org.knime.core.data.columnar.schema;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.stream.IntStream;
 
@@ -57,10 +59,16 @@ import org.junit.Test;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataType;
+import org.knime.core.data.collection.ListCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.value.IntListValueFactory;
+import org.knime.core.table.access.ListAccess.ListReadAccess;
+import org.knime.core.table.access.ListAccess.ListWriteAccess;
+import org.knime.core.table.schema.traits.ListDataTraits;
 import org.knime.core.table.schema.traits.LogicalTypeTrait;
 
 /**
@@ -72,6 +80,13 @@ public class DefaultColumnarValueSchemaTest {
     static DataTableSpec createSpec(final int nCols) {
         return new DataTableSpec(IntStream.range(0, nCols)
             .mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), IntCell.TYPE).createSpec())
+            .toArray(DataColumnSpec[]::new));
+    }
+
+    static DataTableSpec createCollectionSpec(final int nCols) {
+        final var intListType = DataType.getType(ListCell.class, IntCell.TYPE);
+        return new DataTableSpec(IntStream.range(0, nCols)
+            .mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), intListType).createSpec())
             .toArray(DataColumnSpec[]::new));
     }
 
@@ -96,10 +111,30 @@ public class DefaultColumnarValueSchemaTest {
     public void testLogicalDataTypePresent() {
         final var tableSpec = createSpec(1);
         final var schema = createDefaultColumnarValueSchema(tableSpec);
-        final var traits = schema.getTraits(0);
+        assertEquals(2, schema.numColumns());
+        final var traits = schema.getTraits(1);
         final var logicalType = traits.get(LogicalTypeTrait.class);
         assertNotNull(logicalType);
-        assertEquals(schema.getValueFactory(0).getClass().getName(), logicalType.getLogicalType());
+        assertEquals(schema.getValueFactory(1).getClass().getName(), logicalType.getLogicalType());
+    }
+
+    @Test
+    public void testLogicalDataTypeOfCollectionValueFactory() {
+        final var tableSpec = createCollectionSpec(1);
+        final var schema = createDefaultColumnarValueSchema(tableSpec);
+        assertTrue(schema.<ListReadAccess, ListWriteAccess> getValueFactory(1) instanceof IntListValueFactory);
+
+        // Collection value factory logical type traits are expected to be on top layer
+        final var traits = schema.getTraits(1);
+        final var logicalType = traits.get(LogicalTypeTrait.class);
+        assertNotNull(logicalType);
+        assertEquals(IntListValueFactory.class.getName(), logicalType.getLogicalType());
+
+        assertTrue(traits instanceof ListDataTraits);
+        final var innerTraits = ((ListDataTraits)traits).getInner();
+        assertNotNull(innerTraits);
+        final var innerLogicalTraits = innerTraits.get(LogicalTypeTrait.class);
+        assertNull(innerLogicalTraits);
     }
 
 }
