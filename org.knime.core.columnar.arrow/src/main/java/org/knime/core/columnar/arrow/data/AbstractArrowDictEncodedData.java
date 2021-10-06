@@ -66,6 +66,8 @@ import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedIntData.ArrowUnsignedIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongDataFactory;
+import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedType;
+import org.knime.core.columnar.arrow.extensiontypes.ValueFactoryType;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
@@ -324,8 +326,8 @@ public final class AbstractArrowDictEncodedData {
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
             var delegateField = m_delegate.getField(name, dictionaryIdSupplier);
             var delegateFieldType = delegateField.getFieldType();
-            ArrowType decoratedType = new StructDictEncodedExtensionType(delegateFieldType.getType());
-            decoratedType = ValueFactoryExtensionType.wrapIfLogical(decoratedType, m_logicalType);
+            ArrowType decoratedType = new StructDictEncodedType(delegateFieldType.getType());
+            decoratedType = ValueFactoryType.wrapIfLogical(decoratedType, m_logicalType);
             var decoratedFieldType = new FieldType(delegateFieldType.isNullable(), decoratedType,
                 delegateFieldType.getDictionary(), delegateFieldType.getMetadata());
             return new Field(delegateField.getName(), decoratedFieldType, delegateField.getChildren());

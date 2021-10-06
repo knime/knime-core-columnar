@@ -57,6 +57,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.arrow.extensiontypes.ValueFactoryType;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
@@ -167,7 +168,7 @@ public final class ArrowVarBinaryData {
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            final var arrowType = ValueFactoryExtensionType.wrapIfLogical(MinorType.LARGEVARBINARY.getType(), m_logicalType);
+            final var arrowType = ValueFactoryType.wrapIfLogical(MinorType.LARGEVARBINARY.getType(), m_logicalType);
             return Field.nullable(name, arrowType);
         }
 

@@ -44,47 +44,74 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 28, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Aug 16, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.extensiontypes;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.types.pojo.ArrowType;
-import org.apache.arrow.vector.types.pojo.ArrowType.ExtensionType;
 import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
-import org.apache.arrow.vector.types.pojo.FieldType;
 
 /**
- * Arrow {@link ExtensionType} for struct-dict-encoded data.
+ * Arrow extension type that stores the value factory as meta data.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class StructDictEncodedExtensionType extends ExtensionType {//NOSONAR
+// the super class implements equals and delegates to extensionEquals
+public final class ValueFactoryType extends AbstractKnimeExtensionType { //NOSONAR
+
+    static final ValueFactoryType DESERIALIZATION_INSTANCE = new ValueFactoryType();
 
     static {
-        ExtensionTypeRegistry.register(new StructDictEncodedExtensionType());
+        ExtensionTypeRegistry.register(DESERIALIZATION_INSTANCE);
     }
 
-    private final ArrowType m_storageType;
+    /**
+     * E.g. the ValueFactory
+     */
+    private final String m_valueFactory;
 
-    private StructDictEncodedExtensionType() {
-        m_storageType = null;
+    private ValueFactoryType() {
+        super(null);
+        m_valueFactory = null;
     }
 
-    StructDictEncodedExtensionType(final ArrowType storageType) {
-        m_storageType = storageType;
+    /**
+     * Constructor.
+     *
+     * @param valueFactory the fully qualified class name of the value factory this type is associated with
+     * @param storageType the underlying storage type
+     */
+    private ValueFactoryType(final String valueFactory, final ArrowType storageType) {
+        super(storageType);
+        m_valueFactory = valueFactory;
     }
 
-    @Override
-    public ArrowType storageType() {
-        return m_storageType;
+    /**
+     * Convenience method to wrap an {@link ArrowType} into a {@link ValueFactoryType} if the corresponding
+     * data has a logical type.
+     *
+     * @param storageType underlying {@link ArrowType}
+     * @param logicalType logical type of the data (can be null)
+     * @return either a {@link ValueFactoryType} if logicalType was not null or storageType
+     */
+    public static ArrowType wrapIfLogical(final ArrowType storageType, final String logicalType) {
+        if (logicalType != null) {
+            return new ValueFactoryType(logicalType, storageType);
+        } else {
+            return storageType;
+        }
+    }
+
+    /**
+     * @return the value factory name
+     */
+    public String getValueFactory() {
+        return m_valueFactory;
     }
 
     @Override
     public String extensionName() {
-        return "knime.struct_dict_encoded";
+        return "knime.value_factory";
     }
 
     @Override
@@ -92,26 +119,22 @@ public final class StructDictEncodedExtensionType extends ExtensionType {//NOSON
         if (other == this) {
             return true;
         }
-        if (other instanceof StructDictEncodedExtensionType) {
-            return m_storageType.equals(((StructDictEncodedExtensionType)other).m_storageType);
+        if (other instanceof ValueFactoryType) {
+            final ValueFactoryType otherType = (ValueFactoryType)other;
+            return m_valueFactory.equals(otherType.m_valueFactory) //
+                && storageType().equals(otherType.storageType());
         }
         return false;
     }
 
     @Override
     public String serialize() {
-        return "";
+        return m_valueFactory;
     }
 
     @Override
-    public ArrowType deserialize(final ArrowType storageType, final String serializedData) {
-        return new StructDictEncodedExtensionType(storageType);
-    }
-
-    @Override
-    public FieldVector getNewVector(final String name, final FieldType fieldType, final BufferAllocator allocator) {
-        var minorStorageType = Types.getMinorTypeForArrowType(m_storageType);
-        return minorStorageType.getNewVector(name, fieldType, allocator, null);
+    public ValueFactoryType deserialize(final ArrowType storageType, final String serializedData) {
+        return new ValueFactoryType(serializedData, storageType);
     }
 
 }
