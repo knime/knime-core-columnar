@@ -81,25 +81,9 @@ public final class ValueFactoryType extends AbstractKnimeExtensionType { //NOSON
      * @param valueFactory the fully qualified class name of the value factory this type is associated with
      * @param storageType the underlying storage type
      */
-    private ValueFactoryType(final String valueFactory, final ArrowType storageType) {
+    ValueFactoryType(final String valueFactory, final ArrowType storageType) {
         super(storageType);
         m_valueFactory = valueFactory;
-    }
-
-    /**
-     * Convenience method to wrap an {@link ArrowType} into a {@link ValueFactoryType} if the corresponding
-     * data has a logical type.
-     *
-     * @param storageType underlying {@link ArrowType}
-     * @param logicalType logical type of the data (can be null)
-     * @return either a {@link ValueFactoryType} if logicalType was not null or storageType
-     */
-    public static ArrowType wrapIfLogical(final ArrowType storageType, final String logicalType) {
-        if (logicalType != null) {
-            return new ValueFactoryType(logicalType, storageType);
-        } else {
-            return storageType;
-        }
     }
 
     /**

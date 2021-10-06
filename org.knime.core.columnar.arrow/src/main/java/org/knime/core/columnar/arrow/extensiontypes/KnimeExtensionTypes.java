@@ -44,90 +44,49 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Nov 4, 2020 (benjamin): created
+ *   Oct 6, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.extensiontypes;
 
-import java.util.Objects;
-
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.data.NullableReadData;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.ArrowType.ExtensionType;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.LogicalTypeTrait;
 
 /**
- * Abstract implementation of {@link ArrowColumnDataFactory} for {@link ArrowReadData} which extend
- * {@link AbstractArrowReadData}. Holds the current version.
+ * Static factory class for KNIME {@link ExtensionType ExtensionTypes}.
  *
- * Overwrite {@link #getDictionaries(NullableReadData)} if the data object contains dictionaries.
- *
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory {
+public final class KnimeExtensionTypes {
 
-    /** The current version */
-    protected final ArrowColumnDataFactoryVersion m_version;
-
-    protected final DataTraits m_traits;
-
-    /**
-     * Create a new abstract {@link ArrowColumnDataFactory}.
-     *
-     * @param version the current version
-     */
-    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
-        this(version, null);
-    }
-
-    /**
-     * Create a new abstract {@link ArrowColumnDataFactory}.
-     *
-     * @param version the current version
-     * @param traits of the column factory
-     */
-    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version, final DataTraits traits) {
-        m_version = version;
-        m_traits = traits;
-    }
-
-    @Override
-    public FieldVector getVector(final NullableReadData data) {
-        return ((AbstractArrowReadData<?>)data).m_vector;
-    }
-
-    @Override
-    public DictionaryProvider getDictionaries(final NullableReadData data) {
-        return null;
-    }
-
-    @Override
-    public ArrowColumnDataFactoryVersion getVersion() {
-        return m_version;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(m_version, m_traits);
-    }
-
-    @Override
-    public boolean equals(final Object obj) {
-        if (this == obj) {
-            return true;
+    public static Field wrapInExtensionTypeIfNecessary(final Field field, final DataTraits traits) {
+        final var arrowType = field.getType();
+        final var valueFactoryType = DataTraits.getTrait(traits, LogicalTypeTrait.class)//
+            .map(LogicalTypeTrait::getLogicalType)//
+            .map(t -> new ValueFactoryType(t, arrowType));
+        final var structDictType = DataTraits.getTrait(traits, DictEncodingTrait.class)//
+                .map(DictEncodingTrait::getKeyType)//
+            .map(k -> new StructDictEncodedType(field, k));
+        final ArrowType type;
+        if (valueFactoryType.isPresent() && structDictType.isPresent()) {
+            type = new StructDictEncodedValueFactoryType(valueFactoryType.get(), structDictType.get());
+        } else if (valueFactoryType.isPresent()) {
+            type = valueFactoryType.get();
+        } else if (structDictType.isPresent()) {
+            type = structDictType.get();
+        } else {
+            // no extension types necessary
+            return field;
         }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        AbstractArrowColumnDataFactory other = (AbstractArrowColumnDataFactory)obj;
-        return m_version.equals(other.m_version)
-                && Objects.equals(m_traits, other.m_traits);
+        var newFieldType = new FieldType(field.isNullable(), type, field.getDictionary(), field.getMetadata());
+        return new Field(field.getName(), newFieldType, field.getChildren());
     }
 
-
+    private KnimeExtensionTypes() {
+        // static factory class
+    }
 }

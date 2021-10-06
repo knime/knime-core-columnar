@@ -50,6 +50,11 @@ package org.knime.core.columnar.arrow.extensiontypes;
 
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+
+import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 /**
  * Arrow ExtensionType for struct-dict-encoded data.
@@ -58,18 +63,52 @@ import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
  */
 public final class StructDictEncodedType extends AbstractKnimeExtensionType {//NOSONAR
 
-    static final StructDictEncodedType DESERIALIZATION_INSTANCE = new StructDictEncodedType();
+    static final StructDictEncodedType DESERIALIZATION_INSTANCE = new StructDictEncodedType(null);
 
     static {
         ExtensionTypeRegistry.register(DESERIALIZATION_INSTANCE);
     }
 
-    private StructDictEncodedType() {
-        super(null);
+    /**
+     * Deserialization constructor.
+     *
+     * @param storageType type of the underlying storage
+     */
+    private StructDictEncodedType(final ArrowType storageType) {
+        super(storageType);
     }
 
-    public StructDictEncodedType(final ArrowType storageType) {
-        super(storageType);
+    /**
+     * Constructor. Verifies that the storageField has the correct format and matches keyType.
+     * @param storageField a field holding the dictionary struct
+     * @param keyType
+     */
+    StructDictEncodedType(final Field storageField, final KeyType keyType) {
+        super(storageField.getType());
+        Preconditions.checkArgument(storageType() instanceof Struct,
+            "The storage type for StructDictEncoded data must be a struct.");
+        var children = storageField.getChildren();
+        Preconditions.checkArgument(children.size() == 2,
+            "The storage struct field is expected to have two children, one for the keys and one for the values."
+                + " Instead received '%s'.",
+            children);
+        var storageKeyType = children.get(0).getType();
+        var expectedKeyType = getExpectedKeyType(keyType);
+        Preconditions.checkArgument(Objects.equal(storageKeyType, expectedKeyType),
+            "Expected key type '%s' but got '%s'.", expectedKeyType, storageKeyType);
+    }
+
+    private static Int getExpectedKeyType(final KeyType keyType) {
+        switch (keyType) {
+            case BYTE_KEY:
+                return new Int(8, false);
+            case INT_KEY:
+                return new Int(32, false);
+            case LONG_KEY:
+                return new Int(64, false);
+            default:
+                throw new IllegalArgumentException("Unsupported KeyType: " + keyType);
+        }
     }
 
     @Override

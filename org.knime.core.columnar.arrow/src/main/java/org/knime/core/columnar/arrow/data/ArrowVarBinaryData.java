@@ -52,12 +52,12 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.apache.arrow.vector.types.Types.MinorType;
+import org.apache.arrow.vector.types.pojo.ArrowType.LargeBinary;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.arrow.extensiontypes.ValueFactoryType;
+import org.knime.core.columnar.arrow.extensiontypes.KnimeExtensionTypes;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
@@ -168,8 +168,8 @@ public final class ArrowVarBinaryData {
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            final var arrowType = ValueFactoryType.wrapIfLogical(MinorType.LARGEVARBINARY.getType(), m_logicalType);
-            return Field.nullable(name, arrowType);
+            var field = Field.nullable(name, LargeBinary.INSTANCE);
+            return KnimeExtensionTypes.wrapInExtensionTypeIfNecessary(field, m_traits);
         }
 
         @Override
