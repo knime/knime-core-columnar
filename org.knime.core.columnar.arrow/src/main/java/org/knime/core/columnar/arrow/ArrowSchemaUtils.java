@@ -69,6 +69,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Utf8;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedType;
+import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedValueFactoryType;
 import org.knime.core.columnar.arrow.extensiontypes.ValueFactoryType;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
@@ -96,8 +97,8 @@ public final class ArrowSchemaUtils {
      */
     public static ColumnarSchema convertSchema(final Schema schema) {
         var specsWithTraits = schema.getFields().stream()//
-                .map(ArrowSchemaUtils::parseField)//
-                .toArray(DataSpecWithTraits[]::new);
+            .map(ArrowSchemaUtils::parseField)//
+            .toArray(DataSpecWithTraits[]::new);
         return ColumnarSchema.of(specsWithTraits);
     }
 
@@ -109,17 +110,19 @@ public final class ArrowSchemaUtils {
      */
     public static String[] extractColumnNames(final Schema schema) {
         return schema.getFields().stream()//
-                .map(Field::getName)//
-                .toArray(String[]::new);
+            .map(Field::getName)//
+            .toArray(String[]::new);
     }
 
     static DataSpecWithTraits parseField(final Field field) {
         return parseField(field, field.getType());
     }
 
-    private static DataSpecWithTraits parseField(final Field field, final ArrowType type) {
+    private static DataSpecWithTraits parseField(final Field field, final ArrowType type) {//NOSONAR
         if (type instanceof ArrowType.Struct) {
             return parseStructField(field, type);
+        } else if (type instanceof StructDictEncodedValueFactoryType) {
+            return parseStructDictEncodedValueFactoryField(field, (StructDictEncodedValueFactoryType)type);
         } else if (type instanceof ValueFactoryType) {
             return parseValueFactoryField(field, (ValueFactoryType)type);
         } else if (type instanceof StructDictEncodedType) {
@@ -131,19 +134,26 @@ public final class ArrowSchemaUtils {
         }
     }
 
+    private static DataSpecWithTraits parseStructDictEncodedValueFactoryField(final Field field,
+        final StructDictEncodedValueFactoryType type) {
+        var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactoryType().getValueFactory());
+        var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
+        return parseStorageAndAddTrait(field, type, logicalTypeTrait, dictEncodingTrait);
+    }
+
     private static DataSpecWithTraits parseValueFactoryField(final Field field, final ValueFactoryType type) {
         var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactory());
         return parseStorageAndAddTrait(field, type, logicalTypeTrait);
     }
 
-    private static DataSpecWithTraits parseStorageAndAddTrait(final Field field, final ExtensionType type, final DataTrait trait) {
+    private static DataSpecWithTraits parseStorageAndAddTrait(final Field field, final ExtensionType type,
+        final DataTrait... traits) {
         var storageSpecWithTraits = parseField(field, type.storageType());
         return new DataSpecWithTraits(storageSpecWithTraits.spec(),
-            DataTraitUtils.withTrait(storageSpecWithTraits.traits(), trait));
+            DataTraitUtils.withTrait(storageSpecWithTraits.traits(), traits));
     }
 
-    private static DataSpecWithTraits parseStructDictEncodedField(final Field field,
-        final StructDictEncodedType type) {
+    private static DataSpecWithTraits parseStructDictEncodedField(final Field field, final StructDictEncodedType type) {
         var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
         return parseStorageAndAddTrait(field, type, dictEncodingTrait);
     }
@@ -156,7 +166,8 @@ public final class ArrowSchemaUtils {
     }
 
     private static KeyType parseKeyType(final ArrowType keyType) {
-        Preconditions.checkArgument(keyType instanceof Int, "The key type must be an integer type (byte, int, long) but was '%s'.", keyType);
+        Preconditions.checkArgument(keyType instanceof Int,
+            "The key type must be an integer type (byte, int, long) but was '%s'.", keyType);
         var bitWidth = ((Int)keyType).getBitWidth();
         if (bitWidth == 8) {
             return KeyType.BYTE_KEY;
@@ -173,16 +184,16 @@ public final class ArrowSchemaUtils {
     private static DataSpecWithTraits parseStructField(final Field structField, final ArrowType type) {
         assert type instanceof ArrowType.Struct;
         var inner = structField.getChildren().stream()//
-                .map(ArrowSchemaUtils::parseField)//
-                .toArray(DataSpecWithTraits[]::new);
+            .map(ArrowSchemaUtils::parseField)//
+            .toArray(DataSpecWithTraits[]::new);
         return DataSpecs.STRUCT.of(inner);
     }
 
     private static DataSpecWithTraits parseListField(final Field listField, final ArrowType type) {
         assert type instanceof ArrowType.List;
         var children = listField.getChildren();
-        Preconditions.checkState(
-            children.size() == 1, "Expected a single inner vector in field '%s'. This is a coding problem.", listField);
+        Preconditions.checkState(children.size() == 1,
+            "Expected a single inner vector in field '%s'. This is a coding problem.", listField);
         var inner = parseField(children.get(0));
         return DataSpecs.LIST.of(inner);
     }
@@ -276,7 +287,6 @@ public final class ArrowSchemaUtils {
         }
 
     }
-
 
     private ArrowSchemaUtils() {
 
