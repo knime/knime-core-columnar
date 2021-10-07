@@ -207,7 +207,20 @@ public final class ArrowSchemaUtils {
 
         @Override
         public DataSpecWithTraits visit(final Int type) {
-            return DataSpecs.INT;
+            int bitWidth = type.getBitWidth();
+            boolean signed = type.getIsSigned();
+            if (bitWidth == 8) {
+                return signed ? DataSpecs.BYTE : DataSpecs.INT;
+            } else if (bitWidth == 16) {
+                return DataSpecs.INT;
+            } else if (bitWidth == 32) {
+                return signed ? DataSpecs.INT : DataSpecs.LONG;
+            } else if (bitWidth == 64) {
+                // unsigned longs in Arrow are treated as signed longs and will overflow
+                return DataSpecs.LONG;
+            } else {
+                throw new IllegalArgumentException("Unsupported integer bit width encountered: " + bitWidth);
+            }
         }
 
         @Override
