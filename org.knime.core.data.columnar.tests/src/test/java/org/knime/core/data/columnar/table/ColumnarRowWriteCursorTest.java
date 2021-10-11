@@ -49,20 +49,27 @@
 package org.knime.core.data.columnar.table;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.data.columnar.table.ColumnarRowCursorTest.compare;
 import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createColumnarRowContainer;
 import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createUnsavedColumnarContainerTable;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.stream.XMLStreamException;
+
 import org.junit.Test;
 import org.knime.core.columnar.testing.ColumnarTest;
+import org.knime.core.data.DataCell;
 import org.knime.core.data.DataType;
 import org.knime.core.data.collection.ListCell;
 import org.knime.core.data.collection.SetCell;
 import org.knime.core.data.collection.SparseListCell;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.ColumnarTableTestUtils.RowWriteConsumer;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.def.BooleanCell;
@@ -70,9 +77,11 @@ import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.def.StringCell;
+import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.value.BooleanListValueFactory.BooleanListReadValue;
 import org.knime.core.data.v2.value.BooleanListValueFactory.BooleanListWriteValue;
 import org.knime.core.data.v2.value.BooleanSetValueFactory.BooleanSetReadValue;
@@ -105,7 +114,16 @@ import org.knime.core.data.v2.value.StringSetValueFactory.StringSetReadValue;
 import org.knime.core.data.v2.value.StringSetValueFactory.StringSetWriteValue;
 import org.knime.core.data.v2.value.StringSparseListValueFactory.StringSparseListReadValue;
 import org.knime.core.data.v2.value.StringSparseListValueFactory.StringSparseListWriteValue;
+import org.knime.core.data.xml.XMLCell;
+import org.knime.core.data.xml.XMLCellFactory;
 import org.knime.core.node.ExtensionTable;
+import org.knime.core.table.schema.StringDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.VarBinaryDataSpec;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
+import org.knime.core.table.schema.traits.LogicalTypeTrait;
+import org.knime.core.table.schema.traits.StructDataTraits;
+import org.xml.sax.SAXException;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -143,10 +161,23 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
         void accept(RowRead row, int colIdx, int rowIdx);
     }
 
+    @FunctionalInterface
+    interface SchemaChecker {
+        void accept(ColumnarValueSchema schema);
+    }
+
     private static void testWriteReadRows(final RowWriteConsumer writer, final RowReadConsumer reader,
         final DataType type) {
+        testWriteReadRows(writer, reader, type, null);
+    }
+
+    private static void testWriteReadRows(final RowWriteConsumer writer, final RowReadConsumer reader,
+        final DataType type, final SchemaChecker schemaChecker) {
         try (final UnsavedColumnarContainerTable table = createUnsavedColumnarContainerTable(1, 2, type, writer, null);
                 final RowCursor cursor = table.cursor()) {
+            if (schemaChecker != null) {
+                schemaChecker.accept(table.getSchema());
+            }
 
             RowRead rowRead = null;
             int rowIdx = 0;
@@ -175,7 +206,7 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testWriteReadIntList() {
         final var type = DataType.getType(ListCell.class, IntCell.TYPE);
-        final var values = new int[] { 1, 2, 3, 4 };
+        final var values = new int[]{1, 2, 3, 4};
         testWriteReadRows(//
             (row, j, i) -> row.<IntListWriteValue> getWriteValue(j).setValue(values), //
             (row, j, i) -> assertTrue(Arrays.equals(values, row.<IntListReadValue> getValue(j).getIntArray())), //
@@ -185,7 +216,7 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testWriteReadLongList() {
         final var type = DataType.getType(ListCell.class, LongCell.TYPE);
-        final var values = new long[] { 1, 2, 3, 4 };
+        final var values = new long[]{1, 2, 3, 4};
         testWriteReadRows(//
             (row, j, i) -> row.<LongListWriteValue> getWriteValue(j).setValue(values), //
             (row, j, i) -> assertTrue(Arrays.equals(values, row.<LongListReadValue> getValue(j).getLongArray())), //
@@ -195,7 +226,7 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testWriteReadDoubleList() {
         final var type = DataType.getType(ListCell.class, DoubleCell.TYPE);
-        final var values = new double[] { 1, 2, 3, 4 };
+        final var values = new double[]{1, 2, 3, 4};
         testWriteReadRows(//
             (row, j, i) -> row.<DoubleListWriteValue> getWriteValue(j).setValue(values), //
             (row, j, i) -> assertTrue(Arrays.equals(values, row.<DoubleListReadValue> getValue(j).getDoubleArray())), //
@@ -205,7 +236,7 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testWriteReadStringList() {
         final var type = DataType.getType(ListCell.class, StringCell.TYPE);
-        final var values = new String[] { "1", "2", "3", "4" };
+        final var values = new String[]{"1", "2", "3", "4"};
         testWriteReadRows(//
             (row, j, i) -> row.<StringListWriteValue> getWriteValue(j).setValue(values), //
             (row, j, i) -> assertTrue(Arrays.equals(values, row.<StringListReadValue> getValue(j).getStringArray())), //
@@ -215,7 +246,7 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testWriteReadBooleanList() {
         final var type = DataType.getType(ListCell.class, BooleanCell.TYPE);
-        final var values = new boolean[] { true, true, false };
+        final var values = new boolean[]{true, true, false};
         testWriteReadRows(//
             (row, j, i) -> row.<BooleanListWriteValue> getWriteValue(j).setValue(values), //
             (row, j, i) -> assertTrue(Arrays.equals(values, row.<BooleanListReadValue> getValue(j).getBooleanArray())), //
@@ -277,8 +308,8 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testWriteReadIntSparseList() {
         final var type = DataType.getType(SparseListCell.class, IntCell.TYPE);
-        final var values = new int[] {1, 2, 1, 3, 1, 4};
-        final var indices = new int[] {1, 3, 5};
+        final var values = new int[]{1, 2, 1, 3, 1, 4};
+        final var indices = new int[]{1, 3, 5};
         testWriteReadRows(//
             (row, j, i) -> row.<IntSparseListWriteValue> getWriteValue(j).setValue(values, 1), //
             (row, j, i) -> assertTrue(Arrays.equals(indices, row.<IntSparseListReadValue> getValue(j).getAllIndices())), //
@@ -288,44 +319,74 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testWriteReadLongSparseList() {
         final var type = DataType.getType(SparseListCell.class, LongCell.TYPE);
-        final var values = new long[] {1, 2, 1, 3, 1, 4};
-        final var indices = new int[] {1, 3, 5};
+        final var values = new long[]{1, 2, 1, 3, 1, 4};
+        final var indices = new int[]{1, 3, 5};
         testWriteReadRows(//
             (row, j, i) -> row.<LongSparseListWriteValue> getWriteValue(j).setValue(values, 1), //
-            (row, j, i) -> assertTrue(Arrays.equals(indices, row.<LongSparseListReadValue> getValue(j).getAllIndices())), //
+            (row, j,
+                i) -> assertTrue(Arrays.equals(indices, row.<LongSparseListReadValue> getValue(j).getAllIndices())), //
             type);
     }
 
     @Test
     public void testWriteReadDoubleSparseList() {
         final var type = DataType.getType(SparseListCell.class, DoubleCell.TYPE);
-        final var values = new double[] {1, 2, 1, 3, 1, 4};
-        final var indices = new int[] {1, 3, 5};
+        final var values = new double[]{1, 2, 1, 3, 1, 4};
+        final var indices = new int[]{1, 3, 5};
         testWriteReadRows(//
             (row, j, i) -> row.<DoubleSparseListWriteValue> getWriteValue(j).setValue(values, 1.0), //
-            (row, j, i) -> assertTrue(Arrays.equals(indices, row.<DoubleSparseListReadValue> getValue(j).getAllIndices())), //
+            (row, j,
+                i) -> assertTrue(Arrays.equals(indices, row.<DoubleSparseListReadValue> getValue(j).getAllIndices())), //
             type);
     }
 
     @Test
     public void testWriteReadStringSparseList() {
         final var type = DataType.getType(SparseListCell.class, StringCell.TYPE);
-        final var values = new String[] {"1", "2", "1", "3", "1", "4"};
-        final var indices = new int[] {1, 3, 5};
+        final var values = new String[]{"1", "2", "1", "3", "1", "4"};
+        final var indices = new int[]{1, 3, 5};
         testWriteReadRows(//
             (row, j, i) -> row.<StringSparseListWriteValue> getWriteValue(j).setValue(values, "1"), //
-            (row, j, i) -> assertTrue(Arrays.equals(indices, row.<StringSparseListReadValue> getValue(j).getAllIndices())), //
+            (row, j,
+                i) -> assertTrue(Arrays.equals(indices, row.<StringSparseListReadValue> getValue(j).getAllIndices())), //
             type);
     }
 
     @Test
     public void testWriteReadBooleanSparseList() {
         final var type = DataType.getType(SparseListCell.class, BooleanCell.TYPE);
-        final var values = new boolean[] {true, false, true, false, true, false};
-        final var indices = new int[] {1, 3, 5};
+        final var values = new boolean[]{true, false, true, false, true, false};
+        final var indices = new int[]{1, 3, 5};
         testWriteReadRows(//
             (row, j, i) -> row.<BooleanSparseListWriteValue> getWriteValue(j).setValue(values, true), //
-            (row, j, i) -> assertTrue(Arrays.equals(indices, row.<BooleanSparseListReadValue> getValue(j).getAllIndices())), //
+            (row, j,
+                i) -> assertTrue(Arrays.equals(indices, row.<BooleanSparseListReadValue> getValue(j).getAllIndices())), //
             type);
+    }
+
+    @Test
+    public void testWriteReadXMLDataCell()
+        throws IOException, ParserConfigurationException, SAXException, XMLStreamException {
+        final var type = XMLCell.TYPE;
+        final var xmlString = "<dummyXML>Test</dummyXML>";
+        final var value = XMLCellFactory.create(xmlString);
+        testWriteReadRows(//
+            (row, j, i) -> row.<WriteValue<DataCell>> getWriteValue(j).setValue(value), //
+            (row, j, i) -> assertEquals(value, row.<ReadValue> getValue(j).getDataCell()), //
+            type, //
+            (schema) -> {
+                final var logicalType = schema.getTraits(1).get(LogicalTypeTrait.class);
+                assertNotNull(logicalType);
+                // we explicitly check for the logical type because the DictEncodedDataCellValueFactory is not visible here
+                assertEquals("org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory",
+                    logicalType.getLogicalType());
+                assertTrue(schema.getSpec(1) instanceof StructDataSpec);
+                final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);
+                assertTrue(structSpec.getInner()[0] instanceof VarBinaryDataSpec);
+                assertTrue(structSpec.getInner()[1] instanceof StringDataSpec);
+                final StructDataTraits structTraits = (StructDataTraits)schema.getTraits(1);
+                assertTrue(DictEncodingTrait.isEnabled(structTraits.getInner()[0]));
+                assertTrue(DictEncodingTrait.isEnabled(structTraits.getInner()[1]));
+            });
     }
 }
