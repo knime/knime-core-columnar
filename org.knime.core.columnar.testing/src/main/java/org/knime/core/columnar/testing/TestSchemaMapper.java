@@ -174,8 +174,8 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
     @Override
     public TestDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
         return new TestStructDataFactory(
-            IntStream.range(0, spec.getInner().length)
-            .mapToObj(i -> spec.getInner()[i].accept(this, traits.getInner()[i]))
+            IntStream.range(0, spec.size())
+            .mapToObj(i -> spec.getDataSpec(i).accept(this, traits.getDataTraits(i)))
             .toArray(TestDataFactory[]::new));
     }
 

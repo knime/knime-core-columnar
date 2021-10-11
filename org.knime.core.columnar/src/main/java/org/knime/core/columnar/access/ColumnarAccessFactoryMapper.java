@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.access;
 
+import java.util.Arrays;
+
 import org.knime.core.table.schema.BooleanDataSpec;
 import org.knime.core.table.schema.ByteDataSpec;
 import org.knime.core.table.schema.DataSpec;
@@ -77,7 +79,8 @@ public final class ColumnarAccessFactoryMapper implements DataSpec.Mapper<Column
 
     static final ColumnarAccessFactoryMapper INSTANCE = new ColumnarAccessFactoryMapper();
 
-    private ColumnarAccessFactoryMapper() {}
+    private ColumnarAccessFactoryMapper() {
+    }
 
     /**
      * Creates a {@link ColumnarAccessFactory} for the provided {@link DataSpec}.
@@ -91,7 +94,9 @@ public final class ColumnarAccessFactoryMapper implements DataSpec.Mapper<Column
 
     @Override
     public ColumnarAccessFactory visit(final StructDataSpec spec) {
-        return new ColumnarStructAccessFactory(spec.getInner());
+        final DataSpec[] dataSpecArray = new DataSpec[spec.size()];
+        Arrays.setAll(dataSpecArray, spec::getDataSpec);
+        return new ColumnarStructAccessFactory(dataSpecArray);
     }
 
     @Override
