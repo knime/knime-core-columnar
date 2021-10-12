@@ -44,66 +44,76 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 6, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Sep 28, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.arrow.extensiontypes;
 
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+
+import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 /**
- * ExtensionType for ValueFactories whose direct primitive type is struct-dict-encoded. This is necessary
- * because Arrow doesn't support direct nesting of extension types. That's because an ExtensionType is just an
- * annotation (meta-data) on an actual Arrow type and nesting multiple ExtensionTypes results in overwriting this
- * annotation. Note that it is possible to have nested ExtensionTypes when they are attached to different Arrow types
- * (e.g. in a struct or a list).
+ * Arrow ExtensionType for struct-dict-encoded data.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-// Equals is implemented in the super class and delegates to #extensionEquals
-public final class StructDictEncodedValueFactoryType extends AbstractKnimeExtensionType {//NOSONAR
+public final class StructDictEncodedExtensionType extends AbstractExtensionType {//NOSONAR
 
-    private final StructDictEncodedType m_structDictEncodedType;
-
-    private final ValueFactoryType m_valueFactoryType;
+    static final StructDictEncodedExtensionType DESERIALIZATION_INSTANCE = new StructDictEncodedExtensionType(null);
 
     static {
-        ExtensionTypeRegistry.register(new StructDictEncodedValueFactoryType());
+        ExtensionTypeRegistry.register(DESERIALIZATION_INSTANCE);
     }
 
     /**
-     * Private constructor for creating the deserialization instance
+     * Deserialization constructor.
+     *
+     * @param storageType type of the underlying storage
      */
-    private StructDictEncodedValueFactoryType() {
-        super(null);
-        m_structDictEncodedType = null;
-        m_valueFactoryType = null;
-    }
-
-    StructDictEncodedValueFactoryType(final ValueFactoryType valueFactoryType,
-        final StructDictEncodedType structDictEncodedType) {
-        super(structDictEncodedType.storageType());
-        m_structDictEncodedType = structDictEncodedType;
-        m_valueFactoryType = valueFactoryType;
+    private StructDictEncodedExtensionType(final ArrowType storageType) {
+        super(storageType);
     }
 
     /**
-     * @return the {@link ValueFactoryType} part of this type
+     * Constructor. Verifies that the storageField has the correct format and matches keyType.
+     * @param storageField a field holding the dictionary struct
+     * @param keyType
      */
-    public ValueFactoryType getValueFactoryType() {
-        return m_valueFactoryType;
+    StructDictEncodedExtensionType(final Field storageField, final KeyType keyType) {
+        super(storageField.getType());
+        Preconditions.checkArgument(storageType() instanceof Struct,
+            "The storage type for StructDictEncoded data must be a struct.");
+        var children = storageField.getChildren();
+        Preconditions.checkArgument(children.size() == 2,
+            "The storage struct field is expected to have two children, one for the keys and one for the values."
+                + " Instead received '%s'.",
+            children);
+        var storageKeyType = children.get(0).getType();
+        var expectedKeyType = getExpectedKeyType(keyType);
+        Preconditions.checkArgument(Objects.equal(storageKeyType, expectedKeyType),
+            "Expected key type '%s' but got '%s'.", expectedKeyType, storageKeyType);
     }
 
-    /**
-     * @return the {@link StructDictEncodedType} part of this type
-     */
-    public StructDictEncodedType getStructDictEncodedType() {
-        return m_structDictEncodedType;
+    private static Int getExpectedKeyType(final KeyType keyType) {
+        switch (keyType) {
+            case BYTE_KEY:
+                return new Int(8, false);
+            case INT_KEY:
+                return new Int(32, false);
+            case LONG_KEY:
+                return new Int(64, false);
+            default:
+                throw new IllegalArgumentException("Unsupported KeyType: " + keyType);
+        }
     }
 
     @Override
     public String extensionName() {
-        return "knime.struct_dict_encoded_value_factory";
+        return "knime.struct_dict_encoded";
     }
 
     @Override
@@ -111,25 +121,20 @@ public final class StructDictEncodedValueFactoryType extends AbstractKnimeExtens
         if (other == this) {
             return true;
         }
-        if (other instanceof StructDictEncodedValueFactoryType) {
-            var otherType = (StructDictEncodedValueFactoryType)other;
-            return m_structDictEncodedType.equals(otherType.m_structDictEncodedType)
-                && m_valueFactoryType.equals(otherType.m_valueFactoryType);
+        if (other instanceof StructDictEncodedExtensionType) {
+            return storageType().equals(other.storageType());
         }
         return false;
     }
 
     @Override
     public String serialize() {
-        return m_valueFactoryType.serialize();
+        return "";
     }
 
     @Override
-    public ArrowType deserialize(final ArrowType storageType, final String serializedData) {
-        var valueFactoryType = ValueFactoryType.DESERIALIZATION_INSTANCE.deserialize(storageType, serializedData);
-        // StructDictEncodedType doesn't have any meta data
-        var structDictEncodedType = StructDictEncodedType.DESERIALIZATION_INSTANCE.deserialize(storageType, "");
-        return new StructDictEncodedValueFactoryType(valueFactoryType, structDictEncodedType);
+    public StructDictEncodedExtensionType deserialize(final ArrowType storageType, final String serializedData) {
+        return new StructDictEncodedExtensionType(storageType);
     }
 
 }

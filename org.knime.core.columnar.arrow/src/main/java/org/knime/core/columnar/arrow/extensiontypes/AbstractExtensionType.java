@@ -62,11 +62,11 @@ import org.apache.arrow.vector.types.pojo.FieldType;
  */
 // ExtensionType implements equals and delegates to ExtensionType#extensionEquals which subclasses of this class need to
 // implement
-abstract class AbstractKnimeExtensionType extends ExtensionType {//NOSONAR
+abstract class AbstractExtensionType extends ExtensionType {//NOSONAR
 
     private final ArrowType m_storageType;
 
-    protected AbstractKnimeExtensionType(final ArrowType storageType) {
+    protected AbstractExtensionType(final ArrowType storageType) {
         m_storageType = storageType;
     }
 

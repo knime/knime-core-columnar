@@ -64,7 +64,7 @@ import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedIntData.ArrowUnsignedIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongDataFactory;
-import org.knime.core.columnar.arrow.extensiontypes.KnimeExtensionTypes;
+import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
@@ -319,7 +319,7 @@ public final class AbstractArrowDictEncodedData {
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
             var delegateField = m_delegate.getField(name, dictionaryIdSupplier);
-            return KnimeExtensionTypes.wrapInExtensionTypeIfNecessary(delegateField, m_traits);
+            return ExtensionTypes.wrapInExtensionTypeIfNecessary(delegateField, m_traits);
         }
 
         @SuppressWarnings("rawtypes")

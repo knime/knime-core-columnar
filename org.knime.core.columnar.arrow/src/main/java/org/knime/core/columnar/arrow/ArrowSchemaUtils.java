@@ -68,9 +68,9 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Timestamp;
 import org.apache.arrow.vector.types.pojo.ArrowType.Utf8;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedType;
-import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedValueFactoryType;
-import org.knime.core.columnar.arrow.extensiontypes.ValueFactoryType;
+import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedExtensionType;
+import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedValueFactoryExtensionType;
+import org.knime.core.columnar.arrow.extensiontypes.ValueFactoryExtensionType;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
 import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
@@ -121,12 +121,12 @@ public final class ArrowSchemaUtils {
     private static DataSpecWithTraits parseField(final Field field, final ArrowType type) {//NOSONAR
         if (type instanceof ArrowType.Struct) {
             return parseStructField(field, type);
-        } else if (type instanceof StructDictEncodedValueFactoryType) {
-            return parseStructDictEncodedValueFactoryField(field, (StructDictEncodedValueFactoryType)type);
-        } else if (type instanceof ValueFactoryType) {
-            return parseValueFactoryField(field, (ValueFactoryType)type);
-        } else if (type instanceof StructDictEncodedType) {
-            return parseStructDictEncodedField(field, (StructDictEncodedType)type);
+        } else if (type instanceof StructDictEncodedValueFactoryExtensionType) {
+            return parseStructDictEncodedValueFactoryField(field, (StructDictEncodedValueFactoryExtensionType)type);
+        } else if (type instanceof ValueFactoryExtensionType) {
+            return parseValueFactoryField(field, (ValueFactoryExtensionType)type);
+        } else if (type instanceof StructDictEncodedExtensionType) {
+            return parseStructDictEncodedField(field, (StructDictEncodedExtensionType)type);
         } else if (type instanceof ArrowType.List) {
             return parseListField(field, type);
         } else {
@@ -135,13 +135,13 @@ public final class ArrowSchemaUtils {
     }
 
     private static DataSpecWithTraits parseStructDictEncodedValueFactoryField(final Field field,
-        final StructDictEncodedValueFactoryType type) {
+        final StructDictEncodedValueFactoryExtensionType type) {
         var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactoryType().getValueFactory());
         var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
         return parseStorageAndAddTrait(field, type, logicalTypeTrait, dictEncodingTrait);
     }
 
-    private static DataSpecWithTraits parseValueFactoryField(final Field field, final ValueFactoryType type) {
+    private static DataSpecWithTraits parseValueFactoryField(final Field field, final ValueFactoryExtensionType type) {
         var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactory());
         return parseStorageAndAddTrait(field, type, logicalTypeTrait);
     }
@@ -153,7 +153,7 @@ public final class ArrowSchemaUtils {
             DataTraitUtils.withTrait(storageSpecWithTraits.traits(), traits));
     }
 
-    private static DataSpecWithTraits parseStructDictEncodedField(final Field field, final StructDictEncodedType type) {
+    private static DataSpecWithTraits parseStructDictEncodedField(final Field field, final StructDictEncodedExtensionType type) {
         var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
         return parseStorageAndAddTrait(field, type, dictEncodingTrait);
     }

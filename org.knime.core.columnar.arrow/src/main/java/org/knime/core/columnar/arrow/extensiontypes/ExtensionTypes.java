@@ -61,19 +61,26 @@ import org.knime.core.table.schema.traits.LogicalTypeTrait;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class KnimeExtensionTypes {
+public final class ExtensionTypes {
 
+    /**
+     * Wraps the provided field into a field with an ExtensionTypes if the provided traits indicate it.
+     *
+     * @param field to potentially wrap
+     * @param traits of the field
+     * @return the wrapped input field if necessary or just the input field
+     */
     public static Field wrapInExtensionTypeIfNecessary(final Field field, final DataTraits traits) {
         final var arrowType = field.getType();
         final var valueFactoryType = DataTraits.getTrait(traits, LogicalTypeTrait.class)//
             .map(LogicalTypeTrait::getLogicalType)//
-            .map(t -> new ValueFactoryType(t, arrowType));
+            .map(t -> new ValueFactoryExtensionType(t, arrowType));
         final var structDictType = DataTraits.getTrait(traits, DictEncodingTrait.class)//
                 .map(DictEncodingTrait::getKeyType)//
-            .map(k -> new StructDictEncodedType(field, k));
+            .map(k -> new StructDictEncodedExtensionType(field, k));
         final ArrowType type;
         if (valueFactoryType.isPresent() && structDictType.isPresent()) {
-            type = new StructDictEncodedValueFactoryType(valueFactoryType.get(), structDictType.get());
+            type = new StructDictEncodedValueFactoryExtensionType(valueFactoryType.get(), structDictType.get());
         } else if (valueFactoryType.isPresent()) {
             type = valueFactoryType.get();
         } else if (structDictType.isPresent()) {
@@ -86,7 +93,7 @@ public final class KnimeExtensionTypes {
         return new Field(field.getName(), newFieldType, field.getChildren());
     }
 
-    private KnimeExtensionTypes() {
+    private ExtensionTypes() {
         // static factory class
     }
 }

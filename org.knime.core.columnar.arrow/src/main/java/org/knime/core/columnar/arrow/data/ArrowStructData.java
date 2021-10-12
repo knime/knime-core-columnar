@@ -68,7 +68,7 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.NestedDictionaryProvider;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.arrow.extensiontypes.KnimeExtensionTypes;
+import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
@@ -299,7 +299,7 @@ public final class ArrowStructData {
                 children.add(m_inner[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
             }
             var field = new Field(name, new FieldType(true, Struct.INSTANCE, null), children);
-            return KnimeExtensionTypes.wrapInExtensionTypeIfNecessary(field, m_traits);
+            return ExtensionTypes.wrapInExtensionTypeIfNecessary(field, m_traits);
         }
 
         @Override
