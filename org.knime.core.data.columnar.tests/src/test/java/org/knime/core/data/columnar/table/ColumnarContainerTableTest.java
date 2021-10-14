@@ -57,7 +57,7 @@ import org.junit.Test;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.data.columnar.table.ColumnarTableTestUtils.TestColumnStoreFactory;
 import org.knime.core.data.v2.RowWrite;
-import org.knime.core.data.v2.value.IntValueFactory.IntWriteValue;
+import org.knime.core.data.v2.value.ValueInterfaces.IntWriteValue;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany

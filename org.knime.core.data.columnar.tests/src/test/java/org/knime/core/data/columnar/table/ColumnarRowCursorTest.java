@@ -65,7 +65,7 @@ import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
-import org.knime.core.data.v2.value.IntValueFactory.IntReadValue;
+import org.knime.core.data.v2.value.ValueInterfaces.IntReadValue;
 import org.knime.core.node.ExtensionTable;
 
 /**

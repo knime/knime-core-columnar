@@ -67,7 +67,7 @@ import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.ValueSchema;
-import org.knime.core.data.v2.value.IntValueFactory.IntWriteValue;
+import org.knime.core.data.v2.value.ValueInterfaces.IntWriteValue;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.table.schema.ColumnarSchema;
 
