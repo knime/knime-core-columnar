@@ -113,7 +113,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         Objects.requireNonNull(row);
         if (row.getNumCells() != m_numColumns) {
             throw new IllegalArgumentException(
-                String.format("Cell count in row %s is not equal to length of column names array: %d vs. %d",
+                String.format("Cell count in row \"%s\" is not equal to length of column names array: %d vs. %d",
                     row.getKey().toString(), row.getNumCells(), m_spec.getNumColumns()));
         }
         if (m_closed.get() && !m_closing.get()) {
