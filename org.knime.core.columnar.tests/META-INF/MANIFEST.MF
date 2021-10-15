@@ -10,3 +10,5 @@ Require-Bundle: org.junit;bundle-version="[4.13.0,5.0.0)",
   org.knime.core.columnar.testing;bundle-version="[4.2.0,5.0.0)"
 Bundle-RequiredExecutionEnvironment: JavaSE-11
 Automatic-Module-Name: org.knime.core.columnar.tests
+Import-Package: org.mockito,
+ org.mockito.stubbing;version="2.28.2"

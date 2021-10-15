@@ -134,8 +134,18 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
+        public void setData(final NullableReadData data) {
+            super.setData(data);
+            m_lastIndex = -1;
+        }
+
+        @Override
         public boolean isMissing(final int index) {
             return m_innerData.isMissing(index);
+        }
+
+        public int getLastIndex() {
+            return m_lastIndex;
         }
 
     }
