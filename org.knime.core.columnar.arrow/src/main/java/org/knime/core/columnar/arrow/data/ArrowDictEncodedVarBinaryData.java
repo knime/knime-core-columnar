@@ -70,6 +70,7 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Arrow implementation of {@link DictEncodedVarBinaryWriteData} and {@link DictEncodedVarBinaryReadData}
@@ -184,7 +185,7 @@ public final class ArrowDictEncodedVarBinaryData {
         private static final int CURRENT_VERSION = 0;
 
         public ArrowDictEncodedVarBinaryDataFactory(final DataTraits traits) {
-            super(traits, new ArrowVarBinaryDataFactory(traits), CURRENT_VERSION);
+            super(traits, new ArrowVarBinaryDataFactory(DefaultDataTraits.EMPTY), CURRENT_VERSION);
         }
 
         @Override
