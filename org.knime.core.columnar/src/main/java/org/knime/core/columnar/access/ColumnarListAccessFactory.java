@@ -143,11 +143,6 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         public boolean isMissing(final int index) {
             return m_innerData.isMissing(index);
         }
-
-        public int getLastIndex() {
-            return m_lastIndex;
-        }
-
     }
 
     static final class ColumnarListWriteAccess<W extends NullableWriteData> extends AbstractWriteAccess<ListWriteData>

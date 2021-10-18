@@ -48,7 +48,9 @@
  */
 package org.knime.core.columnar.access;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.junit.Test;
 import org.knime.core.columnar.access.ColumnarListAccessFactory.ColumnarListReadAccess;
@@ -64,59 +66,83 @@ import org.knime.core.table.access.ListAccess.ListReadAccess;
 import org.knime.core.table.access.ListAccess.ListWriteAccess;
 import org.knime.core.table.schema.IntDataSpec;
 import org.knime.core.table.schema.ListDataSpec;
-import org.mockito.Mockito;
 
 /**
  *
  * @author Eric Axt KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public class ColumnarListAccessFactorySingleNestedLists {
+public class ColumnarListAccessFactorySingleNestedListsTest {
+
+    final ListDataSpec nestedSpec = new ListDataSpec(new ListDataSpec(IntDataSpec.INSTANCE));
 
     @SuppressWarnings("unchecked")
+    final ColumnarListAccessFactory<ListReadData, ListWriteData> accessFactory =
+        (ColumnarListAccessFactory<ListReadData, ListWriteData>)ColumnarAccessFactoryMapper
+            .createAccessFactory(nestedSpec);
+
+    final TestListDataFactory dataFactory =
+        new TestListDataFactory(new TestListDataFactory(TestIntDataFactory.INSTANCE));
+
+    final TestListData listData = dataFactory.createWriteData(2);
+
     @Test
-    public void test() {
+    public void overwriteWrittenData() {
 
-        final ListDataSpec nestedSpec = new ListDataSpec(new ListDataSpec(IntDataSpec.INSTANCE));
-        @SuppressWarnings("unchecked")
-        final ColumnarListAccessFactory<ListReadData, ListWriteData> accessFactory =
-            (ColumnarListAccessFactory<ListReadData, ListWriteData>)ColumnarAccessFactoryMapper.INSTANCE
-                .visit(nestedSpec);
-        final TestListDataFactory dataFactory =
-            new TestListDataFactory(new TestListDataFactory(TestIntDataFactory.INSTANCE));
-        final TestListData listData = dataFactory.createWriteData(2);
+        ColumnDataIndex mockDex = mock(ColumnDataIndex.class);
+        when(mockDex.getIndex()).thenReturn(1);
 
-        ColumnDataIndex mocDex = Mockito.mock(ColumnDataIndex.class);
-        Mockito.when(mocDex.getIndex()).thenReturn(1);
-
-        ColumnarListWriteAccess<ListWriteData> listWriteAccessRow = accessFactory.createWriteAccess(mocDex);
+        ColumnarListWriteAccess<ListWriteData> listWriteAccessRow = accessFactory.createWriteAccess(mockDex);
         listWriteAccessRow.setData(listData);
-        ColumnarListReadAccess<ListReadData> listReadAccessRow = accessFactory.createReadAccess(mocDex);
+        ColumnarListReadAccess<ListReadData> listReadAccessRow = accessFactory.createReadAccess(mockDex);
         listReadAccessRow.setData(listData);
 
-        listWriteAccessRow.create(1);
-        ListWriteAccess rowListWriteAcess = listWriteAccessRow.getWriteAccess(0);
+        setValue(listWriteAccessRow, 5);
+        assertEquals(getValue(listReadAccessRow), 5);
+
+        listReadAccessRow.setData(listData);
+
+        setValue(listWriteAccessRow, 3);
+        assertEquals(getValue(listReadAccessRow), 3);
+    }
+
+    @Test
+    public void iterateColumnNestedLists() {
+
+        final ColumnDataIndex mockDex = mock(ColumnDataIndex.class);
+        when(mockDex.getIndex()).thenReturn(0);
+
+        ColumnarListWriteAccess<ListWriteData> outer = accessFactory.createWriteAccess(mockDex);
+        outer.setData(listData);
+
+        setValue(outer, 5);
+
+        when(mockDex.getIndex()).thenReturn(1);
+        setValue(outer, 3);
+
+        when(mockDex.getIndex()).thenReturn(0);
+        ColumnarListReadAccess<ListReadData> listReadAccessRow = accessFactory.createReadAccess(mockDex);
+        listReadAccessRow.setData(listData);
+
+        assertEquals(getValue(listReadAccessRow), 5);
+
+        when(mockDex.getIndex()).thenReturn(1);
+        assertEquals(getValue(listReadAccessRow), 3);
+
+    }
+
+    private static void setValue(final ListWriteAccess outer, final int value) {
+        outer.create(1);
+        ListWriteAccess rowListWriteAcess = outer.getWriteAccess(0);
         rowListWriteAcess.create(1);
         IntWriteAccess rowIntWriteValue = rowListWriteAcess.getWriteAccess(0);
-        rowIntWriteValue.setIntValue(5);
-        ListReadAccess rowListReader = listReadAccessRow.getAccess(0);
+        rowIntWriteValue.setIntValue(value);
+    }
+
+    private static int getValue(final ListReadAccess outer) {
+        ListReadAccess rowListReader = outer.getAccess(0);
         IntReadAccess rowIntReader = rowListReader.getAccess(0);
-        assertTrue(rowIntReader.getIntValue() == 5);
-
-
-        mocDex.getIndex();
-
-
-        listWriteAccessRow.setData(listData);
-        listReadAccessRow.setData(listData);
-        listWriteAccessRow.create(1);
-        rowListWriteAcess = listWriteAccessRow.getWriteAccess(0);
-        rowListWriteAcess.create(1);
-        rowIntWriteValue = rowListWriteAcess.getWriteAccess(0);
-        rowIntWriteValue.setIntValue(3);
-        rowListReader = listReadAccessRow.getAccess(0);
-        rowIntReader = rowListReader.getAccess(0);
-        assertTrue(rowIntReader.getIntValue() == 3);
+        return rowIntReader.getIntValue();
     }
 
 }
