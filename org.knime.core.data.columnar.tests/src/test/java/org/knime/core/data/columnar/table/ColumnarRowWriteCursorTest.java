@@ -116,6 +116,7 @@ import org.knime.core.data.v2.value.StringSparseListValueFactory.StringSparseLis
 import org.knime.core.data.v2.value.StringSparseListValueFactory.StringSparseListWriteValue;
 import org.knime.core.data.xml.XMLCell;
 import org.knime.core.data.xml.XMLCellFactory;
+import org.knime.core.data.xml.XMLValue;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
@@ -370,6 +371,34 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
         final var type = XMLCell.TYPE;
         final var xmlString = "<dummyXML>Test</dummyXML>";
         final var value = XMLCellFactory.create(xmlString);
+        testWriteReadRows(//
+            (row, j, i) -> row.<WriteValue<DataCell>> getWriteValue(j).setValue(value), //
+            (row, j, i) -> assertEquals(value, row.<ReadValue> getValue(j).getDataCell()), //
+            type, //
+            (schema) -> {
+                final var logicalType = schema.getTraits(1).get(LogicalTypeTrait.class);
+                assertNotNull(logicalType);
+                // we explicitly check for the logical type because the DictEncodedDataCellValueFactory is not visible here
+                assertEquals("org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory",
+                    logicalType.getLogicalType());
+                assertTrue(schema.getSpec(1) instanceof StructDataSpec);
+                final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);
+                assertTrue(structSpec.getInner()[0] instanceof VarBinaryDataSpec);
+                assertTrue(structSpec.getInner()[1] instanceof StringDataSpec);
+                final StructDataTraits structTraits = (StructDataTraits)schema.getTraits(1);
+                assertTrue(DictEncodingTrait.isEnabled(structTraits.getInner()[0]));
+                assertTrue(DictEncodingTrait.isEnabled(structTraits.getInner()[1]));
+            });
+    }
+
+    @Test
+    public void testWriteReadAdapterXMLDataCell()
+        throws IOException, ParserConfigurationException, SAXException, XMLStreamException {
+        final var type = XMLCell.TYPE;
+        final var xmlString = "<dummyXML>Test</dummyXML>";
+        final var innerValue = XMLCellFactory.create(xmlString);
+        final var value = new MyAdapterCell(innerValue, XMLValue.class);
+
         testWriteReadRows(//
             (row, j, i) -> row.<WriteValue<DataCell>> getWriteValue(j).setValue(value), //
             (row, j, i) -> assertEquals(value, row.<ReadValue> getValue(j).getDataCell()), //
