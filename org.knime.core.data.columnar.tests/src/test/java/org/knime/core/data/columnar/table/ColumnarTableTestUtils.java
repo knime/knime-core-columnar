@@ -90,6 +90,11 @@ final class ColumnarTableTestUtils {
             throw new UnsupportedOperationException("Loading from file not supported by test column store.");
         }
 
+        @Override
+        public ColumnarSchema readSchema(final Path path) {
+            throw new UnsupportedOperationException("Loading from file not supported by test column store.");
+        }
+
     }
 
     static ColumnarValueSchema createSchema(final int nCols) {

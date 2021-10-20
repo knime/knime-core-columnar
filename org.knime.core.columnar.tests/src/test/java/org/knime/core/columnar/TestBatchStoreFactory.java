@@ -71,4 +71,9 @@ public final class TestBatchStoreFactory implements ColumnStoreFactory {
         throw new UnsupportedOperationException("not implemented");
     }
 
+    @Override
+    public ColumnarSchema readSchema(final Path path) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
 }

@@ -77,4 +77,12 @@ public interface ColumnStoreFactory {
      */
     BatchReadStore createReadStore(ColumnarSchema schema, Path path);
 
+    /**
+     * Reads the schema of the store located at the provided path.
+     *
+     * @param path the store is located at
+     * @return the schema of the store
+     */
+    ColumnarSchema readSchema(Path path);
+
 }
