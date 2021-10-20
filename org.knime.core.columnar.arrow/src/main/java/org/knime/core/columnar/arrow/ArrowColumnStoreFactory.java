@@ -158,4 +158,9 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     private BufferAllocator newChildAllocator(final String name) {
         return m_allocator.newChildAllocator(name, m_initReservation, m_maxAllocation);
     }
+
+    @Override
+    public ColumnarSchema readSchema(final Path path) {
+        return ArrowSchemaUtils.readSchema(path);
+    }
 }
