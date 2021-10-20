@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.arrow;
 
+import java.nio.file.Path;
+
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.ArrowType.Binary;
 import org.apache.arrow.vector.types.pojo.ArrowType.Bool;
@@ -88,6 +90,17 @@ import com.google.common.base.Preconditions;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public final class ArrowSchemaUtils {
+
+	/**
+	 * Reads the schema of an Arrow file stored at the provided path.
+	 * 
+	 * @param path where the Arrow file is located
+	 * @return the schema of the file
+	 */
+    public static ColumnarSchema readSchema(final Path path) {
+        var arrowSchema = ArrowReaderWriterUtils.readSchema(path.toFile());
+        return convertSchema(arrowSchema);
+    }
 
     /**
      * Converts a {@link Schema} into a {@link ColumnarSchema} including the extraction of {@link DataTraits}.
