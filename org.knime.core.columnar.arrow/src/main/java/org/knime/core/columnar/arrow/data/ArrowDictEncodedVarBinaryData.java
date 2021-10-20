@@ -70,7 +70,6 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraits;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Arrow implementation of {@link DictEncodedVarBinaryWriteData} and {@link DictEncodedVarBinaryReadData}
@@ -102,7 +101,7 @@ public final class ArrowDictEncodedVarBinaryData {
 
         @Override
         public <T> void setObject(final int index, final T val, final ObjectSerializer<T> serializer) {
-            K dictKey = m_dict.computeIfAbsent(val, v -> {
+            K dictKey = m_dict.computeIfAbsent(val, v -> {//NOSONAR
                 ((VarBinaryWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .setObject(index + m_offset, val, serializer);
                 return generateKey(val);
@@ -123,7 +122,7 @@ public final class ArrowDictEncodedVarBinaryData {
 
         @Override
         public void setBytes(final int index, final byte[] val) {
-            K dictKey = m_dict.computeIfAbsent(val, v -> {
+            K dictKey = m_dict.computeIfAbsent(val, v -> {//NOSONAR
                 ((VarBinaryWriteData)m_delegate.getWriteDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .setBytes(index + m_offset, val);
                 return generateKey(val);
@@ -154,7 +153,7 @@ public final class ArrowDictEncodedVarBinaryData {
         @SuppressWarnings("unchecked")
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-            final K dictKey = getDictKey(index);
+            final K dictKey = getDictKey(index);//NOSONAR
             return (T)m_dict.computeIfAbsent(dictKey,
                 i -> ((VarBinaryReadData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .getObject(m_dictValueLookupTable[index + m_offset], deserializer));
@@ -168,7 +167,7 @@ public final class ArrowDictEncodedVarBinaryData {
 
         @Override
         public byte[] getBytes(final int index) {
-            final K dictKey = getDictKey(index);
+            final K dictKey = getDictKey(index);//NOSONAR
             return (byte[])m_dict.computeIfAbsent(dictKey,
                 i -> ((VarBinaryReadData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .getBytes(m_dictValueLookupTable[index + m_offset]));
@@ -184,8 +183,13 @@ public final class ArrowDictEncodedVarBinaryData {
 
         private static final int CURRENT_VERSION = 0;
 
+        /**
+         * Constructor.
+         *
+         * @param traits containing the KeyType to use for dict encoding
+         */
         public ArrowDictEncodedVarBinaryDataFactory(final DataTraits traits) {
-            super(traits, new ArrowVarBinaryDataFactory(DefaultDataTraits.EMPTY), CURRENT_VERSION);
+            super(traits, ArrowVarBinaryDataFactory.INSTANCE, CURRENT_VERSION);
         }
 
         @Override

@@ -64,7 +64,6 @@ import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedIntData.ArrowUnsignedIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongDataFactory;
-import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
@@ -274,11 +273,11 @@ public final class AbstractArrowDictEncodedData {
         private int[] constructDictKeyIndexMap() {
             var references = new int[m_delegate.length()];
             var map = new HashMap<K, Integer>();
-            for (int i = 0; i < length(); i++) {
+            for (int i = 0; i < length(); i++) {//NOSONAR
                 if (isMissing(i)) {
                     continue;
                 }
-                K key = getDictKey(i);
+                K key = getDictKey(i);//NOSONAR
                 final int index = i;
                 references[i] = map.computeIfAbsent(key, k -> index);
             }
@@ -299,16 +298,12 @@ public final class AbstractArrowDictEncodedData {
 
         private final int m_version;
 
-        private final DataTraits m_traits;
-
         protected AbstractArrowDictEncodedDataFactory(final DataTraits traits, final ArrowColumnDataFactory valueFactory,
             final int version) {
             Preconditions.checkArgument(DictEncodingTrait.isEnabled(traits), "The column is not dictionary encoded.");
             m_keyType = DictEncodingTrait.keyType(traits);
-            // TODO is null correct here, or should this rather create StructDataTraits to delegate any traits down
-            m_delegate = new ArrowStructDataFactory(null, createKeyDataFactory(), valueFactory);
+            m_delegate = new ArrowStructDataFactory(createKeyDataFactory(), valueFactory);
             m_version = version;
-            m_traits = traits;
         }
 
         @Override
@@ -318,8 +313,7 @@ public final class AbstractArrowDictEncodedData {
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            var delegateField = m_delegate.getField(name, dictionaryIdSupplier);
-            return ExtensionTypes.wrapInExtensionTypeIfNecessary(delegateField, m_traits);
+            return m_delegate.getField(name, dictionaryIdSupplier);
         }
 
         @SuppressWarnings("rawtypes")

@@ -69,7 +69,6 @@ import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Arrow implementation of {@link ListWriteData} and {@link ListReadData}.
@@ -208,11 +207,10 @@ public final class ArrowListData {
 
         /**
          * Create a new factory for Arrow list data.
-         * @param traits of the data
          * @param inner the factory to create the type of the list elements
          */
-        public ArrowListDataFactory(final DataTraits traits, final ArrowColumnDataFactory inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, inner.getVersion()), traits);
+        public ArrowListDataFactory(final ArrowColumnDataFactory inner) {
+            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, inner.getVersion()));
             m_inner = inner;
         }
 

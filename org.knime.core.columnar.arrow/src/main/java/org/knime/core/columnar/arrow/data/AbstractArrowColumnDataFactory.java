@@ -55,7 +55,6 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Abstract implementation of {@link ArrowColumnDataFactory} for {@link ArrowReadData} which extend
@@ -71,26 +70,13 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
     /** The current version */
     protected final ArrowColumnDataFactoryVersion m_version;
 
-    protected final DataTraits m_traits;
-
     /**
      * Create a new abstract {@link ArrowColumnDataFactory}.
      *
      * @param version the current version
      */
     protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
-        this(version, null);
-    }
-
-    /**
-     * Create a new abstract {@link ArrowColumnDataFactory}.
-     *
-     * @param version the current version
-     * @param traits of the column factory
-     */
-    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version, final DataTraits traits) {
         m_version = version;
-        m_traits = traits;
     }
 
     @Override
@@ -110,7 +96,7 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_version, m_traits);
+        return Objects.hash(m_version);
     }
 
     @Override
@@ -125,8 +111,7 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
             return false;
         }
         AbstractArrowColumnDataFactory other = (AbstractArrowColumnDataFactory)obj;
-        return m_version.equals(other.m_version)
-                && Objects.equals(m_traits, other.m_traits);
+        return m_version.equals(other.m_version);
     }
 
 

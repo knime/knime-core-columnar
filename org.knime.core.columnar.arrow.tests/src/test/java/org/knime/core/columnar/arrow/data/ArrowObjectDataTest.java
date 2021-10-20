@@ -57,7 +57,6 @@ import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Test {@link ArrowVarBinaryData} with the setObject and getObject methods
@@ -71,7 +70,7 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowVarBinaryWri
 
     /** Create the test for {@link ArrowVarBinaryData} */
     public ArrowObjectDataTest() {
-        super(new ArrowVarBinaryDataFactory(DefaultDataTraits.EMPTY));
+        super(ArrowVarBinaryDataFactory.INSTANCE);
     }
 
     @Override

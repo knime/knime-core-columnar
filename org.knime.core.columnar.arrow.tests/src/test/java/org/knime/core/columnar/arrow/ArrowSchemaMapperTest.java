@@ -50,6 +50,7 @@ package org.knime.core.columnar.arrow;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import static org.knime.core.table.schema.DataSpecs.DICT_ENCODING;
 import static org.knime.core.table.schema.DataSpecs.STRING;
 import static org.knime.core.table.schema.DataSpecs.VARBINARY;
@@ -57,6 +58,7 @@ import static org.knime.core.table.schema.DataSpecs.VARBINARY;
 import java.util.Arrays;
 
 import org.junit.Test;
+import org.knime.core.columnar.arrow.ArrowSchemaMapper.ExtensionArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
@@ -136,7 +138,7 @@ public class ArrowSchemaMapperTest {
     /** Test mapping var binary specs to a {@link ArrowVarBinaryDataFactory} */
     @Test
     public void testMapVarBinarySpec() {
-        testMapSingleSpec(DataSpec.varBinarySpec(), new ArrowVarBinaryDataFactory(DefaultDataTraits.EMPTY));
+        testMapSingleSpec(DataSpec.varBinarySpec(), ArrowVarBinaryDataFactory.INSTANCE);
     }
 
     /** Test mapping void specs to a {@link ArrowVoidDataFactory} */
@@ -248,18 +250,25 @@ public class ArrowSchemaMapperTest {
     public void testMapStructSpec() {
         // Simple
         StructDataSpec spec = new StructDataSpec(DataSpec.doubleSpec(), DataSpec.intSpec());
-        testMapSingleSpec(spec, new ArrowStructDataFactory(DataTraitUtils.emptyTraits(spec),
-            ArrowDoubleDataFactory.INSTANCE, ArrowIntDataFactory.INSTANCE));
-
-
+        testMapSingleSpec(spec, new ArrowStructDataFactory(wrapSimple(ArrowDoubleDataFactory.INSTANCE),
+            wrapSimple(ArrowIntDataFactory.INSTANCE)));
 
         // Complex
         StructDataSpec inner = new StructDataSpec(DataSpec.doubleSpec(), DataSpec.longSpec());
         StructDataSpec outer = new StructDataSpec(DataSpec.stringSpec(), DataSpec.intSpec(), inner);
         testMapSingleSpec(outer,
-            new ArrowStructDataFactory(DataTraitUtils.emptyTraits(outer), ArrowStringDataFactory.INSTANCE,
-                ArrowIntDataFactory.INSTANCE, new ArrowStructDataFactory(DataTraitUtils.emptyTraits(inner),
-                    ArrowDoubleDataFactory.INSTANCE, ArrowLongDataFactory.INSTANCE)));
+            new ArrowStructDataFactory(wrapSimple(ArrowStringDataFactory.INSTANCE),
+                wrapSimple(ArrowIntDataFactory.INSTANCE),
+                wrapComplex(new ArrowStructDataFactory(wrapSimple(ArrowDoubleDataFactory.INSTANCE),
+                    wrapSimple(ArrowLongDataFactory.INSTANCE)), inner)));
+    }
+
+    private static ArrowColumnDataFactory wrapSimple(final ArrowColumnDataFactory factory) {
+        return ArrowSchemaMapper.wrap(factory, DefaultDataTraits.EMPTY);
+    }
+
+    private static ArrowColumnDataFactory wrapComplex(final ArrowColumnDataFactory factory, final DataSpec spec) {
+        return ArrowSchemaMapper.wrap(factory, DataTraitUtils.emptyTraits(spec));
     }
 
     /** Test mapping list specs to a {@link ArrowListDataFactory} */
@@ -268,17 +277,17 @@ public class ArrowSchemaMapperTest {
         // Simple
         ListDataSpec spec = new ListDataSpec(DataSpec.doubleSpec());
         testMapSingleSpec(spec,
-            new ArrowListDataFactory(DataTraitUtils.emptyTraits(spec), ArrowDoubleDataFactory.INSTANCE));
+            new ArrowListDataFactory(wrapSimple(ArrowDoubleDataFactory.INSTANCE)));
 
         // Complex
         StructDataSpec inner = new StructDataSpec(DataSpec.stringSpec(), DataSpec.doubleSpec());
         ListDataSpec middle = new ListDataSpec(inner);
         ListDataSpec outer = new ListDataSpec(middle);
-        testMapSingleSpec(
-            outer,
-            new ArrowListDataFactory(DataTraitUtils.emptyTraits(outer), new ArrowListDataFactory(DataTraitUtils.emptyTraits(middle),
-                    new ArrowStructDataFactory(
-                        DataTraitUtils.emptyTraits(inner), ArrowStringDataFactory.INSTANCE, ArrowDoubleDataFactory.INSTANCE))));
+        testMapSingleSpec(outer,
+            new ArrowListDataFactory(wrapComplex(new ArrowListDataFactory(
+                wrapComplex(new ArrowStructDataFactory(wrapSimple(ArrowStringDataFactory.INSTANCE),
+                    wrapSimple(ArrowDoubleDataFactory.INSTANCE)), inner)),
+                middle)));
     }
 
     // TODO test for other specs when implemented
@@ -298,10 +307,15 @@ public class ArrowSchemaMapperTest {
         final ColumnarSchema schema = new DefaultColumnarSchema(specs, traits);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(4, factories.length);
-        assertSame(ArrowDoubleDataFactory.INSTANCE, factories[0]);
-        assertSame(ArrowLongDataFactory.INSTANCE, factories[1]);
-        assertSame(ArrowDoubleDataFactory.INSTANCE, factories[2]);
-        assertSame(ArrowIntDataFactory.INSTANCE, factories[3]);
+        assertSame(ArrowDoubleDataFactory.INSTANCE, ((ExtensionArrowColumnDataFactory)factories[0]).getDelegate());
+        assertSame(ArrowLongDataFactory.INSTANCE, unwrap(factories[1]));
+        assertSame(ArrowDoubleDataFactory.INSTANCE, unwrap(factories[2]));
+        assertSame(ArrowIntDataFactory.INSTANCE, unwrap(factories[3]));
+    }
+
+    private static ArrowColumnDataFactory unwrap(final ArrowColumnDataFactory factory) {
+        assertTrue(factory instanceof ExtensionArrowColumnDataFactory);
+        return ((ExtensionArrowColumnDataFactory)factory).getDelegate();
     }
 
     /** Test mapping a single column of the given spec. */
@@ -314,7 +328,8 @@ public class ArrowSchemaMapperTest {
     private static void testMapSchema(final ColumnarSchema schema, final ArrowColumnDataFactory expectedFactory) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
-        assertEquals(expectedFactory, factories[0]);
+        var factory = factories[0];
+        assertEquals(expectedFactory, unwrap(factory));
     }
 
     private static DataTraits createTraitsForSpec(final DataSpec spec) {

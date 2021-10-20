@@ -45,8 +45,16 @@
  */
 package org.knime.core.columnar.arrow;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
@@ -61,11 +69,14 @@ import org.knime.core.columnar.arrow.data.ArrowLocalDateTimeData.ArrowLocalDateT
 import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
+import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.schema.BooleanDataSpec;
@@ -110,21 +121,20 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     }
 
     /**
-     * Map each column of the {@link ColumnarSchema} to the according {@link ArrowColumnDataFactory}. The factory can
-     * be used to create, read or write the Arrow implementation of {@link NullableReadData} and {@link NullableWriteData}.
+     * Map each column of the {@link ColumnarSchema} to the according {@link ArrowColumnDataFactory}. The factory can be
+     * used to create, read or write the Arrow implementation of {@link NullableReadData} and {@link NullableWriteData}.
      *
      * @param schema the schema of the column store
      * @return the factories
      */
     static ArrowColumnDataFactory[] map(final ColumnarSchema schema) {
         return IntStream.range(0, schema.numColumns()) //
-            .mapToObj(i -> map(schema.getSpec(i), schema.getTraits(i)))
-            .toArray(ArrowColumnDataFactory[]::new);
+            .mapToObj(i -> map(schema.getSpec(i), schema.getTraits(i))).toArray(ArrowColumnDataFactory[]::new);
     }
 
     /**
-     * Map a single {@link DataSpec} to the according {@link ArrowColumnDataFactory}. The factory can be used to
-     * create, read or write the Arrow implementation of {@link NullableReadData} and {@link NullableWriteData}.
+     * Map a single {@link DataSpec} to the according {@link ArrowColumnDataFactory}. The factory can be used to create,
+     * read or write the Arrow implementation of {@link NullableReadData} and {@link NullableWriteData}.
      *
      * @param spec the spec of the column
      * @return the factory
@@ -134,99 +144,168 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     }
 
     @Override
-    public ArrowBooleanDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
-        return ArrowBooleanDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowBooleanDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowByteDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
-        return ArrowByteDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowByteDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowDoubleDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
-        return ArrowDoubleDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowDoubleDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowDurationDataFactory visit(final DurationDataSpec spec, final DataTraits traits) {
-        return ArrowDurationDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final DurationDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowDurationDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowFloatDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
-        return ArrowFloatDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowFloatDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowIntDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
-        return ArrowIntDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowIntDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowLocalDateDataFactory visit(final LocalDateDataSpec spec, final DataTraits traits) {
-        return ArrowLocalDateDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final LocalDateDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowLocalDateDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowLocalDateTimeDataFactory visit(final LocalDateTimeDataSpec spec, final DataTraits traits) {
-        return ArrowLocalDateTimeDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final LocalDateTimeDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowLocalDateTimeDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowLocalTimeDataFactory visit(final LocalTimeDataSpec spec, final DataTraits traits) {
-        return ArrowLocalTimeDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final LocalTimeDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowLocalTimeDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowLongDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
-        return ArrowLongDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowLongDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowPeriodDataFactory visit(final PeriodDataSpec spec, final DataTraits traits) {
-        return ArrowPeriodDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final PeriodDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowPeriodDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return new ArrowDictEncodedVarBinaryDataFactory(traits);
+            return wrap(new ArrowDictEncodedVarBinaryDataFactory(traits), traits);
+        } else {
+            return wrap(ArrowVarBinaryDataFactory.INSTANCE, traits);
         }
-        return new ArrowVarBinaryDataFactory(traits);
     }
 
     @Override
-    public ArrowVoidDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
-        return ArrowVoidDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowVoidDataFactory.INSTANCE, traits);
     }
 
     @Override
-    public ArrowStructDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
-
-        final ArrowColumnDataFactory[] innerFactories = new ArrowColumnDataFactory[spec.size()];
-        for (int i = 0; i < spec.size(); i++) {
-            innerFactories[i] = ArrowSchemaMapper.map(spec.getDataSpec(i), traits.getDataTraits(i));
-        }
-        return new ArrowStructDataFactory(traits, innerFactories);
+    public ArrowColumnDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
+        final var innerFactories = new ArrowColumnDataFactory[spec.size()];
+        Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
+        return wrap(new ArrowStructDataFactory(innerFactories), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
         final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
-        return new ArrowListDataFactory(traits, inner);
+        return wrap(new ArrowListDataFactory(inner), traits);
     }
 
     @Override
-    public ArrowZonedDateTimeDataFactory visit(final ZonedDateTimeDataSpec spec, final DataTraits traits) {
-        return ArrowZonedDateTimeDataFactory.INSTANCE;
+    public ArrowColumnDataFactory visit(final ZonedDateTimeDataSpec spec, final DataTraits traits) {
+        return wrap(ArrowZonedDateTimeDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return new ArrowDictEncodedStringDataFactory(traits);
+            return wrap(new ArrowDictEncodedStringDataFactory(traits), traits);
         }
-        return ArrowStringDataFactory.INSTANCE;
+        return wrap(ArrowStringDataFactory.INSTANCE, traits);
+    }
+
+    static ExtensionArrowColumnDataFactory wrap(final ArrowColumnDataFactory factory, final DataTraits traits) {
+        return new ExtensionArrowColumnDataFactory(factory, traits);
+    }
+
+    static final class ExtensionArrowColumnDataFactory implements ArrowColumnDataFactory {
+
+        private final ArrowColumnDataFactory m_delegate;
+
+        private final DataTraits m_traits;
+
+        ExtensionArrowColumnDataFactory(final ArrowColumnDataFactory delegate, final DataTraits traits) {
+            m_delegate = delegate;
+            m_traits = traits;
+        }
+
+        ArrowColumnDataFactory getDelegate() {
+            return m_delegate;
+        }
+
+        @Override
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            var storageField = m_delegate.getField(name, dictionaryIdSupplier);
+            return ExtensionTypes.wrapInExtensionTypeIfNecessary(storageField, m_traits);
+        }
+
+        @Override
+        public ArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+            final BufferAllocator allocator, final int capacity) {
+            return m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity);
+        }
+
+        @Override
+        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+            return m_delegate.createRead(vector, nullCount, provider, version);
+        }
+
+        @Override
+        public FieldVector getVector(final NullableReadData data) {
+            return m_delegate.getVector(data);
+        }
+
+        @Override
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
+            return m_delegate.getDictionaries(data);
+        }
+
+        @Override
+        public ArrowColumnDataFactoryVersion getVersion() {
+            return m_delegate.getVersion();
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (obj == this) {
+                return true;
+            }
+            if (obj instanceof ExtensionArrowColumnDataFactory) {
+                var other = (ExtensionArrowColumnDataFactory)obj;
+                return m_traits.equals(other.m_traits) && m_delegate.equals(other.m_delegate);
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(m_traits, m_delegate);
+        }
+
     }
 }

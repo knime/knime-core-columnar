@@ -82,12 +82,9 @@ import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
-import org.knime.core.table.schema.traits.DataTraits;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
- * Test {@link ArrowStructData} with a struct consisting of a string, integer, and struct (of varbinary
- * and double).
+ * Test {@link ArrowStructData} with a struct consisting of a string, integer, and struct (of varbinary and double).
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
@@ -95,14 +92,12 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
 
     private static final int MAX_LENGTH = 100;
 
-    private static final DataTraits EMPTY_TRAITS = DefaultDataTraits.EMPTY;
-
     private static ArrowStructDataFactory createFactory() {
         final ArrowStringDataFactory child1 = ArrowStringDataFactory.INSTANCE;
         final ArrowIntDataFactory child2 = ArrowIntDataFactory.INSTANCE;
-        final ArrowStructDataFactory child3 = new ArrowStructDataFactory(EMPTY_TRAITS,
-            new ArrowVarBinaryDataFactory(DefaultDataTraits.EMPTY), ArrowDoubleDataFactory.INSTANCE);
-        return new ArrowStructDataFactory(EMPTY_TRAITS, child1, child2, child3);
+        final ArrowStructDataFactory child3 =
+            new ArrowStructDataFactory(ArrowVarBinaryDataFactory.INSTANCE, ArrowDoubleDataFactory.INSTANCE);
+        return new ArrowStructDataFactory(child1, child2, child3);
     }
 
     /** Create the test for {@link ArrowStructData} */

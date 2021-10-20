@@ -54,6 +54,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.LongSupplier;
+import java.util.stream.Stream;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
@@ -68,12 +69,10 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.NestedDictionaryProvider;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Arrow implementation of {@link StructWriteData} and {@link StructReadData}.
@@ -274,21 +273,18 @@ public final class ArrowStructData {
         private final ArrowColumnDataFactory[] m_inner;
 
         private static ArrowColumnDataFactoryVersion[] getVersions(final ArrowColumnDataFactory[] factories) {
-            final ArrowColumnDataFactoryVersion[] versions = new ArrowColumnDataFactoryVersion[factories.length];
-            for (int i = 0; i < factories.length; i++) {
-                versions[i] = factories[i].getVersion();
-            }
-            return versions;
+            return Stream.of(factories)//
+                    .map(ArrowColumnDataFactory::getVersion)//
+                    .toArray(ArrowColumnDataFactoryVersion[]::new);
         }
 
         /**
          * Create a new factory for Arrow struct data.
          *
-         * @param traits of the struct
          * @param inner factories to create the inner types
          */
-        public ArrowStructDataFactory(final DataTraits traits, final ArrowColumnDataFactory... inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, getVersions(inner)), traits);
+        public ArrowStructDataFactory(final ArrowColumnDataFactory... inner) {
+            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, getVersions(inner)));
             m_inner = inner;
         }
 
@@ -298,8 +294,7 @@ public final class ArrowStructData {
             for (int i = 0; i < m_inner.length; i++) { //NOSONAR
                 children.add(m_inner[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
             }
-            var field = new Field(name, new FieldType(true, Struct.INSTANCE, null), children);
-            return ExtensionTypes.wrapInExtensionTypeIfNecessary(field, m_traits);
+            return new Field(name, new FieldType(true, Struct.INSTANCE, null), children);
         }
 
         @Override

@@ -57,12 +57,10 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
@@ -160,16 +158,17 @@ public final class ArrowVarBinaryData {
     public static final class ArrowVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
 
         /**
-         * @param traits of the data
+         * Singleton instance.
          */
-        public ArrowVarBinaryDataFactory(final DataTraits traits) {
-            super(ArrowColumnDataFactoryVersion.version(0), traits);
+        public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
+
+        private ArrowVarBinaryDataFactory() {
+            super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            var field = Field.nullable(name, LargeBinary.INSTANCE);
-            return ExtensionTypes.wrapInExtensionTypeIfNecessary(field, m_traits);
+            return Field.nullable(name, LargeBinary.INSTANCE);
         }
 
         @Override
