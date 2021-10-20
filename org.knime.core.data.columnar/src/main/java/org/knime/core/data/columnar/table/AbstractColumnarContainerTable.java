@@ -54,8 +54,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
-import org.knime.core.columnar.filter.DefaultBatchRange;
-import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -130,7 +128,6 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     // this class would then simply wrap one of these
     private final BatchReadStore m_readStore;
 
-
     // effectively final
     private Finalizer m_storeCloser;
 
@@ -146,8 +143,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         final BatchReadStore store = m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath());
 
         final var builder = new ColumnarBatchReadStoreBuilder(store);
-        builder.enableDictEncoding(true)
-            .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache())
+        builder.enableDictEncoding(true).useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache())
             .useHeapCache(ColumnarPreferenceUtils.getHeapCache());
         m_readStore = builder.build();
     }
@@ -254,7 +250,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     @Override
     public RowCursor cursor(final TableFilter filter) {
         try {
-            if (filter != null) {
+           if (filter != null) {
                 filter.validate(getDataTableSpec(), m_size);
                 //  for some reason we don't do validation of the 'from index'
                 final Optional<Long> fromRowIndexOpt = filter.getFromRowIndex();
@@ -305,12 +301,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
         @Override
         public Cursor<ReadAccessRow> createCursor() {
-            final int lastIndexInLastBatch = (int)((m_size - 1) % m_readStore.batchLength());
-            final var batchRange = new DefaultBatchRange(0, 0, m_readStore.numBatches() - 1, lastIndexInLastBatch);
-            return ColumnarCursorFactory.create(m_readStore, new DefaultColumnSelection(m_schema.numColumns()),
-                batchRange);
+            return ColumnarCursorFactory.create(m_readStore, m_size);
         }
-
     }
 
 }

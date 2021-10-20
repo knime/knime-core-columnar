@@ -62,12 +62,15 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.BatchRange;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.DefaultBatchRange;
+import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.virtual.EmptyCursor;
 
 /**
  * Creates {@link Cursor Cursors} to read from {@link BatchReadStore data storages}.
@@ -76,6 +79,23 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class ColumnarCursorFactory {
+
+    /**
+     * Creates a {@link LookaheadCursor} that reads from the provided {@link BatchReadStore}.
+     *
+     * @param readStore the store
+     * @param size the number of rows in the readStore
+     * @return LookaheadCursor reading all entries in the store
+     */
+    public static LookaheadCursor<ReadAccessRow> create(final BatchReadStore readStore, final long size) {
+        if (size == 0) {
+            return EmptyCursor.INSTANCE;
+        } else {
+            final int lastIndexInLastBatch = (int)((size - 1) % readStore.batchLength());
+            return create(readStore, new DefaultColumnSelection(readStore.getSchema().numColumns()),
+                new DefaultBatchRange(0, 0, readStore.numBatches() - 1, lastIndexInLastBatch));
+        }
+    }
 
     /**
      * Creates a {@link LookaheadCursor} that reads from the provided {@link BatchReadStore}.
