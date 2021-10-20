@@ -411,11 +411,11 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
                     logicalType.getLogicalType());
                 assertTrue(schema.getSpec(1) instanceof StructDataSpec);
                 final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);
-                assertTrue(structSpec.getInner()[0] instanceof VarBinaryDataSpec);
-                assertTrue(structSpec.getInner()[1] instanceof StringDataSpec);
+                assertTrue(structSpec.getDataSpec(0) instanceof VarBinaryDataSpec);
+                assertTrue(structSpec.getDataSpec(1) instanceof StringDataSpec);
                 final StructDataTraits structTraits = (StructDataTraits)schema.getTraits(1);
-                assertTrue(DictEncodingTrait.isEnabled(structTraits.getInner()[0]));
-                assertTrue(DictEncodingTrait.isEnabled(structTraits.getInner()[1]));
+                assertTrue(DictEncodingTrait.isEnabled(structTraits.getDataTraits(0)));
+                assertTrue(DictEncodingTrait.isEnabled(structTraits.getDataTraits(1)));
             });
     }
 }
