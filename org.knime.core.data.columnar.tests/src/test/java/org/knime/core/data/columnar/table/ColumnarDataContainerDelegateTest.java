@@ -69,7 +69,8 @@ import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -89,7 +90,7 @@ public class ColumnarDataContainerDelegateTest extends ColumnarTest {
     private static ColumnarDataContainerDelegate createColumnarDataContainerDelegate(final DataTableSpec spec)
         throws IOException {
         final ValueSchema valueSchema =
-            ValueSchema.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
+            ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         final ColumnarValueSchema schema = ColumnarValueSchemaUtils.create(valueSchema);
 
         final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(false, 0, false, false);

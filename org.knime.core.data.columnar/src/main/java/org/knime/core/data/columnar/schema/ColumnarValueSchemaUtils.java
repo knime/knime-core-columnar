@@ -52,7 +52,8 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.meta.DataColumnMetaData;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 
 /**
  * Utility class to work with {@link ColumnarValueSchema}s.
@@ -62,6 +63,27 @@ import org.knime.core.data.v2.ValueSchema;
 public final class ColumnarValueSchemaUtils {
 
     private ColumnarValueSchemaUtils() {
+    }
+
+    /**
+     * Indicates that this schema was created prior to KNIME Analytics Platform 4.5.0.
+     *
+     * @param schema to check
+     * @return true if schema was created before KNIME Analytics Platform 4.5.0
+     */
+    public static boolean createdBefore45(final ColumnarValueSchema schema) {
+        return ValueSchemaUtils.createdBefore45(getValueSchema(schema));
+    }
+
+    private static ValueSchema getValueSchema(final ColumnarValueSchema schema) {
+        if (schema instanceof DefaultColumnarValueSchema) {
+            return ((DefaultColumnarValueSchema)schema).getSource();
+        } else if (schema instanceof UpdatedColumnarValueSchema) {
+            return getValueSchema(((UpdatedColumnarValueSchema)schema).getDelegate());
+        } else {
+            throw new IllegalArgumentException("Unsupported ColumnarValueSchema type: " + schema.getClass());
+        }
+
     }
 
     /**
@@ -87,8 +109,8 @@ public final class ColumnarValueSchemaUtils {
      */
     public static final ColumnarValueSchema updateSource(final ColumnarValueSchema source,
         final Map<Integer, DataColumnDomain> domainMap, final Map<Integer, DataColumnMetaData[]> metadataMap) {
-        final DataColumnSpec[] result = new DataColumnSpec[source.numColumns() - 1];
-        for (int i = 0; i < result.length; i++) {
+        final var result = new DataColumnSpec[source.numColumns() - 1];
+        for (int i = 0; i < result.length; i++) {//NOSONAR
             final DataColumnSpec colSpec = source.getSourceSpec().getColumnSpec(i);
             final DataColumnDomain domain = domainMap.get(i + 1);
             final DataColumnMetaData[] metadata = metadataMap.get(i + 1);
@@ -96,7 +118,7 @@ public final class ColumnarValueSchemaUtils {
             if (domain == null && metadata == null) {
                 result[i] = colSpec;
             } else {
-                final DataColumnSpecCreator creator = new DataColumnSpecCreator(colSpec);
+                final var creator = new DataColumnSpecCreator(colSpec);
                 if (domain != null) {
                     creator.setDomain(domain);
                 }

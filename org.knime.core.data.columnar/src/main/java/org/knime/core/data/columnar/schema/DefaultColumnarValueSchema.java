@@ -45,22 +45,22 @@
  */
 package org.knime.core.data.columnar.schema;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.traits.DataTraitUtils;
 import org.knime.core.table.schema.traits.DataTraits;
-import org.knime.core.table.schema.traits.LogicalTypeTrait;
 
 import com.google.common.collect.Iterators;
 
@@ -80,10 +80,18 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     DefaultColumnarValueSchema(final ValueSchema source) {
         m_source = source;
-        m_specs = Stream.of(source.getValueFactories()).map(ValueFactory::getSpec).collect(Collectors.toList());
-        m_traits = Stream.of(source.getValueFactories())
-            .map(vf -> DataTraitUtils.withTrait(vf.getTraits(), new LogicalTypeTrait(vf.getClass().getName())))
-            .collect(Collectors.toList());
+        final int numFactories = source.numFactories();
+        m_specs = new ArrayList<>(numFactories);
+        m_traits = new ArrayList<>(numFactories);
+        for (int i = 0; i < numFactories; i++) {//NOSONAR
+            final var factory = source.getValueFactory(i);
+            m_specs.add(factory.getSpec());
+            m_traits.add(ValueFactoryUtils.getTraits(factory));
+        }
+    }
+
+    ValueSchema getSource() {
+        return m_source;
     }
 
     @Override
@@ -107,7 +115,7 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     @Override
     public void save(final NodeSettingsWO settings) {
-        ValueSchema.Serializer.save(m_source, settings);
+        ValueSchemaUtils.save(m_source, settings);
     }
 
     @Override
@@ -151,10 +159,9 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
         return m_traits.get(index);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
-        return (ValueFactory<R, W>)m_source.getValueFactories()[index];
+        return m_source.getValueFactory(index);
     }
 
     @Override

@@ -63,7 +63,8 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -74,7 +75,7 @@ public class WrappedBatchStoreTest extends ColumnarTest {
     private static ColumnarValueSchema generateDefaultSchema() {
         final DataTableSpec spec = createSpec();
         final ValueSchema valueSchema =
-            ValueSchema.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
+            ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         return ColumnarValueSchemaUtils.create(valueSchema);
     }
 

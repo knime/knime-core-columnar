@@ -64,7 +64,8 @@ import org.knime.core.data.collection.ListCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.IntListValueFactory;
 import org.knime.core.table.access.ListAccess.ListReadAccess;
 import org.knime.core.table.access.ListAccess.ListWriteAccess;
@@ -92,7 +93,7 @@ public class DefaultColumnarValueSchemaTest {
 
     static DefaultColumnarValueSchema createDefaultColumnarValueSchema(final DataTableSpec spec) {
         final ValueSchema valueSchema =
-            ValueSchema.create(spec, RowKeyType.NOKEY, NotInWorkflowWriteFileStoreHandler.create());
+            ValueSchemaUtils.create(spec, RowKeyType.NOKEY, NotInWorkflowWriteFileStoreHandler.create());
         final ColumnarValueSchema schema = ColumnarValueSchemaUtils.create(valueSchema);
         return (DefaultColumnarValueSchema)schema;
     }

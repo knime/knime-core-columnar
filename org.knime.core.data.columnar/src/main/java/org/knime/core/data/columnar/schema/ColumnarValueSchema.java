@@ -47,7 +47,7 @@ package org.knime.core.data.columnar.schema;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;

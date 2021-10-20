@@ -67,7 +67,8 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 
 /**
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
@@ -78,7 +79,7 @@ public class ColumnarBatchReadStoreBuilderTest extends ColumnarTest {
     private static ColumnarValueSchema generateDefaultSchema() {
         final DataTableSpec spec = createSpec();
         final ValueSchema valueSchema =
-            ValueSchema.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
+            ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         return ColumnarValueSchemaUtils.create(valueSchema);
     }
 

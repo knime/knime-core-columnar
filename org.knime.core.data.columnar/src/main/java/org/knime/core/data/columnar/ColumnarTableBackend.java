@@ -74,7 +74,8 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -114,7 +115,7 @@ public final class ColumnarTableBackend implements TableBackend {
         final IDataRepository repository, final ILocalDataRepository localRepository,
         final IWriteFileStoreHandler fileStoreHandler) {
         final ValueSchema schema =
-            ValueSchema.create(spec, settings.isEnableRowKeys() ? RowKeyType.CUSTOM : RowKeyType.NOKEY,
+            ValueSchemaUtils.create(spec, settings.isEnableRowKeys() ? RowKeyType.CUSTOM : RowKeyType.NOKEY,
                 initFileStoreHandler(fileStoreHandler, repository));
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
@@ -132,7 +133,7 @@ public final class ColumnarTableBackend implements TableBackend {
         final DataContainerSettings settings, final IDataRepository repository, final IWriteFileStoreHandler handler) {
         try {
             final ValueSchema schema =
-                ValueSchema.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
+                ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
             final ColumnarRowContainerSettings containerSettings =
                 new ColumnarRowContainerSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
                     settings.isEnableRowKeys(), settings.isForceSequentialRowHandling());

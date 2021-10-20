@@ -66,7 +66,8 @@ import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.RowWrite;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.ValueInterfaces.IntWriteValue;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -106,7 +107,7 @@ final class ColumnarTableTestUtils {
             IntStream.range(0, nCols).mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), type).createSpec())
                 .toArray(DataColumnSpec[]::new));
         final ValueSchema valueSchema =
-            ValueSchema.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
+            ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         return ColumnarValueSchemaUtils.create(valueSchema);
     }
 

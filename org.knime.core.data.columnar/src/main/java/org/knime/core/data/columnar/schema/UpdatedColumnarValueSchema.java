@@ -75,6 +75,10 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
         m_delegate = delegate;
     }
 
+    ColumnarValueSchema getDelegate() {
+        return m_delegate;
+    }
+
     @Override
     public int numColumns() {
         return m_delegate.numColumns();

@@ -68,7 +68,7 @@ import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelea
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -137,10 +137,12 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         m_tableId = -1;
         m_size = settings.getLong(CFG_TABLE_SIZE);
         m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
+        var dataPath = context.getDataFileRef().getFile().toPath();
+        var schema = m_factory.readSchema(dataPath);
         m_schema = ColumnarValueSchemaUtils
-            .create(ValueSchema.Serializer.load(context.getTableSpec(), context.getDataRepository(), settings));
+            .create(ValueSchemaUtils.load(schema, context.getTableSpec(), context.getDataRepository(), settings));
 
-        final BatchReadStore store = m_factory.createReadStore(m_schema, context.getDataFileRef().getFile().toPath());
+        final BatchReadStore store = m_factory.createReadStore(m_schema, dataPath);
 
         final var builder = new ColumnarBatchReadStoreBuilder(store);
         builder.enableDictEncoding(true).useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache())
