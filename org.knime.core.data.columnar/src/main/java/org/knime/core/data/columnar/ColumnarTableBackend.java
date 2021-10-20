@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.IntSupplier;
 import java.util.stream.Collectors;
 
@@ -62,14 +61,15 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarRowContainerSettings;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
+import org.knime.core.data.columnar.table.LegacyTableUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
+import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
+import org.knime.core.data.container.BufferedTableBackend;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.ColumnRearrangerUtils;
-import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.container.ILocalDataRepository;
-import org.knime.core.data.container.RearrangeColumnsTable;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowContainer;
@@ -98,6 +98,8 @@ public final class ColumnarTableBackend implements TableBackend {
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarTableBackend.class);
 
     private static final String DESCRIPTION;
+
+    private static final BufferedTableBackend OLD_BACKEND = new BufferedTableBackend();
 
     static {
         String d;
@@ -166,49 +168,59 @@ public final class ColumnarTableBackend implements TableBackend {
     }
 
     @Override
-    public KnowsRowCountTable concatenate(final ExecutionMonitor exec, final IWriteFileStoreHandler filestoreHandler,
-        final IntSupplier tableIdSupplier, final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck,
-        final BufferedDataTable... tables) throws CanceledExecutionException {
+    public KnowsRowCountTable concatenate(final ExecutionMonitor exec, final IntSupplier tableIdSupplier,
+        final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables) throws CanceledExecutionException {
         if (duplicatesPreCheck && rowKeyDuplicateSuffix == null) {
-            TableTransformUtils.checkForDuplicateKeys(exec, tables);
-            final DataTableSpec concatenateSpec = TableTransformUtils.concatenateSpec(tables);
-            final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
-            return new VirtualTableExtensionTable(tables, filestoreHandler, List.of(new ConcatenateTransformSpec()),
-                concatenateSpec, concatenatedSize, tableIdSupplier.getAsInt());
-        } else {
-            return ConcatenateTable.create(exec, Optional.ofNullable(rowKeyDuplicateSuffix), duplicatesPreCheck,
-                tables);
+            try {
+                var concatenatedSchema = LegacyTableUtils.concatenateSchemas(tables);
+                TableTransformUtils.checkForDuplicateKeys(exec, tables);
+                final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
+                return new VirtualTableExtensionTable(tables, List.of(new ConcatenateTransformSpec()),
+                    concatenatedSchema, concatenatedSize, tableIdSupplier.getAsInt());
+            } catch (VirtualTableIncompatibleException ex) {
+                LOGGER.warn("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.",
+                    ex);
+            }
+        }
+        return OLD_BACKEND.concatenate(exec, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck,
+            tables);
+    }
+
+    @Override
+    public KnowsRowCountTable append(final ExecutionMonitor exec, final IntSupplier tableIdSupplier,
+        final BufferedDataTable left, final BufferedDataTable right)
+        throws CanceledExecutionException {
+        final BufferedDataTable[] tables = {left, right};
+        try {
+            var appendedSchema = LegacyTableUtils.appendSchemas(tables);
+            TableTransformUtils.checkRowKeysMatch(exec, tables);
+            final long appendSize = TableTransformUtils.appendSize(tables);
+            return new VirtualTableExtensionTable(tables,
+                TableTransformUtils.createAppendTransformations(tables), appendedSchema, appendSize,
+                tableIdSupplier.getAsInt());
+        } catch (VirtualTableIncompatibleException ex) {
+            LOGGER.warn("Can't append with the Columnar Table Backend, falling back on the old backend.", ex);
+            return OLD_BACKEND.append(exec, tableIdSupplier, left, right);
         }
     }
 
     @Override
-    public KnowsRowCountTable append(final ExecutionMonitor exec, final IWriteFileStoreHandler filestoreHandler,
-        final IntSupplier tableIdSupplier, final BufferedDataTable left, final BufferedDataTable right)
-        throws CanceledExecutionException {
-        final BufferedDataTable[] tables = {left, right};
-        TableTransformUtils.checkRowKeysMatch(exec, tables);
-        final long appendSize = TableTransformUtils.appendSize(tables);
-        final DataTableSpec appendedSpec = TableTransformUtils.appendSpec(tables);
-        return new VirtualTableExtensionTable(tables, filestoreHandler,
-            TableTransformUtils.createAppendTransformations(tables), appendedSpec, appendSize,
-            tableIdSupplier.getAsInt());
-    }
-
-    @Override
     public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor,
-        final IWriteFileStoreHandler filestoreHandler, final IntSupplier tableIdSupplier,
-        final ColumnRearranger columnRearranger, final BufferedDataTable table, final ExecutionContext context)
+        final IntSupplier tableIdSupplier, final ColumnRearranger columnRearranger,
+        final BufferedDataTable table, final ExecutionContext context)
         throws CanceledExecutionException {
         ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
-        if (ColumnRearrangerUtils.addsNoNewColumns(columnRearranger)) {
+        try {
+            var rearrangedSchema = LegacyTableUtils.rearrangeSchema(table, columnRearranger);
             List<TableTransformSpec> transformations = TableTransformUtils.createRearrangeTransformations(
                 ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger),
                 table.getDataTableSpec().getNumColumns());
-            return new VirtualTableExtensionTable(new BufferedDataTable[]{table}, filestoreHandler, transformations,
-                columnRearranger.createSpec(), table.size(), tableIdSupplier.getAsInt());
-        } else {
-            // TODO replace fallback with fast tables based implementation once we have map functionality
-            return RearrangeColumnsTable.create(columnRearranger, table, progressMonitor, context);
+            return new VirtualTableExtensionTable(new BufferedDataTable[]{table}, transformations,
+                rearrangedSchema, table.size(), tableIdSupplier.getAsInt());
+        } catch (VirtualTableIncompatibleException ex) {
+            LOGGER.warn("Can't run ColumnRearranger on the Columnar Table Backend. Falling back on the old backend.",
+                ex);
+            return OLD_BACKEND.rearrange(progressMonitor, tableIdSupplier, columnRearranger, table, context);
         }
     }
 

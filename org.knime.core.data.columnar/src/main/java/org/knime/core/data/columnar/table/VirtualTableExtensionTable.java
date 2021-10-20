@@ -69,11 +69,8 @@ import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.columnar.table.virtual.closeable.CloseableTracker;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
-import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
-import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -129,12 +126,11 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private final ReferenceTable[] m_referenceTables;
 
-    private VirtualTable m_virtualTable;
-
     private List<RowAccessible> m_cachedOutputs;
 
-    private final CloseableTracker<RowCursor, IOException> m_cursorTracker =
-        new CloseableTracker<>(IOException.class);
+    private TableTransform m_transformation;
+
+    private final CloseableTracker<RowCursor, IOException> m_cursorTracker = new CloseableTracker<>(IOException.class);
 
     private final CloseableTracker<RowAccessible, IOException> m_filteredAccessibleTracker =
         new CloseableTracker<>(IOException.class);
@@ -154,25 +150,31 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         // only relevant for newly created tables that are temporary i.e. not output tables of a node (see AP-15779)
         // If this table is loaded it means that it must be either an output of some node
         m_tableId = -1;
-        m_schema = ColumnarValueSchemaUtils.create(ValueSchema.Serializer.load(context.getTableSpec(),
-            context.getDataRepository(), settings.getNodeSettings(CFG_SCHEMA)));
         m_dataTableSpec = context.getTableSpec();
         int[] refIds = settings.getIntArray(CFG_REF_TABLES);
         m_refTables = new BufferedDataTable[refIds.length];
-        m_referenceTables = new ReferenceTable[refIds.length];
         m_size = settings.getLong(CFG_SIZE);
         for (var i = 0; i < refIds.length; i++) {
             final BufferedDataTable refTable = context.getTable(refIds[i]);
             m_refTables[i] = refTable;
-            final var fsHandler = NotInWorkflowWriteFileStoreHandler.create();
-            fsHandler.addToRepository(context.getDataRepository());
-            m_referenceTables[i] = createReferenceTable(refTable, fsHandler);
+        }
+        try {
+            m_referenceTables = createReferenceTableWrappers(m_refTables);
+        } catch (VirtualTableIncompatibleException ex) {
+            throw new IllegalStateException("The loaded reference tables are incompatible with virtual tables. This is "
+                + "most likely an implementation error because they must have been compatible when storing the data.",
+                ex);
         }
         try {
             m_tableTransformSpec = reconstructSpecsFromStringArray(settings.getStringArray(CFG_TRANSFORMSPECS));
         } catch (IOException ex) {
             throw new InvalidSettingsException("Error while deserializing transformation ", ex);
         }
+
+        @SuppressWarnings("resource")// will be closed in the close method
+        var schema = getOutput().getSchema();
+        final var valueSchema = ValueSchemaUtils.create(m_dataTableSpec, schema, context.getDataRepository());
+        m_schema = ColumnarValueSchemaUtils.create(valueSchema);
     }
 
     private static List<TableTransformSpec> reconstructSpecsFromStringArray(final String[] serializedSpecs)
@@ -191,27 +193,42 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
      * Constructor.
      *
      * @param refs the reference tables
-     * @param fsHandler the {@link IWriteFileStoreHandler}
      * @param specs the transformations to apply
-     * @param transformedSpec the {@link DataTableSpec} AFTER the transformations are applied
+     * @param transformedSchema the {@link ColumnarValueSchema} AFTER the transformations are applied
      * @param size the size of the output table AFTER the transformations are applied
      * @param tableId the id with which this table is tracked
+     * @throws VirtualTableIncompatibleException if the provided reference tables are not virtual table compatible
      */
     public VirtualTableExtensionTable(final BufferedDataTable[] refs, //
-        final IWriteFileStoreHandler fsHandler, //
         final List<TableTransformSpec> specs, //
-        final DataTableSpec transformedSpec, //
-        final long size,//
-        final int tableId) {
+        final ColumnarValueSchema transformedSchema, //
+        final long size, //
+        final int tableId) throws VirtualTableIncompatibleException {
         m_tableId = tableId;
         m_tableTransformSpec = specs;
         m_refTables = refs;
-        m_referenceTables = Arrays.stream(refs)//
-            .map(t -> createReferenceTable(t, fsHandler))//
-            .toArray(ReferenceTable[]::new);
-        m_schema = ColumnarValueSchemaUtils.create(ValueSchema.create(transformedSpec, RowKeyType.CUSTOM, fsHandler));
+        m_referenceTables = createReferenceTableWrappers(refs);
+        // TODO we could derive the schema from the reference tables but this entails running the computation graph
+        // NOTE: The computation graph does not perform I/O
+        // Any input table dependent checking would still have to happen outside of this constructor
+        // or the VirtualTableExecutor must somehow be configured to do the checking
+        // e.g. via a visitor for the different transformation types
+        m_schema = transformedSchema;
         m_dataTableSpec = m_schema.getSourceSpec();
         m_size = size;
+    }
+
+    private static ReferenceTable[] createReferenceTableWrappers(final BufferedDataTable[] referenceTables)
+        throws VirtualTableIncompatibleException {
+        final var refTableWrappers = new ReferenceTable[referenceTables.length];
+        for (int i = 0; i < refTableWrappers.length; i++) {
+            refTableWrappers[i] = createReferenceTableWrapper(referenceTables[i]);
+        }
+        return refTableWrappers;
+    }
+
+    ColumnarValueSchema getSchema() {
+        return m_schema;
     }
 
     @Override
@@ -239,18 +256,13 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return strings;
     }
 
-    private synchronized VirtualTable getVirtualTable() {
+    private synchronized TableTransform getTransformation() {
         // lazily setup graph once
-        if (m_virtualTable == null) {
-            m_virtualTable = initializeVirtualTable();
+        if (m_transformation == null) {
+            m_transformation = buildGraph();
         }
 
-        return m_virtualTable;
-    }
-
-    private VirtualTable initializeVirtualTable() {
-        var tableTransform = buildGraph();
-        return new VirtualTable(tableTransform, m_schema);
+        return m_transformation;
     }
 
     private TableTransform buildGraph() {
@@ -288,7 +300,6 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public void clear() {
-        m_virtualTable = null;
         closeOpenCursors();
         clearOutputCache();
     }
@@ -364,7 +375,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     }
 
     private List<RowAccessible> runComputationGraph() {
-        final VirtualTableExecutor exec = new LazyVirtualTableExecutor(getVirtualTable().getProducingTransform());
+        final VirtualTableExecutor exec = new LazyVirtualTableExecutor(getTransformation());
         final Map<UUID, RowAccessible> sources = collectSources();
         return exec.execute(sources);
     }
@@ -416,8 +427,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     }
 
     @SuppressWarnings("resource")
-    private static ReferenceTable createReferenceTable(final BufferedDataTable table,
-        final IWriteFileStoreHandler fsHandler) {
+    private static ReferenceTable createReferenceTableWrapper(final BufferedDataTable table)
+        throws VirtualTableIncompatibleException {
         final ExtensionTable unwrapped = unwrap(table);
         if (unwrapped instanceof VirtualTableExtensionTable) {
             final VirtualTableExtensionTable virtualExtensionTable = (VirtualTableExtensionTable)unwrapped;
@@ -427,7 +438,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             return new ColumnarContainerReferenceTable(columnarTable);
         } else {
             // we end up here if the reference tables are not extension tables (e.g. RearrangeColumnsTable)
-            return new BufferedReferenceTable(table, fsHandler);
+            return new BufferedReferenceTable(table);
         }
     }
 
@@ -460,7 +471,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
                 // comp graph for every ancestor that is a VirtualTableExtensionTable
                 return new TableTransform(new SourceTransformSpec(m_id));
             } else {
-                return m_table.getVirtualTable().getProducingTransform();
+                return m_table.getTransformation();
             }
         }
 
@@ -508,10 +519,9 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
         private final ColumnarValueSchema m_schema;
 
-        BufferedReferenceTable(final BufferedDataTable table, final IWriteFileStoreHandler fsHandler) {
+        BufferedReferenceTable(final BufferedDataTable table) throws VirtualTableIncompatibleException {
             m_table = table;
-            final var schema = ValueSchema.create(table.getDataTableSpec(), RowKeyType.CUSTOM, fsHandler);
-            m_schema = ColumnarValueSchemaUtils.create(schema);
+            m_schema = LegacyTableUtils.extractSchema(table);
         }
 
         @Override
