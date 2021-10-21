@@ -53,7 +53,6 @@ import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.data.NullableReadData;
@@ -187,16 +186,16 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
     // used to make sure we don't call expand and a realloc during serialization concurrently.
     private final Object m_expandLock = new Object();
 
-    // The phaser is used to keep track of the number of asynchronously dispatched tasks to
+    // The latch is used to keep track of the number of asynchronously dispatched tasks to
     // know when they have really finished. This is used as a barrier to ensure we only close
     // the back-end once all writing has finished.
-    private final Phaser m_phaser;
+    private final CountUpDownLatch m_latch;
 
-    CachedWriteData(final W delegate, final T[] data, final ExecutorService executor, final Phaser phaser) {
+    CachedWriteData(final W delegate, final T[] data, final ExecutorService executor, final CountUpDownLatch latch) {
         m_delegate = delegate;
         m_data = data;
         m_executor = executor;
-        m_phaser = phaser;
+        m_latch = latch;
     }
 
     @Override
@@ -270,7 +269,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
             }
         }
 
-        m_phaser.arriveAndDeregister();
+        m_latch.countDown();
     }
 
     /**
@@ -288,7 +287,7 @@ abstract class CachedWriteData<W extends NullableWriteData, R extends NullableRe
         final var highest = m_setIndex;
         final var lowest = m_highestDispatchedSerializationIndex;
 
-        m_phaser.register();
+        m_latch.countUp();
         m_future = m_future.thenRunAsync(() -> serializeRange(lowest + 1, highest + 1), m_executor);
         m_highestDispatchedSerializationIndex = highest;
     }

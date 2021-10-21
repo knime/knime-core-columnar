@@ -43,58 +43,70 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  *
+ * History
+ *   Oct 21, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.cache.object;
 
-import java.util.concurrent.ExecutorService;
-
-import org.knime.core.columnar.data.StringData.StringReadData;
-import org.knime.core.columnar.data.StringData.StringWriteData;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Phaser;
 
 /**
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * Similar to {@link CountDownLatch} and {@link Phaser}, this is a latch that can be counted up and down. Await will
+ * wait for its count to become zero from above. Increasing from below to zero will not trigger await to return.
+ * Cannot be reused after the count has reached zero once.
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-final class CachedStringWriteData extends CachedWriteData<StringWriteData, StringReadData, String>
-    implements StringWriteData {
+public class CountUpDownLatch {
 
-    final class CachedStringReadData extends CachedReadData implements StringReadData {
+    private long m_count;
 
-        CachedStringReadData(final int length) {
-            super(length);
+    private Phaser m_phaser = new Phaser(1);
+
+    /**
+     * Create a {@link CountUpDownLatch} with an initial count.
+     *
+     * @param initialCount Initial count, should not be zero or await() will return immediately.
+     */
+    public CountUpDownLatch(final long initialCount) {
+        m_count = initialCount;
+        if (initialCount == 0) {
+            m_phaser.arriveAndDeregister();
         }
+    }
 
-        @Override
-        public String getString(final int index) {
-            return m_data[index];
+    /**
+     * Increase the count.
+     */
+    public synchronized void countUp() {
+        m_count++;
+    }
+
+    /**
+     * Decrease the count, if it becomes zero, await will return.
+     */
+    public synchronized void countDown() {
+        m_count--;
+        if (m_count == 0) {
+            m_phaser.arriveAndDeregister();
         }
-
     }
 
-    CachedStringWriteData(final StringWriteData delegate, final ExecutorService executor, final CountUpDownLatch serializationLatch) {
-        super(delegate, new String[delegate.capacity()], executor, serializationLatch);
+    /**
+     * Wait for the count to become zero. Not interruptible.
+     */
+    public void await() {
+        m_phaser.awaitAdvance(0);
     }
 
-    @Override
-    public void setString(final int index, final String val) {
-        m_data[index] = val;
-        onSet(index);
-    }
-
-    @Override
-    void serializeAt(final int index) {
-        m_delegate.setString(index, m_data[index]);
-    }
-
-    @Override
-    public StringReadData close(final int length) {
-        onClose();
-        return new CachedStringReadData(length);
-    }
-
-    @Override
-    StringReadData closeDelegate(final int length) {
-        return m_delegate.close(length);
+    /**
+     * Wait for the count to become zero.
+     *
+     * @throws InterruptedException
+     */
+    public void awaitInterrputibly() throws InterruptedException {
+        m_phaser.awaitAdvanceInterruptibly(0);
     }
 
 }
