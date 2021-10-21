@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
@@ -92,11 +92,11 @@ public class DictElementCache {
         }
     }
 
-    private Map<Integer, ColumnDictElementCache<Byte>> m_perColumnCacheWithByteKeys = new HashMap<>();
+    private Map<Integer, ColumnDictElementCache<Byte>> m_perColumnCacheWithByteKeys = new ConcurrentHashMap<>();
 
-    private Map<Integer, ColumnDictElementCache<Integer>> m_perColumnCacheWithIntKeys = new HashMap<>();
+    private Map<Integer, ColumnDictElementCache<Integer>> m_perColumnCacheWithIntKeys = new ConcurrentHashMap<>();
 
-    private Map<Integer, ColumnDictElementCache<Long>> m_perColumnCacheWithLongKeys = new HashMap<>();
+    private Map<Integer, ColumnDictElementCache<Long>> m_perColumnCacheWithLongKeys = new ConcurrentHashMap<>();
 
     /**
      * Get the cache for a column by column index
