@@ -58,7 +58,7 @@ import org.knime.core.columnar.data.NullableReadData;
  * @param <D> the type of columnar data to process
  * @param <R> the type of the result of the calculation
  */
-interface ColumnarDomainCalculator<D extends NullableReadData, R> {
+public interface ColumnarDomainCalculator<D extends NullableReadData, R> {
 
     /**
      * Merge data into the aggregate result.
