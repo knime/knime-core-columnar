@@ -68,7 +68,6 @@ import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelea
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -138,9 +137,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         m_size = settings.getLong(CFG_TABLE_SIZE);
         m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
         var dataPath = context.getDataFileRef().getFile().toPath();
-        var schema = m_factory.readSchema(dataPath);
-        m_schema = ColumnarValueSchemaUtils
-            .create(ValueSchemaUtils.load(schema, context.getTableSpec(), context.getDataRepository(), settings));
+        var storeSchema = m_factory.readSchema(dataPath);
+        m_schema = ColumnarValueSchemaUtils.load(storeSchema, context);
 
         final BatchReadStore store = m_factory.createReadStore(m_schema, dataPath);
 

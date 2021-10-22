@@ -70,7 +70,6 @@ import org.knime.core.data.columnar.table.virtual.closeable.CloseableTracker;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -172,9 +171,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         }
 
         @SuppressWarnings("resource")// will be closed in the close method
-        var schema = getOutput().getSchema();
-        final var valueSchema = ValueSchemaUtils.create(m_dataTableSpec, schema, context.getDataRepository());
-        m_schema = ColumnarValueSchemaUtils.create(valueSchema);
+        var columnarSchema = getOutput().getSchema();
+        m_schema = ColumnarValueSchemaUtils.load(columnarSchema, context);
     }
 
     private static List<TableTransformSpec> reconstructSpecsFromStringArray(final String[] serializedSpecs)

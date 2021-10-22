@@ -53,7 +53,11 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaLoadContext;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
+import org.knime.core.node.ExtensionTable.LoadContext;
+import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * Utility class to work with {@link ColumnarValueSchema}s.
@@ -74,6 +78,19 @@ public final class ColumnarValueSchemaUtils {
     public static boolean storesDataCellSerializersSeparately(final ColumnarValueSchema schema) {
         return ValueSchemaUtils.storesDataCellSerializersSeparately(getValueSchema(schema));
     }
+
+    /**
+     * Loads a {@link ColumnarValueSchema} by combining the provided {@link ColumnarSchema} with the information stored
+     * in the {@link LoadContext}.
+     *
+     * @param schema of the underlying store
+     * @param context contains the DataTableSpec as well as the DataRepository and potential additional settings
+     * @return the loaded {@link ColumnarValueSchema}
+     * @throws InvalidSettingsException if the settings in the LoadContext were invalid
+     */
+    public static ColumnarValueSchema load(final ColumnarSchema schema, final ValueSchemaLoadContext context)
+        throws InvalidSettingsException {
+        return create(ValueSchemaUtils.load(schema, context));
     }
 
     private static ValueSchema getValueSchema(final ColumnarValueSchema schema) {
