@@ -61,7 +61,7 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarRowContainerSettings;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
-import org.knime.core.data.columnar.table.LegacyTableUtils;
+import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.container.BufferedTableBackend;
@@ -172,7 +172,7 @@ public final class ColumnarTableBackend implements TableBackend {
         final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables) throws CanceledExecutionException {
         if (duplicatesPreCheck && rowKeyDuplicateSuffix == null) {
             try {
-                var concatenatedSchema = LegacyTableUtils.concatenateSchemas(tables);
+                var concatenatedSchema = VirtualTableSchemaUtils.concatenateSchemas(tables);
                 TableTransformUtils.checkForDuplicateKeys(exec, tables);
                 final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
                 return new VirtualTableExtensionTable(tables, List.of(new ConcatenateTransformSpec()),
@@ -192,7 +192,7 @@ public final class ColumnarTableBackend implements TableBackend {
         throws CanceledExecutionException {
         final BufferedDataTable[] tables = {left, right};
         try {
-            var appendedSchema = LegacyTableUtils.appendSchemas(tables);
+            var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
             TableTransformUtils.checkRowKeysMatch(exec, tables);
             final long appendSize = TableTransformUtils.appendSize(tables);
             return new VirtualTableExtensionTable(tables,
@@ -211,7 +211,7 @@ public final class ColumnarTableBackend implements TableBackend {
         throws CanceledExecutionException {
         ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
         try {
-            var rearrangedSchema = LegacyTableUtils.rearrangeSchema(table, columnRearranger);
+            var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(table, columnRearranger);
             List<TableTransformSpec> transformations = TableTransformUtils.createRearrangeTransformations(
                 ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger),
                 table.getDataTableSpec().getNumColumns());

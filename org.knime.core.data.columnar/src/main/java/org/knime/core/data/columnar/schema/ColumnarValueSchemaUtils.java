@@ -71,8 +71,9 @@ public final class ColumnarValueSchemaUtils {
      * @param schema to check
      * @return true if schema was created before KNIME Analytics Platform 4.5.0
      */
-    public static boolean createdBefore45(final ColumnarValueSchema schema) {
-        return ValueSchemaUtils.createdBefore45(getValueSchema(schema));
+    public static boolean storesDataCellSerializersSeparately(final ColumnarValueSchema schema) {
+        return ValueSchemaUtils.storesDataCellSerializersSeparately(getValueSchema(schema));
+    }
     }
 
     private static ValueSchema getValueSchema(final ColumnarValueSchema schema) {

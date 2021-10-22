@@ -521,7 +521,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
         BufferedReferenceTable(final BufferedDataTable table) throws VirtualTableIncompatibleException {
             m_table = table;
-            m_schema = LegacyTableUtils.extractSchema(table);
+            m_schema = VirtualTableSchemaUtils.extractSchema(table);
         }
 
         @Override

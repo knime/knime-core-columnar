@@ -85,7 +85,7 @@ import org.knime.core.node.util.CheckUtils;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  * @noreference Not intended to be referenced by clients
  */
-public final class LegacyTableUtils {
+public final class VirtualTableSchemaUtils {
 
     private static final ColumnarValueSchema EMPTY = ColumnarValueSchemaUtils.create(
         ValueSchemaUtils.create(new DataTableSpec(), new ValueFactory<?, ?>[]{new DefaultRowKeyValueFactory()}));
@@ -105,7 +105,7 @@ public final class LegacyTableUtils {
         final var outputSpec = AppendedRowsTable.generateDataTableSpec(tableSpecs);
         final Map<String, ValueFactory<?, ?>> factoriesByName = new LinkedHashMap<>(outputSpec.getNumColumns());
         factoriesByName.put("", getRowKeyValueFactory(schemas));
-        // using "" is save because no column can have an empty name in KNIME
+        // using "" is safe because no column can have an empty name in KNIME
         for (var column : outputSpec) {
             final var name = column.getName();
             for (int i = 0; i < schemas.length; i++) {//NOSONAR
@@ -215,7 +215,7 @@ public final class LegacyTableUtils {
     static ColumnarValueSchema extractSchema(final BufferedDataTable table) throws VirtualTableIncompatibleException {
         var delegateTable = Node.invokeGetDelegate(table);
         var schema = extractSchema(delegateTable);
-        if (ColumnarValueSchemaUtils.createdBefore45(schema)) {
+        if (ColumnarValueSchemaUtils.storesDataCellSerializersSeparately(schema)) {
             throw new VirtualTableIncompatibleException(
                 "Tables created before KNIME Analytics Platform 4.5.0 are not compatible with virtual tables.");
         }
@@ -277,7 +277,8 @@ public final class LegacyTableUtils {
                 factories.add(factory);
             } else {
                 factory = getValueFactoryForName(appendSchema, name);
-                assert factory != null : "The column " + name + " is neither in the reference nor in the append table.";
+                CheckUtils.checkState(factory != null,
+                    "The column '%s' is neither in the reference nor in the append table.", name);
                 factories.add(factory);
             }
         }
@@ -309,7 +310,7 @@ public final class LegacyTableUtils {
         return ColumnarValueSchemaUtils.create(valueSchema);
     }
 
-    private LegacyTableUtils() {
+    private VirtualTableSchemaUtils() {
 
     }
 }
