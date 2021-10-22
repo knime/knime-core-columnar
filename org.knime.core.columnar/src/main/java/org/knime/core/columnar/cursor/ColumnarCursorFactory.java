@@ -89,7 +89,7 @@ public final class ColumnarCursorFactory {
      */
     public static LookaheadCursor<ReadAccessRow> create(final BatchReadStore readStore, final long size) {
         if (size == 0) {
-            return EmptyCursor.INSTANCE;
+            return new EmptyCursor(readStore.getSchema());
         } else {
             final int lastIndexInLastBatch = (int)((size - 1) % readStore.batchLength());
             return create(readStore, new DefaultColumnSelection(readStore.getSchema().numColumns()),
