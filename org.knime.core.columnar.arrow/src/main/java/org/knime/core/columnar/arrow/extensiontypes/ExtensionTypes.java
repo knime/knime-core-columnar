@@ -74,13 +74,13 @@ public final class ExtensionTypes {
         final var arrowType = field.getType();
         final var valueFactoryType = DataTraits.getTrait(traits, LogicalTypeTrait.class)//
             .map(LogicalTypeTrait::getLogicalType)//
-            .map(t -> new ValueFactoryExtensionType(t, arrowType));
+            .map(t -> new LogicalTypeExtensionType(t, arrowType));
         final var structDictType = DataTraits.getTrait(traits, DictEncodingTrait.class)//
                 .map(DictEncodingTrait::getKeyType)//
             .map(k -> new StructDictEncodedExtensionType(field, k));
         final ArrowType type;
         if (valueFactoryType.isPresent() && structDictType.isPresent()) {
-            type = new StructDictEncodedValueFactoryExtensionType(valueFactoryType.get(), structDictType.get());
+            type = new StructDictEncodedLogicalTypeExtensionType(valueFactoryType.get(), structDictType.get());
         } else if (valueFactoryType.isPresent()) {
             type = valueFactoryType.get();
         } else if (structDictType.isPresent()) {

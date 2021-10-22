@@ -44,7 +44,7 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 6, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Aug 16, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.arrow.extensiontypes;
 
@@ -52,58 +52,50 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
 
 /**
- * ExtensionType for ValueFactories whose direct primitive type is struct-dict-encoded. This is necessary
- * because Arrow doesn't support direct nesting of extension types. That's because an ExtensionType is just an
- * annotation (meta-data) on an actual Arrow type and nesting multiple ExtensionTypes results in overwriting this
- * annotation. Note that it is possible to have nested ExtensionTypes when they are attached to different Arrow types
- * (e.g. in a struct or a list).
+ * Arrow extension type that stores the value factory as meta data.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-// Equals is implemented in the super class and delegates to #extensionEquals
-public final class StructDictEncodedValueFactoryExtensionType extends AbstractExtensionType {//NOSONAR
+// the super class implements equals and delegates to extensionEquals
+public final class LogicalTypeExtensionType extends AbstractExtensionType { //NOSONAR
 
-    private final StructDictEncodedExtensionType m_structDictEncodedType;
-
-    private final ValueFactoryExtensionType m_valueFactoryType;
+    static final LogicalTypeExtensionType DESERIALIZATION_INSTANCE = new LogicalTypeExtensionType();
 
     static {
-        ExtensionTypeRegistry.register(new StructDictEncodedValueFactoryExtensionType());
+        ExtensionTypeRegistry.register(DESERIALIZATION_INSTANCE);
     }
 
     /**
-     * Private constructor for creating the deserialization instance
+     * E.g. the ValueFactory
      */
-    private StructDictEncodedValueFactoryExtensionType() {
+    private final String m_valueFactory;
+
+    private LogicalTypeExtensionType() {
         super(null);
-        m_structDictEncodedType = null;
-        m_valueFactoryType = null;
-    }
-
-    StructDictEncodedValueFactoryExtensionType(final ValueFactoryExtensionType valueFactoryType,
-        final StructDictEncodedExtensionType structDictEncodedType) {
-        super(structDictEncodedType.storageType());
-        m_structDictEncodedType = structDictEncodedType;
-        m_valueFactoryType = valueFactoryType;
+        m_valueFactory = null;
     }
 
     /**
-     * @return the {@link ValueFactoryExtensionType} part of this type
+     * Constructor.
+     *
+     * @param valueFactory the fully qualified class name of the value factory this type is associated with
+     * @param storageType the underlying storage type
      */
-    public ValueFactoryExtensionType getValueFactoryType() {
-        return m_valueFactoryType;
+    LogicalTypeExtensionType(final String valueFactory, final ArrowType storageType) {
+        super(storageType);
+        m_valueFactory = valueFactory;
     }
 
     /**
-     * @return the {@link StructDictEncodedExtensionType} part of this type
+     * @return the value factory name
      */
-    public StructDictEncodedExtensionType getStructDictEncodedType() {
-        return m_structDictEncodedType;
+    public String getValueFactory() {
+        return m_valueFactory;
     }
 
     @Override
     public String extensionName() {
-        return "knime.struct_dict_encoded_value_factory";
+        return "knime.logical_type";
     }
 
     @Override
@@ -111,25 +103,22 @@ public final class StructDictEncodedValueFactoryExtensionType extends AbstractEx
         if (other == this) {
             return true;
         }
-        if (other instanceof StructDictEncodedValueFactoryExtensionType) {
-            var otherType = (StructDictEncodedValueFactoryExtensionType)other;
-            return m_structDictEncodedType.equals(otherType.m_structDictEncodedType)
-                && m_valueFactoryType.equals(otherType.m_valueFactoryType);
+        if (other instanceof LogicalTypeExtensionType) {
+            final LogicalTypeExtensionType otherType = (LogicalTypeExtensionType)other;
+            return m_valueFactory.equals(otherType.m_valueFactory) //
+                && storageType().equals(otherType.storageType());
         }
         return false;
     }
 
     @Override
     public String serialize() {
-        return m_valueFactoryType.serialize();
+        return m_valueFactory;
     }
 
     @Override
-    public ArrowType deserialize(final ArrowType storageType, final String serializedData) {
-        var valueFactoryType = ValueFactoryExtensionType.DESERIALIZATION_INSTANCE.deserialize(storageType, serializedData);
-        // StructDictEncodedType doesn't have any meta data
-        var structDictEncodedType = StructDictEncodedExtensionType.DESERIALIZATION_INSTANCE.deserialize(storageType, "");
-        return new StructDictEncodedValueFactoryExtensionType(valueFactoryType, structDictEncodedType);
+    public LogicalTypeExtensionType deserialize(final ArrowType storageType, final String serializedData) {
+        return new LogicalTypeExtensionType(serializedData, storageType);
     }
 
 }

@@ -69,8 +69,8 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Utf8;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedExtensionType;
-import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedValueFactoryExtensionType;
-import org.knime.core.columnar.arrow.extensiontypes.ValueFactoryExtensionType;
+import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedLogicalTypeExtensionType;
+import org.knime.core.columnar.arrow.extensiontypes.LogicalTypeExtensionType;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
 import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
@@ -121,10 +121,10 @@ public final class ArrowSchemaUtils {
     private static DataSpecWithTraits parseField(final Field field, final ArrowType type) {//NOSONAR
         if (type instanceof ArrowType.Struct) {
             return parseStructField(field, type);
-        } else if (type instanceof StructDictEncodedValueFactoryExtensionType) {
-            return parseStructDictEncodedValueFactoryField(field, (StructDictEncodedValueFactoryExtensionType)type);
-        } else if (type instanceof ValueFactoryExtensionType) {
-            return parseValueFactoryField(field, (ValueFactoryExtensionType)type);
+        } else if (type instanceof StructDictEncodedLogicalTypeExtensionType) {
+            return parseStructDictEncodedValueFactoryField(field, (StructDictEncodedLogicalTypeExtensionType)type);
+        } else if (type instanceof LogicalTypeExtensionType) {
+            return parseValueFactoryField(field, (LogicalTypeExtensionType)type);
         } else if (type instanceof StructDictEncodedExtensionType) {
             return parseStructDictEncodedField(field, (StructDictEncodedExtensionType)type);
         } else if (type instanceof ArrowType.List) {
@@ -135,13 +135,13 @@ public final class ArrowSchemaUtils {
     }
 
     private static DataSpecWithTraits parseStructDictEncodedValueFactoryField(final Field field,
-        final StructDictEncodedValueFactoryExtensionType type) {
+        final StructDictEncodedLogicalTypeExtensionType type) {
         var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactoryType().getValueFactory());
         var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
         return parseStorageAndAddTrait(field, type, logicalTypeTrait, dictEncodingTrait);
     }
 
-    private static DataSpecWithTraits parseValueFactoryField(final Field field, final ValueFactoryExtensionType type) {
+    private static DataSpecWithTraits parseValueFactoryField(final Field field, final LogicalTypeExtensionType type) {
         var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactory());
         return parseStorageAndAddTrait(field, type, logicalTypeTrait);
     }
