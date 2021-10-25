@@ -70,10 +70,12 @@ public final class ColumnarValueSchemaUtils {
     }
 
     /**
-     * Indicates that this schema was created prior to KNIME Analytics Platform 4.5.0.
+     * Indicates that this schema does not store the cell serializer identifiers with the data, but separately. This was
+     * the case prior to KNIME Analytics Platform 4.5.0.
      *
      * @param schema to check
-     * @return true if schema was created before KNIME Analytics Platform 4.5.0
+     * @return true if schema was stores the cell serializers separately, meaning it was created before KNIME Analytics
+     *         Platform 4.5.0
      */
     public static boolean storesDataCellSerializersSeparately(final ColumnarValueSchema schema) {
         return ValueSchemaUtils.storesDataCellSerializersSeparately(getValueSchema(schema));
