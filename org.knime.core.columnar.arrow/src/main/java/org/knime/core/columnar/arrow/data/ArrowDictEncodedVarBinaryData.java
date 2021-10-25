@@ -49,6 +49,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -94,9 +95,9 @@ public final class ArrowDictEncodedVarBinaryData {
             super(delegate, initialDictKey);
         }
 
-        private ArrowDictEncodedVarBinaryWriteData(final ArrowStructWriteData delegate, final KeyType initialDictKey,
-            final int offset) {
-            super(delegate, initialDictKey, offset);
+        private ArrowDictEncodedVarBinaryWriteData(final ArrowStructWriteData delegate, final KeyType keyType, final int offset,
+            final ConcurrentHashMap<Object, K> dict) {
+            super(delegate, keyType, offset, dict);
         }
 
         @Override
@@ -112,7 +113,10 @@ public final class ArrowDictEncodedVarBinaryData {
 
         @Override
         public ArrowDictEncodedVarBinaryWriteData<K> slice(final int start) {
-            return new ArrowDictEncodedVarBinaryWriteData<>(m_delegate, m_keyType, start + m_offset);
+            var slicedData = new ArrowDictEncodedVarBinaryWriteData<>(m_delegate, m_keyType, start + m_offset, m_dict);
+            // FIXME workaround for debugging
+            setKeyGenerator(m_keyGenerator);
+            return slicedData;
         }
 
         @Override

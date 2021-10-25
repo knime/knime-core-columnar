@@ -98,23 +98,27 @@ public final class AbstractArrowDictEncodedData {
 
         protected final ArrowStructWriteData m_delegate;
 
-        protected final ConcurrentHashMap<T, K> m_dict = new ConcurrentHashMap<>();
+        protected final ConcurrentHashMap<T, K> m_dict;
 
-        private DictKeyGenerator<K> m_keyGenerator = null;
+        protected DictKeyGenerator<K> m_keyGenerator = null;
 
         protected final KeyType m_keyType;
 
         protected int m_offset = 0;
 
         AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType) {
-            m_delegate = delegate;
-            m_keyType = keyType;
+            this(delegate, keyType, 0);
         }
 
         AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType, final int offset) {
+            this(delegate, keyType, offset, new ConcurrentHashMap<>());
+        }
+
+        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType, final int offset, final ConcurrentHashMap<T, K> dict) {
             m_delegate = delegate;
             m_offset = offset;
             m_keyType = keyType;
+            m_dict = dict;
         }
 
         @Override
