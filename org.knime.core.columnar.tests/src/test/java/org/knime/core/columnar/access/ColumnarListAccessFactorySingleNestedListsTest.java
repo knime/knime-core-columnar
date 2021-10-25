@@ -133,15 +133,17 @@ public class ColumnarListAccessFactorySingleNestedListsTest {
 
     private static void setValue(final ListWriteAccess outer, final int value) {
         outer.create(1);
-        ListWriteAccess rowListWriteAcess = outer.getWriteAccess(0);
+        ListWriteAccess rowListWriteAcess = outer.getWriteAccess();
+        outer.setWriteIndex(0);
         rowListWriteAcess.create(1);
-        IntWriteAccess rowIntWriteValue = rowListWriteAcess.getWriteAccess(0);
+        outer.setWriteIndex(0);
+        IntWriteAccess rowIntWriteValue = rowListWriteAcess.getWriteAccess();
         rowIntWriteValue.setIntValue(value);
     }
 
     private static int getValue(final ListReadAccess outer) {
-        ListReadAccess rowListReader = outer.getAccess(0);
-        IntReadAccess rowIntReader = rowListReader.getAccess(0);
+        ListReadAccess rowListReader = outer.getAccess();
+        IntReadAccess rowIntReader = rowListReader.getAccess();
         return rowIntReader.getIntValue();
     }
 

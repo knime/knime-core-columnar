@@ -115,17 +115,21 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
-        public <A extends ReadAccess> A getAccess(final int index) { // NOSONAR
-            updateInnerData();
-            m_innerIndex = index;
+        public <A extends ReadAccess> A getAccess() { // NOSONAR
             @SuppressWarnings("unchecked")
             final A v = (A)m_readAccess;
             return v;
         }
 
+        @Override
+        public void setIndex(final int index) {
+            updateInnerData();
+            m_innerIndex = index;
+        }
+
         private void updateInnerData() {
             final int index = m_index.getIndex();
-            // If we got the same index we don't need to create a new access and value
+            // If we got the same index we don't need to update the inner data
             if (index != m_lastIndex) {
                 m_lastIndex = index;
                 m_innerData = m_data.createReadData(index);
@@ -164,8 +168,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
-        public <A extends WriteAccess> A getWriteAccess(final int index) { // NOSONAR
-            m_innerIndex = index;
+        public <A extends WriteAccess> A getWriteAccess() { // NOSONAR
             // NB: m_writeAccess is always the value for the current index
             // because users must call #create at an index first
             @SuppressWarnings("unchecked")
@@ -174,12 +177,20 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
+        public void setWriteIndex(final int index) {
+            m_innerIndex = index;
+        }
+
+        @Override
         public void setFromNonMissing(final ReadAccess access) {
-            final ListReadAccess listAccess = (ListReadAccess)access;
+            final var listAccess = (ListReadAccess)access;
             final int listSize = listAccess.size();
+            final var elementAccess = listAccess.getAccess();
             create(listSize);
-            for (int i = 0; i < listSize; i++) {
-                getWriteAccess(i).setFrom(listAccess.getAccess(i));
+            for (int i = 0; i < listSize; i++) {//NOSONAR
+                setWriteIndex(i);
+                listAccess.setIndex(i);
+                m_writeAccess.setFrom(elementAccess);
             }
         }
 

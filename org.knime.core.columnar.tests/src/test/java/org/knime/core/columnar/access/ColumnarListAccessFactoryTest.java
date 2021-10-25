@@ -118,10 +118,12 @@ public class ColumnarListAccessFactoryTest {
         assertEquals(m_values.size(), listReadAccess.size());
 
         for (int i = 0; i < m_values.size(); i++) {
-            final StringWriteAccess writeValue = listWriteAccess.getWriteAccess(i);
-            assertEquals(writeValue, listWriteAccess.getWriteAccess(i));
-            final StringReadAccess readValue = listReadAccess.getAccess(i);
-            assertEquals(readValue, listReadAccess.getAccess(i));
+            listWriteAccess.setWriteIndex(i);
+            final StringWriteAccess writeValue = listWriteAccess.getWriteAccess();
+            assertEquals(writeValue, listWriteAccess.getWriteAccess());
+            listReadAccess.setIndex(i);
+            final StringReadAccess readValue = listReadAccess.getAccess();
+            assertEquals(readValue, listReadAccess.getAccess());
 
             assertTrue(listReadAccess.isMissing(i));
             assertNull(readValue.getStringValue());
