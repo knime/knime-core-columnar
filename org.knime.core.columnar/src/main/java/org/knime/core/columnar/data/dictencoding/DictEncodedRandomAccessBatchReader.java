@@ -53,17 +53,29 @@ import java.io.IOException;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.StructData.StructReadData;
+import org.knime.core.columnar.data.dictencoding.DecoratedListData.DecoratedListReadData;
+import org.knime.core.columnar.data.dictencoding.DecoratedStructData.DecoratedStructReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
+import org.knime.core.columnar.data.dictencoding.DictElementCache.DataIndex;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTraitUtils;
+import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.ListDataTraits;
+import org.knime.core.table.schema.traits.StructDataTraits;
 
 /**
  * Wraps a delegate{@link RandomAccessBatchReader} and upon access wraps dictionary encoded data coming from the backend
@@ -110,20 +122,32 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
 
     private NullableReadData wrapDictEncodedData(final ReadBatch batch, final int index) {
         final var data = batch.get(index);
+        final var traits = m_schema.getTraits(index);
+
+        if (!DataTraitUtils.containsDataTrait(DictEncodingTrait.class, traits)) {
+            return data;
+        }
 
         final var spec = m_schema.getSpec(index);
-        final var traits = m_schema.getTraits(index);
-        final var keyType = DictEncodingTrait.keyType(traits);
+        return wrapDictEncodedData(DataIndex.createColumnIndex(index), data, spec, traits);
+    }
 
-        if (DictEncodingTrait.isEnabled(traits)) {
+    private NullableReadData wrapDictEncodedData(final DataIndex index, final NullableReadData data,
+        final DataSpec spec, final DataTraits traits) {
+
+        if (spec instanceof ListDataSpec) {
+            return wrapListData(index, data, spec, traits);
+        } else if (spec instanceof StructDataSpec) {
+            return wrapStructData(index, data, spec, traits);
+        } else if (DictEncodingTrait.isEnabled(traits)) {
+            var keyType = DictEncodingTrait.keyType(traits);
             if (spec instanceof StringDataSpec && !(data instanceof DictDecodedStringReadData)) {
                 if (!(data instanceof DictEncodedStringReadData)) {
                     throw new IllegalArgumentException(
                         "Expected DictEncodedStringReadData to construct DictDecodedStringReadData");
                 }
                 return wrapDictEncodedStringData(data, m_cache.get(index, keyType));
-            } else if (spec instanceof VarBinaryDataSpec
-                && !(data instanceof DictDecodedVarBinaryReadData)) {
+            } else if (spec instanceof VarBinaryDataSpec && !(data instanceof DictDecodedVarBinaryReadData)) {
                 if (!(data instanceof DictEncodedVarBinaryReadData)) {
                     throw new IllegalArgumentException(
                         "Expected DictEncodedVarBinaryReadData to construct DictDecodedVarBinaryReadData");
@@ -131,17 +155,39 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
                 return wrapDictEncodedVarBinaryData(data, m_cache.get(index, keyType));
             }
         }
-
         return data;
     }
 
+    private NullableReadData wrapStructData(final DataIndex index, final NullableReadData data, final DataSpec spec,
+        final DataTraits traits) {
+        final var structSpec = (StructDataSpec)spec;
+        final var structTraits = (StructDataTraits)traits;
+        return new DecoratedStructReadData((StructReadData)data, (i, x) -> wrapDictEncodedData(index.createChild(i),
+            x, structSpec.getDataSpec(i), structTraits.getDataTraits(i)));
+    }
+
+    /**
+     * When wrapping lists we use the list index and not the sub-list index to query a {@link ColumnDictElementCache}
+     * for the contained data, because within slices of a list we share the dictionary and the key generator.
+     */
+    private NullableReadData wrapListData(final DataIndex index, final NullableReadData data, final DataSpec spec,
+        final DataTraits traits) {
+        final var childSpec = ((ListDataSpec)spec).getInner();
+        final var childTraits = ((ListDataTraits)traits).getInner();
+        return new DecoratedListReadData((ListReadData)data,
+            x -> wrapDictEncodedData(index, x, childSpec, childTraits));
+    }
+
+
     @SuppressWarnings("unchecked")
-    private static <K> NullableReadData wrapDictEncodedStringData(final NullableReadData data, final ColumnDictElementCache<K> cache) {
+    private static <K> NullableReadData wrapDictEncodedStringData(final NullableReadData data,
+        final ColumnDictElementCache<K> cache) {
         return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)data, cache);
     }
 
     @SuppressWarnings("unchecked")
-    private static <K> NullableReadData wrapDictEncodedVarBinaryData(final NullableReadData data, final ColumnDictElementCache<K> cache) {
+    private static <K> NullableReadData wrapDictEncodedVarBinaryData(final NullableReadData data,
+        final ColumnDictElementCache<K> cache) {
         return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)data, cache);
     }
 }

@@ -50,6 +50,7 @@ package org.knime.core.columnar.data.dictencoding;
 
 import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
@@ -91,8 +92,8 @@ public final class DictEncodedData {
      * value. The value for each key is only stored once. The implementation of this dictionary encoding is the
      * responsibility of the back-end.
      *
-     * Additionally, a user defined {@link DictKeyGenerator} can be provided which is queried whenever a new value is
-     * seen. By default, zero-based ascending long integers are used as keys.
+     * Additionally, a user defined {@link DictKeyGenerator} must be provided via
+     * {@link #setKeyGenerator(DictKeyGenerator)} which is queried whenever a new value is seen.
      *
      * @param <K> key type, should be Byte, Long or Integer
      *
@@ -116,6 +117,10 @@ public final class DictEncodedData {
          *
          * Note: The key generator can only be set once, and only before any values are stored in this
          * {@link WriteData}.
+         *
+         * Note: In dictionary encoded {@link ListWriteData}, all inner lists share their key generators and
+         * dictionaries. You can set the key generator again for the sub-list as long as it is identical to the key
+         * generator of the other sub lists.
          *
          * @param keyGenerator The key generator will be invoked for each value that has not been seen before.
          */

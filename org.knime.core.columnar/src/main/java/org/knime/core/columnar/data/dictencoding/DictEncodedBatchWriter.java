@@ -55,18 +55,28 @@ import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
+import org.knime.core.columnar.data.dictencoding.DictElementCache.DataIndex;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTraitUtils;
+import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.schema.traits.ListDataTraits;
+import org.knime.core.table.schema.traits.StructDataTraits;
 
 /**
  * A {@link DictEncodedBatchWriter} wraps a delegate BatchWriter and converts user-facing data objects into their
@@ -104,12 +114,12 @@ public class DictEncodedBatchWriter implements BatchWriter {
     @Override
     public WriteBatch create(final int capacity) {
         final WriteBatch batch = m_delegate.create(capacity);
-        final NullableWriteData[] data = new NullableWriteData[m_schema.numColumns()];
+        final var data = new NullableWriteData[m_schema.numColumns()];
 
         for (int i = 0; i < data.length; i++) {
             final NullableWriteData d = batch.get(i);
 
-            if (DictEncodingTrait.isEnabled(m_schema.getTraits(i))) {
+            if (DataTraitUtils.containsDataTrait(DictEncodingTrait.class, m_schema.getTraits(i))) {
                 data[i] = wrapDictEncodedData(i, d);
             } else {
                 data[i] = d;
@@ -121,34 +131,64 @@ public class DictEncodedBatchWriter implements BatchWriter {
     }
 
     private NullableWriteData wrapDictEncodedData(final int i, final NullableWriteData d) {
-        final var spec = m_schema.getSpec(i);
-        final var traits = m_schema.getTraits(i);
-        final var keyType = DictEncodingTrait.keyType(traits);
+        return wrapDictEncodedData(DataIndex.createColumnIndex(i), d, m_schema.getSpec(i), m_schema.getTraits(i));
+    }
 
-        if (spec instanceof StringDataSpec && !(d instanceof DictDecodedStringWriteData)) {
-            if (!(d instanceof DictEncodedStringWriteData)) {
-                throw new IllegalArgumentException(
-                    "Expected DictEncodedStringWriteData to construct DictDecodedStringWriteData");
+    private NullableWriteData wrapDictEncodedData(final DataIndex index, final NullableWriteData d, final DataSpec spec,
+        final DataTraits traits) {
+        if (spec instanceof ListDataSpec) {
+            return wrapListData(index, d, spec, traits);
+        } else if (spec instanceof StructDataSpec) {
+            return wrapStructData(index, d, spec, traits);
+        } else if (traits.hasTrait(DictEncodingTrait.class)) {
+            var keyType = DictEncodingTrait.keyType(traits);
+            if (spec instanceof StringDataSpec && !(d instanceof DictDecodedStringWriteData)) {
+                if (!(d instanceof DictEncodedStringWriteData)) {
+                    throw new IllegalArgumentException(
+                        "Expected DictEncodedStringWriteData to construct DictDecodedStringWriteData");
+                }
+                return wrapDictEncodedStringData(d, m_cache.get(index, keyType));
+            } else if (spec instanceof VarBinaryDataSpec && !(d instanceof DictDecodedVarBinaryWriteData)) {
+                if (!(d instanceof DictEncodedVarBinaryWriteData)) {
+                    throw new IllegalArgumentException(
+                        "Expected DictEncodedVarBinaryWriteData to construct DictDecodedVarBinaryWriteData");
+                }
+                return wrapDictEncodedVarBinaryData(d, m_cache.get(index, keyType));
             }
-            return wrapDictEncodedStringData(d, m_cache.get(i, keyType));
-        } else if (spec instanceof VarBinaryDataSpec && !(d instanceof DictDecodedVarBinaryWriteData)) {
-            if (!(d instanceof DictEncodedVarBinaryWriteData)) {
-                throw new IllegalArgumentException(
-                    "Expected DictEncodedVarBinaryWriteData to construct DictDecodedVarBinaryWriteData");
-            }
-            return wrapDictEncodedVarBinaryData(d, m_cache.get(i, keyType));
         }
-
         return d;
     }
 
+    private NullableWriteData wrapStructData(final DataIndex index, final NullableWriteData d, final DataSpec spec,
+        final DataTraits traits) {
+        final var structSpec = (StructDataSpec)spec;
+        final var structTraits = (StructDataTraits)traits;
+        return new DecoratedStructData.DecoratedStructWriteData((StructWriteData)d,
+            (i, x) -> wrapDictEncodedData(index.createChild(i), x, structSpec.getDataSpec(i),
+                structTraits.getDataTraits(i)));
+    }
+
+    /**
+     * When wrapping lists we use the list index and not the sub-list index to query a {@link ColumnDictElementCache}
+     * for the contained data, because within slices of a list we share the dictionary and the key generator.
+     */
+    private NullableWriteData wrapListData(final DataIndex index, final NullableWriteData d, final DataSpec spec,
+        final DataTraits traits) {
+        final var childTraits = ((ListDataTraits)traits).getInner();
+        final var childSpec = ((ListDataSpec)spec).getInner();
+        return new DecoratedListData.DecoratedListWriteData((ListWriteData)d,
+            x -> wrapDictEncodedData(index, x, childSpec, childTraits));
+    }
+
     @SuppressWarnings("unchecked")
-    private static <K> NullableWriteData wrapDictEncodedStringData(final NullableWriteData data, final ColumnDictElementCache<K> cache) {
+    private static <K> NullableWriteData wrapDictEncodedStringData(final NullableWriteData data,
+        final ColumnDictElementCache<K> cache) {
         return new DictDecodedStringWriteData<K>((DictEncodedStringWriteData<K>)data, cache);
     }
 
     @SuppressWarnings("unchecked")
-    private static <K> NullableWriteData wrapDictEncodedVarBinaryData(final NullableWriteData data, final ColumnDictElementCache<K> cache) {
+    private static <K> NullableWriteData wrapDictEncodedVarBinaryData(final NullableWriteData data,
+        final ColumnDictElementCache<K> cache) {
         return new DictDecodedVarBinaryWriteData<K>((DictEncodedVarBinaryWriteData<K>)data, cache);
     }
 

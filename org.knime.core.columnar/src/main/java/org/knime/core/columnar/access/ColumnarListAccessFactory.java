@@ -159,7 +159,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
 
         @Override
         public void create(final int size) {
-            final W writeData = m_data.createWriteData(m_index.getIndex(), size);
+            final W writeData = m_data.createWriteData(m_index.getIndex(), size); // NOSONAR
             m_writeAccess.setData(writeData);
         }
 

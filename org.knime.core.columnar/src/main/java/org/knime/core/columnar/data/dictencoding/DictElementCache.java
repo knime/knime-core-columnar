@@ -49,6 +49,7 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
@@ -92,33 +93,100 @@ public class DictElementCache {
         }
     }
 
-    private Map<Integer, ColumnDictElementCache<Byte>> m_perColumnCacheWithByteKeys = new ConcurrentHashMap<>();
+    private Map<DataIndex, ColumnDictElementCache<Byte>> m_perColumnCacheWithByteKeys = new ConcurrentHashMap<>();
 
-    private Map<Integer, ColumnDictElementCache<Integer>> m_perColumnCacheWithIntKeys = new ConcurrentHashMap<>();
+    private Map<DataIndex, ColumnDictElementCache<Integer>> m_perColumnCacheWithIntKeys = new ConcurrentHashMap<>();
 
-    private Map<Integer, ColumnDictElementCache<Long>> m_perColumnCacheWithLongKeys = new ConcurrentHashMap<>();
+    private Map<DataIndex, ColumnDictElementCache<Long>> m_perColumnCacheWithLongKeys = new ConcurrentHashMap<>();
 
     /**
      * Get the cache for a column by column index
      *
      * @param <K> The type used for dictionary keys at the specified column
-     * @param columnIndex The column for which to get the cache.
+     * @param dataIndex The data for which to get the cache
      * @param keyType The {@link KeyType} used for the dictionary at the requested column
      * @return The cache for that column. Lazily created if this is the first access.
      */
     @SuppressWarnings("unchecked")
-    public <K> ColumnDictElementCache<K> get(final int columnIndex, final KeyType keyType) {
+    public <K> ColumnDictElementCache<K> get(final DataIndex dataIndex, final KeyType keyType) {
         if (keyType == KeyType.BYTE_KEY) {
-            return (ColumnDictElementCache<K>)m_perColumnCacheWithByteKeys.computeIfAbsent(columnIndex,
+            return (ColumnDictElementCache<K>)m_perColumnCacheWithByteKeys.computeIfAbsent(dataIndex,
                 i -> new ColumnDictElementCache<Byte>(keyType));
         } else if (keyType == KeyType.INT_KEY) {
-            return (ColumnDictElementCache<K>)m_perColumnCacheWithIntKeys.computeIfAbsent(columnIndex,
+            return (ColumnDictElementCache<K>)m_perColumnCacheWithIntKeys.computeIfAbsent(dataIndex,
                 i -> new ColumnDictElementCache<Integer>(keyType));
         } else if (keyType == KeyType.LONG_KEY) {
-            return (ColumnDictElementCache<K>)m_perColumnCacheWithLongKeys.computeIfAbsent(columnIndex,
+            return (ColumnDictElementCache<K>)m_perColumnCacheWithLongKeys.computeIfAbsent(dataIndex,
                 i -> new ColumnDictElementCache<Long>(keyType));
         } else {
             throw new UnsupportedOperationException("Cannot create table-wide dictionary cache for " + keyType);
         }
+    }
+
+    /**
+     * Identifies a particular data object within a nested data structure.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    public static final class DataIndex {
+
+        private final DataIndex m_parent;
+
+        private final int m_index;
+
+        private final int m_hashCode;
+
+        private DataIndex(final int columnIndex) {
+            m_parent = null;
+            m_index = columnIndex;
+            m_hashCode = columnIndex;
+        }
+
+        private DataIndex(final DataIndex parent, final int childIndex) {
+            m_parent = parent;
+            m_index = childIndex;
+            m_hashCode = m_parent.hashCode() + 37 * childIndex;
+        }
+
+        /**
+         * Creates the root index for a column.
+         *
+         * @param columnIndex index of the column within the table
+         * @return an index identifying the root level of the column
+         */
+        public static DataIndex createColumnIndex(final int columnIndex) {
+            return new DataIndex(columnIndex);
+        }
+
+
+        /**
+         * Creates a child index.
+         *
+         * @param childIndex index of the child
+         * @return an index identifying the child at the provided index
+         */
+        public DataIndex createChild(final int childIndex) {
+            return new DataIndex(this, childIndex);
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (obj == this) {
+                return true;
+            } else if (obj instanceof DataIndex) {
+                var other = (DataIndex)obj;
+                return m_hashCode == other.m_hashCode//
+                        && m_index == other.m_index//
+                        && Objects.equals(m_parent, other.m_parent);
+            } else {
+                return false;
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            return m_hashCode;
+        }
+
     }
 }

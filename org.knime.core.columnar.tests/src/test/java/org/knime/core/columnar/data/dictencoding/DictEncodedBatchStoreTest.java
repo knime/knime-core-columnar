@@ -50,6 +50,9 @@ package org.knime.core.columnar.data.dictencoding;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import static org.knime.core.table.schema.DataSpecs.DICT_ENCODING;
+import static org.knime.core.table.schema.DataSpecs.LIST;
+import static org.knime.core.table.schema.DataSpecs.STRING;
 
 import java.io.IOException;
 
@@ -59,6 +62,12 @@ import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.data.ListData.ListReadData;
+import org.knime.core.columnar.data.ListData.ListWriteData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.data.dictencoding.DecoratedListData.DecoratedListReadData;
+import org.knime.core.columnar.data.dictencoding.DecoratedListData.DecoratedListWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
@@ -94,6 +103,51 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
             baseBatch.close(5).release();
         } catch (IOException ex1) {
             fail();
+        }
+    }
+
+    @Test
+    public void testListOfDictEncodedString() throws IOException {
+        var columnarSchema = ColumnarSchema.of(LIST.of(STRING(DICT_ENCODING)), STRING);
+        var cache = new DictElementCache();
+        try (DefaultTestBatchStore batchStore = DefaultTestBatchStore.create(columnarSchema)) {
+            try(BatchWriter baseWriter = batchStore.getWriter();
+                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)
+                ) {
+                var wrappedBatch = wrappedWriter.create(5);
+
+                final var data = (ListWriteData)wrappedBatch.get(0);
+                assertEquals(DecoratedListWriteData.class, data.getClass());
+
+                final var slicedData0 = (StringWriteData)data.createWriteData(0, 2);
+                slicedData0.setString(0, "foo");
+                slicedData0.setString(1, "foo");
+                final var slicedData1 = (StringWriteData)data.createWriteData(1, 3);
+                slicedData1.setString(0, "bar");
+                slicedData1.setString(1, "bar");
+                slicedData1.setString(2, "foo");
+                final var finishedBatch = wrappedBatch.close(5);
+                wrappedWriter.write(finishedBatch);
+                finishedBatch.release();
+            }
+
+            final var selection = new DefaultColumnSelection(columnarSchema.numColumns());
+            try(var wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)
+                ) {
+                var batch = wrappedReader.readRetained(0);
+
+                final var data = (ListReadData)batch.get(0);
+                assertEquals(DecoratedListReadData.class, data.getClass());
+
+                final var slicedData0 = (StringReadData)data.createReadData(0);
+                assertEquals("foo", slicedData0.getString(0));
+                assertEquals("foo", slicedData0.getString(1));
+                final var slicedData1 = (StringReadData)data.createReadData(1);
+                assertEquals("bar", slicedData1.getString(0));
+                assertEquals("bar", slicedData1.getString(1));
+                assertEquals("foo", slicedData1.getString(2));
+                batch.release();
+            }
         }
     }
 

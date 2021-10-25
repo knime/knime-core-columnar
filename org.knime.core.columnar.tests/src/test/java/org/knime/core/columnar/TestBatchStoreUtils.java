@@ -112,6 +112,7 @@ import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecod
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache;
+import org.knime.core.columnar.data.dictencoding.DictElementCache.DataIndex;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
@@ -487,7 +488,8 @@ public final class TestBatchStoreUtils {
                     }
 
                     final StringWriteData objectData = ((StringWriteData)data);
-                    objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
+                    final var str = index % 2 == 0 ? Integer.toString(runningInt++) : "foo";
+                    objectData.setString(index, str);
                     return getStringDelegate(data);
                 }
 
@@ -523,7 +525,8 @@ public final class TestBatchStoreUtils {
                     }
 
                     final StringWriteData objectData = ((StringWriteData)data);
-                    objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
+                    final var str = index % 2 == 0 ? Integer.toString(runningInt++) : "foo";
+                    objectData.setString(index, str);
                     return getStringDelegate(data);
                 }
 
@@ -559,7 +562,8 @@ public final class TestBatchStoreUtils {
                     }
 
                     final StringWriteData objectData = ((StringWriteData)data);
-                    objectData.setString(index, Integer.toString(runningInt++)); // NOSONAR
+                    final var str = index % 2 == 0 ? Integer.toString(runningInt++) : "foo";
+                    objectData.setString(index, str);
                     return getStringDelegate(data);
                 }
 
@@ -647,7 +651,8 @@ public final class TestBatchStoreUtils {
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     if (!(readData instanceof DictDecodedVarBinaryReadData)) {
                         throw new UnsupportedOperationException(
-                            "Can only check values of DictDecodedVarBinaryReadData, not " + readData.getClass().getName());
+                            "Can only check values of DictDecodedVarBinaryReadData, not "
+                                + readData.getClass().getName());
                     }
 
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
@@ -681,7 +686,8 @@ public final class TestBatchStoreUtils {
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     if (!(readData instanceof DictDecodedVarBinaryReadData)) {
                         throw new UnsupportedOperationException(
-                            "Can only check values of DictDecodedVarBinaryReadData, not " + readData.getClass().getName());
+                            "Can only check values of DictDecodedVarBinaryReadData, not "
+                                + readData.getClass().getName());
                     }
 
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
@@ -715,7 +721,8 @@ public final class TestBatchStoreUtils {
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     if (!(readData instanceof DictDecodedVarBinaryReadData)) {
                         throw new UnsupportedOperationException(
-                            "Can only check values of DictDecodedVarBinaryReadData, not " + readData.getClass().getName());
+                            "Can only check values of DictDecodedVarBinaryReadData, not "
+                                + readData.getClass().getName());
                     }
 
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
@@ -862,14 +869,15 @@ public final class TestBatchStoreUtils {
     @SuppressWarnings("unchecked")
     private static <K> NullableReadData wrapDictEncodedString(final NullableReadData data, final int columnIdx,
         final KeyType keyType, final DictElementCache cache) {
-        return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)data, cache.get(columnIdx, keyType));
+        return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)data, //
+                cache.get(DataIndex.createColumnIndex(columnIdx), keyType));
     }
 
     @SuppressWarnings("unchecked")
     private static <K> NullableReadData wrapDictEncodedVarBinary(final NullableReadData data, final int columnIdx,
         final KeyType keyType, final DictElementCache cache) {
-        return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)data,
-            cache.get(columnIdx, keyType));
+        return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)data, //
+            cache.get(DataIndex.createColumnIndex(columnIdx), keyType));
     }
 
     public static NullableReadData[] wrapDictEncodedData(final NullableReadData[] data, final DictElementCache cache,
