@@ -15,7 +15,7 @@ import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
-import org.knime.core.data.v2.value.DoubleValueFactory.DoubleWriteValue;
+import org.knime.core.data.v2.value.ValueInterfaces.DoubleWriteValue;
 import org.knime.core.node.BufferedDataContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
