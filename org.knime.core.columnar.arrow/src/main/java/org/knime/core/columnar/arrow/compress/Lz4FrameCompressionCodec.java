@@ -73,6 +73,38 @@ public class Lz4FrameCompressionCodec extends AbstractCompressionCodec {
     /** With null the default is used */
     private static final LZ4FDecompressOptions DECOMPRESS_OPTIONS = null;
 
+    /*
+     * Mostly copied from AbstractCompressionCodec#compress.
+     *
+     * The format specifies that -1 can be used as a length to signal that the buffer is not compressed (if the
+     * compression brings no advantage). The implementation in AbstractCompressionCodec implements this optimization.
+     * However, the optimization is not implemented in the C++ Arrow implementation and therefore not supported by
+     * pyarrow. This implementation removes this optimization.
+     *
+     * TODO remove when https://issues.apache.org/jira/browse/ARROW-12196 is fixed
+     */
+    @SuppressWarnings("resource")
+    @Override
+    public ArrowBuf compress(final BufferAllocator allocator, final ArrowBuf uncompressedBuffer) {
+        if (uncompressedBuffer.writerIndex() == 0L) {
+            // shortcut for empty buffer
+            ArrowBuf compressedBuffer = allocator.buffer(SIZE_OF_UNCOMPRESSED_LENGTH);
+            compressedBuffer.setLong(0, 0);
+            compressedBuffer.writerIndex(SIZE_OF_UNCOMPRESSED_LENGTH);
+            uncompressedBuffer.close();
+            return compressedBuffer;
+        }
+
+        ArrowBuf compressedBuffer = doCompress(allocator, uncompressedBuffer);
+        long uncompressedLength = uncompressedBuffer.writerIndex();
+
+        // NOTE: THE DIFFERENCE IS HERE
+        writeUncompressedLength(compressedBuffer, uncompressedLength);
+
+        uncompressedBuffer.close();
+        return compressedBuffer;
+    }
+
     @Override
     @SuppressWarnings("resource")
     protected ArrowBuf doCompress(final BufferAllocator allocator, final ArrowBuf uncompressedBuffer) {
