@@ -68,11 +68,11 @@ public final class LogicalTypeExtensionType extends AbstractExtensionType { //NO
     /**
      * E.g. the ValueFactory
      */
-    private final String m_valueFactory;
+    private final String m_logicalType;
 
     private LogicalTypeExtensionType() {
         super(null);
-        m_valueFactory = null;
+        m_logicalType = null;
     }
 
     /**
@@ -83,14 +83,14 @@ public final class LogicalTypeExtensionType extends AbstractExtensionType { //NO
      */
     LogicalTypeExtensionType(final String valueFactory, final ArrowType storageType) {
         super(storageType);
-        m_valueFactory = valueFactory;
+        m_logicalType = valueFactory;
     }
 
     /**
-     * @return the value factory name
+     * @return the logical type
      */
-    public String getValueFactory() {
-        return m_valueFactory;
+    public String getLogicalType() {
+        return m_logicalType;
     }
 
     @Override
@@ -105,7 +105,7 @@ public final class LogicalTypeExtensionType extends AbstractExtensionType { //NO
         }
         if (other instanceof LogicalTypeExtensionType) {
             final LogicalTypeExtensionType otherType = (LogicalTypeExtensionType)other;
-            return m_valueFactory.equals(otherType.m_valueFactory) //
+            return m_logicalType.equals(otherType.m_logicalType) //
                 && storageType().equals(otherType.storageType());
         }
         return false;
@@ -113,7 +113,7 @@ public final class LogicalTypeExtensionType extends AbstractExtensionType { //NO
 
     @Override
     public String serialize() {
-        return m_valueFactory;
+        return m_logicalType;
     }
 
     @Override

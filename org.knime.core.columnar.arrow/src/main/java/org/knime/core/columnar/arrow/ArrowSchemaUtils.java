@@ -135,9 +135,9 @@ public final class ArrowSchemaUtils {
         if (type instanceof ArrowType.Struct) {
             return parseStructField(field, type);
         } else if (type instanceof StructDictEncodedLogicalTypeExtensionType) {
-            return parseStructDictEncodedValueFactoryField(field, (StructDictEncodedLogicalTypeExtensionType)type);
+            return parseStructDictEncodedLogicalTypeField(field, (StructDictEncodedLogicalTypeExtensionType)type);
         } else if (type instanceof LogicalTypeExtensionType) {
-            return parseValueFactoryField(field, (LogicalTypeExtensionType)type);
+            return parseLogicalTypeField(field, (LogicalTypeExtensionType)type);
         } else if (type instanceof StructDictEncodedExtensionType) {
             return parseStructDictEncodedField(field, (StructDictEncodedExtensionType)type);
         } else if (type instanceof ArrowType.List) {
@@ -147,15 +147,15 @@ public final class ArrowSchemaUtils {
         }
     }
 
-    private static DataSpecWithTraits parseStructDictEncodedValueFactoryField(final Field field,
+    private static DataSpecWithTraits parseStructDictEncodedLogicalTypeField(final Field field,
         final StructDictEncodedLogicalTypeExtensionType type) {
-        var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactoryType().getValueFactory());
+        var logicalTypeTrait = new LogicalTypeTrait(type.getLogicalType().getLogicalType());
         var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
         return parseStorageAndAddTrait(field, type, logicalTypeTrait, dictEncodingTrait);
     }
 
-    private static DataSpecWithTraits parseValueFactoryField(final Field field, final LogicalTypeExtensionType type) {
-        var logicalTypeTrait = new LogicalTypeTrait(type.getValueFactory());
+    private static DataSpecWithTraits parseLogicalTypeField(final Field field, final LogicalTypeExtensionType type) {
+        var logicalTypeTrait = new LogicalTypeTrait(type.getLogicalType());
         return parseStorageAndAddTrait(field, type, logicalTypeTrait);
     }
 

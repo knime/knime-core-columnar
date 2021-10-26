@@ -90,7 +90,7 @@ public final class StructDictEncodedLogicalTypeExtensionType extends AbstractExt
     /**
      * @return the {@link LogicalTypeExtensionType} part of this type
      */
-    public LogicalTypeExtensionType getValueFactoryType() {
+    public LogicalTypeExtensionType getLogicalType() {
         return m_valueFactoryType;
     }
 
