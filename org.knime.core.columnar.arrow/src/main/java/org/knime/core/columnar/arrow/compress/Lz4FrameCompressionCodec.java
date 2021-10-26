@@ -51,54 +51,94 @@ import static org.apache.arrow.vector.compression.CompressionUtil.SIZE_OF_UNCOMP
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.util.Preconditions;
 import org.apache.arrow.vector.compression.AbstractCompressionCodec;
 import org.apache.arrow.vector.compression.CompressionUtil.CodecType;
+import org.bytedeco.javacpp.Pointer;
+import org.bytedeco.javacpp.SizeTPointer;
+import org.bytedeco.lz4.LZ4FDecompressOptions;
+import org.bytedeco.lz4.LZ4FDecompressionContext;
+import org.bytedeco.lz4.LZ4FPreferences;
 import org.bytedeco.lz4.global.lz4;
 
 /**
- * Implementation of LZ4 Block compression.
+ * Implementation of LZ4 Frame compression.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class Lz4BlockCompressionCodec extends AbstractCompressionCodec {
+public class Lz4FrameCompressionCodec extends AbstractCompressionCodec {
+
+    /** With null the default is used */
+    private static final LZ4FPreferences COMPRESSION_OPTIONS = null;
+
+    /** With null the default is used */
+    private static final LZ4FDecompressOptions DECOMPRESS_OPTIONS = null;
 
     @Override
-    public ArrowBuf compress(final BufferAllocator allocator, final ArrowBuf uncompressedBuffer) {
-        throw new IllegalStateException("LZ4 Block compression is not supported anymore. Use LZ4 Frame compression.");
-    }
-
-    @Override
+    @SuppressWarnings("resource")
     protected ArrowBuf doCompress(final BufferAllocator allocator, final ArrowBuf uncompressedBuffer) {
-        // Not called
-        return null;
+        final long uncompressedLength = uncompressedBuffer.writerIndex();
+
+        // The maximum size of the compressed data
+        final long maxCompressedLength = lz4.LZ4F_compressFrameBound(uncompressedLength, COMPRESSION_OPTIONS);
+
+        // Allocated buffer for the compression result
+        final ArrowBuf compressedBuffer = allocator.buffer(maxCompressedLength + SIZE_OF_UNCOMPRESSED_LENGTH);
+
+        // Compress
+        final Pointer srcPointer = new ArrowBufPointer(uncompressedBuffer, 0);
+        final Pointer dstPointer = new ArrowBufPointer(compressedBuffer, SIZE_OF_UNCOMPRESSED_LENGTH);
+        final long bytesWritten = lz4.LZ4F_compressFrame(dstPointer, maxCompressedLength, srcPointer,
+            uncompressedLength, COMPRESSION_OPTIONS);
+
+        compressedBuffer.writerIndex(bytesWritten + SIZE_OF_UNCOMPRESSED_LENGTH);
+        return compressedBuffer;
     }
 
     @Override
     @SuppressWarnings("resource")
     protected ArrowBuf doDecompress(final BufferAllocator allocator, final ArrowBuf compressedBuffer) {
-        Preconditions.checkArgument(compressedBuffer.writerIndex() <= Integer.MAX_VALUE,
-            "The compressed buffer size exceeds the integer limit");
-
         // Length of the result
         final long decompressedLength = readUncompressedLength(compressedBuffer);
-        Preconditions.checkArgument(decompressedLength <= Integer.MAX_VALUE,
-            "The decompressed buffer size exceeds the integer limit");
 
         // Allocate decompression result
         final ArrowBuf decompressedBuffer = allocator.buffer(decompressedLength);
 
-        // Decompress
-        final int decompressedBytes;
-        try (final var srcPointer = new ArrowBufPointer(compressedBuffer, SIZE_OF_UNCOMPRESSED_LENGTH);
-                final var dstPointer = new ArrowBufPointer(decompressedBuffer, 0)) {
-            decompressedBytes = lz4.LZ4_decompress_safe(srcPointer, dstPointer,
-                (int)(compressedBuffer.writerIndex() - SIZE_OF_UNCOMPRESSED_LENGTH), (int)decompressedLength);
+        long decompressedBytes = 0;
+        try (final var dctx = new LZ4FDecompressionContext()) {
+
+            // Init the decompression context
+            final long ctxError = lz4.LZ4F_createDecompressionContext(dctx, lz4.LZ4F_VERSION);
+            checkForLZ4FError(ctxError);
+
+            try (
+                    // Pointers to the data
+                    final var srcPointer = new ArrowBufPointer(compressedBuffer, SIZE_OF_UNCOMPRESSED_LENGTH);
+                    final var dstPointer = new ArrowBufPointer(decompressedBuffer, 0);
+                    // Sizes of the data
+                    final var srcSize = new SizeTPointer(1);
+                    final var dstSize = new SizeTPointer(1);) {
+
+                long ret;
+                do {
+                    // Update the size pointers with the currently remaining sizes
+                    dstSize.put(dstPointer.capacity() - dstPointer.position());
+                    srcSize.put(srcPointer.capacity() - srcPointer.position());
+
+                    // Decompress
+                    ret = lz4.LZ4F_decompress(dctx, dstPointer, dstSize, srcPointer, srcSize, DECOMPRESS_OPTIONS);
+                    checkForLZ4FError(ret);
+
+                    // Update the positions of the pointers
+                    srcPointer.position(srcPointer.position() + srcSize.get());
+                    dstPointer.position(dstPointer.position() + dstSize.get());
+                } while (ret != 0);
+                decompressedBytes = dstPointer.position();
+            } finally {
+                // Free the compression context (needed if there was an error)
+                lz4.LZ4F_freeDecompressionContext(dctx);
+            }
         }
 
-        if (decompressedBytes < 0) {
-            throw new CompressionException("LZ4 decompression failed. Return code: " + decompressedBytes);
-        }
         if (decompressedBytes != decompressedLength) {
             throw new CompressionException("LZ4 decompression failed. Expected " + decompressedLength
                 + " bytes, decompressed " + decompressedBytes + " bytes.");
@@ -106,6 +146,12 @@ public class Lz4BlockCompressionCodec extends AbstractCompressionCodec {
 
         decompressedBuffer.writerIndex(decompressedLength);
         return decompressedBuffer;
+    }
+
+    private static void checkForLZ4FError(final long errorCode) {
+        if (lz4.LZ4F_isError(errorCode) != 0) {
+            throw new CompressionException("LZ4 decompression failed: " + lz4.LZ4F_getErrorName(errorCode).getString());
+        }
     }
 
     @Override
