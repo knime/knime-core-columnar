@@ -92,6 +92,7 @@ public final class ArrowReaderWriterUtils {
 
     /**
      * Reads the Arrow {@link Schema} from an Arrow file.
+     *
      * @param file containing Arrow data
      * @return the {@link Schema} stored in file
      */
@@ -142,9 +143,13 @@ public final class ArrowReaderWriterUtils {
         final List<ArrowBuf> decompressedBuffers = new ArrayList<>(compressedBuffers.size());
         for (final ArrowBuf compressedBuf : compressedBuffers) {
             compressedBuf.getReferenceManager().retain();
-            @SuppressWarnings("resource") // Released by the caller
-            final ArrowBuf decompressedBuf = compressionCodec.decompress(allocator, compressedBuf);
-            decompressedBuffers.add(decompressedBuf);
+            if (compressedBuf.writerIndex() > 0) {
+                @SuppressWarnings("resource") // Released by the caller
+                final ArrowBuf decompressedBuf = compressionCodec.decompress(allocator, compressedBuf);
+                decompressedBuffers.add(decompressedBuf);
+            } else {
+                decompressedBuffers.add(compressedBuf);
+            }
         }
         return decompressedBuffers;
     }
