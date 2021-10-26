@@ -296,7 +296,8 @@ public class ZonedDateTimeLegacyTest {
             }
 
             // Compressed
-            try (final ArrowBatchWriter writer = new ArrowBatchWriter(COMPRESSED_FILE,
+            try (@SuppressWarnings("deprecation")
+            final ArrowBatchWriter writer = new ArrowBatchWriter(COMPRESSED_FILE,
                 ArrowSchemaMapper.map(SCHEMA_THREE_COLUMNS), ARROW_LZ4_BLOCK_COMPRESSION, alloc)) {
                 for (int b = 0; b < NUM_BATCHES; b++) {
                     final int seed = b;

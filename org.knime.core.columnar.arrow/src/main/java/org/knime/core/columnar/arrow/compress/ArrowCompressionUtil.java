@@ -70,14 +70,18 @@ public final class ArrowCompressionUtil {
 
     private static final String PROPERTY_COMPRESSION_NONE = "NONE";
 
-    // NOTE:
-    // Now this means LZ4 block compression but when frame compression is implemented it will use frame compression
-    // This is not a problem because reading block compression will still be possible
     private static final String PROPERTY_COMPRESSION_LZ4 = "LZ4";
 
-    // TODO(lz4_frame) deprecate when LZ4_FRAME compression is implemented
-    /** Config for LZ4 block buffer compression using the lz4-java library */
+    /**
+     * Config for LZ4 block buffer compression
+     *
+     * @deprecated use {@link ArrowCompressionUtil#ARROW_LZ4_FRAME_COMPRESSION}.
+     */
+    @Deprecated(since = "4.5.0")
     public static final ArrowCompression ARROW_LZ4_BLOCK_COMPRESSION = new ArrowLz4BlockCompression();
+
+    /** Config for LZ4 frame buffer compression using the JavaCPP presets for LZ4 */
+    public static final ArrowCompression ARROW_LZ4_FRAME_COMPRESSION = new ArrowLz4FrameCompression();
 
     /** Config for not using any compression */
     public static final ArrowCompression ARROW_NO_COMPRESSION = new ArrowNoCompression();
@@ -95,11 +99,11 @@ public final class ArrowCompressionUtil {
         if (defaultCompression == null) {
             final String compressionName = System.getProperty(PROPERTY_COMPRESSION);
             if (PROPERTY_COMPRESSION_NONE.equals(compressionName)) {
-                // Property set to LZ4
+                // Property set to NONE
                 defaultCompression = ARROW_NO_COMPRESSION;
             } else if (PROPERTY_COMPRESSION_LZ4.equals(compressionName)) {
-                // Property set to NONE
-                defaultCompression = ARROW_LZ4_BLOCK_COMPRESSION;
+                // Property set to LZ4
+                defaultCompression = ARROW_LZ4_FRAME_COMPRESSION;
             } else {
                 if (compressionName != null) {
                     // Property set but nothing matched
@@ -108,7 +112,7 @@ public final class ArrowCompressionUtil {
                         compressionName, PROPERTY_COMPRESSION_LZ4, PROPERTY_COMPRESSION_NONE, PROPERTY_COMPRESSION_LZ4);
                 }
                 // Using the default
-                defaultCompression = ARROW_LZ4_BLOCK_COMPRESSION;
+                defaultCompression = ARROW_LZ4_FRAME_COMPRESSION;
             }
         }
         return defaultCompression;
@@ -122,8 +126,10 @@ public final class ArrowCompressionUtil {
      * @return the {@link ArrowCompression} to use
      */
     public static ArrowCompression getCompressionForType(final byte type) {
-        if (type == ARROW_LZ4_BLOCK_COMPRESSION.getCompressionType()) {
-            return ARROW_LZ4_BLOCK_COMPRESSION;
+        if (type == ARROW_LZ4_BLOCK_COMPRESSION.getCompressionType()) { // NOSONAR: We still have to handle block compression
+            return ARROW_LZ4_BLOCK_COMPRESSION; // NOSONAR
+        } else if (type == ARROW_LZ4_FRAME_COMPRESSION.getCompressionType()) {
+            return ARROW_LZ4_FRAME_COMPRESSION;
         } else if (type == ARROW_NO_COMPRESSION.getCompressionType()) {
             return ARROW_NO_COMPRESSION;
         } else {
@@ -152,6 +158,27 @@ public final class ArrowCompressionUtil {
             // We use -2 because it will be never used for another CompressionType
             // and -1 is used for no compression
             return -2;
+        }
+    }
+
+    private static final class ArrowLz4FrameCompression implements ArrowCompression {
+
+        private ArrowLz4FrameCompression() {
+        }
+
+        @Override
+        public CompressionCodec getCompressionCodec() {
+            return new Lz4FrameCompressionCodec();
+        }
+
+        @Override
+        public ArrowBodyCompression getBodyCompression() {
+            return new ArrowBodyCompression(getCompressionType(), BodyCompressionMethod.BUFFER);
+        }
+
+        @Override
+        public byte getCompressionType() {
+            return CompressionType.LZ4_FRAME;
         }
     }
 

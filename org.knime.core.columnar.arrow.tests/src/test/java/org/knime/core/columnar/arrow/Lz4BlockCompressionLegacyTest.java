@@ -139,7 +139,8 @@ public class Lz4BlockCompressionLegacyTest {
      */
     public static void main(final String[] args) throws Exception {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(SCHEMA);
-        try (final RootAllocator alloc = new RootAllocator();
+        try (final RootAllocator alloc = new RootAllocator(); //
+                @SuppressWarnings("deprecation")
                 final ArrowBatchWriter writer =
                     new ArrowBatchWriter(FILE, factories, ARROW_LZ4_BLOCK_COMPRESSION, alloc)) {
             for (int b = 0; b < NUM_BATCHES; b++) {
