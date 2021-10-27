@@ -55,6 +55,7 @@ import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.table.access.BufferedAccesses;
 import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
 import org.knime.core.table.cursor.Cursor;
+import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
 
 /**
@@ -62,7 +63,7 @@ import org.knime.core.table.row.ReadAccessRow;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class RowIteratorCursor implements Cursor<ReadAccessRow> {
+final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
 
     private final BufferedAccessRow m_accessRow;
 
@@ -95,6 +96,11 @@ final class RowIteratorCursor implements Cursor<ReadAccessRow> {
         } else {
             return false;
         }
+    }
+
+    @Override
+    public boolean canForward() {
+        return m_iterator.hasNext();
     }
 
 }

@@ -52,7 +52,7 @@ import java.io.IOException;
 
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.node.BufferedDataTable;
-import org.knime.core.table.cursor.Cursor;
+import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -85,7 +85,7 @@ final class BufferedDataTableRowAccessible implements RowAccessible {
 
     @SuppressWarnings("resource") // the returned cursor closes the iterator
     @Override
-    public Cursor<ReadAccessRow> createCursor() {
+    public LookaheadCursor<ReadAccessRow> createCursor() {
         return new RowIteratorCursor(m_schema, m_table.iterator());
     }
 }
