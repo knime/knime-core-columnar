@@ -53,6 +53,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -194,7 +195,8 @@ public final class VirtualTableSchemaUtils {
                 "Appending columns via the ColumnRearranger is not yet implemented by the Columnar Table Backend.");
         }
         var refSchema = extractSchema(table);
-        return rearrangeSchemas(refSchema, EMPTY, rearranger.createSpec());
+        // virtual tables can't append new columns (yet), so all columns are from the reference schema
+        return rearrangeSchemas(refSchema, EMPTY, rearranger.createSpec(), i -> true);
     }
 
     private static DataTableSpec[] extractSpecs(final ColumnarValueSchema[] schemas) {
@@ -258,11 +260,11 @@ public final class VirtualTableSchemaUtils {
             "Unexpected container table of type '%s' in workflow with Columnar Table Backend detected.");
         final var appendSchema = ((AbstractColumnarContainerTable)appendTable).getSchema();
         final var outputSpec = table.getDataTableSpec();
-        return rearrangeSchemas(referenceSchema, appendSchema, outputSpec);
+        return rearrangeSchemas(referenceSchema, appendSchema, outputSpec, table::isFromReferenceTable);
     }
 
     private static ColumnarValueSchema rearrangeSchemas(final ColumnarValueSchema referenceSchema,
-        final ColumnarValueSchema appendSchema, final DataTableSpec outputSpec) {
+        final ColumnarValueSchema appendSchema, final DataTableSpec outputSpec, final IntPredicate isFromRef) {
         List<ValueFactory<?, ?>> factories = new ArrayList<>(outputSpec.getNumColumns() + 1);
         // add the RowKeyValueFactory
         var rowKeyValueFactory = referenceSchema.getValueFactory(0);
@@ -270,17 +272,12 @@ public final class VirtualTableSchemaUtils {
             "The first ValueFactory of the reference table was not a RowKeyValueFactory but a '%s'.",
             rowKeyValueFactory.getClass());
         factories.add(rowKeyValueFactory);
-        for (var column : outputSpec) {
+        for (int i = 0; i < outputSpec.getNumColumns(); i++) {
+            var column = outputSpec.getColumnSpec(i);
             var name = column.getName();
-            var factory = getValueFactoryForName(referenceSchema, name);
-            if (factory != null) {
-                factories.add(factory);
-            } else {
-                factory = getValueFactoryForName(appendSchema, name);
-                CheckUtils.checkState(factory != null,
-                    "The column '%s' is neither in the reference nor in the append table.", name);
-                factories.add(factory);
-            }
+            var schemaContainingFactory = isFromRef.test(i) ? referenceSchema : appendSchema;
+            var factory = getValueFactoryForName(schemaContainingFactory, name);
+            factories.add(factory);
         }
         return createSchema(outputSpec, factories);
     }
