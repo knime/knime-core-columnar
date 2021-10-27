@@ -379,7 +379,9 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
                 final var logicalType = schema.getTraits(1).get(LogicalTypeTrait.class);
                 assertNotNull(logicalType);
                 // we explicitly check for the logical type because the DictEncodedDataCellValueFactory is not visible here
-                assertEquals("org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory",
+                assertEquals(//
+                    "{\"value_factory_class\":\"org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory\""//
+                    + ",\"data_type\":{\"cell_class\":\"org.knime.core.data.xml.XMLCell\"}}",//
                     logicalType.getLogicalType());
                 assertTrue(schema.getSpec(1) instanceof StructDataSpec);
                 final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);
@@ -407,7 +409,9 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
                 final var logicalType = schema.getTraits(1).get(LogicalTypeTrait.class);
                 assertNotNull(logicalType);
                 // we explicitly check for the logical type because the DictEncodedDataCellValueFactory is not visible here
-                assertEquals("org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory",
+                assertEquals(
+                    "{\"value_factory_class\":\"org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory\","
+                    + "\"data_type\":{\"cell_class\":\"org.knime.core.data.xml.XMLCell\"}}",
                     logicalType.getLogicalType());
                 assertTrue(schema.getSpec(1) instanceof StructDataSpec);
                 final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);

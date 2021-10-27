@@ -116,7 +116,8 @@ public class DefaultColumnarValueSchemaTest {
         final var traits = schema.getTraits(1);
         final var logicalType = traits.get(LogicalTypeTrait.class);
         assertNotNull(logicalType);
-        assertEquals(schema.getValueFactory(1).getClass().getName(), logicalType.getLogicalType());
+        assertEquals("{\"value_factory_class\":\"" + schema.getValueFactory(1).getClass().getName() + "\"}",
+            logicalType.getLogicalType());
     }
 
     @Test
@@ -129,7 +130,8 @@ public class DefaultColumnarValueSchemaTest {
         final var traits = schema.getTraits(1);
         final var logicalType = traits.get(LogicalTypeTrait.class);
         assertNotNull(logicalType);
-        assertEquals(IntListValueFactory.class.getName(), logicalType.getLogicalType());
+        assertEquals("{\"value_factory_class\":\"org.knime.core.data.v2.value.IntListValueFactory\"}",
+            logicalType.getLogicalType());
 
         assertTrue(traits instanceof ListDataTraits);
         final var innerTraits = ((ListDataTraits)traits).getInner();
