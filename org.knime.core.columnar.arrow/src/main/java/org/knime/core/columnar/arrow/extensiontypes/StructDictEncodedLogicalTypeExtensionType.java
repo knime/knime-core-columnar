@@ -49,27 +49,24 @@
 package org.knime.core.columnar.arrow.extensiontypes;
 
 import org.apache.arrow.vector.types.pojo.ArrowType;
-import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
 
 /**
- * ExtensionType for ValueFactories whose direct primitive type is struct-dict-encoded. This is necessary
- * because Arrow doesn't support direct nesting of extension types. That's because an ExtensionType is just an
- * annotation (meta-data) on an actual Arrow type and nesting multiple ExtensionTypes results in overwriting this
- * annotation. Note that it is possible to have nested ExtensionTypes when they are attached to different Arrow types
- * (e.g. in a struct or a list).
+ * ExtensionType for ValueFactories whose direct primitive type is struct-dict-encoded. This is necessary because Arrow
+ * doesn't support direct nesting of extension types. That's because an ExtensionType is just an annotation (meta-data)
+ * on an actual Arrow type and nesting multiple ExtensionTypes results in overwriting this annotation. Note that it is
+ * possible to have nested ExtensionTypes when they are attached to different Arrow types (e.g. in a struct or a list).
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 // Equals is implemented in the super class and delegates to #extensionEquals
 public final class StructDictEncodedLogicalTypeExtensionType extends AbstractExtensionType {//NOSONAR
 
+    static final StructDictEncodedLogicalTypeExtensionType DESERIALIZATION_INSTANCE =
+        new StructDictEncodedLogicalTypeExtensionType();
+
     private final StructDictEncodedExtensionType m_structDictEncodedType;
 
     private final LogicalTypeExtensionType m_valueFactoryType;
-
-    static {
-        ExtensionTypeRegistry.register(new StructDictEncodedLogicalTypeExtensionType());
-    }
 
     /**
      * Private constructor for creating the deserialization instance
@@ -126,9 +123,11 @@ public final class StructDictEncodedLogicalTypeExtensionType extends AbstractExt
 
     @Override
     public ArrowType deserialize(final ArrowType storageType, final String serializedData) {
-        var valueFactoryType = LogicalTypeExtensionType.DESERIALIZATION_INSTANCE.deserialize(storageType, serializedData);
+        var valueFactoryType =
+            LogicalTypeExtensionType.DESERIALIZATION_INSTANCE.deserialize(storageType, serializedData);
         // StructDictEncodedType doesn't have any meta data
-        var structDictEncodedType = StructDictEncodedExtensionType.DESERIALIZATION_INSTANCE.deserialize(storageType, "");
+        var structDictEncodedType =
+            StructDictEncodedExtensionType.DESERIALIZATION_INSTANCE.deserialize(storageType, "");
         return new StructDictEncodedLogicalTypeExtensionType(valueFactoryType, structDictEncodedType);
     }
 

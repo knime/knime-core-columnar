@@ -49,7 +49,6 @@
 package org.knime.core.columnar.arrow.extensiontypes;
 
 import org.apache.arrow.vector.types.pojo.ArrowType;
-import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
 
 /**
  * Arrow extension type that stores the value factory as meta data.
@@ -60,10 +59,6 @@ import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
 public final class LogicalTypeExtensionType extends AbstractExtensionType { //NOSONAR
 
     static final LogicalTypeExtensionType DESERIALIZATION_INSTANCE = new LogicalTypeExtensionType();
-
-    static {
-        ExtensionTypeRegistry.register(DESERIALIZATION_INSTANCE);
-    }
 
     /**
      * E.g. the ValueFactory

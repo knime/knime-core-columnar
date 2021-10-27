@@ -52,6 +52,7 @@ import org.apache.arrow.memory.RootAllocator;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
@@ -123,6 +124,7 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
         m_initReservation = initReservation;
         m_maxAllocation = maxAllocation;
         m_compression = compression;
+        ExtensionTypes.registerExtensionTypes();
     }
 
     @Override

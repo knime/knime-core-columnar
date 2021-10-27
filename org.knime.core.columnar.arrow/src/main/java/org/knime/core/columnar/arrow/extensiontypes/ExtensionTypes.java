@@ -48,8 +48,11 @@
  */
 package org.knime.core.columnar.arrow.extensiontypes;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.ArrowType.ExtensionType;
+import org.apache.arrow.vector.types.pojo.ExtensionTypeRegistry;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
@@ -62,6 +65,19 @@ import org.knime.core.table.schema.traits.LogicalTypeTrait;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public final class ExtensionTypes {
+
+    private static final AtomicBoolean EXT_TYPES_NOT_REGISTERED = new AtomicBoolean(true);
+
+    /**
+     * Registers the extension types with Arrow.
+     */
+    public static void registerExtensionTypes() {
+        if (EXT_TYPES_NOT_REGISTERED.getAndSet(false)) {
+            ExtensionTypeRegistry.register(LogicalTypeExtensionType.DESERIALIZATION_INSTANCE);
+            ExtensionTypeRegistry.register(StructDictEncodedExtensionType.DESERIALIZATION_INSTANCE);
+            ExtensionTypeRegistry.register(StructDictEncodedLogicalTypeExtensionType.DESERIALIZATION_INSTANCE);
+        }
+    }
 
     /**
      * Wraps the provided field into a field with an ExtensionTypes if the provided traits indicate it.
