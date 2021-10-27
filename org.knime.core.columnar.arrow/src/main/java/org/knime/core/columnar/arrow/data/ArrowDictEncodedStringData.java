@@ -49,6 +49,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -66,6 +67,7 @@ import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
+import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraits;
@@ -94,8 +96,8 @@ public final class ArrowDictEncodedStringData {
         }
 
         private ArrowDictEncodedStringWriteData(final ArrowStructWriteData delegate, final KeyType keyType,
-            final int offset) {
-            super(delegate, keyType, offset);
+            final int offset, final ConcurrentHashMap<String, K> dict, final DictKeyGenerator<K> generator) {
+            super(delegate, keyType, offset, dict, generator);
         }
 
         @Override
@@ -111,7 +113,8 @@ public final class ArrowDictEncodedStringData {
 
         @Override
         public ArrowDictEncodedStringWriteData<K> slice(final int start) {
-            return new ArrowDictEncodedStringWriteData<>(m_delegate, m_keyType, start + m_offset);
+            return new ArrowDictEncodedStringWriteData<>(m_delegate, m_keyType, start + m_offset, m_dict,
+                m_keyGenerator);
         }
 
         @Override
@@ -176,16 +179,14 @@ public final class ArrowDictEncodedStringData {
         public ArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             return new ArrowDictEncodedStringWriteData<>(
-                m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity),
-                m_keyType);
+                m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity), m_keyType);
         }
 
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             return new ArrowDictEncodedStringReadData<>(
-                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)),
-                m_keyType);
+                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)), m_keyType);
         }
 
     }

@@ -67,6 +67,7 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
@@ -95,9 +96,9 @@ public final class ArrowDictEncodedVarBinaryData {
             super(delegate, initialDictKey);
         }
 
-        private ArrowDictEncodedVarBinaryWriteData(final ArrowStructWriteData delegate, final KeyType keyType, final int offset,
-            final ConcurrentHashMap<Object, K> dict) {
-            super(delegate, keyType, offset, dict);
+        private ArrowDictEncodedVarBinaryWriteData(final ArrowStructWriteData delegate, final KeyType keyType,
+            final int offset, final ConcurrentHashMap<Object, K> dict, final DictKeyGenerator<K> generator) {
+            super(delegate, keyType, offset, dict, generator);
         }
 
         @Override
@@ -113,10 +114,8 @@ public final class ArrowDictEncodedVarBinaryData {
 
         @Override
         public ArrowDictEncodedVarBinaryWriteData<K> slice(final int start) {
-            var slicedData = new ArrowDictEncodedVarBinaryWriteData<>(m_delegate, m_keyType, start + m_offset, m_dict);
-            // FIXME workaround for debugging
-            setKeyGenerator(m_keyGenerator);
-            return slicedData;
+            return new ArrowDictEncodedVarBinaryWriteData<>(m_delegate, m_keyType, start + m_offset, m_dict,
+                m_keyGenerator);
         }
 
         @Override

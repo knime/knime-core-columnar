@@ -73,7 +73,6 @@ import org.knime.core.columnar.data.LongData.LongWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
-import org.knime.core.columnar.data.dictencoding.DictKeys;
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
@@ -104,21 +103,32 @@ public final class AbstractArrowDictEncodedData {
 
         protected final KeyType m_keyType;
 
-        protected int m_offset = 0;
+        protected final int m_offset;
 
         AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType) {
             this(delegate, keyType, 0);
         }
 
-        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType, final int offset) {
-            this(delegate, keyType, offset, new ConcurrentHashMap<>());
+        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType,
+            final int offset) {
+            this(delegate, keyType, offset, new ConcurrentHashMap<>(), null);
         }
 
-        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType, final int offset, final ConcurrentHashMap<T, K> dict) {
+        /**
+         * When slicing dictionary encoded data, we need to share the dictionary and the key generator across all
+         * slices, so we pass in both.
+         *
+         * If this constructor is called from the simpler constructors above, then we do not have a key generator yet
+         * (because we are constructing the factories) and it needs to be provided using
+         * {{@link #setKeyGenerator(DictKeyGenerator)}.
+         */
+        AbstractArrowDictEncodedWriteData(final ArrowStructWriteData delegate, final KeyType keyType, final int offset,
+            final ConcurrentHashMap<T, K> dict, final DictKeyGenerator<K> keyGenerator) {
             m_delegate = delegate;
             m_offset = offset;
             m_keyType = keyType;
             m_dict = dict;
+            m_keyGenerator = keyGenerator;
         }
 
         @Override
@@ -173,6 +183,10 @@ public final class AbstractArrowDictEncodedData {
 
         @Override
         public void setKeyGenerator(final DictKeyGenerator<K> keyGenerator) {
+            if (keyGenerator == m_keyGenerator) {
+                return;
+            }
+
             if (m_keyGenerator != null) {
                 throw new IllegalStateException(
                     "The DictKeyGenerator was already configured before, cannot be set again");
@@ -183,7 +197,7 @@ public final class AbstractArrowDictEncodedData {
 
         protected K generateKey(final T value) {
             if (m_keyGenerator == null) {
-                m_keyGenerator = DictKeys.createAscendingKeyGenerator(m_keyType);
+                throw new IllegalStateException("DictKeyGenerator must be configured before writing any data!");
             }
 
             return m_keyGenerator.generateKey(value);
@@ -219,8 +233,8 @@ public final class AbstractArrowDictEncodedData {
             m_dictValueLookupTable = constructDictKeyIndexMap();
         }
 
-        AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate, final KeyType keyType, final int[] dictValueLut,
-            final int offset, final int length) {
+        AbstractArrowDictEncodedReadData(final ArrowStructReadData delegate, final KeyType keyType,
+            final int[] dictValueLut, final int offset, final int length) {
             m_delegate = delegate;
             m_dictValueLookupTable = dictValueLut;
             m_offset = offset;
@@ -302,8 +316,8 @@ public final class AbstractArrowDictEncodedData {
 
         private final int m_version;
 
-        protected AbstractArrowDictEncodedDataFactory(final DataTraits traits, final ArrowColumnDataFactory valueFactory,
-            final int version) {
+        protected AbstractArrowDictEncodedDataFactory(final DataTraits traits,
+            final ArrowColumnDataFactory valueFactory, final int version) {
             Preconditions.checkArgument(DictEncodingTrait.isEnabled(traits), "The column is not dictionary encoded.");
             m_keyType = DictEncodingTrait.keyType(traits);
             m_delegate = new ArrowStructDataFactory(createKeyDataFactory(), valueFactory);
@@ -362,10 +376,8 @@ public final class AbstractArrowDictEncodedData {
             }
             var other = (AbstractArrowDictEncodedDataFactory)obj;
             return m_keyType == other.m_keyType //
-                    && m_version == other.m_version
-            && m_delegate.equals(other.m_delegate); //
+                && m_version == other.m_version && m_delegate.equals(other.m_delegate); //
         }
-
 
     }
 }

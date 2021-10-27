@@ -71,6 +71,7 @@ import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByt
 import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteWriteData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
+import org.knime.core.columnar.data.dictencoding.DictKeys;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
@@ -91,6 +92,13 @@ public class ArrowDictEncodedVarBinaryDataTest extends AbstractArrowDataTest<Arr
     /** Create the test for {@link ArrowVarBinaryData} */
     public ArrowDictEncodedVarBinaryDataTest() {
         super(new ArrowDictEncodedVarBinaryDataFactory(new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY))));
+    }
+
+    @Override
+    protected ArrowDictEncodedVarBinaryWriteData<Byte> createWrite(final int numValues) {
+        final var data = super.createWrite(numValues);
+        data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY));
+        return data;
     }
 
     @SuppressWarnings("unchecked")

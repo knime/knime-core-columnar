@@ -58,6 +58,7 @@ import org.junit.Test;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
+import org.knime.core.columnar.data.dictencoding.DictKeys;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
@@ -88,6 +89,7 @@ public class StructDictEncodingTest {
         @SuppressWarnings("unchecked")
         final var data = (ArrowDictEncodedStringWriteData<Long>)ArrowColumnDataFactory.createWrite(factory, "0",
             m_alloc, numRows);
+        data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.LONG_KEY));
 
         data.setString(0, "foo");
         // [<0, "foo">]
@@ -115,6 +117,7 @@ public class StructDictEncodingTest {
         @SuppressWarnings("unchecked")
         final var data = (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0",
             m_alloc, numRows);
+        data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY));
 
         data.setString(0, "foo");
         data.setString(1, "bar");
@@ -134,7 +137,7 @@ public class StructDictEncodingTest {
         @SuppressWarnings("unchecked")
         final var data = (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0",
             m_alloc, numRows);
-
+        data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY));
         int lastWrittenIndex = 0;
 
         try {
