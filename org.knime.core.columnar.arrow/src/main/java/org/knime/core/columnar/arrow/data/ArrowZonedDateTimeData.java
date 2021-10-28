@@ -55,6 +55,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -247,6 +248,32 @@ public final class ArrowZonedDateTimeData {
 
         private ArrowZonedDateTimeDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(1));
+        }
+
+        /**
+         * Checks if the provided field corresponds to a ZonedDateTimeField.
+         *
+         * @param field to check
+         * @return true if the provided field is a ZonedDateTimeField
+         */
+        public static boolean isZonedDateTimeField(final Field field) {
+            return field.getType().equals(MinorType.STRUCT.getType())//
+                    && checkChildren(field.getChildren());
+        }
+
+        private static boolean checkChildren(final List<Field> children) {
+            return children.size() == 4//NOSONAR
+                    && isChildField(children.get(0), CHILD_NAME_EPOCH_DAY, MinorType.BIGINT)//
+                    && isChildField(children.get(1), CHILD_NAME_NANO_OF_DAY, MinorType.TIMENANO)//
+                    && isChildField(children.get(2), CHILD_NAME_ZONE_OFFSET, MinorType.INT)//
+                    && (isChildField(children.get(3), CHILD_NAME_ZONE_ID, MinorType.VARCHAR)
+                        || isChildField(children.get(3), CHILD_NAME_ZONE_ID, MinorType.LARGEVARBINARY));
+        }
+
+        private static boolean isChildField(final Field field, final String name, final MinorType type) {
+            return field.isNullable()//
+                    && field.getType().equals(type.getType())//
+                    && field.getName().equals(name);
         }
 
         @Override

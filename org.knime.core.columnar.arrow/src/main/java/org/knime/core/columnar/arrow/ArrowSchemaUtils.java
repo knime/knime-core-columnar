@@ -70,9 +70,10 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Timestamp;
 import org.apache.arrow.vector.types.pojo.ArrowType.Utf8;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
+import org.knime.core.columnar.arrow.extensiontypes.LogicalTypeExtensionType;
 import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedExtensionType;
 import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedLogicalTypeExtensionType;
-import org.knime.core.columnar.arrow.extensiontypes.LogicalTypeExtensionType;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
 import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
@@ -93,7 +94,7 @@ public final class ArrowSchemaUtils {
 
 	/**
 	 * Reads the schema of an Arrow file stored at the provided path.
-	 * 
+	 *
 	 * @param path where the Arrow file is located
 	 * @return the schema of the file
 	 */
@@ -196,6 +197,10 @@ public final class ArrowSchemaUtils {
 
     private static DataSpecWithTraits parseStructField(final Field structField, final ArrowType type) {
         assert type instanceof ArrowType.Struct;
+        // TODO remove if we remove zoned date time from the supported DataSpecs
+        if (ArrowZonedDateTimeDataFactory.isZonedDateTimeField(structField)) {
+            return DataSpecs.ZONEDDATETIME;
+        }
         var inner = structField.getChildren().stream()//
             .map(ArrowSchemaUtils::parseField)//
             .toArray(DataSpecWithTraits[]::new);
