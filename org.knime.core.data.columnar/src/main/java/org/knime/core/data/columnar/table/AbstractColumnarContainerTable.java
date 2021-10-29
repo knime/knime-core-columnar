@@ -136,12 +136,11 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
         final NodeSettingsRO settings = context.getSettings();
         m_tableId = -1;
         m_size = settings.getLong(CFG_TABLE_SIZE);
+
         m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
         var dataPath = context.getDataFileRef().getFile().toPath();
-        var storeSchema = m_factory.readSchema(dataPath);
-        m_schema = ColumnarValueSchemaUtils.load(storeSchema, context);
-
-        final BatchReadStore store = m_factory.createReadStore(m_schema, dataPath);
+        final BatchReadStore store = m_factory.createReadStore(dataPath);
+        m_schema = ColumnarValueSchemaUtils.load(store.getSchema(), context);
 
         final var builder = new ColumnarBatchReadStoreBuilder(store);
         builder.enableDictEncoding(true).useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache())
@@ -159,9 +158,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     }
 
     void initStoreCloser() {
-        final ResourceWithRelease readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
+        final var readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
             finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
-        final ResourceWithRelease storeRelease = new ResourceWithRelease(m_readStore);
+        final var storeRelease = new ResourceWithRelease(m_readStore);
         m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, storeRelease);
     }
 
@@ -251,7 +250,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
     @Override
     public RowCursor cursor(final TableFilter filter) {
         try {
-           if (filter != null) {
+            if (filter != null) {
                 filter.validate(getDataTableSpec(), m_size);
                 //  for some reason we don't do validation of the 'from index'
                 final Optional<Long> fromRowIndexOpt = filter.getFromRowIndex();

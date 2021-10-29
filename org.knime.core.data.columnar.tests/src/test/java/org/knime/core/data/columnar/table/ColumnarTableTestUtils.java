@@ -87,15 +87,9 @@ final class ColumnarTableTestUtils {
         }
 
         @Override
-        public BatchReadStore createReadStore(final ColumnarSchema schema, final Path path) {
+        public BatchReadStore createReadStore(final Path path) {
             throw new UnsupportedOperationException("Loading from file not supported by test column store.");
         }
-
-        @Override
-        public ColumnarSchema readSchema(final Path path) {
-            throw new UnsupportedOperationException("Loading from file not supported by test column store.");
-        }
-
     }
 
     static ColumnarValueSchema createSchema(final int nCols) {

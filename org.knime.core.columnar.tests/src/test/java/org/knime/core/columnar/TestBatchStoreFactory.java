@@ -67,12 +67,7 @@ public final class TestBatchStoreFactory implements ColumnStoreFactory {
     }
 
     @Override
-    public BatchReadStore createReadStore(final ColumnarSchema schema, final Path path) {
-        throw new UnsupportedOperationException("not implemented");
-    }
-
-    @Override
-    public ColumnarSchema readSchema(final Path path) {
+    public BatchReadStore createReadStore(final Path path) {
         throw new UnsupportedOperationException("not implemented");
     }
 

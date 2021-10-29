@@ -71,18 +71,9 @@ public interface ColumnStoreFactory {
     /**
      * Creates a new {@link BatchReadStore}, reading data from the provided file.
      *
-     * @param schema the columnar schema of the to-be-created store
      * @param path from which data is read
      * @return a newly created store
      */
-    BatchReadStore createReadStore(ColumnarSchema schema, Path path);
-
-    /**
-     * Reads the schema of the store located at the provided path.
-     *
-     * @param path the store is located at
-     * @return the schema of the store
-     */
-    ColumnarSchema readSchema(Path path);
+    BatchReadStore createReadStore(Path path);
 
 }

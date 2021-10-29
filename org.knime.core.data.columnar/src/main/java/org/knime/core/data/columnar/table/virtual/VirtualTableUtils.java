@@ -122,8 +122,7 @@ public final class VirtualTableUtils {
 
     private static IntStream getSelectedIndexStream(final ColumnSelection selection) {
         return IntStream.range(0, selection.numColumns())//
-                .filter(selection::isSelected)//
-;
+                .filter(selection::isSelected);
     }
 
     /**
