@@ -65,6 +65,7 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
+import org.knime.core.data.columnar.table.virtual.closeable.CloseableTracker;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -289,9 +290,12 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
 
     private final class ColumnarContainerRowAccessible implements RowAccessible {
 
+        private final CloseableTracker<Cursor<ReadAccessRow>, IOException> m_trackedCursors =
+            new CloseableTracker<>(IOException.class);
+
         @Override
         public void close() throws IOException {
-            // nothing to close, the outer class is closed by the node that references it
+            m_trackedCursors.close();
         }
 
         @Override
@@ -299,9 +303,10 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable {
             return m_schema;
         }
 
+        @SuppressWarnings("resource")// the purpose of the tracker is memory leaks
         @Override
         public Cursor<ReadAccessRow> createCursor() {
-            return ColumnarCursorFactory.create(m_readStore, m_size);
+            return m_trackedCursors.track(ColumnarCursorFactory.create(m_readStore, m_size));
         }
     }
 
