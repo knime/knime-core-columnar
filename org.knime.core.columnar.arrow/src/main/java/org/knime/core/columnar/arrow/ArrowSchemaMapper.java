@@ -253,9 +253,14 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
         private final DataTraits m_traits;
 
+        private final ArrowColumnDataFactoryVersion m_version;
+
+        private static final int CURRENT_VERSION = 0;
+
         ExtensionArrowColumnDataFactory(final ArrowColumnDataFactory delegate, final DataTraits traits) {
             m_delegate = delegate;
             m_traits = traits;
+            m_version = ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, m_delegate.getVersion());
         }
 
         ArrowColumnDataFactory getDelegate() {
@@ -277,7 +282,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            return m_delegate.createRead(vector, nullCount, provider, version);
+            return m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0));
         }
 
         @Override
@@ -292,7 +297,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
         @Override
         public ArrowColumnDataFactoryVersion getVersion() {
-            return m_delegate.getVersion();
+            return m_version;
         }
 
         @Override
@@ -311,6 +316,5 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         public int hashCode() {
             return Objects.hash(m_traits, m_delegate);
         }
-
     }
 }
