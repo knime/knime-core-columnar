@@ -102,6 +102,7 @@ import org.knime.core.table.schema.ZonedDateTimeDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.ListDataTraits;
+import org.knime.core.table.schema.traits.LogicalTypeTrait;
 import org.knime.core.table.schema.traits.StructDataTraits;
 
 /**
@@ -238,8 +239,12 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         return wrap(ArrowStringDataFactory.INSTANCE, traits);
     }
 
-    static ExtensionArrowColumnDataFactory wrap(final ArrowColumnDataFactory factory, final DataTraits traits) {
-        return new ExtensionArrowColumnDataFactory(factory, traits);
+    static ArrowColumnDataFactory wrap(final ArrowColumnDataFactory factory, final DataTraits traits) {
+        if (traits.hasTrait(LogicalTypeTrait.class) || traits.hasTrait(DictEncodingTrait.class)) {
+            return new ExtensionArrowColumnDataFactory(factory, traits);
+        }
+
+        return factory;
     }
 
     static final class ExtensionArrowColumnDataFactory implements ArrowColumnDataFactory {
