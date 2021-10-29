@@ -135,8 +135,8 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowBatchReadStore createReadStore(final ColumnarSchema schema, final Path path) {
-        return new ArrowBatchReadStore(schema, path, newChildAllocator("ArrowColumnReadStore"));
+    public ArrowBatchReadStore createReadStore(final Path path) {
+        return new ArrowBatchReadStore(path, newChildAllocator("ArrowColumnReadStore"));
     }
 
     /**
@@ -144,25 +144,19 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
      * written completely. The offsets to the record batches and dictionary batches in the file must be provided via a
      * {@link OffsetProvider}.
      *
-     * @param schema the columnar schema of the to-be-created store
      * @param path from which data is read
      * @param offsetProvider a provider for the offsets of the record batches and dictionary batches in the Arrow IPC
      *            file
      * @return a newly created readable
      */
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowPartialFileBatchReadable createPartialFileReadable(final ColumnarSchema schema, final Path path,
+    public ArrowPartialFileBatchReadable createPartialFileReadable(final Path path,
         final OffsetProvider offsetProvider) {
-        return new ArrowPartialFileBatchReadable(schema, path, offsetProvider,
+        return new ArrowPartialFileBatchReadable(path, offsetProvider,
             newChildAllocator("ArrowPartialFileBatchReadStore"));
     }
 
     private BufferAllocator newChildAllocator(final String name) {
         return m_allocator.newChildAllocator(name, m_initReservation, m_maxAllocation);
-    }
-
-    @Override
-    public ColumnarSchema readSchema(final Path path) {
-        return ArrowSchemaUtils.readSchema(path);
     }
 }

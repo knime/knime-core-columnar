@@ -375,7 +375,7 @@ public class ArrowColumnStoreTest {
             // Create the partial readable
             @SuppressWarnings("resource")
             final ArrowPartialFileBatchReadable readable =
-                factory.createPartialFileReadable(schema, writePath, writeStore.getOffsetProvider());
+                factory.createPartialFileReadable(writePath, writeStore.getOffsetProvider());
             @SuppressWarnings("resource")
             final RandomAccessBatchReader reader = readable.createRandomAccessReader();
 
@@ -469,7 +469,7 @@ public class ArrowColumnStoreTest {
         assertTrue(Files.size(readPath) > 0);
 
         // Use the read store to read some data
-        try (final BatchReadStore readStore = factory.createReadStore(schema, readPath)) {
+        try (final BatchReadStore readStore = factory.createReadStore(readPath)) {
             assertEquals(schema, readStore.getSchema());
             assertEquals(1, readStore.numBatches());
             assertEquals(chunkSize, readStore.batchLength());

@@ -55,7 +55,6 @@ import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link RandomAccessBatchReadable} that can read from partially written Arrow IPC files.
@@ -66,9 +65,9 @@ public class ArrowPartialFileBatchReadable extends AbstractArrowBatchReadable im
 
     private final OffsetProvider m_offsetProvider;
 
-    ArrowPartialFileBatchReadable(final ColumnarSchema schema, final Path path, final OffsetProvider offsetProvider,
+    ArrowPartialFileBatchReadable(final Path path, final OffsetProvider offsetProvider,
         final BufferAllocator allocator) {
-        super(schema, path, allocator);
+        super(ArrowSchemaUtils.readSchema(path), path, allocator);
         m_offsetProvider = offsetProvider;
     }
 

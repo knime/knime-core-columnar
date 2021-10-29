@@ -53,7 +53,6 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
-import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link BatchReadStore} implementation for Arrow.
@@ -67,13 +66,13 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
 
     private AtomicInteger m_maxLength;
 
-    ArrowBatchReadStore(final ColumnarSchema schema, final Path path, final BufferAllocator allocator) {
-        this(schema, path, allocator, null, null);
+    ArrowBatchReadStore(final Path path, final BufferAllocator allocator) {
+        this(path, allocator, null, null);
     }
 
-    ArrowBatchReadStore(final ColumnarSchema schema, final Path path, final BufferAllocator allocator,
+    ArrowBatchReadStore(final Path path, final BufferAllocator allocator,
         final AtomicInteger numBatches, final AtomicInteger maxLength) {
-        super(schema, path, allocator);
+        super(ArrowSchemaUtils.readSchema(path), path, allocator);
         m_numBatches = numBatches;
         m_maxLength = maxLength;
     }
