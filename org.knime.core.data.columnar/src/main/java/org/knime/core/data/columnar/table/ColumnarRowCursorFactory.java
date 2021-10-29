@@ -160,12 +160,12 @@ final class ColumnarRowCursorFactory {
     }
 
     static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size,
-        final Set<Finalizer> openCursorFinalizers) throws IOException {
+        final Set<Finalizer> openCursorFinalizers) {
         return create(store, schema, size, openCursorFinalizers, null);
     }
 
     static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size, // NOSONAR
-        final Set<Finalizer> openCursorFinalizers, final TableFilter filter) throws IOException {
+        final Set<Finalizer> openCursorFinalizers, final TableFilter filter) {
         if (size < 1) {
             return new EmptyRowCursor(schema);
         }

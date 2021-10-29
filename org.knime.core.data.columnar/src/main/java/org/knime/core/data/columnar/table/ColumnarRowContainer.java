@@ -49,28 +49,13 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
 
-import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
-import org.knime.core.data.columnar.domain.DomainWritable;
-import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
-import org.knime.core.data.container.DataContainer;
-import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
-import org.knime.core.node.NodeLogger;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -78,75 +63,31 @@ import org.knime.core.node.NodeLogger;
  */
 final class ColumnarRowContainer implements RowContainer {
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowContainer.class);
-
+    @SuppressWarnings("resource") // Columnar table will be closed along with row container.
     static ColumnarRowContainer create(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
         final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
-        final var container = new ColumnarRowContainer(context, id, schema, storeFactory, settings);
-        container.m_finalizer =
-            ResourceLeakDetector.getInstance().createFinalizer(container, container.m_writeCursor, container.m_store);
-        return container;
+        // TODO: turn this into a constructor?
+        return new ColumnarRowContainer(context, id, new ColumnarRowWriteTable(schema, storeFactory, settings));
     }
-
-    private final ColumnarRowWriteCursor m_writeCursor;
 
     private final ExecutionContext m_context;
 
     private final int m_id;
 
-    private final ColumnStoreFactory m_storeFactory;
+    private final ColumnarRowWriteTable m_columnarTable;
 
-    private final DomainWritable m_domainWritable;
+    private ExtensionTable m_finishedTable;
 
-    private final ColumnarBatchStore m_store;
-
-    private final ColumnarValueSchema m_schema;
-
-    private final Path m_path;
-
-    private final boolean m_forceSynchronousIO;
-
-    private Finalizer m_finalizer;
-
-    private ExtensionTable m_table;
-
-    @SuppressWarnings("resource")
-    private ColumnarRowContainer(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
-        final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
-        m_id = id;
-        m_schema = schema;
+    private ColumnarRowContainer(final ExecutionContext context, final int id,
+        final ColumnarRowWriteTable columnarTable) {
         m_context = context;
-        m_storeFactory = storeFactory;
-        m_forceSynchronousIO = settings.isForceSynchronousIO();
-
-        m_path = DataContainer.createTempFile(".knable").toPath();
-
-        final BatchStore lowLevelStore = m_storeFactory.createStore(schema, m_path);
-
-        final var builder = new ColumnarBatchStoreBuilder(lowLevelStore);
-        builder
-            .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache(),
-                ColumnarPreferenceUtils.getPersistExecutor())
-            .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache())
-            .useHeapCache(ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
-                ColumnarPreferenceUtils.getSerializeExecutor())
-            .enableDictEncoding(true).useDomainCalculation(new DefaultDomainWritableConfig(schema,
-                settings.getMaxPossibleNominalDomainValues(), settings.isInitializeDomains()),
-                ColumnarPreferenceUtils.getDomainCalcExecutor());
-
-        if (settings.isCheckDuplicateRowKeys()) {
-            builder.useDuplicateChecking(ColumnarPreferenceUtils.getDuplicateCheckExecutor());
-        }
-
-        m_store = builder.build();
-        m_domainWritable = m_store.getDomainWritable();
-
-        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, m_forceSynchronousIO ? m_store : null);
+        m_id = id;
+        m_columnarTable = columnarTable;
     }
 
     @Override
     public ColumnarRowWriteCursor createCursor() {
-        return m_writeCursor;
+        return m_columnarTable.createCursor();
     }
 
     @SuppressWarnings("resource")
@@ -161,53 +102,16 @@ final class ColumnarRowContainer implements RowContainer {
 
     @Override
     public final void close() {
-        // in case m_table was not created, we have to destroy the store. otherwise the
-        // m_table has a handle on the store and therefore the store shouldn't be destroyed.
-        if (m_table == null) {
-
-            m_finalizer.close();
-            m_writeCursor.close();
-            // closing the store includes closing the writer
-            // (but will make sure duplicate checks and domain calculations are halted)
-            try {
-                m_store.close();
-            } catch (final IOException e) {
-                LOGGER.error("Exception while closing store.", e);
-            }
-
-            try {
-                Files.deleteIfExists(m_path);
-            } catch (final IOException e) {
-                LOGGER.error("Exception while deleting temporary columnar output file", e);
-            }
-        }
+        m_columnarTable.close();
     }
 
     ExtensionTable finishInternal() {
-        if (m_table == null) {
-            m_finalizer.close();
-            m_writeCursor.flush();
-            m_writeCursor.close();
-
-            try {
-                m_store.flush();
-            } catch (IOException e) {
-                LOGGER.error("Exception while flushing cache.", e);
-            }
-
-            final Map<Integer, DataColumnDomain> domains = new HashMap<>();
-            final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
-            final int numColumns = m_schema.numColumns();
-            for (int i = 1; i < numColumns; i++) {
-                domains.put(i, m_domainWritable.getDomain(i));
-                metadata.put(i, m_domainWritable.getMetadata(i));
-            }
-
-            m_table = UnsavedColumnarContainerTable.create(m_path, m_id, m_storeFactory,
-                ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata), m_store, m_store,
-                m_writeCursor.size());
+        if (m_finishedTable == null) {
+            @SuppressWarnings("resource") // Will be closed along with the container table.
+            final ColumnarRowReadTable finishedColumnarTable = m_columnarTable.finish();
+            m_finishedTable = UnsavedColumnarContainerTable.create(m_id, finishedColumnarTable);
         }
-        return m_table;
+        return m_finishedTable;
     }
 
     /**
@@ -218,7 +122,6 @@ final class ColumnarRowContainer implements RowContainer {
      * @apiNote No API.
      */
     void setMaxPossibleValues(final int maxPossibleValues) {
-        m_domainWritable.setMaxPossibleValues(maxPossibleValues);
+        m_columnarTable.setMaxPossibleValues(maxPossibleValues);
     }
-
 }

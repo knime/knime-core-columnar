@@ -54,7 +54,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.node.CanceledExecutionException;
@@ -62,8 +61,8 @@ import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeSettingsWO;
 
 /**
- * ColumnarContainerTable which has not yet been saved, i.e. all data is still in-memory or temporarily persisted in the
- * temp directory.
+ * A {@link ColumnarContainerTable} which has not yet been saved, i.e., all data is still in memory or only temporarily
+ * persisted on disk.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
@@ -71,32 +70,50 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
 
     private final Flushable m_flushable;
 
-    private final Path m_path;
-
     /**
-     * Create an {@link UnsavedColumnarContainerTable} from a given store at a given path
-     * @param path Where the table is saved on disk
-     * @param tableId The table id
-     * @param factory The factory used to create the kind of {@link BatchStore}s used as back end
-     * @param schema The schema of this table
-     * @param store The {@link ColumnarBatchReadStore} used to read data from
-     * @param flushable The {@link Flushable} to flush in case we need to make sure all data is written to disk
-     * @param size The number of rows of the table
-     * @return the newly created {@link UnsavedColumnarContainerTable}
+     * Creates an {@link UnsavedColumnarContainerTable} wrapping the given table.
+     *
+     * @param tableId The table id.
+     * @param columnarTable The underlying table.
+     * @return The newly created table.
      */
-    public static UnsavedColumnarContainerTable create(final Path path, final int tableId,
-        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final ColumnarBatchReadStore store,
-        final Flushable flushable, final long size) {
-        final UnsavedColumnarContainerTable table =
-            new UnsavedColumnarContainerTable(path, tableId, factory, schema, store, flushable, size);
+    public static UnsavedColumnarContainerTable create(final int tableId, final ColumnarRowReadTable columnarTable) {
+        final var table = new UnsavedColumnarContainerTable(tableId, columnarTable, () -> {});
+        // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
+        // the factory methods here?
         table.initStoreCloser();
         return table;
     }
 
-    private UnsavedColumnarContainerTable(final Path path, final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnarBatchReadStore store, final Flushable flushable, final long size) {
-        super(tableId, factory, schema, store, size);
-        m_path = path;
+    /**
+     * Creates an {@link UnsavedColumnarContainerTable} from the given store at the given path.
+     *
+     * @param path Where the table is saved on disk.
+     * @param tableId The table id.
+     * @param factory The factory which created the underlying store.
+     * @param schema The schema of the table.
+     * @param store The underlying store.
+     * @param flushable The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to disk
+     *            in case the created table is permanently saved to disk. Must not be {@code null} but can be a no-op.
+     * @param size The number of rows contained in the table.
+     * @return The newly created table.
+     */
+    @SuppressWarnings("resource") // Columnar table will be closed along with the container table.
+    public static UnsavedColumnarContainerTable create(final Path path, final int tableId,
+        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final ColumnarBatchReadStore store,
+        final Flushable flushable, final long size) {
+        final var table = new UnsavedColumnarContainerTable(tableId,
+            new ColumnarRowReadTable(schema, factory, store, path, size), flushable);
+        // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
+        // the factory methods here?
+        table.initStoreCloser();
+        return table;
+    }
+
+    private UnsavedColumnarContainerTable(final int tableId, final ColumnarRowReadTable columnarTable,
+        // TODO: is flushable used somewhere at all? I only ever see "() -> {}" being passed. Can't we get rid of it?
+        final Flushable flushable) {
+        super(tableId, columnarTable);
         m_flushable = flushable;
     }
 
@@ -105,7 +122,7 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
         throws IOException, CanceledExecutionException {
         super.saveToFileOverwrite(f, settings, exec);
         m_flushable.flush();
-        Files.copy(m_path, f.toPath());
+        Files.copy(m_columnarTable.getPath(), f.toPath());
     }
 
     @Override
@@ -118,10 +135,9 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     public void clear() {
         super.clear();
         try {
-            Files.deleteIfExists(m_path);
-        } catch (IOException e) {
-            LOGGER.info("Error when deleting file that backed the UnsavedColumnarContainerTable", e);
+            Files.deleteIfExists(m_columnarTable.getPath());
+        } catch (final IOException e) {
+            LOGGER.info("Error when deleting file that backed the UnsavedColumnarContainerTable.", e);
         }
     }
-
 }

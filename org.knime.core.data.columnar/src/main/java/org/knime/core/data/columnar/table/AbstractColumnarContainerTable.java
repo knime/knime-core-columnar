@@ -53,8 +53,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.knime.core.columnar.cursor.ColumnarCursorFactory;
-import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
@@ -114,71 +112,59 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         }
     }
 
-    private final ColumnStoreFactory m_factory;
-
-    private final ColumnarValueSchema m_schema;
-
     private final long m_tableId;
 
-    private final long m_size;
+    protected final ColumnarRowReadTable m_columnarTable;
 
     private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    // TODO AP-17236 would allow to implement a BatchReadStoreRowAccessible that lives in org.knime.core.columnar
-    // this class would then simply wrap one of these
-    private final ColumnarBatchReadStore m_readStore;
-
     // effectively final
-    private Finalizer m_storeCloser;
+    private Finalizer m_tableCloser;
 
     @SuppressWarnings("resource")
     AbstractColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
         final NodeSettingsRO settings = context.getSettings();
         m_tableId = -1;
-        m_size = settings.getLong(CFG_TABLE_SIZE);
-
-        m_factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
-        var dataPath = context.getDataFileRef().getFile().toPath();
-        final BatchReadStore store = m_factory.createReadStore(dataPath);
-        m_schema = ColumnarValueSchemaUtils.load(store.getSchema(), context);
-
-        final var builder = new ColumnarBatchReadStoreBuilder(store);
-        builder.enableDictEncoding(true).useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache())
-            .useHeapCache(ColumnarPreferenceUtils.getHeapCache());
-        m_readStore = builder.build();
+        final var size = settings.getLong(CFG_TABLE_SIZE);
+        final ColumnStoreFactory factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
+        final var dataPath = context.getDataFileRef().getFile().toPath();
+        final ColumnarBatchReadStore readStore =
+            new ColumnarBatchReadStoreBuilder(factory.createReadStore(dataPath)) //
+                .enableDictEncoding(true) //
+                .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache()) //
+                .useHeapCache(ColumnarPreferenceUtils.getHeapCache()) //
+                .build();
+        var schema = ColumnarValueSchemaUtils.load(readStore.getSchema(), context);
+        m_columnarTable = new ColumnarRowReadTable(schema, factory, readStore, dataPath, size);
     }
 
-    AbstractColumnarContainerTable(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnarBatchReadStore store, final long size) {
+    AbstractColumnarContainerTable(final int tableId, final ColumnarRowReadTable columnarTable) {
         m_tableId = tableId;
-        m_factory = factory;
-        m_schema = schema;
-        m_size = size;
-        m_readStore = store;
+        m_columnarTable = columnarTable;
     }
 
     void initStoreCloser() {
         final var readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
             finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
-        final var storeRelease = new ResourceWithRelease(m_readStore);
-        m_storeCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, storeRelease);
+        final var tableRelease = new ResourceWithRelease(m_columnarTable);
+        m_tableCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, tableRelease);
     }
 
     @Override
     protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
         throws IOException, CanceledExecutionException {
-        settings.addLong(CFG_TABLE_SIZE, m_size);
-        settings.addString(CFG_FACTORY_TYPE, m_factory.getClass().getName());
-        m_schema.save(settings);
+        settings.addLong(CFG_TABLE_SIZE, m_columnarTable.size());
+        settings.addString(CFG_FACTORY_TYPE, m_columnarTable.getStoreFactory().getClass().getName());
+        m_columnarTable.getSchema().save(settings);
     }
 
     @Override
     public DataTableSpec getDataTableSpec() {
-        return m_schema.getSourceSpec();
+        return m_columnarTable.getSchema().getSourceSpec();
     }
 
     ColumnarValueSchema getSchema() {
-        return m_schema;
+        return m_columnarTable.getSchema();
     }
 
     @Override
@@ -189,7 +175,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
     @Deprecated
     @Override
     public int getRowCount() { // NOSONAR
-        return KnowsRowCountTable.checkRowCount(m_size);
+        return KnowsRowCountTable.checkRowCount(m_columnarTable.size());
     }
 
     @Override
@@ -211,18 +197,18 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     @Override
     public long size() {
-        return m_size;
+        return m_columnarTable.size();
     }
 
     @Override
     public void clear() {
-        m_storeCloser.close();
+        m_tableCloser.close();
         for (final Finalizer closer : m_openCursorFinalizers) {
             closer.releaseResourcesAndLogOutput();
         }
         m_openCursorFinalizers.clear();
         try {
-            m_readStore.close();
+            m_columnarTable.close();
         } catch (final IOException e) {
             LOGGER.error(String.format("Exception while clearing ContainerTable: %s", e.getMessage()), e);
         }
@@ -235,7 +221,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     @Override
     public ColumnarBatchReadStore getStore() {
-        return m_readStore;
+        return m_columnarTable.getStore();
     }
 
     @Override
@@ -245,47 +231,28 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     @Override
     public RowCursor cursor() {
-        try {
-            return ColumnarRowCursorFactory.create(m_readStore, m_schema, m_size, m_openCursorFinalizers);
-        } catch (IOException e) {
-            throw new IllegalStateException("Exception while creating ColumnarRowCursor.", e);
-        }
+        return m_columnarTable.createCursor(m_openCursorFinalizers);
     }
 
     @Override
     public RowCursor cursor(final TableFilter filter) {
-        try {
-            if (filter != null) {
-                filter.validate(getDataTableSpec(), m_size);
-                //  for some reason we don't do validation of the 'from index'
-                final Optional<Long> fromRowIndexOpt = filter.getFromRowIndex();
-                if (fromRowIndexOpt.isPresent()) {
-                    final long fromRowIndex = fromRowIndexOpt.get();
-                    if (fromRowIndex >= m_size) { // NOSONAR
-                        throw new IndexOutOfBoundsException(
-                            String.format("From row index %d too large for table of size %d.", fromRowIndex, m_size));
-                    }
-                }
-            }
-            return ColumnarRowCursorFactory.create(m_readStore, m_schema, m_size, m_openCursorFinalizers, filter);
-        } catch (IOException e) {
-            throw new IllegalStateException("Exception while creating ColumnarRowCursor.", e);
-        }
+        return m_columnarTable.createCursor(m_openCursorFinalizers, filter);
     }
 
+    @SuppressWarnings("resource") // Cursor will be closed along with iterator.
     @Override
-    @SuppressWarnings("resource")
     public final CloseableRowIterator iterator() {
         return new ColumnarRowIterator(cursor());
     }
 
     @Override
-    @SuppressWarnings("resource")
     public final CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
         final Optional<Set<Integer>> materializeColumnIndices = filter.getMaterializeColumnIndices();
-        return materializeColumnIndices.isPresent()
+        @SuppressWarnings("resource") // Cursor will be closed along with iterator.
+        final var iterator = materializeColumnIndices.isPresent()
             ? FilteredColumnarRowIteratorFactory.create(cursor(filter), materializeColumnIndices.get())
             : new ColumnarRowIterator(cursor(filter));
+        return iterator;
     }
 
     RowAccessible asRowAccessible() {
@@ -304,14 +271,13 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
         @Override
         public ColumnarSchema getSchema() {
-            return m_schema;
+            return m_columnarTable.getSchema();
         }
 
-        @SuppressWarnings("resource")// the purpose of the tracker is memory leaks
+        @SuppressWarnings("resource") // the purpose of the tracker is memory leaks
         @Override
         public Cursor<ReadAccessRow> createCursor() {
-            return m_trackedCursors.track(ColumnarCursorFactory.create(m_readStore, m_size));
+            return m_trackedCursors.track(m_columnarTable.createCursor());
         }
     }
-
 }

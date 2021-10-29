@@ -61,6 +61,8 @@ public final class ColumnarContainerTableLoader implements ExtensionTableLoader 
     @Override
     public ExtensionTable load(final LoadContext context) throws InvalidSettingsException {
         final SavedColumnarContainerTable table = new SavedColumnarContainerTable(context);
+        // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
+        // the factory method here?
         table.initStoreCloser();
         return table;
     }
