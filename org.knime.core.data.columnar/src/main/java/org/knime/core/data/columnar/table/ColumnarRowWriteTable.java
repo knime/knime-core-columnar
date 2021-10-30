@@ -89,7 +89,11 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
 
     private final ColumnarBatchStore m_store;
 
-    private final DomainWritable m_domainWritable;
+    /**
+     * Will be {@code null} if {@link ColumnarRowContainerSettings#isCalculateDomains()} of the settings object passed
+     * to the constructor returns {@code false}.
+     */
+    private final DomainWritable m_nullableDomainWritable;
 
     private final ColumnarRowWriteCursor m_writeCursor;
 
@@ -117,23 +121,28 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         m_path = DataContainer.createTempFile(".knable").toPath();
         @SuppressWarnings("resource") // Low-level store will be closed along with the built columnar store.
         final var builder = new ColumnarBatchStoreBuilder(m_storeFactory.createStore(m_schema, m_path));
-        builder //
-            .useColumnDataCache( //
-                ColumnarPreferenceUtils.getColumnDataCache(), ColumnarPreferenceUtils.getPersistExecutor())
-            .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
-            .useHeapCache( //
-                ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
-                ColumnarPreferenceUtils.getSerializeExecutor())
-            .enableDictEncoding(true) //
-            .useDomainCalculation( //
+        if (settings.isUseCaching()) {
+            builder //
+                .useColumnDataCache( //
+                    ColumnarPreferenceUtils.getColumnDataCache(), ColumnarPreferenceUtils.getPersistExecutor())
+                .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
+                .useHeapCache( //
+                    ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
+                    ColumnarPreferenceUtils.getSerializeExecutor());
+        }
+        builder.enableDictEncoding(true);
+        if (settings.isCalculateDomains()) {
+            builder.useDomainCalculation( //
                 new DefaultDomainWritableConfig(m_schema, settings.getMaxPossibleNominalDomainValues(),
                     settings.isInitializeDomains()),
                 ColumnarPreferenceUtils.getDomainCalcExecutor());
+        }
         if (settings.isCheckDuplicateRowKeys()) {
             builder.useDuplicateChecking(ColumnarPreferenceUtils.getDuplicateCheckExecutor());
         }
         m_store = builder.build();
-        m_domainWritable = m_store.getDomainWritable();
+        // Will return null if the builder did not include domain calculation.
+        m_nullableDomainWritable = m_store.getDomainWritable();
         m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, settings.isForceSynchronousIO() ? m_store : null);
 
         m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, m_writeCursor, m_store);
@@ -154,7 +163,11 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
      *              reasons.
      */
     void setMaxPossibleValues(final int maxPossibleValues) {
-        m_domainWritable.setMaxPossibleValues(maxPossibleValues);
+        if (m_nullableDomainWritable != null) {
+            m_nullableDomainWritable.setMaxPossibleValues(maxPossibleValues);
+        } else {
+            throw new IllegalStateException("Domains are not allowed to be updated.");
+        }
     }
 
     /**
@@ -173,16 +186,21 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
             } catch (final IOException ex) {
                 LOGGER.error("Exception while flushing cache.", ex);
             }
-            final Map<Integer, DataColumnDomain> domains = new HashMap<>();
-            final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
-            final int numColumns = m_schema.numColumns();
-            for (int i = 1; i < numColumns; i++) {
-                domains.put(i, m_domainWritable.getDomain(i));
-                metadata.put(i, m_domainWritable.getMetadata(i));
+            final ColumnarValueSchema schema;
+            if (m_nullableDomainWritable != null) {
+                final Map<Integer, DataColumnDomain> domains = new HashMap<>();
+                final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
+                final int numColumns = m_schema.numColumns();
+                for (int i = 1; i < numColumns; i++) {
+                    domains.put(i, m_nullableDomainWritable.getDomain(i));
+                    metadata.put(i, m_nullableDomainWritable.getMetadata(i));
+                }
+                schema = ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata);
+            } else {
+                schema = m_schema;
             }
-            final var updatedSchema = ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata);
             m_nullableFinishedTable =
-                new ColumnarRowReadTable(updatedSchema, m_storeFactory, m_store, m_path, m_writeCursor.size());
+                new ColumnarRowReadTable(schema, m_storeFactory, m_store, m_path, m_writeCursor.size());
         }
         return m_nullableFinishedTable;
     }

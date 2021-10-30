@@ -59,29 +59,67 @@ public final class ColumnarRowContainerSettings {
 
     private final boolean m_initializeDomains;
 
+    private final boolean m_calculateDomains;
+
     private final int m_maxPossibleNominalDomainValues;
 
     private final boolean m_checkDuplicateRowKeys;
 
     private final boolean m_forceSynchronousIO;
 
+    private final boolean m_useCaching;
+
     /**
-     * @param initializeDomains if <source>true</source> domains will be initialized via domain values provided through
+     * @param initializeDomains if {@code true}, domains will be initialized via domain values provided through an
      *            incoming {@link DataTableSpec}.
      * @param maxPossibleNominalDomainValues maximum number of values for nominal domains.
-     * @param checkDuplicateRowKeys whether to check for duplicates among row keys
-     * @param forceSynchronousIO whether close() of the {@link RowContainer} should block until all contents are written
+     * @param checkDuplicateRowKeys whether to check for duplicates among row keys.
+     * @param forceSynchronousIO whether writing a new row to the table should block until all previously written rows
+     *            have been persisted.
      */
     public ColumnarRowContainerSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
         final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO) {
+        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO);
+    }
+
+    /**
+     * @param initializeDomains if {@code true}, domains will be initialized via domain values provided through an
+     *            incoming {@link DataTableSpec}.
+     * @param calculateDomains whether to perform domain calculation based on the data written to the table. It can be
+     *            useful to set this option to {@code false} while setting {@code initializeDomains} to {@code true} if
+     *            it is known that the initial domains will also be the final domains of the table. Note that it is not
+     *            allowed to set both {@code initializeDomains} and {@code calculateDomains} to {@code false}.
+     * @param maxPossibleNominalDomainValues maximum number of values for nominal domains. Ignored if
+     *            {@code calculateDomains} is {@code false}.
+     * @param checkDuplicateRowKeys whether to check for duplicates among row keys.
+     * @param useCaching whether data written to the table should be cached in memory. It can be useful to set this
+     *            option to {@code false} if e.g. it is known that the created table will exclusively be used for
+     *            (disk-based) interprocess communication where in-memory caching does not provide any benefits.
+     * @param forceSynchronousIO whether writing a new row to the table should block until all previously written rows
+     *            have been persisted.
+     * @throws IllegalArgumentException When both {@code initializeDomains} and {@code calculateDomains} are
+     *             {@code false}.
+     */
+    public ColumnarRowContainerSettings(final boolean initializeDomains, final boolean calculateDomains,
+        final int maxPossibleNominalDomainValues, final boolean checkDuplicateRowKeys, final boolean useCaching,
+        final boolean forceSynchronousIO) {
+        if (!initializeDomains && !calculateDomains) {
+            throw new IllegalArgumentException("initializeDomains and calculateDomains cannot both be false.");
+        }
         m_initializeDomains = initializeDomains;
-        m_checkDuplicateRowKeys = checkDuplicateRowKeys;
+        m_calculateDomains = calculateDomains;
         m_maxPossibleNominalDomainValues = maxPossibleNominalDomainValues;
+        m_checkDuplicateRowKeys = checkDuplicateRowKeys;
+        m_useCaching = useCaching;
         m_forceSynchronousIO = forceSynchronousIO;
     }
 
     boolean isInitializeDomains() {
         return m_initializeDomains;
+    }
+
+    boolean isCalculateDomains() {
+        return m_calculateDomains;
     }
 
     int getMaxPossibleNominalDomainValues() {
@@ -90,6 +128,10 @@ public final class ColumnarRowContainerSettings {
 
     boolean isCheckDuplicateRowKeys() {
         return m_checkDuplicateRowKeys;
+    }
+
+    boolean isUseCaching() {
+        return m_useCaching;
     }
 
     boolean isForceSynchronousIO() {
