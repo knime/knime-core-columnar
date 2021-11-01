@@ -53,8 +53,11 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
+import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
@@ -81,6 +84,26 @@ public final class ColumnarRowReadTable implements RowAccessible {
     private final ColumnarBatchReadStore m_store;
 
     private final long m_size;
+
+    /**
+     * @param schema The schema of the table.
+     * @param storeFactory The factory which created the table's underlying store.
+     * @param store The table's underlying store.
+     * @param size The number of rows contained in the table.
+     */
+    @SuppressWarnings("resource") // Wrapped store will be closed along with its wrapper, i.e. along with this table.
+    public ColumnarRowReadTable(final ColumnarValueSchema schema, final ColumnStoreFactory storeFactory,
+        final BatchReadStore store, final long size) {
+        this(schema, storeFactory, wrapInColumnarStore(store), size);
+    }
+
+    private static ColumnarBatchReadStore wrapInColumnarStore(final BatchReadStore store) {
+        return new ColumnarBatchReadStoreBuilder(store) //
+            .enableDictEncoding(true) //
+            .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache()) //
+            .useHeapCache(ColumnarPreferenceUtils.getHeapCache()) //
+            .build();
+    }
 
     /**
      * @param schema The schema of the table.

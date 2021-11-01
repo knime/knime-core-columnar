@@ -53,14 +53,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
-import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.columnar.table.virtual.closeable.CloseableTracker;
@@ -128,12 +127,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         final var size = settings.getLong(CFG_TABLE_SIZE);
         final ColumnStoreFactory factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
         final var dataPath = context.getDataFileRef().getFile().toPath();
-        final ColumnarBatchReadStore readStore =
-            new ColumnarBatchReadStoreBuilder(factory.createReadStore(dataPath)) //
-                .enableDictEncoding(true) //
-                .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache()) //
-                .useHeapCache(ColumnarPreferenceUtils.getHeapCache()) //
-                .build();
+        final BatchReadStore readStore = factory.createReadStore(dataPath);
         var schema = ColumnarValueSchemaUtils.load(readStore.getSchema(), context);
         m_columnarTable = new ColumnarRowReadTable(schema, factory, readStore, size);
     }
