@@ -49,7 +49,6 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
 
@@ -81,23 +80,19 @@ public final class ColumnarRowReadTable implements RowAccessible {
 
     private final ColumnarBatchReadStore m_store;
 
-    private final Path m_path;
-
     private final long m_size;
 
     /**
      * @param schema The schema of the table.
      * @param storeFactory The factory which created the table's underlying store.
      * @param store The table's underlying store.
-     * @param path The location of the underlying store.
      * @param size The number of rows contained in the table.
      */
     public ColumnarRowReadTable(final ColumnarValueSchema schema, final ColumnStoreFactory storeFactory,
-        final ColumnarBatchReadStore store, final Path path, final long size) {
+        final ColumnarBatchReadStore store, final long size) {
         m_schema = schema;
         m_storeFactory = storeFactory;
         m_store = store;
-        m_path = path;
         m_size = size;
     }
 
@@ -121,13 +116,6 @@ public final class ColumnarRowReadTable implements RowAccessible {
      */
     public ColumnarBatchReadStore getStore() {
         return m_store;
-    }
-
-    /**
-     * @return The location of this table's underlying store.
-     */
-    public Path getPath() {
-        return m_path;
     }
 
     /**

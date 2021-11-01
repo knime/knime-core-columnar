@@ -67,7 +67,7 @@ public class WrappedBatchReadStoreTest extends ColumnarTest {
     private static WrappedBatchReadStore generateDefaultWrappedBatchReadStore() throws IOException {
         final BatchStore store = TestBatchStore.create(SCHEMA);
         writeDefaultTable(store);
-        return new WrappedBatchReadStore(store, store.numBatches(), store.batchLength());
+        return new WrappedBatchReadStore(store, store.numBatches(), store.batchLength(), store.getPath());
     }
 
     @Test

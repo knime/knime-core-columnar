@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
+import java.nio.file.Path;
 
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
@@ -154,8 +155,8 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
             m_readable = dictEncoded;
         }
 
-        m_wrappedStore =
-            new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(), builder.m_readStore.batchLength());
+        m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(),
+            builder.m_readStore.batchLength(), builder.m_readStore.getPath());
     }
 
     private void initHeapCache(final SharedObjectCache heapCache) {
@@ -166,9 +167,6 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
         m_readable = new ObjectReadCache(m_readable, heapCache);
     }
 
-    /**
-     * @param builder
-     */
     private void initColumnDataCache(final SharedReadDataCache cache) {
         if (cache == null || cache.getMaxSizeInBytes() == 0) {
             return;
@@ -200,6 +198,11 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
     @Override
     public int batchLength() {
         return m_wrappedStore.batchLength();
+    }
+
+    @Override
+    public Path getPath() {
+        return m_wrappedStore.getPath();
     }
 
     /**

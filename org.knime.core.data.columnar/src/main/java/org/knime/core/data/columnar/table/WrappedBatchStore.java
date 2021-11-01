@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -148,6 +149,8 @@ public final class WrappedBatchStore implements BatchStore {
 
     private final RandomAccessBatchReadable m_readable;
 
+    private final Path m_path;
+
     private final AtomicBoolean m_storeClosed = new AtomicBoolean();
 
     private final AtomicBoolean m_writerClosed = new AtomicBoolean();
@@ -155,13 +158,16 @@ public final class WrappedBatchStore implements BatchStore {
     private final WrappedBatchWriter m_writer;
 
     /**
-     * Create a wrapped batch store from a {@link BatchWritable} and a {@link RandomAccessBatchReadable}.
+     * Create a wrapped batch store from a {@link BatchWritable}, a {@link RandomAccessBatchReadable}, and a path.
+     *
      * @param writable The {@link BatchWritable}
      * @param readable The {@link RandomAccessBatchReadable}
+     * @param path The path
      */
-    public WrappedBatchStore(final BatchWritable writable, final RandomAccessBatchReadable readable) {
+    public WrappedBatchStore(final BatchWritable writable, final RandomAccessBatchReadable readable, final Path path) {
         m_writable = writable;
         m_readable = readable;
+        m_path = path;
         m_writer = new WrappedBatchWriter(m_writable, m_storeClosed, m_writerClosed);
     }
 
@@ -178,6 +184,11 @@ public final class WrappedBatchStore implements BatchStore {
     @Override
     public int batchLength() {
         return m_writer.m_batchLength.get();
+    }
+
+    @Override
+    public Path getPath() {
+        return m_path;
     }
 
     @Override

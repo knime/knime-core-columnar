@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.batch.BatchWritable;
@@ -269,7 +270,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             m_writable = m_domainWritable;
         }
 
-        m_wrappedStore = new WrappedBatchStore(m_writable, m_readable);
+        m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getPath());
     }
 
     private void initHeapCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
@@ -369,6 +370,11 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
     @Override
     public int batchLength() {
         return m_wrappedStore.batchLength();
+    }
+
+    @Override
+    public Path getPath() {
+        return m_wrappedStore.getPath();
     }
 
     /**

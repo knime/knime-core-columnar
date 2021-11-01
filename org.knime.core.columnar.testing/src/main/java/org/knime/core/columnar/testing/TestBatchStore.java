@@ -45,6 +45,7 @@
  */
 package org.knime.core.columnar.testing;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
@@ -68,5 +69,10 @@ public interface TestBatchStore extends BatchStore {
     @SuppressWarnings("resource")
     public static TestBatchStore create(final ColumnarSchema schema) {
         return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema));
+    }
+
+    @SuppressWarnings("resource")
+    public static TestBatchStore create(final ColumnarSchema schema, final Path path) {
+        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema, path));
     }
 }

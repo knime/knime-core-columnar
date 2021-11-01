@@ -114,7 +114,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     private final long m_tableId;
 
-    protected final ColumnarRowReadTable m_columnarTable;
+    private final ColumnarRowReadTable m_columnarTable;
 
     private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -135,7 +135,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
                 .useHeapCache(ColumnarPreferenceUtils.getHeapCache()) //
                 .build();
         var schema = ColumnarValueSchemaUtils.load(readStore.getSchema(), context);
-        m_columnarTable = new ColumnarRowReadTable(schema, factory, readStore, dataPath, size);
+        m_columnarTable = new ColumnarRowReadTable(schema, factory, readStore, size);
     }
 
     AbstractColumnarContainerTable(final int tableId, final ColumnarRowReadTable columnarTable) {

@@ -83,7 +83,7 @@ final class ColumnarTableTestUtils {
 
         @Override
         public BatchStore createStore(final ColumnarSchema schema, final Path path) {
-            return TestBatchStore.create(schema);
+            return TestBatchStore.create(schema, path);
         }
 
         @Override

@@ -45,11 +45,14 @@
  */
 package org.knime.core.columnar.store;
 
+import java.nio.file.Path;
+
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.ReadBatch;
 
 /**
- * An implementation of {@link RandomAccessBatchReadable} with a fixed {@link #numBatches() number of batches}.
+ * An implementation of {@link RandomAccessBatchReadable} with a fixed {@link #numBatches() number of batches} and a
+ * physical location.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -71,4 +74,10 @@ public interface BatchReadStore extends RandomAccessBatchReadable {
      */
     int batchLength();
 
+    /**
+     * @return The designated physical location of the store. Note that the store may not (fully) be existent at this
+     *         location depending on its state. E.g. it could be cached in memory and only later be persisted to its
+     *         location.
+     */
+    Path getPath();
 }

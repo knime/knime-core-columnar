@@ -48,6 +48,7 @@ package org.knime.core.columnar.testing;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -179,6 +180,8 @@ public final class DefaultTestBatchStore implements TestBatchStore {
 
     private final TestDataFactory[] m_factories;
 
+    private final Path m_path;
+
     private final TestBatchWriter m_writer = new TestBatchWriter();
 
     private final List<Object[][]> m_batches = new ArrayList<>();
@@ -196,17 +199,22 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     private CountDownLatch m_latch;
 
     public static DefaultTestBatchStore create(final ColumnarSchema schema) {
-        final DefaultTestBatchStore store = new DefaultTestBatchStore(schema);
+        return create(schema, null);
+    }
+
+    public static DefaultTestBatchStore create(final ColumnarSchema schema, final Path path) {
+        final DefaultTestBatchStore store = new DefaultTestBatchStore(schema, path);
         ColumnarTest.OPEN_CLOSEABLES.add(store);
         ColumnarTest.OPEN_CLOSEABLES.add(store.m_writer);
         return store;
     }
 
-    private DefaultTestBatchStore(final ColumnarSchema schema) {
+    private DefaultTestBatchStore(final ColumnarSchema schema, final Path path) {
         m_schema = schema;
         m_factories = IntStream.range(0, schema.numColumns()) //
             .mapToObj(i -> schema.getSpec(i).accept(TestSchemaMapper.INSTANCE, schema.getTraits(i)) )//
             .toArray(TestDataFactory[]::new);
+        m_path = path;
     }
 
     @Override
@@ -280,6 +288,11 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     @Override
     public int batchLength() {
         return m_maxDataLength;
+    }
+
+    @Override
+    public Path getPath() {
+        return m_path;
     }
 
 }

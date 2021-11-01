@@ -86,7 +86,7 @@ public final class ColumnarRowReadTableTest {
             }
         }).when(m_store).close();
 
-        try (final var table = new ColumnarRowReadTable(null, null, m_store, null, -1)) {
+        try (final var table = new ColumnarRowReadTable(null, null, m_store, -1)) {
             // Nothing to do. We just wan't to confirm that closing the table also closes the underlying store.
         }
         assertTrue(isStoreClosed.get());

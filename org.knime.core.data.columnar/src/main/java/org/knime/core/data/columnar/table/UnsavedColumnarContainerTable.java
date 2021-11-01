@@ -52,8 +52,8 @@ import java.io.File;
 import java.io.Flushable;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 
+import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.node.CanceledExecutionException;
@@ -86,9 +86,8 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     }
 
     /**
-     * Creates an {@link UnsavedColumnarContainerTable} from the given store at the given path.
+     * Creates an {@link UnsavedColumnarContainerTable} from the given store.
      *
-     * @param path Where the table is saved on disk.
      * @param tableId The table id.
      * @param factory The factory which created the underlying store.
      * @param schema The schema of the table.
@@ -99,11 +98,11 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      * @return The newly created table.
      */
     @SuppressWarnings("resource") // Columnar table will be closed along with the container table.
-    public static UnsavedColumnarContainerTable create(final Path path, final int tableId,
-        final ColumnStoreFactory factory, final ColumnarValueSchema schema, final ColumnarBatchReadStore store,
-        final Flushable flushable, final long size) {
+    public static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
+        final ColumnarValueSchema schema, final ColumnarBatchReadStore store, final Flushable flushable,
+        final long size) {
         final var table = new UnsavedColumnarContainerTable(tableId,
-            new ColumnarRowReadTable(schema, factory, store, path, size), flushable);
+            new ColumnarRowReadTable(schema, factory, store, size), flushable);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
         table.initStoreCloser();
@@ -122,7 +121,9 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
         throws IOException, CanceledExecutionException {
         super.saveToFileOverwrite(f, settings, exec);
         m_flushable.flush();
-        Files.copy(m_columnarTable.getPath(), f.toPath());
+        @SuppressWarnings("resource") // Store's life cycle is handled by super class.
+        final BatchReadStore store = getStore();
+        Files.copy(store.getPath(), f.toPath());
     }
 
     @Override
@@ -135,7 +136,9 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     public void clear() {
         super.clear();
         try {
-            Files.deleteIfExists(m_columnarTable.getPath());
+            @SuppressWarnings("resource") // Store's life cycle is handled by super class.
+            final BatchReadStore store = getStore();
+            Files.deleteIfExists(store.getPath());
         } catch (final IOException e) {
             LOGGER.info("Error when deleting file that backed the UnsavedColumnarContainerTable.", e);
         }

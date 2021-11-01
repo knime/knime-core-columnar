@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.testing;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
@@ -86,5 +87,10 @@ public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable 
     @Override
     public int batchLength() {
         return m_testDelegate.batchLength();
+    }
+
+    @Override
+    public Path getPath() {
+        return m_testDelegate.getPath();
     }
 }

@@ -50,7 +50,6 @@ package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -85,8 +84,6 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
 
     private final ColumnStoreFactory m_storeFactory;
 
-    private final Path m_path;
-
     private final ColumnarBatchStore m_store;
 
     /**
@@ -118,9 +115,9 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         final ColumnarRowWriteTableSettings settings) throws IOException {
         m_schema = schema;
         m_storeFactory = storeFactory;
-        m_path = DataContainer.createTempFile(".knable").toPath();
+        final var path = DataContainer.createTempFile(".knable").toPath();
         @SuppressWarnings("resource") // Low-level store will be closed along with the built columnar store.
-        final var builder = new ColumnarBatchStoreBuilder(m_storeFactory.createStore(m_schema, m_path));
+        final var builder = new ColumnarBatchStoreBuilder(m_storeFactory.createStore(m_schema, path));
         if (settings.isUseCaching()) {
             builder //
                 .useColumnDataCache( //
@@ -199,8 +196,7 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
             } else {
                 schema = m_schema;
             }
-            m_nullableFinishedTable =
-                new ColumnarRowReadTable(schema, m_storeFactory, m_store, m_path, m_writeCursor.size());
+            m_nullableFinishedTable = new ColumnarRowReadTable(schema, m_storeFactory, m_store, m_writeCursor.size());
         }
         return m_nullableFinishedTable;
     }
@@ -224,7 +220,7 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
                 LOGGER.error("Exception while closing store.", ex);
             }
             try {
-                Files.deleteIfExists(m_path);
+                Files.deleteIfExists(m_store.getPath());
             } catch (final IOException ex) {
                 LOGGER.error("Exception while deleting temporary columnar output file.", ex);
             }

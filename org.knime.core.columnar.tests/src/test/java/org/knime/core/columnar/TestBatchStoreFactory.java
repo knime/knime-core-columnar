@@ -63,7 +63,7 @@ public final class TestBatchStoreFactory implements ColumnStoreFactory {
     @SuppressWarnings("resource")
     @Override
     public BatchStore createStore(final ColumnarSchema schema, final Path path) {
-        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema));
+        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema, path));
     }
 
     @Override

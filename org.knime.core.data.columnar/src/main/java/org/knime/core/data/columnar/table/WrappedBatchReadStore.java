@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -139,12 +140,16 @@ final class WrappedBatchReadStore implements BatchReadStore {
 
     private final int m_batchLength;
 
+    private final Path m_path;
+
     private final AtomicBoolean m_closed = new AtomicBoolean();
 
-    WrappedBatchReadStore(final RandomAccessBatchReadable readable, final int numBatches, final int batchLength) {
+    WrappedBatchReadStore(final RandomAccessBatchReadable readable, final int numBatches, final int batchLength,
+        final Path path) {
         m_readable = readable;
         m_numBatches = numBatches;
         m_batchLength = batchLength;
+        m_path = path;
     }
 
     @Override
@@ -169,6 +174,11 @@ final class WrappedBatchReadStore implements BatchReadStore {
     @Override
     public int batchLength() {
         return m_batchLength;
+    }
+
+    @Override
+    public Path getPath() {
+        return m_path;
     }
 
     @Override
