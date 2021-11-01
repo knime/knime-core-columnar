@@ -115,7 +115,7 @@ final class ColumnarTableTestUtils {
 
     private static ColumnarRowContainer createColumnarRowContainer(final int nCols, final DataType type,
         final ExecutionContext exec) {
-        final ColumnarRowContainerSettings settings = new ColumnarRowContainerSettings(true, 60, true, false);
+        final ColumnarRowWriteTableSettings settings = new ColumnarRowWriteTableSettings(true, 60, true, false);
         try {
             return ColumnarRowContainer.create(exec, -1, createSchema(nCols, type), TestColumnStoreFactory.INSTANCE,
                 settings);

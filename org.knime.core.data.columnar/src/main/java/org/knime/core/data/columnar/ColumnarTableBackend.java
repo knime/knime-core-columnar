@@ -59,7 +59,7 @@ import org.knime.core.data.IDataRepository;
 import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.ColumnarRowContainerSettings;
+import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
@@ -121,8 +121,8 @@ public final class ColumnarTableBackend implements TableBackend {
                 initFileStoreHandler(fileStoreHandler, repository));
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
-            final ColumnarRowContainerSettings cursorSettings =
-                new ColumnarRowContainerSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
+            final ColumnarRowWriteTableSettings cursorSettings =
+                new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
                     settings.isEnableRowKeys(), settings.isForceSequentialRowHandling());
             return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
         } catch (Exception e) {
@@ -136,8 +136,8 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final ValueSchema schema =
                 ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
-            final ColumnarRowContainerSettings containerSettings =
-                new ColumnarRowContainerSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
+            final ColumnarRowWriteTableSettings containerSettings =
+                new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
                     settings.isEnableRowKeys(), settings.isForceSequentialRowHandling());
             return ColumnarRowContainerUtils.create(context, -1, ColumnarValueSchemaUtils.create(schema),
                 containerSettings);

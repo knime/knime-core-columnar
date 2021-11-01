@@ -65,7 +65,7 @@ final class ColumnarRowContainer implements RowContainer {
 
     @SuppressWarnings("resource") // Columnar table will be closed along with row container.
     static ColumnarRowContainer create(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
-        final ColumnStoreFactory storeFactory, final ColumnarRowContainerSettings settings) throws IOException {
+        final ColumnStoreFactory storeFactory, final ColumnarRowWriteTableSettings settings) throws IOException {
         // TODO: turn this into a constructor?
         return new ColumnarRowContainer(context, id, new ColumnarRowWriteTable(schema, storeFactory, settings));
     }

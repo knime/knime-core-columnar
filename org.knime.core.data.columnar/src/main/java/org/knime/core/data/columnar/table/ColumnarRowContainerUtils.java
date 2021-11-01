@@ -77,7 +77,7 @@ public final class ColumnarRowContainerUtils {
      * @throws Exception when instantiation of the column store factory initially failed
      */
     public static RowContainer create(final ExecutionContext context, final int tableId,
-        final ColumnarValueSchema schema, final ColumnarRowContainerSettings settings) throws Exception {
+        final ColumnarValueSchema schema, final ColumnarRowWriteTableSettings settings) throws Exception {
         return createInternal(context, tableId, schema, settings);
     }
 
@@ -93,13 +93,13 @@ public final class ColumnarRowContainerUtils {
      */
     @SuppressWarnings("resource")
     public static DataContainerDelegate create(final int tableId, final ColumnarValueSchema schema,
-        final ColumnarRowContainerSettings settings) throws Exception {
+        final ColumnarRowWriteTableSettings settings) throws Exception {
         return new ColumnarDataContainerDelegate(schema.getSourceSpec(),
             createInternal(null, tableId, schema, settings));
     }
 
     private static ColumnarRowContainer createInternal(final ExecutionContext context, final int tableId,
-        final ColumnarValueSchema schema, final ColumnarRowContainerSettings settings) throws Exception {
+        final ColumnarValueSchema schema, final ColumnarRowWriteTableSettings settings) throws Exception {
         return ColumnarRowContainer.create(context, tableId, schema,
             ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton(), settings);
     }

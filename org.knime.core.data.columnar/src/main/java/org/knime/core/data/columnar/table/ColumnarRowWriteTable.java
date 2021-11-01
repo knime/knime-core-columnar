@@ -90,7 +90,7 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
     private final ColumnarBatchStore m_store;
 
     /**
-     * Will be {@code null} if {@link ColumnarRowContainerSettings#isCalculateDomains()} of the settings object passed
+     * Will be {@code null} if {@link ColumnarRowWriteTableSettings#isCalculateDomains()} of the settings object passed
      * to the constructor returns {@code false}.
      */
     private final DomainWritable m_nullableDomainWritable;
@@ -115,7 +115,7 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
      * @throws IOException If creating the underlying temporary file where the table will be stored failed.
      */
     public ColumnarRowWriteTable(final ColumnarValueSchema schema, final ColumnStoreFactory storeFactory,
-        final ColumnarRowContainerSettings settings) throws IOException {
+        final ColumnarRowWriteTableSettings settings) throws IOException {
         m_schema = schema;
         m_storeFactory = storeFactory;
         m_path = DataContainer.createTempFile(".knable").toPath();

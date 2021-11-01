@@ -50,12 +50,14 @@ import org.knime.core.data.v2.RowContainer;
 
 /**
  * Settings for columnar {@link RowContainer RowContainers}.
+ * <P>
+ * Renamed from {@code ColumnarRowContainerSettings} which has existed since 4.3.
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
- * @since 4.3
+ * @since 4.5.
  */
-public final class ColumnarRowContainerSettings {
+public final class ColumnarRowWriteTableSettings {
 
     private final boolean m_initializeDomains;
 
@@ -77,7 +79,7 @@ public final class ColumnarRowContainerSettings {
      * @param forceSynchronousIO whether writing a new row to the table should block until all previously written rows
      *            have been persisted.
      */
-    public ColumnarRowContainerSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
+    public ColumnarRowWriteTableSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
         final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO) {
         this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO);
     }
@@ -100,7 +102,7 @@ public final class ColumnarRowContainerSettings {
      * @throws IllegalArgumentException When both {@code initializeDomains} and {@code calculateDomains} are
      *             {@code false}.
      */
-    public ColumnarRowContainerSettings(final boolean initializeDomains, final boolean calculateDomains,
+    public ColumnarRowWriteTableSettings(final boolean initializeDomains, final boolean calculateDomains,
         final int maxPossibleNominalDomainValues, final boolean checkDuplicateRowKeys, final boolean useCaching,
         final boolean forceSynchronousIO) {
         if (!initializeDomains && !calculateDomains) {
