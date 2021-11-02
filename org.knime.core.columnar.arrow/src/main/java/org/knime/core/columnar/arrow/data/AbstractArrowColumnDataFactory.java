@@ -114,5 +114,9 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
         return m_version.equals(other.m_version);
     }
 
+    @Override
+    public String toString() {
+        return this.getClass().getSimpleName() + ".v" + m_version.getVersion();
+    }
 
 }

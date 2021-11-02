@@ -189,5 +189,10 @@ public final class ArrowDictEncodedStringData {
                 m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)), m_keyType);
         }
 
+        @Override
+        public String toString() {
+            return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + m_delegate + "]";
+        }
+
     }
 }

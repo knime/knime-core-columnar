@@ -54,6 +54,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.LongSupplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -365,6 +366,11 @@ public final class ArrowStructData {
 
         private static final String childNameAtIndex(final int index) {
             return String.valueOf(index);
+        }
+
+        @Override
+        public String toString() {
+            return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + Arrays.stream(m_inner).map(Object::toString).collect(Collectors.joining(",")) + "]";
         }
     }
 }
