@@ -317,6 +317,7 @@ public final class ArrowStructData {
         @Override
         public ArrowStructReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+            // TODO add special case for date&time structs in version 0 and increment version
             if (version.getVersion() == CURRENT_VERSION) {
                 final StructVector v = (StructVector)vector;
 
@@ -324,9 +325,12 @@ public final class ArrowStructData {
                 final ArrowReadData[] children = new ArrowReadData[m_inner.length];
                 for (int i = 0; i < children.length; i++) {
                     @SuppressWarnings("resource") // Child vector closed with struct vector
-                    final FieldVector childVector = v.getChild(childNameAtIndex(i));
+                    // TODO is this safe?
+                    final FieldVector childVector = (FieldVector)v.getChildByOrdinal(i);
+
+                    final var childVersion = getChildVersionWithDateTimeSupport(version, i);
                     children[i] =
-                        m_inner[i].createRead(childVector, nullCount.getChild(i), provider, version.getChildVersion(i));
+                        m_inner[i].createRead(childVector, nullCount.getChild(i), provider, childVersion);
                 }
 
                 return new ArrowStructReadData(v,
@@ -334,6 +338,15 @@ public final class ArrowStructData {
             } else {
                 throw new IOException("Cannot read ArrowStructData with version " + version.getVersion()
                     + ". Current version: " + CURRENT_VERSION + ".");
+            }
+        }
+
+        private static ArrowColumnDataFactoryVersion
+            getChildVersionWithDateTimeSupport(final ArrowColumnDataFactoryVersion structVersion, final int i) {
+            try {
+                return structVersion.getChildVersion(i);
+            } catch (ArrayIndexOutOfBoundsException ex) {
+                return ArrowColumnDataFactoryVersion.version(0);
             }
         }
 

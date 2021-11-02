@@ -50,7 +50,9 @@ import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
+import org.apache.arrow.vector.DurationVector;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.TimeNanoVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -105,6 +107,77 @@ public final class ArrowLongData {
         }
     }
 
+    /**
+     * For reading longs from a DurationVector. This is a class introduced for backwards compatibility with data stored
+     * prior to the removal of the Date&Time dataspecs (i.e. anything before KNIME Analytics Platform 4.5).
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    static final class ArrowDurationLongReadData extends AbstractArrowReadData<DurationVector> implements LongReadData {
+
+        private ArrowDurationLongReadData(final DurationVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
+        }
+
+        private ArrowDurationLongReadData(final DurationVector vector, final MissingValues missingValues,
+            final int offset, final int length) {
+            super(vector, missingValues, offset, length);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowDurationLongReadData(m_vector, m_missingValues, m_offset + start, length);
+        }
+
+        @Override
+        public long sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
+
+        @Override
+        public long getLong(final int index) {
+            // NB: DurationVector does not have a #get(int): long
+            @SuppressWarnings("resource") // not ours to close
+            final long value = DurationVector.get(m_vector.getDataBuffer(), m_offset + index);
+            return value;
+        }
+
+    }
+
+    /**
+     * For reading longs from a TimeNanoVector. This is a class introduced for backwards compatibility with data stored
+     * prior to the removal of the Date&Time dataspecs (i.e. anything before KNIME Analytics Platform 4.5).
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    static final class ArrowTimeNanoLongReadData extends AbstractArrowReadData<TimeNanoVector> implements LongReadData {
+
+        private ArrowTimeNanoLongReadData(final TimeNanoVector vector, final MissingValues missingValues) {
+            super(vector, missingValues);
+        }
+
+        private ArrowTimeNanoLongReadData(final TimeNanoVector vector, final MissingValues missingValues,
+            final int offset, final int length) {
+            super(vector, missingValues, offset, length);
+        }
+
+        @Override
+        public long sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowTimeNanoLongReadData(m_vector, m_missingValues, m_offset + start, length);
+        }
+
+        @Override
+        public long getLong(final int index) {
+            return m_vector.get(m_offset + index);
+        }
+
+    }
+
     /** Arrow implementation of {@link LongReadData}. */
     public static final class ArrowLongReadData extends AbstractArrowReadData<BigIntVector> implements LongReadData {
 
@@ -157,11 +230,19 @@ public final class ArrowLongData {
         }
 
         @Override
-        public ArrowLongReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+            // TODO bump version?
             if (m_version.equals(version)) {
-                return new ArrowLongReadData((BigIntVector)vector,
-                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
+                final var missingValues = MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount());
+                if (vector instanceof DurationVector) {
+                    return new ArrowDurationLongReadData((DurationVector)vector, missingValues);
+                } else if (vector instanceof TimeNanoVector) {
+                    return new ArrowTimeNanoLongReadData((TimeNanoVector)vector, missingValues);
+                } else {
+                    return new ArrowLongReadData((BigIntVector)vector,
+                        missingValues);
+                }
             } else {
                 throw new IOException(
                     "Cannot read ArrowLongData with version " + version + ". Current version: " + m_version + ".");

@@ -60,22 +60,16 @@ import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowDurationData.ArrowDurationDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowLocalDateData.ArrowLocalDateDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowLocalDateTimeData.ArrowLocalDateTimeDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
-import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
 import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -85,20 +79,14 @@ import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DataSpec.MapperWithTraits;
 import org.knime.core.table.schema.DoubleDataSpec;
-import org.knime.core.table.schema.DurationDataSpec;
 import org.knime.core.table.schema.FloatDataSpec;
 import org.knime.core.table.schema.IntDataSpec;
 import org.knime.core.table.schema.ListDataSpec;
-import org.knime.core.table.schema.LocalDateDataSpec;
-import org.knime.core.table.schema.LocalDateTimeDataSpec;
-import org.knime.core.table.schema.LocalTimeDataSpec;
 import org.knime.core.table.schema.LongDataSpec;
-import org.knime.core.table.schema.PeriodDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.VoidDataSpec;
-import org.knime.core.table.schema.ZonedDateTimeDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.ListDataTraits;
@@ -160,11 +148,6 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final DurationDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowDurationDataFactory.INSTANCE, traits);
-    }
-
-    @Override
     public ArrowColumnDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
         return wrap(ArrowFloatDataFactory.INSTANCE, traits);
     }
@@ -175,28 +158,8 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     }
 
     @Override
-    public ArrowColumnDataFactory visit(final LocalDateDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowLocalDateDataFactory.INSTANCE, traits);
-    }
-
-    @Override
-    public ArrowColumnDataFactory visit(final LocalDateTimeDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowLocalDateTimeDataFactory.INSTANCE, traits);
-    }
-
-    @Override
-    public ArrowColumnDataFactory visit(final LocalTimeDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowLocalTimeDataFactory.INSTANCE, traits);
-    }
-
-    @Override
     public ArrowColumnDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
         return wrap(ArrowLongDataFactory.INSTANCE, traits);
-    }
-
-    @Override
-    public ArrowColumnDataFactory visit(final PeriodDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowPeriodDataFactory.INSTANCE, traits);
     }
 
     @Override
@@ -224,11 +187,6 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
         final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
         return wrap(new ArrowListDataFactory(inner), traits);
-    }
-
-    @Override
-    public ArrowColumnDataFactory visit(final ZonedDateTimeDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowZonedDateTimeDataFactory.INSTANCE, traits);
     }
 
     @Override
