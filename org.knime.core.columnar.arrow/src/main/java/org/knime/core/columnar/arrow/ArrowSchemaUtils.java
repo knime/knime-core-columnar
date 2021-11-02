@@ -56,7 +56,6 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Bool;
 import org.apache.arrow.vector.types.pojo.ArrowType.Date;
 import org.apache.arrow.vector.types.pojo.ArrowType.Decimal;
 import org.apache.arrow.vector.types.pojo.ArrowType.Duration;
-import org.apache.arrow.vector.types.pojo.ArrowType.ExtensionType;
 import org.apache.arrow.vector.types.pojo.ArrowType.FixedSizeBinary;
 import org.apache.arrow.vector.types.pojo.ArrowType.FloatingPoint;
 import org.apache.arrow.vector.types.pojo.ArrowType.Int;
@@ -77,11 +76,13 @@ import org.knime.core.columnar.arrow.extensiontypes.StructDictEncodedLogicalType
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
 import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
+import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.traits.DataTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraitUtils;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.LogicalTypeTrait;
+import org.knime.core.table.schema.traits.StructDataTraits;
 
 import com.google.common.base.Preconditions;
 
@@ -92,12 +93,12 @@ import com.google.common.base.Preconditions;
  */
 public final class ArrowSchemaUtils {
 
-	/**
-	 * Reads the schema of an Arrow file stored at the provided path.
-	 *
-	 * @param path where the Arrow file is located
-	 * @return the schema of the file
-	 */
+    /**
+     * Reads the schema of an Arrow file stored at the provided path.
+     *
+     * @param path where the Arrow file is located
+     * @return the schema of the file
+     */
     public static ColumnarSchema readSchema(final Path path) {
         var arrowSchema = ArrowReaderWriterUtils.readSchema(path.toFile());
         return convertSchema(arrowSchema);
@@ -152,24 +153,24 @@ public final class ArrowSchemaUtils {
         final StructDictEncodedLogicalTypeExtensionType type) {
         var logicalTypeTrait = new LogicalTypeTrait(type.getLogicalType().getLogicalType());
         var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
-        return parseStorageAndAddTrait(field, type, logicalTypeTrait, dictEncodingTrait);
+        var storageSpecWithTraits = parseField(field, type.storageType());
+        return new DataSpecWithTraits(((StructDataSpec)storageSpecWithTraits.spec()).getDataSpec(1), DataTraitUtils
+            .withTrait(((StructDataTraits)storageSpecWithTraits.traits()).getDataTraits(1), dictEncodingTrait, logicalTypeTrait));
     }
 
     private static DataSpecWithTraits parseLogicalTypeField(final Field field, final LogicalTypeExtensionType type) {
         var logicalTypeTrait = new LogicalTypeTrait(type.getLogicalType());
-        return parseStorageAndAddTrait(field, type, logicalTypeTrait);
-    }
-
-    private static DataSpecWithTraits parseStorageAndAddTrait(final Field field, final ExtensionType type,
-        final DataTrait... traits) {
         var storageSpecWithTraits = parseField(field, type.storageType());
         return new DataSpecWithTraits(storageSpecWithTraits.spec(),
-            DataTraitUtils.withTrait(storageSpecWithTraits.traits(), traits));
+            DataTraitUtils.withTrait(storageSpecWithTraits.traits(), logicalTypeTrait));
     }
 
-    private static DataSpecWithTraits parseStructDictEncodedField(final Field field, final StructDictEncodedExtensionType type) {
+    private static DataSpecWithTraits parseStructDictEncodedField(final Field field,
+        final StructDictEncodedExtensionType type) {
         var dictEncodingTrait = new DataTrait.DictEncodingTrait(parseKeyType(field));
-        return parseStorageAndAddTrait(field, type, dictEncodingTrait);
+        var storageSpecWithTraits = parseField(field, type.storageType());
+        return new DataSpecWithTraits(((StructDataSpec)storageSpecWithTraits.spec()).getDataSpec(1), DataTraitUtils
+            .withTrait(((StructDataTraits)storageSpecWithTraits.traits()).getDataTraits(1), dictEncodingTrait));
     }
 
     private static KeyType parseKeyType(final Field dictEncodedField) {
