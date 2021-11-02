@@ -56,38 +56,26 @@ import org.knime.core.columnar.testing.data.TestDataFactory;
 import org.knime.core.columnar.testing.data.TestDictEncodedStringData.TestDictEncodedStringDataFactory;
 import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData.TestDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
-import org.knime.core.columnar.testing.data.TestDurationData.TestDurationDataFactory;
 import org.knime.core.columnar.testing.data.TestFloatData.TestFloatDataFactory;
 import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
 import org.knime.core.columnar.testing.data.TestListData.TestListDataFactory;
-import org.knime.core.columnar.testing.data.TestLocalDateData.TestLocalDateDataFactory;
-import org.knime.core.columnar.testing.data.TestLocalDateTimeData.TestLocalDateTimeDataFactory;
-import org.knime.core.columnar.testing.data.TestLocalTimeData.TestLocalTimeDataFactory;
 import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
-import org.knime.core.columnar.testing.data.TestPeriodData.TestPeriodDataFactory;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
 import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
 import org.knime.core.columnar.testing.data.TestVoidData.TestVoidDataFactory;
-import org.knime.core.columnar.testing.data.TestZonedDateTimeData.TestZonedDateTimeDataFactory;
 import org.knime.core.table.schema.BooleanDataSpec;
 import org.knime.core.table.schema.ByteDataSpec;
 import org.knime.core.table.schema.DataSpec.MapperWithTraits;
 import org.knime.core.table.schema.DoubleDataSpec;
-import org.knime.core.table.schema.DurationDataSpec;
 import org.knime.core.table.schema.FloatDataSpec;
 import org.knime.core.table.schema.IntDataSpec;
 import org.knime.core.table.schema.ListDataSpec;
-import org.knime.core.table.schema.LocalDateDataSpec;
-import org.knime.core.table.schema.LocalDateTimeDataSpec;
-import org.knime.core.table.schema.LocalTimeDataSpec;
 import org.knime.core.table.schema.LongDataSpec;
-import org.knime.core.table.schema.PeriodDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.VoidDataSpec;
-import org.knime.core.table.schema.ZonedDateTimeDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.ListDataTraits;
@@ -119,11 +107,6 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
     }
 
     @Override
-    public TestDataFactory visit(final DurationDataSpec spec, final DataTraits traits) {
-        return TestDurationDataFactory.INSTANCE;
-    }
-
-    @Override
     public TestDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
         return TestFloatDataFactory.INSTANCE;
     }
@@ -134,28 +117,8 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
     }
 
     @Override
-    public TestDataFactory visit(final LocalDateDataSpec spec, final DataTraits traits) {
-        return TestLocalDateDataFactory.INSTANCE;
-    }
-
-    @Override
-    public TestDataFactory visit(final LocalDateTimeDataSpec spec, final DataTraits traits) {
-        return TestLocalDateTimeDataFactory.INSTANCE;
-    }
-
-    @Override
-    public TestDataFactory visit(final LocalTimeDataSpec spec, final DataTraits traits) {
-        return TestLocalTimeDataFactory.INSTANCE;
-    }
-
-    @Override
     public TestDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
         return TestLongDataFactory.INSTANCE;
-    }
-
-    @Override
-    public TestDataFactory visit(final PeriodDataSpec spec, final DataTraits traits) {
-        return TestPeriodDataFactory.INSTANCE;
     }
 
     @Override
@@ -182,11 +145,6 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
     @Override
     public TestDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
         return new TestListDataFactory(listDataSpec.getInner().accept(this, traits.getInner()));
-    }
-
-    @Override
-    public TestDataFactory visit(final ZonedDateTimeDataSpec spec, final DataTraits traits) {
-        return TestZonedDateTimeDataFactory.INSTANCE;
     }
 
     @Override

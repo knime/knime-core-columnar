@@ -53,13 +53,6 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.Period;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -79,34 +72,22 @@ import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
-import org.knime.core.columnar.data.DurationData.DurationReadData;
-import org.knime.core.columnar.data.DurationData.DurationWriteData;
 import org.knime.core.columnar.data.FloatData.FloatReadData;
 import org.knime.core.columnar.data.FloatData.FloatWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
-import org.knime.core.columnar.data.LocalDateData.LocalDateReadData;
-import org.knime.core.columnar.data.LocalDateData.LocalDateWriteData;
-import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeReadData;
-import org.knime.core.columnar.data.LocalDateTimeData.LocalDateTimeWriteData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeReadData;
-import org.knime.core.columnar.data.LocalTimeData.LocalTimeWriteData;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.PeriodData.PeriodReadData;
-import org.knime.core.columnar.data.PeriodData.PeriodWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
-import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeReadData;
-import org.knime.core.columnar.data.ZonedDateTimeData.ZonedDateTimeWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
@@ -243,27 +224,6 @@ public final class TestBatchStoreUtils {
                 }
             },
 
-            DURATION {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.durationSpec();
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    final DurationWriteData objectData = ((DurationWriteData)data);
-                    objectData.setDuration(index, Duration.ofMillis(runningInt++)); // NOSONAR
-                    return data;
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    final DurationReadData refObjectData = (DurationReadData)refData;
-                    final DurationReadData readObjectData = (DurationReadData)readData;
-                    assertEquals(refObjectData.getDuration(index), readObjectData.getDuration(index));
-                }
-            },
-
             FLOAT {
                 @Override
                 DataSpec getSpec() {
@@ -327,70 +287,6 @@ public final class TestBatchStoreUtils {
                 }
             },
 
-            LOCALDATE {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.localDateSpec();
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    final LocalDateWriteData objectData = ((LocalDateWriteData)data);
-                    objectData.setLocalDate(index, LocalDate.ofEpochDay(runningInt++)); // NOSONAR
-                    return data;
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    final LocalDateReadData refObjectData = (LocalDateReadData)refData;
-                    final LocalDateReadData readObjectData = (LocalDateReadData)readData;
-                    assertEquals(refObjectData.getLocalDate(index), readObjectData.getLocalDate(index));
-                }
-            },
-
-            LOCALDATETIME {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.localDateTimeSpec();
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    final LocalDateTimeWriteData objectData = ((LocalDateTimeWriteData)data);
-                    objectData.setLocalDateTime(index,
-                        LocalDateTime.of(LocalDate.ofEpochDay(runningInt++), LocalTime.ofNanoOfDay(runningInt++))); // NOSONAR
-                    return data;
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    final LocalDateTimeReadData refObjectData = (LocalDateTimeReadData)refData;
-                    final LocalDateTimeReadData readObjectData = (LocalDateTimeReadData)readData;
-                    assertEquals(refObjectData.getLocalDateTime(index), readObjectData.getLocalDateTime(index));
-                }
-            },
-
-            LOCALTIME {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.localTimeSpec();
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    final LocalTimeWriteData objectData = ((LocalTimeWriteData)data);
-                    objectData.setLocalTime(index, LocalTime.ofNanoOfDay(runningInt++)); // NOSONAR
-                    return data;
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    final LocalTimeReadData refObjectData = (LocalTimeReadData)refData;
-                    final LocalTimeReadData readObjectData = (LocalTimeReadData)readData;
-                    assertEquals(refObjectData.getLocalTime(index), readObjectData.getLocalTime(index));
-                }
-            },
-
             LONG {
                 @Override
                 DataSpec getSpec() {
@@ -424,27 +320,6 @@ public final class TestBatchStoreUtils {
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
                     assertEquals(((IntReadData)refData).isMissing(index), ((IntReadData)readData).isMissing(index));
-                }
-            },
-
-            PERIOD {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.periodSpec();
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    final PeriodWriteData objectData = ((PeriodWriteData)data);
-                    objectData.setPeriod(index, Period.ofDays(runningInt++)); // NOSONAR
-                    return data;
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    final PeriodReadData refObjectData = (PeriodReadData)refData;
-                    final PeriodReadData readObjectData = (PeriodReadData)readData;
-                    assertEquals(refObjectData.getPeriod(index), readObjectData.getPeriod(index));
                 }
             },
 
@@ -727,28 +602,6 @@ public final class TestBatchStoreUtils {
 
                     assertArrayEquals(((VarBinaryReadData)refData).getBytes(index),
                         ((VarBinaryReadData)readData).getBytes(index));
-                }
-            },
-
-            ZONEDDATETIME {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.zonedDateTimeSpec();
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    final ZonedDateTimeWriteData objectData = (ZonedDateTimeWriteData)data;
-                    objectData.setZonedDateTime(index, ZonedDateTime.of(LocalDate.ofEpochDay(runningInt++), // NOSONAR
-                        LocalTime.ofNanoOfDay(runningInt++), ZoneId.of("Z"))); // NOSONAR
-                    return data;
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    final ZonedDateTimeReadData refObjectData = (ZonedDateTimeReadData)refData;
-                    final ZonedDateTimeReadData readObjectData = (ZonedDateTimeReadData)readData;
-                    assertEquals(refObjectData.getZonedDateTime(index), readObjectData.getZonedDateTime(index));
                 }
             };
 

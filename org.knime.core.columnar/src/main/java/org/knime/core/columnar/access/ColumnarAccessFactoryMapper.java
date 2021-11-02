@@ -54,20 +54,14 @@ import org.knime.core.table.schema.BooleanDataSpec;
 import org.knime.core.table.schema.ByteDataSpec;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DoubleDataSpec;
-import org.knime.core.table.schema.DurationDataSpec;
 import org.knime.core.table.schema.FloatDataSpec;
 import org.knime.core.table.schema.IntDataSpec;
 import org.knime.core.table.schema.ListDataSpec;
-import org.knime.core.table.schema.LocalDateDataSpec;
-import org.knime.core.table.schema.LocalDateTimeDataSpec;
-import org.knime.core.table.schema.LocalTimeDataSpec;
 import org.knime.core.table.schema.LongDataSpec;
-import org.knime.core.table.schema.PeriodDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.VoidDataSpec;
-import org.knime.core.table.schema.ZonedDateTimeDataSpec;
 
 /**
  * Mapping AccessSpec to ColumnarValueFactory.
@@ -132,36 +126,6 @@ public final class ColumnarAccessFactoryMapper implements DataSpec.Mapper<Column
     @Override
     public ColumnarAccessFactory visit(final ListDataSpec spec) {
         return new ColumnarListAccessFactory<>(spec);
-    }
-
-    @Override
-    public ColumnarAccessFactory visit(final LocalDateDataSpec spec) {
-        return ColumnarLocalDateAccessFactory.INSTANCE;
-    }
-
-    @Override
-    public ColumnarAccessFactory visit(final LocalTimeDataSpec spec) {
-        return ColumnarLocalTimeAccessFactory.INSTANCE;
-    }
-
-    @Override
-    public ColumnarAccessFactory visit(final LocalDateTimeDataSpec spec) {
-        return ColumnarLocalDateTimeAccessFactory.INSTANCE;
-    }
-
-    @Override
-    public ColumnarAccessFactory visit(final DurationDataSpec spec) {
-        return ColumnarDurationAccessFactory.INSTANCE;
-    }
-
-    @Override
-    public ColumnarAccessFactory visit(final PeriodDataSpec spec) {
-        return ColumnarPeriodAccessFactory.INSTANCE;
-    }
-
-    @Override
-    public ColumnarAccessFactory visit(final ZonedDateTimeDataSpec spec) {
-        return ColumnarZonedDateTimeAccessFactory.INSTANCE;
     }
 
     @Override
