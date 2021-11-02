@@ -50,6 +50,7 @@ import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
@@ -65,6 +66,8 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
     private AtomicInteger m_numBatches;
 
     private AtomicInteger m_maxLength;
+
+    private Boolean m_useLZ4BlockCompression;
 
     ArrowBatchReadStore(final Path path, final BufferAllocator allocator) {
         this(path, allocator, null, null);
@@ -83,11 +86,13 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
         return new ArrowBatchReader(m_path.toFile(), m_allocator, factories, config);
     }
 
-    private final void initNumBatchesMaxLength() {
+    private final void initMetadata() {
         try (final ArrowBatchReader reader =
             createRandomAccessReader(new DefaultColumnSelection(m_schema.numColumns()))) {
             m_numBatches = new AtomicInteger(reader.numBatches());
             m_maxLength = new AtomicInteger(reader.maxLength());
+            m_useLZ4BlockCompression =
+                reader.getMetadata().containsKey(ArrowReaderWriterUtils.ARROW_LZ4_BLOCK_FEATURE_KEY);
         } catch (final IOException e) {
             throw new IllegalStateException("Error when reading footer.", e);
         }
@@ -96,7 +101,7 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
     @Override
     public int numBatches() {
         if (m_numBatches == null) {
-            initNumBatchesMaxLength();
+            initMetadata();
         }
         return m_numBatches.get();
     }
@@ -104,8 +109,19 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
     @Override
     public int batchLength() {
         if (m_maxLength == null) {
-            initNumBatchesMaxLength();
+            initMetadata();
         }
         return m_maxLength.get();
+    }
+
+    /**
+     * @return Whether the store's data was persisted using the deprecated
+     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
+     */
+    public boolean isUseLZ4BlockCompression() {
+        if (m_useLZ4BlockCompression == null) {
+            initMetadata();
+        }
+        return m_useLZ4BlockCompression;
     }
 }
