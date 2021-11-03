@@ -50,6 +50,7 @@ package org.knime.core.data.columnar.table;
 
 import java.io.Flushable;
 
+import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.data.columnar.domain.DomainWritable;
 
@@ -63,4 +64,9 @@ public interface ColumnarBatchStore extends BatchStore, ColumnarBatchReadStore, 
      * @return get the {@link DomainWritable}
      */
     DomainWritable getDomainWritable();
+
+    /**
+     * @return get the underlying {@link BatchWritable}
+     */
+    BatchWritable getWritableDelegate();
 }

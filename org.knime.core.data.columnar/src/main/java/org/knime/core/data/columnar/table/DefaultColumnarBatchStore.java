@@ -381,7 +381,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
      * Access to the delegate from the tests
      * @return the {@link BatchWritable} delegate
      */
-    BatchWritable getWritableDelegate() {
+    @Override
+    public BatchWritable getWritableDelegate() {
         return m_writable;
     }
 

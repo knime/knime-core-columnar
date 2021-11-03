@@ -157,7 +157,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         return m_columnarTable.getSchema().getSourceSpec();
     }
 
-    ColumnarValueSchema getSchema() {
+    @Override
+    public ColumnarValueSchema getSchema() {
         return m_columnarTable.getSchema();
     }
 
