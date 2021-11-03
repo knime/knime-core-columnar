@@ -373,7 +373,7 @@ public final class ColumnarBatchStore implements BatchStore, Flushable {
      * Access to the delegate from the tests
      * @return the {@link BatchWritable} delegate
      */
-    BatchWritable getWriteDelegate() {
+    public BatchWritable getWriteDelegate() {
         return m_writable;
     }
 }

@@ -203,7 +203,7 @@ public final class ColumnarBatchReadStore implements BatchReadStore {
      * Access to the delegate from the tests
      * @return the readable delegate
      */
-    RandomAccessBatchReadable getDelegate() {
+    public RandomAccessBatchReadable getDelegate() {
         return m_readable;
     }
 }
