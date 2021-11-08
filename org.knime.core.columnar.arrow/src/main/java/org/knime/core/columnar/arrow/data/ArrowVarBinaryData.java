@@ -50,8 +50,10 @@ import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.ArrowType.LargeBinary;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
@@ -61,6 +63,8 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
@@ -154,8 +158,63 @@ public final class ArrowVarBinaryData {
         }
     }
 
+    /**
+     * Only used for backwards compatibility of ZonedDateTime data that used to store the zone id as dict encoded var
+     * binary.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    static final class ArrowDictEncodedLegacyDateTimeVarBinaryReadData extends AbstractArrowReadData<IntVector>
+        implements VarBinaryReadData {
+
+        private final LargeVarBinaryVector m_dict;
+
+        private ArrowDictEncodedLegacyDateTimeVarBinaryReadData(final IntVector vector, final LargeVarBinaryVector dict,
+            final MissingValues missingValues) {
+            super(vector, missingValues);
+            m_dict = dict;
+        }
+
+        private ArrowDictEncodedLegacyDateTimeVarBinaryReadData(final IntVector vector, final LargeVarBinaryVector dict,
+            final MissingValues missingValues, final int offset, final int length) {
+            super(vector, missingValues, offset, length);
+            m_dict = dict;
+        }
+
+        @Override
+        public long sizeOf() {
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector) + ArrowSizeUtils.sizeOfVariableWidth(m_dict);
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowDictEncodedLegacyDateTimeVarBinaryReadData(m_vector, m_dict, m_missingValues, m_offset + start, length);
+        }
+
+        @Override
+        public byte[] getBytes(final int index) {
+            return m_dict.get(getDictIdx(index));
+        }
+
+        @Override
+        public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
+            return ArrowBufIO.deserialize(getDictIdx(index), m_dict, deserializer);
+        }
+
+        private int getDictIdx(final int index) {
+            return m_vector.get(m_offset + index);
+        }
+
+    }
+
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
     public static final class ArrowVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
+
+        /**
+         * In version 0 we implemented dict encoding in order to load ZonedDateTime data in a backwards compatible way.
+         * Newer versions don't support dict encoding because they should use our own struct dict encoding.
+         */
+        private static final ArrowColumnDataFactoryVersion V0 = ArrowColumnDataFactoryVersion.version(0);
 
         /**
          * Singleton instance.
@@ -163,7 +222,7 @@ public final class ArrowVarBinaryData {
         public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
 
         private ArrowVarBinaryDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(ArrowColumnDataFactoryVersion.version(1));
         }
 
         @Override
@@ -180,11 +239,27 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
-        public ArrowVarBinaryReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (m_version.equals(version)) {
+            final var missingValues = MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount());
+            if (V0.equals(version)) {
+                // in case of ZonedDateTime data we stored the version id as dict encoded var binary
+                var dictionaryEncoding = vector.getField().getDictionary();
+                if (dictionaryEncoding != null) {
+                    var dict = provider.lookup(dictionaryEncoding.getId());
+                    Preconditions.checkArgument(dict.getVectorType().equals(MinorType.LARGEVARBINARY.getType()),
+                        "Encountered dictionary vector of type '%s' but expected a LargeVarBinaryVector.");
+                    @SuppressWarnings("resource")
+                    LargeVarBinaryVector dictVector = (LargeVarBinaryVector)dict.getVector();
+                    return new ArrowDictEncodedLegacyDateTimeVarBinaryReadData((IntVector)vector, dictVector,
+                        missingValues);
+                } else {
+                    return new ArrowVarBinaryReadData((LargeVarBinaryVector)vector,
+                        missingValues);
+                }
+            } else if (m_version.equals(version)) {
                 return new ArrowVarBinaryReadData((LargeVarBinaryVector)vector,
-                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
+                    missingValues);
             } else {
                 throw new IOException(
                     "Cannot read ArrowVarBinaryData with version " + version + ". Current version: " + m_version + ".");

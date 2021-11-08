@@ -209,11 +209,17 @@ public final class ArrowLongData {
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowLongData} */
     public static final class ArrowLongDataFactory extends AbstractArrowColumnDataFactory {
 
+        /**
+         * Also supports reading longs from DurationVectors and TimeNanoVectors. This is necessary for backwards
+         * compatibility of date&time types which now simply use BigIntVector.
+         */
+        private static final ArrowColumnDataFactoryVersion V0 = ArrowColumnDataFactoryVersion.version(0);
+
         /** Singleton instance of {@link ArrowLongDataFactory} */
         public static final ArrowLongDataFactory INSTANCE = new ArrowLongDataFactory();
 
         private ArrowLongDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(ArrowColumnDataFactoryVersion.version(1));
         }
 
         @Override
@@ -232,9 +238,9 @@ public final class ArrowLongData {
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            // TODO bump version?
-            if (m_version.equals(version)) {
-                final var missingValues = MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount());
+
+            final var missingValues = MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount());
+            if (V0.equals(version)) {
                 if (vector instanceof DurationVector) {
                     return new ArrowDurationLongReadData((DurationVector)vector, missingValues);
                 } else if (vector instanceof TimeNanoVector) {
@@ -243,6 +249,8 @@ public final class ArrowLongData {
                     return new ArrowLongReadData((BigIntVector)vector,
                         missingValues);
                 }
+            } else if (m_version.equals(version)) {
+                return new ArrowLongReadData((BigIntVector)vector, missingValues);
             } else {
                 throw new IOException(
                     "Cannot read ArrowLongData with version " + version + ". Current version: " + m_version + ".");

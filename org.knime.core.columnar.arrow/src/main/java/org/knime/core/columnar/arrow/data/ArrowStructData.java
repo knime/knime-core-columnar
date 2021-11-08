@@ -54,7 +54,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.LongSupplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -269,7 +268,12 @@ public final class ArrowStructData {
      */
     public static final class ArrowStructDataFactory extends AbstractArrowColumnDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        private static final int CURRENT_VERSION = 1;
+
+        /**
+         * Also covers support for legacy date&time data types.
+         */
+        private static final int V0 = 0;
 
         private final ArrowColumnDataFactory[] m_inner;
 
@@ -317,36 +321,50 @@ public final class ArrowStructData {
         @Override
         public ArrowStructReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            // TODO add special case for date&time structs in version 0 and increment version
+            final var resolvedVersion = getVersion(version);
+            final StructVector v = (StructVector)vector;
+            // Children
+            final var children = new ArrowReadData[m_inner.length];
+            for (int i = 0; i < children.length; i++) {//NOSONAR
+                @SuppressWarnings("resource") // Child vector closed with struct vector
+                // TODO is this safe?
+                final FieldVector childVector = (FieldVector)v.getChildByOrdinal(i);
+                children[i] = m_inner[i].createRead(childVector, nullCount.getChild(i), provider,
+                    resolvedVersion.getChildVersion(i));
+            }
+
+            return new ArrowStructReadData(v, MissingValues.forNullCount(nullCount.getNullCount(), v.getValueCount()),
+                children);
+        }
+
+        private ArrowColumnDataFactoryVersion getVersion(final ArrowColumnDataFactoryVersion version)
+            throws IOException {
             if (version.getVersion() == CURRENT_VERSION) {
-                final StructVector v = (StructVector)vector;
-
-                // Children
-                final ArrowReadData[] children = new ArrowReadData[m_inner.length];
-                for (int i = 0; i < children.length; i++) {
-                    @SuppressWarnings("resource") // Child vector closed with struct vector
-                    // TODO is this safe?
-                    final FieldVector childVector = (FieldVector)v.getChildByOrdinal(i);
-
-                    final var childVersion = getChildVersionWithDateTimeSupport(version, i);
-                    children[i] =
-                        m_inner[i].createRead(childVector, nullCount.getChild(i), provider, childVersion);
+                return version;
+            } else if (version.getVersion() == V0) {
+                if (hasVersionForChildren(version)) {
+                    return version;
+                } else {
+                    // in case of legacy date&time data we used Arrow structs directly and hence there are no versions
+                    // for the children, however, we know that all versions were 0 (and that there was no more nesting)
+                    return ArrowColumnDataFactoryVersion.version(V0, //
+                        Stream.generate(() -> ArrowColumnDataFactoryVersion.version(0))//
+                            .limit(m_inner.length)//
+                            .toArray(ArrowColumnDataFactoryVersion[]::new));
                 }
-
-                return new ArrowStructReadData(v,
-                    MissingValues.forNullCount(nullCount.getNullCount(), v.getValueCount()), children);
             } else {
                 throw new IOException("Cannot read ArrowStructData with version " + version.getVersion()
                     + ". Current version: " + CURRENT_VERSION + ".");
             }
         }
 
-        private static ArrowColumnDataFactoryVersion
-            getChildVersionWithDateTimeSupport(final ArrowColumnDataFactoryVersion structVersion, final int i) {
+        private boolean hasVersionForChildren(final ArrowColumnDataFactoryVersion version) {
             try {
-                return structVersion.getChildVersion(i);
-            } catch (ArrayIndexOutOfBoundsException ex) {
-                return ArrowColumnDataFactoryVersion.version(0);
+                version.getChildVersion(m_inner.length - 1);
+                return true;
+            } catch (IndexOutOfBoundsException ex) {//NOSONAR
+                // can be the case for legacy date&time data where we used arrow structs directly
+                return false;
             }
         }
 
@@ -383,7 +401,12 @@ public final class ArrowStructData {
 
         @Override
         public String toString() {
-            return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + Arrays.stream(m_inner).map(Object::toString).collect(Collectors.joining(",")) + "]";
+            return new StringBuilder(getClass().getSimpleName())//
+                .append(".v")//
+                .append(CURRENT_VERSION)//
+                .append(" ")//
+                .append(Arrays.toString(m_inner))//
+                .toString();
         }
     }
 }
