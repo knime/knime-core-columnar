@@ -69,20 +69,14 @@ import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowDurationData.ArrowDurationDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowLocalDateData.ArrowLocalDateDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowLocalDateTimeData.ArrowLocalDateTimeDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowLocalTimeData.ArrowLocalTimeDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowPeriodData.ArrowPeriodDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowZonedDateTimeData.ArrowZonedDateTimeDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
@@ -150,42 +144,6 @@ public class ArrowSchemaMapperTest {
     @Test
     public void testMapVoidSpec() {
         testMapSingleSpec(DataSpec.voidSpec(), ArrowVoidDataFactory.INSTANCE);
-    }
-
-    /** Test mapping LocalTime specs to a {@link ArrowLocalTimeDataFactory} */
-    @Test
-    public void testMapLocalTimeSpec() {
-        testMapSingleSpec(DataSpec.localTimeSpec(), ArrowLocalTimeDataFactory.INSTANCE);
-    }
-
-    /** Test mapping LocalDate specs to a {@link ArrowLocalDateDataFactory} */
-    @Test
-    public void testMapLocalDateSpec() {
-        testMapSingleSpec(DataSpec.localDateSpec(), ArrowLocalDateDataFactory.INSTANCE);
-    }
-
-    /** Test mapping Period specs to a {@link ArrowPeriodDataFactory} */
-    @Test
-    public void testMapPeriodSpec() {
-        testMapSingleSpec(DataSpec.periodSpec(), ArrowPeriodDataFactory.INSTANCE);
-    }
-
-    /** Test mapping Duration specs to a {@link ArrowDurationDataFactory} */
-    @Test
-    public void testMapDurationSpec() {
-        testMapSingleSpec(DataSpec.durationSpec(), ArrowDurationDataFactory.INSTANCE);
-    }
-
-    /** Test mapping LocalDateTime specs to a {@link ArrowLocalDateTimeDataFactory} */
-    @Test
-    public void testMapLocalDateTimeSpec() {
-        testMapSingleSpec(DataSpec.localDateTimeSpec(), ArrowLocalDateTimeDataFactory.INSTANCE);
-    }
-
-    /** Test mapping ZonedDateTime specs to a {@link ArrowZonedDateTimeDataFactory} */
-    @Test
-    public void testMapZonedDateTimeSpec() {
-        testMapSingleSpec(DataSpec.zonedDateTimeSpec(), ArrowZonedDateTimeDataFactory.INSTANCE);
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
