@@ -72,6 +72,7 @@ import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
 import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.util.DuplicateChecker;
 
@@ -223,6 +224,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         }
     }
 
+    private static final NodeLogger LOGGER = NodeLogger.getLogger(DefaultColumnarBatchStore.class);
+
     private BatchWritable m_writable;
 
     private RandomAccessBatchReadable m_readable;
@@ -290,7 +293,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
                     try {
                         m_heapCache.flush();
                     } catch (IOException ex) {
-                        //                            LOGGER.error("Error during enforced premature serialization of object data.", ex);
+                        LOGGER.error("Error during enforced premature serialization of object data.", ex);
                     }
                 }).start();
                 return false;
@@ -379,6 +382,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
     /**
      * Access to the delegate from the tests
+     *
      * @return the {@link BatchWritable} delegate
      */
     @Override
