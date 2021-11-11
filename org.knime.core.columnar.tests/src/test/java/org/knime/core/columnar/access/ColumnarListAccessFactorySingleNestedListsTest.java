@@ -124,10 +124,10 @@ public class ColumnarListAccessFactorySingleNestedListsTest {
         ColumnarListReadAccess<ListReadData> listReadAccessRow = accessFactory.createReadAccess(mockDex);
         listReadAccessRow.setData(listData);
 
-        assertEquals(getValue(listReadAccessRow), 5);
+        assertEquals(5, getValue(listReadAccessRow));
 
         when(mockDex.getIndex()).thenReturn(1);
-        assertEquals(getValue(listReadAccessRow), 3);
+        assertEquals(3, getValue(listReadAccessRow));
 
     }
 
@@ -143,6 +143,8 @@ public class ColumnarListAccessFactorySingleNestedListsTest {
 
     private static int getValue(final ListReadAccess outer) {
         ListReadAccess rowListReader = outer.getAccess();
+        outer.setIndex(0);
+        rowListReader.setIndex(0);
         IntReadAccess rowIntReader = rowListReader.getAccess();
         return rowIntReader.getIntValue();
     }
