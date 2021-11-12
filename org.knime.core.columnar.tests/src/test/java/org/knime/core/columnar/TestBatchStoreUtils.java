@@ -88,13 +88,10 @@ import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
-import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringReadData;
-import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.DataIndex;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.testing.TestBatchBuffer;
@@ -104,7 +101,6 @@ import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.ListDataSpec;
-import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait;
@@ -158,8 +154,8 @@ public final class TestBatchStoreUtils {
 
     public static final int DEF_BATCH_LENGTH = 2;
 
-    // Because Struct Dict Encoded data takes up two columns each, once for String and once for VarBinary, for Byte, Int and Long keys
-    public static final int DEF_NUM_ADDITIONAL_COLUMNS = 6;
+    // Because Struct Dict Encoded data takes up two columns each, we check VarBinary three times, once for Byte, Int and Long keys
+    public static final int DEF_NUM_ADDITIONAL_COLUMNS = 3;
 
     public static final int DEF_SIZE_OF_TABLE = DEF_NUM_BATCHES * DEF_NUM_COLUMNS * DEF_BATCH_LENGTH;
 
@@ -338,117 +334,6 @@ public final class TestBatchStoreUtils {
 
                 @Override
                 void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    final StringReadData refObjectData = (StringReadData)refData;
-                    final StringReadData readObjectData = (StringReadData)readData;
-                    assertEquals(refObjectData.getString(index), readObjectData.getString(index));
-                }
-            },
-
-            DICTENCODEDSTRING {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.stringSpec();
-                }
-
-                @Override
-                DataTraits getTraits() {
-                    return new DefaultDataTraits(new DictEncodingTrait()); // long key by default
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    if (!(data instanceof DictDecodedStringWriteData)) {
-                        throw new UnsupportedOperationException(
-                            "Can only set values for DictDecodedStringWriteData, not " + data.getClass().getName());
-                    }
-
-                    final StringWriteData objectData = ((StringWriteData)data);
-                    final var str = index % 2 == 0 ? Integer.toString(runningInt++) : "foo";
-                    objectData.setString(index, str);
-                    return getStringDelegate(data);
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    if (!(readData instanceof DictDecodedStringReadData)) {
-                        throw new UnsupportedOperationException(
-                            "Can only check values of DictDecodedStringReadData, not " + readData.getClass().getName());
-                    }
-
-                    final StringReadData refObjectData = (StringReadData)refData;
-                    final StringReadData readObjectData = (StringReadData)readData;
-                    assertEquals(refObjectData.getString(index), readObjectData.getString(index));
-                }
-            },
-
-            DICTENCODEDSTRING_INTKEY {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.stringSpec();
-                }
-
-                @Override
-                DataTraits getTraits() {
-                    return new DefaultDataTraits(new DictEncodingTrait(KeyType.INT_KEY));
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    if (!(data instanceof DictDecodedStringWriteData)) {
-                        throw new UnsupportedOperationException(
-                            "Can only set values for DictDecodedStringWriteData, not " + data.getClass().getName());
-                    }
-
-                    final StringWriteData objectData = ((StringWriteData)data);
-                    final var str = index % 2 == 0 ? Integer.toString(runningInt++) : "foo";
-                    objectData.setString(index, str);
-                    return getStringDelegate(data);
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    if (!(readData instanceof DictDecodedStringReadData)) {
-                        throw new UnsupportedOperationException(
-                            "Can only check values of DictDecodedStringReadData, not " + readData.getClass().getName());
-                    }
-
-                    final StringReadData refObjectData = (StringReadData)refData;
-                    final StringReadData readObjectData = (StringReadData)readData;
-                    assertEquals(refObjectData.getString(index), readObjectData.getString(index));
-                }
-            },
-
-            DICTENCODEDSTRING_BYTEKEY {
-                @Override
-                DataSpec getSpec() {
-                    return DataSpec.stringSpec();
-                }
-
-                @Override
-                DataTraits getTraits() {
-                    return new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY));
-                }
-
-                @Override
-                NullableWriteData setData(final NullableWriteData data, final int index) {
-                    if (!(data instanceof DictDecodedStringWriteData)) {
-                        throw new UnsupportedOperationException(
-                            "Can only set values for DictDecodedStringWriteData, not " + data.getClass().getName());
-                    }
-
-                    final StringWriteData objectData = ((StringWriteData)data);
-                    final var str = index % 2 == 0 ? Integer.toString(runningInt++) : "foo";
-                    objectData.setString(index, str);
-                    return getStringDelegate(data);
-                }
-
-                @Override
-                void checkEquals(final NullableReadData refData, final NullableReadData readData, final int index) {
-                    if (!(readData instanceof DictDecodedStringReadData)) {
-                        throw new UnsupportedOperationException(
-                            "Can only check values of DictDecodedStringReadData, not " + readData.getClass().getName());
-                    }
-
                     final StringReadData refObjectData = (StringReadData)refData;
                     final StringReadData readObjectData = (StringReadData)readData;
                     assertEquals(refObjectData.getString(index), readObjectData.getString(index));
@@ -700,30 +585,13 @@ public final class TestBatchStoreUtils {
     }
 
     @SuppressWarnings("unchecked")
-    private static <K> NullableWriteData getStringDelegate(final NullableWriteData data) {
-        return ((DictDecodedStringWriteData<K>)data).getDelegate();
-    }
-
-    @SuppressWarnings("unchecked")
     private static <K> NullableWriteData getVarBinaryDelegate(final NullableWriteData data) {
         return ((DictDecodedVarBinaryWriteData<K>)data).getDelegate();
     }
 
     @SuppressWarnings("unchecked")
-    private static <K> NullableReadData getStringDelegate(final NullableReadData data) {
-        return ((DictDecodedStringReadData<K>)data).getDelegate();
-    }
-
-    @SuppressWarnings("unchecked")
     private static <K> NullableReadData getVarBinaryDelegate(final NullableReadData data) {
         return ((DictDecodedVarBinaryReadData<K>)data).getDelegate();
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <K> NullableReadData wrapDictEncodedString(final NullableReadData data, final int columnIdx,
-        final KeyType keyType, final DictElementCache cache) {
-        return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)data, //
-                cache.get(DataIndex.createColumnIndex(columnIdx), keyType));
     }
 
     @SuppressWarnings("unchecked")
@@ -740,9 +608,7 @@ public final class TestBatchStoreUtils {
             final boolean isDictEncoded = DictEncodingTrait.isEnabled(schema.getTraits(i));
             final var keyType = DictEncodingTrait.keyType(schema.getTraits(i));
             final var spec = schema.getSpec(i);
-            if (isDictEncoded && spec instanceof StringDataSpec) {
-                out[i] = wrapDictEncodedString(data[i], i, keyType, cache);
-            } else if (isDictEncoded && spec instanceof VarBinaryDataSpec) {
+            if (isDictEncoded && spec instanceof VarBinaryDataSpec) {
                 out[i] = wrapDictEncodedVarBinary(data[i], i, keyType, cache);
             } else {
                 out[i] = data[i];
@@ -819,8 +685,6 @@ public final class TestBatchStoreUtils {
                     var d = batch.get(j);
                     if (d instanceof DictDecodedVarBinaryReadData) {
                         d = getVarBinaryDelegate(d);
-                    } else if (d instanceof DictDecodedStringReadData) {
-                        d = getStringDelegate(d);
                     }
                     data[j] = (TestData)d;
                     assertArrayEquals(written[j].get(), data[j].get());

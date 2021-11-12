@@ -53,7 +53,6 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.testing.data.TestBooleanData.TestBooleanDataFactory;
 import org.knime.core.columnar.testing.data.TestByteData.TestByteDataFactory;
 import org.knime.core.columnar.testing.data.TestDataFactory;
-import org.knime.core.columnar.testing.data.TestDictEncodedStringData.TestDictEncodedStringDataFactory;
 import org.knime.core.columnar.testing.data.TestDictEncodedVarBinaryData.TestDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.testing.data.TestDoubleData.TestDoubleDataFactory;
 import org.knime.core.columnar.testing.data.TestFloatData.TestFloatDataFactory;
@@ -149,9 +148,6 @@ final class TestSchemaMapper implements MapperWithTraits<TestDataFactory> {
 
     @Override
     public TestDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
-        if (DictEncodingTrait.isEnabled(traits)) {
-            return TestDictEncodedStringDataFactory.factoryForKeyType(DictEncodingTrait.keyType(traits));
-        }
         return TestStringDataFactory.INSTANCE;
     }
 }

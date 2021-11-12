@@ -53,8 +53,6 @@ import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.StringData.StringReadData;
-import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
@@ -125,25 +123,6 @@ public final class DictEncodedData {
          * @param keyGenerator The key generator will be invoked for each value that has not been seen before.
          */
         void setKeyGenerator(final DictKeyGenerator<K> keyGenerator);
-    }
-
-    // ------------------------------------------------------------------------------
-    /**
-     * Interface specialization for dictionary encoded {@link StringReadData}
-     *
-     * @param <K> key type, should be Byte, Long or Integer
-     */
-    public static interface DictEncodedStringReadData<K> extends DictEncodedReadData<K>, StringReadData {
-
-    }
-
-    /**
-     * Interface specialization for dictionary encoded {@link StringWriteData}
-     *
-     * @param <K> key type, should be Byte, Long or Integer
-     */
-    public static interface DictEncodedStringWriteData<K> extends DictEncodedWriteData<K>, StringWriteData {
-
     }
 
     // ------------------------------------------------------------------------------

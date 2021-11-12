@@ -60,16 +60,13 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
-import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.DataIndex;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.ListDataSpec;
-import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
@@ -142,13 +139,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
             return wrapStructData(index, d, spec, traits);
         } else if (traits.hasTrait(DictEncodingTrait.class)) {
             var keyType = DictEncodingTrait.keyType(traits);
-            if (spec instanceof StringDataSpec && !(d instanceof DictDecodedStringWriteData)) {
-                if (!(d instanceof DictEncodedStringWriteData)) {
-                    throw new IllegalArgumentException(
-                        "Expected DictEncodedStringWriteData to construct DictDecodedStringWriteData");
-                }
-                return wrapDictEncodedStringData(d, m_cache.get(index, keyType));
-            } else if (spec instanceof VarBinaryDataSpec && !(d instanceof DictDecodedVarBinaryWriteData)) {
+            if (spec instanceof VarBinaryDataSpec && !(d instanceof DictDecodedVarBinaryWriteData)) {
                 if (!(d instanceof DictEncodedVarBinaryWriteData)) {
                     throw new IllegalArgumentException(
                         "Expected DictEncodedVarBinaryWriteData to construct DictDecodedVarBinaryWriteData");
@@ -178,12 +169,6 @@ public class DictEncodedBatchWriter implements BatchWriter {
         final var childSpec = ((ListDataSpec)spec).getInner();
         return new DecoratedListData.DecoratedListWriteData((ListWriteData)d,
             x -> wrapDictEncodedData(index, x, childSpec, childTraits));
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <K> NullableWriteData wrapDictEncodedStringData(final NullableWriteData data,
-        final ColumnDictElementCache<K> cache) {
-        return new DictDecodedStringWriteData<K>((DictEncodedStringWriteData<K>)data, cache);
     }
 
     @SuppressWarnings("unchecked")
