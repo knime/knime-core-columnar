@@ -122,9 +122,13 @@ public final class ArrowReaderWriterUtils {
         final List<ArrowBuf> compressedBuffers = new ArrayList<>(uncompressedBuffers.size());
         for (final ArrowBuf uncompressedBuf : uncompressedBuffers) {
             uncompressedBuf.getReferenceManager().retain();
-            @SuppressWarnings("resource") // Released by the caller
-            final ArrowBuf compressedBuf = compressionCodec.compress(allocator, uncompressedBuf);
-            compressedBuffers.add(compressedBuf);
+            if (uncompressedBuf.writerIndex() > 0) {
+                @SuppressWarnings("resource") // Released by the caller
+                final ArrowBuf compressedBuf = compressionCodec.compress(allocator, uncompressedBuf);
+                compressedBuffers.add(compressedBuf);
+            } else {
+                compressedBuffers.add(uncompressedBuf);
+            }
         }
         return compressedBuffers;
     }
