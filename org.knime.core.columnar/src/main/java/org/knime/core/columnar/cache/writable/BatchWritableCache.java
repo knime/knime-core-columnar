@@ -234,6 +234,7 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
 
     @Override
     public void flush() throws IOException {
+        // TODO: save data in flush even when writer was not closed yet.
         // if writer unclosed
         if (m_writer.m_closed.getCount() == 1) {
             // nothing to flush

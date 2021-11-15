@@ -349,14 +349,18 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
     @Override
     public void flush() throws IOException {
-        if (m_smallTableCache != null) {
-            m_smallTableCache.flush();
-        }
         if (m_columnDataCache != null) {
             m_columnDataCache.flush();
         }
         if (m_heapCache != null) {
             m_heapCache.flush();
+        }
+        // The small table cache must be flushed after heap cache because if close was called on the writers,
+        // the flush method of the heap cache writer will wait for the close method of the smallTableCache writer.
+        // And due to a questionable assumption in the SmallTableCache, it does not write anything in flush() if
+        // the writer was not called before. That could lead to empty batch stores being saved.
+        if (m_smallTableCache != null) {
+            m_smallTableCache.flush();
         }
     }
 
