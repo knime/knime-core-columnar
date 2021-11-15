@@ -205,6 +205,12 @@ public final class ArrowVarBinaryData {
             return m_vector.get(m_offset + index);
         }
 
+        @Override
+        protected void closeResources() {
+            super.closeResources();
+            m_dict.close();
+        }
+
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
