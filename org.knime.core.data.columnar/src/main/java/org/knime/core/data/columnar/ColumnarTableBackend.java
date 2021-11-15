@@ -59,11 +59,11 @@ import org.knime.core.data.IDataRepository;
 import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
-import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
+import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
+import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.container.BufferedTableBackend;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.ColumnRearrangerUtils;
@@ -148,7 +148,7 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public String getShortName() {
-        return "Columnar Storage (Labs)";
+        return "Columnar Storage";
     }
 
     @Override
