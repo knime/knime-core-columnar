@@ -3,12 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: KNIME Columnar Store Plugin - Arrow Implementation
 Bundle-SymbolicName: org.knime.core.columnar.arrow;singleton:=true
 Bundle-Version: 4.5.0.qualifier
-Bundle-ClassPath: .,
- lib/javacpp-1.5.7-20211030.125913-354.jar,
- lib/lz4-1.9.3-1.5.7-20211106.124209-16.jar,
- lib/lz4-1.9.3-1.5.7-20211106.124209-16-linux-x86_64.jar,
- lib/lz4-1.9.3-1.5.7-20211106.124209-16-macosx-x86_64.jar,
- lib/lz4-1.9.3-1.5.7-20211106.124209-16-windows-x86_64.jar
+Bundle-ClassPath: .
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-RequiredExecutionEnvironment: JavaSE-11
 Bundle-ActivationPolicy: lazy
@@ -24,6 +19,8 @@ Require-Bundle: org.knime.core.columnar;bundle-version="[4.2.0,5.0.0)",
  org.apache.arrow.memory-core;bundle-version="[6.0.0,7.0.0)",
  org.apache.arrow.vector;bundle-version="[6.0.0,7.0.0)",
  com.google.flatbuffers.java;bundle-version="[1.12.0,2.0.0)",
- org.apache.commons.io;bundle-version="[2.6.0,3.0.0)"
+ org.apache.commons.io;bundle-version="[2.6.0,3.0.0)",
+ org.bytedeco.javacpp;bundle-version="1.5.6",
+ org.bytedeco.lz4;bundle-version="1.9.3"
 Export-Package: org.knime.core.columnar.arrow,
  org.knime.core.columnar.arrow.compress
