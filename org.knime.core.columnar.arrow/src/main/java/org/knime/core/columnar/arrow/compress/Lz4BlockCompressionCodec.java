@@ -63,6 +63,10 @@ import org.bytedeco.lz4.global.lz4;
  */
 public class Lz4BlockCompressionCodec extends AbstractCompressionCodec {
 
+    static {
+        System.setProperty("org.bytedeco.javacpp.maxPhysicalBytes", "0");
+    }
+
     @Override
     public ArrowBuf compress(final BufferAllocator allocator, final ArrowBuf uncompressedBuffer) {
         throw new IllegalStateException("LZ4 Block compression is not supported anymore. Use LZ4 Frame compression.");
