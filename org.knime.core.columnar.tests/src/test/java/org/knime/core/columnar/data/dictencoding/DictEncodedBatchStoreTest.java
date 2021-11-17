@@ -49,6 +49,7 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.knime.core.table.schema.DataSpecs.DICT_ENCODING;
 import static org.knime.core.table.schema.DataSpecs.LIST;
@@ -79,6 +80,7 @@ import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 /**
  *
@@ -104,6 +106,79 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
         } catch (IOException ex1) {
             fail();
         }
+    }
+
+    @Test
+    public void testMoreThan255Batches() throws IOException {
+        var columnarSchema = ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.BYTE_KEY)));
+        var cache = new DictElementCache();
+        final var numBatches = 300;
+        final var value = "foo";
+        try (DefaultTestBatchStore batchStore = DefaultTestBatchStore.create(columnarSchema)) {
+            try(BatchWriter baseWriter = batchStore.getWriter();
+                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)
+                ) {
+                for (int b = 0; b < numBatches; b++) {
+                    var wrappedBatch = wrappedWriter.create(2);
+                    final var slicedData0 = (StringWriteData)wrappedBatch.get(0);
+                    slicedData0.setString(0, value);
+                    slicedData0.setString(1, value);
+                    final var finishedBatch = wrappedBatch.close(2);
+                    wrappedWriter.write(finishedBatch);
+                    finishedBatch.release();
+                }
+            }
+
+            final var selection = new DefaultColumnSelection(columnarSchema.numColumns());
+            try(var wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)
+                ) {
+                for (int b = 0; b < numBatches; b++) {
+                    var batch = wrappedReader.readRetained(b);
+
+                    final var slicedData0 = (StringReadData)batch.get(0);
+                    assertEquals(value, slicedData0.getString(0));
+                    assertEquals(value, slicedData0.getString(1));
+                    batch.release();
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testMoreThan255BatchesNoSharedDictFails() throws IOException {
+        // We're not using the @Test(expected ...) setup here because otherwise the batch
+        // is not closed, causing other checks in the test setup to complain.
+        var columnarSchema = ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.BYTE_KEY)));
+        var cache = new DictElementCache();
+        final var numBatches = 300;
+        final var value = "foo";
+        var failed = false;
+        try (DefaultTestBatchStore batchStore = DefaultTestBatchStore.create(columnarSchema)) {
+            try(BatchWriter baseWriter = batchStore.getWriter();
+                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)
+                ) {
+                for (int b = 0; b < numBatches; b++) {
+                    var wrappedBatch = wrappedWriter.create(2);
+                    final var slicedData0 = (StringWriteData)wrappedBatch.get(0);
+                    try {
+                        slicedData0.setString(0, value);
+                        slicedData0.setString(1, value);
+                    } catch (IllegalStateException e) {
+                        failed = true;
+                        break;
+                    } finally {
+                        final var finishedBatch = wrappedBatch.close(2);
+                        wrappedWriter.write(finishedBatch);
+                        finishedBatch.release();
+                        // This is the only difference to the logic in the test above where we clear the cache
+                        // after each batch, which behaves the same as if there was no shared dict at all.
+                        cache.clearCaches();
+                    }
+                }
+            }
+        }
+
+        assertTrue(failed);
     }
 
     @Test
