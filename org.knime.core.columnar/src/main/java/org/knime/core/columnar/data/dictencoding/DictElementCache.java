@@ -55,6 +55,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+
 /**
  * This {@link DictElementCache} will be used to cache entries of dictionary-encoded data across all batches of the
  * table, or at least as long as they do fit in memory.
@@ -77,6 +80,12 @@ public class DictElementCache {
     public static class ColumnDictElementCache<K> implements DictKeyGenerator<K> {
         private final DictKeyGenerator<K> m_dictKeyGenerator;
 
+        // We use weak cache-keys because the cache stores the mapping of dictEntry->dictKey
+        // and the dictEntries are potentially large.
+        private final Cache<?, K> m_cache = CacheBuilder.newBuilder().weakKeys().build();
+
+        private final Map<?, K> m_dictKeyCache;
+
         /**
          * Create a {@link ColumnDictElementCache} using the given dictionary key type
          *
@@ -84,12 +93,18 @@ public class DictElementCache {
          */
         public ColumnDictElementCache(final KeyType keyType) {
             m_dictKeyGenerator = DictKeys.createAscendingKeyGenerator(keyType);
+            m_dictKeyCache = m_cache.asMap();
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public synchronized <T> K generateKey(final T value) {
             // synchronized because that could possibly be called from multiple threads?
-            return m_dictKeyGenerator.generateKey(value);
+            return ((Map<T, K>)m_dictKeyCache).computeIfAbsent(value, m_dictKeyGenerator::generateKey);
+        }
+
+        synchronized void clearCache() {
+            m_cache.invalidateAll();
         }
     }
 
@@ -120,6 +135,23 @@ public class DictElementCache {
                 i -> new ColumnDictElementCache<Long>(keyType));
         } else {
             throw new UnsupportedOperationException("Cannot create table-wide dictionary cache for " + keyType);
+        }
+    }
+
+    /**
+     * Clear the caches, e.g. due to memory pressure
+     */
+    public synchronized void clearCaches() {
+        for (var cache : m_perColumnCacheWithByteKeys.values()) {
+            cache.clearCache();
+        }
+
+        for (var cache : m_perColumnCacheWithIntKeys.values()) {
+            cache.clearCache();
+        }
+
+        for (var cache : m_perColumnCacheWithLongKeys.values()) {
+            cache.clearCache();
         }
     }
 
@@ -158,7 +190,6 @@ public class DictElementCache {
             return new DataIndex(columnIndex);
         }
 
-
         /**
          * Creates a child index.
          *
@@ -176,8 +207,8 @@ public class DictElementCache {
             } else if (obj instanceof DataIndex) {
                 var other = (DataIndex)obj;
                 return m_hashCode == other.m_hashCode//
-                        && m_index == other.m_index//
-                        && Objects.equals(m_parent, other.m_parent);
+                    && m_index == other.m_index//
+                    && Objects.equals(m_parent, other.m_parent);
             } else {
                 return false;
             }
