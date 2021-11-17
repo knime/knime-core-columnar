@@ -236,13 +236,17 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
     private ObjectCache m_heapCache = null;
 
-    private MemoryAlertListener m_memListener = null;
+    private MemoryAlertListener m_heapCacheMemListener = null;
+
+    private MemoryAlertListener m_dictCacheMemListener = null;
 
     private DomainWritable m_domainWritable = null;
 
     private final WrappedBatchStore m_wrappedStore;
 
     private final BatchReadStore m_readStore;
+
+    private DictEncodedBatchWritableReadable m_dictEncoded;
 
     private DefaultColumnarBatchStore(final ColumnarBatchStoreBuilder builder) {
         m_readStore = builder.m_readDelegate;
@@ -257,9 +261,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
 
         if (builder.m_dictEncodingEnabled) {
-            final var dictEncoded = new DictEncodedBatchWritableReadable(m_writable, m_readable);
-            m_readable = dictEncoded;
-            m_writable = dictEncoded;
+            initDictEncoding();
         }
 
         if (builder.m_duplicateCheckExecutor != null) {
@@ -276,6 +278,21 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getPath());
     }
 
+    private void initDictEncoding() {
+        m_dictEncoded = new DictEncodedBatchWritableReadable(m_writable, m_readable);
+        m_readable = m_dictEncoded;
+        m_writable = m_dictEncoded;
+
+        m_dictCacheMemListener = new MemoryAlertListener() {
+            @Override
+            protected boolean memoryAlert(final MemoryAlert alert) {
+                new Thread(m_dictEncoded::clearCache).start();
+                return false;
+            }
+        };
+        MemoryAlertSystem.getInstanceUncollected().addListener(m_dictCacheMemListener);
+    }
+
     private void initHeapCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
         final ExecutorService serializeExec) {
         if (heapCache == null || persistExec == null || serializeExec == null) {
@@ -286,7 +303,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         m_readable = m_heapCache;
         m_writable = m_heapCache;
 
-        m_memListener = new MemoryAlertListener() {
+        m_heapCacheMemListener = new MemoryAlertListener() {
             @Override
             protected boolean memoryAlert(final MemoryAlert alert) {
                 new Thread(() -> {
@@ -299,7 +316,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
                 return false;
             }
         };
-        MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
+        MemoryAlertSystem.getInstanceUncollected().addListener(m_heapCacheMemListener);
     }
 
     private void initSmallTableCache(final SharedBatchWritableCache cache) {
@@ -339,8 +356,12 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
     @Override
     public void close() throws IOException {
-        if (m_heapCache != null) {
-            MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
+        if (m_heapCacheMemListener != null) {
+            MemoryAlertSystem.getInstanceUncollected().removeListener(m_heapCacheMemListener);
+        }
+
+        if (m_dictCacheMemListener != null) {
+            MemoryAlertSystem.getInstanceUncollected().removeListener(m_dictCacheMemListener);
         }
 
         // this also closes the delegates and all caches

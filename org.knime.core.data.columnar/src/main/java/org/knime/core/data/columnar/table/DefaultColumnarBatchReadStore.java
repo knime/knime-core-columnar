@@ -60,6 +60,9 @@ import org.knime.core.columnar.cache.object.SharedObjectCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchReadable;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.data.util.memory.MemoryAlert;
+import org.knime.core.data.util.memory.MemoryAlertListener;
+import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -142,6 +145,10 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
     private final BatchReadStore m_readStore;
 
+    private MemoryAlertListener m_dictCacheMemListener = null;
+
+    private DictEncodedBatchReadable m_dictEncoded;
+
     private DefaultColumnarBatchReadStore(final ColumnarBatchReadStoreBuilder builder) {
         m_readStore = builder.m_readStore;
         m_readable = builder.m_readStore;
@@ -151,12 +158,25 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
         initHeapCache(builder.m_heapCache);
 
         if (builder.m_dictEncodingEnabled) {
-            final var dictEncoded = new DictEncodedBatchReadable(m_readable);
-            m_readable = dictEncoded;
+            initDictEncoding();
         }
 
         m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(),
             builder.m_readStore.batchLength(), builder.m_readStore.getPath());
+    }
+
+    private void initDictEncoding() {
+        m_dictEncoded = new DictEncodedBatchReadable(m_readable);
+        m_readable = m_dictEncoded;
+
+        m_dictCacheMemListener = new MemoryAlertListener() {
+            @Override
+            protected boolean memoryAlert(final MemoryAlert alert) {
+                new Thread(m_dictEncoded::clearCache).start();
+                return false;
+            }
+        };
+        MemoryAlertSystem.getInstanceUncollected().addListener(m_dictCacheMemListener);
     }
 
     private void initHeapCache(final SharedObjectCache heapCache) {
@@ -187,6 +207,10 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
     @Override
     public void close() throws IOException {
+        if (m_dictCacheMemListener != null) {
+            MemoryAlertSystem.getInstanceUncollected().removeListener(m_dictCacheMemListener);
+        }
+
         m_wrappedStore.close();
     }
 

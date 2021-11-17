@@ -92,4 +92,12 @@ public class DictEncodedBatchReadable implements RandomAccessBatchReadable {
     public void close() throws IOException {
         m_delegate.close();
     }
+
+    /**
+     * The dictionaries are cached across batches as long as enough memory is available. In case of memory pressure,
+     * call this method to clear the caches.
+     */
+    public void clearCache() {
+        m_dictElementCache.clearCaches();
+    }
 }
