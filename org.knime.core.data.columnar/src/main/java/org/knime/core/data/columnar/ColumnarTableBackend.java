@@ -178,8 +178,7 @@ public final class ColumnarTableBackend implements TableBackend {
                 return new VirtualTableExtensionTable(tables, List.of(new ConcatenateTransformSpec()),
                     concatenatedSchema, concatenatedSize, tableIdSupplier.getAsInt());
             } catch (VirtualTableIncompatibleException ex) {
-                LOGGER.warn("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.",
-                    ex);
+                LOGGER.debug("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.");
             }
         }
         return OLD_BACKEND.concatenate(exec, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck,
@@ -199,7 +198,7 @@ public final class ColumnarTableBackend implements TableBackend {
                 TableTransformUtils.createAppendTransformations(tables), appendedSchema, appendSize,
                 tableIdSupplier.getAsInt());
         } catch (VirtualTableIncompatibleException ex) {
-            LOGGER.warn("Can't append with the Columnar Table Backend, falling back on the old backend.", ex);
+            LOGGER.debug("Can't append with the Columnar Table Backend, falling back on the old backend.");
             return OLD_BACKEND.append(exec, tableIdSupplier, left, right);
         }
     }
@@ -218,8 +217,7 @@ public final class ColumnarTableBackend implements TableBackend {
             return new VirtualTableExtensionTable(new BufferedDataTable[]{table}, transformations,
                 rearrangedSchema, table.size(), tableIdSupplier.getAsInt());
         } catch (VirtualTableIncompatibleException ex) {
-            LOGGER.warn("Can't run ColumnRearranger on the Columnar Table Backend. Falling back on the old backend.",
-                ex);
+            LOGGER.debug("Can't run ColumnRearranger on the Columnar Table Backend. Falling back on the old backend.");
             return OLD_BACKEND.rearrange(progressMonitor, tableIdSupplier, columnRearranger, table, context);
         }
     }
