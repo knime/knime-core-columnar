@@ -64,6 +64,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.knime.core.columnar.access.ColumnarListAccessFactory.ColumnarListReadAccess;
 import org.knime.core.columnar.access.ColumnarListAccessFactory.ColumnarListWriteAccess;
+import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.testing.data.TestListData;
@@ -71,6 +72,7 @@ import org.knime.core.columnar.testing.data.TestListData.TestListDataFactory;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
 import org.knime.core.table.access.StringAccess.StringReadAccess;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
+import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
 
@@ -139,6 +141,49 @@ public class ColumnarListAccessFactoryTest {
 
         listWriteAccess.setMissing();
         assertTrue(listReadAccess.isMissing());
+
+    }
+
+    @Test
+    public void testReadAccessIsMissingUpdatesData() throws Exception {
+        var accessFactory =
+            new ColumnarListAccessFactory<StringReadData, StringWriteData>(new ListDataSpec(DataSpec.stringSpec()));
+        final TestListDataFactory dataFactory = new TestListDataFactory(TestStringDataFactory.INSTANCE);
+        final TestListData listData = dataFactory.createWriteData(2);
+        setValues(listData, 0, "foo", "bar", "baz");
+        setValues(listData, 1, "bli", null, "blub");
+        var index = new DummyIndex();
+        var listAccess = accessFactory.createReadAccess(index);
+        listAccess.setData(listData);
+        listAccess.setIndex(0);
+        assertFalse(listAccess.isMissing(0));
+        assertFalse(listAccess.isMissing(1));
+        assertFalse(listAccess.isMissing(2));
+        index.m_index = 1; // move on to second row but call isMissing before calling setIndex
+        assertFalse(listAccess.isMissing(0));
+        assertTrue(listAccess.isMissing(1));
+        assertFalse(listAccess.isMissing(2));
+    }
+
+    private static void setValues(final ListWriteData data, final int idx, final String...values) {
+        StringWriteData elementData = data.createWriteData(idx, values.length);
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] != null) {
+                elementData.setString(i, values[i]);
+            } else {
+                elementData.setMissing(i);
+            }
+        }
+    }
+
+    private static class DummyIndex implements ColumnDataIndex {
+
+        private int m_index;
+
+        @Override
+        public int getIndex() {
+            return m_index;
+        }
 
     }
 

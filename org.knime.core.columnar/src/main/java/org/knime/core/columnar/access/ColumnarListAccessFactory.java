@@ -76,7 +76,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
     private final ColumnarAccessFactory m_innerAccessFactory;
 
     ColumnarListAccessFactory(final ListDataSpec listAccessSpec) {
-        final ColumnarAccessFactory innerAccessFactory =
+        final var innerAccessFactory =
             ColumnarAccessFactoryMapper.createAccessFactory(listAccessSpec.getInner());
         m_innerAccessFactory = innerAccessFactory;
     }
@@ -145,6 +145,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
 
         @Override
         public boolean isMissing(final int index) {
+            updateInnerData();
             return m_innerData.isMissing(index);
         }
     }
