@@ -48,15 +48,14 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
+import java.lang.ref.SoftReference;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
-
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 
 /**
  * This {@link DictElementCache} will be used to cache entries of dictionary-encoded data across all batches of the
@@ -80,11 +79,19 @@ public class DictElementCache {
     public static class ColumnDictElementCache<K> implements DictKeyGenerator<K> {
         private final DictKeyGenerator<K> m_dictKeyGenerator;
 
-        // We use weak cache-keys because the cache stores the mapping of dictEntry->dictKey
-        // and the dictEntries are potentially large.
-        private final Cache<?, K> m_cache = CacheBuilder.newBuilder().weakKeys().build();
+        private static final int CACHE_CLEANUP_INTERVAL = 10000;
 
-        private final Map<?, K> m_dictKeyCache;
+        private int m_accessesSinceLastClean = 0;
+
+        /**
+         * We store a hash map of dictionary elements (wrapped in soft reference keys)
+         * to the keys that were used, so that we can reuse the same dictionary key as long
+         * as holding on to the actual objects does not lead to memory pressure.
+         *
+         * SoftReferences with deleted objects could accumulate, so the map is cleaned
+         * from empty SoftReferences from time to time.
+         */
+        private final Map<SoftKey, K> m_dictKeyCache = new HashMap<>();
 
         /**
          * Create a {@link ColumnDictElementCache} using the given dictionary key type
@@ -93,18 +100,82 @@ public class DictElementCache {
          */
         public ColumnDictElementCache(final KeyType keyType) {
             m_dictKeyGenerator = DictKeys.createAscendingKeyGenerator(keyType);
-            m_dictKeyCache = m_cache.asMap();
         }
 
-        @SuppressWarnings("unchecked")
+        /**
+         * A {@link SoftKey} only holds a soft reference to the actual key object, remembers
+         * that key's hash code, and only returns true in equality checks if both objects
+         * are still available.
+         */
+        private class SoftKey {
+            private SoftReference<Object> m_ref;
+
+            private int m_hash;
+
+            public SoftKey(final Object value) {
+                m_ref = new SoftReference<>(value);
+                m_hash = value.hashCode();
+            }
+
+            @Override
+            public boolean equals(final Object obj) {
+                if (obj == this) {
+                    return true;
+                }
+
+                if (!(obj instanceof DictElementCache.ColumnDictElementCache.SoftKey)) {
+                    return false;
+                }
+
+                final var thisValue = m_ref.get();
+                if (thisValue == null) {
+                    return false;
+                }
+
+                @SuppressWarnings("unchecked")
+                final var otherValue = ((SoftKey)obj).m_ref.get();
+                if (otherValue == null) {
+                    return false;
+                }
+
+                return thisValue.equals(otherValue);
+            }
+
+            @Override
+            public int hashCode() {
+                return m_hash;
+            }
+
+            public boolean isGone() {
+                return m_ref.get() == null;
+            }
+
+            public Object get() {
+                return m_ref.get();
+            }
+        }
+
+        private void removeEmptySoftKeys() {
+            m_accessesSinceLastClean = 0;
+            m_dictKeyCache.keySet().removeIf(SoftKey::isGone);
+        }
+
         @Override
         public synchronized <T> K generateKey(final T value) {
-            // synchronized because that could possibly be called from multiple threads?
-            return ((Map<T, K>)m_dictKeyCache).computeIfAbsent(value, m_dictKeyGenerator::generateKey);
+            m_accessesSinceLastClean++;
+            if (m_accessesSinceLastClean > CACHE_CLEANUP_INTERVAL) {
+                removeEmptySoftKeys();
+            }
+
+            // synchronized because generateKey could possibly be called from multiple threads
+            return m_dictKeyCache.computeIfAbsent(new SoftKey(value), v -> {
+                return m_dictKeyGenerator.generateKey(v.get());
+            });
         }
 
         synchronized void clearCache() {
-            m_cache.invalidateAll();
+            System.out.println("Clearing caches due to memory alert!");
+            m_dictKeyCache.clear();
         }
     }
 
