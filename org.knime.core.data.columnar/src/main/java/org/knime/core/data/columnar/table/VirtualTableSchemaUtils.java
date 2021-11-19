@@ -78,6 +78,7 @@ import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.Node;
 import org.knime.core.node.util.CheckUtils;
+import org.knime.core.table.virtual.ColumnarSchemas;
 
 /**
  * Provides methods for extraction and creation of ColumnarValueSchemas from all known KnowsRowCountTables that might be
@@ -103,6 +104,11 @@ public final class VirtualTableSchemaUtils {
         throws VirtualTableIncompatibleException {
         final var schemas = extractSchemas(tables);
         final var tableSpecs = extractSpecs(schemas);
+        try {
+            ColumnarSchemas.concatenate(List.of(schemas));
+        } catch (IllegalArgumentException ex) {
+            throw new VirtualTableIncompatibleException("Schemas don't match exactly.", ex);
+        }
         final var outputSpec = AppendedRowsTable.generateDataTableSpec(tableSpecs);
         final Map<String, ValueFactory<?, ?>> factoriesByName = new LinkedHashMap<>(outputSpec.getNumColumns());
         factoriesByName.put("", getRowKeyValueFactory(schemas));
