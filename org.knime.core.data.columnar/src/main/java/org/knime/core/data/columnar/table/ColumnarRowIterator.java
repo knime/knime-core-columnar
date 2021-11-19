@@ -47,6 +47,7 @@ package org.knime.core.data.columnar.table;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
@@ -93,6 +94,13 @@ final class ColumnarRowIterator extends CloseableRowIterator {
         @Override
         public final RowKey getKey() {
             return new RowKey(m_rowKey);
+        }
+
+        @Override
+        public String toString() {
+            return m_rowKey + ": " + stream()//
+                .map(Object::toString)//
+                .collect(Collectors.joining(", ", "(", ")"));
         }
 
     }
