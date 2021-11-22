@@ -129,7 +129,12 @@ public final class MappedMessageSerializer {
             // RefCount can be > 0 if deserialize(Record|Dictionary)Batch acquired the lock after it dropped to 0 but before the lock was acquired here
             // In this case we do not want to remove the batch because it is used again
             if (refMan.getRefCount() == 0) {
-                MAPPED_BATCHES.remove(key);
+                final ArrowMessage batch = MAPPED_BATCHES.remove(key);
+                if (batch == null) {
+                    // The batch was removed already
+                    // A consumer of the batch called retain after the reference count dropped to 0. This is not allowed.
+                    throw new IllegalStateException("Tried to release a batch that has been released already.");
+                }
                 return true;
             } else {
                 return false;
@@ -218,8 +223,9 @@ public final class MappedMessageSerializer {
             "Trying to wrap unsupported message of class " + batch.getClass().getSimpleName());
     }
 
-    /** Wraps the given batch into another one. The retuned batch can be closed without closing the given batch */
+    /** Wraps the given batch into another one. The returned batch can be closed without closing the given batch */
     private static ArrowRecordBatch wrap(final ArrowRecordBatch batch, final boolean retain) {
+        // NB: The ArrowRecordBatch constructor calls retain on all buffers
         final ArrowRecordBatch b =
             new ArrowRecordBatch(batch.getLength(), batch.getNodes(), batch.getBuffers(), batch.getBodyCompression());
         if (!retain) {
@@ -230,7 +236,7 @@ public final class MappedMessageSerializer {
         return b;
     }
 
-    /** Wraps the given batch into another one. The retuned batch can be closed without closing the given batch */
+    /** Wraps the given batch into another one. The returned batch can be closed without closing the given batch */
     @SuppressWarnings("resource")
     private static ArrowDictionaryBatch wrap(final ArrowDictionaryBatch batch, final boolean retain) {
         final ArrowRecordBatch dictionary = wrap(batch.getDictionary(), retain);

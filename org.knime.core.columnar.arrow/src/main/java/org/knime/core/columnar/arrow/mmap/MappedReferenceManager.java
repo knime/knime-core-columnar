@@ -137,6 +137,11 @@ final class MappedReferenceManager implements ReferenceManager {
 
     @Override
     public void retain(final int increment) {
+        // NB: m_refCount can be 0 here.
+        // This happens if this is released and at the same time deserialized again from the MappedMessageSerializer.
+        // MappedMessageSerializer#deserializeBatch acquires the lock first and calls retain.
+        // MappedMessageSerializer#removeBatch will return "false" because the ref count is not 0 anymore and m_mappedBuffer
+        // will not be cleaned and set to null.
         m_refCount.getAndAdd(increment);
     }
 
