@@ -150,7 +150,8 @@ public final class ColumnarValueSchemaUtils {
                 result[i] = creator.createSpec();
             }
         }
-        return new UpdatedColumnarValueSchema(new DataTableSpec(result), source);
+        final var sourceName = source.getSourceSpec().getName();
+        return new UpdatedColumnarValueSchema(new DataTableSpec(sourceName, result), source);
     }
 
 }
