@@ -178,11 +178,6 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
             m_finalizer.close();
             m_writeCursor.flush();
             m_writeCursor.close();
-            try {
-                m_store.flush();
-            } catch (final IOException ex) {
-                LOGGER.error("Exception while flushing cache.", ex);
-            }
             final ColumnarValueSchema schema;
             if (m_nullableDomainWritable != null) {
                 final Map<Integer, DataColumnDomain> domains = new HashMap<>();
