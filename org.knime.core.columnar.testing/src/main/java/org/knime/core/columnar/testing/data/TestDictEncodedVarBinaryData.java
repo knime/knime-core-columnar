@@ -59,6 +59,7 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarB
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
 import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
+import org.knime.core.table.io.ReadableDataInputStream;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
@@ -146,7 +147,7 @@ public final class TestDictEncodedVarBinaryData<K> extends AbstractTestDictEncod
     public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
         final DataInput input = new DataInputStream(new ByteArrayInputStream(getBytes(index)));
         try {
-            return deserializer.deserialize(input);
+            return deserializer.deserialize(new ReadableDataInputStream(new ByteArrayInputStream(getBytes(index))));
         } catch (IOException ex) {
             throw new IllegalStateException("Error during deserialization", ex);
         }

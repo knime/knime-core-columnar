@@ -47,14 +47,14 @@ package org.knime.core.columnar.testing.data;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInput;
-import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.table.io.ReadableDataInput;
+import org.knime.core.table.io.ReadableDataInputStream;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
@@ -116,7 +116,7 @@ public final class TestVarBinaryData extends AbstractTestData implements VarBina
 
     @Override
     public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-        final DataInput input = new DataInputStream(new ByteArrayInputStream(getBytes(index)));
+        final ReadableDataInput input = new ReadableDataInputStream(new ByteArrayInputStream(getBytes(index)));
         try {
             return deserializer.deserialize(input);
         } catch (IOException ex) {
