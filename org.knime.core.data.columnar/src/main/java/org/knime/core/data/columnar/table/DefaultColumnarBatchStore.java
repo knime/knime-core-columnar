@@ -75,6 +75,7 @@ import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.util.DuplicateChecker;
+import org.knime.core.util.ThreadUtils;
 
 /**
  * Enhances a {@link BatchStore} with additional features like caching, dictionary encoding, domain calculation and
@@ -289,13 +290,13 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         m_memListener = new MemoryAlertListener() {
             @Override
             protected boolean memoryAlert(final MemoryAlert alert) {
-                new Thread(() -> {
+                new Thread(ThreadUtils.runnableWithContext(() -> {
                     try {
                         m_heapCache.flush();
                     } catch (IOException ex) {
                         LOGGER.error("Error during enforced premature serialization of object data.", ex);
                     }
-                }).start();
+                })).start();
                 return false;
             }
         };

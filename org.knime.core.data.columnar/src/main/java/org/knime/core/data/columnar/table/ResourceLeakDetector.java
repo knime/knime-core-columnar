@@ -63,6 +63,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.knime.core.node.NodeLogger;
+import org.knime.core.node.workflow.NodeContext;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -118,6 +119,8 @@ final class ResourceLeakDetector {
 
         private final AtomicBoolean m_closed = new AtomicBoolean();
 
+        private final NodeContext m_nodeContext;
+
         private final String m_stackTraceAtConstructionTime =
             VERBOSE ? stackTraceToString(Thread.currentThread().getStackTrace()) : null;
 
@@ -125,6 +128,7 @@ final class ResourceLeakDetector {
             super(referent, m_enqueuedFinalizers);
             m_referentName = VERBOSE ? referent.getClass().getSimpleName() : null;
             m_resources = resources;
+            m_nodeContext = NodeContext.getContext();
         }
 
         /**
@@ -159,8 +163,13 @@ final class ResourceLeakDetector {
                     LOGGER.debugWithFormat("Current call stack: %s",
                         stackTraceToString(Thread.currentThread().getStackTrace()));
                 }
-                for (final ResourceWithRelease resource : m_resources) {
-                    resource.release();
+                NodeContext.pushContext(m_nodeContext);
+                try {
+                    for (final ResourceWithRelease resource : m_resources) {
+                        resource.release();
+                    }
+                } finally {
+                    NodeContext.removeLastContext();
                 }
             }
             close();
