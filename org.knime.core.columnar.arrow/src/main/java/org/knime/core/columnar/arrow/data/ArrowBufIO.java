@@ -61,6 +61,7 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BaseLargeVariableWidthVector;
 import org.apache.arrow.vector.BitVectorHelper;
 import org.apache.arrow.vector.LargeVarBinaryVector;
+import org.knime.core.table.io.ReadableDataInput;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
@@ -147,7 +148,7 @@ final class ArrowBufIO {
         vector.getOffsetBuffer().setLong((long)index * OFFSET_WIDTH, offset);
     }
 
-    private static final class ArrowBufDataInput implements DataInput {
+    private static final class ArrowBufDataInput implements ReadableDataInput {
 
         private final ArrowBuf m_buffer;
 
@@ -184,6 +185,23 @@ final class ArrowBufIO {
             }
             m_buffer.getBytes(m_bufferIndex, b, off, len);
             m_bufferIndex += len;
+        }
+
+        @Override
+        public int read(final byte[] b, final int off, final int len) throws EOFException {
+            if (off + len > b.length) {
+                throw new IndexOutOfBoundsException();
+            }
+            if (len == 0) {
+                return 0;
+            }
+            if (m_bufferIndex >= m_nextBufferIndex) {
+                throw new EOFException();
+            }
+            int actualLen = m_bufferIndex + len > m_nextBufferIndex ? ((int)(m_nextBufferIndex - m_bufferIndex)) : len;
+            m_buffer.getBytes(m_bufferIndex, b, off, actualLen);
+            m_bufferIndex += actualLen;
+            return actualLen;
         }
 
         @Override
