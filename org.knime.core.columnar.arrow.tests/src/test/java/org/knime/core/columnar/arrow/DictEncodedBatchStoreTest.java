@@ -57,8 +57,6 @@ import static org.knime.core.table.schema.DataSpecs.STRUCT;
 import static org.knime.core.table.schema.DataSpecs.VARBINARY;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import org.junit.After;
 import org.junit.Before;
@@ -78,6 +76,7 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedRandomAccessBatchRea
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
@@ -89,16 +88,16 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 @SuppressWarnings("javadoc")
 public class DictEncodedBatchStoreTest {
 
-    private Path m_tempPath;
+    private FileHandle m_tempPath;
 
     @Before
     public void before() throws IOException {
-        m_tempPath = ArrowTestUtils.createTmpKNIMEArrowPath();
+        m_tempPath = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
     }
 
     @After
     public void after() throws IOException {
-        Files.delete(m_tempPath);
+        m_tempPath.delete();
     }
 
     @Test

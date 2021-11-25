@@ -93,12 +93,13 @@ public class ArrowMemoryTest {
                 final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
                 final ColumnarSchema schema = createWideSchema(DOUBLE, numColumns);
 
-                try (final BatchStore store = factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowPath())) {
+                try (final BatchStore store =
+                    factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowFileSupplier())) {
 
                     storeData(numChunks, chunkSize, numColumns, store);
 
                     try (final BatchStore copyStore =
-                        factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowPath())) {
+                        factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowFileSupplier())) {
 
                         copyData(numChunks, store, copyStore);
                     }

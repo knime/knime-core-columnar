@@ -93,6 +93,7 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.store.FileHandle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,9 +105,9 @@ import org.slf4j.LoggerFactory;
  */
 class ArrowBatchWriter implements BatchWriter {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ArrowBatchWriter.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(ArrowBatchWriter.class);
 
-    private final File m_file;
+    private final FileHandle m_fileHandle;
 
     /** Factories used to get the vectors and dicts from the columns */
     private final ArrowColumnDataFactory[] m_factories;
@@ -134,9 +135,9 @@ class ArrowBatchWriter implements BatchWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    ArrowBatchWriter(final File file, final ArrowColumnDataFactory[] factories, final ArrowCompression compression,
+    ArrowBatchWriter(final FileHandle file, final ArrowColumnDataFactory[] factories, final ArrowCompression compression,
         final BufferAllocator allocator) {
-        m_file = file;
+        m_fileHandle = file;
         m_factories = factories;
         m_compression = compression;
         m_allocator = allocator;
@@ -185,7 +186,8 @@ class ArrowBatchWriter implements BatchWriter {
             m_chunkSize.set(batch.length());
             m_firstWrite = false;
             final Schema schema = new Schema(fields, getMetadata());
-            m_writer = new ArrowWriter(m_file, schema);
+
+            m_writer = new ArrowWriter(m_fileHandle.asFile(), schema);
         }
 
         // Write the dictionaries
@@ -249,8 +251,8 @@ class ArrowBatchWriter implements BatchWriter {
                 m_writer.writeFooter();
                 m_writer.close();
                 if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug("Closing file {} ({})", m_file.getAbsolutePath(),
-                        FileUtils.byteCountToDisplaySize(FileUtils.sizeOf(m_file)));
+                    LOGGER.debug("Closing file {} ({})", m_fileHandle.asFile().getAbsolutePath(),
+                        FileUtils.byteCountToDisplaySize(FileUtils.sizeOf(m_fileHandle.asFile())));
                 }
             }
             m_closed = true;

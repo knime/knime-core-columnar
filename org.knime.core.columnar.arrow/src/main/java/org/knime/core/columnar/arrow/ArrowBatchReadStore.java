@@ -75,7 +75,7 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
 
     ArrowBatchReadStore(final Path path, final BufferAllocator allocator,
         final AtomicInteger numBatches, final AtomicInteger maxLength) {
-        super(ArrowSchemaUtils.readSchema(path), path, allocator);
+        super(ArrowSchemaUtils.readSchema(path), new PathBackedFileHandle(path), allocator);
         m_numBatches = numBatches;
         m_maxLength = maxLength;
     }
@@ -83,7 +83,7 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
     @Override
     public ArrowBatchReader createRandomAccessReader(final ColumnSelection config) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
-        return new ArrowBatchReader(m_path.toFile(), m_allocator, factories, config);
+        return new ArrowBatchReader(m_fileHandle.asFile(), m_allocator, factories, config);
     }
 
     private final void initMetadata() {
@@ -124,4 +124,5 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
         }
         return m_useLZ4BlockCompression;
     }
+
 }

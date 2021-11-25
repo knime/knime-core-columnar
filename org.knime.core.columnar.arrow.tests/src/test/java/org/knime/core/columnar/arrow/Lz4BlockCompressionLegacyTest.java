@@ -53,7 +53,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_LZ4_BLOCK_COMPRESSION;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 
@@ -69,6 +68,7 @@ import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
 
@@ -79,7 +79,8 @@ import org.knime.core.table.schema.DataSpecs;
  */
 public class Lz4BlockCompressionLegacyTest {
 
-    private static final File FILE = Path.of("test_data", "LZ4_block_compression", "data.arrow").toFile();
+    private static final FileHandle FILE =
+        ArrowTestUtils.createFileSupplier(Path.of("test_data", "LZ4_block_compression", "data.arrow"));
 
     private static final ColumnarSchema SCHEMA = ColumnarSchema.of(DataSpecs.INT, DataSpecs.STRING);
 
@@ -121,7 +122,7 @@ public class Lz4BlockCompressionLegacyTest {
     public void testReadLz4BlockData() throws IOException {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(SCHEMA);
         try (final ArrowBatchReader reader =
-            new ArrowBatchReader(FILE, m_alloc, factories, new DefaultColumnSelection(2))) {
+            new ArrowBatchReader(FILE.asFile(), m_alloc, factories, new DefaultColumnSelection(2))) {
             for (int b = 0; b < NUM_BATCHES; b++) {
                 checkBatch(reader, b);
             }

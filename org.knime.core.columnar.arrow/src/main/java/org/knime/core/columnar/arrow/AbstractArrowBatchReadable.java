@@ -53,6 +53,7 @@ import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.batch.BatchReadable;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -66,19 +67,22 @@ abstract class AbstractArrowBatchReadable implements BatchReadable, ArrowIpcFile
 
     protected final ColumnarSchema m_schema;
 
-    protected final Path m_path;
+    protected final FileHandle m_fileHandle;
 
     protected final BufferAllocator m_allocator;
 
-    AbstractArrowBatchReadable(final ColumnarSchema schema, final Path path, final BufferAllocator allocator) {
+    AbstractArrowBatchReadable(final ColumnarSchema schema, final FileHandle file, final BufferAllocator allocator) {
         m_schema = schema;
-        m_path = path;
+        m_fileHandle = file;
         m_allocator = allocator;
     }
 
+    /**
+     * @return the fileHandle
+     */
     @Override
-    public Path getPath() {
-        return m_path;
+    public FileHandle getFileHandle() {
+        return m_fileHandle;
     }
 
     @Override

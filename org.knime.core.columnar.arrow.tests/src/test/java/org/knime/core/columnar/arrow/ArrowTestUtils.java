@@ -84,6 +84,7 @@ import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.store.FileHandle;
 
 /**
  * A static class with utility methods for arrow tests.
@@ -107,6 +108,20 @@ public final class ArrowTestUtils {
         final Path path = Files.createTempFile("KNIME-" + UUID.randomUUID().toString(), ".knarrow");
         path.toFile().deleteOnExit();
         return path;
+    }
+
+    /**
+     * Create a FileSupplier that is backed by a temporary file which is deleted on exit.
+     *
+     * @return the fileSupplier
+     * @throws IOException if the file backing the FileSupplier could not be created
+     */
+    public static FileHandle createTmpKNIMEArrowFileSupplier() throws IOException {
+        return new TestFileSupplier(createTmpKNIMEArrowPath());
+    }
+
+    public static FileHandle createFileSupplier(final Path path) {
+        return new TestFileSupplier(path);
     }
 
     /**

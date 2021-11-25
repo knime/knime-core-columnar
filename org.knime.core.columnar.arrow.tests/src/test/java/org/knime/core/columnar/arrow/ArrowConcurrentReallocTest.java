@@ -52,7 +52,6 @@ import static org.junit.Assert.assertTrue;
 import static org.knime.core.table.schema.DataSpecs.VARBINARY;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -72,6 +71,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.junit.Test;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -202,7 +202,7 @@ public class ArrowConcurrentReallocTest {
         // Try 50 times to run into the race condition that crashes the JVM
         for (int iteration = 0; iteration < 1; iteration++) {
 
-            final Path path = ArrowTestUtils.createTmpKNIMEArrowPath();
+            final FileHandle path = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
             long cachedDataSize = 0;
 
             try (final ArrowBatchStore store = storeFactory.createStore(schema, path);

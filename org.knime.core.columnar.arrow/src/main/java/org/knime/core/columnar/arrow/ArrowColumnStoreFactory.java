@@ -57,6 +57,7 @@ import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -129,8 +130,8 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowBatchStore createStore(final ColumnarSchema schema, final Path path) {
-        return new ArrowBatchStore(schema, path, m_compression, newChildAllocator("ArrowColumnStore"));
+    public ArrowBatchStore createStore(final ColumnarSchema schema, final FileHandle fileSupplier) {
+        return new ArrowBatchStore(schema, fileSupplier, m_compression, newChildAllocator("ArrowColumnStore"));
     }
 
     @Override

@@ -50,7 +50,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
@@ -76,6 +75,7 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
+import org.knime.core.columnar.store.FileHandle;
 
 /**
  * Abstract test for simple Arrow {@link NullableReadData}, {@link NullableWriteData} implementations.
@@ -526,7 +526,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
+        final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowBatchWriter writer =
             new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
@@ -536,7 +536,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
 
         // Read
         try (final ArrowBatchReader reader =
-            new ArrowBatchReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
+            new ArrowBatchReader(tmp.asFile(), m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
             assertEquals(numValues, batch.length());
@@ -548,7 +548,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             }
             batch.release();
         }
-        Files.delete(tmp.toPath());
+        Files.delete(tmp.asPath());
     }
 
     /**
@@ -572,7 +572,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
+        final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowBatchWriter writer =
             new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
@@ -582,7 +582,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
 
         // Read
         try (final ArrowBatchReader reader =
-            new ArrowBatchReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
+            new ArrowBatchReader(tmp.asFile(), m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
             assertEquals(numValues, batch.length());
@@ -599,7 +599,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             }
             batch.release();
         }
-        Files.delete(tmp.toPath());
+        Files.delete(tmp.asPath());
     }
 
     /**
@@ -619,7 +619,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final File tmp = ArrowTestUtils.createTmpKNIMEArrowPath().toFile();
+        final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowBatchWriter writer =
             new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
@@ -629,7 +629,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
 
         // Read
         try (final ArrowBatchReader reader =
-            new ArrowBatchReader(tmp, m_alloc, factories, new DefaultColumnSelection(1))) {
+            new ArrowBatchReader(tmp.asFile(), m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
             assertEquals(numValues, batch.length());
@@ -641,6 +641,6 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             }
             batch.release();
         }
-        Files.delete(tmp.toPath());
+        Files.delete(tmp.asPath());
     }
 }

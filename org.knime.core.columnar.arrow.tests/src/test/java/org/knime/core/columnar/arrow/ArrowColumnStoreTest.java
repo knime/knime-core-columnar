@@ -56,7 +56,6 @@ import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -82,6 +81,7 @@ import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
@@ -95,8 +95,9 @@ import org.knime.core.table.schema.traits.DefaultDataTraits;
  */
 public class ArrowColumnStoreTest {
 
-    static Path writePath;
-    static Path readPath;
+    static FileHandle writePath;
+    static FileHandle readPath;
+
 
     /**
      * Before running the tests, we create temporary paths where ArrowBatchStores can write
@@ -106,8 +107,8 @@ public class ArrowColumnStoreTest {
      */
     @BeforeClass
     public static void beforeClass() throws IOException {
-        writePath = ArrowTestUtils.createTmpKNIMEArrowPath();
-        readPath = ArrowTestUtils.createTmpKNIMEArrowPath();
+        writePath = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
+        readPath = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
     }
 
     /**
@@ -116,8 +117,8 @@ public class ArrowColumnStoreTest {
      */
     @After
     public void after() throws IOException {
-        Files.deleteIfExists(writePath);
-        Files.deleteIfExists(readPath);
+        writePath.delete();
+        readPath.delete();
     }
 
     /**
@@ -274,7 +275,7 @@ public class ArrowColumnStoreTest {
 
             @SuppressWarnings("resource")
             final ArrowBatchWriter writer =
-                new ArrowBatchWriter(writePath.toFile(), factories, ARROW_NO_COMPRESSION, allocator);
+                new ArrowBatchWriter(writePath, factories, ARROW_NO_COMPRESSION, allocator);
             ReadBatch batch;
 
             // Write batch 0
@@ -288,7 +289,7 @@ public class ArrowColumnStoreTest {
             batch.release();
 
             @SuppressWarnings("resource")
-            final RandomAccessBatchReader reader = new ArrowPartialFileBatchReader(writePath.toFile(), allocator,
+            final RandomAccessBatchReader reader = new ArrowPartialFileBatchReader(writePath.asFile(), allocator,
                 factories, new DefaultColumnSelection(1), writer.getOffsetProvider());
 
             // Read back batch 1 already
@@ -375,7 +376,7 @@ public class ArrowColumnStoreTest {
             // Create the partial readable
             @SuppressWarnings("resource")
             final ArrowPartialFileBatchReadable readable =
-                factory.createPartialFileReadable(writePath, writeStore.getOffsetProvider());
+                factory.createPartialFileReadable(writePath.asPath(), writeStore.getOffsetProvider());
             @SuppressWarnings("resource")
             final RandomAccessBatchReader reader = readable.createRandomAccessReader();
 
@@ -455,21 +456,21 @@ public class ArrowColumnStoreTest {
             readBatch.release();
 
             // Assert that the file has been written
-            assertTrue(Files.exists(writePath));
-            assertTrue(Files.size(writePath) > 0);
+            assertTrue(Files.exists(writePath.asPath()));
+            assertTrue(Files.size(writePath.asPath()) > 0);
 
-            Files.copy(writePath, readPath);
+            Files.copy(writePath.asPath(), readPath.asPath());
         }
 
         // Assert that the file written to does exist after closing the store
-        assertTrue(Files.exists(writePath));
+        assertTrue(Files.exists(writePath.asPath()));
 
         // Assert that the file for reading exists
-        assertTrue(Files.exists(readPath));
-        assertTrue(Files.size(readPath) > 0);
+        assertTrue(Files.exists(readPath.asPath()));
+        assertTrue(Files.size(readPath.asPath()) > 0);
 
         // Use the read store to read some data
-        try (final BatchReadStore readStore = factory.createReadStore(readPath)) {
+        try (final BatchReadStore readStore = factory.createReadStore(readPath.asPath())) {
             assertEquals(schema, readStore.getSchema());
             assertEquals(1, readStore.numBatches());
             assertEquals(chunkSize, readStore.batchLength());
@@ -495,8 +496,8 @@ public class ArrowColumnStoreTest {
         }
 
         // Assert that the file for reading exists
-        assertTrue(Files.exists(readPath));
-        assertTrue(Files.size(readPath) > 0);
+        assertTrue(Files.exists(readPath.asPath()));
+        assertTrue(Files.size(readPath.asPath()) > 0);
     }
 
     /** Fill the given batch (consisting of one int column) with some random data */

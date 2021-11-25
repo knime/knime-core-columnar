@@ -48,11 +48,11 @@
  */
 package org.knime.core.columnar.arrow;
 
-import java.nio.file.Path;
+import org.knime.core.columnar.store.FileHandle;
 
 /**
  * This interface must be implemented by classes that write to or read from files in the Arrow IPC file format. There is
- * only the method {@link #getPath()} which must provide the path to the file.
+ * only the method {@link #getFileHandle()} which must provide the path to the file.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
@@ -61,5 +61,5 @@ public interface ArrowIpcFileStore {
     /**
      * @return the path to the Arrow IPC file.
      */
-    Path getPath();
+    FileHandle getFileHandle();
 }

@@ -42,75 +42,53 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 23, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.arrow;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.arrow.compress.ArrowCompression;
-import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.table.schema.ColumnarSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * A {@link BatchStore} implementation for Arrow.
+ * {@link FileHandle} that is backed by an existing {@link Path}.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowBatchStore extends AbstractArrowBatchReadable implements BatchStore {
+final class PathBackedFileHandle implements FileHandle {
 
-    private final ArrowColumnDataFactory[] m_factories;
+    private static final Logger LOGGER = LoggerFactory.getLogger(PathBackedFileHandle.class);
 
-    private final ArrowBatchWriter m_writer;
+    private final Path m_path;
 
-    ArrowBatchStore(final ColumnarSchema schema, final FileHandle fileSupplier, final ArrowCompression compression,
-        final BufferAllocator allocator) {
-        super(schema, fileSupplier, allocator);
-        m_factories = ArrowSchemaMapper.map(schema);
-        m_writer = new ArrowBatchWriter(fileSupplier, m_factories, compression, m_allocator);
+    PathBackedFileHandle(final Path path) {
+        m_path = path;
     }
 
     @Override
-    public BatchWriter getWriter() {
-
-        return m_writer;
+    public File asFile() {
+        return m_path.toFile();
     }
 
     @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
-        return new ArrowPartialFileBatchReader(getFileHandle().asFile(), m_allocator, m_factories, config,
-            m_writer.getOffsetProvider());
+    public void delete() {
+        try {
+            Files.deleteIfExists(m_path);
+        } catch (IOException ex) {
+            LOGGER.error("Exception while deleting file: " + m_path, ex);
+        }
     }
 
     @Override
-    public int numBatches() {
-        return m_writer.numBatches();
-    }
-
-    @Override
-    public int batchLength() {
-        return m_writer.batchLength();
-    }
-
-    /**
-     * @return an object that can provide the offsets of record batches and dictionary batches in an Arrow IPC file. If
-     *         new batches are written to the file after this method was called, the object will also provide offsets to
-     *         the newly written batches.
-     */
-    public OffsetProvider getOffsetProvider() {
-        return m_writer.getOffsetProvider();
-    }
-
-    @Override
-    public void close() throws IOException {
-        m_writer.close();
-        super.close();
+    public Path asPath() {
+        return m_path;
     }
 
 }

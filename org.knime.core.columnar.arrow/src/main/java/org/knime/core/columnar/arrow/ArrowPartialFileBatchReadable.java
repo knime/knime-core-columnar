@@ -67,13 +67,13 @@ public class ArrowPartialFileBatchReadable extends AbstractArrowBatchReadable im
 
     ArrowPartialFileBatchReadable(final Path path, final OffsetProvider offsetProvider,
         final BufferAllocator allocator) {
-        super(ArrowSchemaUtils.readSchema(path), path, allocator);
+        super(ArrowSchemaUtils.readSchema(path), new PathBackedFileHandle(path), allocator);
         m_offsetProvider = offsetProvider;
     }
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
-        return new ArrowPartialFileBatchReader(m_path.toFile(), m_allocator, factories, selection, m_offsetProvider);
+        return new ArrowPartialFileBatchReader(m_fileHandle.asFile(), m_allocator, factories, selection, m_offsetProvider);
     }
 }
