@@ -48,12 +48,15 @@
  */
 package org.knime.core.data.columnar.table;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
 import org.knime.core.data.columnar.domain.DomainWritable;
@@ -115,9 +118,8 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         final ColumnarRowWriteTableSettings settings) throws IOException {
         m_schema = schema;
         m_storeFactory = storeFactory;
-        final var path = DataContainer.createTempFile(".knable").toPath();
         @SuppressWarnings("resource") // Low-level store will be closed along with the built columnar store.
-        final var builder = new ColumnarBatchStoreBuilder(m_storeFactory.createStore(m_schema, path));
+        final var builder = new ColumnarBatchStoreBuilder(m_storeFactory.createStore(m_schema, new TempFileSupplier()));
         if (settings.isUseCaching()) {
             builder //
                 .useColumnDataCache( //
@@ -140,9 +142,52 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         m_store = builder.build();
         // Will return null if the builder did not include domain calculation.
         m_nullableDomainWritable = m_store.getDomainWritable();
-        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, settings.isForceSynchronousIO() ? m_store : null);
+        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, null);
 
         m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, m_writeCursor, m_store);
+    }
+
+    private static final class TempFileSupplier implements FileHandle {
+        private File m_file = null;
+        private Path m_path = null;
+
+        @Override
+        public synchronized File asFile() {
+            init();
+            return m_file;
+        }
+
+        @Override
+        public synchronized void delete() {
+            if (m_path != null) {
+                try {
+                    Files.deleteIfExists(m_path);
+                } catch (IOException ex) {
+                    LOGGER.error("Exception while deleting temporary columnar output file.", ex);
+                }
+            }
+        }
+
+        private synchronized void init() {
+            if (m_file == null) {
+                try {
+                    m_file = DataContainer.createTempFile(".knable");
+                    m_path = m_file.toPath();
+                } catch (IOException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+        }
+
+        @Override
+        public Path asPath() {
+            init();
+            return m_path;
+        }
+
+
+
+
     }
 
     /**
@@ -214,11 +259,7 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
             } catch (final IOException ex) {
                 LOGGER.error("Exception while closing store.", ex);
             }
-            try {
-                Files.deleteIfExists(m_store.getPath());
-            } catch (final IOException ex) {
-                LOGGER.error("Exception while deleting temporary columnar output file.", ex);
-            }
+            m_store.getFileHandle().delete();
         }
     }
 }

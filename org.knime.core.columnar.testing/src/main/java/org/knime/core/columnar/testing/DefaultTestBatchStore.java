@@ -48,7 +48,6 @@ package org.knime.core.columnar.testing;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -61,6 +60,7 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.columnar.testing.data.TestData;
 import org.knime.core.columnar.testing.data.TestDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -180,7 +180,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
 
     private final TestDataFactory[] m_factories;
 
-    private final Path m_path;
+    private final FileHandle m_fileHandle;
 
     private final TestBatchWriter m_writer = new TestBatchWriter();
 
@@ -202,19 +202,19 @@ public final class DefaultTestBatchStore implements TestBatchStore {
         return create(schema, null);
     }
 
-    public static DefaultTestBatchStore create(final ColumnarSchema schema, final Path path) {
-        final DefaultTestBatchStore store = new DefaultTestBatchStore(schema, path);
+    public static DefaultTestBatchStore create(final ColumnarSchema schema, final FileHandle fileHandle) {
+        final DefaultTestBatchStore store = new DefaultTestBatchStore(schema, fileHandle);
         ColumnarTest.OPEN_CLOSEABLES.add(store);
         ColumnarTest.OPEN_CLOSEABLES.add(store.m_writer);
         return store;
     }
 
-    private DefaultTestBatchStore(final ColumnarSchema schema, final Path path) {
+    private DefaultTestBatchStore(final ColumnarSchema schema, final FileHandle fileHandle) {
         m_schema = schema;
         m_factories = IntStream.range(0, schema.numColumns()) //
             .mapToObj(i -> schema.getSpec(i).accept(TestSchemaMapper.INSTANCE, schema.getTraits(i)) )//
             .toArray(TestDataFactory[]::new);
-        m_path = path;
+        m_fileHandle = fileHandle;
     }
 
     @Override
@@ -291,8 +291,8 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     }
 
     @Override
-    public Path getPath() {
-        return m_path;
+    public FileHandle getFileHandle() {
+        return m_fileHandle;
     }
 
 }

@@ -55,6 +55,7 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
@@ -82,8 +83,8 @@ final class ColumnarTableTestUtils {
         }
 
         @Override
-        public BatchStore createStore(final ColumnarSchema schema, final Path path) {
-            return TestBatchStore.create(schema, path);
+        public BatchStore createStore(final ColumnarSchema schema, final FileHandle fileSupplier) {
+            return TestBatchStore.create(schema, fileSupplier);
         }
 
         @Override

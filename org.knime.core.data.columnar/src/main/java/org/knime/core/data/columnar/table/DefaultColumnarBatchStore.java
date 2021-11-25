@@ -49,7 +49,6 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.batch.BatchWritable;
@@ -66,6 +65,7 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadabl
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.domain.DomainWritableConfig;
 import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
@@ -274,7 +274,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             m_writable = m_domainWritable;
         }
 
-        m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getPath());
+        m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getFileHandle());
     }
 
     private void initHeapCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
@@ -381,8 +381,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
     }
 
     @Override
-    public Path getPath() {
-        return m_wrappedStore.getPath();
+    public FileHandle getFileHandle() {
+        return m_wrappedStore.getFileHandle();
     }
 
     /**

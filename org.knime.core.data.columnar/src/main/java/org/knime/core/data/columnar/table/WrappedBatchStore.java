@@ -49,7 +49,6 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -61,6 +60,7 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.columnar.table.WrappedBatchReadStore.WrappedRandomAccessBatchReader;
 import org.knime.core.table.schema.ColumnarSchema;
 
@@ -149,7 +149,7 @@ public final class WrappedBatchStore implements BatchStore {
 
     private final RandomAccessBatchReadable m_readable;
 
-    private final Path m_path;
+    private final FileHandle m_fileHandle;
 
     private final AtomicBoolean m_storeClosed = new AtomicBoolean();
 
@@ -162,12 +162,12 @@ public final class WrappedBatchStore implements BatchStore {
      *
      * @param writable The {@link BatchWritable}
      * @param readable The {@link RandomAccessBatchReadable}
-     * @param path The path
+     * @param fileHandle The file handle
      */
-    public WrappedBatchStore(final BatchWritable writable, final RandomAccessBatchReadable readable, final Path path) {
+    public WrappedBatchStore(final BatchWritable writable, final RandomAccessBatchReadable readable, final FileHandle fileHandle) {
         m_writable = writable;
         m_readable = readable;
-        m_path = path;
+        m_fileHandle = fileHandle;
         m_writer = new WrappedBatchWriter(m_writable, m_storeClosed, m_writerClosed);
     }
 
@@ -187,8 +187,8 @@ public final class WrappedBatchStore implements BatchStore {
     }
 
     @Override
-    public Path getPath() {
-        return m_path;
+    public FileHandle getFileHandle() {
+        return m_fileHandle;
     }
 
     @Override

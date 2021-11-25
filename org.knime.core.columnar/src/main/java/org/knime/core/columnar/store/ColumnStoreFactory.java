@@ -62,11 +62,11 @@ public interface ColumnStoreFactory {
      * Expects that the provided file does not exist yet, if it does, it will be overwritten.
      *
      * @param schema the columnar schema of the to-be-created store
-     * @param path to write data to
+     * @param fileHandle to write data to
      * @return a newly created store
      */
 
-    BatchStore createStore(ColumnarSchema schema, Path path);
+    BatchStore createStore(ColumnarSchema schema, FileHandle fileHandle);
 
     /**
      * Creates a new {@link BatchReadStore}, reading data from the provided file.

@@ -82,7 +82,7 @@ public class WrappedBatchStoreTest extends ColumnarTest {
     @SuppressWarnings("resource")
     private static WrappedBatchStore generateDefaultWrappedBatchStore() {
         final TestBatchStore delegate = TestBatchStore.create(SCHEMA);
-        return new WrappedBatchStore(delegate, delegate, delegate.getPath());
+        return new WrappedBatchStore(delegate, delegate, delegate.getFileHandle());
     }
 
     static final ColumnarValueSchema SCHEMA = generateDefaultSchema();

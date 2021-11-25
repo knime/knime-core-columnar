@@ -78,7 +78,8 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      * @return The newly created table.
      */
     public static UnsavedColumnarContainerTable create(final int tableId, final ColumnarRowReadTable columnarTable) {
-        final var table = new UnsavedColumnarContainerTable(tableId, columnarTable, () -> {});
+        final var table = new UnsavedColumnarContainerTable(tableId, columnarTable, () -> {
+        });
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
         table.initStoreCloser();
@@ -123,7 +124,7 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
         m_flushable.flush();
         @SuppressWarnings("resource") // Store's life cycle is handled by super class.
         final BatchReadStore store = getStore();
-        Files.copy(store.getPath(), f.toPath());
+        Files.copy(store.getFileHandle().asPath(), f.toPath());
     }
 
     @Override
@@ -135,12 +136,8 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     @Override
     public void clear() {
         super.clear();
-        try {
-            @SuppressWarnings("resource") // Store's life cycle is handled by super class.
-            final BatchReadStore store = getStore();
-            Files.deleteIfExists(store.getPath());
-        } catch (final IOException e) {
-            LOGGER.info("Error when deleting file that backed the UnsavedColumnarContainerTable.", e);
-        }
+        @SuppressWarnings("resource") // Store's life cycle is handled by super class.
+        final BatchReadStore store = getStore();
+        store.getFileHandle().delete();
     }
 }

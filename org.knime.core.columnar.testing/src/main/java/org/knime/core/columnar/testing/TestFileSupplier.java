@@ -42,37 +42,48 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 24, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.testing;
 
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.columnar.testing.data.TestData;
-import org.knime.core.table.schema.ColumnarSchema;
-
-// TODO: this class duplicates code from TestBatchBuffer. Consolidate!
 
 /**
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * FileSupplier for testing purposes.
+ *
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public interface TestBatchStore extends BatchStore {
+public final class TestFileSupplier implements FileHandle {
+    private final Path m_path;
 
-    public void blockOnCreateWriteRead(final CountDownLatch latch);
-
-    public List<TestData> getData();
-
-    @SuppressWarnings("resource")
-    public static TestBatchStore create(final ColumnarSchema schema) {
-        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema));
+    TestFileSupplier(final Path path) {
+        m_path = path;
     }
 
-    @SuppressWarnings("resource")
-    public static TestBatchStore create(final ColumnarSchema schema, final FileHandle fileHandle) {
-        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema, fileHandle));
+    @Override
+    public File asFile() {
+        return m_path.toFile();
     }
+
+    @Override
+    public void delete() {
+        try {
+            Files.deleteIfExists(m_path);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to delete store file.");
+        }
+    }
+
+    @Override
+    public Path asPath() {
+        return m_path;
+    }
+
 }

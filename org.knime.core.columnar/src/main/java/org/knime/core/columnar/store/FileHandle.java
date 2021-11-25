@@ -42,37 +42,38 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 23, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.testing;
+package org.knime.core.columnar.store;
 
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-
-import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.columnar.testing.data.TestData;
-import org.knime.core.table.schema.ColumnarSchema;
-
-// TODO: this class duplicates code from TestBatchBuffer. Consolidate!
+import java.io.File;
+import java.nio.file.Path;
 
 /**
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * A handle to a file that might be created lazily when {@link #asFile()} or {@link #asPath()} are called.
+ *
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public interface TestBatchStore extends BatchStore {
+public interface FileHandle {
 
-    public void blockOnCreateWriteRead(final CountDownLatch latch);
+    /**
+     * Deletes the file if it exists.
+     */
+    void delete();
 
-    public List<TestData> getData();
+    /**
+     * Provides the path to the underlying file. The first call may initialize the file if it isn't initialized yet.
+     *
+     * @return the path to the underlying file
+     */
+    Path asPath();
 
-    @SuppressWarnings("resource")
-    public static TestBatchStore create(final ColumnarSchema schema) {
-        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema));
-    }
-
-    @SuppressWarnings("resource")
-    public static TestBatchStore create(final ColumnarSchema schema, final FileHandle fileHandle) {
-        return new TestDictEncodedBatchStore(DefaultTestBatchStore.create(schema, fileHandle));
-    }
+    /**
+     * Provides the file. The first call may initialize the file if it isn't initialized yet.
+     *
+     * @return the underlying file
+     */
+    File asFile();
 }

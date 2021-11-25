@@ -48,11 +48,11 @@
  */
 package org.knime.core.columnar.testing;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadable;
+import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.columnar.testing.data.TestData;
 
 /**
@@ -90,7 +90,7 @@ public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable 
     }
 
     @Override
-    public Path getPath() {
-        return m_testDelegate.getPath();
+    public FileHandle getFileHandle() {
+        return m_testDelegate.getFileHandle();
     }
 }
