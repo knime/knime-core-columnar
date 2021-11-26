@@ -65,6 +65,8 @@ final class MappedArrowBatchKey {
 
     private final File m_file;
 
+    private final int m_hashCode;
+
     /**
      * Create an {@link MappedArrowBatchKey}.
      *
@@ -74,10 +76,14 @@ final class MappedArrowBatchKey {
     MappedArrowBatchKey(final File file, final long offset) {
         m_file = file;
         m_offset = offset;
+        m_hashCode = Objects.hash(file, offset);
     }
 
     @Override
     public boolean equals(final Object obj) {
+        if (obj == this) {
+            return true;
+        }
         if (!(obj instanceof MappedArrowBatchKey)) {
             return false;
         }
@@ -87,6 +93,6 @@ final class MappedArrowBatchKey {
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_file, m_offset);
+        return m_hashCode;
     }
 }
