@@ -68,18 +68,20 @@ import org.knime.core.node.NodeSettingsWO;
  */
 public final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
 
-    private final Flushable m_flushable;
+    private final Flushable m_storeFlusher;
 
     /**
      * Creates an {@link UnsavedColumnarContainerTable} wrapping the given table.
      *
      * @param tableId The table id.
      * @param columnarTable The underlying table.
+     * @param storeFlusher The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to disk
+     *            in case the created table is permanently saved to disk. Must not be {@code null} but can be a no-op.
      * @return The newly created table.
      */
-    public static UnsavedColumnarContainerTable create(final int tableId, final ColumnarRowReadTable columnarTable) {
-        final var table = new UnsavedColumnarContainerTable(tableId, columnarTable, () -> {
-        });
+    public static UnsavedColumnarContainerTable create(final int tableId, final ColumnarRowReadTable columnarTable,
+        final Flushable storeFlusher) {
+        final var table = new UnsavedColumnarContainerTable(tableId, columnarTable, storeFlusher);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
         table.initStoreCloser();
@@ -93,17 +95,17 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      * @param factory The factory which created the underlying store.
      * @param schema The schema of the table.
      * @param store The underlying store.
-     * @param flushable The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to disk
+     * @param storeFlusher The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to disk
      *            in case the created table is permanently saved to disk. Must not be {@code null} but can be a no-op.
      * @param size The number of rows contained in the table.
      * @return The newly created table.
      */
     @SuppressWarnings("resource") // Columnar table will be closed along with the container table.
     public static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnarBatchReadStore store, final Flushable flushable,
+        final ColumnarValueSchema schema, final ColumnarBatchReadStore store, final Flushable storeFlusher,
         final long size) {
         final var table = new UnsavedColumnarContainerTable(tableId,
-            new ColumnarRowReadTable(schema, factory, store, size), flushable);
+            new ColumnarRowReadTable(schema, factory, store, size), storeFlusher);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
         table.initStoreCloser();
@@ -111,19 +113,18 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     }
 
     private UnsavedColumnarContainerTable(final int tableId, final ColumnarRowReadTable columnarTable,
-        // TODO: is flushable used somewhere at all? I only ever see "() -> {}" being passed. Can't we get rid of it?
-        final Flushable flushable) {
+        final Flushable storeFlusher) {
         super(tableId, columnarTable);
-        m_flushable = flushable;
+        m_storeFlusher = storeFlusher;
     }
 
     @Override
     protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
         throws IOException, CanceledExecutionException {
         super.saveToFileOverwrite(f, settings, exec);
-        m_flushable.flush();
+        m_storeFlusher.flush();
         @SuppressWarnings("resource") // Store's life cycle is handled by super class.
-        final BatchReadStore store = getStore();
+        final var store = getStore();
         Files.copy(store.getFileHandle().asPath(), f.toPath());
     }
 

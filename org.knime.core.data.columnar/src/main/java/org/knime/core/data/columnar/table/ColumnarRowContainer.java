@@ -109,7 +109,8 @@ final class ColumnarRowContainer implements RowContainer {
         if (m_finishedTable == null) {
             @SuppressWarnings("resource") // Will be closed along with the container table.
             final ColumnarRowReadTable finishedColumnarTable = m_columnarTable.finish();
-            m_finishedTable = UnsavedColumnarContainerTable.create(m_id, finishedColumnarTable);
+            m_finishedTable =
+                UnsavedColumnarContainerTable.create(m_id, finishedColumnarTable, m_columnarTable.getStoreFlusher());
         }
         return m_finishedTable;
     }

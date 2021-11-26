@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.File;
+import java.io.Flushable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -241,6 +242,10 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         return m_nullableFinishedTable;
     }
 
+    Flushable getStoreFlusher() {
+        return m_store;
+    }
+
     /**
      * Closes this table, discarding any data previously written to it unless {@link #finish()} has been called before,
      * in which case this method does nothing.
@@ -262,4 +267,5 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
             m_store.getFileHandle().delete();
         }
     }
+
 }
