@@ -113,21 +113,25 @@ final class MappedReferenceManager implements ReferenceManager {
 
     @Override
     public boolean release(final int decrement) {
-        final int refCount = m_refCount.addAndGet(-decrement);
-        if (refCount == 0) {
-            // Remove the remembered batch
-            // Note that the batch is not removed if the reference count goes up again before this is finished
-            if (MappedMessageSerializer.removeBatch(this)) {
+        var lock = MappedMessageSerializer.getLock(m_key);
+        lock.lock();
+        try {
+            final int refCount = m_refCount.addAndGet(-decrement);
 
-                // Close the mapping explicitly by calling the cleaner of the buffer
-                MemoryUtil.UNSAFE.invokeCleaner(m_mappedBuffer);
-                m_mappedBuffer = null;
-                return true;
+            if (refCount == 0) {
+                    // Remove the remembered batch
+                    MappedMessageSerializer.removeBatch(this);
+
+                    // Close the mapping explicitly by calling the cleaner of the buffer
+                    MemoryUtil.UNSAFE.invokeCleaner(m_mappedBuffer);
+                    m_mappedBuffer = null;
+                    return true;
             }
+            assert refCount >= 0 : "RefCnt has gone negative";
             return false;
+        } finally {
+            lock.unlock();
         }
-        Preconditions.checkState(refCount >= 0, "RefCnt has gone negative");
-        return false;
     }
 
     @Override
@@ -137,12 +141,8 @@ final class MappedReferenceManager implements ReferenceManager {
 
     @Override
     public void retain(final int increment) {
-        // NB: m_refCount can be 0 here.
-        // This happens if this is released and at the same time deserialized again from the MappedMessageSerializer.
-        // MappedMessageSerializer#deserializeBatch acquires the lock first and calls retain.
-        // MappedMessageSerializer#removeBatch will return "false" because the ref count is not 0 anymore and m_mappedBuffer
-        // will not be cleaned and set to null.
-        m_refCount.getAndAdd(increment);
+        int prev = m_refCount.getAndAdd(increment);//NOSONAR
+        assert prev > 0 : "It's not allowed to retain a batch again after its refCount dropped to 0";
     }
 
     @Override

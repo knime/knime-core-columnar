@@ -119,28 +119,26 @@ public final class MappedMessageSerializer {
         return deserializeBatch(in, offset, MessageHeader.DictionaryBatch);
     }
 
+    /**
+     * Provides access to the lock for a particular key. The lock should be acquired before the reference count of a
+     * batch is decremented, so that no more retains via deserialize(Record|Dictionary)Batch can happen concurrently.
+     *
+     * @param key for which the lock is required
+     * @return the lock for key
+     */
+    static Lock getLock(final MappedArrowBatchKey key) {
+        return LOCKS.get(key);
+    }
+
     /** Remove the batch associated with the reference manager from the map. Returns true if the batch was removed. */
     @SuppressWarnings("resource") // The record batch does not need to be closed. This is only called when the body buffer is closed
-    static boolean removeBatch(final MappedReferenceManager refMan) {
+    static void removeBatch(final MappedReferenceManager refMan) {
         final MappedArrowBatchKey key = refMan.getKey();
-        final Lock lock = LOCKS.get(key);
-        lock.lock();
-        try {
-            // RefCount can be > 0 if deserialize(Record|Dictionary)Batch acquired the lock after it dropped to 0 but before the lock was acquired here
-            // In this case we do not want to remove the batch because it is used again
-            if (refMan.getRefCount() == 0) {
-                final ArrowMessage batch = MAPPED_BATCHES.remove(key);
-                if (batch == null) {
-                    // The batch was removed already
-                    // A consumer of the batch called retain after the reference count dropped to 0. This is not allowed.
-                    throw new IllegalStateException("Tried to release a batch that has been released already.");
-                }
-                return true;
-            } else {
-                return false;
-            }
-        } finally {
-            lock.unlock();
+        final ArrowMessage batch = MAPPED_BATCHES.remove(key);
+        if (batch == null) {
+            // The batch was removed already
+            // A consumer of the batch called retain after the reference count dropped to 0. This is not allowed.
+            throw new IllegalStateException("Tried to release a batch that has been released already.");
         }
     }
 
