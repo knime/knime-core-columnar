@@ -50,6 +50,7 @@ package org.knime.core.columnar.arrow.extensiontypes;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.NullVector;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.ArrowType.ExtensionType;
 import org.apache.arrow.vector.types.pojo.FieldType;
@@ -79,7 +80,11 @@ abstract class AbstractExtensionType extends ExtensionType {//NOSONAR
     public FieldVector getNewVector(final String name, final FieldType fieldType, final BufferAllocator allocator) {
         var storageFieldType =
             new FieldType(fieldType.isNullable(), m_storageType, fieldType.getDictionary(), fieldType.getMetadata());
-        return storageFieldType.createNewSingleVector(name, allocator, null);
+        if (Null.INSTANCE.equals(m_storageType)) {
+            return new NullVector(name, storageFieldType);
+        } else {
+            return storageFieldType.createNewSingleVector(name, allocator, null);
+        }
     }
 
 }
