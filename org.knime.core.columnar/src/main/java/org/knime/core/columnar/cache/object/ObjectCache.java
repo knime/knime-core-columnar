@@ -96,6 +96,120 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for serialization thread.";
 
+    private final ObjectCacheWriter m_writer;
+
+    private final ExecutorService m_executor;
+
+    private final ExecutorService m_serializationExecutor;
+
+    private final RandomAccessBatchReadable m_readableDelegate;
+
+    private final ColumnSelection m_varBinaryData;
+
+    private final ColumnSelection m_stringData;
+
+    private final SharedObjectCache m_cache;
+
+    private final CountUpDownLatch m_serializationLatch = new CountUpDownLatch(1);
+
+    private final Set<CachedWriteData<?, ?, ?>> m_unclosedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    private final AtomicBoolean m_closed = new AtomicBoolean(false);
+
+    /**
+     * @param writable the delegate to which to write
+     * @param readable the delegate from which to read
+     * @param cache the in-heap cache for storing object data
+     * @param persistExecutor the executor to which to submit asynchronous persist tasks
+     * @param serializationExecutor the executor to use for asynchronous serialization of data
+     */
+    @SuppressWarnings("resource")
+    public ObjectCache(final BatchWritable writable,
+        final RandomAccessBatchReadable readable,
+        final SharedObjectCache cache, final ExecutorService persistExecutor,
+        final ExecutorService serializationExecutor) {
+        m_writer = new ObjectCacheWriter(writable.getWriter());
+        m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(readable.getSchema());
+        m_stringData = HeapCacheUtils.getStringIndices(readable.getSchema());
+        m_readableDelegate = readable;
+        m_cache = cache;
+        m_executor = persistExecutor;
+        m_serializationExecutor = serializationExecutor;
+    }
+
+    @Override
+    public BatchWriter getWriter() {
+        return m_writer;
+    }
+
+    @Override
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+        return new ObjectCacheReader(selection);
+    }
+
+    @Override
+    public ColumnarSchema getSchema() {
+        return m_readableDelegate.getSchema();
+    }
+
+    @Override
+    public synchronized void flush() throws IOException {
+        // serialize any currently unclosed data (in the current batch)
+        for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
+            data.flush();
+        }
+
+        // wait for the pending serialization of the previous batch
+        try {
+            m_writer.waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            // Restore interrupted state...
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Wait for the current write operations to finish and then dispose of the cache resources and close the delegate.
+     *
+     * Blocks until closed!
+     */
+    @Override
+    public synchronized void close() throws IOException {
+        if (m_closed.getAndSet(true)) {
+            return;
+        }
+
+        // if the cache is closed without a flush, then the CachedWriteDatas might not have released their resources
+        // yet and we need to wait for that to happen
+        m_unclosedData.forEach(CachedWriteData::cancel);
+        m_unclosedData.clear();
+
+        // wait for all registered serialization tasks to finish
+        m_serializationLatch.countDown();
+        m_serializationLatch.await();
+
+        m_writer.close();
+        try {
+            m_writer.waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            // Note: we're not restoring interrupted state here, close should not be interrupted. Instead we retry waiting.
+            try {
+                m_writer.waitForAndHandleFuture();
+            } catch (InterruptedException f) {
+                throw new IOException("Closing the cache got interrupted while waiting for writer to finish.");
+            }
+        }
+
+        m_cache.getCache().keySet().removeAll(m_cachedData);
+        m_cachedData.clear();
+        m_cachedData = null;
+
+        m_readableDelegate.close();
+    }
+
+
     private final class ObjectCacheWriter implements BatchWriter {
 
         private final BatchWriter m_writerDelegate;
@@ -288,118 +402,5 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             m_readerDelegate.close();
         }
 
-    }
-
-    private final ObjectCacheWriter m_writer;
-
-    private final ExecutorService m_executor;
-
-    private final ExecutorService m_serializationExecutor;
-
-    private final RandomAccessBatchReadable m_readableDelegate;
-
-    private final ColumnSelection m_varBinaryData;
-
-    private final ColumnSelection m_stringData;
-
-    private final SharedObjectCache m_cache;
-
-    private final CountUpDownLatch m_serializationLatch = new CountUpDownLatch(1);
-
-    private final Set<CachedWriteData<?, ?, ?>> m_unclosedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
-    private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
-    private final AtomicBoolean m_closed = new AtomicBoolean(false);
-
-    /**
-     * @param writable the delegate to which to write
-     * @param readable the delegate from which to read
-     * @param cache the in-heap cache for storing object data
-     * @param persistExecutor the executor to which to submit asynchronous persist tasks
-     * @param serializationExecutor the executor to use for asynchronous serialization of data
-     */
-    @SuppressWarnings("resource")
-    public ObjectCache(final BatchWritable writable,
-        final RandomAccessBatchReadable readable,
-        final SharedObjectCache cache, final ExecutorService persistExecutor,
-        final ExecutorService serializationExecutor) {
-        m_writer = new ObjectCacheWriter(writable.getWriter());
-        m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(readable.getSchema());
-        m_stringData = HeapCacheUtils.getStringIndices(readable.getSchema());
-        m_readableDelegate = readable;
-        m_cache = cache;
-        m_executor = persistExecutor;
-        m_serializationExecutor = serializationExecutor;
-    }
-
-    @Override
-    public BatchWriter getWriter() {
-        return m_writer;
-    }
-
-    @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new ObjectCacheReader(selection);
-    }
-
-    @Override
-    public ColumnarSchema getSchema() {
-        return m_readableDelegate.getSchema();
-    }
-
-    @Override
-    public synchronized void flush() throws IOException {
-        // serialize any currently unclosed data (in the current batch)
-        for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
-            data.flush();
-        }
-
-        // wait for the pending serialization of the previous batch
-        try {
-            m_writer.waitForAndHandleFuture();
-        } catch (InterruptedException e) {
-            // Restore interrupted state...
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    /**
-     * Wait for the current write operations to finish and then dispose of the cache resources and close the delegate.
-     *
-     * Blocks until closed!
-     */
-    @Override
-    public synchronized void close() throws IOException {
-        if (m_closed.getAndSet(true)) {
-            return;
-        }
-
-        // if the cache is closed without a flush, then the CachedWriteDatas might not have released their resources
-        // yet and we need to wait for that to happen
-        m_unclosedData.forEach(CachedWriteData::cancel);
-        m_unclosedData.clear();
-
-        // wait for all registered serialization tasks to finish
-        m_serializationLatch.countDown();
-        m_serializationLatch.await();
-
-        m_writer.close();
-        try {
-            m_writer.waitForAndHandleFuture();
-        } catch (InterruptedException e) {
-            // Note: we're not restoring interrupted state here, close should not be interrupted. Instead we retry waiting.
-            try {
-                m_writer.waitForAndHandleFuture();
-            } catch (InterruptedException f) {
-                throw new IOException("Closing the cache got interrupted while waiting for writer to finish.");
-            }
-        }
-
-        m_cache.getCache().keySet().removeAll(m_cachedData);
-        m_cachedData.clear();
-        m_cachedData = null;
-
-        m_readableDelegate.close();
     }
 }
