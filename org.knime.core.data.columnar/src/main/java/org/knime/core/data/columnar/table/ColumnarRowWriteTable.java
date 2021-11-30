@@ -48,16 +48,12 @@
  */
 package org.knime.core.data.columnar.table;
 
-import java.io.File;
 import java.io.Flushable;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
 import org.knime.core.data.columnar.domain.DomainWritable;
@@ -66,7 +62,6 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
-import org.knime.core.data.container.DataContainer;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.NodeLogger;
@@ -82,7 +77,7 @@ import org.knime.core.node.NodeLogger;
  */
 public final class ColumnarRowWriteTable implements AutoCloseable {
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteTable.class);
+    static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteTable.class);
 
     private final ColumnarValueSchema m_schema;
 
@@ -120,7 +115,7 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         m_schema = schema;
         m_storeFactory = storeFactory;
         @SuppressWarnings("resource") // Low-level store will be closed along with the built columnar store.
-        final var builder = new ColumnarBatchStoreBuilder(m_storeFactory.createStore(m_schema, new TempFileSupplier()));
+        final var builder = new ColumnarBatchStoreBuilder(m_storeFactory.createStore(m_schema, new TempFileHandle()));
         if (settings.isUseCaching()) {
             builder //
                 .useColumnDataCache( //
@@ -146,49 +141,6 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, null);
 
         m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, m_writeCursor, m_store);
-    }
-
-    private static final class TempFileSupplier implements FileHandle {
-        private File m_file = null;
-        private Path m_path = null;
-
-        @Override
-        public synchronized File asFile() {
-            init();
-            return m_file;
-        }
-
-        @Override
-        public synchronized void delete() {
-            if (m_path != null) {
-                try {
-                    Files.deleteIfExists(m_path);
-                } catch (IOException ex) {
-                    LOGGER.error("Exception while deleting temporary columnar output file.", ex);
-                }
-            }
-        }
-
-        private synchronized void init() {
-            if (m_file == null) {
-                try {
-                    m_file = DataContainer.createTempFile(".knable");
-                    m_path = m_file.toPath();
-                } catch (IOException ex) {
-                    throw new IllegalStateException(ex);
-                }
-            }
-        }
-
-        @Override
-        public Path asPath() {
-            init();
-            return m_path;
-        }
-
-
-
-
     }
 
     /**
@@ -242,7 +194,10 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         return m_nullableFinishedTable;
     }
 
-    Flushable getStoreFlusher() {
+    /**
+     * @return a {@link Flushable} whose flush method ensures that everything in the underlying store is written to disk
+     */
+    public Flushable getStoreFlusher() {
         return m_store;
     }
 
