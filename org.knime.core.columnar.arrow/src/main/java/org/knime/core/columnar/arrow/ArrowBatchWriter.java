@@ -251,11 +251,23 @@ class ArrowBatchWriter implements BatchWriter {
                 m_writer.writeFooter();
                 m_writer.close();
                 if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug("Closing file {} ({})", m_fileHandle.asFile().getAbsolutePath(),
-                        FileUtils.byteCountToDisplaySize(FileUtils.sizeOf(m_fileHandle.asFile())));
+                    logToDebug();
                 }
             }
             m_closed = true;
+        }
+    }
+
+    private void logToDebug() throws IOException {
+        var path = m_fileHandle.asPath();
+        var absPath = path.toAbsolutePath().toString();
+        if (Files.exists(path)) {
+            LOGGER.debug("Closing file {} ({})", absPath,
+                FileUtils.byteCountToDisplaySize(Files.size(path)));//NOSONAR we only end up here if we actually log
+        } else {
+            // the file may already have been deleted by e.g. the WorkflowManager
+            // if the writer is closed by the MemoryLeakDetector long after its workflow has been closed
+            LOGGER.debug("The file {} has already been deleted.", absPath);
         }
     }
 
