@@ -335,7 +335,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public void putIntoTableRepository(final WorkflowDataRepository dataRepository) {
-        // only relevant in case of tables that hold data of their own
+        dataRepository.addTable(m_tableId, this);
     }
 
     @Override
