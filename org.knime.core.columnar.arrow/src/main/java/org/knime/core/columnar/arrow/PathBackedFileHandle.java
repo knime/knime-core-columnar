@@ -62,13 +62,18 @@ import org.slf4j.LoggerFactory;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class PathBackedFileHandle implements FileHandle {
+public final class PathBackedFileHandle implements FileHandle {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PathBackedFileHandle.class);
 
     private final Path m_path;
 
-    PathBackedFileHandle(final Path path) {
+    /**
+     * Constructs a {@link FileHandle} backed by the provided {@link Path}.
+     *
+     * @param path the handle points to
+     */
+    public PathBackedFileHandle(final Path path) {
         m_path = path;
     }
 
