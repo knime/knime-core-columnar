@@ -46,14 +46,9 @@
  */
 package org.knime.core.data.columnar;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.IntSupplier;
-import java.util.stream.Collectors;
 
-import org.apache.commons.io.IOUtils;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.TableBackend;
@@ -97,20 +92,7 @@ public final class ColumnarTableBackend implements TableBackend {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarTableBackend.class);
 
-    private static final String DESCRIPTION;
-
     private static final BufferedTableBackend OLD_BACKEND = new BufferedTableBackend();
-
-    static {
-        String d;
-        try (InputStream in = ColumnarTableBackend.class.getResourceAsStream("description.html")) {
-            d = IOUtils.readLines(in, StandardCharsets.UTF_8).stream().collect(Collectors.joining("\n"));
-        } catch (NullPointerException | IOException ioe) { // NOSONAR
-            LOGGER.error("Unable to parse description file", ioe);
-            d = "";
-        }
-        DESCRIPTION = d;
-    }
 
     @Override
     public DataContainerDelegate create(final DataTableSpec spec, final DataContainerSettings settings,
@@ -153,7 +135,11 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public String getDescription() {
-        return DESCRIPTION;
+        return "The Columnar Table Backend extension uses a different\n"
+            + "underlying data layer based on a columnar representation,\n"
+            + "which gives noticable speed-ups over the default format.\n\n"
+            + "Please also review the settings in the KNIME preferences\n"
+            + "(File → Preferences → KNIME → Table Backend → Columnar Backend)\n";
     }
 
     // TODO required? how can it ever be null?
