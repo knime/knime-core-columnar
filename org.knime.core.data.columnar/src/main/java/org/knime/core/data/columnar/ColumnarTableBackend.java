@@ -155,7 +155,8 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public KnowsRowCountTable concatenate(final ExecutionMonitor exec, final IntSupplier tableIdSupplier,
-        final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables) throws CanceledExecutionException {
+        final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables)
+        throws CanceledExecutionException {
         if (duplicatesPreCheck && rowKeyDuplicateSuffix == null) {
             try {
                 var concatenatedSchema = VirtualTableSchemaUtils.concatenateSchemas(tables);
@@ -167,22 +168,19 @@ public final class ColumnarTableBackend implements TableBackend {
                 LOGGER.debug("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.");
             }
         }
-        return OLD_BACKEND.concatenate(exec, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck,
-            tables);
+        return OLD_BACKEND.concatenate(exec, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck, tables);
     }
 
     @Override
     public KnowsRowCountTable append(final ExecutionMonitor exec, final IntSupplier tableIdSupplier,
-        final BufferedDataTable left, final BufferedDataTable right)
-        throws CanceledExecutionException {
+        final BufferedDataTable left, final BufferedDataTable right) throws CanceledExecutionException {
         final BufferedDataTable[] tables = {left, right};
         try {
             var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
             TableTransformUtils.checkRowKeysMatch(exec, tables);
             final long appendSize = TableTransformUtils.appendSize(tables);
-            return new VirtualTableExtensionTable(tables,
-                TableTransformUtils.createAppendTransformations(tables), appendedSchema, appendSize,
-                tableIdSupplier.getAsInt());
+            return new VirtualTableExtensionTable(tables, TableTransformUtils.createAppendTransformations(tables),
+                appendedSchema, appendSize, tableIdSupplier.getAsInt());
         } catch (VirtualTableIncompatibleException ex) {
             LOGGER.debug("Can't append with the Columnar Table Backend, falling back on the old backend.");
             return OLD_BACKEND.append(exec, tableIdSupplier, left, right);
@@ -190,9 +188,8 @@ public final class ColumnarTableBackend implements TableBackend {
     }
 
     @Override
-    public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor,
-        final IntSupplier tableIdSupplier, final ColumnRearranger columnRearranger,
-        final BufferedDataTable table, final ExecutionContext context)
+    public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor, final IntSupplier tableIdSupplier,
+        final ColumnRearranger columnRearranger, final BufferedDataTable table, final ExecutionContext context)
         throws CanceledExecutionException {
         ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
         try {
@@ -200,8 +197,8 @@ public final class ColumnarTableBackend implements TableBackend {
             List<TableTransformSpec> transformations = TableTransformUtils.createRearrangeTransformations(
                 ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger),
                 table.getDataTableSpec().getNumColumns());
-            return new VirtualTableExtensionTable(new BufferedDataTable[]{table}, transformations,
-                rearrangedSchema, table.size(), tableIdSupplier.getAsInt());
+            return new VirtualTableExtensionTable(new BufferedDataTable[]{table}, transformations, rearrangedSchema,
+                table.size(), tableIdSupplier.getAsInt());
         } catch (VirtualTableIncompatibleException ex) {
             LOGGER.debug("Can't run ColumnRearranger on the Columnar Table Backend. Falling back on the old backend.");
             return OLD_BACKEND.rearrange(progressMonitor, tableIdSupplier, columnRearranger, table, context);
