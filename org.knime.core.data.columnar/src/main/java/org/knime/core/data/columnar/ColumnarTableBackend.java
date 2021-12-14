@@ -139,7 +139,7 @@ public final class ColumnarTableBackend implements TableBackend {
             + "underlying data layer based on a columnar representation,\n"
             + "which gives noticable speed-ups over the default format.\n\n"
             + "Please also review the settings in the KNIME preferences\n"
-            + "(File → Preferences → KNIME → Table Backend → Columnar Backend)\n";
+            + "(File -> Preferences -> KNIME -> Table Backend -> Columnar Backend)\n";
     }
 
     // TODO required? how can it ever be null?
