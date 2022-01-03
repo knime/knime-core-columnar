@@ -62,11 +62,11 @@ import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTableBackend;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.BufferedTableBackend;
 import org.knime.core.data.container.ColumnRearranger;
-import org.knime.core.data.container.ColumnRearrangerUtils;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.container.ILocalDataRepository;
@@ -210,17 +210,18 @@ public final class ColumnarTableBackend implements TableBackend {
     public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor, final IntSupplier tableIdSupplier,
         final ColumnRearranger columnRearranger, final BufferedDataTable table, final ExecutionContext context)
         throws CanceledExecutionException {
-        ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
+        //        ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
         try {
-            var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(table, columnRearranger);
-            var refTable = ReferenceTables.createReferenceTable(UUID.randomUUID(), table);
-            var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
-            var transformations = TableTransformUtils.createRearrangeTransformations(virtualTable,
-                ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger),
-                table.getDataTableSpec().getNumColumns());
-            return new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, transformations, rearrangedSchema,
-                table.size(), tableIdSupplier.getAsInt());
-        } catch (VirtualTableIncompatibleException ex) {
+            //            var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(table, columnRearranger);
+            //            var refTable = createReferenceTables(table);
+            //            var virtualTableFragment = TableTransformUtils.createRearrangeTransformations(refTable[0].getVirtualTable(),
+            //                ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger),
+            //                table.getDataTableSpec().getNumColumns());
+            //            return new VirtualTableExtensionTable(refTable, virtualTableFragment, rearrangedSchema,
+            //                table.size(), tableIdSupplier.getAsInt());
+            return ColumnarVirtualTableBackend.rearrange(progressMonitor, tableIdSupplier, columnRearranger, table,
+                context);
+        } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
             LOGGER.debug("Can't run ColumnRearranger on the Columnar Table Backend. Falling back on the old backend.");
             return OLD_BACKEND.rearrange(progressMonitor, tableIdSupplier, columnRearranger, table, context);
         }
