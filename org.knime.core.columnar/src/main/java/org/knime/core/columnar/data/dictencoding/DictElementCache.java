@@ -49,9 +49,9 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.knime.core.columnar.cache.DataIndex;
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
@@ -123,70 +123,4 @@ public class DictElementCache {
         }
     }
 
-    /**
-     * Identifies a particular data object within a nested data structure.
-     *
-     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-     */
-    public static final class DataIndex {
-
-        private final DataIndex m_parent;
-
-        private final int m_index;
-
-        private final int m_hashCode;
-
-        private DataIndex(final int columnIndex) {
-            m_parent = null;
-            m_index = columnIndex;
-            m_hashCode = columnIndex;
-        }
-
-        private DataIndex(final DataIndex parent, final int childIndex) {
-            m_parent = parent;
-            m_index = childIndex;
-            m_hashCode = m_parent.hashCode() + 37 * childIndex;
-        }
-
-        /**
-         * Creates the root index for a column.
-         *
-         * @param columnIndex index of the column within the table
-         * @return an index identifying the root level of the column
-         */
-        public static DataIndex createColumnIndex(final int columnIndex) {
-            return new DataIndex(columnIndex);
-        }
-
-
-        /**
-         * Creates a child index.
-         *
-         * @param childIndex index of the child
-         * @return an index identifying the child at the provided index
-         */
-        public DataIndex createChild(final int childIndex) {
-            return new DataIndex(this, childIndex);
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            if (obj == this) {
-                return true;
-            } else if (obj instanceof DataIndex) {
-                var other = (DataIndex)obj;
-                return m_hashCode == other.m_hashCode//
-                        && m_index == other.m_index//
-                        && Objects.equals(m_parent, other.m_parent);
-            } else {
-                return false;
-            }
-        }
-
-        @Override
-        public int hashCode() {
-            return m_hashCode;
-        }
-
-    }
 }

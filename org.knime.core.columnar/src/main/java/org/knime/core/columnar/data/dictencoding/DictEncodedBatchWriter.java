@@ -55,6 +55,7 @@ import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.cache.DataIndex;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -63,7 +64,6 @@ import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.Abstrac
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
-import org.knime.core.columnar.data.dictencoding.DictElementCache.DataIndex;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -164,7 +164,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
         final var structSpec = (StructDataSpec)spec;
         final var structTraits = (StructDataTraits)traits;
         return new DecoratedStructData.DecoratedStructWriteData((StructWriteData)d,
-            (i, x) -> wrapDictEncodedData(index.createChild(i), x, structSpec.getDataSpec(i),
+            (i, x) -> wrapDictEncodedData(index.getChild(i), x, structSpec.getDataSpec(i),
                 structTraits.getDataTraits(i)));
     }
 
