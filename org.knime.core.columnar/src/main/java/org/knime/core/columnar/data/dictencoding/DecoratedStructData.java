@@ -48,13 +48,17 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
+import java.util.Arrays;
 import java.util.function.BiFunction;
 
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableReadData;
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
+import org.knime.core.table.schema.StructDataSpec;
 
 /**
  * {@link DecoratedStructWriteData} and {@link DecoratedStructReadData} allow to decorate the individual data objects inside
@@ -69,102 +73,47 @@ final class DecoratedStructData {
 
     }
 
-    static final class DecoratedStructWriteData implements StructWriteData {
+    static final class DecoratedStructWriteData extends AbstractDecoratingNullableWriteData<StructWriteData>
+        implements StructWriteData {
 
-        private final StructWriteData m_delegate;
+        private final NullableWriteData[] m_decoratedInnerData;
 
-        private final BiFunction<Integer, NullableWriteData, NullableWriteData> m_decorator;
-
-        DecoratedStructWriteData(final StructWriteData delegate,
+        DecoratedStructWriteData(final StructDataSpec spec, final StructWriteData delegate,
             final BiFunction<Integer, NullableWriteData, NullableWriteData> decorator) {
-            m_delegate = delegate;
-            m_decorator = decorator;
-        }
-
-        @Override
-        public void expand(final int minimumCapacity) {
-            m_delegate.expand(minimumCapacity);
-        }
-
-        @Override
-        public void setMissing(final int index) {
-            m_delegate.setMissing(index);
-        }
-
-        @Override
-        public int capacity() {
-            return m_delegate.capacity();
-        }
-
-        @Override
-        public void retain() {
-            m_delegate.retain();
+            super(delegate);
+            m_decoratedInnerData = new NullableWriteData[spec.size()];
+            Arrays.setAll(m_decoratedInnerData, i -> decorator.apply(i, delegate.getWriteDataAt(i)));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <C extends NullableWriteData> C getWriteDataAt(final int index) {
-            return (C)m_decorator.apply(index, m_delegate.getWriteDataAt(index));
-        }
-
-        @Override
-        public void release() {
-            m_delegate.release();
-        }
-
-        @Override
-        public long sizeOf() {
-            return m_delegate.sizeOf();
+            return (C)m_decoratedInnerData[index];
         }
 
         @Override
         public StructReadData close(final int length) {
-            return m_delegate.close(length);
+            return getWriteDelegate().close(length);
         }
 
     }
 
-    static final class DecoratedStructReadData implements StructReadData {
+    static final class DecoratedStructReadData extends AbstractDecoratingNullableReadData<StructReadData>
+        implements StructReadData {
 
-        private final StructReadData m_delegate;
+        private final NullableReadData[] m_decoratedInnerData;
 
-        private final BiFunction<Integer, NullableReadData, NullableReadData> m_decorator;
-
-        DecoratedStructReadData(final StructReadData delegate,
+        DecoratedStructReadData(final StructDataSpec spec, final StructReadData delegate,
             final BiFunction<Integer, NullableReadData, NullableReadData> decorator) {
-            m_delegate = delegate;
-            m_decorator = decorator;
-        }
-
-        @Override
-        public int length() {
-            return m_delegate.length();
-        }
-
-        @Override
-        public boolean isMissing(final int index) {
-            return m_delegate.isMissing(index);
-        }
-
-        @Override
-        public void retain() {
-            m_delegate.retain();
-        }
-
-        @Override
-        public void release() {
-            m_delegate.release();
-        }
-
-        @Override
-        public long sizeOf() {
-            return m_delegate.sizeOf();
+            super(delegate);
+            m_decoratedInnerData = new NullableReadData[spec.size()];
+            Arrays.setAll(m_decoratedInnerData, i -> decorator.apply(i, delegate.getReadDataAt(i)));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <C extends NullableReadData> C getReadDataAt(final int index) {
-            return (C)m_decorator.apply(index, m_delegate.getReadDataAt(index));
+            return (C)m_decoratedInnerData[index];
         }
 
     }

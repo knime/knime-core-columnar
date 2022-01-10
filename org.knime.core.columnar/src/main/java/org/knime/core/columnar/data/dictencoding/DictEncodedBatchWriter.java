@@ -163,7 +163,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
         final DataTraits traits) {
         final var structSpec = (StructDataSpec)spec;
         final var structTraits = (StructDataTraits)traits;
-        return new DecoratedStructData.DecoratedStructWriteData((StructWriteData)d,
+        return new DecoratedStructData.DecoratedStructWriteData(structSpec, (StructWriteData)d,
             (i, x) -> wrapDictEncodedData(index.getChild(i), x, structSpec.getDataSpec(i),
                 structTraits.getDataTraits(i)));
     }
