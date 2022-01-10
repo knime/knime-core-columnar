@@ -108,7 +108,8 @@ public final class DictDecodedStringData {
         @SuppressWarnings("unchecked")
         @Override
         public StringReadData close(final int length) {
-            return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)m_delegate.close(length), m_cache);
+            return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)m_delegate.close(length),
+                m_cache);
         }
     }
 
