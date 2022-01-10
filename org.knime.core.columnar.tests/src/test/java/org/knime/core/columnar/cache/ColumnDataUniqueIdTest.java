@@ -67,11 +67,11 @@ public class ColumnDataUniqueIdTest {
     @Test
     public void testGetters() {
         final BatchReadStore store = createDefaultTestColumnStore();
-        final int columnIndex = Integer.MIN_VALUE;
+        final int columnIndex = 0;
         final int chunkIndex = Integer.MAX_VALUE;
         final ColumnDataUniqueId cduid = new ColumnDataUniqueId(store, columnIndex, chunkIndex);
         assertEquals(store, cduid.getReadable());
-        assertEquals(columnIndex, cduid.getColumnIndex());
+        assertEquals(DataIndex.createColumnIndex(columnIndex), cduid.getColumnIndex());
         assertEquals(chunkIndex, cduid.getBatchIndex());
     }
 
@@ -152,10 +152,10 @@ public class ColumnDataUniqueIdTest {
     public void testToString() {
         @SuppressWarnings("resource")
         final BatchReadStore store = createDefaultTestColumnStore();
-        final int columnIndex = Integer.MIN_VALUE;
+        final int columnIndex = 0;
         final int chunkIndex = Integer.MAX_VALUE;
         final ColumnDataUniqueId cduid = new ColumnDataUniqueId(store, columnIndex, chunkIndex);
-        assertEquals(String.join(",", store.toString(), Integer.toString(columnIndex), Integer.toString(chunkIndex)),
+        assertEquals(String.format("%s,[%s],%s", store.toString(), columnIndex, chunkIndex),
             cduid.toString());
     }
 

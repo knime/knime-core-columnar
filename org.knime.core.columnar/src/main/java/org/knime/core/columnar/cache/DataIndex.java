@@ -44,50 +44,66 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   2 Sep 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   Nov 29, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.cache;
 
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
-import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.batch.RandomAccessBatchReadable;
+import com.google.common.base.Preconditions;
 
 /**
- * An object that uniquely identifies a {@link ReadData} held by a {@link RandomAccessBatchReadable}.
+ * Identifies a data object within a nested structure.
  *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class ColumnDataUniqueId {
+public final class DataIndex {
 
-    private final RandomAccessBatchReadable m_readable;
+    private final int m_index;
 
-    private final DataIndex m_dataIndex;
-
-    private final int m_batchIndex;
+    private final DataIndex m_parent;
 
     private final int m_hashCode;
 
     /**
-     * @param readable the readable holding the data
-     * @param dataIndex the index of the data (may be nested)
-     * @param batchIndex the batch index of the data
+     * Creates the root index for a column.
+     *
+     * @param columnIndex index of the column within the table
+     * @return an index identifying the root level of the column
      */
-    public ColumnDataUniqueId(final RandomAccessBatchReadable readable, final DataIndex dataIndex,
-        final int batchIndex) {
-        m_readable = readable;
-        m_dataIndex = dataIndex;
-        m_batchIndex = batchIndex;
-        m_hashCode = Objects.hash(m_readable, m_dataIndex, m_batchIndex);
+    public static DataIndex createColumnIndex(final int columnIndex) {
+        // TODO cache DataIndex objects if object creation proofs to be a performance issue
+        return new DataIndex(columnIndex);
+    }
+
+    private DataIndex(final int columnIndex) {
+        this(null, columnIndex);
+    }
+
+    private DataIndex(final DataIndex parent, final int index) {
+        Preconditions.checkArgument(index >= 0, "Negative indices are not permitted.");
+        m_parent = parent;
+        m_index = index;
+        m_hashCode = Objects.hash(parent, index);
     }
 
     /**
-     * @param readable the readable holding the data
-     * @param columnIndex the column index of the data
-     * @param batchIndex the batch index of the data
+     * Creates a child index.
+     *
+     * @param childIndex index of the child
+     * @return an index identifying the child at the provided index
      */
-    public ColumnDataUniqueId(final RandomAccessBatchReadable readable, final int columnIndex, final int batchIndex) {
-        this(readable, DataIndex.createColumnIndex(columnIndex), batchIndex);
+    public DataIndex getChild(final int childIndex) {
+        return new DataIndex(this, childIndex);
+    }
+
+    /**
+     * @return true if this index is on column level i.e. it has no parent
+     */
+    public boolean isColumnLevel() {
+        return m_parent == null;
     }
 
     @Override
@@ -96,57 +112,31 @@ public final class ColumnDataUniqueId {
     }
 
     @Override
-    public boolean equals(final Object object) {
-        if (object == this) {
+    public boolean equals(final Object obj) {
+        if (obj == this) {
             return true;
+        } else if (obj instanceof DataIndex) {
+            var other = (DataIndex)obj;
+            return m_hashCode == other.m_hashCode//
+                    && m_index == other.m_index//
+                    && Objects.equals(m_parent, other.m_parent);
+        } else {
+            return false;
         }
-        if (object instanceof ColumnDataUniqueId)
-        {
-            final ColumnDataUniqueId other = (ColumnDataUniqueId)object;
-            return Objects.equals(m_readable, other.m_readable) && m_dataIndex.equals(other.m_dataIndex)
-                && m_batchIndex == other.m_batchIndex;
+    }
+
+    private IntStream indexStream() {
+        if (m_parent == null) {
+            return IntStream.of(m_index);
+        } else {
+            return IntStream.concat(m_parent.indexStream(), IntStream.of(m_index));
         }
-        return false;
     }
 
     @Override
     public String toString() {
-        return String.join(",", m_readable.toString(), m_dataIndex.toString(), Integer.toString(m_batchIndex));
+        return indexStream()//
+                .mapToObj(Integer::toString)//
+                .collect(Collectors.joining(",", "[", "]"));
     }
-
-    /**
-     * Obtains the {@link RandomAccessBatchReadable} that holds the uniquely identified data.
-     *
-     * @return the store holding the data
-     */
-    public RandomAccessBatchReadable getReadable() {
-        return m_readable;
-    }
-
-    DataIndex getColumnIndex() {
-        return m_dataIndex;
-    }
-
-    int getBatchIndex() {
-        return m_batchIndex;
-    }
-
-    /**
-     * Provides the child with the given index.
-     *
-     * @param index of the child
-     * @return the child at the given index
-     */
-    public ColumnDataUniqueId getChild(final int index) {
-        return new ColumnDataUniqueId(m_readable, m_dataIndex.getChild(index), m_batchIndex);
-    }
-
-    /**
-     * Indicates whether this data is on column level or nested e.g. inside of a list or struct.
-     * @return true if this corresponds to column level data
-     */
-    public boolean isColumnLevel() {
-        return m_dataIndex.isColumnLevel();
-    }
-
 }

@@ -66,6 +66,7 @@ import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.cache.DataIndex;
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
