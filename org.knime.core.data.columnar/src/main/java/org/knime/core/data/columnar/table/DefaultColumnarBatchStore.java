@@ -255,13 +255,14 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
         initSmallTableCache(builder.m_smallTableCache);
 
-        initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
-
         if (builder.m_dictEncodingEnabled) {
             final var dictEncoded = new DictEncodedBatchWritableReadable(m_writable, m_readable);
             m_readable = dictEncoded;
             m_writable = dictEncoded;
         }
+
+        initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
+
 
         if (builder.m_duplicateCheckExecutor != null) {
             m_writable =

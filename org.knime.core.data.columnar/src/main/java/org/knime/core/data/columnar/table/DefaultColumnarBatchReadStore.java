@@ -148,12 +148,13 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
         initColumnDataCache(builder.m_columnDataCache);
 
-        initHeapCache(builder.m_heapCache);
-
         if (builder.m_dictEncodingEnabled) {
             final var dictEncoded = new DictEncodedBatchReadable(m_readable);
             m_readable = dictEncoded;
         }
+
+        initHeapCache(builder.m_heapCache);
+
 
         m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(),
             builder.m_readStore.batchLength(), builder.m_readStore.getFileHandle());

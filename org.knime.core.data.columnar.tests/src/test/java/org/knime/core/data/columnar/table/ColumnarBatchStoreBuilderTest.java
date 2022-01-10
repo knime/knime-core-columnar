@@ -198,14 +198,14 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
     }
 
     @Test
-    public void testDictEncodingAfterHeapCache() throws IOException {
+    public void testHeapCacheAfterDictEncoding() throws IOException {
         final var exec = Executors.newSingleThreadExecutor();
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
             final var heapCache = new WeakReferencedObjectCache();
             final var builder =
                 new ColumnarBatchStoreBuilder(delegate).useHeapCache(heapCache, exec, exec).enableDictEncoding(true);
             try (final var wrappedStore = builder.build()) {
-                assertEquals(DictEncodedBatchWritableReadable.class, wrappedStore.getWritableDelegate().getClass());
+                assertEquals(ObjectCache.class, wrappedStore.getWritableDelegate().getClass());
             }
         }
     }
