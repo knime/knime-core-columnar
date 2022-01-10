@@ -46,26 +46,27 @@
  * History
  *   15 Jan 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.cache.object;
+package org.knime.core.columnar.cache.object.shared;
 
 import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
 import java.util.Map;
 
 import org.junit.Test;
 import org.knime.core.columnar.TestBatchStoreUtils;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
+import org.knime.core.columnar.cache.object.shared.WeakReferencedObjectCache;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class SoftReferencedObjectCacheTest {
+public class WeakReferencedObjectCacheTest {
 
     @Test
     public void testWriteMultiRead() {
-        final Map<ColumnDataUniqueId, Object[]> cache = (new SoftReferencedObjectCache()).getCache();
+        final Map<ColumnDataUniqueId, Object[]> cache = (new WeakReferencedObjectCache()).getCache();
         @SuppressWarnings("resource")
         final ColumnDataUniqueId id = new ColumnDataUniqueId(TestBatchStoreUtils.createDefaultTestColumnStore(), 0, 0);
         Object[] val = new Object[0];
@@ -73,7 +74,7 @@ public class SoftReferencedObjectCacheTest {
         assertArrayEquals(val, cache.get(id));
         val = null; // NOSONAR
         System.gc(); // NOSONAR
-        assertNotNull(cache.get(id));
+        assertNull(cache.get(id));
     }
 
 }

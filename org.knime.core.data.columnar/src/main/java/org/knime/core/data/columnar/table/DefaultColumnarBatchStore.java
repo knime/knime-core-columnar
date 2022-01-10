@@ -58,7 +58,7 @@ import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.cache.data.ReadDataCache;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.ObjectCache;
-import org.knime.core.columnar.cache.object.SharedObjectCache;
+import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.cache.writable.BatchWritableCache;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadable;

@@ -44,26 +44,36 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   13 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   15 Jan 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.cache.object;
+package org.knime.core.columnar.cache.object.shared;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertNotNull;
 
 import java.util.Map;
 
+import org.junit.Test;
+import org.knime.core.columnar.TestBatchStoreUtils;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
 /**
- * A cache for in-heap storing of object data that can be shared between multiple {@link ObjectCache ObjectCaches} and
- * {@link ObjectReadCache ObjectReadCaches}. Cached data is ephemeral, i.e, object data referenced only in the cache may
- * be reclaimed by the garbage collector at any point in time.
- *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public interface SharedObjectCache {
+@SuppressWarnings("javadoc")
+public class SoftReferencedObjectCacheTest {
 
-    /**
-     * @return the object data cache
-     */
-    Map<ColumnDataUniqueId, Object[]> getCache();
+    @Test
+    public void testWriteMultiRead() {
+        final Map<ColumnDataUniqueId, Object[]> cache = (new SoftReferencedObjectCache()).getCache();
+        @SuppressWarnings("resource")
+        final ColumnDataUniqueId id = new ColumnDataUniqueId(TestBatchStoreUtils.createDefaultTestColumnStore(), 0, 0);
+        Object[] val = new Object[0];
+        cache.put(id, val);
+        assertArrayEquals(val, cache.get(id));
+        val = null; // NOSONAR
+        System.gc(); // NOSONAR
+        assertNotNull(cache.get(id));
+    }
 
 }

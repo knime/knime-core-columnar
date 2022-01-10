@@ -44,49 +44,54 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   15 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   Dec 17, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.cache.object;
+package org.knime.core.columnar.cache.object.shared;
 
-import java.lang.ref.SoftReference;
+import java.util.Collection;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 
 import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 
 /**
- * Implementation of an {@link SharedObjectCache} in which values are softly referenced. As per contract of
- * {@link SoftReference SoftReferences}, cached object data that is only
- * <a href="package-summary.html#reachability">softly reachable</a> is guaranteed to have been cleared before the
- * virtual machine throws an <code>OutOfMemoryError</code>. Additionally, this cache allows for manual invalidation,
- * i.e., removal of all entries.
+ * Abstract implementation of {@link SharedObjectCache} that is based on {@link Cache}.
  *
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class SoftReferencedObjectCache implements SharedObjectCache {
+abstract class AbstractSharedObjectCache implements SharedObjectCache {
 
-    private final Cache<ColumnDataUniqueId, Object[]> m_cache;
+    protected final Cache<ColumnDataUniqueId, Object[]> m_cache;
 
-    /**
-     * Creates a new cache.
-     */
-    public SoftReferencedObjectCache() {
-        m_cache = CacheBuilder.newBuilder().softValues().expireAfterAccess(60, TimeUnit.SECONDS).build();
+    AbstractSharedObjectCache(final Cache<ColumnDataUniqueId, Object[]> cache) {
+        m_cache = cache;
     }
 
     @Override
-    public Map<ColumnDataUniqueId, Object[]> getCache() {
-        return m_cache.asMap();
+    public Object[] computeIfAbsent(final ColumnDataUniqueId key, final Function<ColumnDataUniqueId, Object[]> mappingFunction) {
+        // TODO can we operate on cache directly?
+        return m_cache.asMap().computeIfAbsent(key, mappingFunction);
+    }
+
+    @Override
+    public void put(final ColumnDataUniqueId key, final Object[] value) {
+        m_cache.put(key, value);
+    }
+
+    @Override
+    public void removeAll(final Collection<ColumnDataUniqueId> keys) {
+        m_cache.invalidateAll(keys);
     }
 
     /**
-     * Invalidate the cache, i.e., remove all entries.
+     * Only for testing purposes.
+     *
+     * @return the cache as map
      */
-    public void invalidate() {
-        m_cache.invalidateAll();
+    Map<ColumnDataUniqueId, Object[]> getCache() {
+        return m_cache.asMap();
     }
 
 }

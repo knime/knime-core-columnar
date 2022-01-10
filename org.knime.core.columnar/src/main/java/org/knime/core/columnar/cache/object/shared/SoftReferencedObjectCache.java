@@ -46,37 +46,37 @@
  * History
  *   15 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.cache.object;
+package org.knime.core.columnar.cache.object.shared;
 
-import java.lang.ref.WeakReference;
-import java.util.Map;
+import java.lang.ref.SoftReference;
+import java.util.concurrent.TimeUnit;
 
-import org.knime.core.columnar.cache.ColumnDataUniqueId;
-
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
 /**
- * Implementation of an {@link SharedObjectCache} in which values are weakly referenced. As per contract of
- * {@link WeakReference WeakReferences}, cached object data is reclaimed as soon as the garbage collector notices that
- * it is only <a href="package-summary.html#reachability">weakly reachable</a>.
+ * Implementation of an {@link SharedObjectCache} in which values are softly referenced. As per contract of
+ * {@link SoftReference SoftReferences}, cached object data that is only
+ * <a href="package-summary.html#reachability">softly reachable</a> is guaranteed to have been cleared before the
+ * virtual machine throws an <code>OutOfMemoryError</code>. Additionally, this cache allows for manual invalidation,
+ * i.e., removal of all entries.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class WeakReferencedObjectCache implements SharedObjectCache {
-
-    private final Cache<ColumnDataUniqueId, Object[]> m_cache;
+public final class SoftReferencedObjectCache extends AbstractSharedObjectCache {
 
     /**
      * Creates a new cache.
      */
-    public WeakReferencedObjectCache() {
-        m_cache = CacheBuilder.newBuilder().weakValues().build();
+    public SoftReferencedObjectCache() {
+        super(CacheBuilder.newBuilder().softValues().expireAfterAccess(60, TimeUnit.SECONDS).build());
     }
 
-    @Override
-    public Map<ColumnDataUniqueId, Object[]> getCache() {
-        return m_cache.asMap();
+
+    /**
+     * Invalidate the cache, i.e., remove all entries.
+     */
+    public void invalidate() {
+        m_cache.invalidateAll();
     }
 
 }

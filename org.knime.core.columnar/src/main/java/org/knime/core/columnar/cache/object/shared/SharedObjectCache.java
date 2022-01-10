@@ -44,36 +44,52 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   15 Jan 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   13 Oct 2020 (Marc Bux, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.columnar.cache.object;
+package org.knime.core.columnar.cache.object.shared;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertNull;
-
+import java.util.Collection;
 import java.util.Map;
+import java.util.function.Function;
 
-import org.junit.Test;
-import org.knime.core.columnar.TestBatchStoreUtils;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
+import org.knime.core.columnar.cache.object.ObjectCache;
+import org.knime.core.columnar.cache.object.ObjectReadCache;
 
 /**
+ * A cache for in-heap storing of object data that can be shared between multiple {@link ObjectCache ObjectCaches} and
+ * {@link ObjectReadCache ObjectReadCaches}. Cached data is ephemeral, i.e, object data referenced only in the cache may
+ * be reclaimed by the garbage collector at any point in time.
+ *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-@SuppressWarnings("javadoc")
-public class WeakReferencedObjectCacheTest {
+public interface SharedObjectCache {
 
-    @Test
-    public void testWriteMultiRead() {
-        final Map<ColumnDataUniqueId, Object[]> cache = (new WeakReferencedObjectCache()).getCache();
-        @SuppressWarnings("resource")
-        final ColumnDataUniqueId id = new ColumnDataUniqueId(TestBatchStoreUtils.createDefaultTestColumnStore(), 0, 0);
-        Object[] val = new Object[0];
-        cache.put(id, val);
-        assertArrayEquals(val, cache.get(id));
-        val = null; // NOSONAR
-        System.gc(); // NOSONAR
-        assertNull(cache.get(id));
-    }
+    /**
+     * Either returns the value associated with {@link ColumnDataUniqueId key} or computes the value using the
+     * mappingFunction and adds it to the cache.
+     *
+     * @param key identifying the cached object
+     * @param mappingFunction to compute the cached object if it is absent
+     * @return the cached object
+     * @see Map#computeIfAbsent(Object, Function)
+     */
+    Object[] computeIfAbsent(ColumnDataUniqueId key, Function<ColumnDataUniqueId, Object[]> mappingFunction);
+
+    /**
+     * Puts the provided value into the cache.
+     *
+     * @param key referring to value
+     * @param value the value to cache
+     * @see Map#put(Object, Object)
+     */
+    void put(ColumnDataUniqueId key, Object[] value);
+
+    /**
+     * Removes the values associated with the provided keys from the cache.
+     *
+     * @param keys of the value to remove from the cache
+     */
+    void removeAll(final Collection<ColumnDataUniqueId> keys);
 
 }

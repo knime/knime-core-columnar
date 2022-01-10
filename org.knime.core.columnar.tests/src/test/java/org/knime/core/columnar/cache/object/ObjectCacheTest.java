@@ -76,6 +76,7 @@ import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
+import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
@@ -107,9 +108,21 @@ public class ObjectCacheTest extends ColumnarTest {
             private final Map<ColumnDataUniqueId, Object[]> m_cache = new ConcurrentHashMap<>();
 
             @Override
-            public Map<ColumnDataUniqueId, Object[]> getCache() {
-                return m_cache;
+            public Object[] computeIfAbsent(final ColumnDataUniqueId key,
+                final Function<ColumnDataUniqueId, Object[]> mappingFunction) {
+                return m_cache.computeIfAbsent(key, mappingFunction);
             }
+
+            @Override
+            public void put(final ColumnDataUniqueId key, final Object[] value) {
+                m_cache.put(key, value);
+            }
+
+            @Override
+            public void removeAll(final Collection<ColumnDataUniqueId> keys) {
+                m_cache.keySet().removeAll(keys);
+            }
+
         };
     }
 

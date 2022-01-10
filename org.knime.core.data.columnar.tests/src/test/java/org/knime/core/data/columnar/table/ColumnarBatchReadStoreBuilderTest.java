@@ -57,7 +57,7 @@ import org.junit.Test;
 import org.knime.core.columnar.cache.data.ReadDataReadCache;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.ObjectReadCache;
-import org.knime.core.columnar.cache.object.WeakReferencedObjectCache;
+import org.knime.core.columnar.cache.object.shared.WeakReferencedObjectCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchReadable;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestBatchStore;

@@ -23,7 +23,7 @@ import org.junit.Test;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
-import org.knime.core.columnar.cache.object.WeakReferencedObjectCache;
+import org.knime.core.columnar.cache.object.shared.WeakReferencedObjectCache;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
