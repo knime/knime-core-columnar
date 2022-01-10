@@ -61,12 +61,14 @@ import static org.knime.core.columnar.TestBatchStoreUtils.writeDefaultTable;
 import static org.knime.core.table.schema.DataSpecs.STRING;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Function;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -76,6 +78,7 @@ import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
+import org.knime.core.columnar.cache.object.CachedStringData.CachedStringWriteData;
 import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;

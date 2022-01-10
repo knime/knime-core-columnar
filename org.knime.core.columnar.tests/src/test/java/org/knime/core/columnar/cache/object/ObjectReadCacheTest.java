@@ -61,6 +61,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.junit.Test;
+import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;

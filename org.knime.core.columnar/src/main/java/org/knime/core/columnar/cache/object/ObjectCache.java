@@ -49,13 +49,13 @@ package org.knime.core.columnar.cache.object;
 import java.io.Flushable;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
 
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
@@ -66,12 +66,12 @@ import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
+import org.knime.core.columnar.cache.object.CachedData.CachedDataFactory;
+import org.knime.core.columnar.cache.object.CachedData.CachedWriteData;
+import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.data.StringData.StringReadData;
-import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
-import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.slf4j.Logger;
@@ -98,25 +98,19 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
     private final ObjectCacheWriter m_writer;
 
-    private final ExecutorService m_executor;
-
-    private final ExecutorService m_serializationExecutor;
+    private final ExecutorService m_persistExecutor;
 
     private final RandomAccessBatchReadable m_readableDelegate;
 
-    private final ColumnSelection m_varBinaryData;
-
-    private final ColumnSelection m_stringData;
-
-    private final SharedObjectCache m_cache;
-
     private final CountUpDownLatch m_serializationLatch = new CountUpDownLatch(1);
 
-    private final Set<CachedWriteData<?, ?, ?>> m_unclosedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<CachedWriteData> m_unclosedData = ConcurrentHashMap.newKeySet();
 
-    private Set<ColumnDataUniqueId> m_cachedData = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final CacheManager m_cacheManager;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
+
+    private final CachedDataFactory[] m_cachedDataFactories;
 
     /**
      * @param writable the delegate to which to write
@@ -126,17 +120,15 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
      * @param serializationExecutor the executor to use for asynchronous serialization of data
      */
     @SuppressWarnings("resource")
-    public ObjectCache(final BatchWritable writable,
-        final RandomAccessBatchReadable readable,
+    public ObjectCache(final BatchWritable writable, final RandomAccessBatchReadable readable,
         final SharedObjectCache cache, final ExecutorService persistExecutor,
         final ExecutorService serializationExecutor) {
         m_writer = new ObjectCacheWriter(writable.getWriter());
-        m_varBinaryData = HeapCacheUtils.getVarBinaryIndices(readable.getSchema());
-        m_stringData = HeapCacheUtils.getStringIndices(readable.getSchema());
         m_readableDelegate = readable;
-        m_cache = cache;
-        m_executor = persistExecutor;
-        m_serializationExecutor = serializationExecutor;
+        m_persistExecutor = persistExecutor;
+        m_cacheManager = new CacheManager(cache);
+        m_cachedDataFactories = CachedDataFactoryBuilder.createForWriting(m_persistExecutor, m_unclosedData,
+            m_cacheManager, m_serializationLatch, serializationExecutor).build(getSchema());
     }
 
     @Override
@@ -157,7 +149,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
     @Override
     public synchronized void flush() throws IOException {
         // serialize any currently unclosed data (in the current batch)
-        for (CachedWriteData<?, ?, ?> data : m_unclosedData) {
+        for (var data : m_unclosedData) {
             data.flush();
         }
 
@@ -202,13 +194,14 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             }
         }
 
-        m_cache.getCache().keySet().removeAll(m_cachedData);
-        m_cachedData.clear();
-        m_cachedData = null;
+        m_cacheManager.close();
 
         m_readableDelegate.close();
     }
 
+    private ColumnDataUniqueId createId(final int columnIndex, final int batchIndex) {
+        return new ColumnDataUniqueId(this, columnIndex, batchIndex);
+    }
 
     private final class ObjectCacheWriter implements BatchWriter {
 
@@ -223,6 +216,8 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
          */
         private volatile int m_numBatches;
 
+        private volatile int m_numCreatedBatches;
+
         private ObjectCacheWriter(final BatchWriter delegate) {
             m_writerDelegate = delegate;
         }
@@ -230,25 +225,11 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         @Override
         public WriteBatch create(final int capacity) {
             final WriteBatch batch = m_writerDelegate.create(capacity);
-            final NullableWriteData[] data = new NullableWriteData[getSchema().numColumns()];
-
-            for (int i = 0; i < data.length; i++) {
-                if (m_varBinaryData.isSelected(i)) {
-                    final VarBinaryWriteData columnWriteData = (VarBinaryWriteData)batch.get(i);
-                    final var cachedData =
-                        new CachedVarBinaryWriteData(columnWriteData, m_serializationExecutor, m_serializationLatch);
-                    m_unclosedData.add(cachedData);
-                    data[i] = cachedData;
-                } else if (m_stringData.isSelected(i)) {
-                    final StringWriteData columnWriteData = (StringWriteData)batch.get(i);
-                    final var cachedData =
-                        new CachedStringWriteData(columnWriteData, m_serializationExecutor, m_serializationLatch);
-                    m_unclosedData.add(cachedData);
-                    data[i] = cachedData;
-                } else {
-                    data[i] = batch.get(i);
-                }
-            }
+            var schema = getSchema();
+            final var data = new NullableWriteData[schema.numColumns()];
+            final int currentBatch = m_numCreatedBatches;
+            m_numCreatedBatches++;
+            Arrays.setAll(data, i -> m_cachedDataFactories[i].createWriteData(batch.get(i), createId(i, currentBatch)));
             return new DefaultWriteBatch(data);
         }
 
@@ -275,35 +256,21 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             }
 
             final int numColumns = batch.numData();
-            @SuppressWarnings("unchecked")
-            final CompletableFuture<NullableReadData>[] futures = new CompletableFuture[numColumns];
-
-            for (int i = 0; i < numColumns; i++) {
-                if (m_varBinaryData.isSelected(i) || m_stringData.isSelected(i)) {
-                    final var heapCachedData = (CachedWriteData<?, ?, ?>.CachedReadData)batch.get(i);
-                    futures[i] = CompletableFuture.supplyAsync(() -> {
-                        m_unclosedData.remove(heapCachedData.getWriteData());
-                        return heapCachedData.closeWriteDelegate();
-                    }, m_executor);
-                    final ColumnDataUniqueId ccuid = new ColumnDataUniqueId(ObjectCache.this, i, m_numBatches);
-                    m_cache.getCache().put(ccuid, heapCachedData.getData());
-                    m_cachedData.add(ccuid);
-                } else {
-                    futures[i] = CompletableFuture.completedFuture(batch.get(i));
-                }
-            }
-
+            final var futures = new CompletableFuture[numColumns];
             int currentBatch = m_numBatches;
+            Arrays.setAll(futures,
+                i -> m_cachedDataFactories[i].getCachedDataFuture(batch.get(i)));
             m_future = CompletableFuture.allOf(futures).thenRunAsync(() -> { // NOSONAR
                 try {
-                    m_writerDelegate.write(new DefaultReadBatch(
-                        Arrays.stream(futures).map(CompletableFuture::join).toArray(NullableReadData[]::new)));
+                    m_writerDelegate.write(new DefaultReadBatch(Stream.of(futures)//
+                        .map(CompletableFuture::join)//
+                        .toArray(NullableReadData[]::new)));
                 } catch (IOException e) {
                     throw new IllegalStateException(String.format("Failed to write batch %d.", currentBatch), e);
                 } finally {
                     batch.release();
                 }
-            }, m_executor);
+            }, m_persistExecutor);
 
             m_numBatches++;
         }
@@ -318,7 +285,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
                 } catch (IOException e) {
                     throw new IllegalStateException("Failed to close writer.", e);
                 }
-            }, m_executor);
+            }, m_persistExecutor);
         }
 
         private void waitForAndHandleFuture() throws InterruptedException, IOException {
@@ -368,33 +335,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             }
 
             final ReadBatch batch = m_readerDelegate.readRetained(index);
-            return m_selection.createBatch(i -> {
-                if (m_varBinaryData.isSelected(i)) {
-                    return wrapVarBinary(batch, index, i);
-                } else if (m_stringData.isSelected(i)) {
-                    return wrapString(batch, index, i);
-                } else {
-                    return batch.get(i);
-                }
-            });
-        }
-
-        private CachedVarBinaryLoadingReadData wrapVarBinary(final ReadBatch batch, final int batchIndex,
-            final int columnIndex) {
-            final VarBinaryReadData columnReadData = (VarBinaryReadData)batch.get(columnIndex);
-            final Object[] array =
-                m_cache.getCache().computeIfAbsent(new ColumnDataUniqueId(ObjectCache.this, columnIndex, batchIndex),
-                    k -> new Object[columnReadData.length()]);
-            return new CachedVarBinaryLoadingReadData(columnReadData, array);
-        }
-
-        private CachedStringLoadingReadData wrapString(final ReadBatch batch, final int batchIndex,
-            final int columnIndex) {
-            final StringReadData columnReadData = (StringReadData)batch.get(columnIndex);
-            final String[] array = (String[])m_cache.getCache().computeIfAbsent(
-                new ColumnDataUniqueId(ObjectCache.this, columnIndex, batchIndex),
-                k -> new String[columnReadData.length()]);
-            return new CachedStringLoadingReadData(columnReadData, array);
+            return m_selection.createBatch(i -> m_cachedDataFactories[i].createReadData(batch.get(i), createId(i, index)));
         }
 
         @Override
