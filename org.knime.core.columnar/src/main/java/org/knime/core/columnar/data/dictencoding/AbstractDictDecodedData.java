@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableReadData;
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
@@ -66,89 +66,28 @@ final class AbstractDictDecodedData {
     AbstractDictDecodedData() {
     }
 
-    abstract static class AbstractDictDecodedReadData<K, D extends DictEncodedReadData<K>> implements NullableReadData {
-        protected final D m_delegate;
+    abstract static class AbstractDictDecodedReadData<K, D extends DictEncodedReadData<K>>
+        extends AbstractDecoratingNullableReadData<D> {
 
         protected final ColumnDictElementCache<K> m_cache;
 
         AbstractDictDecodedReadData(final D delegate, final ColumnDictElementCache<K> cache) {
-            m_delegate = delegate;
+            super(delegate);
             m_cache = cache;
         }
 
-        @Override
-        public boolean isMissing(final int index) {
-            return m_delegate.isMissing(index);
-        }
-
-        @Override
-        public int length() {
-            return m_delegate.length();
-        }
-
-        @Override
-        public void retain() {
-            m_delegate.retain();
-        }
-
-        @Override
-        public void release() {
-            m_delegate.release();
-        }
-
-        @Override
-        public long sizeOf() {
-            return m_delegate.sizeOf();
-        }
-
-        public D getDelegate() {
-            return m_delegate;
-        }
     }
 
-    abstract static class AbstractDictDecodedWriteData<K, D extends DictEncodedWriteData<K>> implements NullableWriteData {
-        protected final D m_delegate;
+    abstract static class AbstractDictDecodedWriteData<K, D extends DictEncodedWriteData<K>>
+        extends AbstractDecoratingNullableWriteData<D> {
 
         protected final ColumnDictElementCache<K> m_cache;
 
         AbstractDictDecodedWriteData(final D delegate, final ColumnDictElementCache<K> cache) {
-            m_delegate = delegate;
+            super(delegate);
             m_cache = cache;
             m_delegate.setKeyGenerator(cache);
         }
 
-        @Override
-        public void setMissing(final int index) {
-            m_delegate.setMissing(index);
-        }
-
-        @Override
-        public void expand(final int minimumCapacity) {
-            m_delegate.expand(minimumCapacity);
-        }
-
-        @Override
-        public int capacity() {
-            return m_delegate.capacity();
-        }
-
-        @Override
-        public void retain() {
-            m_delegate.retain();
-        }
-
-        @Override
-        public void release() {
-            m_delegate.release();
-        }
-
-        @Override
-        public long sizeOf() {
-            return m_delegate.sizeOf();
-        }
-
-        public D getDelegate() {
-            return m_delegate;
-        }
     }
 }

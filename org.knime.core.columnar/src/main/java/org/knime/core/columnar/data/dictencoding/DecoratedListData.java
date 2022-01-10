@@ -51,6 +51,8 @@ package org.knime.core.columnar.data.dictencoding;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableReadData;
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableWriteData;
 import org.knime.core.columnar.data.ListData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
@@ -70,100 +72,42 @@ final class DecoratedListData {
 
     }
 
-    static final class DecoratedListWriteData implements ListWriteData {
-
-        private final ListWriteData m_delegate;
+    static final class DecoratedListWriteData extends AbstractDecoratingNullableWriteData<ListWriteData> implements ListWriteData {
 
         private final Function<NullableWriteData, NullableWriteData> m_decorator;
 
         DecoratedListWriteData(final ListWriteData delegate, final UnaryOperator<NullableWriteData> decorator) {
-            m_delegate = delegate;
+            super(delegate);
             m_decorator = decorator;
-        }
-
-        @Override
-        public void expand(final int minimumCapacity) {
-            m_delegate.expand(minimumCapacity);
-        }
-
-        @Override
-        public void setMissing(final int index) {
-            m_delegate.setMissing(index);
-        }
-
-        @Override
-        public int capacity() {
-            return m_delegate.capacity();
-        }
-
-        @Override
-        public void retain() {
-            m_delegate.retain();
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
-            return (C)m_decorator.apply(m_delegate.createWriteData(index, size));
-        }
-
-        @Override
-        public void release() {
-            m_delegate.release();
-        }
-
-        @Override
-        public long sizeOf() {
-            return m_delegate.sizeOf();
+            return (C)m_decorator.apply(getWriteDelegate().createWriteData(index, size));
         }
 
         @Override
         public ListReadData close(final int length) {
-            return m_delegate.close(length);
+            return getWriteDelegate().close(length);
         }
 
     }
 
-    static final class DecoratedListReadData implements ListReadData {
-
-        private final ListReadData m_delegate;
+    static final class DecoratedListReadData extends AbstractDecoratingNullableReadData<ListReadData>
+        implements ListReadData {
 
         private final UnaryOperator<NullableReadData> m_decorator;
 
         DecoratedListReadData(final ListReadData delegate, final UnaryOperator<NullableReadData> decorator) {
-            m_delegate = delegate;
+            super(delegate);
             m_decorator = decorator;
-        }
-
-        @Override
-        public int length() {
-            return m_delegate.length();
-        }
-
-        @Override
-        public boolean isMissing(final int index) {
-            return m_delegate.isMissing(index);
-        }
-
-        @Override
-        public void retain() {
-            m_delegate.retain();
-        }
-
-        @Override
-        public void release() {
-            m_delegate.release();
-        }
-
-        @Override
-        public long sizeOf() {
-            return m_delegate.sizeOf();
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <C extends NullableReadData> C createReadData(final int index) {
-            return (C)m_decorator.apply(m_delegate.createReadData(index));
+            return (C)m_decorator.apply(getReadDelegate().createReadData(index));
         }
 
     }
