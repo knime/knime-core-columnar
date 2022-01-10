@@ -50,9 +50,8 @@ import static org.awaitility.Duration.ONE_HUNDRED_MILLISECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.knime.core.columnar.TestBatchStoreUtils.DEF_BATCH_LENGTH;
-import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_ADDITIONAL_COLUMNS;
 import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_BATCHES;
+import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_COLUMNS;
 import static org.knime.core.columnar.TestBatchStoreUtils.DEF_SIZE_OF_TABLE;
 import static org.knime.core.columnar.TestBatchStoreUtils.checkRefs;
 import static org.knime.core.columnar.TestBatchStoreUtils.createDefaultTestColumnStore;
@@ -93,7 +92,7 @@ public class ReadDataCacheTest extends ColumnarTest {
     }
 
     static SharedReadDataCache generateCache(final int numTablesHeld) {
-        return new SharedReadDataCache((long)numTablesHeld * (DEF_SIZE_OF_TABLE + DEF_BATCH_LENGTH * DEF_NUM_BATCHES * DEF_NUM_ADDITIONAL_COLUMNS), 1);
+        return new SharedReadDataCache((long)numTablesHeld * DEF_SIZE_OF_TABLE, 1);
     }
 
     private static ReadDataCache generateDefaultCachedColumnStore(final BatchStore delegate,
@@ -169,7 +168,7 @@ public class ReadDataCacheTest extends ColumnarTest {
     }
 
     private static void checkCacheSize(final SharedReadDataCache cache, final int tablesHeldInCache) {
-        assertEquals((long)DEF_SIZE_OF_TABLE * tablesHeldInCache, (long)cache.size() * DEF_BATCH_LENGTH);
+        assertEquals((long)DEF_NUM_BATCHES * DEF_NUM_COLUMNS * tablesHeldInCache, cache.size());
     }
 
     private static void checkUnflushed(final TestDataTable table, final TestBatchStore delegate) throws IOException {
