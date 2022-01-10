@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.testing.data;
 
+import java.util.Arrays;
+
 import org.knime.core.columnar.testing.data.TestByteData.TestByteDataFactory;
 import org.knime.core.columnar.testing.data.TestIntData.TestIntDataFactory;
 import org.knime.core.columnar.testing.data.TestLongData.TestLongDataFactory;
@@ -165,5 +167,10 @@ public abstract class AbstractTestData implements TestData {
         }
 
         throw new IllegalArgumentException("Unsupported key type " + keyType);
+    }
+
+    @Override
+    public String toString() {
+        return Arrays.deepToString(m_values);
     }
 }

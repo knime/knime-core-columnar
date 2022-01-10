@@ -55,6 +55,7 @@ import static org.knime.core.table.schema.DataSpecs.LIST;
 import static org.knime.core.table.schema.DataSpecs.STRING;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import org.junit.Test;
 import org.knime.core.columnar.TestBatchStoreUtils;
@@ -68,6 +69,8 @@ import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.dictencoding.DecoratedListData.DecoratedListReadData;
 import org.knime.core.columnar.data.dictencoding.DecoratedListData.DecoratedListWriteData;
+import org.knime.core.columnar.data.dictencoding.DecoratedStructData.DecoratedStructReadData;
+import org.knime.core.columnar.data.dictencoding.DecoratedStructData.DecoratedStructWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryReadData;
@@ -76,9 +79,14 @@ import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.DefaultTestBatchStore;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
+import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
+import org.knime.core.table.schema.traits.DataTraitUtils;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  *
@@ -154,16 +162,13 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     private static void checkDictEncodedWriteData(final ColumnarSchema columnarSchema, final WriteBatch baseBatch,
         final WriteBatch wrappedBatch) {
         for (int c = 0; c < columnarSchema.numColumns(); c++) {
-            if (DictEncodingTrait.isEnabled(columnarSchema.getTraits(c))) {
-                if (columnarSchema.getSpec(c) == StringDataSpec.INSTANCE) {
-                    assertEquals(wrappedBatch.get(c).getClass(), DictDecodedStringWriteData.class);
-                } else if (columnarSchema.getSpec(c) == VarBinaryDataSpec.INSTANCE) {
-                    assertEquals(wrappedBatch.get(c).getClass(), DictDecodedVarBinaryWriteData.class);
-                } else {
-                    fail("Dict Encoding for type " + columnarSchema.getSpec(c).toString() + " not tested yet");
-                }
+            final var wrappedClass = wrappedBatch.get(c).getClass();
+            var expectedClass =
+                getExpectedDictEncodingClass(columnarSchema.getSpec(c), columnarSchema.getTraits(c), false);
+            if (expectedClass.isPresent()) {
+                assertEquals(expectedClass.get(), wrappedClass);
             } else {
-                assertEquals(baseBatch.get(c).getClass(), wrappedBatch.get(c).getClass());
+                assertEquals(baseBatch.get(c).getClass(), wrappedClass);
             }
         }
     }
@@ -171,17 +176,33 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     private static void checkDictEncodedReadData(final ColumnarSchema columnarSchema, final ReadBatch baseBatch,
         final ReadBatch wrappedBatch) {
         for (int c = 0; c < columnarSchema.numColumns(); c++) {
-            if (DictEncodingTrait.isEnabled(columnarSchema.getTraits(c))) {
-                if (columnarSchema.getSpec(c) == StringDataSpec.INSTANCE) {
-                    assertEquals(wrappedBatch.get(c).getClass(), DictDecodedStringReadData.class);
-                } else if (columnarSchema.getSpec(c) == VarBinaryDataSpec.INSTANCE) {
-                    assertEquals(wrappedBatch.get(c).getClass(), DictDecodedVarBinaryReadData.class);
-                } else {
-                    fail("Dict Encoding for type " + columnarSchema.getSpec(c).toString() + " not tested yet");
-                }
+            final var wrappedClass = wrappedBatch.get(c).getClass();
+            var expectedClass =
+                getExpectedDictEncodingClass(columnarSchema.getSpec(c), columnarSchema.getTraits(c), true);
+            if (expectedClass.isPresent()) {
+                assertEquals(expectedClass.get(), wrappedClass);
             } else {
-                assertEquals(baseBatch.get(c).getClass(), wrappedBatch.get(c).getClass());
+                assertEquals(baseBatch.get(c).getClass(), wrappedClass);
             }
+        }
+    }
+
+    private static Optional<Class<?>> getExpectedDictEncodingClass(final DataSpec spec, final DataTraits traits,
+        final boolean isRead) {
+        if (DataTraitUtils.containsDataTrait(DictEncodingTrait.class, traits)) {
+            if (spec == StringDataSpec.INSTANCE) {
+                return Optional.of(isRead ? DictDecodedStringReadData.class : DictDecodedStringWriteData.class);
+            } else if (spec == VarBinaryDataSpec.INSTANCE) {
+                return Optional.of(isRead ? DictDecodedVarBinaryReadData.class : DictDecodedVarBinaryWriteData.class);
+            } else if (spec instanceof StructDataSpec) {
+                return Optional.of(isRead ? DecoratedStructReadData.class : DecoratedStructWriteData.class);
+            } else if (spec instanceof ListDataSpec) {
+                return Optional.of(isRead ? DecoratedListReadData.class : DecoratedListWriteData.class);
+            } else {
+                throw new IllegalArgumentException("Dict Encoding for type " + spec.toString() + " not tested yet");
+            }
+        } else {
+            return Optional.empty();
         }
     }
 
