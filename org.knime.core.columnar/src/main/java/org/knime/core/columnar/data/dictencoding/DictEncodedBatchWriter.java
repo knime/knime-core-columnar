@@ -49,6 +49,7 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultReadBatch;
@@ -56,11 +57,14 @@ import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.DataIndex;
+import org.knime.core.columnar.data.DecoratingData.DecoratingNullableReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
+import org.knime.core.columnar.data.dictencoding.DecoratedListData.DecoratedListReadData;
+import org.knime.core.columnar.data.dictencoding.DecoratedStructData.DecoratedStructReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedVarBinaryData.DictDecodedVarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
@@ -192,20 +196,25 @@ public class DictEncodedBatchWriter implements BatchWriter {
         return new DictDecodedVarBinaryWriteData<K>((DictEncodedVarBinaryWriteData<K>)data, cache);
     }
 
-    @SuppressWarnings("rawtypes")
     @Override
     public void write(final ReadBatch batch) throws IOException {
         // Replace all DictEncoded Data objects by the content that they wrap
-        NullableReadData[] data = new NullableReadData[batch.numData()];
-
-        for (int i = 0; i < batch.numData(); i++) {
-            data[i] = batch.get(i);
-            if (data[i] instanceof AbstractDictDecodedReadData) {
-                data[i] = ((AbstractDictDecodedReadData)data[i]).getDelegate();
-            }
-        }
-
+        var data = new NullableReadData[batch.numData()];
+        Arrays.setAll(data, i -> unpack(batch.get(i)));
         m_delegate.write(new DefaultReadBatch(data));
+    }
+
+    private static NullableReadData unpack(NullableReadData data) {
+        while (isDictDecodingWrapper(data)) {
+            data = ((DecoratingNullableReadData)data).getReadDelegate();
+        }
+        return data;
+    }
+
+    private static boolean isDictDecodingWrapper(final NullableReadData data) {
+        return data instanceof AbstractDictDecodedReadData //
+                || data instanceof DecoratedListReadData //
+                || data instanceof DecoratedStructReadData;
     }
 
 }
