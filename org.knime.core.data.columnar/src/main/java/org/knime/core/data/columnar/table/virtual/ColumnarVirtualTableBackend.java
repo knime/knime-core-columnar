@@ -56,6 +56,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.IntSupplier;
+import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -63,11 +64,13 @@ import java.util.stream.Stream;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.MissingCell;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.RowKeyValue;
+import org.knime.core.data.UnmaterializedCell;
 import org.knime.core.data.columnar.TableTransformUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
@@ -101,6 +104,8 @@ import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
 import org.knime.core.table.virtual.spec.MapTransformSpec.DefaultMapperFactory;
+
+import gnu.trove.map.hash.TIntIntHashMap;
 
 /**
  * Handles the construction (and optimization) of virtual tables that are generated via the ExecutionContext in a node.
@@ -280,10 +285,11 @@ public final class ColumnarVirtualTableBackend {
 
         private final IWriteFileStoreHandler m_fsHandler;
 
-        // currently includes all columns TODO determine per CellFactory once the CellFactory declares which columns it needs
         private final int[] m_inputIndices;
 
         private final VirtualTable m_sourceTable;
+
+        private final int m_numColumnsInInputTable;
 
         MapBuilder(final VirtualTable sourceTable, final ColumnarValueSchema schema,
             final IWriteFileStoreHandler fsHandler) {
@@ -292,6 +298,7 @@ public final class ColumnarVirtualTableBackend {
             m_inputValueFactories = new GenericValueFactory[schema.numColumns()];
             Arrays.setAll(m_inputValueFactories, i -> new GenericValueFactory(schema.getValueFactory(i)));
             m_inputIndices = IntStream.range(0, m_inputValueFactories.length).toArray();
+            m_numColumnsInInputTable = m_inputValueFactories.length - 1; // the row key is not counted towards the cols
         }
 
         VirtualTable map(final CellFactory factory) {
@@ -302,11 +309,46 @@ public final class ColumnarVirtualTableBackend {
             GenericValueFactory[] outputValueFactories = Stream.of(valueFactories)//
                 .map(GenericValueFactory::new)//
                 .toArray(GenericValueFactory[]::new);
-            var cellFactoryMap = new CellFactoryMap(m_inputValueFactories, outputValueFactories, factory);
+
+            var requiredColumnsMapper = createRequiredColumnsMapper(factory);
+            var inputFactories = Stream.concat(//
+                Stream.of(m_inputValueFactories[0]), // the row key is always included
+                IntStream.range(0, m_inputValueFactories.length - 1)//
+                    .filter(i -> requiredColumnsMapper.applyAsInt(i) > -1) // column is required
+                    .map(i -> i + 1) // account for row key column
+                    .mapToObj(i -> m_inputValueFactories[i]))//
+                .toArray(GenericValueFactory[]::new);
+            var cellFactoryMap = new CellFactoryMap(inputFactories, outputValueFactories,
+                factory, requiredColumnsMapper, m_numColumnsInInputTable);
             var valueSchema = ValueSchemaUtils.create(new DataTableSpec(factory.getColumnSpecs()), valueFactories);
             var outputSchema = ColumnarValueSchemaUtils.create(valueSchema);
-            return m_sourceTable.map(m_inputIndices,
+            return m_sourceTable.map(getColumnIndices(factory),
                 new DefaultMapperFactory(outputSchema, cellFactoryMap::createMapper));
+        }
+
+        private static IntUnaryOperator createRequiredColumnsMapper(final CellFactory cellFactory) {
+            var requiredCols = cellFactory.getRequiredColumns();
+            if (requiredCols.isPresent()) {
+                var array = requiredCols.get();
+                var mapper = new TIntIntHashMap(array.length, 0.7f, -1, -1);
+                IntStream.range(0, array.length)//
+                    .forEach(i -> mapper.put(array[i], i));
+                return mapper::get;
+            } else {
+                return IntUnaryOperator.identity();
+            }
+        }
+
+        private int[] getColumnIndices(final CellFactory factory) {
+            var requiredColumns = factory.getRequiredColumns();
+            if (requiredColumns.isPresent()) {
+                return IntStream.concat(IntStream.of(0), // the row key column is always included
+                    IntStream.of(requiredColumns.get())//
+                        .map(i -> i + 1)// required columns does not contain the row key
+                ).toArray();
+            } else {
+                return m_inputIndices;
+            }
         }
     }
 
@@ -318,14 +360,21 @@ public final class ColumnarVirtualTableBackend {
 
         private final CellFactory m_cellFactory;
 
+        private final IntUnaryOperator m_requiredColumnMapper;
+
+        private final int m_numInputColumns;
+
         CellFactoryMap(final GenericValueFactory[] inputValueFactories,
-            final GenericValueFactory[] outputValueFactories, final CellFactory cellFactory) {
+            final GenericValueFactory[] outputValueFactories, final CellFactory cellFactory,
+            final IntUnaryOperator requiredColumnMapper, final int numInputColumns) {
             m_readValueFactories = inputValueFactories;
             m_writeValueFactories = outputValueFactories;
             m_cellFactory = cellFactory;
+            m_requiredColumnMapper = requiredColumnMapper;
+            m_numInputColumns = numInputColumns;
         }
 
-        Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        Runnable createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var rowKey = (RowKeyValue)m_readValueFactories[0].createReadValue(inputs[0]);
             var readValues = IntStream.range(1, inputs.length)//
                 .mapToObj(i -> new NullableReadValue(m_readValueFactories[i].createReadValue(inputs[i]), inputs[i]))
@@ -333,41 +382,61 @@ public final class ColumnarVirtualTableBackend {
             var writeValues = new NullableWriteValue[outputs.length];
             Arrays.setAll(writeValues,
                 i -> new NullableWriteValue<>(m_writeValueFactories[i].createWriteValue(outputs[i]), outputs[i]));
-            return new Mapper(rowKey, readValues, writeValues, m_cellFactory);
+            final var cellConsumer = new CellConsumer(writeValues);
+            final var rowSupplier = new RowSupplier(rowKey, readValues, m_numInputColumns, m_requiredColumnMapper);
+            return () -> cellConsumer.accept(m_cellFactory.getCells(rowSupplier.getRow()));
         }
 
     }
 
-    private static final class Mapper implements Runnable {
-
-        private final RowKeyValue m_rowKey;
+    private static final class RowSupplier {
 
         private final NullableReadValue[] m_readValues;
 
+        private final RowKeyValue m_rowKey;
+
+        private final IntUnaryOperator m_requiredColumnMapper;
+
+        // reuse same cell array since a new one will be created in DefaultRow anyway
+        private final DataCell[] m_cells;
+
+        RowSupplier(final RowKeyValue rowKey, final NullableReadValue[] readValues, final int numInputColumns,
+            final IntUnaryOperator requiredColumnMapper) {
+            m_readValues = readValues;
+            m_requiredColumnMapper = requiredColumnMapper;
+            m_rowKey = rowKey;
+            m_cells = new DataCell[numInputColumns];
+        }
+
+        DataRow getRow() {
+            var rowKey = new RowKey(m_rowKey.getString());
+            Arrays.setAll(m_cells, this::getCell);
+            return new DefaultRow(rowKey, m_cells);
+        }
+
+        private DataCell getCell(final int i) {
+            var mappedIdx = m_requiredColumnMapper.applyAsInt(i);
+            if (mappedIdx > -1) {
+                return m_readValues[mappedIdx].getDataCell();
+            } else {
+                return UnmaterializedCell.getInstance();
+            }
+        }
+
+    }
+
+    private static final class CellConsumer {
         private final NullableWriteValue<?>[] m_writeValues;
 
-        private final CellFactory m_cellFactory;
-
-        Mapper(final RowKeyValue rowKey, final NullableReadValue[] readValues,
-            final NullableWriteValue<?>[] writeValues, final CellFactory cellFactory) {
-            m_rowKey = rowKey;
-            m_readValues = readValues;
+        CellConsumer(final NullableWriteValue<?>[] writeValues) {
             m_writeValues = writeValues;
-            m_cellFactory = cellFactory;
         }
 
-        @Override
-        public void run() {
-            var rowKey = new RowKey(m_rowKey.getString());
-            var cells = Stream.of(m_readValues)//
-                .map(NullableReadValue::getDataCell)//
-                .toArray(DataCell[]::new);
-            var row = new DefaultRow(rowKey, cells);
-            var outputs = m_cellFactory.getCells(row);
-            IntStream.range(0, m_writeValues.length)//
-                .forEach(i -> m_writeValues[i].setDataCell(outputs[i]));
+        void accept(final DataCell[] cells) {
+            for (int i = 0; i < m_writeValues.length; i++) {//NOSONAR
+                m_writeValues[i].setDataCell(cells[i]);
+            }
         }
-
     }
 
     private static final class NullableWriteValue<D extends DataValue> {
