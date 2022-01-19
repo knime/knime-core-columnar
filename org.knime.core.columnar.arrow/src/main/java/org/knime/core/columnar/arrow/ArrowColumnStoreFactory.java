@@ -49,6 +49,9 @@ import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.bytedeco.javacpp.Loader;
+import org.bytedeco.javacpp.presets.javacpp;
+import org.bytedeco.lz4.global.lz4;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
@@ -59,6 +62,9 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * A {@link ColumnStoreFactory} implementation for Arrow.
@@ -67,6 +73,20 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public class ArrowColumnStoreFactory implements ColumnStoreFactory {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ArrowColumnStoreFactory.class);
+
+    static {
+        // AP-18253: Load LZ4 libs on startup to avoid concurrency issues when different threads try to load it
+        // concurrently
+        System.setProperty("org.bytedeco.javacpp.maxPhysicalBytes", "0");
+        try {
+            Loader.load(javacpp.class, lz4.class);
+            // we need to prevent this from crashing otherwise the AP might not start at all
+        } catch (Throwable th) { //NOSONAR
+            LOGGER.error("Failed to initialize LZ4 libraries. The Columnar Table Backend won't work properly.", th);
+        }
+    }
 
     private static final RootAllocator ROOT = new RootAllocator();
 

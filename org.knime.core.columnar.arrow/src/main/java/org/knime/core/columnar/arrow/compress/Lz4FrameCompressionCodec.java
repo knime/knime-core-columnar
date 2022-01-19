@@ -67,10 +67,6 @@ import org.bytedeco.lz4.global.lz4;
  */
 public class Lz4FrameCompressionCodec extends AbstractCompressionCodec {
 
-    static {
-        System.setProperty("org.bytedeco.javacpp.maxPhysicalBytes", "0");
-    }
-
     /** With null the default is used */
     private static final LZ4FPreferences COMPRESSION_OPTIONS = null;
 
