@@ -177,6 +177,7 @@ public final class ColumnarCursorFactory {
 
         @Override
         public boolean canForward() {
+            // TODO (TP) best order of conditions depends on whether there are more batches than rows in a batch
             return m_currentIndexInCurrentBatch < m_lastIndexInCurrentBatch || m_currentBatchIndex < m_lastBatchIndex;
         }
 
