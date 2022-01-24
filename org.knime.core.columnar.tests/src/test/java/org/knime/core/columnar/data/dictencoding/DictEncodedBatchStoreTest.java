@@ -60,7 +60,6 @@ import java.util.Optional;
 import org.junit.Test;
 import org.knime.core.columnar.TestBatchStoreUtils;
 import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.ListData.ListReadData;
@@ -140,12 +139,10 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
             }
 
             final var selection = new DefaultColumnSelection(columnarSchema.numColumns());
-            try(var wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)
-                ) {
+            try(var wrappedReader = batchStore.createRandomAccessReader(selection)) {
                 var batch = wrappedReader.readRetained(0);
 
                 final var data = (ListReadData)batch.get(0);
-                assertEquals(DecoratedListReadData.class, data.getClass());
 
                 final var slicedData0 = (StringReadData)data.createReadData(0);
                 assertEquals("foo", slicedData0.getString(0));
@@ -207,49 +204,12 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     }
 
     @Test
-    public void testWrappedReader() {
-        var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
-        var columnSelection = new DefaultColumnSelection(columnarSchema.numColumns());
-        var cache = new DictElementCache();
-        try (DefaultTestBatchStore batchStore = DefaultTestBatchStore.create(columnarSchema)) {
-            try(BatchWriter baseWriter = batchStore.getWriter();
-                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache);
-                ) {
-                var wrappedBatch = wrappedWriter.create(5);
-                var readBatch = wrappedBatch.close(5);
-                wrappedWriter.write(readBatch);
-                readBatch.release();
-            }
-            try(RandomAccessBatchReader baseReader = batchStore.createRandomAccessReader(columnSelection);
-                DictEncodedRandomAccessBatchReader wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, columnSelection, columnarSchema, cache)
-            ) {
-                var baseBatch = baseReader.readRetained(0);
-                var wrappedBatch = wrappedReader.readRetained(0);
-                checkDictEncodedReadData(columnarSchema, baseBatch, wrappedBatch);
-                baseBatch.release();
-                wrappedBatch.release();
-            }
-        } catch (IOException ex1) {
-            fail();
-        }
-    }
-
-    @Test
     public void testWrappedBatchStore() throws IOException {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
-        var columnSelection = new DefaultColumnSelection(columnarSchema.numColumns());
         try (final var baseStore = DefaultTestBatchStore.create(columnarSchema);
              final var batchStore = new DictEncodedBatchWritableReadable(baseStore, baseStore)) {
             try (var writer = batchStore.getWriter()) {
                 assertEquals(writer.getClass(), DictEncodedBatchWriter.class);
-            }
-
-            try (var reader = batchStore.createRandomAccessReader()) {
-                assertEquals(reader.getClass(), DictEncodedRandomAccessBatchReader.class);
-            }
-
-            try (var reader = batchStore.createRandomAccessReader(columnSelection)) {
-                assertEquals(reader.getClass(), DictEncodedRandomAccessBatchReader.class);
             }
         }
     }
@@ -257,21 +217,10 @@ public class DictEncodedBatchStoreTest extends ColumnarTest {
     @Test
     public void testWrappedBatchReadStore() throws IOException {
         var columnarSchema = TestBatchStoreUtils.createDefaultSchema();
-        var columnSelection = new DefaultColumnSelection(columnarSchema.numColumns());
         try (final var baseStore = DefaultTestBatchStore.create(columnarSchema);
                 final var batchStore = new DictEncodedBatchWritableReadable(baseStore, baseStore)) {
             try (var writer = batchStore.getWriter()) {
                 assertEquals(writer.getClass(), DictEncodedBatchWriter.class);
-            }
-
-            try (var readStore = new DictEncodedBatchReadable(baseStore)) {
-                try (var reader = batchStore.createRandomAccessReader()) {
-                    assertEquals(reader.getClass(), DictEncodedRandomAccessBatchReader.class);
-                }
-
-                try (var reader = batchStore.createRandomAccessReader(columnSelection)) {
-                    assertEquals(reader.getClass(), DictEncodedRandomAccessBatchReader.class);
-                }
             }
         }
     }

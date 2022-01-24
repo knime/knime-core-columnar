@@ -66,8 +66,6 @@ public class DictEncodedBatchReadable implements RandomAccessBatchReadable {
 
     private final RandomAccessBatchReadable m_delegate;
 
-    private final DictElementCache m_dictElementCache = new DictElementCache();
-
     /**
      * Create with a delegate.
      *
@@ -84,8 +82,7 @@ public class DictEncodedBatchReadable implements RandomAccessBatchReadable {
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema(),
-            m_dictElementCache);
+        return m_delegate.createRandomAccessReader(selection);
     }
 
     @Override

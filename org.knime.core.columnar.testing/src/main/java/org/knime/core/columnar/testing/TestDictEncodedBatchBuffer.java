@@ -56,7 +56,6 @@ import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.data.dictencoding.DictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWriter;
-import org.knime.core.columnar.data.dictencoding.DictEncodedRandomAccessBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.testing.data.TestData;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -98,7 +97,7 @@ public class TestDictEncodedBatchBuffer implements TestBatchBuffer {
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new DictEncodedRandomAccessBatchReader(m_delegate, selection, m_delegate.getSchema(), m_cache);
+        return m_delegate.createRandomAccessReader(selection);
     }
 
     @Override

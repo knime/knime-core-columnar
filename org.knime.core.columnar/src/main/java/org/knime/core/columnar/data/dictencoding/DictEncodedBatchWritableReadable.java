@@ -98,8 +98,7 @@ public class DictEncodedBatchWritableReadable
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new DictEncodedRandomAccessBatchReader(m_readDelegate, selection, m_readDelegate.getSchema(),
-            m_dictElementCache);
+        return m_readDelegate.createRandomAccessReader(selection);
     }
 
     @Override
