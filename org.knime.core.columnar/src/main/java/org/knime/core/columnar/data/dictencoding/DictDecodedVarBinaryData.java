@@ -48,14 +48,11 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
-import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableReadData;
 import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
-import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
@@ -106,47 +103,7 @@ public final class DictDecodedVarBinaryData {
         @SuppressWarnings("unchecked")
         @Override
         public VarBinaryReadData close(final int length) {
-            return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)m_delegate.close(length));
-        }
-    }
-
-    /**
-     * {@link DictDecodedVarBinaryReadData} provides table-wide caching and {@link VarBinaryReadData} access to a
-     * wrapped {@link DictEncodedVarBinaryReadData}.
-     *
-     * @param <K> key type, should be Byte, Long or Integer
-     *
-     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
-     */
-    public static class DictDecodedVarBinaryReadData<K> extends AbstractDecoratingNullableReadData<DictEncodedVarBinaryReadData<K>>
-        implements VarBinaryReadData, DictDecodedReadData {
-
-        /**
-         * Create a {@link DictDecodedVarBinaryReadData} wrapping a {@link DictDecodedVarBinaryReadData} provided by a
-         * back-end.
-         *
-         * @param delegate The delegate {@link DictEncodedVarBinaryReadData}
-         */
-        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData<K> delegate) {
-            super(delegate);
-        }
-
-        @Override
-        public byte[] getBytes(final int index) {
-            // TODO: for global dict caching:
-            //          int dictKey = m_delegate.getDictEntryKey(index);
-            //          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getBytes(index));
-
-            return m_delegate.getBytes(index);
-        }
-
-        @Override
-        public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-            // TODO: for global dict caching:
-            //          int dictKey = m_delegate.getDictEntryKey(index);
-            //          return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getObject(index));
-
-            return m_delegate.getObject(index, deserializer);
+            return m_delegate.close(length);
         }
     }
 }

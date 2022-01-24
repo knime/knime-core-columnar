@@ -67,7 +67,6 @@ import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.cache.DataIndex;
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
@@ -91,8 +90,6 @@ import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
-import org.knime.core.columnar.data.dictencoding.DictDecoder;
-import org.knime.core.columnar.data.dictencoding.DictElementCache;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.testing.TestBatchBuffer;
 import org.knime.core.columnar.testing.TestBatchStore;
@@ -545,16 +542,6 @@ public final class TestBatchStoreUtils {
         final StructReadData expectedStruct = ((ListReadData)expected).createReadData(index);
         final StructReadData actualStruct = ((ListReadData)actual).createReadData(index);
         checkEqualsStructOfDictencodedVarBinaryData(expectedStruct, actualStruct, 0);
-    }
-
-    public static NullableReadData[] wrapDictEncodedData(final NullableReadData[] data, final DictElementCache cache,
-        final ColumnarSchema schema) {
-        NullableReadData[] out = new NullableReadData[data.length];
-        final var dictDecoder = new DictDecoder(cache);
-        for (int i = 0; i < out.length; i++) {
-            out[i] = dictDecoder.decode(DataIndex.createColumnIndex(i), data[i], schema.getSpec(i), schema.getTraits(i));
-        }
-        return out;
     }
 
     public static List<NullableReadData[]> writeDefaultTable(final BatchWritable store) throws IOException {

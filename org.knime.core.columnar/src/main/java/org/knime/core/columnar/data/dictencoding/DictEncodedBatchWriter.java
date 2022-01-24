@@ -211,8 +211,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
     }
 
     private static boolean isDictDecodingWrapper(final NullableReadData data) {
-        return data instanceof DictDecodedReadData //
-                || data instanceof DecoratedListReadData //
+        return data instanceof DecoratedListReadData //
                 || data instanceof DecoratedStructReadData;
     }
 

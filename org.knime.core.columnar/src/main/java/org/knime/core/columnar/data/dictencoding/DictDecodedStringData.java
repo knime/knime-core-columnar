@@ -49,12 +49,10 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import org.knime.core.columnar.WriteData;
-import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableReadData;
 import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
-import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 
 /**
@@ -109,38 +107,7 @@ public final class DictDecodedStringData {
         @SuppressWarnings("unchecked")
         @Override
         public StringReadData close(final int length) {
-            return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)m_delegate.close(length));
+            return m_delegate.close(length);
         }
     }
-
-    /**
-     * {@link DictDecodedStringReadData} provides table-wide caching and {@link StringReadData} access to a wrapped
-     * {@link DictEncodedStringReadData}.
-     *
-     * @param <K> key type, should be Byte, Long or Integer
-     *
-     * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
-     */
-    public static class DictDecodedStringReadData<K> extends AbstractDecoratingNullableReadData<DictEncodedStringReadData<K>>
-        implements StringReadData, DictDecodedReadData {
-        /**
-         * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a
-         * back-end.
-         *
-         * @param delegate The delegate {@link DictEncodedStringReadData}
-         */
-        public DictDecodedStringReadData(final DictEncodedStringReadData<K> delegate) {
-            super(delegate);
-        }
-
-        @Override
-        public String getString(final int index) {
-            // TODO: for global dict caching:
-            //            int dictKey = m_delegate.getDictEntryKey(index);
-            //            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getString(index));
-
-            return m_delegate.getString(index);
-        }
-    }
-
 }
