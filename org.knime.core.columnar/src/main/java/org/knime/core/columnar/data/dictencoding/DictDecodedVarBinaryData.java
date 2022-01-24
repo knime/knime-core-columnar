@@ -105,7 +105,7 @@ public final class DictDecodedVarBinaryData {
         @SuppressWarnings("unchecked")
         @Override
         public VarBinaryReadData close(final int length) {
-            return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)m_delegate.close(length), m_cache);
+            return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)m_delegate.close(length));
         }
     }
 
@@ -127,9 +127,8 @@ public final class DictDecodedVarBinaryData {
          * @param delegate The delegate {@link DictEncodedVarBinaryReadData}
          * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
-        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData<K> delegate,
-            final ColumnDictElementCache<K> cache) {
-            super(delegate, cache);
+        public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData<K> delegate) {
+            super(delegate);
         }
 
         @Override

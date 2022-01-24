@@ -147,7 +147,7 @@ public final class DictDecoder {
                 "Expected DictEncodedStringReadData to construct DictDecodedStringReadData but received "
                     + data.getClass());
         }
-        return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)data, cache);
+        return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)data);
     }
 
     @SuppressWarnings("unchecked")
@@ -158,6 +158,6 @@ public final class DictDecoder {
                 "Expected DictEncodedVarBinaryReadData to construct DictDecodedVarBinaryReadData but received "
                     + data.getClass());
         }
-        return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)data, cache);
+        return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)data);
     }
 }

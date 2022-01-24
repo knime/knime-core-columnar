@@ -108,8 +108,7 @@ public final class DictDecodedStringData {
         @SuppressWarnings("unchecked")
         @Override
         public StringReadData close(final int length) {
-            return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)m_delegate.close(length),
-                m_cache);
+            return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)m_delegate.close(length));
         }
     }
 
@@ -130,8 +129,8 @@ public final class DictDecodedStringData {
          * @param delegate The delegate {@link DictEncodedStringReadData}
          * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
-        public DictDecodedStringReadData(final DictEncodedStringReadData<K> delegate, final ColumnDictElementCache<K> cache) {
-            super(delegate, cache);
+        public DictDecodedStringReadData(final DictEncodedStringReadData<K> delegate) {
+            super(delegate);
         }
 
         @Override
