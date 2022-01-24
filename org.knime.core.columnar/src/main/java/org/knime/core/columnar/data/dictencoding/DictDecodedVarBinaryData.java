@@ -48,10 +48,10 @@
  */
 package org.knime.core.columnar.data.dictencoding;
 
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableReadData;
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableWriteData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
@@ -77,7 +77,7 @@ public final class DictDecodedVarBinaryData {
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
     public static class DictDecodedVarBinaryWriteData<K>
-        extends AbstractDictDecodedWriteData<K, DictEncodedVarBinaryWriteData<K>> implements VarBinaryWriteData {
+        extends AbstractDecoratingNullableWriteData<DictEncodedVarBinaryWriteData<K>> implements VarBinaryWriteData {
 
         /**
          * Create a {@link DictDecodedVarBinaryWriteData} wrapping a {@link DictDecodedVarBinaryWriteData} provided by a
@@ -89,7 +89,8 @@ public final class DictDecodedVarBinaryData {
          */
         public DictDecodedVarBinaryWriteData(final DictEncodedVarBinaryWriteData<K> delegate,
             final ColumnDictElementCache<K> cache) {
-            super(delegate, cache);
+            super(delegate);
+            m_delegate.setKeyGenerator(cache);
         }
 
         @Override
@@ -117,15 +118,14 @@ public final class DictDecodedVarBinaryData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedVarBinaryReadData<K> extends AbstractDictDecodedReadData<K, DictEncodedVarBinaryReadData<K>>
-        implements VarBinaryReadData {
+    public static class DictDecodedVarBinaryReadData<K> extends AbstractDecoratingNullableReadData<DictEncodedVarBinaryReadData<K>>
+        implements VarBinaryReadData, DictDecodedReadData {
 
         /**
          * Create a {@link DictDecodedVarBinaryReadData} wrapping a {@link DictDecodedVarBinaryReadData} provided by a
          * back-end.
          *
          * @param delegate The delegate {@link DictEncodedVarBinaryReadData}
-         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
         public DictDecodedVarBinaryReadData(final DictEncodedVarBinaryReadData<K> delegate) {
             super(delegate);

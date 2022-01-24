@@ -62,7 +62,6 @@ import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
 import org.knime.core.columnar.data.dictencoding.DecoratedListData.DecoratedListReadData;
 import org.knime.core.columnar.data.dictencoding.DecoratedStructData.DecoratedStructReadData;
 import org.knime.core.columnar.data.dictencoding.DictDecodedStringData.DictDecodedStringWriteData;
@@ -212,7 +211,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
     }
 
     private static boolean isDictDecodingWrapper(final NullableReadData data) {
-        return data instanceof AbstractDictDecodedReadData //
+        return data instanceof DictDecodedReadData //
                 || data instanceof DecoratedListReadData //
                 || data instanceof DecoratedStructReadData;
     }

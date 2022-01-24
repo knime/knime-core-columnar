@@ -49,10 +49,10 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import org.knime.core.columnar.WriteData;
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableReadData;
+import org.knime.core.columnar.data.DecoratingData.AbstractDecoratingNullableWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedReadData;
-import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.AbstractDictDecodedWriteData;
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
@@ -76,7 +76,7 @@ public final class DictDecodedStringData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringWriteData<K> extends AbstractDictDecodedWriteData<K, DictEncodedStringWriteData<K>>
+    public static class DictDecodedStringWriteData<K> extends AbstractDecoratingNullableWriteData<DictEncodedStringWriteData<K>>
         implements StringWriteData {
 
         /**
@@ -89,7 +89,8 @@ public final class DictDecodedStringData {
          */
         public DictDecodedStringWriteData(final DictEncodedStringWriteData<K> delegate,
             final ColumnDictElementCache<K> cache) {
-            super(delegate, cache);
+            super(delegate);
+            m_delegate.setKeyGenerator(cache);
         }
 
         /**
@@ -120,14 +121,13 @@ public final class DictDecodedStringData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringReadData<K> extends AbstractDictDecodedReadData<K, DictEncodedStringReadData<K>>
-        implements StringReadData {
+    public static class DictDecodedStringReadData<K> extends AbstractDecoratingNullableReadData<DictEncodedStringReadData<K>>
+        implements StringReadData, DictDecodedReadData {
         /**
          * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a
          * back-end.
          *
          * @param delegate The delegate {@link DictEncodedStringReadData}
-         * @param cache The table-wide {@link ColumnDictElementCache} for dictionary entries
          */
         public DictDecodedStringReadData(final DictEncodedStringReadData<K> delegate) {
             super(delegate);
