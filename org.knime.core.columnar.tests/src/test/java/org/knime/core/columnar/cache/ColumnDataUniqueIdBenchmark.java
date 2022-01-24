@@ -36,8 +36,8 @@ public class ColumnDataUniqueIdBenchmark {
     final BatchReadStore store = createDefaultTestColumnStore();
     final ColumnDataUniqueId id = new ColumnDataUniqueId(store, DataIndex.createColumnIndex(1).getChild(1), 0);
     final ColumnDataUniqueId eid = new ColumnDataUniqueId(store, DataIndex.createColumnIndex(1).getChild(1), 0);
-    final ColumnDataUniqueIdOld id2 = new ColumnDataUniqueIdOld(store, DataIndexOld.createColumnIndex(1).getChild(1), 0);
-    final ColumnDataUniqueIdOld eid2 = new ColumnDataUniqueIdOld(store, DataIndexOld.createColumnIndex(1).getChild(1), 0);
+    final ColumnDataUniqueIdOld idOld = new ColumnDataUniqueIdOld(store, DataIndexOld.createColumnIndex(1).getChild(1), 0);
+    final ColumnDataUniqueIdOld eidOld = new ColumnDataUniqueIdOld(store, DataIndexOld.createColumnIndex(1).getChild(1), 0);
 
     @Benchmark
     public boolean benchmarkEquals()
@@ -46,8 +46,8 @@ public class ColumnDataUniqueIdBenchmark {
     }
 
     @Benchmark
-    public boolean benchmarkEquals2()
+    public boolean benchmarkEqualsOld()
     {
-        return id2.equals(eid2);
+        return idOld.equals(eidOld);
     }
 }
