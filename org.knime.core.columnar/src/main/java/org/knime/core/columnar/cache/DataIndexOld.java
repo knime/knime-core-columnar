@@ -59,11 +59,11 @@ import com.google.common.base.Preconditions;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class DataIndex {
+public final class DataIndexOld {
 
     private final int m_index;
 
-    private final DataIndex m_parent;
+    private final DataIndexOld m_parent;
 
     private final int m_hashCode;
 
@@ -73,16 +73,16 @@ public final class DataIndex {
      * @param columnIndex index of the column within the table
      * @return an index identifying the root level of the column
      */
-    public static DataIndex createColumnIndex(final int columnIndex) {
+    public static DataIndexOld createColumnIndex(final int columnIndex) {
         // TODO cache DataIndex objects if object creation proofs to be a performance issue
-        return new DataIndex(columnIndex);
+        return new DataIndexOld(columnIndex);
     }
 
-    private DataIndex(final int columnIndex) {
+    private DataIndexOld(final int columnIndex) {
         this(null, columnIndex);
     }
 
-    private DataIndex(final DataIndex parent, final int index) {
+    private DataIndexOld(final DataIndexOld parent, final int index) {
         Preconditions.checkArgument(index >= 0, "Negative indices are not permitted.");
         m_parent = parent;
         m_index = index;
@@ -95,8 +95,8 @@ public final class DataIndex {
      * @param childIndex index of the child
      * @return an index identifying the child at the provided index
      */
-    public DataIndex getChild(final int childIndex) {
-        return new DataIndex(this, childIndex);
+    public DataIndexOld getChild(final int childIndex) {
+        return new DataIndexOld(this, childIndex);
     }
 
     /**
@@ -115,9 +115,10 @@ public final class DataIndex {
     public boolean equals(final Object obj) {
         if (obj == this) {
             return true;
-        } else if (obj instanceof DataIndex) {
-            var other = (DataIndex)obj;
-            return m_index == other.m_index//
+        } else if (obj instanceof DataIndexOld) {
+            var other = (DataIndexOld)obj;
+            return m_hashCode == other.m_hashCode//
+                    && m_index == other.m_index//
                     && Objects.equals(m_parent, other.m_parent);
         } else {
             return false;
