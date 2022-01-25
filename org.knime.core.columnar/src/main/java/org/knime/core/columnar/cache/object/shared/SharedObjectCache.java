@@ -74,7 +74,7 @@ public interface SharedObjectCache {
      * @return the cached object
      * @see Map#computeIfAbsent(Object, Function)
      */
-    Object[] computeIfAbsent(ColumnDataUniqueId key, Function<ColumnDataUniqueId, Object[]> mappingFunction);
+    Object computeIfAbsent(ColumnDataUniqueId key, Function<ColumnDataUniqueId, Object> mappingFunction);
 
     /**
      * Puts the provided value into the cache.
@@ -83,7 +83,7 @@ public interface SharedObjectCache {
      * @param value the value to cache
      * @see Map#put(Object, Object)
      */
-    void put(ColumnDataUniqueId key, Object[] value);
+    void put(ColumnDataUniqueId key, Object value);
 
     /**
      * Removes the values associated with the provided keys from the cache.

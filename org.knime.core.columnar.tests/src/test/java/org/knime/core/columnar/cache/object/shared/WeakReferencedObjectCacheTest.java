@@ -56,7 +56,6 @@ import java.util.Map;
 import org.junit.Test;
 import org.knime.core.columnar.TestBatchStoreUtils;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
-import org.knime.core.columnar.cache.object.shared.WeakReferencedObjectCache;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -66,12 +65,12 @@ public class WeakReferencedObjectCacheTest {
 
     @Test
     public void testWriteMultiRead() {
-        final Map<ColumnDataUniqueId, Object[]> cache = (new WeakReferencedObjectCache()).getCache();
+        final Map<ColumnDataUniqueId, Object> cache = (new WeakReferencedObjectCache()).getCache();
         @SuppressWarnings("resource")
         final ColumnDataUniqueId id = new ColumnDataUniqueId(TestBatchStoreUtils.createDefaultTestColumnStore(), 0, 0);
         Object[] val = new Object[0];
         cache.put(id, val);
-        assertArrayEquals(val, cache.get(id));
+        assertArrayEquals(val, (Object[])cache.get(id));
         val = null; // NOSONAR
         System.gc(); // NOSONAR
         assertNull(cache.get(id));

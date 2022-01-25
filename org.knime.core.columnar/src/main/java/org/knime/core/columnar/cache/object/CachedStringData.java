@@ -78,7 +78,7 @@ final class CachedStringData {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    static final class CachedStringDataFactory extends AbstractCachedValueDataFactory<String> {
+    static final class CachedStringDataFactory extends AbstractCachedValueDataFactory<String[]> {
 
         CachedStringDataFactory(final ExecutorService executor, final Set<CachedWriteData> unclosedData,
             final CacheManager cacheManager, final ExecutorService serializationExecutor,
@@ -88,7 +88,7 @@ final class CachedStringData {
 
         @Override
         protected AbstractCachedValueWriteData<?, ?, ?> createCachedData(final NullableWriteData data,
-            final Consumer<Object[]> cache) {
+            final Consumer<Object> cache) {
             return new CachedStringWriteData((StringWriteData)data, m_serializationExecutor, m_serializationLatch,
                 cache);
         }
@@ -113,7 +113,7 @@ final class CachedStringData {
         extends AbstractCachedValueWriteData<StringWriteData, StringReadData, String> implements StringWriteData {
 
         CachedStringWriteData(final StringWriteData delegate, final ExecutorService executor,
-            final CountUpDownLatch serializationLatch, final Consumer<Object[]> cache) {
+            final CountUpDownLatch serializationLatch, final Consumer<Object> cache) {
             super(delegate, new String[delegate.capacity()], executor, serializationLatch, cache);
         }
 

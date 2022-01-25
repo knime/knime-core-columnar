@@ -81,7 +81,7 @@ final class CachedVarBinaryData {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    static final class CachedVarBinaryDataFactory extends AbstractCachedValueDataFactory<Object> {
+    static final class CachedVarBinaryDataFactory extends AbstractCachedValueDataFactory<Object[]> {
 
         CachedVarBinaryDataFactory(final ExecutorService executor, final Set<CachedWriteData> unclosedData,
             final CacheManager cacheManager, final ExecutorService serializationExecutor,
@@ -91,7 +91,7 @@ final class CachedVarBinaryData {
 
         @Override
         public AbstractCachedValueWriteData<?, ?, ?> createCachedData(final NullableWriteData data,
-            final Consumer<Object[]> cache) {
+            final Consumer<Object> cache) {
             return new CachedVarBinaryWriteData((VarBinaryWriteData)data, m_serializationExecutor, m_serializationLatch,
                 cache);
         }
@@ -118,7 +118,7 @@ final class CachedVarBinaryData {
         private ObjectSerializer<?>[] m_serializers;
 
         CachedVarBinaryWriteData(final VarBinaryWriteData delegate, final ExecutorService executor,
-            final CountUpDownLatch serializationLatch, final Consumer<Object[]> cache) {
+            final CountUpDownLatch serializationLatch, final Consumer<Object> cache) {
             super(delegate, new Object[delegate.capacity()], executor, serializationLatch, cache);
             m_serializers = new ObjectSerializer<?>[delegate.capacity()];
         }

@@ -63,20 +63,20 @@ import com.google.common.cache.Cache;
  */
 abstract class AbstractSharedObjectCache implements SharedObjectCache {
 
-    protected final Cache<ColumnDataUniqueId, Object[]> m_cache;
+    protected final Cache<ColumnDataUniqueId, Object> m_cache;
 
-    AbstractSharedObjectCache(final Cache<ColumnDataUniqueId, Object[]> cache) {
+    AbstractSharedObjectCache(final Cache<ColumnDataUniqueId, Object> cache) {
         m_cache = cache;
     }
 
     @Override
-    public Object[] computeIfAbsent(final ColumnDataUniqueId key, final Function<ColumnDataUniqueId, Object[]> mappingFunction) {
+    public Object computeIfAbsent(final ColumnDataUniqueId key, final Function<ColumnDataUniqueId, Object> mappingFunction) {
         // TODO can we operate on cache directly?
         return m_cache.asMap().computeIfAbsent(key, mappingFunction);
     }
 
     @Override
-    public void put(final ColumnDataUniqueId key, final Object[] value) {
+    public void put(final ColumnDataUniqueId key, final Object value) {
         m_cache.put(key, value);
     }
 
@@ -90,7 +90,7 @@ abstract class AbstractSharedObjectCache implements SharedObjectCache {
      *
      * @return the cache as map
      */
-    Map<ColumnDataUniqueId, Object[]> getCache() {
+    Map<ColumnDataUniqueId, Object> getCache() {
         return m_cache.asMap();
     }
 

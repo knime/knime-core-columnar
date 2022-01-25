@@ -108,16 +108,16 @@ public class ObjectCacheTest extends ColumnarTest {
     static SharedObjectCache generateCache() {
 
         return new SharedObjectCache() {
-            private final Map<ColumnDataUniqueId, Object[]> m_cache = new ConcurrentHashMap<>();
+            private final Map<ColumnDataUniqueId, Object> m_cache = new ConcurrentHashMap<>();
 
             @Override
-            public Object[] computeIfAbsent(final ColumnDataUniqueId key,
-                final Function<ColumnDataUniqueId, Object[]> mappingFunction) {
+            public Object computeIfAbsent(final ColumnDataUniqueId key,
+                final Function<ColumnDataUniqueId, Object> mappingFunction) {
                 return m_cache.computeIfAbsent(key, mappingFunction);
             }
 
             @Override
-            public void put(final ColumnDataUniqueId key, final Object[] value) {
+            public void put(final ColumnDataUniqueId key, final Object value) {
                 m_cache.put(key, value);
             }
 

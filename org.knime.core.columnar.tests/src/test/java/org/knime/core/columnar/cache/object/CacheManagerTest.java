@@ -107,7 +107,7 @@ public class CacheManagerTest {
         var index = createId(0, 0);
         m_testInstance.cacheData(values, index);
         assertTrue(m_cache.m_cache.containsKey(index));
-        assertArrayEquals(values, m_testInstance.getOrCreate(index, () -> values));
+        assertArrayEquals(values, (String[])m_testInstance.getOrCreate(index, () -> values));
         assertTrue(m_cache.m_cache.containsKey(index));
     }
 
@@ -142,16 +142,16 @@ public class CacheManagerTest {
 
     private static final class TestSharedObjectCache implements SharedObjectCache {
 
-        private final Map<ColumnDataUniqueId, Object[]> m_cache = new ConcurrentHashMap<>();
+        private final Map<ColumnDataUniqueId, Object> m_cache = new ConcurrentHashMap<>();
 
         @Override
-        public Object[] computeIfAbsent(final ColumnDataUniqueId key,
-            final Function<ColumnDataUniqueId, Object[]> mappingFunction) {
+        public Object computeIfAbsent(final ColumnDataUniqueId key,
+            final Function<ColumnDataUniqueId, Object> mappingFunction) {
             return m_cache.computeIfAbsent(key, mappingFunction);
         }
 
         @Override
-        public void put(final ColumnDataUniqueId key, final Object[] value) {
+        public void put(final ColumnDataUniqueId key, final Object value) {
             m_cache.put(key, value);
         }
 

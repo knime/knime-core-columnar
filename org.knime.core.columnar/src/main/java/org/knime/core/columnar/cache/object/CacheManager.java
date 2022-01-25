@@ -70,12 +70,12 @@ final class CacheManager implements AutoCloseable {
         m_cache = cache;
     }
 
-    void cacheData(final Object[] data, final ColumnDataUniqueId id) {
+    void cacheData(final Object data, final ColumnDataUniqueId id) {
         m_cache.put(id, data);
         m_cachedData.add(id);
     }
 
-    Object[] getOrCreate(final ColumnDataUniqueId id, final Supplier<Object[]> supplier) {
+    Object getOrCreate(final ColumnDataUniqueId id, final Supplier<Object> supplier) {
         return m_cache.computeIfAbsent(id, k -> {
             m_cachedData.add(k);
             return supplier.get();

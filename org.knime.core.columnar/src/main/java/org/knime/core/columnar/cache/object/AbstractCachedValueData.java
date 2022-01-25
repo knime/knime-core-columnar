@@ -107,7 +107,7 @@ final class AbstractCachedValueData {
         @Override
         public final NullableReadData createReadData(final NullableReadData data, final ColumnDataUniqueId id) {
             @SuppressWarnings("unchecked")
-            T[] array = (T[])m_cacheManager.getOrCreate(id, () -> createArray(data.length()));
+            T array = (T)m_cacheManager.getOrCreate(id, () -> createArray(data.length()));
             return createCachedData(data, array);
         }
 
@@ -117,11 +117,11 @@ final class AbstractCachedValueData {
         }
 
         protected abstract CachedWriteData createCachedData(final NullableWriteData data,
-            final Consumer<Object[]> cache);
+            final Consumer<Object> cache);
 
-        protected abstract NullableReadData createCachedData(final NullableReadData data, final T[] array);
+        protected abstract NullableReadData createCachedData(final NullableReadData data, final T array);
 
-        protected abstract T[] createArray(final int length);
+        protected abstract T createArray(final int length);
 
     }
 
@@ -197,11 +197,11 @@ final class AbstractCachedValueData {
         // the back-end once all writing has finished.
         private final CountUpDownLatch m_serializationLatch;
 
-        private final Consumer<Object[]> m_cache;
+        private final Consumer<Object> m_cache;
 
 
         AbstractCachedValueWriteData(final W delegate, final T[] data, final ExecutorService executor,
-            final CountUpDownLatch latch, final Consumer<Object[]> cache) {
+            final CountUpDownLatch latch, final Consumer<Object> cache) {
             super(delegate);
             m_data = data;
             m_serializationExecutor = executor;
