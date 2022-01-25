@@ -105,7 +105,7 @@ public class CountUpDownLatch {
      *
      * @throws InterruptedException
      */
-    public void awaitInterrputibly() throws InterruptedException {
+    public void awaitInterruptibly() throws InterruptedException {
         m_phaser.awaitAdvanceInterruptibly(0);
     }
 
