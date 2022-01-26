@@ -48,13 +48,11 @@
  */
 package org.knime.core.columnar.cache.object;
 
-import java.util.List;
 import java.util.function.Consumer;
 
 import org.knime.core.columnar.cache.object.AbstractCachedData.AbstractCachedLoadingReadData;
 import org.knime.core.columnar.cache.object.AbstractCachedData.AbstractCachedWriteData;
 import org.knime.core.columnar.cache.object.CachedData.CachedLoadingReadData;
-import org.knime.core.columnar.cache.object.CachedData.CachedReadData;
 import org.knime.core.columnar.cache.object.CachedData.CachedWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -123,7 +121,6 @@ final class AbstractCachedNestedData {
 
        @Override
        public void expand(final int minimumCapacity) {
-           // TODO discuss if this is safe
            waitForAndGetFuture();
            lockWriting();
            try {
@@ -134,18 +131,6 @@ final class AbstractCachedNestedData {
            }
        }
 
-       abstract class AbstractCachedNestedReadData extends AbstractCachedReadData {
-
-           protected final List<CachedReadData> m_readChildren;
-
-           AbstractCachedNestedReadData(final int length, final List<CachedReadData> readChildren) {
-               super(length);
-               m_readChildren = readChildren;
-           }
-
-           // TODO pull up methods that can be generalized
-
-       }
    }
 
    /**

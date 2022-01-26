@@ -190,7 +190,7 @@ final class AbstractCachedValueData {
         private final AtomicBoolean m_cancelled = new AtomicBoolean(false);
 
         // used to make sure we don't call expand and a realloc during serialization concurrently.
-        private final Lock m_expandLock = new ReentrantLock();
+        private final Lock m_writeLock = new ReentrantLock();
 
         // The latch is used to keep track of the number of asynchronously dispatched tasks to
         // know when they have really finished. This is used as a barrier to ensure we only close
@@ -258,12 +258,12 @@ final class AbstractCachedValueData {
         @Override
         public void lockWriting() {
             waitForAndGetFuture();
-            m_expandLock.lock();
+            m_writeLock.lock();
         }
 
         @Override
         public void unlockWriting() {
-            m_expandLock.unlock();
+            m_writeLock.unlock();
         }
 
         @Override
@@ -273,9 +273,6 @@ final class AbstractCachedValueData {
 
         @Override
         public synchronized void flush() {
-            if (m_future.isDone()) {
-                waitForAndGetFuture();
-            }
             dispatchSerialization();
             waitForAndGetFuture();
         }
@@ -291,7 +288,7 @@ final class AbstractCachedValueData {
                     if (m_cancelled.get()) {
                         break;
                     }
-                    m_expandLock.lock();
+                    m_writeLock.lock();
                     try {
                         serializeAt(i);
                     } finally {
