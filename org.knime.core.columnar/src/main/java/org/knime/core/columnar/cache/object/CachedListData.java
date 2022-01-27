@@ -108,6 +108,8 @@ final class CachedListData {
 
         private final ColumnDataUniqueId m_id;
 
+        private int m_lastIndex = -1;
+
         CachedListWriteData(final ListWriteData delegate, final CachedDataFactory elementFactory,
             final ColumnDataUniqueId id) {
             super(delegate, new CachedWriteData[delegate.capacity()]);
@@ -126,16 +128,21 @@ final class CachedListData {
         @SuppressWarnings("unchecked")
         @Override
         public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
+            if (m_lastIndex > -1) {
+                // It's not allowed to write at multiple positions in a list in parallel.
+                // See ListWriteData#createWriteData contract
+                m_children[m_lastIndex].flush();
+            }
             var elementData = m_delegate.createWriteData(index, size);
             m_elementSizes[index] = size;
             var out = (CachedWriteData)m_elementFactory.createWriteData(elementData, m_id.getChild(index));
             m_children[index] = out;
+            m_lastIndex = index;
             return (C)out;
         }
 
         @Override
         public void expandCache() {
-            super.expandCache();
             final var newCapacity = m_delegate.capacity();
             if (m_children.length < newCapacity) {
                 m_children = Arrays.copyOf(m_children, newCapacity);
@@ -153,6 +160,7 @@ final class CachedListData {
         private CachedReadData closeIfPresent(final int index) {
             var element = m_children[index];
             if (element != null) {
+                // FIXME not allowed see ListWriteData#createWriteData contract
                 return element.close(m_elementSizes[index]);
             } else {
                 return null;
