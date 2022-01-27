@@ -58,7 +58,6 @@ import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.cache.DataIndex;
 import org.knime.core.columnar.cache.object.CachedData.CachedDataFactory;
 import org.knime.core.columnar.cache.object.CachedData.CachedWriteData;
-import org.knime.core.columnar.cache.object.CachedListData.CachedListDataFactory;
 import org.knime.core.columnar.cache.object.CachedStringData.CachedStringDataFactory;
 import org.knime.core.columnar.cache.object.CachedStructData.CachedStructDataFactory;
 import org.knime.core.columnar.cache.object.CachedVarBinaryData.CachedVarBinaryDataFactory;
@@ -149,14 +148,17 @@ final class CachedDataFactoryBuilder {
         }
     }
 
+    @SuppressWarnings({"static-method", "unused"}) // TODO implement AP-18333 (see below)
     private CachedDataFactory createCachedListDataFactory(final DataIndex index, final ListDataSpec listSpec,
         final ListDataTraits listTraits) {
-        var elementFactory = createCachedDataFactory(listSpec.getInner(), listTraits.getInner(), index.getChild(0));
-        if (elementFactory == UncachedDataFactory.INSTANCE) {
-            return UncachedDataFactory.INSTANCE;
-        } else {
-            return new CachedListDataFactory(elementFactory, m_persistExecutor, m_unclosedData);
-        }
+        return UncachedDataFactory.INSTANCE;
+        // TODO AP-18333: Properly implement caching lists of objects
+//        var elementFactory = createCachedDataFactory(listSpec.getInner(), listTraits.getInner(), index.getChild(0));
+//        if (elementFactory == UncachedDataFactory.INSTANCE) {
+//            return UncachedDataFactory.INSTANCE;
+//        } else {
+//            return new CachedListDataFactory(elementFactory, m_persistExecutor, m_unclosedData);
+//        }
     }
 
     private CachedDataFactory createCachedStructDataFactory(final DataIndex index, final StructDataSpec structSpec,

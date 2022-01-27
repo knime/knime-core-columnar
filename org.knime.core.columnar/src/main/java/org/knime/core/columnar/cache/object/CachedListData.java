@@ -70,6 +70,7 @@ import org.knime.core.columnar.data.NullableWriteData;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
+// TODO currently unused. Will be implemented as part of AP-18333
 final class CachedListData {
 
     private CachedListData() {
