@@ -62,7 +62,6 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
-import org.knime.core.data.columnar.table.virtual.closeable.CloseableTracker;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -205,7 +204,6 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         }
         m_openCursorFinalizers.clear();
         try {
-            m_rowAccessibleView.closeInternal();
             m_columnarTable.close();
         } catch (final IOException e) {
             LOGGER.error(String.format("Exception while clearing ContainerTable: %s", e.getMessage()), e);
@@ -259,16 +257,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     private final class ColumnarContainerRowAccessible implements RowAccessible {
 
-        private final CloseableTracker<Cursor<ReadAccessRow>, IOException> m_trackedCursors =
-            new CloseableTracker<>(IOException.class);
-
         @Override
         public void close() throws IOException {
             // the life-cycle of this view is bound to the life-cycle of the outer instance
-        }
-
-        void closeInternal() throws IOException {
-            m_trackedCursors.close();
         }
 
         @Override
@@ -276,10 +267,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
             return m_columnarTable.getSchema();
         }
 
-        @SuppressWarnings("resource") // the purpose of the tracker is memory leaks
         @Override
         public Cursor<ReadAccessRow> createCursor() {
-            return m_trackedCursors.track(m_columnarTable.createCursor());
+            return m_columnarTable.createCursor();
         }
     }
 }
