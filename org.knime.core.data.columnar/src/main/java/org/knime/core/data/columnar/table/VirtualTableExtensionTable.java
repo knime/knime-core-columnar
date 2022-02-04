@@ -2,6 +2,7 @@ package org.knime.core.data.columnar.table;
 
 import static java.util.stream.Collectors.toList;
 
+import java.io.Closeable;
 /*
  * ------------------------------------------------------------------------
  *
@@ -66,10 +67,10 @@ import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
-import org.knime.core.data.columnar.table.virtual.closeable.CloseableTracker;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.RowRead;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -129,14 +130,11 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private TableTransform m_transformation;
 
-    private final CloseableTracker<RowCursor, IOException> m_cursorTracker = new CloseableTracker<>(IOException.class);
-
-    private final CloseableTracker<RowAccessible, IOException> m_filteredAccessibleTracker =
-        new CloseableTracker<>(IOException.class);
-
     private final long m_size;
 
     private final int m_tableId;
+
+    private final CursorTracker<RowCursor> m_openCursors = CursorTracker.createRowCursorTracker();
 
     /**
      * Serialization constructor. Not to be used by clients.
@@ -298,16 +296,12 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public void clear() {
-        closeOpenCursors();
-        clearOutputCache();
-    }
-
-    private void closeOpenCursors() {
         try {
-            m_cursorTracker.close();
+            m_openCursors.close();
         } catch (IOException ex) {
-            LOGGER.debug("Failed to close at least one open cursor.", ex);
+            LOGGER.debug("Exception while closing open cursors.", ex);
         }
+        clearOutputCache();
     }
 
     private void clearOutputCache() {
@@ -355,10 +349,10 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return new ColumnarRowIterator(cursor());
     }
 
-    @SuppressWarnings("resource") // the cursor is managed by the returned RowCursor
     @Override
     public RowCursor cursor() {
-        return m_cursorTracker.track(VirtualTableUtils.createColumnarRowCursor(m_schema, getOutput().createCursor()));
+        return m_openCursors
+            .createTrackedCursor(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, getOutput().createCursor()));
     }
 
     private synchronized RowAccessible getOutput() {
@@ -386,11 +380,10 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return sources;
     }
 
-    @SuppressWarnings("resource") // we track the cursors, so even if the client doesn't close them, we do on #clear()
     @Override
     public RowCursor cursor(final TableFilter filter) {
         if (TableFilterUtils.hasFilter(filter)) {
-            return m_cursorTracker.track(createdFilteredRowCursor(filter));
+            return m_openCursors.createTrackedCursor(() -> createdFilteredRowCursor(filter));
         } else {
             // cursor() already does the tracking for us
             return cursor();
@@ -403,11 +396,11 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         var table = createFilteredVirtualTable(filter, srcId);
         final VirtualTableExecutor exec = new LazyVirtualTableExecutor(table.getProducingTransform());
         final List<RowAccessible> accessibles = exec.execute(Map.of(srcId, getOutput()));
-        m_filteredAccessibleTracker.trackAll(accessibles);
         final Cursor<ReadAccessRow> physicalCursor = accessibles.get(0).createCursor();
-        return TableFilterUtils.createColumnSelection(filter, m_schema.numColumns())//
+        var cursor = TableFilterUtils.createColumnSelection(filter, m_schema.numColumns())//
             .map(s -> VirtualTableUtils.createTableFilterRowCursor(m_schema, physicalCursor, s))//
             .orElseGet(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, physicalCursor));
+        return new SourceClosingRowCursor(cursor, accessibles.toArray(Closeable[]::new));
     }
 
     private VirtualTable createFilteredVirtualTable(final TableFilter filter, final UUID srcId) {
@@ -532,6 +525,46 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         @Override
         public Map<UUID, RowAccessible> getSources() {
             return Collections.singletonMap(m_id, VirtualTableUtils.createRowAccessible(m_schema, m_table));
+        }
+
+    }
+
+    private static final class SourceClosingRowCursor implements RowCursor {
+
+        private final RowCursor m_delegate;
+
+        private final Closeable[] m_sources;
+
+        SourceClosingRowCursor(final RowCursor cursor, final Closeable[] sources) {
+            m_sources = sources;
+            m_delegate = cursor;
+        }
+
+        @Override
+        public RowRead forward() {
+            return m_delegate.forward();
+        }
+
+        @Override
+        public boolean canForward() {
+            return m_delegate.canForward();
+        }
+
+        @Override
+        public int getNumColumns() {
+            return m_delegate.getNumColumns();
+        }
+
+        @Override
+        public void close() {
+            m_delegate.close();
+            for (var source : m_sources) {
+                try {
+                    source.close();
+                } catch (IOException ex) {
+                    LOGGER.debug("Failed to close source RowAccessibles.", ex);
+                }
+            }
         }
 
     }

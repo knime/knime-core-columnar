@@ -85,6 +85,9 @@ public final class ColumnarRowReadTable implements RowAccessible {
 
     private final long m_size;
 
+    private final CursorTracker<LookaheadCursor<ReadAccessRow>> m_cursorTracker =
+        CursorTracker.createLookaheadCursorTracker();
+
     /**
      * @param schema The schema of the table.
      * @param storeFactory The factory which created the table's underlying store.
@@ -150,7 +153,8 @@ public final class ColumnarRowReadTable implements RowAccessible {
 
     @Override
     public LookaheadCursor<ReadAccessRow> createCursor() {
-        return ColumnarCursorFactory.create(m_store, m_size);
+        // we track the cursors, so that we can close them before closing m_store
+        return m_cursorTracker.createTrackedCursor(() -> ColumnarCursorFactory.create(m_store, m_size));
     }
 
     /**
@@ -187,6 +191,8 @@ public final class ColumnarRowReadTable implements RowAccessible {
 
     @Override
     public void close() throws IOException {
+        m_cursorTracker.close();
         m_store.close();
     }
+
 }
