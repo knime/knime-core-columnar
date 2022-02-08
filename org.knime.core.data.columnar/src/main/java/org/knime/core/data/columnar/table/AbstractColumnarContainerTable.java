@@ -47,11 +47,9 @@ package org.knime.core.data.columnar.table;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
@@ -114,11 +112,9 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     private final ColumnarRowReadTable m_columnarTable;
 
-    private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
     private final ColumnarContainerRowAccessible m_rowAccessibleView = new ColumnarContainerRowAccessible();
 
-    // effectively final
+    // effectively final. This is a safety net for the case that a table gets GC'ed without being cleared by the AP
     private Finalizer m_tableCloser;
 
     @SuppressWarnings("resource")
@@ -139,10 +135,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
     }
 
     void initStoreCloser() {
-        final var readersRelease = new ResourceWithRelease(m_openCursorFinalizers,
-            finalizers -> finalizers.forEach(Finalizer::releaseResourcesAndLogOutput));
         final var tableRelease = new ResourceWithRelease(m_columnarTable);
-        m_tableCloser = ResourceLeakDetector.getInstance().createFinalizer(this, readersRelease, tableRelease);
+        m_tableCloser = ResourceLeakDetector.getInstance().createFinalizer(this, tableRelease);
     }
 
     @Override
@@ -199,10 +193,6 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
     @Override
     public void clear() {
         m_tableCloser.close();
-        for (final Finalizer closer : m_openCursorFinalizers) {
-            closer.releaseResourcesAndLogOutput();
-        }
-        m_openCursorFinalizers.clear();
         try {
             m_columnarTable.close();
         } catch (final IOException e) {
@@ -227,12 +217,12 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     @Override
     public RowCursor cursor() {
-        return m_columnarTable.createCursor(m_openCursorFinalizers);
+        return m_columnarTable.createRowCursor();
     }
 
     @Override
     public RowCursor cursor(final TableFilter filter) {
-        return m_columnarTable.createCursor(m_openCursorFinalizers, filter);
+        return m_columnarTable.createRowCursor(filter);
     }
 
     @SuppressWarnings("resource") // Cursor will be closed along with iterator.
