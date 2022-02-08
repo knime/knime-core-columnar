@@ -117,7 +117,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
     private final Set<Finalizer> m_openCursorFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    private final CloseableTracker<RowAccessible, IOException> m_trackedRowAccessibles = new CloseableTracker<>(IOException.class);
+    private final ColumnarContainerRowAccessible m_rowAccessibleView = new ColumnarContainerRowAccessible();
 
     // effectively final
     private Finalizer m_tableCloser;
@@ -205,7 +205,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         }
         m_openCursorFinalizers.clear();
         try {
-            m_trackedRowAccessibles.close();
+            m_rowAccessibleView.closeInternal();
             m_columnarTable.close();
         } catch (final IOException e) {
             LOGGER.error(String.format("Exception while clearing ContainerTable: %s", e.getMessage()), e);
@@ -253,9 +253,8 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         return iterator;
     }
 
-    @SuppressWarnings("resource") // we are tracking it so that we can close it when this table is closed
     RowAccessible asRowAccessible() {
-        return m_trackedRowAccessibles.track(new ColumnarContainerRowAccessible());
+        return m_rowAccessibleView;
     }
 
     private final class ColumnarContainerRowAccessible implements RowAccessible {
@@ -265,6 +264,10 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
 
         @Override
         public void close() throws IOException {
+            // the life-cycle of this view is bound to the life-cycle of the outer instance
+        }
+
+        void closeInternal() throws IOException {
             m_trackedCursors.close();
         }
 
