@@ -46,7 +46,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.filter.BatchRange;
@@ -57,7 +57,6 @@ import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -112,18 +111,11 @@ final class ColumnarRowCursorFactory {
 
         private final RowRead m_rowRead;
 
-        private final Set<Finalizer> m_openCursorFinalizers;
-
-        // effectively final
-        private Finalizer m_finalizer;
-
-        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate,
-            final Set<Finalizer> openCursorFinalizers, final ColumnarValueSchema schema,
+        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate, final ColumnarValueSchema schema,
             final ColumnSelection selection) {
             m_delegate = delegate;
             ReadAccessRow access = delegate.access();
             m_rowRead = VirtualTableUtils.createRowRead(schema, access, selection);
-            m_openCursorFinalizers = openCursorFinalizers;
         }
 
         @Override
@@ -143,29 +135,24 @@ final class ColumnarRowCursorFactory {
 
         @Override
         public void close() {
-            // Finalizer could have already been closed in AbstractColumnarContainerTable::clear
-            if (!m_finalizer.isClosed()) {
-                m_finalizer.close();
-                try {
-                    m_delegate.close();
-                } catch (IOException ex) {
-                    final String error = "Exception while closing batch reader.";
-                    LOGGER.error(error, ex);
-                    throw new IllegalStateException(error, ex);
-                }
-                m_openCursorFinalizers.remove(m_finalizer);
+            try {
+                m_delegate.close();
+            } catch (IOException ex) {
+                final String error = "Exception while closing batch reader.";
+                LOGGER.error(error, ex);
+                throw new IllegalStateException(error, ex);
             }
         }
 
     }
 
-    static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size,
-        final Set<Finalizer> openCursorFinalizers) {
-        return create(store, schema, size, openCursorFinalizers, null);
+    static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size) {
+        return create(store, schema, size, null);
     }
 
+    @SuppressWarnings("resource") // the returned cursor has to be closed by the caller
     static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size, // NOSONAR
-        final Set<Finalizer> openCursorFinalizers, final TableFilter filter) {
+        final TableFilter filter) {
         if (size < 1) {
             return new EmptyRowCursor(schema);
         }
@@ -184,12 +171,7 @@ final class ColumnarRowCursorFactory {
 
         final var selection = createColumnSelection(filter, schema.numColumns());
 
-        var cursor = new DefaultRowCursor(ColumnarCursorFactory.create(store, selection, batchRange),
-            openCursorFinalizers, schema, selection);
-        // can't invoke this in the constructor since it passes a reference to itself to the ResourceLeakDetector
-        cursor.m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(cursor, cursor.m_delegate);
-        openCursorFinalizers.add(cursor.m_finalizer);
-        return cursor;
+        return new DefaultRowCursor(ColumnarCursorFactory.create(store, selection, batchRange), schema, selection);
     }
 
     private static BatchRange createBatchRange(final TableFilter filter, final long size, final int batchLength) {

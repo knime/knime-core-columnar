@@ -50,7 +50,6 @@ package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
 import java.util.Optional;
-import java.util.Set;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.store.BatchReadStore;
@@ -58,7 +57,6 @@ import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
-import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
@@ -87,6 +85,8 @@ public final class ColumnarRowReadTable implements RowAccessible {
 
     private final CursorTracker<LookaheadCursor<ReadAccessRow>> m_cursorTracker =
         CursorTracker.createLookaheadCursorTracker();
+
+    private final CursorTracker<RowCursor> m_rowCursorTracker = CursorTracker.createRowCursorTracker();
 
     /**
      * @param schema The schema of the table.
@@ -158,22 +158,18 @@ public final class ColumnarRowReadTable implements RowAccessible {
     }
 
     /**
-     * @param openCursorFinalizers Used for resource leak detection. The returned cursor adds itself to the set upon
-     *            construction and removes itself when being closed.
      * @return A newly constructed cursor that allows to read this table's data.
      */
-    public RowCursor createCursor(final Set<Finalizer> openCursorFinalizers) {
-        return ColumnarRowCursorFactory.create(m_store, m_schema, m_size, openCursorFinalizers);
+    public RowCursor createRowCursor() {
+        return m_rowCursorTracker.createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size));
     }
 
     /**
-     * @param openCursorFinalizers Used for resource leak detection. The returned cursor adds itself to the set upon
-     *            construction and removes itself when being closed.
      * @param filter A filter that constrains which rows and columns of this table's data will be accessed by the
      *            cursor.
      * @return A newly constructed cursor that allows to read this table's data.
      */
-    public RowCursor createCursor(final Set<Finalizer> openCursorFinalizers, final TableFilter filter) {
+    public RowCursor createRowCursor(final TableFilter filter) {
         if (filter != null) {
             filter.validate(m_schema.getSourceSpec(), m_size);
             //  For some reason, the "from" index is not validated by the method above. So we do it ourselves.
@@ -186,11 +182,13 @@ public final class ColumnarRowReadTable implements RowAccessible {
                 }
             }
         }
-        return ColumnarRowCursorFactory.create(m_store, m_schema, m_size, openCursorFinalizers, filter);
+        return m_rowCursorTracker
+            .createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size, filter));
     }
 
     @Override
     public void close() throws IOException {
+        m_rowCursorTracker.close();
         m_cursorTracker.close();
         m_store.close();
     }
