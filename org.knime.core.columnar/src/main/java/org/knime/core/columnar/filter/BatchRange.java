@@ -48,6 +48,9 @@
  */
 package org.knime.core.columnar.filter;
 
+import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.table.row.Selection;
+
 /**
  * Represents the selection of a range of batches.
  *
@@ -75,4 +78,27 @@ public interface BatchRange {
      *         read fully.
      */
     int getLastRowInLastBatch();
+
+    /**
+     * Create a new {@link BatchRange} from the row range in the given {@link Selection}.
+     *
+     * @param selection selected columns and row range
+     * @param store the store provides the batch length and number of batches
+     * @return a new {@link BatchRange}
+     */
+    static BatchRange fromSelection(final Selection selection, final BatchReadStore store) {
+        if (selection.rows().allSelected()) {
+            final int lastIndexInLastBatch = -1; // last batch should be read fully
+            return new DefaultBatchRange(0, 0, store.numBatches() - 1, lastIndexInLastBatch);
+        } else {
+            final long firstRow = selection.rows().fromIndex();
+            final long lastRow = selection.rows().toIndex() - 1;
+            final int batchLen = store.batchLength();
+            final int firstBatch = (int)(firstRow / batchLen);
+            final int firstRowInFirstBatch = (int)(firstRow % batchLen);
+            final int lastBatch = (int)(lastRow / batchLen);
+            final int lastIndexInLastBatch = (int)(lastRow % batchLen);
+            return new DefaultBatchRange(firstBatch, firstRowInFirstBatch, lastBatch, lastIndexInLastBatch);
+        }
+    }
 }

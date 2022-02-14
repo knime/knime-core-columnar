@@ -49,6 +49,7 @@ import java.util.function.IntFunction;
 
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.table.row.Selection;
 
 /**
  * A selection of columns among a total number of columns.
@@ -83,4 +84,18 @@ public interface ColumnSelection {
      */
     ReadBatch createBatch(IntFunction<NullableReadData> indexToReadData);
 
+    /**
+     * Create a new {@link ColumnSelection} from the columns in the given {@link Selection}.
+     *
+     * @param selection selected columns and row range
+     * @param numColumns the total number of columns (selected or unselected)
+     * @return a new {@link ColumnSelection}
+     */
+    static ColumnSelection fromSelection(final Selection selection, final int numColumns) {
+        if (selection.columns().allSelected()) {
+            return new DefaultColumnSelection(numColumns);
+        } else {
+            return new FilteredColumnSelection(numColumns, selection.columns().getSelected(0, numColumns));
+        }
+    }
 }
