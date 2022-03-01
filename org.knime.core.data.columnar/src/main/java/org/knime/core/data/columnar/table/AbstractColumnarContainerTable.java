@@ -76,6 +76,7 @@ import org.knime.core.node.workflow.WorkflowDataRepository;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -260,6 +261,11 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         @Override
         public Cursor<ReadAccessRow> createCursor() {
             return m_columnarTable.createCursor();
+        }
+
+        @Override
+        public Cursor<ReadAccessRow> createCursor(final Selection selection) {
+            return m_columnarTable.createCursor(selection);
         }
     }
 }

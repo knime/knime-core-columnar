@@ -1,8 +1,3 @@
-package org.knime.core.data.columnar.table;
-
-import static java.util.stream.Collectors.toList;
-
-import java.io.Closeable;
 /*
  * ------------------------------------------------------------------------
  *
@@ -51,6 +46,11 @@ import java.io.Closeable;
  * History
  *   May 18, 2021 (dietzc): created
  */
+package org.knime.core.data.columnar.table;
+
+import static java.util.stream.Collectors.toList;
+
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -89,6 +89,7 @@ import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.exec.LazyVirtualTableExecutor;
 import org.knime.core.table.virtual.exec.VirtualTableExecutor;
 import org.knime.core.table.virtual.serialization.TableTransformSerializer;
+import org.knime.core.table.virtual.spec.SourceTableProperties;
 import org.knime.core.table.virtual.spec.SourceTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
 
@@ -460,7 +461,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
                 // it would have the benefit that upstream nodes wouldn't have to run the comp graph again if a
                 // downstream node already ran it but it might be slower because we would run the partial
                 // comp graph for every ancestor that is a VirtualTableExtensionTable
-                return new TableTransform(new SourceTransformSpec(m_id, m_table.getSchema()));
+                return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_table.getSchema())));
             } else {
                 return m_table.getTransformation();
             }
@@ -492,7 +493,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
         @Override
         public TableTransform getParent() {
-            return new TableTransform(new SourceTransformSpec(m_id, m_table.getSchema()));
+            return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_table.getSchema())));
         }
 
         @SuppressWarnings("resource") // we close the RowAccessible by closing m_cachedOutput
@@ -517,7 +518,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
         @Override
         public TableTransform getParent() {
-            return new TableTransform(new SourceTransformSpec(m_id, m_schema));
+            return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_schema)));
         }
 
         // the returned RowAccessible will be closed through the computation graph when we close m_cachedOutputs

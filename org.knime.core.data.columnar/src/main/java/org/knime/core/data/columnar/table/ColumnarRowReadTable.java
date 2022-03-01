@@ -63,6 +63,7 @@ import org.knime.core.data.v2.RowCursor;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.row.Selection;
 
 /**
  * Standard implementation of a read-only table that understands KNIME's {@link ReadValue logical} data types and is
@@ -155,6 +156,12 @@ public final class ColumnarRowReadTable implements RowAccessible {
     public LookaheadCursor<ReadAccessRow> createCursor() {
         // we track the cursors, so that we can close them before closing m_store
         return m_cursorTracker.createTrackedCursor(() -> ColumnarCursorFactory.create(m_store, m_size));
+    }
+
+    @Override
+    public LookaheadCursor<ReadAccessRow> createCursor(final Selection selection) {
+        // we track the cursors, so that we can close them before closing m_store
+        return m_cursorTracker.createTrackedCursor(() -> ColumnarCursorFactory.create(m_store, selection));
     }
 
     /**

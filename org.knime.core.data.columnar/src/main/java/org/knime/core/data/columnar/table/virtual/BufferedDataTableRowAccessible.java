@@ -51,10 +51,12 @@ package org.knime.core.data.columnar.table.virtual;
 import java.io.IOException;
 
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -87,5 +89,11 @@ final class BufferedDataTableRowAccessible implements RowAccessible {
     @Override
     public LookaheadCursor<ReadAccessRow> createCursor() {
         return new RowIteratorCursor(m_schema, m_table.iterator());
+    }
+
+    @SuppressWarnings("resource") // the returned cursor closes the iterator
+    @Override
+    public LookaheadCursor<ReadAccessRow> createCursor(final Selection selection) {
+        return new RowIteratorCursor(m_schema, m_table.filter(TableFilter.fromSelection(selection)).iterator());
     }
 }

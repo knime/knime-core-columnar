@@ -53,6 +53,7 @@ import java.io.IOException;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -82,6 +83,11 @@ final class UncloseableRowAccessible implements RowAccessible {
     @Override
     public Cursor<ReadAccessRow> createCursor() {
         return m_delegate.createCursor();
+    }
+
+    @Override
+    public Cursor<ReadAccessRow> createCursor(final Selection selection) {
+        return m_delegate.createCursor(selection);
     }
 
 }
