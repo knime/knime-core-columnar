@@ -117,7 +117,6 @@ public class WriteAccessRowWriteTest {
 
     private void stubWriteAccessRow() {
         final WriteAccess[] accesses = {m_rowKeyAccess, m_booleanAccess, m_intAccess, m_doubleAccess};
-        when(m_writeAccessRow.size()).thenReturn(accesses.length);
         when(m_writeAccessRow.getWriteAccess(anyInt())).then(i -> accesses[(int)i.getArgument(0)]);
     }
 
