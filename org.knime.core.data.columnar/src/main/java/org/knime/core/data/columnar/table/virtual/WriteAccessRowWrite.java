@@ -59,6 +59,7 @@ import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.table.row.Selection.ColumnSelection;
 import org.knime.core.table.row.WriteAccessRow;
 
 /**
@@ -82,24 +83,42 @@ public final class WriteAccessRowWrite implements RowWrite {
      *
      * @param schema of the table
      * @param writeAccess to write to
+     * @param selection the selected columns
      */
-    public WriteAccessRowWrite(final ColumnarValueSchema schema, final WriteAccessRow writeAccess) {
+    public WriteAccessRowWrite(final ColumnarValueSchema schema, final WriteAccessRow writeAccess,
+        final ColumnSelection selection) {
         m_accesses = writeAccess;
-        m_values = IntStream.range(0, m_accesses.size())//
-            .mapToObj(i -> schema.getValueFactory(i).createWriteValue(m_accesses.getWriteAccess(i)))//
-            .toArray(WriteValue<?>[]::new);
+        final var numColumns = schema.numColumns();
+        m_values = new WriteValue<?>[numColumns];
+        var selected = selection.allSelected() ? IntStream.range(0, numColumns)
+            : IntStream.of(selection.getSelected(0, numColumns));
+        selected.forEach(i -> m_values[i] = schema.getValueFactory(i).createWriteValue(m_accesses.getWriteAccess(i)));
         m_rowKeyValue = (RowKeyWriteValue)m_values[0];
     }
+
+    /**
+     * Constructor.
+     *
+     * @param schema of the table
+     * @param writeAccess to write to
+     */
+    public WriteAccessRowWrite(final ColumnarValueSchema schema, final WriteAccessRow writeAccess) {
+        this(schema, writeAccess, ColumnSelection.all());
+    }
+
 
     @Override
     public void setFrom(final RowRead values) {
         assert values.getNumColumns() == getNumColumns();
-        m_rowKeyValue.setRowKey(values.getRowKey());
+        setRowKey(values.getRowKey());
         for (var i = 0; i < values.getNumColumns(); i++) {
             if (values.isMissing(i)) {
                 setMissing(i);
             } else {
-                m_values[i + 1].setValue(values.getValue(i));
+                final var writeValue = m_values[i + 1];
+                if (writeValue != null) {
+                    writeValue.setValue(values.getValue(i));
+                }
             }
         }
     }
@@ -111,13 +130,16 @@ public final class WriteAccessRowWrite implements RowWrite {
      */
     public void setFrom(final DataRow row) {
         assert row.getNumCells() == getNumColumns();
-        m_rowKeyValue.setRowKey(row.getKey().getString());
+        setRowKey(row.getKey());
         for (var i = 0; i < row.getNumCells(); i++) {
             final DataCell cell = row.getCell(i);
             if (cell.isMissing()) {
                 setMissing(i);
             } else {
-                setValue(m_values[i + 1], cell);
+                var writeValue = m_values[i + 1];
+                if (writeValue != null) {
+                    setValue(writeValue, cell);
+                }
             }
         }
     }
@@ -140,17 +162,23 @@ public final class WriteAccessRowWrite implements RowWrite {
 
     @Override
     public void setMissing(final int index) {
-        m_accesses.getWriteAccess(index + 1).setMissing();
+        if (m_values[index + 1] != null) {
+            m_accesses.getWriteAccess(index + 1).setMissing();
+        }
     }
 
     @Override
     public void setRowKey(final String rowKey) {
-        m_rowKeyValue.setRowKey(rowKey);
+        if (m_rowKeyValue != null) {
+            m_rowKeyValue.setRowKey(rowKey);
+        }
     }
 
     @Override
     public void setRowKey(final RowKeyValue rowKey) {
-        m_rowKeyValue.setRowKey(rowKey);
+        if (m_rowKeyValue != null) {
+            m_rowKeyValue.setRowKey(rowKey);
+        }
     }
 
 }

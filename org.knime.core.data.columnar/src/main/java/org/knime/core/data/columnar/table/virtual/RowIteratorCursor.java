@@ -57,6 +57,7 @@ import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
+import org.knime.core.table.row.Selection.ColumnSelection;
 
 /**
  * A {@link Cursor} that is backed by a {@link CloseableRowIterator}.
@@ -71,11 +72,15 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
 
     private final CloseableRowIterator m_iterator;
 
+    RowIteratorCursor(final ColumnarValueSchema schema, final CloseableRowIterator iterator,
+        final ColumnSelection selection) {
+        m_accessRow = BufferedAccesses.createBufferedAccessRow(schema, selection);
+        m_rowWrite = new WriteAccessRowWrite(schema, m_accessRow, selection);
+        m_iterator = iterator;
+    }
 
     RowIteratorCursor(final ColumnarValueSchema schema, final CloseableRowIterator iterator) {
-        m_accessRow = BufferedAccesses.createBufferedAccessRow(schema);
-        m_rowWrite = new WriteAccessRowWrite(schema, m_accessRow);
-        m_iterator = iterator;
+        this(schema, iterator, ColumnSelection.all());
     }
 
     @Override
