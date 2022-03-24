@@ -73,11 +73,12 @@ import org.knime.core.node.NodeLogger;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.WorkflowDataRepository;
-import org.knime.core.table.cursor.Cursor;
+import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * Implementation of an {@link ExtensionTable}. This table is managed by the KNIME framework and allows to access data
@@ -246,7 +247,7 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         return m_rowAccessibleView;
     }
 
-    private final class ColumnarContainerRowAccessible implements RowAccessible {
+    private final class ColumnarContainerRowAccessible implements LookaheadRowAccessible {
 
         @Override
         public void close() throws IOException {
@@ -259,12 +260,12 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         }
 
         @Override
-        public Cursor<ReadAccessRow> createCursor() {
+        public LookaheadCursor<ReadAccessRow> createCursor() {
             return m_columnarTable.createCursor();
         }
 
         @Override
-        public Cursor<ReadAccessRow> createCursor(final Selection selection) {
+        public LookaheadCursor<ReadAccessRow> createCursor(final Selection selection) {
             return m_columnarTable.createCursor(selection);
         }
     }
