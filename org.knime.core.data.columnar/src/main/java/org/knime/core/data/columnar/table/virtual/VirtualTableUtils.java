@@ -69,6 +69,7 @@ import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * Provides utility functions for dealing with the conversion between the physical (accesses) and logical layer (values)
@@ -167,13 +168,21 @@ public final class VirtualTableUtils {
 
     /**
      * Decorates the provided {@link RowAccessible} to be unclosable.
+     * <p>
+     * The lookahead capability of the decorated {@code RowAccessible} is preserved. That is, if the given
+     * {@code rowAccessible} implements {@link LookaheadRowAccessible}, then the returned {@code RowAccessible} also
+     * implements {@code LookaheadRowAccessible}.
      *
      * @param rowAccessible to make uncloseable
      * @return a {@link RowAccessible} that delegates everything to the provided rowAccessible except for the close
      *         method
      */
     public static RowAccessible uncloseable(final RowAccessible rowAccessible) {
-        return new UncloseableRowAccessible(rowAccessible);
+        if (rowAccessible instanceof LookaheadRowAccessible) {
+            return new UncloseableLookaheadRowAccessible((LookaheadRowAccessible)rowAccessible);
+        } else {
+            return new UncloseableRowAccessible(rowAccessible);
+        }
     }
 
     private VirtualTableUtils() {
