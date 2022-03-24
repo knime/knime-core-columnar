@@ -62,8 +62,8 @@ import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
-import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.row.Selection;
+import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * Standard implementation of a read-only table that understands KNIME's {@link ReadValue logical} data types and is
@@ -74,7 +74,7 @@ import org.knime.core.table.row.Selection;
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
-public final class ColumnarRowReadTable implements RowAccessible {
+public final class ColumnarRowReadTable implements LookaheadRowAccessible {
 
     private final ColumnarValueSchema m_schema;
 
