@@ -58,13 +58,14 @@ import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * A {@link RowAccessible} that is based on a {@link BufferedDataTable}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class BufferedDataTableRowAccessible implements RowAccessible {
+final class BufferedDataTableRowAccessible implements LookaheadRowAccessible {
 
     private final ColumnarValueSchema m_schema;
 
