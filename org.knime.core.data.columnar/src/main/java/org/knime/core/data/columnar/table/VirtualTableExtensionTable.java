@@ -452,6 +452,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             m_table = table;
         }
 
+        @SuppressWarnings("resource")
         @Override
         public TableTransform getParent() {
             if (m_table.hasCachedOutput()) {
@@ -461,7 +462,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
                 // it would have the benefit that upstream nodes wouldn't have to run the comp graph again if a
                 // downstream node already ran it but it might be slower because we would run the partial
                 // comp graph for every ancestor that is a VirtualTableExtensionTable
-                return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_table.getSchema())));
+                return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_table.getOutput())));
             } else {
                 return m_table.getTransformation();
             }
@@ -491,9 +492,10 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             m_table = table;
         }
 
+        @SuppressWarnings("resource") // we close the RowAccessible by closing m_cachedOutput
         @Override
         public TableTransform getParent() {
-            return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_table.getSchema())));
+            return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_table.asRowAccessible())));
         }
 
         @SuppressWarnings("resource") // we close the RowAccessible by closing m_cachedOutput
@@ -518,7 +520,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
         @Override
         public TableTransform getParent() {
-            return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_schema)));
+            return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_schema, true)));
         }
 
         // the returned RowAccessible will be closed through the computation graph when we close m_cachedOutputs
