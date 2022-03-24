@@ -86,7 +86,7 @@ import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
-import org.knime.core.table.virtual.exec.LazyVirtualTableExecutor;
+import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
 import org.knime.core.table.virtual.exec.VirtualTableExecutor;
 import org.knime.core.table.virtual.serialization.TableTransformSerializer;
 import org.knime.core.table.virtual.spec.SourceTableProperties;
@@ -368,7 +368,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     }
 
     private List<RowAccessible> runComputationGraph() {
-        final VirtualTableExecutor exec = new LazyVirtualTableExecutor(getTransformation());
+        final VirtualTableExecutor exec = new GraphVirtualTableExecutor(getTransformation());
         final Map<UUID, RowAccessible> sources = collectSources();
         return exec.execute(sources);
     }
@@ -395,7 +395,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     private RowCursor createdFilteredRowCursor(final TableFilter filter) {
         final var srcId = UUID.randomUUID();
         var table = createFilteredVirtualTable(filter, srcId);
-        final VirtualTableExecutor exec = new LazyVirtualTableExecutor(table.getProducingTransform());
+        final VirtualTableExecutor exec = new GraphVirtualTableExecutor(table.getProducingTransform());
         final List<RowAccessible> accessibles = exec.execute(Map.of(srcId, getOutput()));
         final Cursor<ReadAccessRow> physicalCursor = accessibles.get(0).createCursor();
         var cursor = TableFilterUtils.createColumnSelection(filter, m_schema.numColumns())//
