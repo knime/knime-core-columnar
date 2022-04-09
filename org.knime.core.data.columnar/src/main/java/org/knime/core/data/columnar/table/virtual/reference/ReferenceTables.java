@@ -44,25 +44,55 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 14, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Dec 27, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.data.columnar.table.virtual.reference;
+
+import java.util.UUID;
+
+import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
+import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
+import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
+import org.knime.core.data.container.WrappedTable;
+import org.knime.core.node.BufferedDataTable;
+import org.knime.core.node.ExtensionTable;
+import org.knime.core.node.Node;
 
 /**
- * Exception that is thrown if an operation is not compatible with fast tables e.g. if the ValueFactories
- * corresponding to the same column differ.
+ * Factory class for {@link ReferenceTable ReferenceTables}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public class VirtualTableIncompatibleException extends Exception {
+public final class ReferenceTables {
 
-    private static final long serialVersionUID = 1L;
-
-    VirtualTableIncompatibleException(final String message) {
-        super(message);
+    @SuppressWarnings("resource")// the caller must handle the life-cycle of the returned table
+    public static ReferenceTable createReferenceTable(final UUID id, final BufferedDataTable table)
+        throws VirtualTableIncompatibleException {
+        final ExtensionTable extensionTable = extractExtensionTable(table);
+        if (extensionTable instanceof VirtualTableExtensionTable) {
+            final VirtualTableExtensionTable virtualExtensionTable = (VirtualTableExtensionTable)extensionTable;
+            return new VirtualReferenceTable(table, id, virtualExtensionTable);
+        } else if (extensionTable instanceof AbstractColumnarContainerTable) {
+            final AbstractColumnarContainerTable columnarTable = (AbstractColumnarContainerTable)extensionTable;
+            return new ColumnarContainerReferenceTable(table, id, columnarTable);
+        } else {
+            // we end up here if the reference tables are not extension tables (e.g. RearrangeColumnsTable)
+            return new BufferedReferenceTable(table, id);
+        }
     }
 
-    public VirtualTableIncompatibleException(final String format, final Object... objects) {
-        super(String.format(format, objects));
+    private static ExtensionTable extractExtensionTable(final BufferedDataTable table) {
+        var delegate = Node.invokeGetDelegate(table);
+        if (delegate instanceof ExtensionTable) {
+            return (ExtensionTable)delegate;
+        } else if (delegate instanceof WrappedTable) {
+            return extractExtensionTable(delegate.getReferenceTables()[0]);
+        } else {
+            return null;
+        }
+    }
+
+    private ReferenceTables() {
+
     }
 }

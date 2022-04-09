@@ -44,25 +44,49 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 14, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Dec 27, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.data.columnar.table.virtual.reference;
 
-/**
- * Exception that is thrown if an operation is not compatible with fast tables e.g. if the ValueFactories
- * corresponding to the same column differ.
- *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
- */
-public class VirtualTableIncompatibleException extends Exception {
+import java.util.Collections;
+import java.util.Map;
+import java.util.UUID;
 
-    private static final long serialVersionUID = 1L;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
+import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
+import org.knime.core.node.BufferedDataTable;
+import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.virtual.VirtualTable;
 
-    VirtualTableIncompatibleException(final String message) {
-        super(message);
+final class BufferedReferenceTable extends AbstractReferenceTable {
+
+    private final ColumnarValueSchema m_schema;
+
+    private final VirtualTable m_virtualTable;
+
+    BufferedReferenceTable(final BufferedDataTable table, final UUID id) throws VirtualTableIncompatibleException {
+        super(table, id);
+        m_schema = VirtualTableSchemaUtils.extractSchema(table);
+        m_virtualTable = new VirtualTable(id, m_schema, true);
     }
 
-    public VirtualTableIncompatibleException(final String format, final Object... objects) {
-        super(String.format(format, objects));
+    @Override
+    public VirtualTable getVirtualTable() {
+        return m_virtualTable;
     }
+
+    // the returned RowAccessible will be closed through the computation graph when we close m_cachedOutputs
+    @SuppressWarnings("resource")
+    @Override
+    public Map<UUID, RowAccessible> getSources() {
+        return Collections.singletonMap(getId(), VirtualTableUtils.createRowAccessible(m_schema, getBufferedTable()));
+    }
+
+    @Override
+    public ColumnarValueSchema getSchema() {
+        return m_schema;
+    }
+
 }

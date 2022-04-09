@@ -44,25 +44,39 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 14, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Jan 3, 2022 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.data.columnar.table.virtual.reference;
+
+import java.util.UUID;
+
+import org.knime.core.node.BufferedDataTable;
 
 /**
- * Exception that is thrown if an operation is not compatible with fast tables e.g. if the ValueFactories
- * corresponding to the same column differ.
+ * Base implementation of {@link ReferenceTable} that provides implementations of
+ * {@link ReferenceTable#getBufferedTable()} and {@link ReferenceTable#getId()}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public class VirtualTableIncompatibleException extends Exception {
+abstract class AbstractReferenceTable implements ReferenceTable {
 
-    private static final long serialVersionUID = 1L;
+    private final BufferedDataTable m_bufferedTable;
 
-    VirtualTableIncompatibleException(final String message) {
-        super(message);
+    private final UUID m_id;
+
+    AbstractReferenceTable(final BufferedDataTable bufferedTable, final UUID id) {
+        m_id = id;
+        m_bufferedTable = bufferedTable;
     }
 
-    public VirtualTableIncompatibleException(final String format, final Object... objects) {
-        super(String.format(format, objects));
+    @Override
+    public BufferedDataTable getBufferedTable() {
+        return m_bufferedTable;
     }
+
+    @Override
+    public UUID getId() {
+        return m_id;
+    }
+
 }

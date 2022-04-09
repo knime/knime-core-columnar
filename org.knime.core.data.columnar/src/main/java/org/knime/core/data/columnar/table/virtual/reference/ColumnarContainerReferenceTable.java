@@ -44,25 +44,52 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 14, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Dec 27, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.data.columnar.table.virtual.reference;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.UUID;
+
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
+import org.knime.core.node.BufferedDataTable;
+import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.virtual.VirtualTable;
 
 /**
- * Exception that is thrown if an operation is not compatible with fast tables e.g. if the ValueFactories
- * corresponding to the same column differ.
+ * {@link ReferenceTable} that is backed by an {@link AbstractColumnarContainerTable} which can act as source in a
+ * {@link VirtualTable}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public class VirtualTableIncompatibleException extends Exception {
+final class ColumnarContainerReferenceTable extends AbstractReferenceTable {
 
-    private static final long serialVersionUID = 1L;
+    private final AbstractColumnarContainerTable m_table;
 
-    VirtualTableIncompatibleException(final String message) {
-        super(message);
+    private final VirtualTable m_virtualTable;
+
+    ColumnarContainerReferenceTable(final BufferedDataTable bufferedTable, final UUID id,
+        final AbstractColumnarContainerTable table) {
+        super(bufferedTable, id);
+        m_table = table;
+        m_virtualTable = new VirtualTable(id, table.getSchema(), true);
     }
 
-    public VirtualTableIncompatibleException(final String format, final Object... objects) {
-        super(String.format(format, objects));
+    @SuppressWarnings("resource") // we close the RowAccessible by closing m_cachedOutput
+    @Override
+    public Map<UUID, RowAccessible> getSources() {
+        return Collections.singletonMap(getId(), m_table.asRowAccessible());
+    }
+
+    @Override
+    public VirtualTable getVirtualTable() {
+        return m_virtualTable;
+    }
+
+    @Override
+    public ColumnarValueSchema getSchema() {
+        return m_table.getSchema();
     }
 }

@@ -75,7 +75,6 @@ import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.WorkflowDataRepository;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
-import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.virtual.LookaheadRowAccessible;
@@ -86,7 +85,7 @@ import org.knime.core.table.virtual.LookaheadRowAccessible;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractColumnarContainerTable extends ExtensionTable implements ColumnarContainerTable {
+public abstract class AbstractColumnarContainerTable extends ExtensionTable implements ColumnarContainerTable {
 
     protected static final NodeLogger LOGGER = NodeLogger.getLogger(AbstractColumnarContainerTable.class);
 
@@ -243,7 +242,10 @@ abstract class AbstractColumnarContainerTable extends ExtensionTable implements 
         return iterator;
     }
 
-    RowAccessible asRowAccessible() {
+    /**
+     * @return a view of this table as {@link LookaheadRowAccessible}
+     */
+    public LookaheadRowAccessible asRowAccessible() {
         return m_rowAccessibleView;
     }
 
