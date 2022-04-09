@@ -54,19 +54,20 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
+import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
+import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -80,6 +81,7 @@ import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.workflow.WorkflowDataRepository;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.row.ReadAccessRow;
@@ -107,6 +109,10 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
  */
 public final class VirtualTableExtensionTable extends ExtensionTable {
 
+    private static final String CFG_VIRTUAL_TABLE_FRAGMENT = "VIRTUAL_TABLE_FRAGMENT";
+
+    private static final String CFG_REF_TABLE_IDS = "REF_TABLE_IDS";
+
     private static final String CFG_SCHEMA = "schema";
 
     private static final String CFG_SIZE = "size";
@@ -116,8 +122,6 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     private static final String CFG_REF_TABLES = "REF_TABLES";
 
     private static final String CFG_TRANSFORMSPECS = "SPECS";
-
-    private final List<TableTransformSpec> m_tableTransformSpec;
 
     private final DataTableSpec m_dataTableSpec;
 
@@ -129,7 +133,18 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private List<RowAccessible> m_cachedOutputs;
 
-    private TableTransform m_transformation;
+    /**
+     * Fragment of the workflow's VirtualTable that corresponds to this VirtualTableExtensionTable. Contains all
+     * transformations, that are saved as part of this VirtualTableExtensionTable.
+     */
+    private final TableTransform m_tableTransformFragment;
+
+    /**
+     * The workflow's full VirtualTable up to this table. This is not saved but constructed using m_virtualTableFragment
+     * and the m_referenceTables. Allows us to optimize the full VirtualTable for requests to this table's data.
+     *
+     */
+    private final TableTransform m_resolvedTableTransform;
 
     private final long m_size;
 
@@ -156,22 +171,46 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             final BufferedDataTable refTable = context.getTable(refIds[i]);
             m_refTables[i] = refTable;
         }
+
         try {
-            m_referenceTables = createReferenceTableWrappers(m_refTables);
+            m_referenceTables = createReferenceTables(settings, m_refTables);
         } catch (VirtualTableIncompatibleException ex) {
             throw new IllegalStateException("The loaded reference tables are incompatible with virtual tables. This is "
                 + "most likely an implementation error because they must have been compatible when storing the data.",
                 ex);
         }
         try {
-            m_tableTransformSpec = reconstructSpecsFromStringArray(settings.getStringArray(CFG_TRANSFORMSPECS));
+            m_tableTransformFragment = loadTableTransformFragment(settings, m_referenceTables);
         } catch (IOException ex) {
             throw new InvalidSettingsException("Error while deserializing transformation ", ex);
         }
+        m_resolvedTableTransform = resolveFullTableTransform(m_tableTransformFragment, m_referenceTables);
 
-        @SuppressWarnings("resource")// will be closed in the close method
+        @SuppressWarnings("resource") // will be closed in the close method
         var columnarSchema = getOutput().getSchema();
         m_schema = ColumnarValueSchemaUtils.load(columnarSchema, context);
+    }
+
+    private static ReferenceTable[] createReferenceTables(final NodeSettingsRO settings, final BufferedDataTable[] refTables)
+        throws InvalidSettingsException, VirtualTableIncompatibleException {
+        final var numRefTables = refTables.length;
+        var referenceTables = new ReferenceTable[numRefTables];
+        if (settings.containsKey(CFG_REF_TABLE_IDS)) {
+            var ids = settings.getStringArray(CFG_REF_TABLE_IDS);
+            final var numIds = ids.length;
+            CheckUtils.checkSetting(numIds == numRefTables,
+                "The number of reference tables (%s) and reference table IDs (%s) vary.", numRefTables, numIds);
+            for (int i = 0; i < numIds; i++) { //NOSONAR
+                var id = UUID.fromString(ids[i]);
+                referenceTables[i] = ReferenceTables.createReferenceTable(id, refTables[i]);
+            }
+        } else {
+            // no ids present (probably stored with 4.5) -> generate new ids
+            for (int i = 0; i < numRefTables; i++) { //NOSONAR
+                referenceTables[i] = ReferenceTables.createReferenceTable(UUID.randomUUID(), refTables[i]);
+            }
+        }
+        return referenceTables;
     }
 
     private static List<TableTransformSpec> reconstructSpecsFromStringArray(final String[] serializedSpecs)
@@ -186,25 +225,53 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return specs;
     }
 
+    private static TableTransform loadTableTransformFragment(final NodeSettingsRO settings,
+        final ReferenceTable[] referenceTables)
+        throws JsonProcessingException, InvalidSettingsException {
+        var objectMapper = new ObjectMapper();
+        if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT)) {
+            return TableTransformSerializer.load(objectMapper.readTree(settings.getString(CFG_VIRTUAL_TABLE_FRAGMENT)));
+        } else {
+            // in 4.5 we stored a list of TableTransformSpecs as opposed to a complete TableTransform or VirtualTable
+            var transformSpecs = reconstructSpecsFromStringArray(settings.getStringArray(CFG_TRANSFORMSPECS));
+            var sourceSpecs = Stream.of(referenceTables)//
+                    // all KNIME tables know their size and therefore are LookaheadRowAccessibles
+                    .map(t -> new SourceTransformSpec(t.getId(), new SourceTableProperties(t.getSchema(), true)))//
+                    .map(TableTransform::new)//
+                    .collect(toList());
+            var transformSpecIter = transformSpecs.iterator();
+            CheckUtils.checkSetting(transformSpecIter.hasNext(), "No transform spec stored");
+            var tableTransform = new TableTransform(sourceSpecs, transformSpecIter.next());
+            while (transformSpecIter.hasNext()) {
+                // in 4.5 we always had a simple sequence of transformations without any branching
+                tableTransform = new TableTransform(List.of(tableTransform), transformSpecIter.next());
+            }
+            return tableTransform;
+        }
+    }
+
     /**
      * Constructor.
      *
      * @param refs the reference tables
-     * @param specs the transformations to apply
+     * @param virtualTableFragment the {@link VirtualTable} representing this table with the {@link ReferenceTable refs}
+     *            as sources
      * @param transformedSchema the {@link ColumnarValueSchema} AFTER the transformations are applied
      * @param size the size of the output table AFTER the transformations are applied
      * @param tableId the id with which this table is tracked
-     * @throws VirtualTableIncompatibleException if the provided reference tables are not virtual table compatible
      */
-    public VirtualTableExtensionTable(final BufferedDataTable[] refs, //
-        final List<TableTransformSpec> specs, //
+    public VirtualTableExtensionTable(final ReferenceTable[] refs, //
+        final VirtualTable virtualTableFragment, //
         final ColumnarValueSchema transformedSchema, //
         final long size, //
-        final int tableId) throws VirtualTableIncompatibleException {
+        final int tableId) {
         m_tableId = tableId;
-        m_tableTransformSpec = specs;
-        m_refTables = refs;
-        m_referenceTables = createReferenceTableWrappers(refs);
+        m_tableTransformFragment = virtualTableFragment.getProducingTransform();
+        m_resolvedTableTransform = resolveFullTableTransform(m_tableTransformFragment, refs);
+        m_refTables = Stream.of(refs)//
+            .map(ReferenceTable::getBufferedTable)//
+            .toArray(BufferedDataTable[]::new);
+        m_referenceTables = refs;
         // TODO we could derive the schema from the reference tables but this entails running the computation graph
         // NOTE: The computation graph does not perform I/O
         // Any input table dependent checking would still have to happen outside of this constructor
@@ -215,16 +282,23 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         m_size = size;
     }
 
-    private static ReferenceTable[] createReferenceTableWrappers(final BufferedDataTable[] referenceTables)
-        throws VirtualTableIncompatibleException {
-        final var refTableWrappers = new ReferenceTable[referenceTables.length];
-        for (int i = 0; i < refTableWrappers.length; i++) {
-            refTableWrappers[i] = createReferenceTableWrapper(referenceTables[i]);
-        }
-        return refTableWrappers;
+    private static TableTransform resolveFullTableTransform(final TableTransform fragment,
+        final ReferenceTable[] referenceTables) {
+        return fragment.reSource(//
+            Stream.of(referenceTables)//
+                .collect(//
+                    Collectors.toMap(//
+                        ReferenceTable::getId, //
+                        t -> t.getVirtualTable().getProducingTransform()//
+                    )//
+                )//
+        );
     }
 
-    ColumnarValueSchema getSchema() {
+    /**
+     * @return the schema of the table
+     */
+    public ColumnarValueSchema getSchema() {
         return m_schema;
     }
 
@@ -232,46 +306,26 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
         throws IOException, CanceledExecutionException {
         m_schema.save(settings.addNodeSettings(CFG_SCHEMA));
-        settings.addStringArray(CFG_TRANSFORMSPECS, getSpecsAsStringArray());
-        final var ids = new int[m_refTables.length];
-        for (var i = 0; i < ids.length; i++) {
-            ids[i] = m_refTables[i].getBufferedTableId();
-        }
-        settings.addIntArray(CFG_REF_TABLES, ids);
+        settings.addIntArray(CFG_REF_TABLES, //
+            Stream.of(m_refTables)//
+                .mapToInt(BufferedDataTable::getBufferedTableId)//
+                .toArray()//
+        );
         settings.addLong(CFG_SIZE, m_size);
+        settings.addStringArray(CFG_REF_TABLE_IDS, //
+            Stream.of(m_referenceTables)//
+                .map(ReferenceTable::getId)//
+                .map(UUID::toString)//
+                .toArray(String[]::new)//
+        );
+        settings.addString(CFG_VIRTUAL_TABLE_FRAGMENT, getVirtualTableFragmentStringRepresentation());
     }
 
-    private String[] getSpecsAsStringArray() throws JsonProcessingException {
-        final var mapper = new ObjectMapper();
+    private String getVirtualTableFragmentStringRepresentation() throws JsonProcessingException {
         final var factory = new JsonNodeFactory(false);
-        final var strings = new String[m_tableTransformSpec.size()];
-        var i = 0;
-        for (TableTransformSpec spec : m_tableTransformSpec) {
-            strings[i] = mapper.writeValueAsString(TableTransformSerializer.serializeTransformSpec(spec, factory));
-            i++;
-        }
-        return strings;
-    }
-
-    private synchronized TableTransform getTransformation() {
-        // lazily setup graph once
-        if (m_transformation == null) {
-            m_transformation = buildGraph();
-        }
-
-        return m_transformation;
-    }
-
-    private TableTransform buildGraph() {
-        final List<TableTransform> parents = Arrays.stream(m_referenceTables)//
-            .map(ReferenceTable::getParent)//
-            .collect(toList());
-        Iterator<TableTransformSpec> transformSpecs = m_tableTransformSpec.iterator();
-        var tableTransform = new TableTransform(parents, transformSpecs.next());
-        while (transformSpecs.hasNext()) {
-            tableTransform = new TableTransform(List.of(tableTransform), transformSpecs.next());
-        }
-        return tableTransform;
+        var tableTransformJson = TableTransformSerializer.save(m_tableTransformFragment, factory);
+        final var mapper = new ObjectMapper();
+        return mapper.writeValueAsString(tableTransformJson);
     }
 
     @Override
@@ -356,24 +410,24 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             .createTrackedCursor(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, getOutput().createCursor()));
     }
 
-    private synchronized RowAccessible getOutput() {
+    synchronized RowAccessible getOutput() {
         if (m_cachedOutputs == null) {
             m_cachedOutputs = runComputationGraph();
         }
         return m_cachedOutputs.get(0);
     }
 
-    private boolean hasCachedOutput() {//NOSONAR
+    boolean hasCachedOutput() {//NOSONAR
         return m_cachedOutputs != null;
     }
 
     private List<RowAccessible> runComputationGraph() {
-        final VirtualTableExecutor exec = new GraphVirtualTableExecutor(getTransformation());
+        final VirtualTableExecutor exec = new GraphVirtualTableExecutor(m_resolvedTableTransform);
         final Map<UUID, RowAccessible> sources = collectSources();
         return exec.execute(sources);
     }
 
-    private Map<UUID, RowAccessible> collectSources() {
+    public Map<UUID, RowAccessible> collectSources() {
         final Map<UUID, RowAccessible> sources = new HashMap<>();
         for (var i = 0; i < m_referenceTables.length; i++) {
             sources.putAll(m_referenceTables[i].getSources());
@@ -393,10 +447,9 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @SuppressWarnings("resource") // we track both the accessibles and the cursor using CloseableTracker
     private RowCursor createdFilteredRowCursor(final TableFilter filter) {
-        final var srcId = UUID.randomUUID();
-        var table = createFilteredVirtualTable(filter, srcId);
+        var table = createFilteredVirtualTable(filter);
         final VirtualTableExecutor exec = new GraphVirtualTableExecutor(table.getProducingTransform());
-        final List<RowAccessible> accessibles = exec.execute(Map.of(srcId, getOutput()));
+        final List<RowAccessible> accessibles = exec.execute(collectSources());
         final Cursor<ReadAccessRow> physicalCursor = accessibles.get(0).createCursor();
         var cursor = TableFilterUtils.createColumnSelection(filter, m_schema.numColumns())//
             .map(s -> VirtualTableUtils.createTableFilterRowCursor(m_schema, physicalCursor, s))//
@@ -404,8 +457,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return new SourceClosingRowCursor(cursor, accessibles.toArray(Closeable[]::new));
     }
 
-    private VirtualTable createFilteredVirtualTable(final TableFilter filter, final UUID srcId) {
-        var table = new VirtualTable(srcId, m_schema);
+    private VirtualTable createFilteredVirtualTable(final TableFilter filter) {
+        var table = getVirtualTable();
 
         if (TableFilterUtils.definesRowRange(filter)) {
             table = table.slice(TableFilterUtils.extractFromIndex(filter),
@@ -418,119 +471,10 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return table;
     }
 
-    @SuppressWarnings("resource")
-    private static ReferenceTable createReferenceTableWrapper(final BufferedDataTable table)
-        throws VirtualTableIncompatibleException {
-        final ExtensionTable unwrapped = unwrap(table);
-        if (unwrapped instanceof VirtualTableExtensionTable) {
-            final VirtualTableExtensionTable virtualExtensionTable = (VirtualTableExtensionTable)unwrapped;
-            return new VirtualReferenceTable(virtualExtensionTable);
-        } else if (unwrapped instanceof AbstractColumnarContainerTable) {
-            final AbstractColumnarContainerTable columnarTable = (AbstractColumnarContainerTable)unwrapped;
-            return new ColumnarContainerReferenceTable(columnarTable);
-        } else {
-            // we end up here if the reference tables are not extension tables (e.g. RearrangeColumnsTable)
-            return new BufferedReferenceTable(table);
-        }
+    public VirtualTable getVirtualTable() {
+        return new VirtualTable(m_resolvedTableTransform, m_schema);
     }
 
-    private interface ReferenceTable {
-
-        TableTransform getParent();
-
-        Map<UUID, RowAccessible> getSources();
-
-    }
-
-    private static final class VirtualReferenceTable implements ReferenceTable {
-
-        private final VirtualTableExtensionTable m_table;
-
-        private UUID m_id;
-
-        VirtualReferenceTable(final VirtualTableExtensionTable table) {
-            m_table = table;
-        }
-
-        @SuppressWarnings("resource")
-        @Override
-        public TableTransform getParent() {
-            if (m_table.hasCachedOutput()) {
-                assert m_id == null;
-                m_id = UUID.randomUUID();
-                // TODO discuss if we should always take this route
-                // it would have the benefit that upstream nodes wouldn't have to run the comp graph again if a
-                // downstream node already ran it but it might be slower because we would run the partial
-                // comp graph for every ancestor that is a VirtualTableExtensionTable
-                return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_table.getOutput())));
-            } else {
-                return m_table.getTransformation();
-            }
-        }
-
-        @SuppressWarnings("resource")
-        @Override
-        public Map<UUID, RowAccessible> getSources() {
-            if (m_id != null) {
-                assert m_table.hasCachedOutput();
-                // we need to prevent the returned RandomAccessible from being closed because otherwise resetting
-                // a downstream node would close the underlying RowAccessible of an upstream node
-                return Map.of(m_id, VirtualTableUtils.uncloseable(m_table.getOutput()));
-            }
-            return m_table.collectSources();
-        }
-
-    }
-
-    private static final class ColumnarContainerReferenceTable implements ReferenceTable {
-
-        private final AbstractColumnarContainerTable m_table;
-
-        private final UUID m_id = UUID.randomUUID();
-
-        ColumnarContainerReferenceTable(final AbstractColumnarContainerTable table) {
-            m_table = table;
-        }
-
-        @SuppressWarnings("resource") // we close the RowAccessible by closing m_cachedOutput
-        @Override
-        public TableTransform getParent() {
-            return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_table.asRowAccessible())));
-        }
-
-        @SuppressWarnings("resource") // we close the RowAccessible by closing m_cachedOutput
-        @Override
-        public Map<UUID, RowAccessible> getSources() {
-            return Collections.singletonMap(m_id, m_table.asRowAccessible());
-        }
-    }
-
-    private static final class BufferedReferenceTable implements ReferenceTable {
-
-        private final BufferedDataTable m_table;
-
-        private final UUID m_id = UUID.randomUUID();
-
-        private final ColumnarValueSchema m_schema;
-
-        BufferedReferenceTable(final BufferedDataTable table) throws VirtualTableIncompatibleException {
-            m_table = table;
-            m_schema = VirtualTableSchemaUtils.extractSchema(table);
-        }
-
-        @Override
-        public TableTransform getParent() {
-            return new TableTransform(new SourceTransformSpec(m_id, new SourceTableProperties(m_schema, true)));
-        }
-
-        // the returned RowAccessible will be closed through the computation graph when we close m_cachedOutputs
-        @SuppressWarnings("resource")
-        @Override
-        public Map<UUID, RowAccessible> getSources() {
-            return Collections.singletonMap(m_id, VirtualTableUtils.createRowAccessible(m_schema, m_table));
-        }
-
-    }
 
     private static final class SourceClosingRowCursor implements RowCursor {
 

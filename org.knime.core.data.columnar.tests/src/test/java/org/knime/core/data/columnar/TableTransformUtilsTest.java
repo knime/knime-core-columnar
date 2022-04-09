@@ -48,16 +48,22 @@
  */
 package org.knime.core.data.columnar;
 
+import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-import java.util.List;
+import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.junit.Test;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.DefaultColumnarSchema;
+import org.knime.core.table.schema.traits.DefaultDataTraits;
+import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.ColumnFilterTransformSpec;
-import org.knime.core.table.virtual.spec.IdentityTransformSpec;
 import org.knime.core.table.virtual.spec.PermuteTransformSpec;
-import org.knime.core.table.virtual.spec.TableTransformSpec;
+import org.knime.core.table.virtual.spec.SourceTransformSpec;
 
 /**
  * Contains unit tests for {@link TableTransformUtils}.
@@ -69,57 +75,77 @@ public class TableTransformUtilsTest {
 
     @Test
     public void testCreateRearrangeTransformationsOnlyFilter() {
+        var table = createTable(10);
         int[] original = {0, 3, 5, 8};
-        final List<TableTransformSpec> transforms = TableTransformUtils.createRearrangeTransformations(original, 10);
-        assertEquals(1, transforms.size());
-        final ColumnFilterTransformSpec spec = (ColumnFilterTransformSpec)transforms.get(0);
+        final var transformedTable = TableTransformUtils.filterAndPermute(table, original);
+        var transform = transformedTable.getProducingTransform();
+        final ColumnFilterTransformSpec spec = (ColumnFilterTransformSpec)transform.getSpec();
         int[] expected = {0, 1, 4, 6, 9};
         assertArrayEquals(expected, spec.getColumnSelection());
+        var precedingTransforms = transform.getPrecedingTransforms();
+        assertEquals(1, precedingTransforms.size());
+        assertTrue(precedingTransforms.get(0).getSpec() instanceof SourceTransformSpec);
+    }
+
+    private static VirtualTable createTable(final int numColsWithoutRowKey) {
+        var numColsWithRowKey = numColsWithoutRowKey + 1;
+        var schema =
+            new DefaultColumnarSchema(Stream.generate(DataSpec::intSpec).limit(numColsWithRowKey).collect(toList()),
+                Stream.generate(() -> DefaultDataTraits.EMPTY).limit(numColsWithRowKey).collect(toList()));
+        return new VirtualTable(UUID.randomUUID(), schema);
     }
 
     @Test (expected = IllegalArgumentException.class)
     public void testCreateRearrangeTransformationsWithDuplicateIndices() throws Exception {
         int[] original = {0, 3, 5, 3, 9};
-        TableTransformUtils.createRearrangeTransformations(original, 10);
+        TableTransformUtils.filterAndPermute(createTable(10), original);
     }
 
     @Test
     public void testCreateRearrangeTransformationsOnlyPermute() {
         int[] original = {4, 0, 3, 1, 2};
-        final List<TableTransformSpec> transforms = TableTransformUtils.createRearrangeTransformations(original, 5);
-        assertEquals(1, transforms.size());
-        final PermuteTransformSpec spec = (PermuteTransformSpec)transforms.get(0);
+        final var transformedTable = TableTransformUtils.filterAndPermute(createTable(5), original);
+        var transform = transformedTable.getProducingTransform();
+        final PermuteTransformSpec spec = (PermuteTransformSpec)transform.getSpec();
         int[] expected = {0, 5, 1, 4, 2, 3};
         assertArrayEquals(expected, spec.getPermutation());
+        var precedingTransforms = transform.getPrecedingTransforms();
+        assertEquals(1, precedingTransforms.size());
+        assertTrue(precedingTransforms.get(0).getSpec() instanceof SourceTransformSpec);
     }
 
     @Test
     public void testCreateRearrangeTransformationsFilterAndPermuteCombined() {
         int[] original = {8, 0, 5, 3};
-        final List<TableTransformSpec> transforms = TableTransformUtils.createRearrangeTransformations(original, 10);
-        assertEquals(2, transforms.size());
-        final ColumnFilterTransformSpec filterSpec = (ColumnFilterTransformSpec)transforms.get(0);
-        int[] expectedFilter = {0, 1, 4, 6, 9};
-        assertArrayEquals(expectedFilter, filterSpec.getColumnSelection());
-        final PermuteTransformSpec permuteSpec = (PermuteTransformSpec)transforms.get(1);
+        final var transformedTable = TableTransformUtils.filterAndPermute(createTable(10), original);
+        var permuteTransform = transformedTable.getProducingTransform();
+        final PermuteTransformSpec permuteSpec = (PermuteTransformSpec)permuteTransform.getSpec();
         int[] expectedPermutation = {0, 4, 1, 3, 2};
         assertArrayEquals(expectedPermutation, permuteSpec.getPermutation());
+        assertEquals(1, permuteTransform.getPrecedingTransforms().size());
+        var filterTransform = permuteTransform.getPrecedingTransforms().get(0);
+        final ColumnFilterTransformSpec filterSpec = (ColumnFilterTransformSpec)filterTransform.getSpec();
+        int[] expectedFilter = {0, 1, 4, 6, 9};
+        assertArrayEquals(expectedFilter, filterSpec.getColumnSelection());
+        assertEquals(1, filterTransform.getPrecedingTransforms().size());
+        var sourceTransform = filterTransform.getPrecedingTransforms().get(0);
+        assertTrue(sourceTransform.getSpec() instanceof SourceTransformSpec);
     }
 
     @Test
     public void testCreateRearrangeTransformationsNoOp() throws Exception {
         int[] original = {0, 1, 2, 3, 4};
-        final List<TableTransformSpec> transforms = TableTransformUtils.createRearrangeTransformations(original, 5);
-        assertEquals(1, transforms.size());
-        assertEquals(IdentityTransformSpec.INSTANCE, transforms.get(0));
+        final var table = createTable(5);
+        final var transformedTable = TableTransformUtils.filterAndPermute(table, original);
+        assertEquals(table, transformedTable);
     }
 
     @Test
     public void testCreateRearrangeTransformationsDetectsFilterForTrailingColumns() {
         int[] original = {0, 1, 2};
-        final List<TableTransformSpec> transforms = TableTransformUtils.createRearrangeTransformations(original, 5);
-        assertEquals(1, transforms.size());
-        final ColumnFilterTransformSpec filterSpec = (ColumnFilterTransformSpec)transforms.get(0);
+        final var transformedTable = TableTransformUtils.filterAndPermute(createTable(5), original);
+        var filterTransform = transformedTable.getProducingTransform();
+        final ColumnFilterTransformSpec filterSpec = (ColumnFilterTransformSpec)filterTransform.getSpec();
         int[] expected = {0, 1, 2, 3};
         assertArrayEquals(expected, filterSpec.getColumnSelection());
     }

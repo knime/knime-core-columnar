@@ -48,26 +48,29 @@
  */
 package org.knime.core.data.columnar;
 
+import static java.util.stream.Collectors.toList;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 import org.knime.core.data.DataTable;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.append.AppendedRowsTable;
+import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.util.CheckUtils;
+import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ColumnFilterTransformSpec;
-import org.knime.core.table.virtual.spec.IdentityTransformSpec;
-import org.knime.core.table.virtual.spec.PermuteTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
 import org.knime.core.util.DuplicateChecker;
 import org.knime.core.util.DuplicateKeyException;
@@ -82,7 +85,7 @@ import gnu.trove.set.hash.TIntHashSet;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class TableTransformUtils {
+public final class TableTransformUtils {
 
     private static final TableFilter ONLY_ROWKEYS = TableFilter.materializeCols();
 
@@ -91,9 +94,16 @@ final class TableTransformUtils {
     }
 
     private static DataTableSpec[] extractSpecs(final BufferedDataTable[] referenceTables) {
-        return Arrays.stream(referenceTables)//
+        return Stream.of(referenceTables)//
             .map(DataTable::getDataTableSpec)//
             .toArray(DataTableSpec[]::new);
+    }
+
+    private static DataTableSpec[] extractSpecs(final ReferenceTable[] referenceTables) {
+        return Stream.of(referenceTables)//
+                .map(ReferenceTable::getBufferedTable)//
+                .map(DataTable::getDataTableSpec)//
+                .toArray(DataTableSpec[]::new);
     }
 
     static DataTableSpec appendSpec(final BufferedDataTable[] tables) {
@@ -122,8 +132,25 @@ final class TableTransformUtils {
         return tables[0].size();
     }
 
-    static List<TableTransformSpec> createAppendTransformations(final BufferedDataTable[] tables) {
-        return createAppendTransformations(extractSpecs(tables));
+    static VirtualTable appendTables(final ReferenceTable[] tables) {
+        var virtualTable = new VirtualTable(tables[0].getId(), tables[0].getSchema());
+        var appendedTables = Stream.of(tables)//
+                .skip(1)//
+                .map(TableTransformUtils::asSource)//
+                .map(TableTransformUtils::filterRowKey)//
+                .collect(toList());
+        return virtualTable.append(appendedTables);
+    }
+
+    private static VirtualTable filterRowKey(final VirtualTable table) {
+        return table.filterColumns(//
+            IntStream.range(1, table.getSchema().numColumns())//
+                .toArray()//
+        );
+    }
+
+    private static VirtualTable asSource(final ReferenceTable table) {
+        return new VirtualTable(table.getId(), table.getSchema());
     }
 
     static List<TableTransformSpec> createAppendTransformations(final DataTableSpec[] specs) {
@@ -254,21 +281,30 @@ final class TableTransformUtils {
 
     }
 
-    static List<TableTransformSpec> createRearrangeTransformations(final int[] originalIndices,
-        final int originalNumColumns) {
+    /**
+     * Applies the combined filter and permutation defined by <b>originalIndices</b> to the table.
+     * The filter and permutation are applied as separate operations.
+     *
+     * @param table the input table
+     * @param originalIndices the index is the position in the output and the value the index in the original table
+     * @return the filtered and permuted table
+     */
+    public static VirtualTable filterAndPermute(final VirtualTable table, final int[] originalIndices) {
+        // -1 because table contains a row key column that is not included in originalIndices
+        final int originalNumColumns = table.getSchema().numColumns() - 1;
         final var properties = new IndexArrayProperties(originalIndices, originalNumColumns);
         if (properties.m_isComplete && properties.m_isSorted) {
-            return List.of(IdentityTransformSpec.INSTANCE);
+            return table;
         } else if (properties.m_isComplete) {
-            return List.of(new PermuteTransformSpec(prependRowKeyColumnIndex(originalIndices)));
+            return table.permute(prependRowKeyColumnIndex(originalIndices));
         } else if (properties.m_isSorted) {
-            return List.of(new ColumnFilterTransformSpec(prependRowKeyColumnIndex(originalIndices)));
+            return table.filterColumns(prependRowKeyColumnIndex(originalIndices));
         } else {
-            return splitIntoFilterAndPermute(originalIndices);
+            return splitIntoFilterAndPermute(table, originalIndices);
         }
     }
 
-    private static List<TableTransformSpec> splitIntoFilterAndPermute(final int[] originalIndices) {
+    private static VirtualTable splitIntoFilterAndPermute(final VirtualTable sourceTable, final int[] originalIndices) {
         final int[] filter = Arrays.stream(originalIndices).sorted().toArray();
         final TIntIntMap offsets = new TIntIntHashMap();
         for (int selected : filter) {
@@ -277,24 +313,25 @@ final class TableTransformUtils {
         final int[] permutation = Arrays.stream(originalIndices)//
             .map(i -> i - offsets.get(i))//
             .toArray();
-        return List.of(new ColumnFilterTransformSpec(prependRowKeyColumnIndex(filter)),
-            new PermuteTransformSpec(prependRowKeyColumnIndex(permutation)));
+        return sourceTable//
+                .filterColumns(prependRowKeyColumnIndex(filter))//
+                .permute(prependRowKeyColumnIndex(permutation));
     }
 
     private static int[] prependRowKeyColumnIndex(final int[] indices) {
         return IntStream.concat(//
             IntStream.of(0), // the row key is always included
-            Arrays.stream(indices).map(i -> i + 1) // shift to accomodate the row key
+            Arrays.stream(indices).map(i -> i + 1) // shift to accommodate the row key
         ).toArray();
     }
 
-    private static final class IndexArrayProperties {
+    public static final class IndexArrayProperties {
 
         private final boolean m_isSorted;
 
         private final boolean m_isComplete;
 
-        IndexArrayProperties(final int[] indices, final int originalNumColumns) {
+        public IndexArrayProperties(final int[] indices, final int originalNumColumns) {
             if (indices.length == 0) {
                 m_isSorted = true;
                 m_isComplete = originalNumColumns == 0;
@@ -321,7 +358,15 @@ final class TableTransformUtils {
             }
             return isSorted;
         }
+        public boolean isSorted() {
+            return m_isSorted;
+        }
+
+        public boolean isComplete() {
+            return m_isComplete;
+        }
     }
+
 
     private TableTransformUtils() {
         // static utility class

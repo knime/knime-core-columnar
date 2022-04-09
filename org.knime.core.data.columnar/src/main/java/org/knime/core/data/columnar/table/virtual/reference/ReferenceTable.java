@@ -44,25 +44,36 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 14, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Dec 27, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.data.columnar.table.virtual.reference;
+
+import java.util.Map;
+import java.util.UUID;
+
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
+import org.knime.core.node.BufferedDataTable;
+import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.virtual.VirtualTable;
 
 /**
- * Exception that is thrown if an operation is not compatible with fast tables e.g. if the ValueFactories
- * corresponding to the same column differ.
+ * A reference table for {@link VirtualTableExtensionTable} that can be used to build a {@link VirtualTable} based on
+ * KNIME tables.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public class VirtualTableIncompatibleException extends Exception {
+public interface ReferenceTable {
 
-    private static final long serialVersionUID = 1L;
+    // TODO replace with getter for TableTransform? The VirtualTable can always be reconstructed from the TableTransform and schema
+    VirtualTable getVirtualTable();
 
-    VirtualTableIncompatibleException(final String message) {
-        super(message);
-    }
+    Map<UUID, RowAccessible> getSources();
 
-    public VirtualTableIncompatibleException(final String format, final Object... objects) {
-        super(String.format(format, objects));
-    }
+    BufferedDataTable getBufferedTable();
+
+    UUID getId();
+
+    ColumnarValueSchema getSchema();
+
 }

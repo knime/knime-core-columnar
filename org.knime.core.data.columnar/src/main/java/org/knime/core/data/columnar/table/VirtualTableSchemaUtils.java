@@ -220,7 +220,7 @@ public final class VirtualTableSchemaUtils {
         return schemas;
     }
 
-    static ColumnarValueSchema extractSchema(final BufferedDataTable table) throws VirtualTableIncompatibleException {
+    public static ColumnarValueSchema extractSchema(final BufferedDataTable table) throws VirtualTableIncompatibleException {
         var delegateTable = Node.invokeGetDelegate(table);
         var schema = extractSchema(delegateTable);
         if (ColumnarValueSchemaUtils.storesDataCellSerializersSeparately(schema)) {

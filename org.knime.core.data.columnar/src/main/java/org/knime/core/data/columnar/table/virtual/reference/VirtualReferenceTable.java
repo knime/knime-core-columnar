@@ -44,25 +44,49 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 14, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Dec 27, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.data.columnar.table.virtual.reference;
+
+import java.util.Map;
+import java.util.UUID;
+
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
+import org.knime.core.node.BufferedDataTable;
+import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.virtual.VirtualTable;
 
 /**
- * Exception that is thrown if an operation is not compatible with fast tables e.g. if the ValueFactories
- * corresponding to the same column differ.
+ * A {@link ReferenceTable} that is backed by a {@link VirtualTableExtensionTable}.
+ * {@link ReferenceTable#getVirtualTable()} {@link ReferenceTable#getSources()} return the {@link VirtualTable} and
+ * sources of the {@link VirtualTableExtensionTable}, respectively.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public class VirtualTableIncompatibleException extends Exception {
+final class VirtualReferenceTable extends AbstractReferenceTable {
 
-    private static final long serialVersionUID = 1L;
+    private final VirtualTableExtensionTable m_table;
 
-    VirtualTableIncompatibleException(final String message) {
-        super(message);
+    VirtualReferenceTable(final BufferedDataTable bufferedTable, final UUID id,
+        final VirtualTableExtensionTable table) {
+        super(bufferedTable, id);
+        m_table = table;
     }
 
-    public VirtualTableIncompatibleException(final String format, final Object... objects) {
-        super(String.format(format, objects));
+    @Override
+    public VirtualTable getVirtualTable() {
+        return m_table.getVirtualTable();
     }
+
+    @Override
+    public Map<UUID, RowAccessible> getSources() {
+        return m_table.collectSources();
+    }
+
+    @Override
+    public ColumnarValueSchema getSchema() {
+        return m_table.getSchema();
+    }
+
 }

@@ -46,8 +46,11 @@
  */
 package org.knime.core.data.columnar;
 
-import java.util.List;
+import static java.util.stream.Collectors.toList;
+
+import java.util.UUID;
 import java.util.function.IntSupplier;
+import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
@@ -59,6 +62,8 @@ import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
+import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.BufferedTableBackend;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.ColumnRearrangerUtils;
@@ -77,8 +82,7 @@ import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeLogger;
-import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
-import org.knime.core.table.virtual.spec.TableTransformSpec;
+import org.knime.core.table.virtual.VirtualTable;
 
 /**
  * Columnar {@link TableBackend} implementation.
@@ -162,9 +166,14 @@ public final class ColumnarTableBackend implements TableBackend {
                 var concatenatedSchema = VirtualTableSchemaUtils.concatenateSchemas(tables);
                 TableTransformUtils.checkForDuplicateKeys(exec, tables);
                 final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
-                return new VirtualTableExtensionTable(tables, List.of(new ConcatenateTransformSpec()),
+                var refTables = createReferenceTables(tables);
+                var sources = Stream.of(refTables)//
+                        .map(r -> new VirtualTable(r.getId(), r.getSchema()))//
+                        .collect(toList());
+                var virtualTableFragment = sources.get(0).concatenate(sources.subList(1, sources.size()));
+                return new VirtualTableExtensionTable(refTables, virtualTableFragment,
                     concatenatedSchema, concatenatedSize, tableIdSupplier.getAsInt());
-            } catch (VirtualTableIncompatibleException ex) {
+            } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
                 LOGGER.debug("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.");
             }
         }
@@ -179,12 +188,22 @@ public final class ColumnarTableBackend implements TableBackend {
             var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
             TableTransformUtils.checkRowKeysMatch(exec, tables);
             final long appendSize = TableTransformUtils.appendSize(tables);
-            return new VirtualTableExtensionTable(tables, TableTransformUtils.createAppendTransformations(tables),
+            var refTables = createReferenceTables(tables);
+            return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables),
                 appendedSchema, appendSize, tableIdSupplier.getAsInt());
-        } catch (VirtualTableIncompatibleException ex) {
+        } catch (VirtualTableIncompatibleException ex) {// NOSONAR don't spam the log
             LOGGER.debug("Can't append with the Columnar Table Backend, falling back on the old backend.");
             return OLD_BACKEND.append(exec, tableIdSupplier, left, right);
         }
+    }
+
+    private static ReferenceTable[] createReferenceTables(final BufferedDataTable... tables)
+        throws VirtualTableIncompatibleException {
+        var refTables = new ReferenceTable[tables.length];
+        for (int i = 0; i < refTables.length; i++) {
+            refTables[i] = ReferenceTables.createReferenceTable(UUID.randomUUID(), tables[i]);
+        }
+        return refTables;
     }
 
     @Override
@@ -194,12 +213,13 @@ public final class ColumnarTableBackend implements TableBackend {
         ColumnRearrangerUtils.checkSpecCompatibility(columnRearranger, table.getDataTableSpec());
         try {
             var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(table, columnRearranger);
-            List<TableTransformSpec> transformations = TableTransformUtils.createRearrangeTransformations(
-                ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger),
-                table.getDataTableSpec().getNumColumns());
-            return new VirtualTableExtensionTable(new BufferedDataTable[]{table}, transformations, rearrangedSchema,
+            var refTable = ReferenceTables.createReferenceTable(UUID.randomUUID(), table);
+            var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
+            final var originalIndices = ColumnRearrangerUtils.extractOriginalIndicesOfIncludedColumns(columnRearranger);
+            var transformation = TableTransformUtils.filterAndPermute(virtualTable, originalIndices);
+            return new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, transformation, rearrangedSchema,
                 table.size(), tableIdSupplier.getAsInt());
-        } catch (VirtualTableIncompatibleException ex) {
+        } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log with stacktraces
             LOGGER.debug("Can't run ColumnRearranger on the Columnar Table Backend. Falling back on the old backend.");
             return OLD_BACKEND.rearrange(progressMonitor, tableIdSupplier, columnRearranger, table, context);
         }
