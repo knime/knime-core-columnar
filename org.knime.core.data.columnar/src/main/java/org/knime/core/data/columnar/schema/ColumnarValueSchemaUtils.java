@@ -45,19 +45,28 @@
  */
 package org.knime.core.data.columnar.schema;
 
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaLoadContext;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.ExtensionTable.LoadContext;
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpec;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Utility class to work with {@link ColumnarValueSchema}s.
@@ -79,6 +88,13 @@ public final class ColumnarValueSchemaUtils {
      */
     public static boolean storesDataCellSerializersSeparately(final ColumnarValueSchema schema) {
         return ValueSchemaUtils.storesDataCellSerializersSeparately(getValueSchema(schema));
+    }
+
+    /**
+     * @return an empty {@link ColumnarValueSchema}
+     */
+    public static ColumnarValueSchema empty() {
+        return EmptyColumnarValueSchema.INSTANCE;
     }
 
     /**
@@ -152,6 +168,58 @@ public final class ColumnarValueSchemaUtils {
         }
         final var sourceName = source.getSourceSpec().getName();
         return new UpdatedColumnarValueSchema(new DataTableSpec(sourceName, result), source);
+    }
+
+    private enum EmptyColumnarValueSchema implements ColumnarValueSchema {
+
+        INSTANCE;
+
+        private static final DataTableSpec EMPTY = new DataTableSpec();
+
+        @Override
+        public int numColumns() {
+            return 0;
+        }
+
+        @Override
+        public DataSpec getSpec(final int index) {
+            throw emptyException();
+        }
+
+        @Override
+        public Stream<DataSpec> specStream() {
+            return Stream.empty();
+        }
+
+        @Override
+        public DataTraits getTraits(final int index) {
+            throw emptyException();
+        }
+
+        @Override
+        public Iterator<DataSpec> iterator() {
+            return Collections.emptyIterator();
+        }
+
+        @Override
+        public DataTableSpec getSourceSpec() {
+            return EMPTY;
+        }
+
+        @Override
+        public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
+            throw emptyException();
+        }
+
+        private IndexOutOfBoundsException emptyException() {
+            return new IndexOutOfBoundsException("This ColumnarValueSchema is empty.");
+        }
+
+        @Override
+        public void save(final NodeSettingsWO settings) {
+            // nothing to save
+        }
+
     }
 
 }
