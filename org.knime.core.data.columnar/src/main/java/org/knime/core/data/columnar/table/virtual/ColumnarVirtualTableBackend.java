@@ -145,7 +145,8 @@ public final class ColumnarVirtualTableBackend {
         if (cellFactoryColumns.isEmpty()) {
             refTables = new ReferenceTable[] {refTable};
         } else {
-            checkForStatefulFactories(cellFactoryColumns);
+            // TODO implement stateful mapping via iteration (needed once the executor can parallelize)
+//            checkForStatefulFactories(cellFactoryColumns);
             checkForDataTypeConverterFactories(cellFactoryColumns);
             var appendTable = createAppendTable(refTable, context, cellFactoryColumns, tableIdSupplier.getAsInt(),
                 progressMonitor, table.size());
@@ -243,6 +244,7 @@ public final class ColumnarVirtualTableBackend {
                 monitor.checkCanceled();
             }
             var appendTable = container.finish();
+            // TODO call special AbstractCellFactory#afterProcessing where necessary
             return ReferenceTables.createReferenceTable(UUID.randomUUID(), appendTable);
         } catch (CanceledExecutionException canceledException) {
             // this stunt is necessary because ColumnarRowContainerUtils.create throws Exception
@@ -305,7 +307,8 @@ public final class ColumnarVirtualTableBackend {
             var outputSpecs = factory.getColumnSpecs();
             ValueFactory<?, ?>[] valueFactories = Stream.of(outputSpecs)//
                 .map(DataColumnSpec::getType)//
-                .map(t -> ValueFactoryUtils.getValueFactory(t, m_fsHandler)).toArray(ValueFactory[]::new);
+                .map(t -> ValueFactoryUtils.getValueFactory(t, m_fsHandler))//
+                .toArray(ValueFactory[]::new);
             GenericValueFactory[] outputValueFactories = Stream.of(valueFactories)//
                 .map(GenericValueFactory::new)//
                 .toArray(GenericValueFactory[]::new);
