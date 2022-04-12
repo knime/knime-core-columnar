@@ -90,4 +90,9 @@ final class UncloseableLookaheadRowAccessible implements LookaheadRowAccessible 
         return m_delegate.createCursor(selection);
     }
 
+    @Override
+    public long size() {
+        return m_delegate.size();
+    }
+
 }

@@ -262,6 +262,11 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         }
 
         @Override
+        public long size() {
+            return m_columnarTable.size();
+        }
+
+        @Override
         public LookaheadCursor<ReadAccessRow> createCursor() {
             return m_columnarTable.createCursor();
         }

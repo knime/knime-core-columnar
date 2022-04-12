@@ -148,6 +148,7 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
     /**
      * @return The number of rows contained in this table.
      */
+    @Override
     public long size() {
         return m_size;
     }

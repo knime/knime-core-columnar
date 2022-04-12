@@ -90,4 +90,9 @@ final class UncloseableRowAccessible implements RowAccessible {
         return m_delegate.createCursor(selection);
     }
 
+    @Override
+    public long size() {
+        return m_delegate.size();
+    }
+
 }

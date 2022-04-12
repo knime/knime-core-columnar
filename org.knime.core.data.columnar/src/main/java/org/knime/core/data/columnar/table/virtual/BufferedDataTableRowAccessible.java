@@ -98,4 +98,9 @@ final class BufferedDataTableRowAccessible implements LookaheadRowAccessible {
         return new RowIteratorCursor(m_schema, m_table.filter(TableFilter.fromSelection(selection)).iterator(),
             selection.columns());
     }
+
+    @Override
+    public long size() {
+        return m_table.size();
+    }
 }
