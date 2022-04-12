@@ -69,11 +69,11 @@ public final class IntData {
     public static interface IntWriteData extends NullableWriteData {
 
         /**
-         * Assigns a int value to the element at the given index. The contract is that values are only ever set for
-         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
-         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         * Assigns a int value to the element at the given index (row). The contract is that values are only ever set
+         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param index the index at which to set the int value
+         * @param index the index (row) at which to set the int value
          * @param val the int value to set
          */
         void setInt(int index, int val);
@@ -89,11 +89,11 @@ public final class IntData {
     public static interface IntReadData extends NullableReadData {
 
         /**
-         * Obtains the int value at the given index. It is the responsibility of the client calling this method to make
-         * sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         * Obtains the int value at the given index (row). It is the responsibility of the client calling this method to
+         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
          *
-         * @param index the index at which to obtain the int element
-         * @return the int element at the given index
+         * @param index the index (row) at which to obtain the int element
+         * @return the int element at the given index (row)
          */
         int getInt(int index);
 

@@ -70,11 +70,11 @@ public final class FloatData {
     public static interface FloatWriteData extends NullableWriteData {
 
         /**
-         * Assigns a float value to the element at the given index. The contract is that values are only ever set for
-         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
-         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         * Assigns a float value to the element at the given index (row). The contract is that values are only ever set
+         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param index the index at which to set the float value
+         * @param index the index (row) at which to set the float value
          * @param val the float value to set
          */
         void setFloat(int index, float val);
@@ -90,11 +90,11 @@ public final class FloatData {
     public static interface FloatReadData extends NullableReadData {
 
         /**
-         * Obtains the float value at the given index. It is the responsibility of the client calling this method to
-         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         * Obtains the float value at the given index (row). It is the responsibility of the client calling this method
+         * to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
          *
-         * @param index the index at which to obtain the float element
-         * @return the float element at the given index
+         * @param index the index (row) at which to obtain the float element
+         * @return the float element at the given index (row)
          */
         float getFloat(int index);
 

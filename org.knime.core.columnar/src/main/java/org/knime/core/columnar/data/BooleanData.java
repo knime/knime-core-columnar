@@ -67,11 +67,11 @@ public final class BooleanData {
     public static interface BooleanWriteData extends NullableWriteData {
 
         /**
-         * Assigns a boolean value to the element at the given index. The contract is that values are only ever set for
-         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
-         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         * Assigns a boolean value to the element at the given index (row). The contract is that values are only ever
+         * set for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param index the index at which to set the boolean value
+         * @param index the index (row) at which to set the boolean value
          * @param val the boolean value to set
          */
         void setBoolean(int index, boolean val);
@@ -87,11 +87,12 @@ public final class BooleanData {
     public static interface BooleanReadData extends NullableReadData {
 
         /**
-         * Obtains the boolean value at the given index. It is the responsibility of the client calling this method to
-         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         * Obtains the boolean value at the given index (row). It is the responsibility of the client calling this
+         * method to make sure that the provided index is non-negative and smaller than the length of this
+         * {@link ReadData}.
          *
-         * @param index the index at which to obtain the boolean element
-         * @return the boolean element at the given index
+         * @param index the index (row) at which to obtain the boolean element
+         * @return the boolean element at the given index (row)
          */
         boolean getBoolean(int index);
 

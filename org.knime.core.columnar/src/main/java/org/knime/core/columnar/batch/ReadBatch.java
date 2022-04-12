@@ -65,7 +65,7 @@ public interface ReadBatch extends Batch<NullableReadData>, NullableReadData {
     /**
      * Obtains the {@link NullableReadData} at a certain index.
      *
-     * @param index the index at which to look for the data
+     * @param index the index (column) at which to look for the data
      * @return the non-null data at the given index
      * @throws IndexOutOfBoundsException if the index is negative or equal to or greater than the size of the batch
      * @throws NoSuchElementException if there is no data available at the given index

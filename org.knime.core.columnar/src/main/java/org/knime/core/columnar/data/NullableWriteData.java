@@ -57,11 +57,11 @@ import org.knime.core.columnar.WriteData;
 public interface NullableWriteData extends WriteData {
 
     /**
-     * Sets the element at the given index to be missing. The contract is that values are only ever set for ascending
-     * indices. It is the responsibility of the client calling this method to make sure that the provided index is
-     * non-negative and smaller than the capacity of this {@link WriteData}.
+     * Sets the element at the given index (row) to be missing. The contract is that values are only ever set for
+     * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
+     * index is non-negative and smaller than the capacity of this {@link WriteData}.
      *
-     * @param index the index at which to set a element to be missing
+     * @param index the index (row) at which to set a element to be missing
      */
     void setMissing(int index);
 

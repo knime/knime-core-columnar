@@ -72,11 +72,11 @@ public final class StringData {
     public interface StringWriteData extends NullableWriteData {
 
         /**
-         * Assigns a String value to the element at the given index. The contract is that values are only ever set for
-         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
-         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         * Assigns a String value to the element at the given index (row). The contract is that values are only ever set
+         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param index the index at which to set the String value
+         * @param index the index (row) at which to set the String value
          * @param val the String value to set
          */
         void setString(int index, String val);
@@ -94,10 +94,10 @@ public final class StringData {
     public interface StringReadData extends NullableReadData {
 
         /**
-         * Obtains the String value at the given index. It is the responsibility of the client calling this method to
-         * make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         * Obtains the String value at the given index (row). It is the responsibility of the client calling this method
+         * to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
          *
-         * @param index the index at which to obtain the String element
+         * @param index the index (row) at which to obtain the String element
          * @return the String element at the given index
          */
         String getString(int index);

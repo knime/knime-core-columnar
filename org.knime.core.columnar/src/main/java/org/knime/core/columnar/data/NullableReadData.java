@@ -59,10 +59,11 @@ import org.knime.core.columnar.ReadData;
 public interface NullableReadData extends ReadData {
 
     /**
-     * Checks whether the element at the given index is missing. It is the responsibility of the client calling this
-     * method to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+     * Checks whether the element at the given index (row) is missing. It is the responsibility of the client calling
+     * this method to make sure that the provided index is non-negative and smaller than the length of this
+     * {@link ReadData}.
      *
-     * @param index the index at which to check for a missing element
+     * @param index the (row) index at which to check for a missing element
      * @return true if the element at the given index is missing; otherwise false
      */
     boolean isMissing(int index);

@@ -69,22 +69,22 @@ public final class VarBinaryData {
     public static interface VarBinaryWriteData extends NullableWriteData {
 
         /**
-         * Assigns a byte array value to the element at the given index. The contract is that values are only ever set
-         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * Assigns a byte array value to the element at the given index (row). The contract is that values are only ever
+         * set for ascending indices. It is the responsibility of the client calling this method to make sure that the
          * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param index the index at which to set the byte array value
+         * @param index the index (row) at which to set the byte array value
          * @param val the byte array value to set
          */
         void setBytes(int index, byte[] val);
 
         /**
-         * Assigns an object to the element at the given index. The contract is that values are only ever set for
+         * Assigns an object to the element at the given index (row). The contract is that values are only ever set for
          * ascending indices. It is the responsibility of the client calling this method to make sure that the provied
          * index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
          * @param <T> the type of object to set
-         * @param index the index at which to set the object
+         * @param index the index (row) at which to set the object
          * @param value the object to set
          * @param serializer capable of serializing the provided object
          */
@@ -101,22 +101,24 @@ public final class VarBinaryData {
     public static interface VarBinaryReadData extends NullableReadData {
 
         /**
-         * Obtains the byte array value at the given index. It is the responsibility of the client calling this method
-         * to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         * Obtains the byte array value at the given index (row). It is the responsibility of the client calling this
+         * method to make sure that the provided index is non-negative and smaller than the length of this
+         * {@link ReadData}.
          *
-         * @param index the index at which to obtain the byte array element
+         * @param index the index (row) at which to obtain the byte array element
          * @return the byte array element at the given index
          */
         byte[] getBytes(int index);
 
         /**
-         * Obtains the object stored at the given index. It is the responsibility of the client calling this method
-         * to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         * Obtains the object stored at the given index (row). It is the responsibility of the client calling this
+         * method to make sure that the provided index is non-negative and smaller than the length of this
+         * {@link ReadData}.
          *
          * @param <T> the type of read object
-         * @param index the index at which to obtain the object element
+         * @param index the index (row) at which to obtain the object element
          * @param deserializer {@link ObjectDeserializer} capable of deserializing the object
-         * @return the object at the given index
+         * @return the object at the given index (row)
          */
         <T> T getObject(int index, ObjectDeserializer<T> deserializer);
 

@@ -69,11 +69,11 @@ public final class LongData {
     public static interface LongWriteData extends NullableWriteData {
 
         /**
-         * Assigns a long value to the element at the given index. The contract is that values are only ever set for
-         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
-         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         * Assigns a long value to the element at the given index (row). The contract is that values are only ever set
+         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param index the index at which to set the long value
+         * @param index the index (row) at which to set the long value
          * @param val the long value to set
          */
         void setLong(int index, long val);
@@ -89,10 +89,10 @@ public final class LongData {
     public static interface LongReadData extends NullableReadData {
 
         /**
-         * Obtains the long value at the given index. It is the responsibility of the client calling this method to make
-         * sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         * Obtains the long value at the given index (row). It is the responsibility of the client calling this method
+         * to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
          *
-         * @param index the index at which to obtain the long element
+         * @param index the index (row) at which to obtain the long element
          * @return the long element at the given index
          */
         long getLong(int index);

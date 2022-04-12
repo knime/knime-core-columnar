@@ -69,11 +69,11 @@ public final class ByteData {
     public interface ByteWriteData extends NullableWriteData {
 
         /**
-         * Assigns a byte value to the element at the given index. The contract is that values are only ever set for
-         * ascending indices. It is the responsibility of the client calling this method to make sure that the provided
-         * index is non-negative and smaller than the capacity of this {@link WriteData}.
+         * Assigns a byte value to the element at the given index (row). The contract is that values are only ever set
+         * for ascending indices. It is the responsibility of the client calling this method to make sure that the
+         * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
-         * @param index the index at which to set the byte value
+         * @param index the index (row) at which to set the byte value
          * @param val the byte value to set
          */
         void setByte(int index, byte val);
@@ -89,11 +89,11 @@ public final class ByteData {
     public interface ByteReadData extends NullableReadData {
 
         /**
-         * Obtains the byte value at the given index. It is the responsibility of the client calling this method to make
-         * sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
+         * Obtains the byte value at the given index (row). It is the responsibility of the client calling this method
+         * to make sure that the provided index is non-negative and smaller than the length of this {@link ReadData}.
          *
-         * @param index the index at which to obtain the byte element
-         * @return the byte element at the given index
+         * @param index the index (row) at which to obtain the byte element
+         * @return the byte element at the given index (row)
          */
         byte getByte(int index);
 

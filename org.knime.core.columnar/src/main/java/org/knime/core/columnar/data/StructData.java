@@ -70,14 +70,14 @@ public final class StructData {
     public interface StructWriteData extends NullableWriteData {
 
         /**
-         * Obtains a {@link NullableWriteData} of type C at the given index in the struct, which can then be populated
+         * Obtains a {@link NullableWriteData} of type C at the given index (column) in the struct, which can then be populated
          * with values. The returned data must not be {@link WriteData#close(int) closed} or
          * {@link WriteData#expand(int) expanded}. It is the responsibility of the client calling this method to make
          * sure that the provided index is non-negative and smaller than the size (i.e., number of inner
          * {@link DataSpec ColumnDataSpecs} in the {@link StructDataSpec}) of this struct.
          *
          * @param <C> the type of the {@link NullableWriteData}
-         * @param index the index in the struct at which to obtain the data
+         * @param index the index (column) in the struct at which to obtain the data
          * @return the {@link NullableWriteData} at the given index in the struct
          */
         <C extends NullableWriteData> C getWriteDataAt(int index);
@@ -93,14 +93,14 @@ public final class StructData {
     public interface StructReadData extends NullableReadData {
 
         /**
-         * Obtains a {@link NullableReadData} of type C at the given index in the struct, which can then be used to read
+         * Obtains a {@link NullableReadData} of type C at the given index (column) in the struct, which can then be used to read
          * values. It is the responsibility of the client calling this method to make sure that the provided index is
          * non-negative and smaller than the size (i.e., number of inner {@link DataSpec ColumnDataSpecs} in the
          * {@link StructDataSpec}) of this struct.
          *
          * @param <C> the type of the {@link NullableReadData}
-         * @param index the index in the struct at which to obtain the data
-         * @return the {@link NullableReadData} at the given index in the struct
+         * @param index the index (column) in the struct at which to obtain the data
+         * @return the {@link NullableReadData} at the given index (column) in the struct
          */
         <C extends NullableReadData> C getReadDataAt(int index);
 

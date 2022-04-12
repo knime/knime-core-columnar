@@ -71,13 +71,13 @@ public final class ListData {
 
         /**
          * Creates a {@link NullableWriteData} of type C that represents a list with a certain fixed size at the given
-         * index, which can then be populated with values. The contract is that lists are only ever created once and
-         * only for ascending indices. Also, the returned data must not be {@link WriteData#close(int) closed} or
+         * index (row), which can then be populated with values. The contract is that lists are only ever created once
+         * and only for ascending indices. Also, the returned data must not be {@link WriteData#close(int) closed} or
          * {@link WriteData#expand(int) expanded}. It is the responsibility of the client calling this method to make
          * sure that the provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
          * @param <C> the type of the {@link NullableWriteData}
-         * @param index the index at which to create the list
+         * @param index the index (row) at which to create the list
          * @param size the size of the list
          * @return a newly created {@link NullableWriteData} that represents the list
          */
@@ -94,12 +94,12 @@ public final class ListData {
     public static interface ListReadData extends NullableReadData {
 
         /**
-         * Obtains a {@link NullableReadData} of type C that represents the list at the given index, which can then be
-         * used to read values. It is the responsibility of the client calling this method to make sure that the
+         * Obtains a {@link NullableReadData} of type C that represents the list at the given index (row), which can
+         * then be used to read values. It is the responsibility of the client calling this method to make sure that the
          * provided index is non-negative and smaller than the capacity of this {@link WriteData}.
          *
          * @param <C> the type of the {@link NullableReadData}
-         * @param index the index at which to obtain the list
+         * @param index the index (row) at which to obtain the list
          * @return a {@link NullableReadData} that represents the list
          */
         <C extends NullableReadData> C createReadData(int index);
