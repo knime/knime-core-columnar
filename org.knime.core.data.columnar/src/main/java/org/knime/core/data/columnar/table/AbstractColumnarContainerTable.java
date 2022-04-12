@@ -229,7 +229,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
     @SuppressWarnings("resource") // Cursor will be closed along with iterator.
     @Override
     public final CloseableRowIterator iterator() {
-        return new ColumnarRowIterator(cursor());
+        return new PrefetchingRowIterator(new ColumnarRowIterator(cursor()));
     }
 
     @Override
@@ -239,7 +239,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         final var iterator = materializeColumnIndices.isPresent()
             ? FilteredColumnarRowIteratorFactory.create(cursor(filter), materializeColumnIndices.get())
             : new ColumnarRowIterator(cursor(filter));
-        return iterator;
+        return new PrefetchingRowIterator(iterator);
     }
 
     /**
