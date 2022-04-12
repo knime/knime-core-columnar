@@ -401,7 +401,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     @SuppressWarnings("resource") // the cursor is managed by the returned iterator
     @Override
     public CloseableRowIterator iterator() {
-        return new ColumnarRowIterator(cursor());
+        return new PrefetchingRowIterator(new ColumnarRowIterator(cursor()));
     }
 
     @Override
