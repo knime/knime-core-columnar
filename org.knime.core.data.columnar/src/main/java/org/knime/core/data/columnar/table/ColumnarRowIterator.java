@@ -63,7 +63,7 @@ import org.knime.core.data.v2.RowRead;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarRowIterator extends CloseableRowIterator {
+public final class ColumnarRowIterator extends CloseableRowIterator {
 
     abstract static class CellIterator implements Iterator<DataCell> {
         /**
@@ -149,7 +149,7 @@ final class ColumnarRowIterator extends CloseableRowIterator {
 
     private final int m_numValues;
 
-    ColumnarRowIterator(final RowCursor cursor) {
+    public ColumnarRowIterator(final RowCursor cursor) {
         m_cursor = cursor;
         m_numValues = m_cursor.getNumColumns();
     }

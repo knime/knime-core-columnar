@@ -46,7 +46,6 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.filter.BatchRange;
@@ -71,7 +70,7 @@ import org.knime.core.table.row.ReadAccessRow;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarRowCursorFactory {
+public final class ColumnarRowCursorFactory {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowCursorFactory.class);
 
@@ -146,7 +145,7 @@ final class ColumnarRowCursorFactory {
 
     }
 
-    static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size) {
+    public static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size) {
         return create(store, schema, size, null);
     }
 
