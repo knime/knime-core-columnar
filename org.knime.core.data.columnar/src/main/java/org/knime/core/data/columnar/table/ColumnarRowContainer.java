@@ -55,7 +55,6 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
-import org.knime.core.node.ExtensionTable;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -76,7 +75,7 @@ final class ColumnarRowContainer implements RowContainer {
 
     private final ColumnarRowWriteTable m_columnarTable;
 
-    private ExtensionTable m_finishedTable;
+    private UnsavedColumnarContainerTable m_finishedTable;
 
     private ColumnarRowContainer(final ExecutionContext context, final int id,
         final ColumnarRowWriteTable columnarTable) {
@@ -105,7 +104,7 @@ final class ColumnarRowContainer implements RowContainer {
         m_columnarTable.close();
     }
 
-    ExtensionTable finishInternal() {
+    UnsavedColumnarContainerTable finishInternal() {
         if (m_finishedTable == null) {
             @SuppressWarnings("resource") // Will be closed along with the container table.
             final ColumnarRowReadTable finishedColumnarTable = m_columnarTable.finish();

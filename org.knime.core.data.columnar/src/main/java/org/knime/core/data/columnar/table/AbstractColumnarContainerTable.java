@@ -228,7 +228,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
     @SuppressWarnings("resource") // Cursor will be closed along with iterator.
     @Override
-    public final CloseableRowIterator iterator() {
+    public CloseableRowIterator iterator() {
         return new PrefetchingRowIterator(new ColumnarRowIterator(cursor()));
     }
 

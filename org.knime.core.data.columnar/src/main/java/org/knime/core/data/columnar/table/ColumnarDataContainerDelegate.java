@@ -148,6 +148,9 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private List<DataRow> m_curBatch = new ArrayList<>(BATCH_SIZE);
 
+    // TODO clear if memory alert occurs
+    private final List<DataRow> m_allRows = new ArrayList<>();
+
     /**
      * The index of the pending batch, i.e., the index of the next batch that has to be forwarded to the {@link Buffer}.
      */
@@ -176,7 +179,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private long m_size;
 
-    private ContainerTable m_containerTable;
+    private UnsavedColumnarContainerTable m_containerTable;
 
     ColumnarDataContainerDelegate(final DataTableSpec spec, final ColumnarRowContainer container) {
         m_delegateContainer = container;
@@ -222,6 +225,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         // TODO handle low memory
 
         m_curBatch.add(row);
+        m_allRows.add(row);
         if (m_curBatch.size() == BATCH_SIZE) {
             try {
                 submit();
@@ -286,6 +290,8 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
             submitLastBatchAndWait();
             m_containerTable = m_delegateContainer.finishInternal();
+            // TODO only set if not already cleaned up due to memory alert
+            m_containerTable.setDataRows(m_allRows);
             m_delegateCursor.close();
             m_closing.set(false);
         }

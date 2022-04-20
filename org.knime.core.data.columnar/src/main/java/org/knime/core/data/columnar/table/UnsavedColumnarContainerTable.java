@@ -51,11 +51,16 @@ package org.knime.core.data.columnar.table;
 import java.io.File;
 import java.io.Flushable;
 import java.io.IOException;
+import java.lang.ref.SoftReference;
 import java.nio.file.Files;
+import java.util.Iterator;
+import java.util.List;
 
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.DataRow;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeSettingsWO;
@@ -69,6 +74,9 @@ import org.knime.core.node.NodeSettingsWO;
 public final class UnsavedColumnarContainerTable extends AbstractColumnarContainerTable {
 
     private final Flushable m_storeFlusher;
+
+    // TODO move to super class and potentially reload on next read in case it's been garbage collected
+    private SoftReference<List<DataRow>> m_rows = new SoftReference<>(null);
 
     /**
      * Creates an {@link UnsavedColumnarContainerTable} wrapping the given table.
@@ -141,4 +149,40 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
         final BatchReadStore store = getStore();
         store.getFileHandle().delete();
     }
+
+    void setDataRows(final List<DataRow> rows) {
+        m_rows = new SoftReference<>(rows);
+    }
+
+    @Override
+    public CloseableRowIterator iterator() {
+        var rows = m_rows.get();
+        if (rows != null) {
+            return new CloseableRowIterator() {
+
+                Iterator<DataRow> m_iterator = rows.iterator();
+
+                @Override
+                public DataRow next() {
+                    // TODO decorate returned rows to behave like the columnar backend (no missing value causes, int becomes double in lists etc)
+                    return m_iterator.next();
+                }
+
+                @Override
+                public boolean hasNext() {
+                    return m_iterator.hasNext();
+                }
+
+                @Override
+                public void close() {
+                    // nothing to close
+                }
+            };
+        } else {
+            return super.iterator();
+        }
+    }
+
+
+
 }
