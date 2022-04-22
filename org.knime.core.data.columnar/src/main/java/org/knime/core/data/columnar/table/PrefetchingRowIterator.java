@@ -48,7 +48,6 @@
  */
 package org.knime.core.data.columnar.table;
 
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -59,9 +58,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
-import org.knime.core.data.RowKey;
 import org.knime.core.data.container.CloseableRowIterator;
 
 /**
@@ -81,17 +78,19 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
             }
         });
 
-    private static final int BATCH_SIZE = 100;
+    private static final int BATCH_SIZE = 1024;
 
     private final CloseableRowIterator m_source;
 
-    private final BlockingDeque<DataRow> m_rowQueue = new LinkedBlockingDeque<>();
+    private final BlockingDeque<DataRow[]> m_rowQueue = new LinkedBlockingDeque<>();
 
     private DataRow m_currentRow;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
-    private boolean m_reachedEnd = false;
+    private int m_currentIndex = -1;
+
+    private DataRow[] m_currentRows = null;
 
     public PrefetchingRowIterator(final CloseableRowIterator source) {
         m_source = source;
@@ -103,41 +102,45 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
     }
 
     private void prefetchNextBatch() {
+        final DataRow[] rows = new DataRow[BATCH_SIZE];
         for (int i = 0; i < BATCH_SIZE && m_source.hasNext(); i++) {//NOSONAR
             if (m_closed.get()) {
                 // row iterator is closed -> stop prefetching
                 return;
             }
-            m_rowQueue.add(m_source.next());
+            rows[i] = m_source.next();
         }
+        m_rowQueue.add(rows);
         if (m_source.hasNext()) {
             startPrefetching();
         } else {
-            m_rowQueue.add(PoisonedRow.INSTANCE);
+            m_rowQueue.add(new DataRow[0]);
         }
     }
 
     @Override
     public boolean hasNext() {
-        if (m_reachedEnd) {
-            return false;
-        }
         if (m_currentRow == null) {
             m_currentRow = getNextRow();
         }
-        return !m_reachedEnd;
+        return m_currentRow != null;
     }
 
     private DataRow getNextRow() {
         try {
-            var row = m_rowQueue.takeFirst();
-            if (row == PoisonedRow.INSTANCE) {
-                m_reachedEnd = true;
+            if (m_currentRows == null || ++m_currentIndex == m_currentRows.length) {
+                m_currentRows = m_rowQueue.takeFirst();
+
+                if (m_currentRows.length == 0) {
+                    return null;
+                } else {
+                    m_currentIndex = 0;
+                }
             }
-            return row;
+            return m_currentRows[m_currentIndex];
         } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while waiting for prefetched rows.", ex);
+            ex.printStackTrace();
+            return null;
         }
     }
 
@@ -158,33 +161,4 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
         m_rowQueue.clear();
         m_source.close();
     }
-
-    private enum PoisonedRow implements DataRow {
-        INSTANCE;
-
-        @Override
-        public Iterator<DataCell> iterator() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public int getNumCells() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        @Override
-        public RowKey getKey() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public DataCell getCell(final int index) {
-            // TODO Auto-generated method stub
-            return null;
-        }
-    }
-
 }
