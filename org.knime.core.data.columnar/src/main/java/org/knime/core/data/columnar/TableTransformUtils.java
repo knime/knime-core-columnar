@@ -133,7 +133,7 @@ public final class TableTransformUtils {
     }
 
     static VirtualTable appendTables(final ReferenceTable[] tables) {
-        var virtualTable = new VirtualTable(tables[0].getId(), tables[0].getSchema());
+        var virtualTable = asSource(tables[0]);
         var appendedTables = Stream.of(tables)//
                 .skip(1)//
                 .map(TableTransformUtils::asSource)//
@@ -150,7 +150,7 @@ public final class TableTransformUtils {
     }
 
     private static VirtualTable asSource(final ReferenceTable table) {
-        return new VirtualTable(table.getId(), table.getSchema());
+        return new VirtualTable(table.getId(), table.getSchema(), true);
     }
 
     static List<TableTransformSpec> createAppendTransformations(final DataTableSpec[] specs) {
