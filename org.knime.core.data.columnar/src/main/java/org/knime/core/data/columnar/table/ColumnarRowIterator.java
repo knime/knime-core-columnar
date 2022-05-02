@@ -161,7 +161,7 @@ public final class ColumnarRowIterator extends CloseableRowIterator {
 
     @Override
     public DataRow next() {
-        if (!hasNext()) {
+        if (!hasNext()) { // TODO: cache result of hasNext() call somehow? maybe at end of next(), so that next hasNext() call is cheaper for client?
             throw new NoSuchElementException();
         }
 

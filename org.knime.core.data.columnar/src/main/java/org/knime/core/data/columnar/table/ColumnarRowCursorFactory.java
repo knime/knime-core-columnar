@@ -155,6 +155,8 @@ public final class ColumnarRowCursorFactory {
         if (size < 1) {
             return new EmptyRowCursor(schema);
         }
+
+        // TODO: The following is very weird. Probably the exception message should be changed? And also the maxLength variable name?
         final int maxLength = store.batchLength();
         if (maxLength < 1) {
             throw new IllegalStateException(
