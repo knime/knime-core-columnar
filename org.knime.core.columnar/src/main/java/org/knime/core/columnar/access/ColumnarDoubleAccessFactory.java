@@ -58,7 +58,7 @@ import org.knime.core.table.access.ReadAccess;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
+public final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
 
     /** Instance **/
     static final ColumnarDoubleAccessFactory INSTANCE = new ColumnarDoubleAccessFactory();
@@ -76,10 +76,10 @@ final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
         return new ColumnarDoubleWriteAccess(index);
     }
 
-    static final class ColumnarDoubleReadAccess extends AbstractReadAccess<DoubleReadData>
+    public static final class ColumnarDoubleReadAccess extends AbstractReadAccess<DoubleReadData>
         implements DoubleReadAccess {
 
-        ColumnarDoubleReadAccess(final ColumnDataIndex index) {
+        public ColumnarDoubleReadAccess(final ColumnDataIndex index) {
             super(index);
         }
 
