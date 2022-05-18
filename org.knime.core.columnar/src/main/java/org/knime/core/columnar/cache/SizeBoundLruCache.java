@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.Weigher;
 
 /**
@@ -73,8 +74,30 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
         private final Evictor<? super K, ? super D> m_evictor;
 
         DataWithEvictor(final D data, final Evictor<? super K, ? super D> evictor) {
+            data.retain();
             m_data = data;
             m_evictor = evictor;
+        }
+
+        /**
+         * Retain and return data.
+         *
+         * @throws IllegalStateException when the data has already been discarded as a consequence of the reference count reaching zero
+         */
+        D getRetained() {
+            m_data.retain();
+            return m_data;
+        }
+
+        /**
+         * Call evictor if the entry was evicted (not explicitly removed/replaced).
+         * Release data.
+         */
+        void onRemoval(final RemovalNotification<K, DataWithEvictor<K, D>> removalNotification) {
+            if (removalNotification.wasEvicted()) {
+                m_evictor.evict(removalNotification.getKey(), m_data);
+            }
+            m_data.release();
         }
     }
 
@@ -96,13 +119,8 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
             return Math.max(1, (int)size);
         };
 
-        final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
-            if (removalNotification.wasEvicted()) {
-                final DataWithEvictor<K, D> evicted = removalNotification.getValue();
-                evicted.m_evictor.evict(removalNotification.getKey(), evicted.m_data);
-                evicted.m_data.release();
-            }
-        };
+        final RemovalListener<K, DataWithEvictor<K, D>> removalListener =
+                removalNotification -> removalNotification.getValue().onRemoval(removalNotification);
 
         final Cache<K, DataWithEvictor<K, D>> cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel)
             .maximumWeight(maxSize).weigher(weigher).removalListener(removalListener).build();
@@ -112,32 +130,24 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
     @Override
     public void put(final K key, final D data, final Evictor<? super K, ? super D> evictor) {
-        data.retain();
-        m_lruCache.compute(key, (k, d) -> {
-            if (d != null) {
-                d.m_data.release(); // if we replace data, we have to make sure to release the old data
-            }
-            return new DataWithEvictor<K, D>(data, evictor);
-        });
+        m_lruCache.put(key, new DataWithEvictor<>(data, evictor));
     }
 
     @Override
     public D getRetained(final K key) {
         final DataWithEvictor<K, D> cached = m_lruCache.get(key);
-        if (cached == null) {
-            return null;
+        if (cached != null) {
+            try {
+                return cached.getRetained();
+            } catch (IllegalStateException e) { // NOSONAR
+                // we should only end up here in the very rare case where the data is evicted in between get() and retain()
+            }
         }
-        try {
-            cached.m_data.retain();
-        } catch (IllegalStateException e) { // NOSONAR
-            // we should only end up here in the very rare case where the data is evicted in between get() and retain()
-            return null;
-        }
-        return cached.m_data;
+        return null;
     }
 
     @Override
-    public D removeRetained(final K key) {
+    public D remove(final K key) {
         final DataWithEvictor<K, D> removed = m_lruCache.remove(key);
         return removed == null ? null : removed.m_data;
     }

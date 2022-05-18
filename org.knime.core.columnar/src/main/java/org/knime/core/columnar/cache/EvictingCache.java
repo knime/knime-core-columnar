@@ -68,7 +68,7 @@ public interface EvictingCache<K, D extends ReferencedData> {
      * @param <D> the type of cached data
      */
     @FunctionalInterface
-    static interface Evictor<K, D extends ReferencedData> extends BiConsumer<K, D> {
+    interface Evictor<K, D> extends BiConsumer<K, D> {
         default void evict(final K key, final D data) {
             accept(key, data);
         }
@@ -76,6 +76,9 @@ public interface EvictingCache<K, D extends ReferencedData> {
 
     /**
      * Associates the given data with the given key and places it in the cache.
+     * <p>
+     * The given {@code data} is {@link ReferencedData#retain() retained}. If another D was already associated to the
+     * same key, it will be released but its evictor (if any) will <em>not</em> be called.
      *
      * @param key key with which the specified data is to be associated
      * @param data data to be retained and associated with the specified key
@@ -86,8 +89,15 @@ public interface EvictingCache<K, D extends ReferencedData> {
     }
 
     /**
-     * Associates the given data with the given key and places it in the cache. If, at some point, the data is evicted
-     * from the cache, the given evictor is called.
+     * Associates the given data with the given key and places it in the cache.
+     * <p>
+     * The given {@code data} is {@link ReferencedData#retain() retained}. If, at some point, the data is evicted from
+     * the cache, the given {@code evictor} is called and the data is {@link ReferencedData#release()
+     * released}.
+     * <p>
+     * Note that, if another {@code D} was already associated to the same key, it will be released but
+     * its evictor (if any) will <em>not</em> be called.
+     *
      *
      * @param key key with which the specified data is to be associated
      * @param data data to be retained and associated with the specified key
@@ -97,7 +107,10 @@ public interface EvictingCache<K, D extends ReferencedData> {
 
     /**
      * Returns the retained data to which the specified key is mapped. Returns null if this cache contains no mapping
-     * for the key. It is up to the client calling this method to release the returned data once it is no longer needed.
+     * for the key.
+     * <p>
+     * The returned data is {@link ReferencedData#retain() retained} for the caller. It is up to the caller to
+     * {@link ReferencedData#release() release} the returned data once it is no longer needed.
      *
      * @param key key whose associated value is to be returned
      * @return retained data to which the specified key is mapped, or null if this cache contains no mapping for the key
@@ -105,15 +118,15 @@ public interface EvictingCache<K, D extends ReferencedData> {
     D getRetained(final K key);
 
     /**
-     * Removes the mapping for a key from this cache if it is present (optional operation). Returns the retained data to
-     * which this cache previously associated the key, or <tt>null</tt> if the cache contained no mapping for the key.
-     * It is up to the client calling this method to release the returned data once it is no longer needed.
+     * Removes the mapping for a key from this cache if it is present (optional operation). Returns the data to which
+     * this cache previously associated the key, or {@code null} if the cache contained no mapping for the key.
+     * <p>
+     * Note that the cache will {@link ReferencedData#release() release} the removed data but its evictor (if any) will <em>not</em> be called.
      *
      * @param key key whose mapping is to be removed from the cache
-     * @return the retained data to which the specified key was mapped, or null if the cache contained no mapping for
-     *         the key
+     * @return the data to which the specified key was mapped, or null if the cache contained no mapping for the key
      */
-    D removeRetained(final K key);
+    D remove(final K key);
 
     /**
      * Returns the approximate number of key-data mappings in this cache.
