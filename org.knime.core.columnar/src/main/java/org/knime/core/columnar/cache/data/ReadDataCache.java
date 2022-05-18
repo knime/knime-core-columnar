@@ -402,10 +402,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             //                  where we always lock on column 0, i.e., lockUID = new ColumnDataUniqueId(ReadDataCache.this, 0, index)
             //                  Probably, we just don't need any synchronization here.
             synchronized (lock) {
-                final var data = m_globalCache.removeRetained(ccUID);
-                if (data != null) {
-                    data.release();
-                }
+                m_globalCache.remove(ccUID);
             }
         }
     }
