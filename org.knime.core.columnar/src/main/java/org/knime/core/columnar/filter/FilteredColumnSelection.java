@@ -99,7 +99,7 @@ public final class FilteredColumnSelection implements ColumnSelection {
             m_numColumns);
     }
 
-    private static final class FilteredReadBatch implements ReadBatch {
+    public static final class FilteredReadBatch implements ReadBatch {
 
         private final Map<Integer, NullableReadData> m_data;
 
@@ -107,7 +107,7 @@ public final class FilteredColumnSelection implements ColumnSelection {
 
         private final int m_length;
 
-        FilteredReadBatch(final Map<Integer, NullableReadData> data, final int numColumns) {
+        public FilteredReadBatch(final Map<Integer, NullableReadData> data, final int numColumns) {
             m_data = data;
             m_numColumns = numColumns;
             m_length = data.values().stream().mapToInt(ReadData::length).max().orElse(0);

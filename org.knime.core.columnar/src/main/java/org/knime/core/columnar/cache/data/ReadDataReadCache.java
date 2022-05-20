@@ -45,7 +45,10 @@
  */
 package org.knime.core.columnar.cache.data;
 
+import static org.knime.core.columnar.cache.data.ReadDataCache.getSelectedColumns;
+
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -56,7 +59,6 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.cache.EvictingCache;
 import org.knime.core.columnar.cache.EvictingCache.Evictor;
-import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
@@ -64,7 +66,7 @@ import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link RandomAccessBatchReadable} that reads {@link ReadData} from a delegate and places it in a fixed-size
- * {@link SharedBatchWritableCache LRU cache} in memory for faster subsequent access.
+ * {@link SharedReadDataCache LRU cache} in memory for faster subsequent access.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -76,32 +78,57 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
         private final ColumnSelection m_selection;
 
+        private final int[] m_selectedColumns;
+
         ReadDataReadCacheReader(final ColumnSelection selection) {
             m_selection = selection;
+            m_selectedColumns = getSelectedColumns(selection);
         }
 
         @Override
         public ReadBatch readRetained(final int index) throws IOException {
-            return m_selection.createBatch(i -> { // NOSONAR
+            final int numColumns = m_selection.numColumns();
+            final NullableReadData[] datas = new NullableReadData[numColumns];
+            int[] missingCols = new int[m_selectedColumns.length];
+            int numMissing = 0;
+            for (int i : m_selectedColumns) {
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataReadCache.this, i, index);
-                final Object lock = m_cachedData.computeIfAbsent(ccUID, k -> new Object());
+                final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
+                if (cachedData != null) {
+                    datas[i] = cachedData;
+                } else {
+                    missingCols[numMissing++] = i;
+                }
+            }
+            if (numMissing > 0) {
+                missingCols = Arrays.copyOf(missingCols, numMissing);
 
+                // we use the first column's id as a proxy for locking.
+                final ColumnDataUniqueId lockUID = new ColumnDataUniqueId(ReadDataReadCache.this, 0, index);
+                final Object lock = m_cachedData.computeIfAbsent(lockUID, k -> new Object());
                 synchronized (lock) {
-                    final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
-                    if (cachedData != null) {
-                        return cachedData;
-                    }
-
-                    try (RandomAccessBatchReader reader = m_reabableDelegate
-                        .createRandomAccessReader(new FilteredColumnSelection(m_selection.numColumns(), i))) {
-                        final NullableReadData data = reader.readRetained(index).get(i);
-                        m_globalCache.put(ccUID, data, m_evictor);
-                        return data;
+                    try (RandomAccessBatchReader reader = m_readableDelegate
+                            .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
+                        final ReadBatch batch = reader.readRetained(index);
+                        for (int i : missingCols) {
+                            final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataReadCache.this, i, index);
+                            final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
+                            if (cachedData != null) {
+                                datas[i] = cachedData;
+                            } else {
+                                final NullableReadData data = batch.get(i);
+                                m_cachedData.computeIfAbsent(ccUID, k -> new Object());
+                                m_globalCache.put(ccUID, data, m_evictor);
+                                datas[i] = data;
+                            }
+                        }
                     } catch (IOException e) {
                         throw new IllegalStateException("Exception while loading column data.", e);
                     }
                 }
-            });
+            }
+
+            return m_selection.createBatch(i -> datas[i]);
         }
 
         @Override
@@ -111,18 +138,18 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
     }
 
-    private final RandomAccessBatchReadable m_reabableDelegate;
+    private final RandomAccessBatchReadable m_readableDelegate;
 
     private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
 
     private Map<ColumnDataUniqueId, Object> m_cachedData = new ConcurrentHashMap<>();
 
     /**
-     * @param reabableDelegate the delegate from which to read in case of a cache miss
+     * @param readableDelegate the delegate from which to read in case of a cache miss
      * @param cache the cache for obtaining and storing data
      */
-    public ReadDataReadCache(final RandomAccessBatchReadable reabableDelegate, final SharedReadDataCache cache) {
-        m_reabableDelegate = reabableDelegate;
+    public ReadDataReadCache(final RandomAccessBatchReadable readableDelegate, final SharedReadDataCache cache) {
+        m_readableDelegate = readableDelegate;
         m_globalCache = cache.getCache();
     }
 
@@ -133,7 +160,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
     @Override
     public ColumnarSchema getSchema() {
-        return m_reabableDelegate.getSchema();
+        return m_readableDelegate.getSchema();
     }
 
     @Override
@@ -144,7 +171,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
             }
             m_cachedData.clear();
             m_cachedData = null;
-            m_reabableDelegate.close();
+            m_readableDelegate.close();
         }
     }
 }
