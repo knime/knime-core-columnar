@@ -103,13 +103,13 @@ public final class FilteredColumnSelection implements ColumnSelection {
 
         private final Map<Integer, NullableReadData> m_data;
 
-        private final int m_size;
+        private final int m_numColumns;
 
         private final int m_length;
 
-        FilteredReadBatch(final Map<Integer, NullableReadData> data, final int size) {
+        FilteredReadBatch(final Map<Integer, NullableReadData> data, final int numColumns) {
             m_data = data;
-            m_size = size;
+            m_numColumns = numColumns;
             m_length = data.values().stream().mapToInt(ReadData::length).max().orElse(0);
         }
 
@@ -122,9 +122,9 @@ public final class FilteredColumnSelection implements ColumnSelection {
             if (index < 0) {
                 throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
             }
-            if (index >= m_size) {
+            if (index >= m_numColumns) {
                 throw new IndexOutOfBoundsException(String
-                    .format("Column index %d larger then the batch's's number of columns (%d).", index, m_size - 1));
+                    .format("Column index %d larger then the batch's's number of columns (%d).", index, m_numColumns - 1));
             }
             throw new NoSuchElementException(
                 String.format("Data at index %d is not available in this filtered batch.", index));
@@ -143,7 +143,7 @@ public final class FilteredColumnSelection implements ColumnSelection {
          */
         @Override
         public NullableReadData[] getUnsafe() {
-            final NullableReadData[] data = new NullableReadData[m_size];
+            final NullableReadData[] data = new NullableReadData[m_numColumns];
             m_data.entrySet().stream().forEach(e -> data[e.getKey()] = e.getValue());
             return data;
         }
@@ -174,7 +174,7 @@ public final class FilteredColumnSelection implements ColumnSelection {
 
         @Override
         public int numData() {
-            return m_size;
+            return m_numColumns;
         }
 
     }
