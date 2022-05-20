@@ -103,9 +103,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 // either lose the unflushed, to-be-evicted data, because it will be released once evicted from the cache
                 // or we retain it and accept that we temporarily use up more off-heap memory than the cache allows
                 c.retain();
-                @SuppressWarnings("resource")
-                ReadDataCache store = (ReadDataCache)k.getReadable();
-                store.enqueueRunnable(c::release);
+                enqueueRunnable(c::release);
                 // We can easily get into this state when cancelling a node that writes a lot of data. A warning should
                 // therefore be sufficient here.
                 LOGGER.warn("{} Unflushed data evicted from cache. "
@@ -333,7 +331,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
         // the {@link CompletableFuture}s will still continue to be executed, hence we wait with
         // a latch that is counted down after everything else.
         final var closedLatch = new CountDownLatch(1);
-        m_future = m_future.thenRunAsync(closedLatch::countDown, m_executor);
+        enqueueRunnable(closedLatch::countDown);
         try {
             closedLatch.await();
         } catch (InterruptedException e) {
