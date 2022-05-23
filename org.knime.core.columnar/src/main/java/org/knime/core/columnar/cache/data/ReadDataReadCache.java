@@ -112,11 +112,12 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
                         final ReadBatch batch = reader.readRetained(index);
                         for (int i : missingCols) {
                             final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataReadCache.this, i, index);
+                            final NullableReadData data = batch.get(i);
                             final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
                             if (cachedData != null) {
+                                data.release();
                                 datas[i] = cachedData;
                             } else {
-                                final NullableReadData data = batch.get(i);
                                 m_cachedData.computeIfAbsent(ccUID, k -> new Object());
                                 m_globalCache.put(ccUID, data, m_evictor);
                                 datas[i] = data;

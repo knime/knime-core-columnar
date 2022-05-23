@@ -232,11 +232,12 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                         final ReadBatch batch = reader.readRetained(index);
                         for (int i : missingCols) {
                             final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, index);
+                            final NullableReadData data = batch.get(i);
                             final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
                             if (cachedData != null) {
+                                data.release();
                                 datas[i] = cachedData;
                             } else {
-                                final NullableReadData data = batch.get(i);
                                 m_cachedData.computeIfAbsent(ccUID, k -> new CountDownLatch(0));
                                 m_globalCache.put(ccUID, data, m_evictor);
                                 datas[i] = data;
