@@ -138,7 +138,7 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         m_store = builder.build();
         // Will return null if the builder did not include domain calculation.
         m_nullableDomainWritable = m_store.getDomainWritable();
-        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, null);
+        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, settings.isForceSynchronousIO() ? m_store : null);
 
         m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, m_writeCursor, m_store);
     }
