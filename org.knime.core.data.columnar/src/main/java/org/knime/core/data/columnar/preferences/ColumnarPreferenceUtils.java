@@ -192,6 +192,13 @@ public final class ColumnarPreferenceUtils {
         return 0L;
     }
 
+    /**
+     * @return the amount of free memory in bytes.
+     *
+     * Note: On Mac, this returns unuseable information because MacOS caches everything in RAM,
+     * even closed application etc. and calls this "cached" and not "free". So if a Mac has been running
+     * for some time, the amount of free memory will be pretty much zero.
+     */
     private static long getTotalFreeMemorySize() {
         try {
             return Math.max(((Long)ManagementFactory.getPlatformMBeanServer()
@@ -211,6 +218,13 @@ public final class ColumnarPreferenceUtils {
     static int getUsablePhysicalMemorySizeMB() {
         final long jvmMemory = (long)(getMaxHeapSize() * 1.25); // add 25% to heap size for GC, code cache, etc.
         final long totalUnreservedMemory = getTotalPhysicalMemorySize() - ((long)RESERVED_SIZE << 20);
+
+        // Because getTotalFreeMemorySize() is not reliable on Mac, we ignore the free memory
+        // size and return half of the remaining physical memory.
+        if (operatingSystemIsMac()) {
+            return (int)Math.min(Math.max(0, totalUnreservedMemory - jvmMemory) >> 20, Integer.MAX_VALUE) / 2;
+        }
+
         final long freeMemorySans1G = getTotalFreeMemorySize() - (1L << 30); // reserve 1 GB for other applications
 
         final long usablePhysicalMemory = Math.max(Math.min(totalUnreservedMemory - jvmMemory, freeMemorySans1G), 0L);
@@ -291,7 +305,15 @@ public final class ColumnarPreferenceUtils {
     public static synchronized SharedBatchWritableCache getSmallTableCache() {
         if (smallTableCache == null) {
             final long smallTableCacheSize = (long)getSmallTableCacheSize() << 20;
-            final long totalFreeMemorySize = getTotalFreeMemorySize();
+            long totalFreeMemorySize = getTotalFreeMemorySize();
+
+            if (operatingSystemIsMac()) {
+                // Because getTotalFreeMemorySize() is not reliable on Mac, we ignore the free memory
+                // size and rely on the usable physical memory size and hope that the OS clears the
+                // unused but cached things from the RAM if needed.
+                totalFreeMemorySize = ((long)getUsablePhysicalMemorySizeMB()) << 20;
+            }
+
             final int smallTableThreshold = (int)Math.min((long)getSmallTableThreshold() << 20, Integer.MAX_VALUE);
 
             if (smallTableCacheSize <= 0) {
@@ -319,14 +341,26 @@ public final class ColumnarPreferenceUtils {
         return useDefaults() ? COLUMN_DATA_CACHE_SIZE_DEF : COLUMNAR_STORE.getInt(COLUMN_DATA_CACHE_SIZE_KEY);
     }
 
+    private static boolean operatingSystemIsMac() {
+        String os = System.getProperty("os.name").toLowerCase();
+        return os.contains("mac");
+    }
+
     /**
      * @return the cache for storing general ReadData
      */
     public static synchronized SharedReadDataCache getColumnDataCache() {
         if (columnDataCache == null) {
             final long columnDataCacheSize = (long)getColumnDataCacheSize() << 20;
-            final long totalFreeMemorySize =
-                Math.max(getTotalFreeMemorySize() - getSmallTableCache().getCacheSize(), 0L);
+            final long smallTableCacheSize = getSmallTableCache().getCacheSize();
+            long totalFreeMemorySize = Math.max(getTotalFreeMemorySize() - smallTableCacheSize, 0L);
+
+            if (operatingSystemIsMac()) {
+                // Because getTotalFreeMemorySize() is not reliable on Mac, we ignore the free memory
+                // size and rely on the usable physical memory size and hope that the OS clears the
+                // unused but cached things from the RAM if needed.
+                totalFreeMemorySize = ((long)getUsablePhysicalMemorySizeMB()) << 20 - smallTableCacheSize;
+            }
 
             if (columnDataCacheSize <= 0) {
                 columnDataCache = new SharedReadDataCache(0, getNumThreads());
