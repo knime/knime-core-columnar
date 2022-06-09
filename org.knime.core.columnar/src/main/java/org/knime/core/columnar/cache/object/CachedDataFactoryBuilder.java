@@ -60,6 +60,7 @@ import org.knime.core.columnar.cache.object.CachedData.CachedDataFactory;
 import org.knime.core.columnar.cache.object.CachedData.CachedWriteData;
 import org.knime.core.columnar.cache.object.CachedStringData.CachedStringDataFactory;
 import org.knime.core.columnar.cache.object.CachedStructData.CachedStructDataFactory;
+import org.knime.core.columnar.cache.object.CachedVarBinaryData.CachedVarBinaryDataFactory;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -67,6 +68,7 @@ import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
+import org.knime.core.table.schema.VarBinaryDataSpec;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.ListDataTraits;
 import org.knime.core.table.schema.traits.StructDataTraits;
@@ -130,10 +132,9 @@ final class CachedDataFactoryBuilder {
         if (spec instanceof StringDataSpec) {
             return new CachedStringDataFactory(m_persistExecutor, m_unclosedData, m_cacheManager,
                 m_serializationExecutor, m_serializationLatch);
-            // TODO enable caching of VarBinary once AP-19045 is fixed
-//        } else if (spec instanceof VarBinaryDataSpec) {
-//            return new CachedVarBinaryDataFactory(m_persistExecutor, m_unclosedData, m_cacheManager,
-//                m_serializationExecutor, m_serializationLatch);
+        } else if (spec instanceof VarBinaryDataSpec) {
+            return new CachedVarBinaryDataFactory(m_persistExecutor, m_unclosedData, m_cacheManager,
+                m_serializationExecutor, m_serializationLatch);
         } else if (spec instanceof StructDataSpec) {
             var structSpec = (StructDataSpec)spec;
             var structTraits = (StructDataTraits)traits;
