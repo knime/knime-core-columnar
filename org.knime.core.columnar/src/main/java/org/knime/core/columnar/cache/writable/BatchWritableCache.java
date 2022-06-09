@@ -285,7 +285,10 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
 
     @Override
     public synchronized void close() throws IOException {
-        m_globalCache.remove(BatchWritableCache.this);
+        final ReadBatches removed = m_globalCache.removeRetained(BatchWritableCache.this);
+        if (removed != null) {
+            removed.release();
+        }
         m_readableDelegate.close();
     }
 

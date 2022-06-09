@@ -391,7 +391,10 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 }
             }
 
-            m_globalCache.remove(ccUID);
+            final var data = m_globalCache.removeRetained(ccUID);
+            if (data != null) {
+                data.release();
+            }
         }
     }
 

@@ -168,11 +168,15 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
     public synchronized void close() throws IOException {
         if (m_cachedData != null) {
             for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
-                m_globalCache.remove(id);
+                final NullableReadData removed = m_globalCache.removeRetained(id);
+                if (removed != null) {
+                    removed.release();
+                }
             }
             m_cachedData.clear();
             m_cachedData = null;
             m_readableDelegate.close();
         }
     }
+
 }
