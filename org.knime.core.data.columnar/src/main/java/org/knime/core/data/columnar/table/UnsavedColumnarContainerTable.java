@@ -129,12 +129,6 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     }
 
     @Override
-    public void close() {
-        clear();
-        super.close();
-    }
-
-    @Override
     public void clear() {
         super.clear();
         @SuppressWarnings("resource") // Store's life cycle is handled by super class.
