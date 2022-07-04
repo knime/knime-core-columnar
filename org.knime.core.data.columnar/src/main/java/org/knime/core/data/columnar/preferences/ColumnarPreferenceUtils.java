@@ -359,7 +359,7 @@ public final class ColumnarPreferenceUtils {
                 // Because getTotalFreeMemorySize() is not reliable on Mac, we ignore the free memory
                 // size and rely on the usable physical memory size and hope that the OS clears the
                 // unused but cached things from the RAM if needed.
-                totalFreeMemorySize = ((long)getUsablePhysicalMemorySizeMB()) << 20 - smallTableCacheSize;
+                totalFreeMemorySize = (((long)getUsablePhysicalMemorySizeMB()) << 20) - smallTableCacheSize;
             }
 
             if (columnDataCacheSize <= 0) {
