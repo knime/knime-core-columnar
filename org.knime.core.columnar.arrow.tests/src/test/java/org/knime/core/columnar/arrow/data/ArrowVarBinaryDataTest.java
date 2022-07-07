@@ -51,12 +51,20 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.Random;
 
+import org.junit.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
+import org.knime.core.table.io.ReadableDataInputStream;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  * Test {@link ArrowVarBinaryData}
@@ -122,5 +130,41 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
         final byte[] bytes = new byte[random.nextInt(MAX_LENGTH)];
         random.nextBytes(bytes);
         return bytes;
+    }
+
+    /**
+     * Test three different ways to serialize and deserialize bytes: 1. using the setBytes()/getBytes() methods, 2.
+     * using setObject/getObject with simple serializers, and 3. by serializing from/to a byte buffer and writing those
+     * bytes to the ArrowVarBinaryWriteData.
+     *
+     * @throws IOException
+     */
+    @Test
+    public void testByteArraySerialization() throws IOException {
+        final int numValues = 3;
+        ArrowVarBinaryWriteData data = createWrite(numValues);
+        byte[] blob = "TestData".getBytes();
+
+        ObjectSerializer<byte[]> serializer = (out, v) -> out.write(v);
+        ObjectDeserializer<byte[]> deserializer = (in) -> in.readBytes();
+
+        data.setBytes(0, blob);
+        data.setObject(1, blob, serializer);
+        var outStream = new ByteArrayOutputStream();
+        serializer.serialize(new DataOutputStream(outStream), blob);
+        data.setBytes(2, outStream.toByteArray());
+
+        ArrowVarBinaryReadData readData = data.close(numValues);
+        try {
+            for (int i = 0; i < numValues; i++) {
+                assertArrayEquals(blob, readData.getBytes(i));
+                assertArrayEquals(blob, readData.getObject(i, deserializer));
+                byte[] deserializedFromBytes = deserializer
+                    .deserialize(new ReadableDataInputStream(new ByteArrayInputStream(readData.getBytes(i))));
+                assertArrayEquals(blob, deserializedFromBytes);
+            }
+        } finally {
+            readData.release();
+        }
     }
 }
