@@ -142,11 +142,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private final AtomicBoolean m_closed = new AtomicBoolean();
 
-    private static final int BATCH_SIZE = 100;
+    private final int m_batchSize;
 
-    private long m_curBatchIdx = 0;
+    private long m_curBatchIdx;
 
-    private List<DataRow> m_curBatch = new ArrayList<>(BATCH_SIZE);
+    private List<DataRow> m_curBatch;
 
     /**
      * The index of the pending batch, i.e., the index of the next batch that has to be forwarded to the {@link Buffer}.
@@ -178,11 +178,15 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private ContainerTable m_containerTable;
 
-    ColumnarDataContainerDelegate(final DataTableSpec spec, final ColumnarRowContainer container) {
+    ColumnarDataContainerDelegate(final DataTableSpec spec, final ColumnarRowContainer container, final ColumnarRowWriteTableSettings settings) {
         m_delegateContainer = container;
         m_delegateCursor = container.createCursor();
         m_spec = spec;
         m_numColumns = m_spec.getNumColumns();
+
+        m_batchSize = settings.getRowBatchSize();
+        m_curBatchIdx = 0;
+        m_curBatch = new ArrayList<>(m_batchSize);
     }
 
     @Override
@@ -222,7 +226,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         // TODO handle low memory
 
         m_curBatch.add(row);
-        if (m_curBatch.size() == BATCH_SIZE) {
+        if (m_curBatch.size() == m_batchSize) {
             try {
                 submit();
             } catch (InterruptedException ex) {
@@ -268,7 +272,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         final var batch = m_curBatch;
         ASYNC_EXECUTORS.execute(new ContainerRunnable(batch, m_curBatchIdx++));
         // reset batch
-        m_curBatch = new ArrayList<>(BATCH_SIZE);
+        m_curBatch = new ArrayList<>(m_batchSize);
     }
 
     @Override

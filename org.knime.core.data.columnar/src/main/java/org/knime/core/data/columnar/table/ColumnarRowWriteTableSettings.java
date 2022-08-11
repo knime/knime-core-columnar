@@ -71,6 +71,9 @@ public final class ColumnarRowWriteTableSettings {
 
     private final boolean m_useCaching;
 
+    /** The amount of rows to be processed by a single thread when not forced to handle rows sequentially. */
+    private final int m_rowBatchSize;
+
     /**
      * @param initializeDomains if {@code true}, domains will be initialized via domain values provided through an
      *            incoming {@link DataTableSpec}.
@@ -78,10 +81,12 @@ public final class ColumnarRowWriteTableSettings {
      * @param checkDuplicateRowKeys whether to check for duplicates among row keys.
      * @param forceSynchronousIO whether writing a new row to the table should block until all previously written rows
      *            have been persisted.
+     * @param rowRatchSize number of rows to be processed by a single thread when not forced to handle rows
+     *            sequentially.
      */
     public ColumnarRowWriteTableSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
-        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO) {
-        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO);
+        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO, final int rowRatchSize) {
+        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO, rowRatchSize);
     }
 
     /**
@@ -99,12 +104,14 @@ public final class ColumnarRowWriteTableSettings {
      *            (disk-based) interprocess communication where in-memory caching does not provide any benefits.
      * @param forceSynchronousIO whether writing a new row to the table should block until all previously written rows
      *            have been persisted.
+     * @param rowRatchSize number of rows to be processed by a single thread when not forced to handle rows
+     *            sequentially.
      * @throws IllegalArgumentException When both {@code initializeDomains} and {@code calculateDomains} are
      *             {@code false}.
      */
     public ColumnarRowWriteTableSettings(final boolean initializeDomains, final boolean calculateDomains,
         final int maxPossibleNominalDomainValues, final boolean checkDuplicateRowKeys, final boolean useCaching,
-        final boolean forceSynchronousIO) {
+        final boolean forceSynchronousIO, final int rowRatchSize) {
         if (!initializeDomains && !calculateDomains) {
             throw new IllegalArgumentException("initializeDomains and calculateDomains cannot both be false.");
         }
@@ -114,6 +121,7 @@ public final class ColumnarRowWriteTableSettings {
         m_checkDuplicateRowKeys = checkDuplicateRowKeys;
         m_useCaching = useCaching;
         m_forceSynchronousIO = forceSynchronousIO;
+        m_rowBatchSize = rowRatchSize;
     }
 
     boolean isInitializeDomains() {
@@ -138,5 +146,14 @@ public final class ColumnarRowWriteTableSettings {
 
     boolean isForceSynchronousIO() {
         return m_forceSynchronousIO;
+    }
+
+    /**
+     * Returns the amount of rows to be processed by a single thread when not forced to handle rows sequentially.
+     *
+     * @return the row batch size
+     */
+    public int getRowBatchSize() {
+        return m_rowBatchSize;
     }
 }

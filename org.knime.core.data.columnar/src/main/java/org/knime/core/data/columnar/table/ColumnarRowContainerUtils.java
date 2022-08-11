@@ -95,7 +95,7 @@ public final class ColumnarRowContainerUtils {
     public static DataContainerDelegate create(final int tableId, final ColumnarValueSchema schema,
         final ColumnarRowWriteTableSettings settings) throws Exception {
         return new ColumnarDataContainerDelegate(schema.getSourceSpec(),
-            createInternal(null, tableId, schema, settings));
+            createInternal(null, tableId, schema, settings), settings);
     }
 
     private static ColumnarRowContainer createInternal(final ExecutionContext context, final int tableId,
