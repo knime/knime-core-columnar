@@ -71,7 +71,6 @@ import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
-import org.knime.core.node.KNIMEConstants;
 import org.knime.core.node.workflow.NodeContext;
 
 /**
@@ -84,39 +83,8 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private static final int MAX_NUM_THREADS;
 
-    /**
-     * The cache size for asynchronous table writing. It's the number of rows that are kept in memory before handing it
-     * to the writer routines. The default value can be changed using the java property
-     * {@link KNIMEConstants#PROPERTY_ASYNC_WRITE_CACHE_SIZE}.
-     *
-     * @deprecated access via {@link DataContainerSettings#getDefault()}
-     */
-    @Deprecated
-    static final int ASYNC_CACHE_SIZE;
-
-    /**
-     * Whether to use synchronous IO while adding rows to a buffer or reading from an file iterator. The default value
-     * can be changed by setting the appropriate java property {@link KNIMEConstants#PROPERTY_SYNCHRONOUS_IO} at
-     * startup.
-     *
-     * @deprecated access via {@link DataContainerSettings#getDefault()}
-     */
-    @Deprecated
-    static final boolean SYNCHRONOUS_IO;
-
-    /**
-     * The default value for initializing the domain.
-     *
-     * @deprecated access via {@link DataContainerSettings#getDefault()}
-     */
-    @Deprecated
-    static final boolean INIT_DOMAIN;
-
     static {
         final DataContainerSettings defaults = DataContainerSettings.getDefault();
-        ASYNC_CACHE_SIZE = defaults.getRowBatchSize();
-        SYNCHRONOUS_IO = defaults.isForceSequentialRowHandling();
-        INIT_DOMAIN = defaults.getInitializeDomain();
         ASYNC_EXECUTORS = new ThreadPoolExecutor(defaults.getMaxContainerThreads(), defaults.getMaxContainerThreads(),
             10L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), new ThreadFactory() {
                 private final AtomicLong m_threadCount = new AtomicLong();
