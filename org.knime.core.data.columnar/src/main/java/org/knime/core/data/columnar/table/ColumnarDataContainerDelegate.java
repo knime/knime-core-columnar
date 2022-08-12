@@ -45,11 +45,11 @@
  */
 package org.knime.core.data.columnar.table;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
@@ -57,21 +57,20 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.commons.lang3.mutable.MutableLong;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.container.BlobSupportDataRow;
 import org.knime.core.data.container.Buffer;
 import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
+import org.knime.core.data.container.DataContainerException;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.workflow.NodeContext;
+import org.knime.core.util.DuplicateKeyException;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -110,29 +109,31 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private final AtomicBoolean m_closed = new AtomicBoolean();
 
+
+
+    /**
+     * TODO (TP) javadoc
+     */
+    private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
+
+    /**
+     * Whether this container handles rows synchronously (as opposed to collecting and submitting batches).
+     */
+    private final boolean m_forceSynchronousIO;
+
+    /** The size of each batch submitted to the {@link #ASYNC_EXECUTORS} service. */
     private final int m_batchSize;
 
-    private long m_curBatchIdx;
-
     private List<DataRow> m_curBatch;
-
-    /**
-     * The index of the pending batch, i.e., the index of the next batch that has to be forwarded to the {@link Buffer}.
-     */
-    private final MutableLong m_pendingBatchIdx = new MutableLong();
-
-    /** The write throwable indicating that asynchronous writing failed. */
-    private AtomicReference<Throwable> m_writeThrowable = new AtomicReference<>();
-
-    /**
-     * Semaphore used to block the container until all {@link #m_maxNumThreads} {@link ContainerRunnable} are finished.
-     */
-    private final Semaphore m_numActiveContRunnables = new Semaphore(ASYNC_EXECUTORS.getMaximumPoolSize());
 
     /**
      * Semaphore used to block the producer in case that we have more than {@link #m_maxNumThreads} batches waiting to
      * be handed over to the {@link Buffer}.
      */
+    // TODO (TP) should this be initialized to something else???
+    //      BufferedDataContainerDelegate:
+    //            m_maxNumThreads = Math.min(settings.getMaxThreadsPerContainer(), ASYNC_EXECUTORS.getMaximumPoolSize());
+    //            m_numActiveContRunnables = new Semaphore(m_maxNumThreads);
     private final Semaphore m_numPendingBatches = new Semaphore(ASYNC_EXECUTORS.getMaximumPoolSize());
 
     private long m_size;
@@ -145,8 +146,9 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         m_spec = spec;
         m_numColumns = m_spec.getNumColumns();
 
+
+        m_forceSynchronousIO = settings.isForceSynchronousIO();
         m_batchSize = settings.getRowBatchSize();
-        m_curBatchIdx = 0;
         m_curBatch = new ArrayList<>(m_batchSize);
     }
 
@@ -164,6 +166,41 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     @Override
     public void setMaxPossibleValues(final int maxPossibleValues) { // NOSONAR
         m_delegateContainer.setMaxPossibleValues(maxPossibleValues);
+    }
+
+    /**
+     * Checks if any of the {@link ContainerRunnable} threw an exception.
+     */
+    private void checkAsyncWriteThrowable() {
+        if (m_future.isCompletedExceptionally()) {
+            waitForAndHandleFuture();
+        }
+    }
+
+    private void waitForAndHandleFuture() {
+        try {
+            m_future.get();
+        } catch (ExecutionException e) {
+            throw wrap(e.getCause());
+        } catch (CancellationException | InterruptedException e) {
+            throw wrap(e);
+        }
+    }
+
+    private static RuntimeException wrap(final Throwable t) {
+        final StringBuilder error = new StringBuilder();
+        if (t.getMessage() != null) {
+            error.append(t.getMessage());
+        } else {
+            error.append("Writing to table process threw \"");
+            error.append(t.getClass().getSimpleName()).append("\"");
+        }
+        if (t instanceof DuplicateKeyException) {
+            // self-causation not allowed
+            return new DuplicateKeyException((DuplicateKeyException)t);
+        } else {
+            return new DataContainerException(error.toString(), t);
+        }
     }
 
     @Override
@@ -184,22 +221,41 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
          * been added. Here, this is done asynchronously and taken care of by the delegate ColumnarRowContainer and its
          * underlying DomainColumnStore. */
 
+        // TODO (TP): handle synchronous writing (if isForceSynchronousIO)
+
+        // TODO (TP): handle close(), clear() ??
+
         // TODO handle low memory
+
+        checkAsyncWriteThrowable();
 
         m_curBatch.add(row);
         if (m_curBatch.size() == m_batchSize) {
             try {
                 submit();
-            } catch (InterruptedException ex) {
-                // FIXME ...
-                throw new IllegalStateException(ex);
+            } catch (InterruptedException e) {
+                throw wrap(e);
             }
         }
 
-//        writeRowIntoCursor(row);
         m_size++;
     }
 
+    // TODO (TP):
+    //   writeRowIntoCursor is approx equivalent to BufferedDataContainerDelegate.addRowToTableSynchronously()
+    //   - add isMemoryLow() handling (?) ==> Probably not? This is done at a lower level hopefully?
+    //
+    //    /**
+    //     * Adds the row to the table in a synchronous manner and reacts to memory alerts.
+    //     *
+    //     * @param row the row to be synchronously processed
+    //     */
+    //    private void addRowToTableSynchronously(final DataRow row) {
+    //        if (MemoryAlertSystem.getInstanceUncollected().isMemoryLow()) {
+    //            m_buffer.flushBuffer();
+    //        }
+    //        addRowToTableWrite(row);
+    //    }
     private void writeRowIntoCursor(final DataRow row) {
         final RowWrite rowWrite = m_delegateCursor.forward();
         rowWrite.setRowKey(row.getKey());
@@ -216,22 +272,14 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     /**
      * Submits the current batch to the {@link #ASYNC_EXECUTORS} service.
      *
-     * @throws InterruptedException if an interrupted occured
+     * @throws InterruptedException if interrupted while waiting for space in the pending-batches queue
      */
     private void submit() throws InterruptedException {
         // wait until we are allowed to submit a new runnable
         m_numPendingBatches.acquire();
-        m_numActiveContRunnables.acquire();
-        // poll can only return null if we never had #nThreads ContainerRunnables at the same
-        // time queued for execution or none of the already submitted Runnables has already finished
-        // it's computation
-//        DataTableDomainCreator domainCreator = m_domainUpdaterPool.poll();
-//        if (domainCreator == null) {
-//            domainCreator = new DataTableDomainCreator(m_domainCreator);
-//            domainCreator.setMaxPossibleValues(m_domainCreator.getMaxPossibleValues());
-//        }
-        final var batch = m_curBatch;
-        ASYNC_EXECUTORS.execute(new ContainerRunnable(batch, m_curBatchIdx++));
+
+        m_future = m_future.thenRunAsync(new ContainerRunnable(m_curBatch), ASYNC_EXECUTORS);
+
         // reset batch
         m_curBatch = new ArrayList<>(m_batchSize);
     }
@@ -256,13 +304,10 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     private void submitLastBatchAndWait() {
         try {
             submit();
-            m_numActiveContRunnables.acquire(MAX_NUM_THREADS);
-            m_numActiveContRunnables.release(MAX_NUM_THREADS);
-        } catch (InterruptedException ex) {
-            // FIXME
-            throw new IllegalStateException(ex);
+            waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            throw wrap(e);
         }
-
     }
 
     @Override
@@ -277,16 +322,10 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         }
     }
 
-    /** Map storing those rows that still need to be forwarded to the {@link Buffer}. */
-    private final Map<Long, List<DataRow>> m_pendingBatchMap = new ConcurrentHashMap<>();
-
     private final class ContainerRunnable implements Runnable {
 
         /** The batch of rows to be processed. */
         private final List<DataRow> m_rows;
-
-        /** The current batch index. */
-        private final long m_batchIdx;
 
         private final NodeContext m_nodeContext;
 
@@ -297,9 +336,8 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
          * @param rows the batch of rows to be processed
          * @param batchIdx the batch index
          */
-        ContainerRunnable(final List<DataRow> rows, final long batchIdx) {
+        ContainerRunnable(final List<DataRow> rows) {
             m_rows = rows;
-            m_batchIdx = batchIdx;
             /**
              * The node context may be null if the DataContainer has been created outside of a node's context (e.g., in
              * unit tests). This is also the reason why this class does not extend the RunnableWithContext class.
@@ -311,73 +349,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         public final void run() {
             NodeContext.pushContext(m_nodeContext);
             try {
-                if (m_writeThrowable.get() == null) {
-                    boolean addRows;
-                    synchronized (m_pendingBatchIdx) {
-                        addRows = m_batchIdx == m_pendingBatchIdx.longValue();
-                        if (!addRows) {
-                            m_pendingBatchMap.put(m_batchIdx, m_rows);
-                        }
-                    }
-                    if (addRows) {
-                        addRows(m_rows);
-                        m_numPendingBatches.release();
-                        while (isNextPendingBatchExistent()) {
-                            addRows(m_pendingBatchMap.remove(m_pendingBatchIdx.longValue()));
-                            m_numPendingBatches.release();
-                        }
-                    }
-
-                }
-            } catch (final Throwable t) {
-                m_writeThrowable.compareAndSet(null, t);
-                // Potential deadlock cause by the following scenario.
-                // Initial condition:
-                //      1. ContainerRunnables:
-                //          1.1 The max number of container runnables are submitted to the pool
-                //          1.2 No batch has been handed over to the buffer (m_numPendingBatches no available permits)
-                //      2. Producer:
-                //          2.1. Hasn't seen an exception so far wants to submit another batch and tries to acquire a
-                //              permit from m_numPendingBatches
-                //      3. The container runnable whose index equals the current pending batch index crashes before
-                //          it can hand anything to the buffer and finally give its permit back to m_numPendingBatches
-                // Result: The producer waits forever to acquire a permit from m_numPendingBatches. Hence, we have to
-                //          release at least one permit here
-                // Note: The producer will submit another ContainerRunnable, however this will do nothing as
-                //          m_writeThrowable.get != null
-                if (m_batchIdx == m_pendingBatchIdx.longValue()) {
-                    m_numPendingBatches.release();
-                }
+                m_rows.forEach(r -> writeRowIntoCursor(r));
             } finally {
-                m_numActiveContRunnables.release();
                 NodeContext.removeLastContext();
+                m_numPendingBatches.release();
             }
         }
-
-        /**
-         * Forwards the given list of {@link BlobSupportDataRow} to the buffer
-         *
-         * @param blobRows the rows to be forwarded to the buffer
-         * @throws IOException - if the buffer cannot write the rows to disc
-         */
-        private void addRows(final List<DataRow> rows) throws IOException {
-            rows.forEach(r -> writeRowIntoCursor(r));
-        }
-
-        /**
-         * Checks whether there is another batch of {@link BlobSupportDataRow} existent that has to be forwarded to the
-         * buffer.
-         *
-         * @return {@code true} if another batch has to be forwarded to the buffer, {@code false} otherwise
-         *
-         */
-        private boolean isNextPendingBatchExistent() {
-            synchronized (m_pendingBatchIdx) {
-                m_pendingBatchIdx.increment();
-                return m_pendingBatchMap.containsKey(m_pendingBatchIdx.longValue());
-            }
-        }
-
     }
-
 }
