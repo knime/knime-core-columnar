@@ -47,6 +47,7 @@ package org.knime.core.data.columnar.table;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -105,9 +106,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private final ColumnarRowContainer m_delegateContainer;
 
-    private final AtomicBoolean m_cleared = new AtomicBoolean();
+    private boolean m_closed = false;
 
-    private final AtomicBoolean m_closed = new AtomicBoolean();
+    private boolean m_cleared = false;
+
+    private AtomicBoolean m_async_abort = new AtomicBoolean(false);
 
 
 
@@ -145,8 +148,6 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         m_delegateCursor = container.createCursor();
         m_spec = spec;
         m_numColumns = m_spec.getNumColumns();
-
-
         m_forceSynchronousIO = settings.isForceSynchronousIO();
         m_batchSize = settings.getRowBatchSize();
         m_curBatch = new ArrayList<>(m_batchSize);
@@ -205,40 +206,37 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     @Override
     public void addRowToTable(final DataRow row) {
-//        Objects.requireNonNull(row);
+        Objects.requireNonNull(row);
+        if (m_closed) {
+            throw new IllegalStateException("Container delegate has already been closed.");
+        }
+
 //        if (row.getNumCells() != m_numColumns) {
 //            throw new IllegalArgumentException(
 //                String.format("Cell count in row \"%s\" is not equal to length of column names array: %d vs. %d",
 //                    row.getKey().toString(), row.getNumCells(), m_spec.getNumColumns()));
 //        }
-//        if (m_closed.get() && !m_closing.get()) {
-//            throw new IllegalStateException("Container delegate has already been closed.");
-//        }
-//        if (m_cleared.get()) {
-//            throw new IllegalStateException("Container delegate has already been cleared.");
-//        }
         /* As per contract, this method should also throw an unchecked DuplicateKeyException if a row's key has already
          * been added. Here, this is done asynchronously and taken care of by the delegate ColumnarRowContainer and its
          * underlying DomainColumnStore. */
 
-        // TODO (TP): handle synchronous writing (if isForceSynchronousIO)
-
-        // TODO (TP): handle close(), clear() ??
-
         // TODO handle low memory
 
-        checkAsyncWriteThrowable();
-
-        m_curBatch.add(row);
-        if (m_curBatch.size() == m_batchSize) {
-            try {
-                submit();
-            } catch (InterruptedException e) {
-                throw wrap(e);
-            }
+        if (m_forceSynchronousIO) {
+            writeRowIntoCursor(row);
+        } else {
+            addRowToTableAsynchronously(row);
         }
 
         m_size++;
+    }
+
+    private void addRowToTableAsynchronously(final DataRow row) {
+        checkAsyncWriteThrowable();
+        m_curBatch.add(row);
+        if (m_curBatch.size() == m_batchSize) {
+            submit();
+        }
     }
 
     // TODO (TP):
@@ -270,13 +268,21 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     }
 
     /**
-     * Submits the current batch to the {@link #ASYNC_EXECUTORS} service.
+     * Submits the current batch to the {@link #ASYNC_EXECUTORS} service (unless the current batch is empty).
      *
      * @throws InterruptedException if interrupted while waiting for space in the pending-batches queue
      */
-    private void submit() throws InterruptedException {
+    private void submit() {
+        if (m_curBatch.isEmpty()) {
+            return;
+        }
+
         // wait until we are allowed to submit a new runnable
-        m_numPendingBatches.acquire();
+        try {
+            m_numPendingBatches.acquire();
+        } catch (InterruptedException e) {
+            throw wrap(e);
+        }
 
         m_future = m_future.thenRunAsync(new ContainerRunnable(m_curBatch), ASYNC_EXECUTORS);
 
@@ -286,7 +292,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     @Override
     public ContainerTable getTable() {
-        if (!m_closed.get()) {
+        if (!m_closed) {
             throw new IllegalStateException("getTable() can only be called after close() was called.");
         }
         return m_containerTable;
@@ -294,28 +300,26 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     @Override
     public void close() {
-        if (!m_closed.getAndSet(true)) {
-            submitLastBatchAndWait();
+        if (!m_closed) {
+            m_closed = true;
+            submit(); // submit the last batch
+            waitForAndHandleFuture();
             m_containerTable = m_delegateContainer.finishInternal();
             m_delegateCursor.close();
         }
     }
 
-    private void submitLastBatchAndWait() {
-        try {
-            submit();
-            waitForAndHandleFuture();
-        } catch (InterruptedException e) {
-            throw wrap(e);
-        }
-    }
-
     @Override
     public void clear() {
-        if (!m_cleared.getAndSet(true)) {
-            if (m_containerTable != null) {
+        if (!m_cleared) {
+            m_cleared = true;
+            if (m_closed) {
                 m_containerTable.clear();
             } else {
+                m_async_abort.set(true);
+                m_closed = true;
+                m_curBatch = null; // discard the last batch
+                waitForAndHandleFuture();
                 m_delegateCursor.close();
                 m_delegateContainer.close();
             }
@@ -347,6 +351,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
         @Override
         public final void run() {
+            if (m_async_abort.get()) {
+                // clear() was called. Don't write anything anymore.
+                return;
+            }
+
             NodeContext.pushContext(m_nodeContext);
             try {
                 m_rows.forEach(r -> writeRowIntoCursor(r));
