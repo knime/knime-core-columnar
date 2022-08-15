@@ -67,6 +67,7 @@ import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerException;
 import org.knime.core.data.container.DataContainerSettings;
+import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
@@ -106,13 +107,14 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private final ColumnarRowContainer m_delegateContainer;
 
+    /** Flag indicating the memory state. */
+    private boolean m_memoryLowState;
+
     private boolean m_closed = false;
 
     private boolean m_cleared = false;
 
     private AtomicBoolean m_async_abort = new AtomicBoolean(false);
-
-
 
     /**
      * TODO (TP) javadoc
@@ -204,6 +206,15 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         }
     }
 
+    /**
+     * TODO (TP) revise javadoc
+     *
+     * Adds the row to the table in a asynchronous/synchronous manner depending on the current memory state, see
+     * {@link #m_memoryLowState}. Whenever we change into a low memory state we flush everything to disk and wait for
+     * all {@link ContainerRunnable} to finish their execution, while blocking the data producer.
+     *
+     * @param row the row to be asynchronously processed
+     */
     @Override
     public void addRowToTable(final DataRow row) {
         Objects.requireNonNull(row);
@@ -220,23 +231,24 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
          * been added. Here, this is done asynchronously and taken care of by the delegate ColumnarRowContainer and its
          * underlying DomainColumnStore. */
 
-        // TODO handle low memory
+        if (MemoryAlertSystem.getInstanceUncollected().isMemoryLow()) {
+            // When a low memory state occurs in consecutive addRowToTable calls, only the first time we need to flush
+            if (!m_memoryLowState) {
+                m_memoryLowState = true;
+                submit();
+                waitForAndHandleFuture();
+            }
+        } else {
+            m_memoryLowState = false;
+        }
 
-        if (m_forceSynchronousIO) {
+        if (m_forceSynchronousIO || m_memoryLowState) {
             writeRowIntoCursor(row);
         } else {
             addRowToTableAsynchronously(row);
         }
 
         m_size++;
-    }
-
-    private void addRowToTableAsynchronously(final DataRow row) {
-        checkAsyncWriteThrowable();
-        m_curBatch.add(row);
-        if (m_curBatch.size() == m_batchSize) {
-            submit();
-        }
     }
 
     // TODO (TP):
@@ -264,6 +276,14 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
             } else {
                 rowWrite.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
             }
+        }
+    }
+
+    private void addRowToTableAsynchronously(final DataRow row) {
+        checkAsyncWriteThrowable();
+        m_curBatch.add(row);
+        if (m_curBatch.size() == m_batchSize) {
+            submit();
         }
     }
 
