@@ -72,6 +72,7 @@ import org.knime.core.data.util.memory.MemoryAlertSystem;
  * RowIterator that uses a thread pool to asynchronously prefetch rows.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+ * @author Tobias Pietzsch
  */
 public final class PrefetchingRowIterator extends CloseableRowIterator {
 
@@ -87,10 +88,24 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
 
     private final CloseableRowIterator m_source;
 
+    /**
+     * How many rows to prefetch in one batch.
+     */
     private final int m_batchSize;
 
+    /**
+     * How many batches to prefetch ahead (at most)
+     */
     private final int m_queueSize;
 
+    /**
+     * A prefetched batch, comprising an array of prefetched {@code rows} and a {@code isLastBatch} flag.
+     * {@code isLastBatch==true} indicates that this is the last prefetched batch. This will happen if either
+     * <ul>
+     * <li>the source iterator is exhausted, or</li>
+     * <li>a low-momory alert occured, in which case ther are more source rows but we stop prefetching</li>
+     * </ul>
+     */
     private static final class RowBatch {
         final DataRow[] rows;
 
@@ -102,33 +117,57 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
         }
     }
 
+    /**
+     * The queue of prefetched {@code RowBatch}es
+     */
     private final BlockingDeque<RowBatch> m_batchQueue;
 
+    /**
+     * This flag is set when a memory alert occurs. The async runnables will stop prefetching and enqueue the what it has
+     * loaded so far, indicating that this is the last batch.
+     */
     private final AtomicBoolean m_lowMemory = new AtomicBoolean(false);
 
+    /**
+     * This flag is set in {@link #close()}. The async runnables will abort when it sees this, making sure that
+     * {@code m_future} completes ASAP. {@link #close()} waits {@code m_future} before closing the source to make sure
+     * that all async accesses are complete.
+     */
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
     private final MemoryAlertListener m_memListener;
 
     /**
-     * TODO (TP) javadoc
+     * Represents the completion of all pending {@link #prefetchBatch()} runnables. New {@link #prefetchBatch()}
+     * runnables are appended using {@code thenRunAsync(...)}.
      */
     private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
+    /**
+     * The current {@code RowBatch} that was taken off the {@code m_batchQueue} and is now being served by
+     * {@link #next()}.
+     */
     private RowBatch m_currentBatch;
 
-    // switch to synchronous iteration caused by low memory or because source is exhausted
+    /**
+     * The index of the current row in the current {@code m_currentBatch}.
+     */
+    private int m_currentIndex = -1;
+
+    /**
+     * Indicates that all pending {@code RowBatch}es have been served by {@link #next()} (and we have stopped to
+     * prefetch). We are now switching to directly serve values from the source iterator (if any are left).
+     */
     private boolean m_sync = false;
 
     private DataRow m_currentRow;
 
-    private int m_currentIndex = -1;
-
     public PrefetchingRowIterator(final CloseableRowIterator source) {
         m_source = source;
 
-        m_batchSize = 100; // TODO (TP)
-        m_queueSize = 3; // TODO (TP)
+        m_batchSize = 100; // TODO this should come from NodeSettings or similar?
+        m_queueSize = 3; // TODO this should come from NodeSettings or similar?
+
         m_batchQueue = new LinkedBlockingDeque<>(m_queueSize);
 
         m_memListener = new MemoryAlertListener() {
@@ -148,10 +187,17 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
         }
     }
 
+    /**
+     * Enqueue a task for fetching one (and only one) RowBatch.
+     */
     private void enqueuePrefetchBatch() {
         m_future = m_future.thenRunAsync(() -> prefetchBatch(), EXECUTOR);
     }
 
+    /**
+     * Prefetch and enqueue the next RowBatch.
+     * (Run asynchronously via {{@link #enqueuePrefetchBatch()}.)
+     */
     private void prefetchBatch() {
         final DataRow[] rows = new DataRow[ m_batchSize ];
         for (int i = 0; i < m_batchSize; ++i) {
@@ -172,6 +218,12 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
         m_batchQueue.add(new RowBatch(rows, false));
     }
 
+    /**
+     * Return the next row in {@code m_currentRow} (or {@code null} if there is no next row). The row is either taken
+     * from RowBatches from {@code m_batchQueue}, or directly from {@code m_source} if prefetching has ended.
+     *
+     * @return the next row
+     */
     private DataRow getNextRow() {
         if (m_sync) {
             return m_source.hasNext() ? m_source.next() : null;
@@ -192,7 +244,6 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
         if (m_currentIndex < rows.length) {
             return rows[m_currentIndex++];
         } else {
-            // end of current batch
             if (m_currentBatch.isLastBatch) {
                 m_sync = true;
             }
@@ -238,6 +289,10 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
         }
     }
 
+    /**
+     * Wait for {@code m_future} to complete (normally or exceptionally).
+     * Rethrow exceptions.
+     */
     private void waitForAndHandleFuture() {
         try {
             m_future.get();

@@ -62,7 +62,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.container.Buffer;
 import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerException;
@@ -76,6 +75,7 @@ import org.knime.core.util.DuplicateKeyException;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Tobias Pietzsch
  */
 final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
@@ -114,10 +114,17 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private boolean m_cleared = false;
 
+    /**
+     * {@link ContainerRunnable}s abort when they see that this flag is {@code true}.
+     * <p>
+     * The flag is set in {@link #clear()}, followed by waiting for all runnables to complete
+     * ({@link #waitForAndHandleFuture()}, and finally clearing the delegate.
+     */
     private AtomicBoolean m_async_abort = new AtomicBoolean(false);
 
     /**
-     * TODO (TP) javadoc
+     * Represents the completion of all pending {@link ContainerRunnable}s. New {@link ContainerRunnable}s are appended
+     * using {@link #submit()}.
      */
     private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
@@ -129,18 +136,25 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     /** The size of each batch submitted to the {@link #ASYNC_EXECUTORS} service. */
     private final int m_batchSize;
 
+    /**
+     * This list is filled with {@code DataRow}s for asynchronous writing. When {@code m_batchSize} rows are accumulated
+     * it is {@code #submit() submitted} and replaced by a new empty list.
+     */
     private List<DataRow> m_curBatch;
 
     /**
-     * Semaphore used to block the producer in case that we have more than {@link #m_maxNumThreads} batches waiting to
-     * be handed over to the {@link Buffer}.
+     * Semaphore used to block the producer in case that we have more than {@link #MAX_NUM_THREADS} batches waiting to
+     * be written to the {@m_delegateContainer}.
      */
     // TODO (TP) should this be initialized to something else???
     //      BufferedDataContainerDelegate:
     //            m_maxNumThreads = Math.min(settings.getMaxThreadsPerContainer(), ASYNC_EXECUTORS.getMaximumPoolSize());
     //            m_numActiveContRunnables = new Semaphore(m_maxNumThreads);
-    private final Semaphore m_numPendingBatches = new Semaphore(ASYNC_EXECUTORS.getMaximumPoolSize());
+    private final Semaphore m_numPendingBatches = new Semaphore(MAX_NUM_THREADS);
 
+    /**
+     * How many rows have been written to this {@code ColumnarDataContainerDelegate}.
+     */
     private long m_size;
 
     private ContainerTable m_containerTable;
@@ -172,7 +186,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     }
 
     /**
-     * Checks if any of the {@link ContainerRunnable} threw an exception.
+     * Check and rethrow exceptions that occurred during asynchronous writing
      */
     private void checkAsyncWriteThrowable() {
         if (m_future.isCompletedExceptionally()) {
@@ -180,6 +194,10 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         }
     }
 
+    /**
+     * Wait for {@code m_future} to complete (normally or exceptionally).
+     * Rethrow exceptions.
+     */
     private void waitForAndHandleFuture() {
         try {
             m_future.get();
@@ -207,8 +225,6 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     }
 
     /**
-     * TODO (TP) revise javadoc
-     *
      * Adds the row to the table in a asynchronous/synchronous manner depending on the current memory state, see
      * {@link #m_memoryLowState}. Whenever we change into a low memory state we flush everything to disk and wait for
      * all {@link ContainerRunnable} to finish their execution, while blocking the data producer.
@@ -251,21 +267,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         m_size++;
     }
 
-    // TODO (TP):
-    //   writeRowIntoCursor is approx equivalent to BufferedDataContainerDelegate.addRowToTableSynchronously()
-    //   - add isMemoryLow() handling (?) ==> Probably not? This is done at a lower level hopefully?
-    //
-    //    /**
-    //     * Adds the row to the table in a synchronous manner and reacts to memory alerts.
-    //     *
-    //     * @param row the row to be synchronously processed
-    //     */
-    //    private void addRowToTableSynchronously(final DataRow row) {
-    //        if (MemoryAlertSystem.getInstanceUncollected().isMemoryLow()) {
-    //            m_buffer.flushBuffer();
-    //        }
-    //        addRowToTableWrite(row);
-    //    }
+    /**
+     * Write the given {@code row} directly to the delegate cursor.
+     *
+     * @param row the row to be written
+     */
     private void writeRowIntoCursor(final DataRow row) {
         final RowWrite rowWrite = m_delegateCursor.forward();
         rowWrite.setRowKey(row.getKey());
@@ -279,6 +285,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         }
     }
 
+    /**
+     * Add the given {@code row} to the current batch, for later asynchronous writing.
+     *
+     * @param row the row to be written
+     */
     private void addRowToTableAsynchronously(final DataRow row) {
         checkAsyncWriteThrowable();
         m_curBatch.add(row);
