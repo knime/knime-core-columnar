@@ -48,8 +48,12 @@
  */
 package org.knime.core.data.columnar.table;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -60,6 +64,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.knime.core.data.DataRow;
 import org.knime.core.data.container.CloseableRowIterator;
+import org.knime.core.data.util.memory.MemoryAlert;
+import org.knime.core.data.util.memory.MemoryAlertListener;
+import org.knime.core.data.util.memory.MemoryAlertSystem;
 
 /**
  * RowIterator that uses a thread pool to asynchronously prefetch rows.
@@ -78,43 +85,119 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
             }
         });
 
-    private static final int BATCH_SIZE = 1024;
-
     private final CloseableRowIterator m_source;
 
-    private final BlockingDeque<DataRow[]> m_rowQueue = new LinkedBlockingDeque<>();
+    private final int m_batchSize;
 
-    private DataRow m_currentRow;
+    private final int m_queueSize;
+
+    private static final class RowBatch {
+        final DataRow[] rows;
+
+        final boolean isLastBatch;
+
+        public RowBatch(final DataRow[] rows, final boolean isLastBatch) {
+            this.rows = rows;
+            this.isLastBatch = isLastBatch;
+        }
+    }
+
+    private final BlockingDeque<RowBatch> m_batchQueue;
+
+    private final AtomicBoolean m_lowMemory = new AtomicBoolean(false);
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
-    private int m_currentIndex = -1;
+    private final MemoryAlertListener m_memListener;
 
-    private DataRow[] m_currentRows = null;
+    /**
+     * TODO (TP) javadoc
+     */
+    private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
+
+    private RowBatch m_currentBatch;
+
+    // switch to synchronous iteration caused by low memory or because source is exhausted
+    private boolean m_sync = false;
+
+    private DataRow m_currentRow;
+
+    private int m_currentIndex = -1;
 
     public PrefetchingRowIterator(final CloseableRowIterator source) {
         m_source = source;
-        startPrefetching();
+
+        m_batchSize = 100; // TODO (TP)
+        m_queueSize = 3; // TODO (TP)
+        m_batchQueue = new LinkedBlockingDeque<>(m_queueSize);
+
+        m_memListener = new MemoryAlertListener() {
+            @Override
+            protected boolean memoryAlert(final MemoryAlert alert) {
+                m_lowMemory.set(true);
+                return true; // indicates that this listener should be removed (because once we go into low-memory regime, we stay there.)
+            }
+        };
+        MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
+
+        m_sync = true;
+        if (!m_sync) {
+            for (int i = 0; i < m_queueSize; ++i) {
+                enqueuePrefetchBatch();
+            }
+        }
     }
 
-    private void startPrefetching() {
-        EXECUTOR.execute(this::prefetchNextBatch);
+    private void enqueuePrefetchBatch() {
+        m_future = m_future.thenRunAsync(() -> prefetchBatch(), EXECUTOR);
     }
 
-    private void prefetchNextBatch() {
-        final DataRow[] rows = new DataRow[BATCH_SIZE];
-        for (int i = 0; i < BATCH_SIZE && m_source.hasNext(); i++) {//NOSONAR
+    private void prefetchBatch() {
+        final DataRow[] rows = new DataRow[ m_batchSize ];
+        for (int i = 0; i < m_batchSize; ++i) {
             if (m_closed.get()) {
-                // row iterator is closed -> stop prefetching
                 return;
             }
-            rows[i] = m_source.next();
+            if (m_lowMemory.get()) {
+                m_batchQueue.add(new RowBatch(Arrays.copyOf(rows,  i), true));
+                return;
+            }
+            if (m_source.hasNext()) {
+                rows[i] = m_source.next();
+            } else {
+                m_batchQueue.add(new RowBatch(Arrays.copyOf(rows,  i), true));
+                return;
+            }
         }
-        m_rowQueue.add(rows);
-        if (m_source.hasNext()) {
-            startPrefetching();
+        m_batchQueue.add(new RowBatch(rows, false));
+    }
+
+    private DataRow getNextRow() {
+        if (m_sync) {
+            return m_source.hasNext() ? m_source.next() : null;
+        }
+
+        if (m_currentBatch == null) {
+            checkAsyncWriteThrowable();
+            try {
+                m_currentBatch = m_batchQueue.takeFirst();
+            } catch (InterruptedException e) {
+                throw wrap(e);
+            }
+            m_currentIndex = 0;
+            enqueuePrefetchBatch();
+        }
+
+        final DataRow[] rows = m_currentBatch.rows;
+        if (m_currentIndex < rows.length) {
+            return rows[m_currentIndex++];
         } else {
-            m_rowQueue.add(new DataRow[0]);
+            // end of current batch
+            if (m_currentBatch.isLastBatch) {
+                m_sync = true;
+            }
+            m_currentBatch = null;
+            return getNextRow();
         }
     }
 
@@ -124,24 +207,6 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
             m_currentRow = getNextRow();
         }
         return m_currentRow != null;
-    }
-
-    private DataRow getNextRow() {
-        try {
-            if (m_currentRows == null || ++m_currentIndex == m_currentRows.length) {
-                m_currentRows = m_rowQueue.takeFirst();
-
-                if (m_currentRows.length == 0) {
-                    return null;
-                } else {
-                    m_currentIndex = 0;
-                }
-            }
-            return m_currentRows[m_currentIndex];
-        } catch (InterruptedException ex) {
-            ex.printStackTrace();
-            return null;
-        }
     }
 
     @Override
@@ -158,7 +223,32 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
     @Override
     public void close() {
         m_closed.set(true);
-        m_rowQueue.clear();
+        waitForAndHandleFuture();
+        m_batchQueue.clear();
         m_source.close();
+        MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
+    }
+
+    /**
+     * Check and rethrow exceptions that occurred during asynchronous prefetching
+     */
+    private void checkAsyncWriteThrowable() {
+        if (m_future.isCompletedExceptionally()) {
+            waitForAndHandleFuture();
+        }
+    }
+
+    private void waitForAndHandleFuture() {
+        try {
+            m_future.get();
+        } catch (ExecutionException e) {
+            throw wrap(e.getCause());
+        } catch (CancellationException | InterruptedException e) {
+            throw wrap(e);
+        }
+    }
+
+    private static RuntimeException wrap(final Throwable t) {
+        return new RuntimeException("Error while prefetching rows", t);
     }
 }
