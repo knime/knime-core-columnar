@@ -81,12 +81,12 @@ public final class ColumnarRowWriteTableSettings {
      * @param checkDuplicateRowKeys whether to check for duplicates among row keys.
      * @param forceSynchronousIO whether writing a new row to the table should block until all previously written rows
      *            have been persisted.
-     * @param rowRatchSize number of rows to be processed by a single thread when not forced to handle rows
+     * @param rowBatchSize number of rows to be processed by a single thread when not forced to handle rows
      *            sequentially.
      */
     public ColumnarRowWriteTableSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
-        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO, final int rowRatchSize) {
-        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO, rowRatchSize);
+        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO, final int rowBatchSize) {
+        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO, rowBatchSize);
     }
 
     /**
@@ -104,14 +104,14 @@ public final class ColumnarRowWriteTableSettings {
      *            (disk-based) interprocess communication where in-memory caching does not provide any benefits.
      * @param forceSynchronousIO whether writing a new row to the table should block until all previously written rows
      *            have been persisted.
-     * @param rowRatchSize number of rows to be processed by a single thread when not forced to handle rows
+     * @param rowBatchSize number of rows to be processed by a single thread when not forced to handle rows
      *            sequentially.
      * @throws IllegalArgumentException When both {@code initializeDomains} and {@code calculateDomains} are
      *             {@code false}.
      */
     public ColumnarRowWriteTableSettings(final boolean initializeDomains, final boolean calculateDomains,
         final int maxPossibleNominalDomainValues, final boolean checkDuplicateRowKeys, final boolean useCaching,
-        final boolean forceSynchronousIO, final int rowRatchSize) {
+        final boolean forceSynchronousIO, final int rowBatchSize) {
         if (!initializeDomains && !calculateDomains) {
             throw new IllegalArgumentException("initializeDomains and calculateDomains cannot both be false.");
         }
@@ -121,7 +121,7 @@ public final class ColumnarRowWriteTableSettings {
         m_checkDuplicateRowKeys = checkDuplicateRowKeys;
         m_useCaching = useCaching;
         m_forceSynchronousIO = forceSynchronousIO;
-        m_rowBatchSize = rowRatchSize;
+        m_rowBatchSize = rowBatchSize;
     }
 
     boolean isInitializeDomains() {
