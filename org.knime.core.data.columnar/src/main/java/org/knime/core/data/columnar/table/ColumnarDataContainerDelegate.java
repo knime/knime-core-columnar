@@ -146,11 +146,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
      * Semaphore used to block the producer in case that we have more than {@link #MAX_NUM_THREADS} batches waiting to
      * be written to the {@m_delegateContainer}.
      */
-    // TODO (TP) should this be initialized to something else???
-    //      BufferedDataContainerDelegate:
-    //            m_maxNumThreads = Math.min(settings.getMaxThreadsPerContainer(), ASYNC_EXECUTORS.getMaximumPoolSize());
-    //            m_numActiveContRunnables = new Semaphore(m_maxNumThreads);
-    private final Semaphore m_numPendingBatches = new Semaphore(MAX_NUM_THREADS);
+    private final Semaphore m_numPendingBatches;
 
     /**
      * How many rows have been written to this {@code ColumnarDataContainerDelegate}.
@@ -167,6 +163,8 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         m_forceSynchronousIO = settings.isForceSynchronousIO();
         m_batchSize = settings.getRowBatchSize();
         m_curBatch = new ArrayList<>(m_batchSize);
+        m_numPendingBatches = new Semaphore(settings.getMaxPendingBatches());
+
     }
 
     @Override

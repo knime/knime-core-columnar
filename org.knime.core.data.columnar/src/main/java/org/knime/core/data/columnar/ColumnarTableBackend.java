@@ -109,7 +109,7 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final ColumnarRowWriteTableSettings cursorSettings =
                 new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize());
+                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", e);
@@ -124,12 +124,17 @@ public final class ColumnarTableBackend implements TableBackend {
                 ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
             final ColumnarRowWriteTableSettings containerSettings =
                 new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize());
+                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(context, -1, ColumnarValueSchemaUtils.create(schema),
                 containerSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Exception while creating ColumnarRowWriteCursor.", e);
         }
+    }
+
+    private static int maxPendingBatches( final DataContainerSettings settings ) {
+        // TODO: Empirically find good setting for maxPendingBatches
+        return settings.getMaxContainerThreads();
     }
 
     @Override

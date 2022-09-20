@@ -131,7 +131,7 @@ public final class ColumnarRowWriteTableTest {
 
     private static ColumnarRowWriteTableSettings createSettings(final boolean initializeDomains,
         final boolean calculateDomains) {
-        return new ColumnarRowWriteTableSettings(initializeDomains, calculateDomains, 60, true, true, false);
+        return new ColumnarRowWriteTableSettings(initializeDomains, calculateDomains, 60, true, true, false, 100, 4);
     }
 
     private static ColumnarValueSchema createTestTableSchemaWithDomains() {

@@ -71,8 +71,16 @@ public final class ColumnarRowWriteTableSettings {
 
     private final boolean m_useCaching;
 
-    /** The amount of rows to be processed by a single thread when not forced to handle rows sequentially. */
+    /**
+     * The amount of rows to be processed by a single thread when not forced to handle rows sequentially.
+     */
     private final int m_rowBatchSize;
+
+    /**
+     * The maximum number of batches to queue for processing before adding further rows is blocked.
+     * Together with {@link #m_rowBatchSize}, this determines the maximum number of rows that are held by a container before they are processed.
+     */
+    private final int m_maxPendingBatches;
 
     /**
      * @param initializeDomains if {@code true}, domains will be initialized via domain values provided through an
@@ -85,8 +93,8 @@ public final class ColumnarRowWriteTableSettings {
      *            sequentially.
      */
     public ColumnarRowWriteTableSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
-        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO, final int rowBatchSize) {
-        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO, rowBatchSize);
+        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO, final int rowBatchSize, final int maxPendingBatches) {
+        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO, rowBatchSize, maxPendingBatches);
     }
 
     /**
@@ -106,12 +114,13 @@ public final class ColumnarRowWriteTableSettings {
      *            have been persisted.
      * @param rowBatchSize number of rows to be processed by a single thread when not forced to handle rows
      *            sequentially.
+     * @param maxPendingBatches maximum number of batches to queue for processing before adding further rows is blocked.
      * @throws IllegalArgumentException When both {@code initializeDomains} and {@code calculateDomains} are
      *             {@code false}.
      */
     public ColumnarRowWriteTableSettings(final boolean initializeDomains, final boolean calculateDomains,
         final int maxPossibleNominalDomainValues, final boolean checkDuplicateRowKeys, final boolean useCaching,
-        final boolean forceSynchronousIO, final int rowBatchSize) {
+        final boolean forceSynchronousIO, final int rowBatchSize, final int maxPendingBatches) {
         if (!initializeDomains && !calculateDomains) {
             throw new IllegalArgumentException("initializeDomains and calculateDomains cannot both be false.");
         }
@@ -122,6 +131,7 @@ public final class ColumnarRowWriteTableSettings {
         m_useCaching = useCaching;
         m_forceSynchronousIO = forceSynchronousIO;
         m_rowBatchSize = rowBatchSize;
+        m_maxPendingBatches = maxPendingBatches;
     }
 
     boolean isInitializeDomains() {
@@ -155,5 +165,16 @@ public final class ColumnarRowWriteTableSettings {
      */
     public int getRowBatchSize() {
         return m_rowBatchSize;
+    }
+
+    /**
+     * Returns the maximum number of batches to queue for processing before adding further rows is blocked. Together
+     * with the {@link #getRowBatchSize() row batch size}, this determines the maximum number of rows that are held by a
+     * container before they are processed.
+     *
+     * @return the maximum number of queued batches before blocking
+     */
+    public int getMaxPendingBatches() {
+        return m_maxPendingBatches;
     }
 }

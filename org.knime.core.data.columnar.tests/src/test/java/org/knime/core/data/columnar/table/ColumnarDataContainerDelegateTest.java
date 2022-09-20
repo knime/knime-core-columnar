@@ -93,7 +93,7 @@ public class ColumnarDataContainerDelegateTest extends ColumnarTest {
             ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         final ColumnarValueSchema schema = ColumnarValueSchemaUtils.create(valueSchema);
 
-        final ColumnarRowWriteTableSettings settings = new ColumnarRowWriteTableSettings(false, 0, false, false, 100);
+        final ColumnarRowWriteTableSettings settings = new ColumnarRowWriteTableSettings(false, 0, false, false, 100, 4);
         final ColumnarRowContainer container =
             ColumnarRowContainer.create(null, -1, schema, TestColumnStoreFactory.INSTANCE, settings);
 

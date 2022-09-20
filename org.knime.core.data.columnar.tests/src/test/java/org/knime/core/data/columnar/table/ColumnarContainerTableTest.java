@@ -71,7 +71,7 @@ public class ColumnarContainerTableTest extends ColumnarTest {
         final int nRows = 13;
         final int tableId = 12;
 
-        final ColumnarRowWriteTableSettings settings = new ColumnarRowWriteTableSettings(true, 0, true, false);
+        final ColumnarRowWriteTableSettings settings = new ColumnarRowWriteTableSettings(true, 0, true, false, 100, 4);
         try (final ColumnarRowContainer container =
             ColumnarRowContainer.create(null, tableId, createSchema(1), TestColumnStoreFactory.INSTANCE, settings);
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
