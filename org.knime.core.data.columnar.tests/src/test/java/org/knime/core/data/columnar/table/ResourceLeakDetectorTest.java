@@ -111,8 +111,8 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
         AutoCloseable closeable = supplier.get(); // NOSONAR
         checkOpenFinalizers(numOpenFinalizers + 1);
 
-        closeable = null;
         final WeakReference<AutoCloseable> ref = new WeakReference<>(closeable);
+        closeable = null;
         System.gc(); // NOSONAR
         await().until(() -> ref.get() == null);
 
