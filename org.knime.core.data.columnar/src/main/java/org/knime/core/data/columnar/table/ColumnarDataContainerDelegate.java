@@ -236,11 +236,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
             throw new IllegalStateException("Container delegate has already been closed.");
         }
 
-//        if (row.getNumCells() != m_numColumns) {
-//            throw new IllegalArgumentException(
-//                String.format("Cell count in row \"%s\" is not equal to length of column names array: %d vs. %d",
-//                    row.getKey().toString(), row.getNumCells(), m_spec.getNumColumns()));
-//        }
+        if (row.getNumCells() != m_numColumns) {
+            throw new IllegalArgumentException(
+                String.format("Cell count in row \"%s\" is not equal to length of column names array: %d vs. %d",
+                    row.getKey().toString(), row.getNumCells(), m_spec.getNumColumns()));
+        }
         /* As per contract, this method should also throw an unchecked DuplicateKeyException if a row's key has already
          * been added. Here, this is done asynchronously and taken care of by the delegate ColumnarRowContainer and its
          * underlying DomainColumnStore. */
