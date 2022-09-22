@@ -48,6 +48,7 @@
  */
 package org.knime.core.data.columnar.table;
 
+import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.BlockingDeque;
@@ -170,13 +171,7 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
 
         m_batchQueue = new LinkedBlockingDeque<>(m_queueSize);
 
-        m_memListener = new MemoryAlertListener() {
-            @Override
-            protected boolean memoryAlert(final MemoryAlert alert) {
-                m_lowMemory.set(true);
-                return true; // indicates that this listener should be removed (because once we go into low-memory regime, we stay there.)
-            }
-        };
+        m_memListener = new MemListener(this);
         MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
 
         m_sync = true;
@@ -191,7 +186,7 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
      * Enqueue a task for fetching one (and only one) RowBatch.
      */
     private void enqueuePrefetchBatch() {
-        m_future = m_future.thenRunAsync(() -> prefetchBatch(), EXECUTOR);
+        m_future = m_future.thenRunAsync(this::prefetchBatch, EXECUTOR);
     }
 
     /**
@@ -305,5 +300,32 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
 
     private static RuntimeException wrap(final Throwable t) {
         return new RuntimeException("Error while prefetching rows", t);
+    }
+
+    /**
+     * The listener only maintains a WeakReference to the iterator because the MemoryAlertSystem otherwise prevents it
+     * from being garbage collected.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    private static final class MemListener extends MemoryAlertListener {
+
+        private final WeakReference<PrefetchingRowIterator> m_ref;
+
+        MemListener(final PrefetchingRowIterator iterator) {
+            m_ref = new WeakReference<>(iterator);
+        }
+
+        @SuppressWarnings("resource") // it's not our task to close the iterator
+        @Override
+        protected boolean memoryAlert(final MemoryAlert alert) {
+            var iterator = m_ref.get();
+            if (iterator != null) {
+                iterator.m_lowMemory.set(true);
+            }
+            // indicates that this listener should be removed (because once we go into low-memory regime, we stay there.)
+            return true;
+        }
+
     }
 }
