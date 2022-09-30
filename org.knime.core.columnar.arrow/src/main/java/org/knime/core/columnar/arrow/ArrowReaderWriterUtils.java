@@ -52,7 +52,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
@@ -183,6 +186,11 @@ public final class ArrowReaderWriterUtils {
                 return null;
             }
         }
+
+        @Override
+        public Set<Long> getDictionaryIds() {
+            return Collections.singleton(m_id);
+        }
     }
 
     /**
@@ -211,6 +219,13 @@ public final class ArrowReaderWriterUtils {
                 }
             }
             return null;
+        }
+
+        @Override
+        public Set<Long> getDictionaryIds() {
+            return m_providers.stream() //
+                .flatMap(p -> p.getDictionaryIds().stream()) //
+                .collect(Collectors.toSet());
         }
     }
 
