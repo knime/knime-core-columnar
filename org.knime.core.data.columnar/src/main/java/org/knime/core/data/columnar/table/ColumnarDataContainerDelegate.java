@@ -343,7 +343,10 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         if (!m_cleared) {
             m_cleared = true;
             if (m_closed) {
-                m_containerTable.clear();
+                if (m_containerTable != null) {
+                    // can be null if close failed exceptionally e.g. because of duplicate row keys
+                    m_containerTable.clear();
+                }
             } else {
                 m_async_abort.set(true);
                 m_closed = true;
