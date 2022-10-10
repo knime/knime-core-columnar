@@ -49,6 +49,7 @@
 package org.knime.core.columnar.batch;
 
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.knime.core.columnar.ReferencedData;
 
@@ -56,6 +57,8 @@ import org.knime.core.columnar.ReferencedData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 abstract class AbstractBatch<D extends ReferencedData> implements Batch<D> {
+
+    private final AtomicInteger m_refCounter = new AtomicInteger(1);
 
     final D[] m_data;
 
@@ -65,12 +68,15 @@ abstract class AbstractBatch<D extends ReferencedData> implements Batch<D> {
 
     @Override
     public final void release() {
-        Arrays.stream(m_data).forEach(ReferencedData::release);
+        if (m_refCounter.decrementAndGet() == 0) {
+            Arrays.stream(m_data).forEach(ReferencedData::release);
+        }
     }
 
     @Override
     public final void retain() {
-        Arrays.stream(m_data).forEach(ReferencedData::retain);
+        assert m_refCounter.get() > 0 : "refCounter is already zero, can't retain anymore";
+        m_refCounter.incrementAndGet();
     }
 
     @Override
