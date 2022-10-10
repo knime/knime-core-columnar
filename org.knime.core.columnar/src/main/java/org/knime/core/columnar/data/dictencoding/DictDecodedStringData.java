@@ -105,6 +105,11 @@ public final class DictDecodedStringData {
             m_delegate.setString(index, val);
         }
 
+        @Override
+        public void setBytes(final int index, final byte[] bytes) {
+            m_delegate.setBytes(index, bytes);
+        }
+
         @SuppressWarnings("unchecked")
         @Override
         public StringReadData close(final int length) {
@@ -141,6 +146,11 @@ public final class DictDecodedStringData {
             //            return m_cache.computeIfAbsent(dictKey, d -> m_delegate.getString(index));
 
             return m_delegate.getString(index);
+        }
+
+        @Override
+        public byte[] getBytes(final int index) {
+            return m_delegate.getBytes(index);
         }
     }
 

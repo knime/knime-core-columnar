@@ -81,6 +81,11 @@ final class ColumnarStringAccessFactory
             return m_data.getString(m_index.getIndex());
         }
 
+        @Override
+        public byte[] getBytes() {
+            return m_data.getBytes(m_index.getIndex());
+        }
+
     }
 
     static final class ColumnarStringWriteAccess extends AbstractWriteAccess<StringWriteData> implements StringWriteAccess {
@@ -95,8 +100,13 @@ final class ColumnarStringAccessFactory
         }
 
         @Override
+        public void setBytes(final byte[] bytes) {
+            m_data.setBytes(m_index.getIndex(), bytes);
+        }
+
+        @Override
         public void setFromNonMissing(final ReadAccess access) {
-            m_data.setString(m_index.getIndex(), ((StringReadAccess)access).getStringValue());
+            setBytes(((StringReadAccess)access).getBytes());
         }
 
     }

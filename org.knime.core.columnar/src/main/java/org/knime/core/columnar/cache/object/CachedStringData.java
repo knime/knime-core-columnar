@@ -124,6 +124,11 @@ final class CachedStringData {
         }
 
         @Override
+        public void setBytes(final int index, final byte[] bytes) {
+            throw new UnsupportedOperationException("setBytes is not supported for CachedStringWriteData");
+        }
+
+        @Override
         void serializeAt(final int index) {
             m_delegate.setString(index, m_data[index]);
         }
@@ -150,6 +155,11 @@ final class CachedStringData {
                 return m_data[index];
             }
 
+            @Override
+            public byte[] getBytes(final int index) {
+                throw new UnsupportedOperationException("getBytes is not supported for CachedStringReadData");
+            }
+
         }
     }
 
@@ -172,6 +182,11 @@ final class CachedStringData {
                 m_data[index] = m_delegate.getString(index);
             }
             return m_data[index];
+        }
+
+        @Override
+        public byte[] getBytes(final int index) {
+            return m_delegate.getBytes(index);
         }
 
     }

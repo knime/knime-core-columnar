@@ -81,6 +81,8 @@ public final class StringData {
          */
         void setString(int index, String val);
 
+        void setBytes(int index, byte[] bytes);
+
         @Override
         StringReadData close(int length);
 
@@ -101,6 +103,8 @@ public final class StringData {
          * @return the String element at the given index
          */
         String getString(int index);
+
+        byte[] getBytes(int index);
 
     }
 
