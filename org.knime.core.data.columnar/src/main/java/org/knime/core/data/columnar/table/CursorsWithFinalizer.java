@@ -134,6 +134,11 @@ final class CursorsWithFinalizer {
         }
 
         @Override
+        public A pinAccess() {
+            return m_delegate.pinAccess();
+        }
+
+        @Override
         public boolean forward() {
             return m_delegate.forward();
         }

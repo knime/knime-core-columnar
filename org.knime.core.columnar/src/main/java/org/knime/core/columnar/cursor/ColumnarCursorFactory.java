@@ -161,10 +161,13 @@ public final class ColumnarCursorFactory {
 
         private int m_currentIndexInCurrentBatch;
 
+        private final ColumnarAccessFactory[] m_accessFactories;
+
         private DefaultColumnarCursor(final BatchReadStore store, final ColumnSelection selection,
             final ColumnarAccessFactory[] accessFactories, final BatchRange batchSelection) {
             m_numColumns = store.getSchema().numColumns();
             m_selection = selection;
+            m_accessFactories = accessFactories;
             m_accesses = Arrays.stream(accessFactories) //
                 .map(f -> f.createReadAccess(this)) //
                 .toArray(ColumnarReadAccess[]::new);
@@ -189,6 +192,11 @@ public final class ColumnarCursorFactory {
         @Override
         public ReadAccessRow access() {
             return this;
+        }
+
+        @Override
+        public ReadAccessRow pinAccess() {
+            return new PinnedColumnarReadAccessRow(m_currentBatch, m_currentBatchIndex, m_accessFactories);
         }
 
         @Override
@@ -261,6 +269,53 @@ public final class ColumnarCursorFactory {
                 m_currentBatch = null;
             }
             m_reader.close();
+        }
+
+    }
+
+    private static final class PinnedColumnarReadAccessRow implements ReadAccessRow, ColumnDataIndex, AutoCloseable {
+
+        private final ColumnarAccessFactory[] m_accessFactories;
+
+        private final ReadBatch m_batch;
+
+        private final int m_idx;
+
+        private final ColumnarReadAccess[] m_accesses;
+
+        PinnedColumnarReadAccessRow(final ReadBatch batch, final int idx,
+            final ColumnarAccessFactory[] accessFactories) {
+            m_accessFactories = accessFactories;
+            m_batch = batch;
+            m_batch.retain();
+            m_idx = idx;
+            m_accesses = new ColumnarReadAccess[accessFactories.length];
+        }
+
+        @Override
+        public int size() {
+            return m_accessFactories.length;
+        }
+
+        @Override
+        public <A extends ReadAccess> A getAccess(final int index) {
+            var access = m_accesses[index];
+            if (access == null) {
+                access = m_accessFactories[index].createReadAccess(this);
+                access.setData(m_batch.get(index));
+                m_accesses[index] = access;
+            }
+            return (A)access;
+        }
+
+        @Override
+        public int getIndex() {
+            return m_idx;
+        }
+
+        @Override
+        public void close() {
+            m_batch.release();
         }
 
     }
