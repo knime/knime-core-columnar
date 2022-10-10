@@ -174,11 +174,8 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
         m_memListener = new MemListener(this);
         MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
 
-        m_sync = true;
-        if (!m_sync) {
-            for (int i = 0; i < m_queueSize; ++i) {
-                enqueuePrefetchBatch();
-            }
+        for (int i = 0; i < m_queueSize; ++i) { //NOSONAR
+            enqueuePrefetchBatch();
         }
     }
 
