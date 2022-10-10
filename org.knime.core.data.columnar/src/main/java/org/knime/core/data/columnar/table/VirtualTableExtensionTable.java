@@ -418,7 +418,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             .createTrackedCursor(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, getOutput().createCursor()));
     }
 
-    synchronized RowAccessible getOutput() {
+    public synchronized RowAccessible getOutput() {
         if (m_cachedOutputs == null) {
             m_cachedOutputs = runComputationGraph();
         }

@@ -48,21 +48,33 @@ package org.knime.core.data.columnar;
 
 import static java.util.stream.Collectors.toList;
 
+import java.io.IOException;
 import java.util.UUID;
 import java.util.function.IntSupplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataValue;
 import org.knime.core.data.IDataRepository;
+import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.TableBackend;
+import org.knime.core.data.columnar.BatchStoreFilterer.ReadAccessRowFilterFactory;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
+import org.knime.core.data.columnar.table.ColumnarRowReadTable;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
+import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
+import org.knime.core.data.columnar.table.TempFileHandle;
+import org.knime.core.data.columnar.table.UnsavedColumnarContainerTable;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.BufferedTableBackend;
@@ -75,6 +87,7 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
@@ -82,7 +95,9 @@ import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
+import org.knime.core.node.Node;
 import org.knime.core.node.NodeLogger;
+import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.virtual.VirtualTable;
 
@@ -109,9 +124,9 @@ public final class ColumnarTableBackend implements TableBackend {
                 initFileStoreHandler(fileStoreHandler, repository));
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
-            final ColumnarRowWriteTableSettings cursorSettings =
-                new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
+            final ColumnarRowWriteTableSettings cursorSettings = new ColumnarRowWriteTableSettings(
+                settings.getInitializeDomain(), settings.getMaxDomainValues(), settings.isEnableRowKeys(),
+                settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", e);
@@ -124,9 +139,9 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final ValueSchema schema =
                 ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
-            final ColumnarRowWriteTableSettings containerSettings =
-                new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
+            final ColumnarRowWriteTableSettings containerSettings = new ColumnarRowWriteTableSettings(
+                settings.getInitializeDomain(), settings.getMaxDomainValues(), settings.isEnableRowKeys(),
+                settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(context, -1, ColumnarValueSchemaUtils.create(schema),
                 containerSettings);
         } catch (Exception e) {
@@ -134,7 +149,7 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
 
-    private static int maxPendingBatches( final DataContainerSettings settings ) {
+    private static int maxPendingBatches(final DataContainerSettings settings) {
         // TODO: Empirically find good setting for maxPendingBatches
         return settings.getMaxContainerThreads();
     }
@@ -175,11 +190,11 @@ public final class ColumnarTableBackend implements TableBackend {
                 final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
                 var refTables = createReferenceTables(tables);
                 var sources = Stream.of(refTables)//
-                        .map(r -> new VirtualTable(r.getId(), r.getSchema()))//
-                        .collect(toList());
+                    .map(r -> new VirtualTable(r.getId(), r.getSchema()))//
+                    .collect(toList());
                 var virtualTableFragment = sources.get(0).concatenate(sources.subList(1, sources.size()));
-                return new VirtualTableExtensionTable(refTables, virtualTableFragment,
-                    concatenatedSchema, concatenatedSize, tableIdSupplier.getAsInt());
+                return new VirtualTableExtensionTable(refTables, virtualTableFragment, concatenatedSchema,
+                    concatenatedSize, tableIdSupplier.getAsInt());
             } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
                 LOGGER.debug("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.");
             }
@@ -271,6 +286,145 @@ public final class ColumnarTableBackend implements TableBackend {
         } catch (VirtualTableIncompatibleException ex) {//NOSONAR
             return OLD_BACKEND.slice(exec, table, slice, tableIdSupplier);
         }
+    }
+
+    @SuppressWarnings("resource")
+    @Override
+    public KnowsRowCountTable filter(final ExecutionContext context, final IntSupplier tableIdSupplier,
+        final BufferedDataTable table, final RowReadFilterFactory filterFactory) {
+        // TODO instead of actually doing much here we could also be sneaky and do the whole filtering asynchronously
+        // and until that completes we can provide a table consisting of the input table + filter
+        // as long as the writing isn't finished, iteration could be done on the filtered input table
+        var delegate = Node.invokeGetDelegate(table);
+        try {
+            var schema = VirtualTableSchemaUtils.extractSchema(table);
+            var storeFactory = getStoreFactory();
+            var writeStore = new ColumnarBatchStoreBuilder(storeFactory.createStore(schema, new TempFileHandle()))
+                .useColumnDataCache( //
+                    ColumnarPreferenceUtils.getColumnDataCache(), ColumnarPreferenceUtils.getPersistExecutor())
+                .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
+                .useHeapCache( //
+                    ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
+                    ColumnarPreferenceUtils.getSerializeExecutor())//
+                .build();
+            var readAccessFilterFactory = new RowReadFilterFactoryAdapter(filterFactory, schema);
+            long size;
+            if (delegate instanceof AbstractColumnarContainerTable) {
+                var containerTable = (AbstractColumnarContainerTable)delegate;
+                //            rowReadTable =
+                //                filterColumnarContainerTable((AbstractColumnarContainerTable)delegate, filterFactory, context);
+                size = BatchStoreFilterer.filter(containerTable.asRowAccessible(), readAccessFilterFactory, writeStore,
+                    context);
+                // TODO alternative strategy: synchronously calculate which rows to keep and create the actual table asynchronously
+                // Advantages:
+                // - Creating a single boolean/long/int column is cheap
+                // - The heavy lifting could be parallelized
+                // - And pushed down to Arrow or even further down (e.g. pyarrow.compute has a filter function)
+            } else if (delegate instanceof VirtualTableExtensionTable) {
+                var virtualTable = (VirtualTableExtensionTable)delegate;
+                size =
+                    BatchStoreFilterer.filter(virtualTable.getOutput(), readAccessFilterFactory, writeStore, context);
+            } else {
+                // the table is not columnar
+                size = BatchStoreFilterer.filter(VirtualTableUtils.createRowAccessible(schema, table),
+                    readAccessFilterFactory, writeStore, context);
+            }
+            var rowReadTable = new ColumnarRowReadTable(schema, storeFactory, writeStore, size);
+            return UnsavedColumnarContainerTable.create(tableIdSupplier.getAsInt(), rowReadTable, writeStore);
+        } catch (VirtualTableIncompatibleException ex) {//NOSONAR
+            return OLD_BACKEND.filter(context, tableIdSupplier, table, filterFactory);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Filtering failed due to an IOException.", ex);
+        }
+    }
+
+    private static ColumnStoreFactory getStoreFactory() {
+        try {
+            return ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    private static ColumnarRowReadTable filterColumnarContainerTable(final AbstractColumnarContainerTable table,
+        final RowReadFilterFactory filterFactory, final ExecutionMonitor monitor) {
+        var readStore = table.getStore();
+        try {
+            var storeFactory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+            var writeStore = storeFactory.createStore(readStore.getSchema(), new TempFileHandle());
+            var size = BatchStoreFilterer.filter(readStore,
+                new RowReadFilterFactoryAdapter(filterFactory, table.getSchema()), writeStore, monitor);
+            return new ColumnarRowReadTable(table.getSchema(), storeFactory, writeStore, size);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Filtering failed.", ex);
+        }
+    }
+
+    private static final class RowReadFilterFactoryAdapter implements ReadAccessRowFilterFactory {
+
+        private final RowReadFilterFactory m_filterFactory;
+
+        private final ColumnarValueSchema m_schema;
+
+        RowReadFilterFactoryAdapter(final RowReadFilterFactory filterFactory, final ColumnarValueSchema schema) {
+            m_filterFactory = filterFactory;
+            m_schema = schema;
+        }
+
+
+        @Override
+        public ReadAccessRowFilter createFilter(final ReadAccessRow access) {
+            var filteredRowRead = new FilteredRowRead(m_filterFactory.requiresRowKey(),
+                m_filterFactory.requiredColumns(), m_schema, access);
+            var filter = m_filterFactory.createFilter(filteredRowRead);
+            return filter::include;
+        }
+
+    }
+
+    private static final class FilteredRowRead implements RowRead {
+
+        private final DataValue[] m_values;
+
+        private final RowKeyValue m_rowKey;
+
+        private final ReadAccessRow m_access;
+
+        FilteredRowRead(final boolean includeRowKey, final int[] includedColumns, final ColumnarValueSchema schema,
+            final ReadAccessRow access) {
+            m_access = access;
+            if (includeRowKey) {
+                m_rowKey = (RowKeyValue)schema.getValueFactory(0).createReadValue(access.getAccess(0));
+            } else {
+                m_rowKey = null;
+            }
+            m_values = IntStream.of(includedColumns)//
+                .mapToObj(i -> schema.getValueFactory(i).createReadValue(access.getAccess(i)))//
+                .toArray(DataValue[]::new);
+        }
+
+        @Override
+        public int getNumColumns() {
+            return m_values.length;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <D extends DataValue> D getValue(final int index) {
+            return (D)m_values[index];
+        }
+
+        @Override
+        public boolean isMissing(final int index) {
+            return m_access.getAccess(index + 1).isMissing();
+        }
+
+        @Override
+        public RowKeyValue getRowKey() {
+            return m_rowKey;
+        }
+
+
     }
 
 }

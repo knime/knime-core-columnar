@@ -230,7 +230,7 @@ public final class VirtualTableSchemaUtils {
         return schema;
     }
 
-    private static ColumnarValueSchema extractSchema(final KnowsRowCountTable table)//NOSONAR
+    public static ColumnarValueSchema extractSchema(final KnowsRowCountTable table)//NOSONAR
         throws VirtualTableIncompatibleException {
         if (table instanceof AbstractColumnarContainerTable) {
             return ((AbstractColumnarContainerTable)table).getSchema();

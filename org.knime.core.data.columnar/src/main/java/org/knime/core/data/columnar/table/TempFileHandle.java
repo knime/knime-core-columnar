@@ -61,11 +61,15 @@ import org.knime.core.data.container.DataContainer;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class TempFileHandle implements FileHandle {
+public final class TempFileHandle implements FileHandle {
 
     private File m_file = null;
 
     private Path m_path = null;
+
+    public TempFileHandle() {
+
+    }
 
     @Override
     public synchronized File asFile() {
