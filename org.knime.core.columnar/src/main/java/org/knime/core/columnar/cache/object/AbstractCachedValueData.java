@@ -325,7 +325,7 @@ final class AbstractCachedValueData {
         void onSet(final int index) {
             m_setIndex = index;
 
-            if (m_setIndex > m_highestDispatchedSerializationIndex + SERIALIZATION_DELAY) {
+            if (m_setIndex > m_highestDispatchedSerializationIndex + 1024) {
                 dispatchSerialization();
             }
         }
