@@ -303,9 +303,9 @@ public final class ColumnarTableBackend implements TableBackend {
                 .useColumnDataCache( //
                     ColumnarPreferenceUtils.getColumnDataCache(), ColumnarPreferenceUtils.getPersistExecutor())
                 .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
-                .useHeapCache( //
-                    ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
-                    ColumnarPreferenceUtils.getSerializeExecutor())//
+//                .useHeapCache( //
+//                    ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
+//                    ColumnarPreferenceUtils.getSerializeExecutor())//
                 .build();
             var readAccessFilterFactory = new RowReadFilterFactoryAdapter(filterFactory, schema);
             long size;
@@ -315,6 +315,7 @@ public final class ColumnarTableBackend implements TableBackend {
                 //                filterColumnarContainerTable((AbstractColumnarContainerTable)delegate, filterFactory, context);
                 size = BatchStoreFilterer.filter(containerTable.asRowAccessible(), readAccessFilterFactory, writeStore,
                     context);
+
                 // TODO alternative strategy: synchronously calculate which rows to keep and create the actual table asynchronously
                 // Advantages:
                 // - Creating a single boolean/long/int column is cheap
