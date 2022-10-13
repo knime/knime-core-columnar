@@ -50,23 +50,10 @@ package org.knime.core.data.columnar;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.ObjIntConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
@@ -75,11 +62,11 @@ import org.knime.core.columnar.access.ColumnarWriteAccess;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.parallel.exec.RowWriteTask;
+import org.knime.core.columnar.parallel.exec.WriteTaskExecutor;
+import org.knime.core.columnar.parallel.write.AsyncBatchWriter;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.data.columnar.DataTransfers.DataTransfer;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
@@ -118,7 +105,7 @@ final class BatchStoreFilterer {
                         .mapToObj(asyncWriter::getDataWriter)//
                         .collect(Collectors.toList())//
                 ); //
-                var writeDispatcher = new WriteDispatcher(1000, writeExecutor)//
+                var writeDispatcher = new WriteDispatcher(10000, writeExecutor)//
         ) {
             for (int b = 0; b < source.numBatches(); b++) {//NOSONAR
                 var readBatch = reader.readRetained(b);
@@ -159,7 +146,7 @@ final class BatchStoreFilterer {
 
         WriteDispatcher(final int taskSize, final Consumer<RowWriteTask> taskConsumer) {
             m_taskSize = taskSize;
-            m_taskBuilder = new RowWriteTask.Builder(taskSize);
+            m_taskBuilder = RowWriteTask.builder(taskSize);
             m_taskConsumer = taskConsumer;
         }
 
@@ -182,307 +169,6 @@ final class BatchStoreFilterer {
             m_taskBuilder.close();
         }
 
-    }
-
-    private static final class WriteTaskExecutor implements Consumer<RowWriteTask>, AutoCloseable {
-
-        private static final ExecutorService EXECUTOR =
-            Executors.newCachedThreadPool(r -> new Thread(r, "KNIME-Columnar-Write-Task-Executor-"));
-
-        // might make this blocking and only allow a limited number of pending tasks
-        private final BlockingQueue<RowWriteTask> m_tasks = new LinkedBlockingQueue<>(3);
-
-        private final List<? extends ObjIntConsumer<NullableReadData>> m_columnWriters;
-
-        private Future<?> m_currentTaskFuture;
-
-        private final AtomicBoolean m_open = new AtomicBoolean(true);
-
-        private final AtomicBoolean m_waitingForFinish = new AtomicBoolean(false);
-
-        WriteTaskExecutor(final List<? extends ObjIntConsumer<NullableReadData>> columnWriters) {
-            m_columnWriters = columnWriters;
-            m_currentTaskFuture = EXECUTOR.submit(this::scheduleColumnTasks);
-        }
-
-        private void scheduleColumnTasks() {
-            // null is the poison pill
-            while (m_open.get()) {
-                try (var task = m_tasks.take()) {
-                    if (task == RowWriteTask.NULL) {
-                        // poison pill
-                        return;
-                    }
-                    var columnTaskFutures = new ArrayList<Future<?>>(m_columnWriters.size());
-                    for (int c = 0; c < m_columnWriters.size(); c++) { //NOSONAR
-                        var columnTask = new ColumnWriteTask(task, c, m_columnWriters.get(c));
-                        columnTaskFutures.add(EXECUTOR.submit(columnTask));
-                    }
-
-                    for (var future : columnTaskFutures) {
-                        // TODO should probably cancel all futures in this case
-                        try {
-                            future.get();
-                        } catch (InterruptedException ex) {
-                            Thread.currentThread().interrupt();
-                            throw new IllegalStateException(
-                                "Interrupted while waiting for the completion of ColumnWriteTasks.", ex);
-                        } catch (ExecutionException ex) { //NOSONAR just a wrapper, we report the actual cause
-                            throw new IllegalStateException("A ColumnWriteTask failed.", ex.getCause());
-                        }
-                    }
-                } catch (InterruptedException interruptWhileWaitingForTask) {
-                    // TODO maybe that's just fine?
-                    Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Interrupted while waiting for tasks.",
-                        interruptWhileWaitingForTask);
-                }
-            }
-
-        }
-
-        @Override
-        public void accept(final RowWriteTask t) {
-            if (m_waitingForFinish.get()) {
-                throw new IllegalStateException("Waiting for the queue to be finished. No more tasks can be added.");
-            }
-            try {
-                m_tasks.put(t);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("Writing has been interrupted.", ex);
-            }
-        }
-
-        void await() throws InterruptedException {
-            m_waitingForFinish.set(true);
-            // insert the poison pill
-            m_tasks.put(RowWriteTask.NULL);
-            try {
-                m_currentTaskFuture.get();
-            } catch (ExecutionException ex) {//NOSONAR just a wrapper
-                throw new IllegalStateException("Asynchronous writing failed.", ex.getCause());
-            }
-        }
-
-        @Override
-        public void close() {
-            if (m_open.getAndSet(false)) {
-                m_tasks.forEach(RowWriteTask::close);
-                m_currentTaskFuture.cancel(true);
-            }
-        }
-
-    }
-
-    private static final class AsyncBatchWriter implements Closeable {
-
-        private final BatchWriter m_writer;
-
-        private WriteBatch m_currentBatch;
-
-        private final CyclicBarrier m_finalizeBatchBarrier;
-
-        private final int m_batchLength;
-
-        private final AsyncDataWriter[] m_columnWriters;
-
-        AsyncBatchWriter(final BatchStore batchStore, final int batchLength) {
-            m_batchLength = batchLength;
-            m_writer = batchStore.getWriter();
-            final var schema = batchStore.getSchema();
-            m_finalizeBatchBarrier = new CyclicBarrier(schema.numColumns(), this::switchBatch);
-            m_columnWriters = schema.specStream()//
-                .map(DataTransfers::createTransfer)//
-                .map(AsyncDataWriter::new)//
-                .toArray(AsyncDataWriter[]::new);
-            startBatch();
-        }
-
-        AsyncDataWriter getDataWriter(final int colIdx) {
-            return m_columnWriters[colIdx];
-        }
-
-        private void switchBatch() {
-            finishBatch(m_batchLength);
-            startBatch();
-        }
-
-        private void startBatch() {
-            m_currentBatch = m_writer.create(m_batchLength);
-            resetColumnWriters();
-        }
-
-        private void finishBatch(final int batchLength) {
-            assert allColumnWritersHaveExpectedIndex(batchLength) : "The column writers are out of sync.";
-            var finishedBatch = m_currentBatch.close(batchLength);
-            try {
-                m_writer.write(finishedBatch);
-            } catch (IOException ex) {
-                // TODO we probably need a more elaborate mechanism to properly work in the concurrent setting
-                throw new IllegalStateException("Failed to write batch.", ex);
-            }
-            finishedBatch.release();
-        }
-
-        private void finishLastBatch() throws IOException {
-            var currentBatchLength = getCurrentBatchLength();
-            if (currentBatchLength > 0) {
-                finishBatch(currentBatchLength);
-            }
-            close();
-        }
-
-        private int getCurrentBatchLength() {
-            return m_columnWriters[0].currentIdx();
-        }
-
-        private boolean allColumnWritersHaveExpectedIndex(final int expected) {
-            return Stream.of(m_columnWriters).mapToInt(AsyncDataWriter::currentIdx).allMatch(i -> i == expected);
-        }
-
-        private void resetColumnWriters() {
-            for (int i = 0; i < m_currentBatch.numData(); i++) {
-                m_columnWriters[i].reset(m_currentBatch.get(i));
-            }
-        }
-
-        @Override
-        public void close() throws IOException {
-            m_finalizeBatchBarrier.reset();
-            m_currentBatch = null;
-            m_writer.close();
-        }
-
-        private final class AsyncDataWriter implements ObjIntConsumer<NullableReadData> {
-
-            private final DataTransfer m_transfer;
-
-            private NullableWriteData m_writeData;
-
-            private int m_idx = 0;
-
-            int currentIdx() {
-                return m_idx;
-            }
-
-            AsyncDataWriter(final DataTransfer transfer) {
-                m_transfer = transfer;
-            }
-
-            void reset(final NullableWriteData writeData) {
-                m_writeData = writeData;
-                m_idx = 0;
-            }
-
-            @Override
-            public void accept(final NullableReadData readData, final int idx) {
-                m_transfer.transfer(readData, idx, m_writeData, m_idx);
-                m_idx++;
-                if (m_idx == m_batchLength) {
-                    try {
-                        m_finalizeBatchBarrier.await();
-                    } catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
-                        throw new IllegalStateException("Interrupted while waiting for next batch.", ex);
-                    } catch (BrokenBarrierException ex) {
-                        throw new IllegalStateException("The barrier for the next batch has been broken.", ex);
-                    }
-                }
-
-            }
-        }
-
-    }
-
-    private static final class ColumnWriteTask implements Runnable {
-
-        private final int m_colIdx;
-
-        private final RowWriteTask m_task;
-
-        private final ObjIntConsumer<NullableReadData> m_writer;
-
-        ColumnWriteTask(final RowWriteTask task, final int colIdx, final ObjIntConsumer<NullableReadData> writer) {
-            m_task = task;
-            m_colIdx = colIdx;
-            m_writer = writer;
-        }
-
-        @Override
-        public void run() {
-            for (int i = 0; i < m_task.size(); i++) { //NOSONAR
-                var readData = m_task.getBatch(i).get(m_colIdx);
-                m_writer.accept(readData, m_task.getBatchIndex(i));
-            }
-        }
-
-    }
-
-    private static final class RowWriteTask implements AutoCloseable {
-
-        static final RowWriteTask NULL = new RowWriteTask(new ReadBatch[0], new int[0]);
-
-        private final int[] m_indices;
-
-        private final ReadBatch[] m_batches;
-
-        private RowWriteTask(final ReadBatch[] batches, final int[] indices) {
-            m_indices = indices;
-            m_batches = batches;
-        }
-
-        int getBatchIndex(final int idx) {
-            return m_indices[idx];
-        }
-
-        ReadBatch getBatch(final int idx) {
-            return m_batches[idx];
-        }
-
-        int size() {
-            return m_indices.length;
-        }
-
-        @Override
-        public void close() {
-            for (var batch : m_batches) {
-                batch.release();
-            }
-        }
-
-        private static final class Builder implements AutoCloseable {
-            private final int[] m_indices;
-
-            private final ReadBatch[] m_batches;
-
-            private int m_currentIndex = 0;
-
-            private Builder(final int length) {
-                m_indices = new int[length];
-                m_batches = new ReadBatch[length];
-            }
-
-            Builder addPosition(final int index, final ReadBatch batch) {
-                batch.retain();
-                m_indices[m_currentIndex] = index;
-                m_batches[m_currentIndex] = batch;
-                m_currentIndex++;
-                return this;
-            }
-
-            @Override
-            public void close() {
-                IntStream.range(0, m_currentIndex).forEach(i -> m_batches[i].release());
-            }
-
-            RowWriteTask build() {
-                var indices = Arrays.copyOf(m_indices, m_currentIndex);
-                var batches = Arrays.copyOf(m_batches, m_currentIndex);
-                m_currentIndex = 0;
-                return new RowWriteTask(batches, indices);
-            }
-        }
     }
 
     // TODO find a better value
