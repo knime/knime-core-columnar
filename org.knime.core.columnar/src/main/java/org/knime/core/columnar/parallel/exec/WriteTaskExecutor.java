@@ -53,30 +53,26 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
-public final class WriteTaskExecutor implements Consumer<RowWriteTask>, AutoCloseable {
+import org.knime.core.columnar.parallel.write.GridWriter;
 
-    private static final ExecutorService EXECUTOR =
-        Executors.newFixedThreadPool(4, new ThreadFactory() {
-            private final AtomicInteger m_threadNum = new AtomicInteger(0);
-            @Override
-            public Thread newThread(final Runnable r) {
-                return new Thread(r, "KNIME-Columnar-Write-Task-Executor-" + m_threadNum.getAndIncrement());
-            }
-        });
+/**
+ *
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+ */
+public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, AutoCloseable {
 
     // might make this blocking and only allow a limited number of pending tasks
-    private final BlockingQueue<RowWriteTask> m_tasks = new LinkedBlockingQueue<>(3);
+    private final BlockingQueue<RowTaskBatch<A>> m_tasks = new LinkedBlockingQueue<>(3);
 
-    private final List<DataWriter> m_columnWriters;
+    private final List<DataWriter<A>> m_columnWriters;
 
     private Future<?> m_currentTaskFuture;
 
@@ -84,40 +80,50 @@ public final class WriteTaskExecutor implements Consumer<RowWriteTask>, AutoClos
 
     private final AtomicBoolean m_waitingForFinish = new AtomicBoolean(false);
 
-    public WriteTaskExecutor(final List<DataWriter> columnWriters) {
-        m_columnWriters = columnWriters;
-        m_currentTaskFuture = EXECUTOR.submit(this::scheduleColumnTasks);
+    private final ExecutorService m_executor;
+
+    private final RowTaskBatch<A> m_poisonPill;
+
+    public WriteTaskExecutor(final GridWriter<A> gridWriter, final ExecutorService executor,
+        final RowTaskBatch<A> poisonPill) {
+        m_poisonPill = poisonPill;
+        m_executor = executor;
+        m_columnWriters = IntStream.range(0, gridWriter.numWriters())//
+            .mapToObj(gridWriter::getDataWriter)//
+            .collect(Collectors.toList());
+        m_currentTaskFuture = m_executor.submit(this::scheduleColumnTasks);
     }
 
     private void scheduleColumnTasks() {
         // null is the poison pill
         while (m_open.get()) {
             try (var task = m_tasks.take()) {
-                if (task == RowWriteTask.NULL) {
+                if (task == m_poisonPill) {
                     // poison pill
                     return;
                 }
                 var doneLatch = new CountDownLatch(m_columnWriters.size());
                 for (int c = 0; c < m_columnWriters.size(); c++) { //NOSONAR
-                    var columnTask = new ColumnWriteTask(task, c, m_columnWriters.get(c), EXECUTOR, doneLatch);
-                    EXECUTOR.submit(columnTask);
+                    var writer = m_columnWriters.get(c);
+                    var columnWriteTask = task.createColumnTask(c, writer.getAccess());
+                    var columnTask = new ColumnWriteTaskRunner(writer, columnWriteTask, doneLatch);
+                    m_executor.submit(columnTask);
                 }
                 if (!doneLatch.await(10, TimeUnit.SECONDS)) {
-                    throw new IllegalStateException("RowWriteTask not done in time!");
+                    //                    throw new IllegalStateException("Write not done in time");
                 }
             } catch (InterruptedException interruptWhileWaitingForTask) {
                 // TODO can also be happening while we wait for the current task to finish
                 // TODO maybe that's just fine?
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("Interrupted while waiting for tasks.",
-                    interruptWhileWaitingForTask);
+                throw new IllegalStateException("Interrupted while waiting for tasks.", interruptWhileWaitingForTask);
             }
         }
 
     }
 
     @Override
-    public void accept(final RowWriteTask t) {
+    public void accept(final RowTaskBatch<A> t) {
         if (m_waitingForFinish.get()) {
             throw new IllegalStateException("Waiting for the queue to be finished. No more tasks can be added.");
         }
@@ -132,7 +138,7 @@ public final class WriteTaskExecutor implements Consumer<RowWriteTask>, AutoClos
     public void await() throws InterruptedException {
         m_waitingForFinish.set(true);
         // insert the poison pill
-        m_tasks.put(RowWriteTask.NULL);
+        m_tasks.put(m_poisonPill);
         try {
             m_currentTaskFuture.get();
         } catch (ExecutionException ex) {//NOSONAR just a wrapper
@@ -143,9 +149,46 @@ public final class WriteTaskExecutor implements Consumer<RowWriteTask>, AutoClos
     @Override
     public void close() {
         if (m_open.getAndSet(false)) {
-            m_tasks.forEach(RowWriteTask::close);
+            m_tasks.forEach(RowTaskBatch::close);
             m_currentTaskFuture.cancel(true);
         }
+    }
+
+    private final class ColumnWriteTaskRunner implements Runnable {
+
+        private int m_readIdx;
+
+        private final CountDownLatch m_doneLatch;
+
+        private final ColumnTask m_task;
+
+        private final DataWriter<A> m_writer;
+
+        ColumnWriteTaskRunner(final DataWriter<A> writer, final ColumnTask task, final CountDownLatch doneLatch) {
+            m_task = task;
+            m_doneLatch = doneLatch;
+            m_writer = writer;
+        }
+
+        @Override
+        public void run() {
+            try {
+                for (; m_readIdx < m_task.size(); m_readIdx++) { //NOSONAR
+                    if (m_writer.canWrite()) {
+                        m_task.performSubtask(m_readIdx);
+                        m_writer.advance();
+                    } else {
+                        m_executor.submit(this);
+                        return;
+                    }
+                }
+            } catch (Throwable ex) {
+                ex.printStackTrace();
+            } finally {
+                m_doneLatch.countDown();
+            }
+        }
+
     }
 
 }

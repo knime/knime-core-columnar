@@ -201,13 +201,16 @@ public class DictEncodedBatchWriter implements BatchWriter {
         // Replace all DictEncoded Data objects by the content that they wrap
         var data = new NullableReadData[batch.numData()];
         Arrays.setAll(data, i -> unpack(batch.get(i)));
-        m_delegate.write(new DefaultReadBatch(data));
+        var dictEncodedBatch = new DefaultReadBatch(data);
+        m_delegate.write(dictEncodedBatch);
+//        dictEncodedBatch.release();
     }
 
     private static NullableReadData unpack(NullableReadData data) {
         while (isDictDecodingWrapper(data)) {
             data = ((DecoratingNullableReadData)data).getReadDelegate();
         }
+//        data.retain();
         return data;
     }
 

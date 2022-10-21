@@ -48,14 +48,28 @@
  */
 package org.knime.core.columnar.data;
 
+import java.util.Arrays;
+
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
+import org.knime.core.columnar.data.ByteData.ByteReadData;
+import org.knime.core.columnar.data.ByteData.ByteWriteData;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.columnar.data.FloatData.FloatReadData;
+import org.knime.core.columnar.data.FloatData.FloatWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.columnar.data.ListData.ListReadData;
+import org.knime.core.columnar.data.ListData.ListWriteData;
+import org.knime.core.columnar.data.LongData.LongReadData;
+import org.knime.core.columnar.data.LongData.LongWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.data.StructData.StructReadData;
+import org.knime.core.columnar.data.StructData.StructWriteData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.BooleanDataSpec;
 import org.knime.core.table.schema.ByteDataSpec;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -94,10 +108,6 @@ public final class DataTransfers {
         return dataSpec.accept(DataSpecToTransferMapper.INSTANCE);
     }
 
-    private static IllegalStateException notImplemented(final String type) {
-        return new IllegalStateException(type + " transfer isn't implemented");
-    }
-
     private enum DataSpecToTransferMapper implements DataSpec.Mapper<DataTransfer> {
 
             INSTANCE;
@@ -109,7 +119,7 @@ public final class DataTransfers {
 
         @Override
         public DataTransfer visit(final ByteDataSpec spec) {
-            throw notImplemented("byte");
+            return new ByteDataTransfer();
         }
 
         @Override
@@ -119,7 +129,7 @@ public final class DataTransfers {
 
         @Override
         public DataTransfer visit(final FloatDataSpec spec) {
-            throw notImplemented("float");
+            return new FloatDataTransfer();
         }
 
         @Override
@@ -129,32 +139,43 @@ public final class DataTransfers {
 
         @Override
         public DataTransfer visit(final LongDataSpec spec) {
-            throw notImplemented("long");
+            return new LongDataTransfer();
         }
 
         @Override
         public DataTransfer visit(final VarBinaryDataSpec spec) {
-            throw notImplemented("varbinary");
+            return new VarBinaryDataTransfer();
         }
 
         @Override
         public DataTransfer visit(final VoidDataSpec spec) {
-            throw notImplemented("void");
+            return VoidDataTransfer.INSTANCE;
         }
 
         @Override
         public DataTransfer visit(final StructDataSpec spec) {
-            throw notImplemented("struct");
+            return new StructDataTransfer(spec);
         }
 
         @Override
         public DataTransfer visit(final ListDataSpec listDataSpec) {
-            throw notImplemented("list");
+            return new ListDataTransfer(listDataSpec);
         }
 
         @Override
         public DataTransfer visit(final StringDataSpec spec) {
             return new StringDataTransfer();
+        }
+
+    }
+
+    private enum VoidDataTransfer implements DataTransfer {
+            INSTANCE;
+
+        @Override
+        public void transfer(final NullableReadData readData, final int readIdx, final NullableWriteData writeData,
+            final int writeIdx) {
+            // no data to transfer
         }
 
     }
@@ -195,6 +216,26 @@ public final class DataTransfers {
 
     }
 
+    private static final class FloatDataTransfer extends AbstractDataTransfer<FloatReadData, FloatWriteData> {
+
+        @Override
+        protected void transferNonMissing(final FloatReadData readData, final int readIdx,
+            final FloatWriteData writeData, final int writeIdx) {
+            writeData.setFloat(writeIdx, readData.getFloat(readIdx));
+        }
+
+    }
+
+    private static final class ByteDataTransfer extends AbstractDataTransfer<ByteReadData, ByteWriteData> {
+
+        @Override
+        protected void transferNonMissing(final ByteReadData readData, final int readIdx, final ByteWriteData writeData,
+            final int writeIdx) {
+            writeData.setByte(writeIdx, readData.getByte(readIdx));
+        }
+
+    }
+
     private static final class IntDataTransfer extends AbstractDataTransfer<IntReadData, IntWriteData> {
 
         @Override
@@ -211,6 +252,67 @@ public final class DataTransfers {
         protected void transferNonMissing(final StringReadData readData, final int readIdx,
             final StringWriteData writeData, final int writeIdx) {
             writeData.setBytes(writeIdx, readData.getBytes(readIdx));
+        }
+
+    }
+
+    private static final class LongDataTransfer extends AbstractDataTransfer<LongReadData, LongWriteData> {
+
+        @Override
+        protected void transferNonMissing(final LongReadData readData, final int readIdx, final LongWriteData writeData,
+            final int writeIdx) {
+            writeData.setLong(writeIdx, readData.getLong(readIdx));
+        }
+
+    }
+
+    private static final class VarBinaryDataTransfer
+        extends AbstractDataTransfer<VarBinaryReadData, VarBinaryWriteData> {
+
+        @Override
+        protected void transferNonMissing(final VarBinaryReadData readData, final int readIdx,
+            final VarBinaryWriteData writeData, final int writeIdx) {
+            writeData.setBytes(writeIdx, readData.getBytes(readIdx));
+        }
+
+    }
+
+    private static final class StructDataTransfer extends AbstractDataTransfer<StructReadData, StructWriteData> {
+
+        private final DataTransfer[] m_fieldTransfers;
+
+        StructDataTransfer(final StructDataSpec spec) {
+            m_fieldTransfers = new DataTransfer[spec.size()];
+            Arrays.setAll(m_fieldTransfers, i -> createTransfer(spec.getDataSpec(i)));
+        }
+
+        @Override
+        protected void transferNonMissing(final StructReadData readData, final int readIdx,
+            final StructWriteData writeData, final int writeIdx) {
+            for (int i = 0; i < m_fieldTransfers.length; i++) {
+                m_fieldTransfers[i].transfer(readData.getReadDataAt(i), readIdx, writeData.getWriteDataAt(i), writeIdx);
+            }
+        }
+
+    }
+
+    private static final class ListDataTransfer extends AbstractDataTransfer<ListReadData, ListWriteData> {
+
+        private final DataTransfer m_elementTransfer;
+
+        ListDataTransfer(final ListDataSpec spec) {
+            m_elementTransfer = createTransfer(spec.getInner());
+        }
+
+        @Override
+        protected void transferNonMissing(final ListReadData readData, final int readIdx, final ListWriteData writeData,
+            final int writeIdx) {
+            var elementReadData = readData.createReadData(readIdx);
+            var size = elementReadData.length();
+            var elementWriteData = writeData.createWriteData(writeIdx, size);
+            for (int i = 0; i < size; i++) {
+                m_elementTransfer.transfer(elementReadData, i, elementWriteData, writeIdx);
+            }
         }
 
     }

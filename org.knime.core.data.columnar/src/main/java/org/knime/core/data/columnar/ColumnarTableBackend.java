@@ -313,7 +313,7 @@ public final class ColumnarTableBackend implements TableBackend {
                 var containerTable = (AbstractColumnarContainerTable)delegate;
                 //            rowReadTable =
                 //                filterColumnarContainerTable((AbstractColumnarContainerTable)delegate, filterFactory, context);
-                size = BatchStoreFilterer.filter(containerTable.asRowAccessible(), readAccessFilterFactory, writeStore,
+                size = BatchStoreFilterer.filter(containerTable.getStore(), readAccessFilterFactory, writeStore,
                     context);
 
                 // TODO alternative strategy: synchronously calculate which rows to keep and create the actual table asynchronously

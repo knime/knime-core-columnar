@@ -84,8 +84,11 @@ public final class DefaultColumnSelection implements ColumnSelection {
 
     @Override
     public ReadBatch createBatch(final IntFunction<NullableReadData> function) {
-        return new DefaultReadBatch(
-            IntStream.range(0, m_numColumns).mapToObj(function::apply).toArray(NullableReadData[]::new));
+        return new DefaultReadBatch(//
+            IntStream.range(0, m_numColumns)//
+                .mapToObj(function::apply)//
+                .toArray(NullableReadData[]::new)//
+        );
     }
 
 }

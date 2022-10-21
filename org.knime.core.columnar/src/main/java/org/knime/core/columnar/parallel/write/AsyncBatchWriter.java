@@ -48,25 +48,26 @@
  */
 package org.knime.core.columnar.parallel.write;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+import org.knime.core.columnar.access.ColumnDataIndex;
+import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
+import org.knime.core.columnar.access.ColumnarWriteAccess;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.DataTransfers;
-import org.knime.core.columnar.data.DataTransfers.DataTransfer;
-import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.parallel.exec.DataWriter;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.table.access.WriteAccess;
+import org.knime.core.table.schema.DataSpec;
 
 /**
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class AsyncBatchWriter implements Closeable {
+public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
     private final BatchWriter m_writer;
 
@@ -84,14 +85,19 @@ public final class AsyncBatchWriter implements Closeable {
         final var schema = batchStore.getSchema();
         m_finalizeBatchBarrier = new AtomicInteger(schema.numColumns());
         m_columnWriters = schema.specStream()//
-            .map(DataTransfers::createTransfer)//
             .map(AsyncDataWriter::new)//
             .toArray(AsyncDataWriter[]::new);
         startBatch();
     }
 
-    public DataWriter getDataWriter(final int colIdx) {
+    @Override
+    public DataWriter<WriteAccess> getDataWriter(final int colIdx) {
         return m_columnWriters[colIdx];
+    }
+
+    @Override
+    public int numWriters() {
+        return m_columnWriters.length;
     }
 
     private void switchBatch() {
@@ -116,6 +122,7 @@ public final class AsyncBatchWriter implements Closeable {
         finishedBatch.release();
     }
 
+    @Override
     public void finishLastBatch() throws IOException {
         var currentBatchLength = getCurrentBatchLength();
         if (currentBatchLength > 0) {
@@ -125,11 +132,11 @@ public final class AsyncBatchWriter implements Closeable {
     }
 
     private int getCurrentBatchLength() {
-        return m_columnWriters[0].currentIdx();
+        return m_columnWriters[0].getIndex();
     }
 
     private boolean allColumnWritersHaveExpectedIndex(final int expected) {
-        return Stream.of(m_columnWriters).mapToInt(AsyncDataWriter::currentIdx).allMatch(i -> i == expected);
+        return Stream.of(m_columnWriters).mapToInt(AsyncDataWriter::getIndex).allMatch(i -> i == expected);
     }
 
     private void resetColumnWriters() {
@@ -141,46 +148,53 @@ public final class AsyncBatchWriter implements Closeable {
 
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void close() throws IOException {
         // TODO how to tell the column writers that we are done?
+        m_currentBatch.release();
         m_currentBatch = null;
         m_writer.close();
     }
 
-    private final class AsyncDataWriter implements DataWriter {
-
-        private final DataTransfer m_transfer;
-
-        private NullableWriteData m_writeData;
+    private final class AsyncDataWriter implements DataWriter<WriteAccess>, ColumnDataIndex {
 
         private final AtomicInteger m_idx = new AtomicInteger(0);
 
-        int currentIdx() {
-            return m_idx.get();
-        }
+        private final ColumnarWriteAccess m_writeAccess;
 
-        AsyncDataWriter(final DataTransfer transfer) {
-            m_transfer = transfer;
+        AsyncDataWriter(final DataSpec spec) {
+            m_writeAccess = ColumnarAccessFactoryMapper.createAccessFactory(spec).createWriteAccess(this);
         }
 
         void reset(final NullableWriteData writeData) {
-            m_writeData = writeData;
+            m_writeAccess.setData(writeData);
             m_idx.set(0);
         }
 
         @Override
-        public boolean accept(final NullableReadData readData, final int idx) {
-            if (m_idx.get() == m_batchLength) {
-                return false;
-            }
-            m_transfer.transfer(readData, idx, m_writeData, m_idx.get());
+        public WriteAccess getAccess() {
+            return m_writeAccess;
+        }
+
+        @Override
+        public boolean canWrite() {
+            return m_idx.get() < m_batchLength;
+        }
+
+        @Override
+        public void advance() {
             if (m_idx.incrementAndGet() == m_batchLength && m_finalizeBatchBarrier.decrementAndGet() == 0) {
                 // this is the last column to finish writing in this batch
                 switchBatch();
             }
-            return true;
+        }
 
+        @Override
+        public int getIndex() {
+            return m_idx.get();
         }
     }
 

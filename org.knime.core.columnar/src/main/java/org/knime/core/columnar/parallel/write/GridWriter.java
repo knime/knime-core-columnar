@@ -42,48 +42,27 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- * 
+ *
  * History
- *   Oct 13, 2022 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Oct 14, 2022 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.parallel.exec;
+package org.knime.core.columnar.parallel.write;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
+import java.io.Closeable;
+import java.io.IOException;
 
-final class ColumnWriteTask implements Runnable {
+import org.knime.core.columnar.parallel.exec.DataWriter;
 
-    private final int m_colIdx;
+/**
+ *
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+ */
+public interface GridWriter<A> extends Closeable {
 
-    private final RowWriteTask m_task;
+    DataWriter<A> getDataWriter(int colIdx);
 
-    private final DataWriter m_writer;
+    int numWriters();
 
-    private int m_readIdx;
-
-    private final ExecutorService m_executor;
-
-    private final CountDownLatch m_doneLatch;
-
-    ColumnWriteTask(final RowWriteTask task, final int colIdx, final DataWriter writer,
-        final ExecutorService executor, final CountDownLatch doneLatch) {
-        m_task = task;
-        m_colIdx = colIdx;
-        m_writer = writer;
-        m_executor = executor;
-        m_doneLatch = doneLatch;
-    }
-
-    @Override
-    public void run() {
-        for (; m_readIdx < m_task.size(); m_readIdx++) { //NOSONAR
-            var readData = m_task.getBatch(m_readIdx).get(m_colIdx);
-            if (!m_writer.accept(readData, m_task.getBatchIndex(m_readIdx))) {
-                m_executor.submit(this);
-                return;
-            }
-        }
-        m_doneLatch.countDown();
-    }
+    void finishLastBatch() throws IOException;
 
 }

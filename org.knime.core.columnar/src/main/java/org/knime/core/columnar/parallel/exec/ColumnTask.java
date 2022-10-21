@@ -42,62 +42,14 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
+ * 
  * History
- *   23 Feb 2021 (Marc Bux, KNIME GmbH, Berlin, Germany): created
+ *   Oct 13, 2022 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.batch;
+package org.knime.core.columnar.parallel.exec;
 
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Stream;
+public interface ColumnTask {
+    int size();
 
-import org.knime.core.columnar.ReferencedData;
-
-/**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
- */
-abstract class AbstractBatch<D extends ReferencedData> implements Batch<D> {
-
-    private final AtomicInteger m_refCounter = new AtomicInteger(1);
-
-    final D[] m_data;
-
-    AbstractBatch(final D[] data) {
-        m_data = data;
-    }
-
-    @Override
-    public final void release() {
-//        if (m_refCounter.decrementAndGet() == 0) {
-            Stream.of(m_data).forEach(ReferencedData::release);
-//        }
-    }
-
-    @Override
-    public final void retain() {
-//        if (m_refCounter.getAndUpdate(x -> x > 0 ? (x + 1) : x) <= 0) {
-//            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
-//        }
-        Stream.of(m_data).forEach(ReferencedData::retain);
-    }
-
-    @Override
-    public final long sizeOf() {
-        return Stream.of(m_data).mapToLong(ReferencedData::sizeOf).sum();
-    }
-
-    @Override
-    public final D get(final int index) {
-        return m_data[index];
-    }
-
-    @Override
-    public final D[] getUnsafe() {
-        return m_data;
-    }
-
-    @Override
-    public final int numData() {
-        return m_data.length;
-    }
+    void performSubtask(int subtask);
 }

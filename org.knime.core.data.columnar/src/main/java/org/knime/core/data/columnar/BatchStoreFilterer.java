@@ -50,10 +50,12 @@ package org.knime.core.data.columnar;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.ObjIntConsumer;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
@@ -62,7 +64,8 @@ import org.knime.core.columnar.access.ColumnarWriteAccess;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.parallel.exec.RowWriteTask;
+import org.knime.core.columnar.parallel.exec.MultiBatchWriteTask;
+import org.knime.core.columnar.parallel.exec.RowTaskBatch;
 import org.knime.core.columnar.parallel.exec.WriteTaskExecutor;
 import org.knime.core.columnar.parallel.write.AsyncBatchWriter;
 import org.knime.core.columnar.store.BatchReadStore;
@@ -89,6 +92,15 @@ final class BatchStoreFilterer {
         ReadAccessRowFilter createFilter(final ReadAccessRow access);
     }
 
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4, new ThreadFactory() {
+        private final AtomicInteger m_threadNum = new AtomicInteger(0);
+
+        @Override
+        public Thread newThread(final Runnable r) {
+            return new Thread(r, "KNIME-Columnar-Write-Task-Executor-" + m_threadNum.getAndIncrement());
+        }
+    });
+
     static long filter(final BatchReadStore source, final ReadAccessRowFilterFactory filterFactory,
         final BatchStore sink, final ExecutionMonitor monitor) throws IOException {
         var readIdx = new BatchIndex();
@@ -100,12 +112,8 @@ final class BatchStoreFilterer {
         try (//
                 var reader = source.createRandomAccessReader();
                 var asyncWriter = new AsyncBatchWriter(sink, source.batchLength());
-                var writeExecutor = new WriteTaskExecutor(//
-                    IntStream.range(0, schema.numColumns())//
-                        .mapToObj(asyncWriter::getDataWriter)//
-                        .collect(Collectors.toList())//
-                ); //
-                var writeDispatcher = new WriteDispatcher(10000, writeExecutor)//
+                var writeExecutor = new WriteTaskExecutor(asyncWriter, EXECUTOR, MultiBatchWriteTask.NULL);
+                var writeDispatcher = new WriteDispatcher(schema, 10000, writeExecutor)//
         ) {
             for (int b = 0; b < source.numBatches(); b++) {//NOSONAR
                 var readBatch = reader.readRetained(b);
@@ -136,17 +144,17 @@ final class BatchStoreFilterer {
 
     private static final class WriteDispatcher implements ObjIntConsumer<ReadBatch>, AutoCloseable {
 
-        private final RowWriteTask.Builder m_taskBuilder;
+        private final MultiBatchWriteTask.Builder m_taskBuilder;
 
         private final int m_taskSize;
 
-        private final Consumer<RowWriteTask> m_taskConsumer;
+        private final Consumer<RowTaskBatch> m_taskConsumer;
 
         private int m_taskCounter;
 
-        WriteDispatcher(final int taskSize, final Consumer<RowWriteTask> taskConsumer) {
+        WriteDispatcher(final ColumnarSchema schema, final int taskSize, final Consumer<RowTaskBatch> taskConsumer) {
             m_taskSize = taskSize;
-            m_taskBuilder = RowWriteTask.builder(taskSize);
+            m_taskBuilder = MultiBatchWriteTask.builder(schema, taskSize);
             m_taskConsumer = taskConsumer;
         }
 

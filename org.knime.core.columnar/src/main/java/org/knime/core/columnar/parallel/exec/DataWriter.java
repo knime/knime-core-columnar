@@ -48,8 +48,11 @@
  */
 package org.knime.core.columnar.parallel.exec;
 
-import org.knime.core.columnar.data.NullableReadData;
+public interface DataWriter<A> {
 
-public interface DataWriter {
-    boolean accept(NullableReadData data, int readIdx);
+    boolean canWrite();
+
+    void advance();
+
+    A getAccess();
 }

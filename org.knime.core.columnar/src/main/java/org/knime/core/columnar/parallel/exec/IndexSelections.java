@@ -48,86 +48,64 @@
  */
 package org.knime.core.columnar.parallel.exec;
 
-import java.util.Arrays;
-import java.util.stream.IntStream;
-
-import org.knime.core.columnar.batch.ReadBatch;
-
 /**
- *
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class RowWriteTask implements AutoCloseable {
+public final class IndexSelections {
 
-    public static final RowWriteTask NULL = new RowWriteTask(new ReadBatch[0], new int[0]);
-
-    private final int[] m_indices;
-
-    private final ReadBatch[] m_batches;
-
-    private RowWriteTask(final ReadBatch[] batches, final int[] indices) {
-        m_indices = indices;
-        m_batches = batches;
+    interface IndexSelection {
+        int size();
+        int get(int idx);
     }
 
-    public int getBatchIndex(final int idx) {
-        return m_indices[idx];
+    public static IndexSelection selection(final int ... indices) {
+        // TODO builder?
+        return new Subset(indices);
     }
 
-    public ReadBatch getBatch(final int idx) {
-        return m_batches[idx];
+    public static IndexSelection all(final int size) {
+        return new All(size);
     }
 
-    public int size() {
-        return m_indices.length;
-    }
-
-    @Override
-    public void close() {
-        for (var batch : m_batches) {
-            batch.release();
-        }
-    }
-
-    public static Builder builder(final int length) {
-        return new Builder(length);
-    }
-
-    /**
-     *
-     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-     */
-    public static final class Builder implements AutoCloseable {
+    private static final class Subset implements IndexSelection {
         private final int[] m_indices;
 
-        private final ReadBatch[] m_batches;
-
-        private int m_currentIndex = 0;
-
-        Builder(final int length) {
-            m_indices = new int[length];
-            m_batches = new ReadBatch[length];
-        }
-
-        public Builder addPosition(final int index, final ReadBatch batch) {
-            batch.retain();
-            m_indices[m_currentIndex] = index;
-            m_batches[m_currentIndex] = batch;
-            m_currentIndex++;
-            return this;
+        Subset(final int[] indices) {
+            m_indices = indices;
         }
 
         @Override
-        public void close() {
-            IntStream.range(0, m_currentIndex).forEach(i -> m_batches[i].release());
+        public int size() {
+            return m_indices.length;
         }
 
-        public RowWriteTask build() {
-            var indices = Arrays.copyOf(m_indices, m_currentIndex);
-            var batches = Arrays.copyOf(m_batches, m_currentIndex);
-            m_currentIndex = 0;
-            return new RowWriteTask(batches, indices);
+        @Override
+        public int get(final int idx) {
+            return m_indices[idx];
         }
+
+
     }
+
+    private static final class All implements IndexSelection {
+
+        private final int m_size;
+
+        All(final int size) {
+            m_size = size;
+        }
+
+        @Override
+        public int size() {
+            return m_size;
+        }
+
+        @Override
+        public int get(final int idx) {
+            return idx;
+        }
+
+    }
+
 }

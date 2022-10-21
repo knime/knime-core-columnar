@@ -53,6 +53,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
@@ -143,6 +144,10 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, m_writeCursor, m_store);
     }
 
+    BatchStore getStore() {
+        return m_store;
+    }
+
     /**
      * @return This table's write-only cursor.
      * @implNote Currently only a single cursor is supported, i.e., it is always the same cursor instance that is
@@ -190,6 +195,29 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
                 schema = m_schema;
             }
             m_nullableFinishedTable = new ColumnarRowReadTable(schema, m_storeFactory, m_store, m_writeCursor.size());
+        }
+        return m_nullableFinishedTable;
+    }
+
+    ColumnarRowReadTable finish(final long size) {
+        if (m_nullableFinishedTable == null) {
+            m_finalizer.close();
+            m_writeCursor.flush();
+            m_writeCursor.close();
+            final ColumnarValueSchema schema;
+            if (m_nullableDomainWritable != null) {
+                final Map<Integer, DataColumnDomain> domains = new HashMap<>();
+                final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();
+                final int numColumns = m_schema.numColumns();
+                for (int i = 1; i < numColumns; i++) {
+                    domains.put(i, m_nullableDomainWritable.getDomain(i));
+                    metadata.put(i, m_nullableDomainWritable.getMetadata(i));
+                }
+                schema = ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata);
+            } else {
+                schema = m_schema;
+            }
+            m_nullableFinishedTable = new ColumnarRowReadTable(schema, m_storeFactory, m_store, size);
         }
         return m_nullableFinishedTable;
     }
