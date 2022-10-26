@@ -81,7 +81,7 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
         // concurrently
         System.setProperty("org.bytedeco.javacpp.maxPhysicalBytes", "0");
         try {
-            Loader.load(javacpp.class, lz4.class);
+            Loader.load(new Class[] { javacpp.class, lz4.class });
             // we need to prevent this from crashing otherwise the AP might not start at all
         } catch (Throwable th) { //NOSONAR
             LOGGER.error("Failed to initialize LZ4 libraries. The Columnar Table Backend won't work properly.", th);

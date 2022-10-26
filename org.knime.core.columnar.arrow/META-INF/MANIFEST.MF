@@ -20,7 +20,7 @@ Require-Bundle: org.knime.core.columnar;bundle-version="[4.2.0,5.0.0)",
  org.apache.arrow.vector;bundle-version="[9.0.0,10.0.0)",
  com.google.flatbuffers.java;bundle-version="[1.12.0,2.0.0)",
  org.apache.commons.io;bundle-version="[2.6.0,3.0.0)",
- org.bytedeco.javacpp;bundle-version="1.5.6",
- org.bytedeco.lz4;bundle-version="1.9.3"
+ org.bytedeco.javacpp;bundle-version="[1.5.8,2.0.0)",
+ org.bytedeco.lz4;bundle-version="[1.9.4,2.0.0)"
 Export-Package: org.knime.core.columnar.arrow,
  org.knime.core.columnar.arrow.compress
