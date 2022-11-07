@@ -50,6 +50,7 @@ import static java.util.stream.Collectors.toList;
 
 import java.util.UUID;
 import java.util.function.IntSupplier;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
@@ -82,6 +83,7 @@ import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeLogger;
+import org.knime.core.table.row.Selection;
 import org.knime.core.table.virtual.VirtualTable;
 
 /**
@@ -227,6 +229,47 @@ public final class ColumnarTableBackend implements TableBackend {
         } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log with stacktraces
             LOGGER.debug("Can't run ColumnRearranger on the Columnar Table Backend. Falling back on the old backend.");
             return OLD_BACKEND.rearrange(progressMonitor, tableIdSupplier, columnRearranger, table, context);
+        }
+    }
+
+    @Override
+    public KnowsRowCountTable slice(final ExecutionContext exec, final BufferedDataTable table, final Selection slice,
+        final IntSupplier tableIdSupplier) {
+        var spec = table.getDataTableSpec();
+        try {
+            var refTable = ReferenceTables.createReferenceTable(UUID.randomUUID(), table);
+            var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
+            var cols = slice.columns();
+            var rearranger = new ColumnRearranger(spec);
+            if (!cols.allSelected()){
+                var colIndices = cols.getSelected();
+                virtualTable = virtualTable.filterColumns(//
+                    IntStream.concat(//
+                        IntStream.of(0), // the row key is always part of the table
+                        IntStream.of(colIndices)//
+                            .map(i -> i + 1))// the slice does not account for the row key column
+                        .toArray()//
+                );
+                rearranger.keepOnly(colIndices);
+            }
+
+            var rows = slice.rows();
+            var size = table.size();
+            if (!rows.allSelected(0, size)) {
+                long fromRow = Math.max(0, rows.fromIndex());
+                long toRow = Math.min(size, rows.toIndex());
+                virtualTable = virtualTable.slice(fromRow, toRow);
+                size = toRow - fromRow;
+            }
+
+            var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(table, rearranger);
+
+            var slicedTable = new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, virtualTable,
+                rearrangedSchema, size, tableIdSupplier.getAsInt());
+            exec.setProgress(1);
+            return slicedTable;
+        } catch (VirtualTableIncompatibleException ex) {//NOSONAR
+            return OLD_BACKEND.slice(exec, table, slice, tableIdSupplier);
         }
     }
 
