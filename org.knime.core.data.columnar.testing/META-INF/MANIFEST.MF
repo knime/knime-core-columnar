@@ -9,7 +9,7 @@ Bundle-RequiredExecutionEnvironment: JavaSE-11
 Bundle-ActivationPolicy: lazy
 Bundle-ClassPath: .
 Require-Bundle: org.knime.core.columnar;bundle-version="[4.2.0,5.0.0)",
- org.knime.core;bundle-version="[4.2.0,5.0.0)",
+ org.knime.core;bundle-version="[4.7.0,5.0.0)",
  org.knime.core.columnar.arrow;bundle-version="[4.2.0,5.0.0)",
  org.knime.testing;bundle-version="[4.2.0,5.0.0)",
  org.knime.workbench.repository;bundle-version="[4.2.0,5.0.0)",
