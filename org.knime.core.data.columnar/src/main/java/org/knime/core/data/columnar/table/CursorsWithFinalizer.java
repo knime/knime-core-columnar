@@ -51,7 +51,9 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 import java.util.function.Consumer;
 
+import org.knime.core.data.DataRow;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
+import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.table.cursor.Cursor;
@@ -86,6 +88,12 @@ final class CursorsWithFinalizer {
         var cursorWithFinalizer = new RowCursorWithFinalizer(rowCursor);
         finalizerRegistry.accept(cursorWithFinalizer.m_finalizer);
         return cursorWithFinalizer;
+    }
+
+    static CloseableRowIterator rowIterator(final CloseableRowIterator rowIterator, final Consumer<Finalizer> finalizerRegistry) {
+        var rowIteratorWithFinalizer = new RowIteratorWithFinalizer(rowIterator);
+        finalizerRegistry.accept(rowIteratorWithFinalizer.m_finalizer);
+        return rowIteratorWithFinalizer;
     }
 
     private static final class CursorWithFinalizer<A> implements Cursor<A> {
@@ -181,6 +189,35 @@ final class CursorsWithFinalizer {
         public void close() {
             m_delegate.close();
             m_finalizer.close();
+        }
+
+    }
+
+    private static final class RowIteratorWithFinalizer extends CloseableRowIterator {
+
+        private final CloseableRowIterator m_delegate;
+
+        private final Finalizer m_finalizer;
+
+        RowIteratorWithFinalizer(final CloseableRowIterator delegate) {
+            m_delegate = delegate;
+            m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, delegate);
+        }
+
+        @Override
+        public void close() {
+            m_delegate.close();
+            m_finalizer.close();
+        }
+
+        @Override
+        public boolean hasNext() {
+            return m_delegate.hasNext();
+        }
+
+        @Override
+        public DataRow next() {
+            return m_delegate.next();
         }
 
     }

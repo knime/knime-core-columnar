@@ -58,6 +58,7 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
+import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.cursor.LookaheadCursor;
@@ -104,6 +105,11 @@ final class CursorTracker<C extends Closeable> implements Closeable {
     static CursorTracker<RowCursor> createRowCursorTracker() {
         Set<Finalizer> openFinalizers = finalizerSet();
         return new CursorTracker<>(c -> CursorsWithFinalizer.rowCursor(c, openFinalizers::add), openFinalizers);
+    }
+
+    static CursorTracker<CloseableRowIterator> createRowIteratorTracker() {
+        Set<Finalizer> openFinalizers = finalizerSet();
+        return new CursorTracker<>(c -> CursorsWithFinalizer.rowIterator(c, openFinalizers::add), openFinalizers);
     }
 
     @SuppressWarnings("resource")

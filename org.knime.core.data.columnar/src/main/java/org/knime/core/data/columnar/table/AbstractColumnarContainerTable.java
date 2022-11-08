@@ -115,6 +115,8 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
     private final ColumnarContainerRowAccessible m_rowAccessibleView = new ColumnarContainerRowAccessible();
 
+    private final CursorTracker<CloseableRowIterator> m_iteratorTracker = CursorTracker.createRowIteratorTracker();
+
     // effectively final. This is a safety net for the case that a table gets GC'ed without being cleared by the AP
     private Finalizer m_tableCloser;
 
@@ -195,6 +197,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
     public void clear() {
         m_tableCloser.close();
         try {
+            m_iteratorTracker.close();
             m_columnarTable.close();
         } catch (final IOException e) {
             LOGGER.error(String.format("Exception while clearing ContainerTable: %s", e.getMessage()), e);
@@ -226,19 +229,24 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         return m_columnarTable.createRowCursor(filter);
     }
 
-    @SuppressWarnings("resource") // Cursor will be closed along with iterator.
     @Override
     public final CloseableRowIterator iterator() {
-        return new PrefetchingRowIterator(new ColumnarRowIterator(cursor()));
+        return m_iteratorTracker.createTrackedCursor(
+            () -> (new PrefetchingRowIterator(new ColumnarRowIterator(m_columnarTable.createUntrackedRowCursor()))));
     }
 
     @Override
-    public final CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
+    public CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
+        return m_iteratorTracker.createTrackedCursor(() -> iteratorWithFilterInternal(filter));
+    }
+
+    @SuppressWarnings("resource") // the calling method tracks the iterator
+    private final CloseableRowIterator iteratorWithFilterInternal(final TableFilter filter) {
         final Optional<Set<Integer>> materializeColumnIndices = filter.getMaterializeColumnIndices();
-        @SuppressWarnings("resource") // Cursor will be closed along with iterator.
         final var iterator = materializeColumnIndices.isPresent()
-            ? FilteredColumnarRowIteratorFactory.create(cursor(filter), materializeColumnIndices.get())
-            : new ColumnarRowIterator(cursor(filter));
+            ? FilteredColumnarRowIteratorFactory.create(m_columnarTable.createUntrackedRowCursor(filter),
+                materializeColumnIndices.get())
+            : new ColumnarRowIterator(m_columnarTable.createUntrackedRowCursor(filter));
         return new PrefetchingRowIterator(iterator);
     }
 
