@@ -152,6 +152,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private final CursorTracker<RowCursor> m_openCursors = CursorTracker.createRowCursorTracker();
 
+    private final CursorTracker<CloseableRowIterator> m_openIterators = CursorTracker.createRowIteratorTracker();
+
     /**
      * Serialization constructor. Not to be used by clients.
      *
@@ -352,6 +354,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     @Override
     public void clear() {
         try {
+        	m_openIterators.close();
             m_openCursors.close();
         } catch (IOException ex) {
             LOGGER.debug("Exception while closing open cursors.", ex);
@@ -398,10 +401,18 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return true;
     }
 
-    @SuppressWarnings("resource") // the cursor is managed by the returned iterator
     @Override
     public CloseableRowIterator iterator() {
-        return new PrefetchingRowIterator(new ColumnarRowIterator(cursor()));
+        return m_openIterators.createTrackedCursor(() -> new PrefetchingRowIterator(new ColumnarRowIterator(cursor())));
+    }
+
+    @Override
+    public CloseableRowIterator iteratorWithFilter(final TableFilter filter) {
+        if (TableFilterUtils.hasFilter(filter)) {
+            return m_openIterators.createTrackedCursor(() -> new PrefetchingRowIterator(new ColumnarRowIterator(cursor(filter))));
+        } else {
+            return iterator();
+        }
     }
 
     @Override
