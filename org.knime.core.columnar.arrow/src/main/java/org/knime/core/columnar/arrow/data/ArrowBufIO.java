@@ -64,6 +64,7 @@ import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.knime.core.table.io.ReadableDataInput;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  * Serializes and deserializes an object of type <T> to a {@link DataOutput} / {@link DataInput}. The {@link DataOutput}

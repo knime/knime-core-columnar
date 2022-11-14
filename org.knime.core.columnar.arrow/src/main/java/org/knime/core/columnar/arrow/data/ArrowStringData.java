@@ -63,6 +63,7 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  * Arrow implementation of {@link StringWriteData} and {@link StringReadData}.
