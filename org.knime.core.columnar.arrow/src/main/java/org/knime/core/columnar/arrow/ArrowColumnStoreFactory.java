@@ -65,7 +65,6 @@ import org.knime.core.table.schema.ColumnarSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * A {@link ColumnStoreFactory} implementation for Arrow.
  *
@@ -81,10 +80,15 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
         // concurrently
         System.setProperty("org.bytedeco.javacpp.maxPhysicalBytes", "0");
         try {
-            Loader.load(new Class[] { javacpp.class, lz4.class });
-            // we need to prevent this from crashing otherwise the AP might not start at all
-        } catch (Throwable th) { //NOSONAR
+            // NB: Loader.load(Class...) catches exceptions but Loader.load(Class) does not
+            Loader.load(javacpp.class);
+            Loader.load(lz4.class);
+        } catch (final Throwable th) { // NOSONAR
+            // AP-19695: If we cannot load the native libraries Loader#load(Class) will throw an UnsatisfiedLinkError.
+            // We only catch this error to add a useful error message to the KNIME log. Afterwards we re-throw it
+            // because the Arrow backend cannot be used without the lz4 libraries.
             LOGGER.error("Failed to initialize LZ4 libraries. The Columnar Table Backend won't work properly.", th);
+            throw th;
         }
     }
 
