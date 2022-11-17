@@ -222,12 +222,7 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
         }
 
         if (m_currentBatch == null) {
-            checkAsyncWriteThrowable();
-            try {
-                m_currentBatch = m_batchQueue.takeFirst();
-            } catch (InterruptedException e) {
-                throw wrap(e);
-            }
+            m_currentBatch = nextBatch();
             m_currentIndex = 0;
             enqueuePrefetchBatch();
         }
@@ -241,6 +236,19 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
             }
             m_currentBatch = null;
             return getNextRow();
+        }
+    }
+
+    private RowBatch nextBatch() {
+        checkAsyncWriteThrowable();
+        RowBatch nextBatch;
+        try {
+            while ((nextBatch = m_batchQueue.pollFirst(500, TimeUnit.MILLISECONDS)) == null) {
+                checkAsyncWriteThrowable();
+            }
+            return nextBatch;
+        } catch (InterruptedException ex) {
+            throw wrap(ex);
         }
     }
 
