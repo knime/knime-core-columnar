@@ -45,10 +45,12 @@
  */
 package org.knime.core.data.columnar.table;
 
+import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.node.ExtensionTable.LoadContext;
 import org.knime.core.node.ExtensionTableLoader;
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeLogger;
 
 /**
  * Extension point for ExtensionTables created for Columnar Table Backend.
@@ -69,7 +71,23 @@ public final class ColumnarContainerTableLoader implements ExtensionTableLoader 
 
     @Override
     public boolean canLoad(final String type) {
-        return type.equalsIgnoreCase(UnsavedColumnarContainerTable.class.getName());
+        return singletonColumnStoreFactoryAvailable()
+            && type.equalsIgnoreCase(UnsavedColumnarContainerTable.class.getName());
+    }
+
+    /**
+     * Check if the column store factory for the columnar backend could be loaded. If not, we cannot load any columnar
+     * tables.
+     */
+    private static boolean singletonColumnStoreFactoryAvailable() {
+        try {
+            ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+            return true;
+        } catch (final Exception e) {
+            NodeLogger.getLogger(ColumnarContainerTableLoader.class)
+                .warn("Unable to instantiate the default columnar store.", e);
+            return false;
+        }
     }
 
     private static final class SavedColumnarContainerTable extends AbstractColumnarContainerTable {
