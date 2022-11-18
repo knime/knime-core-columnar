@@ -428,7 +428,7 @@ abstract class AbstractArrowBatchReader implements RandomAccessBatchReader {
          */
         static void checkFileSize(final SeekableReadChannel in) throws IOException {
             if (in.size() <= ARROW_MAGIC_LENGTH * 2 + 4) {
-                throw new IOException("Arrow file invalid: File is to small: " + in.size());
+                throw new IOException("Arrow file invalid: File is too small: " + in.size());
             }
         }
 

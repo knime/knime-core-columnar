@@ -205,6 +205,13 @@ class ArrowBatchReader extends AbstractArrowBatchReader {
         private static int getDictionariesPerBatch(final ArrowFooter footer) throws IOException {
             final int numBatches = footer.getRecordBatches().size();
             final int numDictionaries = footer.getDictionaries().size();
+            if (numBatches == 0) {
+            	// pyarrow doesn't write any batches if a table is empty
+                if (numDictionaries != 0) {
+                    throw new IOException("Arrow file invalid: There are no batches but there are dictionaries.");
+                }
+                return 0;
+            }
             if (numDictionaries % numBatches != 0) {
                 throw new IOException(
                     "Arrow file invalid: There must be the same number of dictionaries for each batch.");
