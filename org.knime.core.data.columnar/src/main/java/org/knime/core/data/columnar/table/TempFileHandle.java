@@ -79,7 +79,7 @@ final class TempFileHandle implements FileHandle {
             try {
                 Files.deleteIfExists(m_path);
             } catch (IOException ex) {
-                ColumnarRowWriteTable.LOGGER.error("Exception while deleting temporary columnar output file.", ex);
+                ColumnarRowWriteTable.LOGGER.debug("Exception while deleting temporary columnar output file.", ex);
             }
         }
     }
