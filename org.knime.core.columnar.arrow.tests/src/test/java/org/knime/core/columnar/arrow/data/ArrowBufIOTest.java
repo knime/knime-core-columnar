@@ -51,6 +51,7 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.knime.core.columnar.arrow.data.ArrowBufIO.deserialize;
@@ -608,4 +609,96 @@ public class ArrowBufIOTest {
         }
     }
 
+    @Test
+    public void testRead() {
+        ObjectSerializer<byte[]> simpleWrite = (o, d) -> o.write(d);
+        var data = new byte[]{10, 20, 30};
+
+        // Read once into buffer that is big enough
+        serdeByteArray(data, simpleWrite, (in) -> {
+            var buffer = new byte[10];
+            var read = in.read(buffer, 0, buffer.length);
+            assertEquals(data.length, read);
+            var output = new byte[read];
+            System.arraycopy(buffer, 0, output, 0, read);
+            return output;
+        });
+
+        // Read twice into buffer that is not big enough
+        serdeByteArray(data, simpleWrite, (in) -> {
+            var output = new byte[data.length];
+            var buffer = new byte[2];
+            var read = in.read(buffer, 0, buffer.length);
+            assertEquals(2, read);
+            System.arraycopy(buffer, 0, output, 0, read);
+            read = in.read(buffer, 0, buffer.length);
+            assertEquals(1, read);
+            System.arraycopy(buffer, 0, output, 2, read);
+            return output;
+        });
+
+        // Read into buffer exactly big enough
+        serdeByteArray(data, simpleWrite, (in) -> {
+            var buffer = new byte[3];
+            var read = in.read(buffer, 0, buffer.length);
+            assertEquals(3, read);
+            read = in.read(new byte[10], 0, 10); // No data available anymore -> should return -1
+            assertEquals(-1, read);
+            return buffer;
+        });
+
+        // Read empty bytes
+        serdeByteArray(new byte[0], simpleWrite, (in) -> {
+            var buffer = new byte[10];
+            var read = in.read(buffer, 0, buffer.length);
+            assertEquals(-1, read); // No data available anymore -> should return -1
+            return new byte[0];
+        });
+
+        // Read into empty buffer
+        serdeByteArray(data, simpleWrite, (in) -> {
+            var buffer = new byte[0];
+            var read = in.read(buffer, 0, buffer.length);
+            assertEquals(0, read); // No space available
+
+            // Just return what we expect
+            return data;
+        });
+
+        // Try to read more than the buffer size
+        assertThrows(IndexOutOfBoundsException.class, () -> {
+            serdeByteArray(data, simpleWrite, (in) -> {
+                var buffer = new byte[10];
+                // Try to read more than we have buffer space
+                in.read(buffer, 0, 20);
+                return null;
+            });
+        });
+
+        // Read with offsets
+        serdeByteArray(data, simpleWrite, (in) -> {
+            var output = new byte[data.length];
+            var buffer = new byte[10];
+            var read = in.read(buffer, 5, 2);
+            assertEquals(2, read);
+            System.arraycopy(buffer, 5, output, 0, read);
+
+            read = in.read(buffer, 2, 7);
+            assertEquals(1, read);
+            System.arraycopy(buffer, 2, output, 2, read);
+            return output;
+        });
+    }
+
+    @Test
+    public void testReadBytes() {
+        ObjectSerializer<byte[]> simpleWrite = (o, d) -> o.write(d);
+        ObjectDeserializer<byte[]> simpleReadBytes = (in) -> in.readBytes();
+
+        // Simple
+        serdeByteArray(new byte[]{10, 20, 30}, simpleWrite, simpleReadBytes);
+
+        // Empty data
+        serdeByteArray(new byte[]{}, simpleWrite, simpleReadBytes);
+    }
 }

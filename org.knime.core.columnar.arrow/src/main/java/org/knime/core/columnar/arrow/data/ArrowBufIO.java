@@ -188,9 +188,9 @@ final class ArrowBufIO {
         }
 
         @Override
-        public byte[] readBytes() throws EOFException {
+        public byte[] readBytes() {
             if (m_bufferIndex == m_nextBufferIndex) {
-                throw new EOFException();
+                return new byte[0];
             }
 
             long numBytesAvailable = m_nextBufferIndex - m_bufferIndex;
@@ -204,7 +204,7 @@ final class ArrowBufIO {
         }
 
         @Override
-        public int read(final byte[] b, final int off, final int len) throws EOFException {
+        public int read(final byte[] b, final int off, final int len) {
             if (off + len > b.length) {
                 throw new IndexOutOfBoundsException();
             }
@@ -212,7 +212,7 @@ final class ArrowBufIO {
                 return 0;
             }
             if (m_bufferIndex >= m_nextBufferIndex) {
-                throw new EOFException();
+                return -1;
             }
             int actualLen = m_bufferIndex + len > m_nextBufferIndex ? ((int)(m_nextBufferIndex - m_bufferIndex)) : len;
             m_buffer.getBytes(m_bufferIndex, b, off, actualLen);
