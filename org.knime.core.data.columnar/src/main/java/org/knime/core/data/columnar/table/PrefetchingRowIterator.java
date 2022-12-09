@@ -274,32 +274,30 @@ public final class PrefetchingRowIterator extends CloseableRowIterator {
     @Override
     public void close() {
         m_closed.set(true);
-        waitForAndHandleFuture();
-        m_batchQueue.clear();
-        m_source.close();
-        MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
-    }
-
-    /**
-     * Check and rethrow exceptions that occurred during asynchronous prefetching
-     */
-    private void checkAsyncWriteThrowable() {
-        if (m_future.isCompletedExceptionally()) {
-            waitForAndHandleFuture();
-        }
-    }
-
-    /**
-     * Wait for {@code m_future} to complete (normally or exceptionally).
-     * Rethrow exceptions.
-     */
-    private void waitForAndHandleFuture() {
         try {
             m_future.get();
         } catch (ExecutionException e) {
             throw wrap(e.getCause());
         } catch (CancellationException | InterruptedException e) {
             throw wrap(e);
+        } finally {
+            m_batchQueue.clear();
+            m_source.close();
+            MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
+        }
+
+    }
+
+    /**
+     * Check and rethrow exceptions that occurred during asynchronous prefetching. Closes the iterator if an exception
+     * occurred.
+     */
+    private void checkAsyncWriteThrowable() {
+        if (m_future.isCompletedExceptionally()) {
+            // Something went wrong
+            // We cannot use this iterator anymore. Therefore, we cleanup now
+            // NOTE: close will throw the exception of the future
+            close();
         }
     }
 
