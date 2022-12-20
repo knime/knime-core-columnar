@@ -68,6 +68,7 @@ import org.knime.core.columnar.parallel.exec.MultiBatchWriteTask;
 import org.knime.core.columnar.parallel.exec.RowTaskBatch;
 import org.knime.core.columnar.parallel.exec.WriteTaskExecutor;
 import org.knime.core.columnar.parallel.write.AsyncBatchWriter;
+import org.knime.core.columnar.parallel.write.AsyncBatchWriter.FixedCapacityStrategy;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.node.ExecutionMonitor;
@@ -111,8 +112,8 @@ final class BatchStoreFilterer {
         double numBatches = source.numBatches();
         try (//
                 var reader = source.createRandomAccessReader();
-                var asyncWriter = new AsyncBatchWriter(sink, source.batchLength());
-                var writeExecutor = new WriteTaskExecutor(asyncWriter, EXECUTOR, MultiBatchWriteTask.NULL);
+                var asyncWriter = new AsyncBatchWriter(sink, new FixedCapacityStrategy(source.batchLength()));
+                var writeExecutor = new WriteTaskExecutor<>(asyncWriter, EXECUTOR, MultiBatchWriteTask.NULL);
                 var writeDispatcher = new WriteDispatcher(schema, 10000, writeExecutor)//
         ) {
             for (int b = 0; b < source.numBatches(); b++) {//NOSONAR
@@ -148,11 +149,12 @@ final class BatchStoreFilterer {
 
         private final int m_taskSize;
 
-        private final Consumer<RowTaskBatch> m_taskConsumer;
+        private final Consumer<RowTaskBatch<WriteAccess>> m_taskConsumer;
 
         private int m_taskCounter;
 
-        WriteDispatcher(final ColumnarSchema schema, final int taskSize, final Consumer<RowTaskBatch> taskConsumer) {
+        WriteDispatcher(final ColumnarSchema schema, final int taskSize,
+            final Consumer<RowTaskBatch<WriteAccess>> taskConsumer) {
             m_taskSize = taskSize;
             m_taskBuilder = MultiBatchWriteTask.builder(schema, taskSize);
             m_taskConsumer = taskConsumer;

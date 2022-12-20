@@ -100,7 +100,7 @@ public final class ColumnarRowContainerUtils {
         } else {
             final var storeFactory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
             return new ParallelColumnarDataContainerDelegate(tableId, schema, new ColumnarRowWriteTable(schema,
-                storeFactory, settings), tableId);
+                storeFactory, settings));
         }
     }
 

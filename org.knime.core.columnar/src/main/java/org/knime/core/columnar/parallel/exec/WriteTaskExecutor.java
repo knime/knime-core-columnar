@@ -95,7 +95,6 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
     }
 
     private void scheduleColumnTasks() {
-        // null is the poison pill
         while (m_open.get()) {
             try (var task = m_tasks.take()) {
                 if (task == m_poisonPill) {

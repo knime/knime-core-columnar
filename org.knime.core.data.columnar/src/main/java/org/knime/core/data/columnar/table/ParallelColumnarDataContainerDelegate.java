@@ -48,6 +48,9 @@
  */
 package org.knime.core.data.columnar.table;
 
+import static org.knime.core.columnar.ColumnarParameters.BATCH_SIZE_TARGET;
+import static org.knime.core.columnar.ColumnarParameters.CAPACITY_MAX;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,16 +59,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
-import org.knime.core.columnar.batch.DefaultReadBatch;
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.ColumnarParameters;
 import org.knime.core.columnar.parallel.exec.ColumnTask;
 import org.knime.core.columnar.parallel.exec.RowTaskBatch;
 import org.knime.core.columnar.parallel.exec.WriteTaskExecutor;
 import org.knime.core.columnar.parallel.write.AsyncBatchWriter;
+import org.knime.core.columnar.parallel.write.AsyncBatchWriter.AdjustingCapacityStrategy;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
@@ -98,7 +98,7 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
 
     private final AsyncBatchWriter m_batchWriter;
 
-    private final WriteTaskExecutor m_writeExec;
+    private final WriteTaskExecutor<WriteAccess> m_writeExec;
 
     private final ColumnarValueSchema m_schema;
 
@@ -115,16 +115,17 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
     private long m_size = 0;
 
     // TODO implement sequential I/O for filestore columns
+    // or get rid of the sequential writing in loops by introducing a flush functionality in core that automatically
+    // flushes the containers after each loop iteration
 
     ParallelColumnarDataContainerDelegate(final int tableId, final ColumnarValueSchema schema,
-        final ColumnarRowWriteTable writeTable, final int batchLength) {
+        final ColumnarRowWriteTable writeTable) {
         m_writeTable = writeTable;
         m_schema = schema;
         m_store = writeTable.getStore();
-        // TODO run the first batch synchronously to figure out the batch size and then switch to
-        // parallel writing on the remaining batches
-        m_batchWriter = new AsyncBatchWriter(m_store, batchLength);
-        m_writeExec = new WriteTaskExecutor(m_batchWriter, EXECUTOR, RowBatchWriteTask.NULL);
+        m_batchWriter = new AsyncBatchWriter(m_store,
+            new AdjustingCapacityStrategy(ColumnarParameters.CAPACITY_INIT, BATCH_SIZE_TARGET, CAPACITY_MAX));
+        m_writeExec = new WriteTaskExecutor<>(m_batchWriter, EXECUTOR, RowBatchWriteTask.NULL);
         m_dispatcher = new DataRowBatchTaskDispatcher(100, this::scheduleBatch);
         m_id = tableId;
     }
@@ -135,13 +136,7 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
         m_size++;
     }
 
-    private ReadBatch createReadBatch(final DataRow[] rows) {
-        var rowKeyData = RowBatchReadDatas.createRowKeyBatchReadData(m_schema.getValueFactory(0), rows);
-        var colDatas = IntStream.range(0, m_schema.numColumns() - 1)//
-            .mapToObj(i -> RowBatchReadDatas.createRowBatchReadData(i, m_schema.getValueFactory(i + 1), rows));
-        return new DefaultReadBatch(Stream.concat(Stream.of(rowKeyData), colDatas).toArray(NullableReadData[]::new));
-    }
-
+    @SuppressWarnings("resource") // the task is closed by the executor once it is finished
     private void scheduleBatch(final DataRow[] rows) {
         m_writeExec.accept(new RowBatchWriteTask(m_schema, rows));
     }
@@ -186,6 +181,7 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Interrupted while waiting for the table writing to finish.", ex);
             }
+            @SuppressWarnings("resource") // is managed by m_containerTable
             final ColumnarRowReadTable finishedColumnarTable = m_writeTable.finish(m_size);
             closeAsyncResources();
             m_containerTable =
@@ -337,6 +333,7 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
 
         }
 
+        @SuppressWarnings("unchecked")
         private static <D extends DataValue> void setValue(final WriteValue<D> writeValue, final DataValue value) {
             writeValue.setValue((D)value);
         }

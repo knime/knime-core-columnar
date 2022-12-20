@@ -63,11 +63,109 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.DataSpec;
 
+import com.google.common.base.Preconditions;
+
 /**
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
+
+    public interface CapacityStrategy {
+        int getInitialCapacity();
+
+        /**
+         * @param batch to potentially expand
+         * @return the new capacity for the batch (or the same if the batch should not be expanded)
+         */
+        int getNewCapacity(WriteBatch batch);
+
+    }
+
+    /**
+     * Always recommends the same strategy.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    public static final class FixedCapacityStrategy implements CapacityStrategy {
+
+        private final int m_capacity;
+
+        public FixedCapacityStrategy(final int capacity) {
+            Preconditions.checkArgument(capacity > 0, "The capacity must be greater than 0.");
+            m_capacity = capacity;
+        }
+
+        @Override
+        public int getInitialCapacity() {
+            return m_capacity;
+        }
+
+        @Override
+        public int getNewCapacity(final WriteBatch batch) {
+            return m_capacity;
+        }
+
+    }
+
+    public static final class AdjustingCapacityStrategy implements CapacityStrategy {
+
+        private boolean m_adjusting = true;
+
+        private int m_currentCapacity;
+
+        private final int m_initialCapacity;
+
+        private final long m_targetBatchSize;
+
+        private final int m_maxCapacity;
+
+        public AdjustingCapacityStrategy(final int initialCapacity, final long targetBatchSize, final int maxCapacity) {
+            m_initialCapacity = initialCapacity;
+            m_currentCapacity = initialCapacity;
+            m_targetBatchSize = targetBatchSize;
+            m_maxCapacity = maxCapacity;
+        }
+
+        @Override
+        public int getInitialCapacity() {
+            return m_initialCapacity;
+        }
+
+        @Override
+        public int getNewCapacity(final WriteBatch batch) {
+            if (m_adjusting) {
+                final int newCapacity = recalculateCapacity(batch);
+                if (newCapacity >= m_maxCapacity) {
+                    m_adjusting = false;
+                }
+                return newCapacity;
+            } else {
+                return batch.capacity();
+            }
+        }
+
+        private int recalculateCapacity(final WriteBatch batch) {
+            final int curCapacity = batch.capacity();
+            final long curBatchSize = batch.sizeOf();
+
+            final int newCapacity;
+            if (curBatchSize > 0) {
+                // we want to avoid too much serialization overhead for capacities > 100
+                // 100 rows should give us a good estimate for the capacity, though
+                long factor = m_targetBatchSize / curBatchSize;
+                if (curCapacity <= 100) {
+                    factor = Math.min(8, factor);
+                }
+                newCapacity = (int)Math.min(m_maxCapacity, curCapacity * factor); // can't exceed Integer.MAX_VALUE
+            } else {
+                newCapacity = m_maxCapacity;
+            }
+            return newCapacity;
+        }
+
+    }
+
 
     private final BatchWriter m_writer;
 
@@ -75,12 +173,16 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
     private final AtomicInteger m_finalizeBatchBarrier;
 
-    private final int m_batchLength;
+    private final AtomicInteger m_batchCapacity;
+
+    private final CapacityStrategy m_capacityStrategy;
 
     private final AsyncDataWriter[] m_columnWriters;
 
-    public AsyncBatchWriter(final BatchStore batchStore, final int batchLength) {
-        m_batchLength = batchLength;
+
+    public AsyncBatchWriter(final BatchStore batchStore, final CapacityStrategy capacityStrategy) {
+        m_capacityStrategy = capacityStrategy;
+        m_batchCapacity = new AtomicInteger(capacityStrategy.getInitialCapacity());
         m_writer = batchStore.getWriter();
         final var schema = batchStore.getSchema();
         m_finalizeBatchBarrier = new AtomicInteger(schema.numColumns());
@@ -101,12 +203,17 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
     }
 
     private void switchBatch() {
-        finishBatch(m_batchLength);
-        startBatch();
+        var newCapacity = m_capacityStrategy.getNewCapacity(m_currentBatch);
+        if (newCapacity > m_batchCapacity.get()) {
+            m_currentBatch.expand(newCapacity);
+        } else {
+            finishBatch(m_batchCapacity.get());
+            startBatch();
+        }
     }
 
     private void startBatch() {
-        m_currentBatch = m_writer.create(m_batchLength);
+        m_currentBatch = m_writer.create(m_batchCapacity.get());
         resetColumnWriters();
     }
 
@@ -148,9 +255,6 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void close() throws IOException {
         // TODO how to tell the column writers that we are done?
@@ -181,12 +285,12 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
         @Override
         public boolean canWrite() {
-            return m_idx.get() < m_batchLength;
+            return m_idx.get() < m_batchCapacity.get();
         }
 
         @Override
         public void advance() {
-            if (m_idx.incrementAndGet() == m_batchLength && m_finalizeBatchBarrier.decrementAndGet() == 0) {
+            if (m_idx.incrementAndGet() == m_batchCapacity.get() && m_finalizeBatchBarrier.decrementAndGet() == 0) {
                 // this is the last column to finish writing in this batch
                 switchBatch();
             }

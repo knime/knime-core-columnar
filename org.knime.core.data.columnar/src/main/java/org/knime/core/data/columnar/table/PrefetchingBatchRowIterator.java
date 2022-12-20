@@ -109,8 +109,8 @@ final class PrefetchingBatchRowIterator extends CloseableRowIterator {
 
     private int m_consumedBatches;
 
-    PrefetchingBatchRowIterator(final ColumnarContainerTable table,
-        final int numPendingBatches, final int batchSize, final ExecutorService executor) {
+    PrefetchingBatchRowIterator(final ColumnarContainerTable table, final int numPendingBatches, final int batchSize,
+        final ExecutorService executor) {
         m_executor = executor;
         var schema = table.getSchema();
         m_rowBatchQueue = new ArrayBlockingQueue<>(numPendingBatches);
@@ -248,7 +248,9 @@ final class PrefetchingBatchRowIterator extends CloseableRowIterator {
         private final ColumnarValueSchema m_schema;
 
         MiniReadBatch(final ColumnarValueSchema schema, final ReadBatch batch, final int startIdx, final int endIdx) {
-            batch.retain();
+            if (batch != null) {
+                batch.retain();
+            }
             m_batch = batch;
             m_startIdx = startIdx;
             m_endIdx = endIdx;
