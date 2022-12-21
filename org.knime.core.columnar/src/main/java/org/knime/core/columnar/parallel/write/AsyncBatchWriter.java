@@ -134,22 +134,25 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
         @Override
         public int getNewCapacity(final WriteBatch batch) {
+            int curCapacity = batch.capacity();
             if (m_adjusting) {
-                final int newCapacity = recalculateCapacity(batch);
-                if (newCapacity >= m_maxCapacity) {
+                final int newCapacity = recalculateCapacity(batch, curCapacity);
+                // TODO why do curCapacity and m_batchCapacity differ?
+                if (curCapacity < newCapacity) {
+                    if (newCapacity == m_maxCapacity) {
+                        m_adjusting = false;
+                    }
+                    return newCapacity;
+                } else {
                     m_adjusting = false;
                 }
-                return newCapacity;
-            } else {
-                return batch.capacity();
             }
+            return curCapacity;
         }
 
-        private int recalculateCapacity(final WriteBatch batch) {
-            final int curCapacity = batch.capacity();
+        private int recalculateCapacity(final WriteBatch batch, final int curCapacity) {
             final long curBatchSize = batch.sizeOf();
 
-            final int newCapacity;
             if (curBatchSize > 0) {
                 // we want to avoid too much serialization overhead for capacities > 100
                 // 100 rows should give us a good estimate for the capacity, though
@@ -157,11 +160,10 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
                 if (curCapacity <= 100) {
                     factor = Math.min(8, factor);
                 }
-                newCapacity = (int)Math.min(m_maxCapacity, curCapacity * factor); // can't exceed Integer.MAX_VALUE
+                return (int)Math.min(m_maxCapacity, curCapacity * factor); // can't exceed Integer.MAX_VALUE
             } else {
-                newCapacity = m_maxCapacity;
+                return m_maxCapacity;
             }
-            return newCapacity;
         }
 
     }
@@ -205,6 +207,7 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
     private void switchBatch() {
         var newCapacity = m_capacityStrategy.getNewCapacity(m_currentBatch);
         if (newCapacity > m_batchCapacity.get()) {
+            m_batchCapacity.set(newCapacity);
             m_currentBatch.expand(newCapacity);
         } else {
             finishBatch(m_batchCapacity.get());
