@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.parallel.exec;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -84,8 +85,11 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
 
     private final RowTaskBatch<A> m_poisonPill;
 
+    private final GridWriter<A> m_gridWriter;
+
     public WriteTaskExecutor(final GridWriter<A> gridWriter, final ExecutorService executor,
         final RowTaskBatch<A> poisonPill) {
+        m_gridWriter = gridWriter;
         m_poisonPill = poisonPill;
         m_executor = executor;
         m_columnWriters = IntStream.range(0, gridWriter.numWriters())//
@@ -142,6 +146,11 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
             m_currentTaskFuture.get();
         } catch (ExecutionException ex) {//NOSONAR just a wrapper
             throw new IllegalStateException("Asynchronous writing failed.", ex.getCause());
+        }
+        try {
+            m_gridWriter.finishLastBatch();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to finish last batch.", ex);
         }
     }
 

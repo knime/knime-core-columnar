@@ -78,6 +78,7 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
          * @param batch to potentially expand
          * @return the new capacity for the batch (or the same if the batch should not be expanded)
          */
+        // TODO make this Batch<?> in order to discourage expanding the batch
         int getNewCapacity(WriteBatch batch);
 
     }
@@ -206,9 +207,10 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
     private void switchBatch() {
         var newCapacity = m_capacityStrategy.getNewCapacity(m_currentBatch);
-        if (newCapacity > m_batchCapacity.get()) {
-            m_batchCapacity.set(newCapacity);
+        if (newCapacity > m_currentBatch.capacity()) {
             m_currentBatch.expand(newCapacity);
+            m_finalizeBatchBarrier.set(m_columnWriters.length);
+            m_batchCapacity.set(newCapacity);
         } else {
             finishBatch(m_batchCapacity.get());
             startBatch();
@@ -238,7 +240,6 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
         if (currentBatchLength > 0) {
             finishBatch(currentBatchLength);
         }
-        close();
     }
 
     private int getCurrentBatchLength() {
