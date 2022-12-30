@@ -275,46 +275,57 @@ public final class ColumnarTableBackend implements TableBackend {
     }
 
     @Override
-    public KnowsRowCountTable slice(final ExecutionContext exec, final BufferedDataTable table, final Selection slice,
-        final IntSupplier tableIdSupplier) {
-        var spec = table.getDataTableSpec();
-        var preprocessedTable = preprocessTable(table, exec);
+    public KnowsRowCountTable[] slice(final ExecutionContext exec, final BufferedDataTable table,
+        final Selection[] slices, final IntSupplier tableIdSupplier) {
         try {
-            var refTable = ReferenceTables.createReferenceTable(UUID.randomUUID(), preprocessedTable);
-            var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
-            var cols = slice.columns();
-            var rearranger = new ColumnRearranger(spec);
-            if (!cols.allSelected()){
-                var colIndices = cols.getSelected();
-                virtualTable = virtualTable.filterColumns(//
-                    IntStream.concat(//
-                        IntStream.of(0), // the row key is always part of the table
-                        IntStream.of(colIndices)//
-                            .map(i -> i + 1))// the slice does not account for the row key column
-                        .toArray()//
-                );
-                rearranger.keepOnly(colIndices);
+            final var numSlices = slices.length;
+            var tableSlices = new KnowsRowCountTable[numSlices];
+            for (var i = 0; i < slices.length; i++) {
+                exec.setMessage(String.format("Creating slice %s of %s.", i + 1, numSlices));
+                tableSlices[i] =
+                    slice(exec.createSubExecutionContext(1.0 / numSlices), table, slices[i], tableIdSupplier);
             }
-
-            var rows = slice.rows();
-            var size = preprocessedTable.size();
-            if (!rows.allSelected(0, size)) {
-                long fromRow = Math.max(0, rows.fromIndex());
-                long toRow = Math.min(size, rows.toIndex());
-                virtualTable = virtualTable.slice(fromRow, toRow);
-                size = toRow - fromRow;
-            }
-
-            var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(preprocessedTable, rearranger);
-
-            var slicedTable = new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, virtualTable,
-                rearrangedSchema, size, tableIdSupplier.getAsInt());
-            exec.setProgress(1);
-            return slicedTable;
+            return tableSlices;
         } catch (VirtualTableIncompatibleException ex) {//NOSONAR
             logFallback();
-            return OLD_BACKEND.slice(exec, table, slice, tableIdSupplier);
+            return OLD_BACKEND.slice(exec, table, slices, tableIdSupplier);
         }
+    }
+
+    private static KnowsRowCountTable slice(final ExecutionContext exec, final BufferedDataTable table,
+        final Selection slice, final IntSupplier tableIdSupplier) throws VirtualTableIncompatibleException {
+        var spec = table.getDataTableSpec();
+        var refTable = ReferenceTables.createReferenceTable(UUID.randomUUID(), table);
+        var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
+        var cols = slice.columns();
+        var rearranger = new ColumnRearranger(spec);
+        if (!cols.allSelected()) {
+            var colIndices = cols.getSelected();
+            virtualTable = virtualTable.filterColumns(//
+                IntStream.concat(//
+                    IntStream.of(0), // the row key is always part of the table
+                    IntStream.of(colIndices)//
+                        .map(i -> i + 1))// the slice does not account for the row key column
+                    .toArray()//
+            );
+            rearranger.keepOnly(colIndices);
+        }
+
+        var rows = slice.rows();
+        var size = table.size();
+        if (!rows.allSelected(0, size)) {
+            long fromRow = Math.max(0, rows.fromIndex());
+            long toRow = Math.min(size, rows.toIndex());
+            virtualTable = virtualTable.slice(fromRow, toRow);
+            size = toRow - fromRow;
+        }
+
+        var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(table, rearranger);
+
+        var slicedTable = new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, virtualTable, rearrangedSchema,
+            size, tableIdSupplier.getAsInt());
+        exec.setProgress(1);
+        return slicedTable;
     }
 
     @Override

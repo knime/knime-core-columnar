@@ -95,7 +95,7 @@ final class BufferedDataTableRowAccessible implements LookaheadRowAccessible {
     @SuppressWarnings("resource") // the returned cursor closes the iterator
     @Override
     public LookaheadCursor<ReadAccessRow> createCursor(final Selection selection) {
-        return new RowIteratorCursor(m_schema, m_table.filter(TableFilter.fromSelection(selection)).iterator(),
+        return new RowIteratorCursor(m_schema, m_table.filter(TableFilter.fromSelection(selection, m_table)).iterator(),
             selection.columns());
     }
 
