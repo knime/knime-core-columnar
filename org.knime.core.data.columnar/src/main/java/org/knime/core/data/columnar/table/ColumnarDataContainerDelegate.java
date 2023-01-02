@@ -328,11 +328,22 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     }
 
     @Override
+    public void flushRows() {
+        if (!m_closed) {
+            internalFlush();
+        }
+    }
+
+    private void internalFlush() {
+        submit();
+        waitForAndHandleFuture();
+    }
+
+    @Override
     public void close() {
         if (!m_closed) {
             m_closed = true;
-            submit(); // submit the last batch
-            waitForAndHandleFuture();
+            internalFlush(); // make sure all data has been written
             m_containerTable = m_delegateContainer.finishInternal();
             m_delegateCursor.close();
         }
