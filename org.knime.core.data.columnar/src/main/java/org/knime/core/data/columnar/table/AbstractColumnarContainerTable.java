@@ -232,7 +232,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
     @Override
     public final CloseableRowIterator iterator() {
         return m_iteratorTracker.createTrackedCursor(
-            () -> (new PrefetchingRowIterator(new ColumnarRowIterator(m_columnarTable.createUntrackedRowCursor()))));
+            () -> (new ColumnarRowIterator(m_columnarTable.createUntrackedRowCursor())));
     }
 
     @Override
@@ -243,11 +243,10 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
     @SuppressWarnings("resource") // the calling method tracks the iterator
     private final CloseableRowIterator iteratorWithFilterInternal(final TableFilter filter) {
         final Optional<Set<Integer>> materializeColumnIndices = filter.getMaterializeColumnIndices();
-        final var iterator = materializeColumnIndices.isPresent()
+        return materializeColumnIndices.isPresent()
             ? FilteredColumnarRowIteratorFactory.create(m_columnarTable.createUntrackedRowCursor(filter),
                 materializeColumnIndices.get())
             : new ColumnarRowIterator(m_columnarTable.createUntrackedRowCursor(filter));
-        return new PrefetchingRowIterator(iterator);
     }
 
     /**

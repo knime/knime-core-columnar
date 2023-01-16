@@ -403,13 +403,13 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public CloseableRowIterator iterator() {
-        return m_openIterators.createTrackedCursor(() -> new PrefetchingRowIterator(new ColumnarRowIterator(cursor())));
+        return m_openIterators.createTrackedCursor(() -> new ColumnarRowIterator(cursor()));
     }
 
     @Override
     public CloseableRowIterator iteratorWithFilter(final TableFilter filter) {
         if (TableFilterUtils.hasFilter(filter)) {
-            return m_openIterators.createTrackedCursor(() -> new PrefetchingRowIterator(new ColumnarRowIterator(cursor(filter))));
+            return m_openIterators.createTrackedCursor(() -> new ColumnarRowIterator(cursor(filter)));
         } else {
             return iterator();
         }
