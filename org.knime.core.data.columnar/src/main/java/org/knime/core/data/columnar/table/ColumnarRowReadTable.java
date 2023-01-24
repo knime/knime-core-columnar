@@ -169,11 +169,7 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
      * @return A newly constructed cursor that allows to read this table's data.
      */
     public RowCursor createRowCursor() {
-        return m_rowCursorTracker.createTrackedCursor(this::createUntrackedRowCursor);
-    }
-
-    RowCursor createUntrackedRowCursor() {
-        return ColumnarRowCursorFactory.create(m_store, m_schema, m_size);
+        return m_rowCursorTracker.createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size));
     }
 
     /**
@@ -182,10 +178,6 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
      * @return A newly constructed cursor that allows to read this table's data.
      */
     public RowCursor createRowCursor(final TableFilter filter) {
-        return m_rowCursorTracker.createTrackedCursor(() -> createUntrackedRowCursor(filter));
-    }
-
-    RowCursor createUntrackedRowCursor(final TableFilter filter) {
         if (filter != null) {
             filter.validate(m_schema.getSourceSpec(), m_size);
             //  For some reason, the "from" index is not validated by the method above. So we do it ourselves.
@@ -198,7 +190,8 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
                 }
             }
         }
-        return ColumnarRowCursorFactory.create(m_store, m_schema, m_size, filter);
+        return m_rowCursorTracker
+            .createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size, filter));
     }
 
     @Override
