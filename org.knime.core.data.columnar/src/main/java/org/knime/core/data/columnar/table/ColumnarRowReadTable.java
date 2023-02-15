@@ -82,6 +82,8 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
 
     private final ColumnarBatchReadStore m_store;
 
+    private final ColumnarProxyValueFactory m_proxyValueFactory;
+
     private final long m_size;
 
     private final CursorTracker<LookaheadCursor<ReadAccessRow>> m_cursorTracker =
@@ -121,6 +123,7 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
         m_storeFactory = storeFactory;
         m_store = store;
         m_size = size;
+        m_proxyValueFactory = new ColumnarProxyValueFactory(store, schema);
     }
 
     /**
@@ -194,8 +197,14 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
             .createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size, filter));
     }
 
+    ProxyRowIterator createRowIterator() {
+        return new ProxyRowIterator(m_proxyValueFactory.createKeyProxy(), m_proxyValueFactory.createCellProxies(),
+            m_size);
+    }
+
     @Override
     public void close() throws IOException {
+        m_proxyValueFactory.close();
         m_rowCursorTracker.close();
         m_cursorTracker.close();
         m_store.close();
