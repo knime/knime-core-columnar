@@ -63,14 +63,16 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.DataCell;
+import org.knime.core.data.DataType;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.ProxyRowIterator.ProxyValue;
 import org.knime.core.data.v2.RowKeyValueFactory;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.table.access.ReadAccess;
-import org.knime.core.table.schema.DataSpec;
 
 /**
+ * Creates ProxyValues that index into a {@link BatchReadStore}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
@@ -93,8 +95,16 @@ final class ColumnarProxyValueFactory implements Closeable {
 
     private ProxyValue<DataCell> createCellProxy(final int column) {
         var valueFactory = m_valueSchema.getValueFactory(column);
-        return new ColumnarProxyValue<>(r -> valueFactory.createReadValue(r).getDataCell(), m_accessProvider,
+        return new ColumnarProxyValue<>(r -> toCell(r, valueFactory), m_accessProvider,
             column);
+    }
+
+    private static DataCell toCell(final ReadAccess access, final ValueFactory<ReadAccess, ?> valueFactory) {
+        if (access.isMissing()) {
+            return DataType.getMissingCell();
+        } else {
+            return valueFactory.createReadValue(access).getDataCell();
+        }
     }
 
     ProxyValue<RowKey> createKeyProxy() {
@@ -114,6 +124,8 @@ final class ColumnarProxyValueFactory implements Closeable {
 
         private final RandomAccessBatchReader m_reader;
 
+        private final ColumnarAccessFactory[] m_accessFactories;
+
         // the batch is cached because reading and releasing is in O(numColumns)
         private ReadBatch m_currentBatch;
 
@@ -122,14 +134,18 @@ final class ColumnarProxyValueFactory implements Closeable {
         RandomAccessProvider(final BatchReadStore store) {
             m_store = store;
             m_reader = store.createRandomAccessReader();
+            m_accessFactories = store.getSchema().specStream()//
+                    .map(ColumnarAccessFactoryMapper::createAccessFactory)//
+                    .toArray(ColumnarAccessFactory[]::new);
         }
 
-        synchronized ColumnarRandomReadAccess getAccess(final long row, final int column) {
+        synchronized <T> T getAccess(final long row, final int column, final Function<ReadAccess, T> accessMapper) {
             final int columnDataIndex = getColumnDataIndex(row);
-            final int batchIndex = getBatchIndex(row);
-            var batch = getBatch(batchIndex);
-            var accessFactory = ColumnarAccessFactoryMapper.createAccessFactory(m_store.getSchema().getSpec(column));
-            return new ColumnarRandomReadAccess(accessFactory, batch.get(column), columnDataIndex);
+            var batch = getBatch(row);
+            var data = batch.get(column);
+            var access = m_accessFactories[column].createReadAccess(() -> columnDataIndex);
+            access.setData(data);
+            return accessMapper.apply(access);
         }
 
         private ReadBatch getBatch(final long rowIndex) {
@@ -161,23 +177,28 @@ final class ColumnarProxyValueFactory implements Closeable {
         }
 
         @Override
-        public void close() throws IOException {
+        public synchronized void close() throws IOException {
+            if (m_currentBatch != null) {
+                m_currentBatch.release();
+                m_currentBatch = null;
+                m_currentBatchIndex = -1;
+            }
             m_reader.close();
         }
 
     }
 
-    private static final class ColumnarRandomReadAccess implements ReadAccess, AutoCloseable {
+    private static final class RandomAccessHolder implements AutoCloseable {
 
-        private final ReadAccess m_delegate;
+        private final ReadAccess m_access;
 
         private final NullableReadData m_data;
 
-        ColumnarRandomReadAccess(final ColumnarAccessFactory accessFactory, final NullableReadData data,
+        RandomAccessHolder(final ColumnarAccessFactory accessFactory, final NullableReadData data,
             final int indexInData) {
             var access = accessFactory.createReadAccess(() -> indexInData);
             access.setData(data);
-            m_delegate = access;
+            m_access = access;
             m_data = data;
             m_data.retain();
         }
@@ -187,14 +208,8 @@ final class ColumnarProxyValueFactory implements Closeable {
             m_data.release();
         }
 
-        @Override
-        public DataSpec getDataSpec() {
-            return m_delegate.getDataSpec();
-        }
-
-        @Override
-        public boolean isMissing() {
-            return m_delegate.isMissing();
+        ReadAccess getAccess() {
+            return m_access;
         }
 
     }
@@ -215,10 +230,8 @@ final class ColumnarProxyValueFactory implements Closeable {
         }
 
         @Override
-        public T getValue(final long rowIndex) {
-            try (var access = m_randomAccessProvider.getAccess(rowIndex, m_column)) {
-                return m_accessMapper.apply(access);
-            }
+        public synchronized T getValue(final long rowIndex) {
+            return m_randomAccessProvider.getAccess(rowIndex, m_column, m_accessMapper);
         }
 
     }

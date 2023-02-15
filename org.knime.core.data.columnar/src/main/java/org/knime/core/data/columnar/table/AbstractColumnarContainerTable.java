@@ -48,8 +48,6 @@ package org.knime.core.data.columnar.table;
 import java.io.File;
 import java.io.IOException;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
@@ -235,12 +233,14 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
     @Override
     public final CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
-        final Optional<Set<Integer>> materializeColumnIndices = filter.getMaterializeColumnIndices();
-        @SuppressWarnings("resource") // Cursor will be closed along with iterator.
-        final var iterator = materializeColumnIndices.isPresent()
-            ? FilteredColumnarRowIteratorFactory.create(cursor(filter), materializeColumnIndices.get())
-            : new ColumnarRowIterator(cursor(filter));
-        return iterator;
+//        final Optional<Set<Integer>> materializeColumnIndices = filter.getMaterializeColumnIndices();
+//        @SuppressWarnings("resource") // Cursor will be closed along with iterator.
+//        final var iterator = materializeColumnIndices.isPresent()
+//            ? FilteredColumnarRowIteratorFactory.create(cursor(filter), materializeColumnIndices.get())
+//            : new ColumnarRowIterator(cursor(filter));
+        // TODO use TableFilter for iterator, reduces the cost of reading batches but requires binding the
+        // ProxyValueFactory to the row iterator and thus tracking it.
+        return iterator();
     }
 
     /**

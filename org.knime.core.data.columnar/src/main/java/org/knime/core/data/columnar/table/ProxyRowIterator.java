@@ -51,6 +51,7 @@ package org.knime.core.data.columnar.table;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.stream.IntStream;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
@@ -107,16 +108,21 @@ final class ProxyRowIterator extends CloseableRowIterator {
 
         private final ProxyValue<RowKey> m_keyProxy;
 
+        private final DataCell[] m_cells;
+
+        private RowKey m_key;
+
         ProxyRow(final long rowIndex, final ProxyValue<RowKey> keyProxy, final List<ProxyValue<DataCell>> cellProxies) {
             m_rowIndex = rowIndex;
             m_cellProxies = cellProxies;
             m_keyProxy = keyProxy;
+            m_cells = new DataCell[cellProxies.size()];
         }
 
         @Override
         public Iterator<DataCell> iterator() {
-            return m_cellProxies.stream()//
-                    .map(p -> p.getValue(m_rowIndex))//
+            return IntStream.range(0, getNumCells())//
+                    .mapToObj(this::getCell)//
                     .iterator();
         }
 
@@ -127,12 +133,20 @@ final class ProxyRowIterator extends CloseableRowIterator {
 
         @Override
         public RowKey getKey() {
-            return m_keyProxy.getValue(m_rowIndex);
+            if (m_key == null) {
+                m_key = m_keyProxy.getValue(m_rowIndex);
+            }
+            return m_key;
         }
 
         @Override
         public DataCell getCell(final int index) {
-            return m_cellProxies.get(index).getValue(m_rowIndex);
+            var cell = m_cells[index];
+            if (cell == null) {
+                cell = m_cellProxies.get(index).getValue(m_rowIndex);
+                m_cells[index] = cell;
+            }
+            return cell;
         }
 
     }
