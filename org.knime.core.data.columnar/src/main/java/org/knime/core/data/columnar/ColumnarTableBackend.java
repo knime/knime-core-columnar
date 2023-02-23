@@ -188,6 +188,37 @@ public final class ColumnarTableBackend implements TableBackend {
     }
 
     @Override
+    public KnowsRowCountTable append(final ExecutionContext exec, final IntSupplier tableIdSupplier,
+        final AppendConfig config, final BufferedDataTable left, final BufferedDataTable right)
+        throws CanceledExecutionException {
+        try {
+            switch (config.getRowIDMode()) {
+                case FROM_TABLE:
+                        var table = appendWithRowIDFromTable(tableIdSupplier, config.getRowIDTableIndex(),
+                            new BufferedDataTable[]{left, right});
+                        exec.setProgress(1);
+                        return table;
+                case MATCHING:
+                    return append(exec, tableIdSupplier, left, right);
+                default:
+                    throw new IllegalStateException("Unknown RowIDMode encountered: " + config.getRowIDMode());
+            }
+        } catch (VirtualTableIncompatibleException ex) {
+            LOGGER.debug("Can't append with the Columnar Table Backend, falling back on the old backend.");
+            return OLD_BACKEND.append(exec, tableIdSupplier, config, left, right);
+        }
+    }
+
+    private static KnowsRowCountTable appendWithRowIDFromTable(
+        final IntSupplier tableIdSupplier, final int tableIndex, final BufferedDataTable[] tables)
+        throws VirtualTableIncompatibleException {
+        var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
+        var refTables = createReferenceTables(tables);
+        return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables, tableIndex),
+            appendedSchema, tables[0].size(), tableIdSupplier.getAsInt());
+    }
+
+    @Override
     public KnowsRowCountTable append(final ExecutionMonitor exec, final IntSupplier tableIdSupplier,
         final BufferedDataTable left, final BufferedDataTable right) throws CanceledExecutionException {
         final BufferedDataTable[] tables = {left, right};
@@ -196,7 +227,7 @@ public final class ColumnarTableBackend implements TableBackend {
             TableTransformUtils.checkRowKeysMatch(exec, tables);
             final long appendSize = TableTransformUtils.appendSize(tables);
             var refTables = createReferenceTables(tables);
-            return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables),
+            return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables, 0),
                 appendedSchema, appendSize, tableIdSupplier.getAsInt());
         } catch (VirtualTableIncompatibleException ex) {// NOSONAR don't spam the log
             LOGGER.debug("Can't append with the Columnar Table Backend, falling back on the old backend.");

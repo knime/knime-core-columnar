@@ -48,9 +48,8 @@
  */
 package org.knime.core.data.columnar;
 
-import static java.util.stream.Collectors.toList;
-
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -132,14 +131,39 @@ public final class TableTransformUtils {
         return tables[0].size();
     }
 
-    static VirtualTable appendTables(final ReferenceTable[] tables) {
+    static VirtualTable appendTables(final ReferenceTable[] tables, final int rowIDTable) {
         var virtualTable = asSource(tables[0]);
-        var appendedTables = Stream.of(tables)//
-                .skip(1)//
-                .map(TableTransformUtils::asSource)//
-                .map(TableTransformUtils::filterRowKey)//
-                .collect(toList());
-        return virtualTable.append(appendedTables);
+        var numColumnsInFirstTable = numColumns(virtualTable);
+        var appendedTables = new ArrayList<VirtualTable>(tables.length - 1);
+        int rowIDColumnIndex = 0;//NOSONAR
+        for (int i = 1; i < tables.length; i++) {//NOSONAR
+            var appendedTable = asSource(tables[i]);
+            if (i != rowIDTable) {
+                appendedTable = filterRowKey(appendedTable);
+                if (i < rowIDTable) {
+                    rowIDColumnIndex += numColumns(appendedTable);
+                }
+            }
+            appendedTables.add(appendedTable);
+        }
+
+        virtualTable = virtualTable.append(appendedTables);
+        if (rowIDTable > 0) {
+            virtualTable = filterRowKey(virtualTable);
+            rowIDColumnIndex += numColumnsInFirstTable - 1;
+            final int finalRowIDCol = rowIDColumnIndex;
+            virtualTable = virtualTable.permute(//
+                IntStream.concat(//
+                    IntStream.of(rowIDColumnIndex), // move RowID column first
+                    IntStream.range(0, numColumns(virtualTable)) // fill in remaining columns
+                    .filter(i -> i != finalRowIDCol) // ignore rowID column index
+                ).toArray());
+        }
+        return virtualTable;
+    }
+
+    private static int numColumns(final VirtualTable virtualTable) {
+        return virtualTable.getSchema().numColumns();
     }
 
     private static VirtualTable filterRowKey(final VirtualTable table) {
