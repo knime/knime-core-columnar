@@ -5,7 +5,7 @@ Bundle-SymbolicName: org.knime.core.data.columnar;singleton:=true
 Automatic-Module-Name: org.knime.core.data.columnar
 Bundle-Version: 5.1.0.qualifier
 Bundle-Vendor: KNIME AG
-Bundle-RequiredExecutionEnvironment: JavaSE-11
+Bundle-RequiredExecutionEnvironment: JavaSE-17
 Bundle-ActivationPolicy: lazy
 Export-Package: org.knime.core.data.columnar,
  org.knime.core.data.columnar.domain,
