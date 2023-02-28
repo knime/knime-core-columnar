@@ -49,14 +49,16 @@
 package org.knime.core.columnar.parallel.exec;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -98,22 +100,61 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
         m_currentTaskFuture = m_executor.submit(this::scheduleColumnTasks);
     }
 
-    private void scheduleColumnTasks() {
+    private static class Take<T> implements ForkJoinPool.ManagedBlocker
+    {
+        private BlockingQueue<T> queue;
+
+        private volatile T element;
+
+        Take(BlockingQueue<T> queue) {
+            this.queue = queue;
+        }
+
+        @Override
+        public boolean block() throws InterruptedException {
+            if ( element == null )
+                element = queue.take();
+            return true;
+        }
+
+        @Override
+        public boolean isReleasable() {
+            if ( element != null )
+                return true;
+            element = queue.poll();
+            return element != null;
+        }
+
+        T get()
+        {
+            final T result = element;
+            element = null;
+            return result;
+        }
+    }
+
+    private void scheduleColumnTasks()
+    {
+        final Take<RowTaskBatch<A>> takeTask = new Take<>(m_tasks);
         while (m_open.get()) {
-            try (var task = m_tasks.take()) {
-                if (task == m_poisonPill) {
-                    // poison pill
-                    return;
-                }
-                var doneLatch = new CountDownLatch(m_columnWriters.size());
-                for (int c = 0; c < m_columnWriters.size(); c++) { //NOSONAR
-                    var writer = m_columnWriters.get(c);
-                    var columnWriteTask = task.createColumnTask(c, writer.getAccess());
-                    var columnTask = new ColumnWriteTaskRunner(writer, columnWriteTask, doneLatch);
-                    m_executor.submit(columnTask);
-                }
-                if (!doneLatch.await(10, TimeUnit.SECONDS)) {
-                    //                    throw new IllegalStateException("Write not done in time");
+            try {
+                ForkJoinPool.managedBlock(takeTask);
+                try (var task = takeTask.get()) {
+                    if (task == m_poisonPill) {
+                        // poison pill
+                        return;
+                    }
+                    final List<ForkJoinTask<Boolean>> columnTasks = new ArrayList<>();
+                    for (int c = 0; c < m_columnWriters.size(); c++) { //NOSONAR
+                        var writer = m_columnWriters.get(c);
+                        var columnWriteTask = task.createColumnTask(c, writer.getAccess());
+                        columnTasks.add(ForkJoinTask.adapt(new ColumnWriteTaskRunner(writer, columnWriteTask)));
+                    }
+                    ForkJoinTask.invokeAll(columnTasks);
+                    while (columnTasks.stream().anyMatch(columnTask -> !columnTask.join())) {
+                        columnTasks.forEach(ForkJoinTask::reinitialize);
+                        ForkJoinTask.invokeAll(columnTasks);
+                    }
                 }
             } catch (InterruptedException interruptWhileWaitingForTask) {
                 // TODO can also be happening while we wait for the current task to finish
@@ -122,7 +163,6 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
                 throw new IllegalStateException("Interrupted while waiting for tasks.", interruptWhileWaitingForTask);
             }
         }
-
     }
 
     @Override
@@ -162,41 +202,31 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
         }
     }
 
-    private final class ColumnWriteTaskRunner implements Runnable {
+    private final class ColumnWriteTaskRunner implements Callable<Boolean> {
 
         private int m_readIdx;
-
-        private final CountDownLatch m_doneLatch;
 
         private final ColumnTask m_task;
 
         private final DataWriter<A> m_writer;
 
-        ColumnWriteTaskRunner(final DataWriter<A> writer, final ColumnTask task, final CountDownLatch doneLatch) {
+        ColumnWriteTaskRunner(final DataWriter<A> writer, final ColumnTask task) {
             m_task = task;
-            m_doneLatch = doneLatch;
             m_writer = writer;
         }
 
         @Override
-        public void run() {
-            try {
-                for (; m_readIdx < m_task.size(); m_readIdx++) { //NOSONAR
-                    if (m_writer.canWrite()) {
-                        m_task.performSubtask(m_readIdx);
-                        m_writer.advance();
-                    } else {
-                        m_executor.submit(this);
-                        return;
-                    }
+        public Boolean call() {
+            for (; m_readIdx < m_task.size(); m_readIdx++) { //NOSONAR
+                if (m_writer.canWrite()) {
+                    m_task.performSubtask(m_readIdx);
+                    m_writer.advance();
+                } else {
+                    return false;
                 }
-            } catch (Throwable ex) {
-                ex.printStackTrace();
-            } finally {
-                m_doneLatch.countDown();
             }
+            return true;
         }
-
     }
 
 }
