@@ -50,7 +50,6 @@ package org.knime.core.data.columnar;
 
 import static java.util.stream.Collectors.toList;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -72,8 +71,6 @@ import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ColumnFilterTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
-import org.knime.core.util.DuplicateChecker;
-import org.knime.core.util.DuplicateKeyException;
 
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -219,67 +216,7 @@ public final class TableTransformUtils {
         }
     }
 
-    static void checkForDuplicateKeys(final ExecutionMonitor progMon, final BufferedDataTable[] tables) {
-        final var checker = new DuplicateChecker();
-        final var progress = new Progress(progMon, concatenatedSize(tables));
-        try {
-            checkForDuplicateKeys(progress, checker, tables);
-        } finally {
-            checker.clear();
-        }
-    }
 
-    private static void checkForDuplicateKeys(final Progress progress, final DuplicateChecker checker,
-        final BufferedDataTable[] tables) {
-        for (var i = 0; i < tables.length; i++) {
-            try {
-                addKeys(progress, checker, tables[i]);
-            } catch (DuplicateKeyException ex) {
-                throw new IllegalArgumentException("Duplicate row key \"" + ex.getKey() + "\" in table with index " + i,
-                    ex);
-            } catch (IOException ex) {
-                throw new IllegalArgumentException("An I/O problem occurred while checking for duplicate keys.", ex);
-            }
-        }
-        try {
-            checker.checkForDuplicates();
-        } catch (DuplicateKeyException | IOException ex) {
-            throw new IllegalArgumentException("Duplicate row keys", ex);
-        }
-    }
-
-    private static void addKeys(final Progress progress, final DuplicateChecker checker, final BufferedDataTable table)
-        throws DuplicateKeyException, IOException {
-        try (RowCursor cursor = table.cursor(ONLY_ROWKEYS)) {
-            while (cursor.canForward()) {
-                final var key = cursor.forward().getRowKey().getString();
-                checker.addKey(key);
-                progress.report(key);
-            }
-        }
-    }
-
-    private static final class Progress {
-        private final ExecutionMonitor m_progressMonitor;
-
-        private final long m_totalSize;
-
-        private final double m_doubleSize;
-
-        private long m_currentRow = 0;
-
-        Progress(final ExecutionMonitor progressMonitor, final long totalSize) {
-            m_progressMonitor = progressMonitor;
-            m_totalSize = totalSize;
-            m_doubleSize = totalSize;
-        }
-
-        void report(final String key) {
-            m_progressMonitor.setProgress(m_currentRow / m_doubleSize,
-                () -> String.format("Checking tables, row %d/%d ('%s')", m_currentRow, m_totalSize, key));
-        }
-
-    }
 
     /**
      * Applies the combined filter and permutation defined by <b>originalIndices</b> to the table.

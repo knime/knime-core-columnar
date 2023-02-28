@@ -65,7 +65,21 @@ import org.knime.core.node.Node;
  */
 public final class ReferenceTables {
 
-    @SuppressWarnings("resource")// the caller must handle the life-cycle of the returned table
+    public static ReferenceTable[] createReferenceTables(final BufferedDataTable[] tables)
+        throws VirtualTableIncompatibleException {
+        var refTables = new ReferenceTable[tables.length];
+        for (int i = 0; i < tables.length; i++) {
+            refTables[i] = createReferenceTable(tables[i]);
+        }
+        return refTables;
+    }
+
+    public static ReferenceTable createReferenceTable(final BufferedDataTable table)
+        throws VirtualTableIncompatibleException {
+        return createReferenceTable(UUID.randomUUID(), table);
+    }
+
+    @SuppressWarnings("resource") // the caller must handle the life-cycle of the returned table
     public static ReferenceTable createReferenceTable(final UUID id, final BufferedDataTable table)
         throws VirtualTableIncompatibleException {
         final ExtensionTable extensionTable = extractExtensionTable(table);

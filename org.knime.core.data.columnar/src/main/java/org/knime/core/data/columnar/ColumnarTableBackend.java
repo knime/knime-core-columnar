@@ -46,18 +46,16 @@
  */
 package org.knime.core.data.columnar;
 
-import static java.util.stream.Collectors.toList;
-
 import java.util.UUID;
 import java.util.function.IntSupplier;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.ColumnarConcatenater;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
@@ -170,16 +168,7 @@ public final class ColumnarTableBackend implements TableBackend {
         throws CanceledExecutionException {
         if (duplicatesPreCheck && rowKeyDuplicateSuffix == null) {
             try {
-                var concatenatedSchema = VirtualTableSchemaUtils.concatenateSchemas(tables);
-                TableTransformUtils.checkForDuplicateKeys(exec, tables);
-                final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
-                var refTables = createReferenceTables(tables);
-                var sources = Stream.of(refTables)//
-                        .map(r -> new VirtualTable(r.getId(), r.getSchema()))//
-                        .collect(toList());
-                var virtualTableFragment = sources.get(0).concatenate(sources.subList(1, sources.size()));
-                return new VirtualTableExtensionTable(refTables, virtualTableFragment,
-                    concatenatedSchema, concatenatedSize, tableIdSupplier.getAsInt());
+                return new ColumnarConcatenater(tableIdSupplier, exec, duplicatesPreCheck).concatenate(tables);
             } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
                 LOGGER.debug("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.");
             }
@@ -195,7 +184,7 @@ public final class ColumnarTableBackend implements TableBackend {
             var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
             TableTransformUtils.checkRowKeysMatch(exec, tables);
             final long appendSize = TableTransformUtils.appendSize(tables);
-            var refTables = createReferenceTables(tables);
+            var refTables = ReferenceTables.createReferenceTables(tables);
             return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables),
                 appendedSchema, appendSize, tableIdSupplier.getAsInt());
         } catch (VirtualTableIncompatibleException ex) {// NOSONAR don't spam the log
@@ -204,14 +193,6 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
 
-    private static ReferenceTable[] createReferenceTables(final BufferedDataTable... tables)
-        throws VirtualTableIncompatibleException {
-        var refTables = new ReferenceTable[tables.length];
-        for (int i = 0; i < refTables.length; i++) {
-            refTables[i] = ReferenceTables.createReferenceTable(UUID.randomUUID(), tables[i]);
-        }
-        return refTables;
-    }
 
     @Override
     public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor, final IntSupplier tableIdSupplier,

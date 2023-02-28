@@ -205,13 +205,13 @@ public final class VirtualTableSchemaUtils {
         return rearrangeSchemas(refSchema, EMPTY, rearranger.createSpec(), i -> true);
     }
 
-    private static DataTableSpec[] extractSpecs(final ColumnarValueSchema[] schemas) {
+    static DataTableSpec[] extractSpecs(final ColumnarValueSchema[] schemas) {
         return Stream.of(schemas)//
             .map(ColumnarValueSchema::getSourceSpec)//
             .toArray(DataTableSpec[]::new);
     }
 
-    private static ColumnarValueSchema[] extractSchemas(final BufferedDataTable[] tables)
+    public static ColumnarValueSchema[] extractSchemas(final BufferedDataTable[] tables)
         throws VirtualTableIncompatibleException {
         var schemas = new ColumnarValueSchema[tables.length];
         for (int i = 0; i < schemas.length; i++) {//NOSONAR
