@@ -269,7 +269,10 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
     private final class AsyncDataWriter implements DataWriter<WriteAccess>, ColumnDataIndex {
 
-        private final AtomicInteger m_idx = new AtomicInteger(0);
+        private volatile int m_idx = 0;
+
+        // non-atomic, non-volatile copy of m_batchCapacity
+        private int m_capacity;
 
         private final ColumnarWriteAccess m_writeAccess;
 
@@ -279,7 +282,8 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
         void reset(final NullableWriteData writeData) {
             m_writeAccess.setData(writeData);
-            m_idx.set(0);
+            m_idx = 0;
+            m_capacity = m_batchCapacity.get();
         }
 
         @Override
@@ -289,12 +293,19 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
         @Override
         public boolean canWrite() {
-            return m_idx.get() < m_batchCapacity.get();
+            // assuming m_batchCapacity goes up, only update our local
+            // non-volatile copy if we would exceed the last-known value.
+            if ( m_idx >= m_capacity )
+                m_capacity = m_batchCapacity.get();
+            return m_idx < m_capacity;
+//            return m_idx < m_batchCapacity.get();
         }
 
+        // assumption: advance() is not called if canWrite()==false
         @Override
         public void advance() {
-            if (m_idx.incrementAndGet() == m_batchCapacity.get() && m_finalizeBatchBarrier.decrementAndGet() == 0) {
+            ++m_idx;
+            if (!canWrite() && m_finalizeBatchBarrier.decrementAndGet() == 0) {
                 // this is the last column to finish writing in this batch
                 switchBatch();
             }
@@ -302,7 +313,7 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
 
         @Override
         public int getIndex() {
-            return m_idx.get();
+            return m_idx;
         }
     }
 
