@@ -48,6 +48,10 @@
  */
 package org.knime.core.columnar.cursor;
 
+import static org.knime.core.columnar.ColumnarParameters.BATCH_SIZE_TARGET;
+import static org.knime.core.columnar.ColumnarParameters.CAPACITY_INIT;
+import static org.knime.core.columnar.ColumnarParameters.CAPACITY_MAX;
+
 import java.io.IOException;
 import java.util.stream.IntStream;
 
@@ -96,29 +100,6 @@ public final class ColumnarWriteCursorFactory {
      */
     private static final class ColumnarWriteCursor
         implements WriteCursor<WriteAccessRow>, ColumnDataIndex, WriteAccessRow {
-
-        // the initial capacity (in number of held elements) of a single chunk
-        // arrow has a minimum capacity of 2
-        private static final int CAPACITY_INIT_DEF = 2;
-
-        private static final String CAPACITY_INIT_PROPERTY = "knime.columnar.capacity.initial";
-
-        private static final int CAPACITY_INIT = Integer.getInteger(CAPACITY_INIT_PROPERTY, CAPACITY_INIT_DEF);
-
-        // the maximum capacity (in number of held elements) of a single chunk
-        // subtract 750 since arrow rounds up to the next power of 2 anyways
-        static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
-
-        private static final String CAPACITY_MAX_PROPERTY = "knime.columnar.capacity.max";
-
-        private static final int CAPACITY_MAX = Integer.getInteger(CAPACITY_MAX_PROPERTY, CAPACITY_MAX_DEF);
-
-        // the target size (in bytes) of a full batch
-        private static final long BATCH_SIZE_TARGET_DEF = 1L << 26; // 64 MB
-
-        private static final String BATCH_SIZE_TARGET_PROPERTY = "knime.columnar.batch.size.target";
-
-        private static final long BATCH_SIZE_TARGET = Long.getLong(BATCH_SIZE_TARGET_PROPERTY, BATCH_SIZE_TARGET_DEF);
 
         private final BatchWriter m_writer;
 
