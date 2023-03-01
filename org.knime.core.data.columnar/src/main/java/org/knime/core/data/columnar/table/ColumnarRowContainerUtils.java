@@ -94,8 +94,14 @@ public final class ColumnarRowContainerUtils {
     @SuppressWarnings("resource")
     public static DataContainerDelegate create(final int tableId, final ColumnarValueSchema schema,
         final ColumnarRowWriteTableSettings settings) throws Exception {
-        return new ColumnarDataContainerDelegate(schema.getSourceSpec(),
-            createInternal(null, tableId, schema, settings), settings);
+        if (settings.isForceSynchronousIO()) {
+            return new ColumnarDataContainerDelegate(schema.getSourceSpec(),
+                createInternal(null, tableId, schema, settings), settings);
+        } else {
+            final var storeFactory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+            return new ParallelColumnarDataContainerDelegate(tableId, schema, new ColumnarRowWriteTable(schema,
+                storeFactory, settings));
+        }
     }
 
     private static ColumnarRowContainer createInternal(final ExecutionContext context, final int tableId,
