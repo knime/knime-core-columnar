@@ -122,8 +122,8 @@ public final class ColumnarWriteCursorFactory {
                 .mapToObj(i -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(i)))//
                 .map(f -> f.createWriteAccess(this))//
                 .toArray(ColumnarWriteAccess[]::new);
-            switchToNextData();
             m_currentIndex = -1;
+            m_currentMaxIndex = -1;
         }
 
         @Override
