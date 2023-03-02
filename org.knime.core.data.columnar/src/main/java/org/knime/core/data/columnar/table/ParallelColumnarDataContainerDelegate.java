@@ -124,8 +124,10 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
         m_schema = schema;
         m_store = writeTable.getStore();
         m_batchWriter = new AsyncBatchWriter(m_store,
-            new AdjustingCapacityStrategy(ColumnarParameters.CAPACITY_INIT, BATCH_SIZE_TARGET, CAPACITY_MAX));
-        m_writeExec = new WriteTaskExecutor<>(m_batchWriter, EXECUTOR, RowBatchWriteTask.NULL);
+//            new FixedCapacityStrategy(32_000)
+            new AdjustingCapacityStrategy(ColumnarParameters.CAPACITY_INIT, ColumnarParameters.BATCH_SIZE_TARGET, ColumnarParameters.CAPACITY_MAX)
+            );
+        m_writeExec = new WriteTaskExecutor<>(m_batchWriter, EXECUTOR, RowBatchWriteTask.NULL, ThreadUtils::callableWithContext);
         m_dispatcher = new DataRowBatchTaskDispatcher(100, this::scheduleBatch);
         m_id = tableId;
     }
