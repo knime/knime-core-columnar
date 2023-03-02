@@ -48,9 +48,6 @@
  */
 package org.knime.core.data.columnar.table;
 
-import static org.knime.core.columnar.ColumnarParameters.BATCH_SIZE_TARGET;
-import static org.knime.core.columnar.ColumnarParameters.CAPACITY_MAX;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -75,7 +72,9 @@ import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.node.workflow.NodeContext;
 import org.knime.core.table.access.WriteAccess;
+import org.knime.core.util.ThreadUtils;
 
 /**
  *
@@ -83,14 +82,15 @@ import org.knime.core.table.access.WriteAccess;
  */
 final class ParallelColumnarDataContainerDelegate implements DataContainerDelegate {
 
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4, new ThreadFactory() {
+    private static final ExecutorService EXECUTOR = ThreadUtils.executorServiceWithContext(
+            Executors.newFixedThreadPool(4, new ThreadFactory() {
         private final AtomicInteger m_threadNum = new AtomicInteger(0);
 
         @Override
         public Thread newThread(final Runnable r) {
             return new Thread(r, "KNIME-Columnar-Data-Container-Executor-" + m_threadNum.getAndIncrement());
         }
-    });
+    }));
 
     private final BatchStore m_store;
 
