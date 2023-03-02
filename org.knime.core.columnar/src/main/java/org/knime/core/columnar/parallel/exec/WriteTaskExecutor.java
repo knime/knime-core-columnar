@@ -61,6 +61,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -89,8 +90,10 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
 
     private final GridWriter<A> m_gridWriter;
 
+    private final UnaryOperator<Callable<Boolean>> m_callableAdapter;
+
     public WriteTaskExecutor(final GridWriter<A> gridWriter, final ExecutorService executor,
-        final RowTaskBatch<A> poisonPill) {
+        final RowTaskBatch<A> poisonPill, final UnaryOperator<Callable<Boolean>> callableAdapter) {
         m_gridWriter = gridWriter;
         m_poisonPill = poisonPill;
         m_executor = executor;
@@ -98,6 +101,7 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
             .mapToObj(gridWriter::getDataWriter)//
             .collect(Collectors.toList());
         m_currentTaskFuture = m_executor.submit(this::scheduleColumnTasks);
+        m_callableAdapter = callableAdapter;
     }
 
     private static class Take<T> implements ForkJoinPool.ManagedBlocker
@@ -106,21 +110,23 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
 
         private volatile T element;
 
-        Take(BlockingQueue<T> queue) {
+        Take(final BlockingQueue<T> queue) {
             this.queue = queue;
         }
 
         @Override
         public boolean block() throws InterruptedException {
-            if ( element == null )
+            if ( element == null ) {
                 element = queue.take();
+            }
             return true;
         }
 
         @Override
         public boolean isReleasable() {
-            if ( element != null )
+            if ( element != null ) {
                 return true;
+            }
             element = queue.poll();
             return element != null;
         }
@@ -148,7 +154,7 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
                     for (int c = 0; c < m_columnWriters.size(); c++) { //NOSONAR
                         var writer = m_columnWriters.get(c);
                         var columnWriteTask = task.createColumnTask(c, writer.getAccess());
-                        columnTasks.add(ForkJoinTask.adapt(new ColumnWriteTaskRunner(writer, columnWriteTask)));
+                        columnTasks.add(ForkJoinTask.adapt(m_callableAdapter.apply(new ColumnWriteTaskRunner(writer, columnWriteTask))));
                     }
                     ForkJoinTask.invokeAll(columnTasks);
                     while (columnTasks.stream().anyMatch(columnTask -> !columnTask.join())) {
