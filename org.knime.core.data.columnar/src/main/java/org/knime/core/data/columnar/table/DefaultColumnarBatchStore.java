@@ -266,7 +266,9 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
         if (builder.m_duplicateCheckExecutor != null) {
             m_writable =
-                new DuplicateCheckWritable(m_writable, new DuplicateChecker(), builder.m_duplicateCheckExecutor);
+                // TODO call DuplicateChecker#flushIfNecessary upon memory alert
+                new DuplicateCheckWritable(m_writable, new DuplicateChecker(Integer.MAX_VALUE),
+                    builder.m_duplicateCheckExecutor);
         }
 
         if (builder.m_domainCalculationConfig != null) {
