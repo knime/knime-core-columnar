@@ -269,6 +269,7 @@ final class AbstractCachedValueData {
         @Override
         public void expandCache() {
             m_data = Arrays.copyOf(m_data, m_delegate.capacity());
+            m_cache.accept(m_data);
         }
 
         @Override
