@@ -74,11 +74,6 @@ import org.knime.core.table.virtual.spec.TableTransformSpec;
 import org.knime.core.util.DuplicateChecker;
 import org.knime.core.util.DuplicateKeyException;
 
-import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
-
 /**
  * Utility class that contains various methods for dealing with TableTransforms in ColumnarTableBackend.
  *
@@ -96,13 +91,6 @@ public final class TableTransformUtils {
         return Stream.of(referenceTables)//
             .map(DataTable::getDataTableSpec)//
             .toArray(DataTableSpec[]::new);
-    }
-
-    private static DataTableSpec[] extractSpecs(final ReferenceTable[] referenceTables) {
-        return Stream.of(referenceTables)//
-                .map(ReferenceTable::getBufferedTable)//
-                .map(DataTable::getDataTableSpec)//
-                .toArray(DataTableSpec[]::new);
     }
 
     static DataTableSpec appendSpec(final BufferedDataTable[] tables) {
@@ -303,92 +291,6 @@ public final class TableTransformUtils {
                 () -> String.format("Checking tables, row %d/%d ('%s')", m_currentRow, m_totalSize, key));
         }
 
-    }
-
-    /**
-     * Applies the combined filter and permutation defined by <b>originalIndices</b> to the table.
-     * The filter and permutation are applied as separate operations.
-     *
-     * @param table the input table
-     * @param originalIndices the index is the position in the output and the value the index in the original table
-     * @return the filtered and permuted table
-     */
-    public static VirtualTable filterAndPermute(final VirtualTable table, final int[] originalIndices) {
-        // -1 because table contains a row key column that is not included in originalIndices
-        final int originalNumColumns = table.getSchema().numColumns() - 1;
-        final var properties = new IndexArrayProperties(originalIndices, originalNumColumns);
-        if (properties.m_isComplete && properties.m_isSorted) {
-            return table;
-        } else if (properties.m_isComplete) {
-            return table.permute(prependRowKeyColumnIndex(originalIndices));
-        } else if (properties.m_isSorted) {
-            return table.filterColumns(prependRowKeyColumnIndex(originalIndices));
-        } else {
-            return splitIntoFilterAndPermute(table, originalIndices);
-        }
-    }
-
-    private static VirtualTable splitIntoFilterAndPermute(final VirtualTable sourceTable, final int[] originalIndices) {
-        final int[] filter = Arrays.stream(originalIndices).sorted().toArray();
-        final TIntIntMap offsets = new TIntIntHashMap();
-        for (int selected : filter) {
-            offsets.put(selected, selected - offsets.size());
-        }
-        final int[] permutation = Arrays.stream(originalIndices)//
-            .map(i -> i - offsets.get(i))//
-            .toArray();
-        return sourceTable//
-                .filterColumns(prependRowKeyColumnIndex(filter))//
-                .permute(prependRowKeyColumnIndex(permutation));
-    }
-
-    private static int[] prependRowKeyColumnIndex(final int[] indices) {
-        return IntStream.concat(//
-            IntStream.of(0), // the row key is always included
-            Arrays.stream(indices).map(i -> i + 1) // shift to accommodate the row key
-        ).toArray();
-    }
-
-    public static final class IndexArrayProperties {
-
-        private final boolean m_isSorted;
-
-        private final boolean m_isComplete;
-
-        public IndexArrayProperties(final int[] indices, final int originalNumColumns) {
-            if (indices.length == 0) {
-                m_isSorted = true;
-                m_isComplete = originalNumColumns == 0;
-            } else {
-                var isSorted = checkSortedAndUnique(indices);
-                m_isComplete = indices.length == originalNumColumns;
-                m_isSorted = isSorted;
-            }
-        }
-
-        private static boolean checkSortedAndUnique(final int[] indices) {
-            var isSorted = true;
-            var previous = indices[0];
-            final TIntSet uniqueIndices = new TIntHashSet(indices.length);
-            uniqueIndices.add(previous);
-            for (var i = 1; i < indices.length; i++) {
-                var current = indices[i];
-                if (current < previous) {
-                    isSorted = false;
-                }
-                CheckUtils.checkArgument(uniqueIndices.add(current),
-                    "The provided indices contain the index %s multiple times.", current);
-                previous = current;
-            }
-            return isSorted;
-        }
-        public boolean isSorted() {
-            return m_isSorted;
-        }
-
-        public boolean isComplete() {
-            return m_isComplete;
-        }
     }
 
 
