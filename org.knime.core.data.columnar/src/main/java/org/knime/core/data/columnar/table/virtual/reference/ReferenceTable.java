@@ -65,7 +65,6 @@ import org.knime.core.table.virtual.VirtualTable;
  */
 public interface ReferenceTable {
 
-    // TODO replace with getter for TableTransform? The VirtualTable can always be reconstructed from the TableTransform and schema
     VirtualTable getVirtualTable();
 
     Map<UUID, RowAccessible> getSources();
