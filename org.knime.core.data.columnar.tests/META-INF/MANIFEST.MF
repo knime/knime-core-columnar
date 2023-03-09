@@ -10,6 +10,6 @@ Require-Bundle: org.junit;bundle-version="[4.13.0,5.0.0)",
  org.knime.core.columnar.testing;bundle-version="[5.0.0,6.0.0)",
  org.mockito.mockito-core;bundle-version="[2.28.2,3.0.0)",
  org.knime.core.table;bundle-version="[5.0.0,6.0.0)",
- org.junit.jupiter.api
+ org.junit.jupiter.api;bundle-version="[5.8.1,6.0.0)"
 Bundle-RequiredExecutionEnvironment: JavaSE-17
 Automatic-Module-Name: org.knime.core.data.columnar.tests

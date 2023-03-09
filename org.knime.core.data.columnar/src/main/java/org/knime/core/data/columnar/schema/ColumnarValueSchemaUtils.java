@@ -55,6 +55,7 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.data.v2.RowKeyValueFactory;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaLoadContext;
@@ -131,6 +132,27 @@ public final class ColumnarValueSchemaUtils {
      */
     public static final ColumnarValueSchema create(final ValueSchema source) {
         return new DefaultColumnarValueSchema(source);
+    }
+
+    /**
+     * Create a new {@link ColumnarValueSchema} based on a {@link DataTableSpec} and {@link ValueFactory ValueFactories}.
+     * 
+     * @param spec of the table
+     * @param valueFactories for the columns including the RowID
+     * @return a new {@link ColumnarValueSchema}
+     */
+    public static final ColumnarValueSchema create(final DataTableSpec spec, final ValueFactory<?, ?>[] valueFactories) {
+        return create(ValueSchemaUtils.create(spec, valueFactories));
+    }
+
+    /**
+     * Checks if a schema includes a RowID column.
+     * 
+     * @param schema to check
+     * @return true if the schema has a RowID column
+     */
+    public static final boolean hasRowID(final ColumnarValueSchema schema) {
+        return schema.numColumns() > 0 && schema.getValueFactory(0) instanceof RowKeyValueFactory;
     }
 
     /**
