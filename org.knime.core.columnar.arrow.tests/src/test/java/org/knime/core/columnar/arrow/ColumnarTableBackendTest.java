@@ -48,29 +48,27 @@
  */
 package org.knime.core.columnar.arrow;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.knime.core.data.columnar.ColumnarTableBackend;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.InternalTableAPI;
 import org.knime.testing.core.ExecutionContextExtension;
-import org.knime.testing.core.InternalTableAPITester;
+import org.knime.testing.data.AbstractTableBackendTest;
 
 /**
  * Tests the {@link InternalTableAPI} using the {@link ColumnarTableBackend}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarInternalTableAPITest {
+final class ColumnarTableBackendTest extends AbstractTableBackendTest {
 
     @RegisterExtension
     private static final ExecutionContextExtension EXEC_EXTENSION =
         new ExecutionContextExtension(new ColumnarTableBackend());
 
-
-    @SuppressWarnings("static-method")
-    @Test
-    void testAppend() throws Exception {
-        new InternalTableAPITester(EXEC_EXTENSION.getExecutionContext()).testAppend();
+    @Override
+    protected ExecutionContext getExecutionContext() {
+        return EXEC_EXTENSION.getExecutionContext();
     }
+
 }
