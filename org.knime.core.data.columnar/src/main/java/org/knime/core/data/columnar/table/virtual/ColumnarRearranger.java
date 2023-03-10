@@ -51,6 +51,7 @@ package org.knime.core.data.columnar.table.virtual;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,7 @@ import org.knime.core.data.DataCell;
 import org.knime.core.data.DataCellTypeConverter;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
+import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.DataValue;
@@ -85,7 +87,6 @@ import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.ColumnRearrangerUtils;
 import org.knime.core.data.container.ColumnRearrangerUtils.RearrangedColumn;
 import org.knime.core.data.container.DataContainerSettings;
-import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowContainer;
@@ -518,35 +519,64 @@ public final class ColumnarRearranger {
 
     private static final class CellFactoryMapper implements MapperFactory.Mapper {
 
-        private final RowKeyValue m_rowKey;
-
-        private final NullableReadValue[] m_readValues;
-
         private final NullableWriteValue<?>[] m_writeValues;
 
         private final CellFactory m_cellFactory;
 
+        private final ReadValueRow m_row;
+
         CellFactoryMapper(final RowKeyValue rowKey, final NullableReadValue[] readValues,
             final NullableWriteValue<?>[] writeValues, final CellFactory cellFactory) {
-            m_rowKey = rowKey;
-            m_readValues = readValues;
+            m_row = new ReadValueRow(rowKey, readValues);
             m_writeValues = writeValues;
             m_cellFactory = cellFactory;
         }
 
         @Override
         public void map(final long rowIndex) {
-            var rowKey = new RowKey(m_rowKey.getString());
-            var cells = Stream.of(m_readValues)//
-                .map(NullableReadValue::getDataCell)//
-                .toArray(DataCell[]::new);
-            var row = new DefaultRow(rowKey, cells);
-            var outputs = m_cellFactory.getCells(row, rowIndex);
+            var outputs = m_cellFactory.getCells(m_row, rowIndex);
             IntStream.range(0, m_writeValues.length)//
                 .forEach(i -> m_writeValues[i].setDataCell(outputs[i]));
         }
 
     }
+
+    private static final class ReadValueRow implements DataRow {
+
+        private final RowKeyValue m_rowID;
+
+        private final NullableReadValue[] m_columns;
+
+        ReadValueRow(final RowKeyValue rowID, final NullableReadValue[] columns) {
+            m_rowID = rowID;
+            m_columns = columns;
+        }
+
+        @Override
+        public Iterator<DataCell> iterator() {
+            return Stream.of(m_columns)//
+                    .map(NullableReadValue::getDataCell)//
+                    .iterator();
+        }
+
+        @Override
+        public int getNumCells() {
+            return m_columns.length;
+        }
+
+        @Override
+        public RowKey getKey() {
+            return new RowKey(m_rowID.getString());
+        }
+
+        @Override
+        public DataCell getCell(final int index) {
+            return m_columns[index].getDataCell();
+        }
+
+
+    }
+
 
     private static final class NullableWriteValue<D extends DataValue> {
 
