@@ -48,8 +48,15 @@
  */
 package org.knime.core.columnar.arrow;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.knime.core.data.DataColumnSpecCreator;
+import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.ColumnarTableBackend;
+import org.knime.core.data.def.IntCell;
+import org.knime.core.data.def.StringCell;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.InternalTableAPI;
 import org.knime.testing.core.ExecutionContextExtension;
@@ -69,6 +76,25 @@ final class ColumnarTableBackendTest extends AbstractTableBackendTest {
     @Override
     protected ExecutionContext getExecutionContext() {
         return EXEC_EXTENSION.getExecutionContext();
+    }
+
+    /**
+     * Tests that the ColumnarTableBackend complains if the new spec's types are not the same or super types of the
+     * columns in the input table. The old backend just ignores this (which can lead to nasty errors downstream) but the
+     * columnar backend needs to explicitly map the types in order to ensure compatibility with the value factory of the
+     * new type.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testUpcastWithIncompatibleType() throws Exception {
+        var exec = getExecutionContext();
+        var container =
+            exec.createDataContainer(new DataTableSpec(new DataColumnSpecCreator("foo", IntCell.TYPE).createSpec()));
+        container.close();
+        var table = container.getTable();
+        var incompatibleSpec = new DataTableSpec(new DataColumnSpecCreator("foo", StringCell.TYPE).createSpec());
+        assertThrows(IllegalArgumentException.class, () -> exec.createSpecReplacerTable(table, incompatibleSpec));
     }
 
 }
