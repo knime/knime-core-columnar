@@ -80,6 +80,11 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
         return new ColumnarVarBinaryReadAccess(index);
     }
 
+    @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        return new FixedVarBinaryReadAccess(index);
+    }
+
     static final class ColumnarVarBinaryReadAccess extends AbstractReadAccess<VarBinaryReadData>
         implements VarBinaryReadAccess {
 
@@ -95,6 +100,25 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
         @Override
         public <T> T getObject(final ObjectDeserializer<T> deserializer) {
             return m_data.getObject(m_index.getIndex(), deserializer);
+        }
+
+    }
+
+    static final class FixedVarBinaryReadAccess extends AbstractFixedReadAccess<VarBinaryReadData>
+        implements VarBinaryReadAccess {
+
+        FixedVarBinaryReadAccess(final int index) {
+            super(index);
+        }
+
+        @Override
+        public byte[] getByteArray() {
+            return m_data.getBytes(m_index);
+        }
+
+        @Override
+        public <T> T getObject(final ObjectDeserializer<T> deserializer) {
+            return m_data.getObject(m_index, deserializer);
         }
 
     }

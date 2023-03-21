@@ -71,6 +71,11 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory {
     }
 
     @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        return new FixedBooleanReadAccess(index);
+    }
+
+    @Override
     public ColumnarBooleanWriteAccess createWriteAccess(final ColumnDataIndex index) {
         return new ColumnarBooleanWriteAccess(index);
     }
@@ -85,6 +90,19 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory {
         @Override
         public boolean getBooleanValue() {
             return m_data.getBoolean(m_index.getIndex());
+        }
+
+    }
+
+    static final class FixedBooleanReadAccess extends AbstractFixedReadAccess<BooleanReadData> implements BooleanReadAccess {
+
+        FixedBooleanReadAccess(final int index) {
+            super(index);
+        }
+
+        @Override
+        public boolean getBooleanValue() {
+            return m_data.getBoolean(m_index);
         }
 
     }

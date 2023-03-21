@@ -80,4 +80,6 @@ public interface ColumnarAccessFactory {
      */
     ColumnarReadAccess createReadAccess(ColumnDataIndex index);
 
+    ColumnarReadAccess createFixedReadAccess(final int index);
+
 }

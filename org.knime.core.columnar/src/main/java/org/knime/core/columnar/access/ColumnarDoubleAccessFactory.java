@@ -72,6 +72,11 @@ final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
     }
 
     @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        return new FixedDoubleReadAccess(index);
+    }
+
+    @Override
     public ColumnarDoubleWriteAccess createWriteAccess(final ColumnDataIndex index) {
         return new ColumnarDoubleWriteAccess(index);
     }
@@ -86,6 +91,19 @@ final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
         @Override
         public double getDoubleValue() {
             return m_data.getDouble(m_index.getIndex());
+        }
+
+    }
+
+    static final class FixedDoubleReadAccess extends AbstractFixedReadAccess<DoubleReadData> implements DoubleReadAccess {
+
+        FixedDoubleReadAccess(final int index) {
+            super(index);
+        }
+
+        @Override
+        public double getDoubleValue() {
+            return m_data.getDouble(m_index);
         }
 
     }

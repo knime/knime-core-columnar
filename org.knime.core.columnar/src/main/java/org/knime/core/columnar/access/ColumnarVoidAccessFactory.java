@@ -77,6 +77,11 @@ final class ColumnarVoidAccessFactory implements ColumnarAccessFactory {
         return VoidReadAccess.READ_ACCESS_INSTANCE;
     }
 
+    @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        return VoidReadAccess.READ_ACCESS_INSTANCE;
+    }
+
     static final class VoidReadAccess implements ColumnarReadAccess {
 
         private static final VoidReadAccess READ_ACCESS_INSTANCE = new VoidReadAccess();

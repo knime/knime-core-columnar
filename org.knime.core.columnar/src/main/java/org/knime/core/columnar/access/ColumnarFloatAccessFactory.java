@@ -69,6 +69,11 @@ final class ColumnarFloatAccessFactory implements ColumnarAccessFactory {
     }
 
     @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        return new FixedFloatReadAccess(index);
+    }
+
+    @Override
     public ColumnarFloatWriteAccess createWriteAccess(final ColumnDataIndex index) {
         return new ColumnarFloatWriteAccess(index);
     }
@@ -82,6 +87,19 @@ final class ColumnarFloatAccessFactory implements ColumnarAccessFactory {
         @Override
         public float getFloatValue() {
             return m_data.getFloat(m_index.getIndex());
+        }
+
+    }
+
+    static final class FixedFloatReadAccess extends AbstractFixedReadAccess<FloatReadData> implements FloatReadAccess {
+
+        FixedFloatReadAccess(final int index) {
+            super(index);
+        }
+
+        @Override
+        public float getFloatValue() {
+            return m_data.getFloat(m_index);
         }
 
     }

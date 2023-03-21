@@ -14,7 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  aInt with this program; if not, see <http://www.gnu.org/licenses>.
+ *  along with this program; if not, see <http://www.gnu.org/licenses>.
  *
  *  Additional permission under GNU GPL version 3 section 7:
  *
@@ -42,88 +42,36 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Mar 20, 2023 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.columnar.access;
 
-import org.knime.core.columnar.data.IntData.IntReadData;
-import org.knime.core.columnar.data.IntData.IntWriteData;
-import org.knime.core.table.access.IntAccess.IntReadAccess;
-import org.knime.core.table.access.IntAccess.IntWriteAccess;
-import org.knime.core.table.access.ReadAccess;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
- * A ColumnarValueFactory implementation wrapping {@link IntReadData} / {@link IntWriteData} as {@link IntReadAccess} /
- * {@link IntWriteAccess}.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @since 4.3
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarIntAccessFactory
-    implements ColumnarAccessFactory {
+abstract class AbstractFixedReadAccess<T extends NullableReadData> implements ColumnarReadAccess {
 
-    /** INSTANCE **/
-    static final ColumnarIntAccessFactory INSTANCE = new ColumnarIntAccessFactory();
+    protected T m_data;
 
-    private ColumnarIntAccessFactory() {
+    protected final int m_index;
+
+    AbstractFixedReadAccess(final int index) {
+        m_index = index;
     }
 
     @Override
-    public final ColumnarIntReadAccess createReadAccess(final ColumnDataIndex index) {
-        return new ColumnarIntReadAccess(index);
+    public void setData(final NullableReadData data) {
+        m_data = (T)data;
     }
 
     @Override
-    public ColumnarReadAccess createFixedReadAccess(final int index) {
-        return new FixedIntReadAccess(index);
-    }
-
-    @Override
-    public final ColumnarIntWriteAccess createWriteAccess(final ColumnDataIndex index) {
-        return new ColumnarIntWriteAccess(index);
-    }
-
-    static final class ColumnarIntReadAccess extends AbstractReadAccess<IntReadData> implements IntReadAccess {
-
-        ColumnarIntReadAccess(final ColumnDataIndex index) {
-            super(index);
-        }
-
-        @Override
-        public int getIntValue() {
-            return m_data.getInt(m_index.getIndex());
-        }
-
-    }
-
-    static final class FixedIntReadAccess extends AbstractFixedReadAccess<IntReadData> implements IntReadAccess {
-
-        FixedIntReadAccess(final int index) {
-            super(index);
-        }
-
-        @Override
-        public int getIntValue() {
-            return m_data.getInt(m_index);
-        }
-
-    }
-
-    static final class ColumnarIntWriteAccess extends AbstractWriteAccess<IntWriteData> implements IntWriteAccess {
-
-        ColumnarIntWriteAccess(final ColumnDataIndex index) {
-            super(index);
-        }
-
-        @Override
-        public void setIntValue(final int value) {
-            m_data.setInt(m_index.getIndex(), value);
-        }
-
-        @Override
-        public void setFromNonMissing(final ReadAccess access) {
-            m_data.setInt(m_index.getIndex(), ((IntReadAccess)access).getIntValue());
-        }
-
+    public final boolean isMissing() {
+        return m_data.isMissing(m_index);
     }
 
 }

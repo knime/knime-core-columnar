@@ -73,6 +73,11 @@ final class ColumnarLongAccessFactory implements ColumnarAccessFactory {
     }
 
     @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        return new FixedLongReadAccess(index);
+    }
+
+    @Override
     public ColumnarLongWriteAccess createWriteAccess(final ColumnDataIndex index) {
         return new ColumnarLongWriteAccess(index);
     }
@@ -86,6 +91,19 @@ final class ColumnarLongAccessFactory implements ColumnarAccessFactory {
         @Override
         public long getLongValue() {
             return m_data.getLong(m_index.getIndex());
+        }
+
+    }
+
+    static final class FixedLongReadAccess extends AbstractFixedReadAccess<LongReadData> implements LongReadAccess {
+
+        FixedLongReadAccess(final int index) {
+            super(index);
+        }
+
+        @Override
+        public long getLongValue() {
+            return m_data.getLong(m_index);
         }
 
     }

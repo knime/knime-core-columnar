@@ -65,6 +65,14 @@ final class ColumnarStringAccessFactory
         return new ColumnarStringReadAccess(index);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        return new FixedStringReadAccess(index);
+    }
+
     @Override
     public final ColumnarStringWriteAccess createWriteAccess(final ColumnDataIndex index) {
         return new ColumnarStringWriteAccess(index);
@@ -79,6 +87,19 @@ final class ColumnarStringAccessFactory
         @Override
         public String getStringValue() {
             return m_data.getString(m_index.getIndex());
+        }
+
+    }
+
+    static final class FixedStringReadAccess extends AbstractFixedReadAccess<StringReadData> implements StringReadAccess {
+
+        FixedStringReadAccess(final int index) {
+            super(index);
+        }
+
+        @Override
+        public String getStringValue() {
+            return m_data.getString(m_index);
         }
 
     }

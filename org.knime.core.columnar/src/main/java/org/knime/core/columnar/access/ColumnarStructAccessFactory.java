@@ -89,6 +89,11 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
     }
 
     @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public ColumnarStructReadAccess createReadAccess(final ColumnDataIndex index) {
         return new ColumnarStructReadAccess(m_inner, index);
     }

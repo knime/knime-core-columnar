@@ -91,6 +91,11 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         return new ColumnarListReadAccess<>(index, m_innerAccessFactory);
     }
 
+    @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        throw new UnsupportedOperationException();
+    }
+
     static final class ColumnarListReadAccess<R extends NullableReadData> extends AbstractReadAccess<ListReadData>
         implements ListReadAccess {
 
@@ -149,6 +154,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
             return m_innerData.isMissing(index);
         }
     }
+
 
     static final class ColumnarListWriteAccess<W extends NullableWriteData> extends AbstractWriteAccess<ListWriteData>
         implements ListWriteAccess {

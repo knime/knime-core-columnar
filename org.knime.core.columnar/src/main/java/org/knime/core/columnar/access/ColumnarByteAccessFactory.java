@@ -67,6 +67,11 @@ final class ColumnarByteAccessFactory implements ColumnarAccessFactory {
     }
 
     @Override
+    public ColumnarReadAccess createFixedReadAccess(final int index) {
+        return new FixedByteReadAccess(index);
+    }
+
+    @Override
     public ColumnarByteWriteAccess createWriteAccess(final ColumnDataIndex index) {
         return new ColumnarByteWriteAccess(index);
     }
@@ -80,6 +85,19 @@ final class ColumnarByteAccessFactory implements ColumnarAccessFactory {
         @Override
         public byte getByteValue() {
             return m_data.getByte(m_index.getIndex());
+        }
+
+    }
+
+    static final class FixedByteReadAccess extends AbstractFixedReadAccess<ByteReadData> implements ByteReadAccess {
+
+        FixedByteReadAccess(final int index) {
+            super(index);
+        }
+
+        @Override
+        public byte getByteValue() {
+            return m_data.getByte(m_index);
         }
 
     }
