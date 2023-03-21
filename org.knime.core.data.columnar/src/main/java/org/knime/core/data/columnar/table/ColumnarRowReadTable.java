@@ -57,6 +57,7 @@ import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
+import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
@@ -82,12 +83,16 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
 
     private final ColumnarBatchReadStore m_store;
 
+    private final RandomAccessDataRowFactory m_randomAccessDataRowFactory;
+
     private final long m_size;
 
     private final CursorTracker<LookaheadCursor<ReadAccessRow>> m_cursorTracker =
         CursorTracker.createLookaheadCursorTracker();
 
     private final CursorTracker<RowCursor> m_rowCursorTracker = CursorTracker.createRowCursorTracker();
+
+    private final RandomAccessProvider m_randomAccessProvider;
 
     /**
      * @param schema The schema of the table.
@@ -121,6 +126,8 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
         m_storeFactory = storeFactory;
         m_store = store;
         m_size = size;
+        m_randomAccessProvider = new RandomAccessProvider(store, size);
+        m_randomAccessDataRowFactory = new RandomAccessDataRowFactory(m_randomAccessProvider, schema);
     }
 
     /**
@@ -194,8 +201,13 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
             .createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size, filter));
     }
 
+    CloseableRowIterator createRowIterator() {
+        return m_randomAccessDataRowFactory.createIterator();
+    }
+
     @Override
     public void close() throws IOException {
+        m_randomAccessProvider.close();
         m_rowCursorTracker.close();
         m_cursorTracker.close();
         m_store.close();
