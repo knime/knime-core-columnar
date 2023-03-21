@@ -68,11 +68,11 @@ import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.RandomAccessDataRowFactory.RandomAccessDataRow;
 import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.WriteValue;
-import org.knime.core.node.workflow.NodeContext;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.util.ThreadUtils;
 
@@ -128,7 +128,7 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
             new AdjustingCapacityStrategy(ColumnarParameters.CAPACITY_INIT, ColumnarParameters.BATCH_SIZE_TARGET, ColumnarParameters.CAPACITY_MAX)
             );
         m_writeExec = new WriteTaskExecutor<>(m_batchWriter, EXECUTOR, RowBatchWriteTask.NULL, ThreadUtils::callableWithContext);
-        m_dispatcher = new DataRowBatchTaskDispatcher(100, this::scheduleBatch);
+        m_dispatcher = new DataRowBatchTaskDispatcher(100);
         m_id = tableId;
     }
 
@@ -138,37 +138,56 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
         m_size++;
     }
 
-    @SuppressWarnings("resource") // the task is closed by the executor once it is finished
-    private void scheduleBatch(final DataRow[] rows) {
-        m_writeExec.accept(new RowBatchWriteTask(m_schema, rows));
+
+    @Override
+    public void flushRows() {
+        // TODO implement
     }
 
-    private static final class DataRowBatchTaskDispatcher {
+    private final class DataRowBatchTaskDispatcher {
+
         private final int m_batchSize;
 
         private final List<DataRow> m_batch;
 
-        private final Consumer<DataRow[]> m_batchConsumer;
+        boolean m_allProxyRows = true;
 
-        DataRowBatchTaskDispatcher(final int batchSize, final Consumer<DataRow[]> batchConsumer) {
+
+        DataRowBatchTaskDispatcher(final int batchSize) {
             m_batchSize = batchSize;
             m_batch = new ArrayList<>(batchSize);
-            m_batchConsumer = batchConsumer;
         }
 
         void addRow(final DataRow row) {
+            m_allProxyRows = m_allProxyRows && row instanceof RandomAccessDataRow;
             m_batch.add(row);
             if (m_batch.size() == m_batchSize) {
-                m_batchConsumer.accept(m_batch.toArray(DataRow[]::new));
-                m_batch.clear();
+                scheduleBatch();
             }
         }
 
         void dispatchLastBatch() {
             if (!m_batch.isEmpty()) {
-                m_batchConsumer.accept(m_batch.toArray(DataRow[]::new));
+                scheduleBatch();
             }
         }
+
+        @SuppressWarnings("resource") // the task is closed by the executor once it is finished
+        private void scheduleBatch() {
+            m_writeExec.accept(createTask());
+            m_batch.clear();
+            m_allProxyRows = true;
+        }
+
+        private RowTaskBatch<WriteAccess> createTask() {
+            DataRow[] rows = m_batch.toArray(DataRow[]::new);
+            if (m_allProxyRows) {
+                return new RandomAccessRowBatchWriteTask(rows);
+            } else {
+                return new RowBatchWriteTask(m_schema, rows);
+            }
+        }
+
     }
 
     @Override
@@ -241,6 +260,54 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
         m_writeTable.setMaxPossibleValues(maxPossibleValues);
     }
 
+    private static final class RandomAccessRowBatchWriteTask implements RowTaskBatch<WriteAccess> {
+
+        private final DataRow[] m_rows;
+
+        RandomAccessRowBatchWriteTask(final DataRow[] rows) {
+            m_rows = rows;
+        }
+
+        @Override
+        public ColumnTask createColumnTask(final int colIdx, final WriteAccess writeAccess) {
+            return new RandomAccessRowColumnTask(colIdx, writeAccess);
+        }
+
+
+        @Override
+        public void close() {
+            // nothing to close
+        }
+
+        private final class RandomAccessRowColumnTask implements ColumnTask {
+
+            private final int m_columnIndex;
+
+            private final WriteAccess m_writeAccess;
+
+            RandomAccessRowColumnTask(final int columnIndex, final WriteAccess writeAccess) {
+                m_columnIndex = columnIndex;
+                m_writeAccess = writeAccess;
+            }
+
+            @Override
+            public int size() {
+                return m_rows.length;
+            }
+
+            @Override
+            public void performSubtask(final int subtask) {
+                getRow(subtask).getAccessRow().acceptAccess(m_writeAccess::setFrom, m_columnIndex);
+            }
+
+            private RandomAccessDataRow getRow(final int index) {
+                return (RandomAccessDataRow)m_rows[index];
+            }
+
+        }
+
+    }
+
     private static final class RowBatchWriteTask implements RowTaskBatch<WriteAccess> {
 
         static final RowBatchWriteTask NULL = new RowBatchWriteTask(null, null);
@@ -274,6 +341,27 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
         public void close() {
             // nothing to close, all data is on heap
         }
+
+        private class RowBatchColumnWriteTask implements ColumnTask {
+
+            private final Consumer<DataRow> m_rowConsumer;
+
+            RowBatchColumnWriteTask(final Consumer<DataRow> rowConsumer) {
+                m_rowConsumer = rowConsumer;
+            }
+
+            @Override
+            public int size() {
+                return m_rows.length;
+            }
+
+            @Override
+            public void performSubtask(final int subtask) {
+                m_rowConsumer.accept(m_rows[subtask]);
+            }
+
+        }
+
 
         private static final class ColumnWrite implements Consumer<DataRow> {
 
@@ -313,26 +401,6 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
             public void accept(final DataRow t) {
                 m_writeValue.setRowKey(t.getKey());
             }
-        }
-
-        private class RowBatchColumnWriteTask implements ColumnTask {
-
-            private final Consumer<DataRow> m_rowConsumer;
-
-            RowBatchColumnWriteTask(final Consumer<DataRow> rowConsumer) {
-                m_rowConsumer = rowConsumer;
-            }
-
-            @Override
-            public int size() {
-                return m_rows.length;
-            }
-
-            @Override
-            public void performSubtask(final int subtask) {
-                m_rowConsumer.accept(m_rows[subtask]);
-            }
-
         }
 
         @SuppressWarnings("unchecked")
