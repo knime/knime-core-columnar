@@ -65,10 +65,18 @@ import org.knime.core.node.Node;
  */
 public final class ReferenceTables {
 
+    /**
+     * Creates a ReferenceTable with the provided ID that is backed by the provided BufferedDataTable.
+     *
+     * @param id of the reference table
+     * @param table backing the reference table
+     * @return a ReferenceTable with the given id that is backed by the given table
+     * @throws VirtualTableIncompatibleException if the table is not compatible with the ColumnarTableBackend
+     */
     @SuppressWarnings("resource")// the caller must handle the life-cycle of the returned table
     public static ReferenceTable createReferenceTable(final UUID id, final BufferedDataTable table)
         throws VirtualTableIncompatibleException {
-        final ExtensionTable extensionTable = extractExtensionTable(table);
+        final var extensionTable = extractExtensionTable(table);
         if (extensionTable instanceof VirtualTableExtensionTable) {
             final VirtualTableExtensionTable virtualExtensionTable = (VirtualTableExtensionTable)extensionTable;
             return new VirtualReferenceTable(table, id, virtualExtensionTable);
