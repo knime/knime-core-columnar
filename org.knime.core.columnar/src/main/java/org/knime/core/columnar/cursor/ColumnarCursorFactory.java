@@ -94,6 +94,12 @@ public final class ColumnarCursorFactory {
         } else {
 //          TODO: replace by this?:
 //          return create(readStore, Selection.all().retainRows(0, size));
+
+
+            // TODO(variable-batch-sizes):
+            // - Could use the suggestion above? No information about the batch size needed
+            // - When we have information about individual batch sizes we can easily implement the same (just look at the size of the last batch)
+
             final int lastIndexInLastBatch = (int)((size - 1) % readStore.batchLength());
             return create(readStore, new DefaultColumnSelection(readStore.getSchema().numColumns()),
                 new DefaultBatchRange(0, 0, readStore.numBatches() - 1, lastIndexInLastBatch));
@@ -177,6 +183,11 @@ public final class ColumnarCursorFactory {
 
             m_firstBatchIndex = batchSelection.getFirstBatch();
             m_firstIndexInFirstBatch = batchSelection.getFirstRowInFirstBatch();
+
+            // TODO(variable-batch-sizes):
+            // - If we knew the total size we could just use this
+            // - Otherwise we can surly find an implementation with variable batch sizes
+
             // Special case for stores that contain only empty batches: don't even bother trying to iterate over them,
             // this would only complicate the index-handling logic in the methods below.
             m_lastBatchIndex = store.batchLength() > 0 ? batchSelection.getLastBatch() : -1;

@@ -181,10 +181,10 @@ public final class WrappedBatchStore implements BatchStore {
         return m_writer.m_numBatches.get();
     }
 
-    @Override
-    public int batchLength() {
-        return m_writer.m_batchLength.get();
-    }
+//    @Override
+//    public int batchLength() {
+//        return m_writer.m_batchLength.get();
+//    }
 
     @Override
     public FileHandle getFileHandle() {

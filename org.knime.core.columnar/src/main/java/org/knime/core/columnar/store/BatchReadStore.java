@@ -46,7 +46,6 @@
 package org.knime.core.columnar.store;
 
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
-import org.knime.core.columnar.batch.ReadBatch;
 
 /**
  * An implementation of {@link RandomAccessBatchReadable} with a fixed {@link #numBatches() number of batches} and a
@@ -65,12 +64,12 @@ public interface BatchReadStore extends RandomAccessBatchReadable {
     int numBatches();
 
     /**
-     * Obtain the {@link ReadBatch#length()} of batches in this store. Note that the length of the last batch might be
+     * Obtain the {@link ReadBatch#length()} of batch of the given index in this store. Note that the length of the last batch might be
      * smaller than the reported value.
      *
      * @return the length of batches
      */
-    int batchLength();
+//    int batchLength(int batchIdx);
 
     /**
      * @return The designated physical location of the store. Note that the store may not (fully) be existent at this

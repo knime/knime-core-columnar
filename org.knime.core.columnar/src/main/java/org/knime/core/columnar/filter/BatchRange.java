@@ -91,6 +91,13 @@ public interface BatchRange {
             final int lastIndexInLastBatch = -1; // last batch should be read fully
             return new DefaultBatchRange(0, 0, store.numBatches() - 1, lastIndexInLastBatch);
         } else {
+
+            // TODO(variable-batch-sizes):
+            // - We could re-implement this by going through the batch sizes and finding the one with the specified index.
+            //   The time complexity will increase but this should not be too bad because the number of batches should not be
+            //   too large and we could reduce it to `log n` by saving the start indices of each batch and doing a binary search
+            // - Otherwise we need to check if this BatchRange could be changed completely
+
             final long firstRow = selection.rows().fromIndex();
             final long lastRow = selection.rows().toIndex() - 1;
             final int batchLen = store.batchLength();

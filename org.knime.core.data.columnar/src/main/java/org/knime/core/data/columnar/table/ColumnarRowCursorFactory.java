@@ -46,7 +46,6 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.filter.BatchRange;
@@ -156,6 +155,11 @@ final class ColumnarRowCursorFactory {
         if (size < 1) {
             return new EmptyRowCursor(schema);
         }
+
+
+        // TODO(variable-batch-sizes):
+        // The batch length here is used to create a batch range -> Here goes the same as commented in BatchRange.java
+
         final int maxLength = store.batchLength();
         if (maxLength < 1) {
             throw new IllegalStateException(

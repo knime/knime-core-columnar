@@ -376,10 +376,10 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         return m_wrappedStore.numBatches();
     }
 
-    @Override
-    public int batchLength() {
-        return m_wrappedStore.batchLength();
-    }
+//    @Override
+//    public int batchLength() {
+//        return m_wrappedStore.batchLength();
+//    }
 
     @Override
     public FileHandle getFileHandle() {
