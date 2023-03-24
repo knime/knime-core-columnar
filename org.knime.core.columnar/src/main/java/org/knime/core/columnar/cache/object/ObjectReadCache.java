@@ -116,17 +116,14 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
 
         private final RandomAccessBatchReader m_readerDelegate;
 
-        private final ColumnSelection m_selection;
-
         private ObjectReadCacheReader(final ColumnSelection selection) {
             m_readerDelegate = m_reabableDelegate.createRandomAccessReader(selection);
-            m_selection = selection;
         }
 
         @Override
         public ReadBatch readRetained(final int index) throws IOException {
             final ReadBatch batch = m_readerDelegate.readRetained(index);
-            return m_selection.createBatch(i -> m_cachedDataFactories[i].createReadData(batch.get(i), createId(i, index)));
+            return batch.transform((i, d) -> m_cachedDataFactories[i].createReadData(d, createId(i, index)));
         }
 
         @Override

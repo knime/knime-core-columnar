@@ -69,8 +69,6 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
 
     private final ColumnarSchema m_schema;
 
-    private final ColumnSelection m_selection;
-
     private final DictDecoder m_decoder;
 
     /**
@@ -85,7 +83,6 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
     public DictEncodedRandomAccessBatchReader(final RandomAccessBatchReadable delegate, final ColumnSelection selection,
         final ColumnarSchema schema, final DictElementCache cache) {
         m_delegate = delegate.createRandomAccessReader(selection);
-        m_selection = selection;
         m_schema = schema;
         m_decoder = new DictDecoder(cache);
     }
@@ -97,12 +94,11 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
 
     @Override
     public ReadBatch readRetained(final int index) throws IOException {
-        final ReadBatch batch = m_delegate.readRetained(index);
-        return m_selection.createBatch(i -> wrapDictEncodedData(batch, i));
+        final var batch = m_delegate.readRetained(index);
+        return batch.transform(this::wrapDictEncodedData);
     }
 
-    private NullableReadData wrapDictEncodedData(final ReadBatch batch, final int index) {
-        final var data = batch.get(index);
+    private NullableReadData wrapDictEncodedData(final int index, final NullableReadData data) {
         return m_decoder.decode(DataIndex.createColumnIndex(index), data, m_schema.getSpec(index),
             m_schema.getTraits(index));
     }

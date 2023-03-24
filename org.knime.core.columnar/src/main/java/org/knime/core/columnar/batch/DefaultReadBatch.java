@@ -48,6 +48,9 @@
  */
 package org.knime.core.columnar.batch;
 
+import java.util.stream.IntStream;
+
+import org.knime.core.columnar.ReferenceCounter;
 import org.knime.core.columnar.data.NullableReadData;
 
 /**
@@ -71,6 +74,19 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
             length = Math.max(length, d.length());
         }
         m_length = length;
+    }
+
+    private DefaultReadBatch(final NullableReadData[] data, final ReferenceCounter refCounter, final int length) {
+        super(data, refCounter);
+        m_length = length;
+    }
+
+    @Override
+    public ReadBatch transform(final DataTransformer dataOperator) {
+        var transformedDatas = IntStream.range(0, m_data.length)
+                .mapToObj(i -> dataOperator.transform(i, m_data[i]))
+                .toArray(NullableReadData[]::new);
+        return new DefaultReadBatch(transformedDatas, m_refCounter, m_length);
     }
 
     @Override

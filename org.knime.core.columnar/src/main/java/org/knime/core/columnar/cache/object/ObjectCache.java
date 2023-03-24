@@ -55,11 +55,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Stream;
 
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
@@ -261,10 +259,9 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             Arrays.setAll(futures,
                 i -> m_cachedDataFactories[i].getCachedDataFuture(batch.get(i)));
             m_future = CompletableFuture.allOf(futures).thenRunAsync(() -> { // NOSONAR
+                var serializedBatch = batch.transform((i, d) -> (NullableReadData)futures[i].join());
                 try {
-                    m_writerDelegate.write(new DefaultReadBatch(Stream.of(futures)//
-                        .map(CompletableFuture::join)//
-                        .toArray(NullableReadData[]::new)));
+                    m_writerDelegate.write(serializedBatch);
                 } catch (IOException e) {
                     throw new IllegalStateException(String.format("Failed to write batch %d.", currentBatch), e);
                 } finally {
@@ -315,11 +312,8 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
         private final RandomAccessBatchReader m_readerDelegate;
 
-        private final ColumnSelection m_selection;
-
         private ObjectCacheReader(final ColumnSelection selection) {
             m_readerDelegate = m_readableDelegate.createRandomAccessReader(selection);
-            m_selection = selection;
         }
 
         @Override
@@ -335,7 +329,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             }
 
             final ReadBatch batch = m_readerDelegate.readRetained(index);
-            return m_selection.createBatch(i -> m_cachedDataFactories[i].createReadData(batch.get(i), createId(i, index)));
+            return batch.transform((i, d) -> m_cachedDataFactories[i].createReadData(d, createId(i, index)));
         }
 
         @Override

@@ -79,4 +79,22 @@ public interface ReadBatch extends Batch<NullableReadData>, NullableReadData {
     @Override
     int length();
 
+    /**
+     * Creates a new batch with transformed data that shares the references with this batch.
+     *
+     * @param transformer for transforming the data of this batch
+     * @return a new batch with the transformed data that shares the references with this batch
+     */
+    ReadBatch transform(DataTransformer transformer);
+
+    /**
+     * Transforms data objects.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    @FunctionalInterface
+    interface DataTransformer {
+        NullableReadData transform(int dataIndex, NullableReadData data);
+    }
+
 }

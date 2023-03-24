@@ -52,6 +52,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 import org.junit.Test;
 import org.knime.core.columnar.ReferencedData;
@@ -118,12 +119,15 @@ public abstract class AbstractBatchTest<B extends AbstractBatch<? extends Refere
         }
         batch.retain();
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
-            assertEquals(2, data[i].getRefs());
+            // batches count their own references and only release once their reference count hits zero
+            assertEquals(1, data[i].getRefs());
         }
         batch.release();
         for (int i = 0; i < DEF_NUM_COLUMNS; i++) {
             assertEquals(1, data[i].getRefs());
         }
+        batch.release();
+        Stream.of(data).forEach(d -> assertEquals(0, d.getRefs()));
     }
 
     @Test

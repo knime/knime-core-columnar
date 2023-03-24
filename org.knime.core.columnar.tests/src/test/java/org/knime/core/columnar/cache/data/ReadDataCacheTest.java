@@ -172,6 +172,7 @@ public class ReadDataCacheTest extends ColumnarTest {
     }
 
     private static void checkUnflushed(final TestDataTable table, final TestBatchStore delegate) throws IOException {
+        // refs are the TestDataTable, the unflushed batch and the cache
         assertEquals(3, checkRefs(table));
         assertFalse(tableInStore(delegate, table));
     }

@@ -57,6 +57,7 @@ import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
 import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.ReferenceCounter;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
@@ -99,6 +100,9 @@ public final class FilteredColumnSelection implements ColumnSelection {
             m_numColumns);
     }
 
+    /**
+     * A ReadBatch that doesn't contain the all columns of the underlying store.
+     */
     public static final class FilteredReadBatch implements ReadBatch {
 
         private final Map<Integer, NullableReadData> m_data;
@@ -107,10 +111,32 @@ public final class FilteredColumnSelection implements ColumnSelection {
 
         private final int m_length;
 
+        private final ReferenceCounter m_refCounter;
+
+        /**
+         * Constructor.
+         *
+         * @param data the data stored in the batch
+         * @param numColumns the total number of columns in the underlying store
+         */
         public FilteredReadBatch(final Map<Integer, NullableReadData> data, final int numColumns) {
+            this(data, numColumns, new ReferenceCounter(),
+                data.values().stream().mapToInt(ReadData::length).max().orElse(0));
+        }
+
+        private FilteredReadBatch(final Map<Integer, NullableReadData> data, final int numColumns,
+            final ReferenceCounter refCounter, final int length) {
             m_data = data;
             m_numColumns = numColumns;
-            m_length = data.values().stream().mapToInt(ReadData::length).max().orElse(0);
+            m_length = length;
+            m_refCounter = refCounter;
+        }
+
+        @Override
+        public ReadBatch transform(final DataTransformer transformer) {
+            var transformedData = m_data.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> transformer.transform(e.getKey(), e.getValue())));
+            return new FilteredReadBatch(transformedData, m_numColumns, m_refCounter, m_length);
         }
 
         @Override
@@ -143,7 +169,7 @@ public final class FilteredColumnSelection implements ColumnSelection {
          */
         @Override
         public NullableReadData[] getUnsafe() {
-            final NullableReadData[] data = new NullableReadData[m_numColumns];
+            final var data = new NullableReadData[m_numColumns];
             m_data.entrySet().stream().forEach(e -> data[e.getKey()] = e.getValue());
             return data;
         }
@@ -155,16 +181,14 @@ public final class FilteredColumnSelection implements ColumnSelection {
 
         @Override
         public void release() {
-            for (final NullableReadData data : m_data.values()) {
-                data.release();
+            if (m_refCounter.release()) {
+                m_data.values().forEach(ReferencedData::release);
             }
         }
 
         @Override
         public void retain() {
-            for (final NullableReadData data : m_data.values()) {
-                data.retain();
-            }
+            m_refCounter.retain();
         }
 
         @Override

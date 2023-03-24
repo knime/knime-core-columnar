@@ -50,6 +50,7 @@ package org.knime.core.columnar.batch;
 
 import java.util.Arrays;
 
+import org.knime.core.columnar.ReferenceCounter;
 import org.knime.core.columnar.ReferencedData;
 
 /**
@@ -57,20 +58,30 @@ import org.knime.core.columnar.ReferencedData;
  */
 abstract class AbstractBatch<D extends ReferencedData> implements Batch<D> {
 
+    protected final ReferenceCounter m_refCounter;
+
     final D[] m_data;
 
     AbstractBatch(final D[] data) {
-        m_data = data;
+        this(data, new ReferenceCounter());
     }
+
+    protected AbstractBatch(final D[] data, final ReferenceCounter refCounter) {
+        m_data = data;
+        m_refCounter = refCounter;
+    }
+
 
     @Override
     public final void release() {
-        Arrays.stream(m_data).forEach(ReferencedData::release);
+        if (m_refCounter.release()) {
+            Arrays.stream(m_data).forEach(ReferencedData::release);
+        }
     }
 
     @Override
     public final void retain() {
-        Arrays.stream(m_data).forEach(ReferencedData::retain);
+        m_refCounter.retain();
     }
 
     @Override

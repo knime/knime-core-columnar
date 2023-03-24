@@ -99,6 +99,7 @@ public class BatchWritableCacheTest extends ColumnarTest {
     }
 
     private static void checkCached(final TestDataTable table) {
+        // references are the TestDataTable and the cached batch
         assertEquals(2, checkRefs(table));
     }
 

@@ -578,8 +578,12 @@ public final class TestBatchStoreUtils {
     public static void writeTable(final BatchWritable store, final TestDataTable table) throws IOException {
         try (final BatchWriter writer = store.getWriter()) {
             for (int i = 0; i < table.size(); i++) {
-                final TestData[] batch = table.getBatch(i);
-                writer.write(new DefaultReadBatch(batch));
+                final var data = table.getBatch(i);
+                // Retain the data to mimic the behavior of readRetained
+                Stream.of(data).forEach(ReferencedData::retain);
+                var batch = new DefaultReadBatch(data);
+                writer.write(batch);
+                batch.release();
             }
         }
     }
@@ -621,11 +625,15 @@ public final class TestBatchStoreUtils {
                 final var loopIndices = indices != null ? indices : IntStream.range(0, written.length).toArray();
                 for (int j : loopIndices) { // NOSONAR
                     var d = DecoratingData.unpack(batch.get(j));
+                    // TestDataTable#close releases the data, hence we need to retain it here because
+                    // it may come from the cache
+                    d.retain();
                     data[j] = (TestData)d;
                     assertArrayEquals(written[j].get(), data[j].get());
                 }
 
                 result.add(data);
+                batch.release();
             }
             return new TestDataTable(result);
         }

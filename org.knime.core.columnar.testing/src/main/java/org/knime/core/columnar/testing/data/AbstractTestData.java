@@ -82,6 +82,9 @@ public abstract class AbstractTestData implements TestData {
     @Override
     public final synchronized void release() {
         m_refs--;
+        if (m_refs < 0) {
+            throw new IllegalStateException("Released too many times.");
+        }
     }
 
     @Override

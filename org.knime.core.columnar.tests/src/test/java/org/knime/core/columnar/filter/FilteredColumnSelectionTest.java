@@ -146,9 +146,12 @@ public class FilteredColumnSelectionTest {
         final ReadBatch batch = createBatch(data, 0);
         assertEquals(1, data[0].getRefs());
         batch.retain();
-        assertEquals(2, data[0].getRefs());
+        // the batch only retains the data once
+        assertEquals(1, data[0].getRefs());
         batch.release();
         assertEquals(1, data[0].getRefs());
+        batch.release();
+        assertEquals(0, data[0].getRefs());
     }
 
     @Test

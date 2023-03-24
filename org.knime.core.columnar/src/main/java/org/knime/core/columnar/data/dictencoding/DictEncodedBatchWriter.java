@@ -49,10 +49,8 @@
 package org.knime.core.columnar.data.dictencoding;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
@@ -199,9 +197,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
     @Override
     public void write(final ReadBatch batch) throws IOException {
         // Replace all DictEncoded Data objects by the content that they wrap
-        var data = new NullableReadData[batch.numData()];
-        Arrays.setAll(data, i -> unpack(batch.get(i)));
-        m_delegate.write(new DefaultReadBatch(data));
+        m_delegate.write(batch.transform((i, d) -> unpack(d)));
     }
 
     private static NullableReadData unpack(NullableReadData data) {
