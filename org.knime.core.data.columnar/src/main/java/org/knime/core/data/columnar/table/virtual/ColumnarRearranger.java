@@ -244,7 +244,17 @@ public final class ColumnarRearranger {
 
         ColumnarVirtualTable appendedColumns =
             mappedColumnList.get(0).append(mappedColumnList.subList(1, mappedColumnList.size()));
-        return materializeAppendTable(table, progress, sourceTable, appendedColumns);
+
+        var uniqueCellFactories = columnsToCreate.stream()//
+                .map(RearrangedColumn::getCellFactory)//
+                .collect(Collectors.toSet());
+
+        ColumnRearrangerUtils.initProcessing(uniqueCellFactories, m_context);
+        try {
+            return materializeAppendTable(table, progress, sourceTable, appendedColumns);
+        } finally {
+            ColumnRearrangerUtils.finishProcessing(uniqueCellFactories);
+        }
     }
 
     private Map<RearrangedColumn, ColumnarVirtualTable> createColumns(final List<RearrangedColumn> columnsToCreate,
