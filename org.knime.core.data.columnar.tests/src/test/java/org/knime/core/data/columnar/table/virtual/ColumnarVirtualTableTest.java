@@ -63,7 +63,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.LongCell;
@@ -151,7 +151,6 @@ final class ColumnarVirtualTableTest {
             .build();
 
         assertEquals(expectedSchema, appendedTable.getSchema());
-        assertSchemasMatch(appendedTable);
     }
 
     @Test
@@ -160,14 +159,13 @@ final class ColumnarVirtualTableTest {
         var mappedTable = table.map(new TestMapperFactory(), 1);
         var expectedSchema = builder(false).withColumn("bar", LONG).build();
         assertEquals(expectedSchema, mappedTable.getSchema());
-        assertSchemasMatch(mappedTable);
     }
 
     @Test
     void testPermuteWithRowID() {
         testPermute(true);
         // it's not allowed to move the RowID to a different position
-        assertThrows(IllegalArgumentException.class, () -> TABLE.permute(1, 0, 3, 2));
+        assertThrows(IllegalArgumentException.class, () -> TABLE.selectColumns(1, 0, 3, 2));
     }
 
     @Test
@@ -178,10 +176,9 @@ final class ColumnarVirtualTableTest {
     private static void testPermute(final boolean withRowID) {
         var table = createTable(withRowID, FOO, BAR, BAZ);
         int[] permutation = withRowID ? new int[] {0, 3, 1, 2} : new int[] {2, 0, 1};
-        var permuted = table.permute(permutation);
+        var permuted = table.selectColumns(permutation);
         var expectedSchema = createSchema(withRowID, BAZ, FOO, BAR);
         assertEquals(expectedSchema, permuted.getSchema());
-        assertSchemasMatch(permuted);
     }
 
     @Test
@@ -197,13 +194,12 @@ final class ColumnarVirtualTableTest {
     private static void testFilterColumns(final boolean withRowID) {
         var table = createTable(withRowID, FOO, BAR, BAZ);
         var filterIndices = withRowID ? new int[] {0, 2} : new int[] {1};
-        var filtered = table.filterColumns(filterIndices);
+        var filtered = table.selectColumns(filterIndices);
         var expectedSchema = createSchema(withRowID, BAR);
         assertEquals(expectedSchema, filtered.getSchema());
-        assertSchemasMatch(filtered);
     }
 
-    private static final class TestMapperFactory implements ColumnarMapperFactory {
+    private static final class TestMapperFactory implements ColumnarMapperWithRowIndexFactory {
 
         @Override
         public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
@@ -217,16 +213,6 @@ final class ColumnarVirtualTableTest {
             return builder(false).withColumn("bar", LONG).build();
         }
 
-    }
-
-    private static void assertSchemasMatch(final ColumnarVirtualTable table) {
-        var columnarValueSchema = table.getSchema();
-        var columnarSchema = table.getVirtualTable().getSchema();
-        assertEquals(columnarSchema.numColumns(), columnarValueSchema.numColumns());
-        for (int i = 0; i < columnarSchema.numColumns(); i++) {
-            assertEquals(columnarSchema.getSpec(i), columnarValueSchema.getSpec(i));
-            assertEquals(columnarSchema.getTraits(i), columnarValueSchema.getTraits(i));
-        }
     }
 
     private static ColumnarVirtualTable createTable(final ColumnarValueSchema schema) {

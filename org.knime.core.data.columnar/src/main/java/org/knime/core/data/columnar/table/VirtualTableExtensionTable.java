@@ -65,6 +65,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
@@ -265,8 +266,32 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         final ColumnarValueSchema transformedSchema, //
         final long size, //
         final int tableId) {
+        this(refs, virtualTableFragment.getProducingTransform(), transformedSchema, size, tableId);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param refs the reference tables
+     * @param virtualTableFragment the {@link VirtualTable} representing this table with the {@link ReferenceTable refs}
+     *            as sources
+     * @param size the size of the output table AFTER the transformations are applied
+     * @param tableId the id with which this table is tracked
+     */
+    public VirtualTableExtensionTable(final ReferenceTable[] refs, //
+        final ColumnarVirtualTable virtualTableFragment, //
+        final long size, //
+        final int tableId) {
+        this(refs, virtualTableFragment.getProducingTransform(), virtualTableFragment.getSchema(), size, tableId);
+    }
+
+    private VirtualTableExtensionTable(final ReferenceTable[] refs, //
+        final TableTransform fragmentTableTransform, //
+        final ColumnarValueSchema transformedSchema, //
+        final long size, //
+        final int tableId) {
         m_tableId = tableId;
-        m_tableTransformFragment = virtualTableFragment.getProducingTransform();
+        m_tableTransformFragment = fragmentTableTransform;
         m_resolvedTableTransform = resolveFullTableTransform(m_tableTransformFragment, refs);
         m_refTables = Stream.of(refs)//
             .map(ReferenceTable::getBufferedTable)//
@@ -474,7 +499,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return new SourceClosingRowCursor(cursor, accessibles.toArray(Closeable[]::new));
     }
 
-    private VirtualTable createFilteredVirtualTable(final TableFilter filter) {
+    private ColumnarVirtualTable createFilteredVirtualTable(final TableFilter filter) {
         var table = getVirtualTable();
 
         if (TableFilterUtils.definesRowRange(filter)) {
@@ -483,13 +508,13 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         }
 
         if (TableFilterUtils.definesColumnFilter(filter)) {
-            table = table.filterColumns(TableFilterUtils.extractPhysicalColumnIndices(filter, m_schema.numColumns()));
+            table = table.selectColumns(TableFilterUtils.extractPhysicalColumnIndices(filter, m_schema.numColumns()));
         }
         return table;
     }
 
-    public VirtualTable getVirtualTable() {
-        return new VirtualTable(m_resolvedTableTransform, m_schema);
+    public ColumnarVirtualTable getVirtualTable() {
+        return new ColumnarVirtualTable(m_resolvedTableTransform, m_schema);
     }
 
 

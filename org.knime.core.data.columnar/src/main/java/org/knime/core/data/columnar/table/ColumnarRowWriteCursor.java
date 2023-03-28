@@ -145,4 +145,10 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
         return m_rowWrite.getNumColumns();
     }
 
+    /**
+     * @return the accessCursor
+     */
+    WriteCursor<WriteAccessRow> getAccessCursor() {
+        return m_accessCursor;
+    }
 }

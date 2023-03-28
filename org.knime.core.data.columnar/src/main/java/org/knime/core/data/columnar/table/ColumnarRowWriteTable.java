@@ -65,6 +65,10 @@ import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.NodeLogger;
+import org.knime.core.table.cursor.WriteCursor;
+import org.knime.core.table.row.RowWriteAccessible;
+import org.knime.core.table.row.WriteAccessRow;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * Standard implementation of a write-only table that understands KNIME's {@link WriteValue logical} data types and is
@@ -75,7 +79,7 @@ import org.knime.core.node.NodeLogger;
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
-public final class ColumnarRowWriteTable implements AutoCloseable {
+public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAccessible {
 
     static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteTable.class);
 
@@ -223,4 +227,16 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         }
     }
 
+
+    // -- implement RowWriteAccessible --
+
+    @Override
+    public ColumnarSchema getSchema() {
+        return m_schema;
+    }
+
+    @Override
+    public WriteCursor<WriteAccessRow> getWriteCursor() {
+        return m_writeCursor.getAccessCursor();
+    }
 }

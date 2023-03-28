@@ -48,32 +48,29 @@
  */
 package org.knime.core.data.columnar.table.virtual.reference;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.row.RowAccessible;
-import org.knime.core.table.virtual.VirtualTable;
 
 final class BufferedReferenceTable extends AbstractReferenceTable {
 
-    private final ColumnarValueSchema m_schema;
-
-    private final VirtualTable m_virtualTable;
+    private final ColumnarVirtualTable m_virtualTable;
 
     BufferedReferenceTable(final BufferedDataTable table, final UUID id) throws VirtualTableIncompatibleException {
         super(table, id);
-        m_schema = VirtualTableSchemaUtils.extractSchema(table);
-        m_virtualTable = new VirtualTable(id, m_schema, true);
+        ColumnarValueSchema schema = VirtualTableSchemaUtils.extractSchema(table);
+        m_virtualTable = new ColumnarVirtualTable(id, schema, true);
     }
 
     @Override
-    public VirtualTable getVirtualTable() {
+    public ColumnarVirtualTable getVirtualTable() {
         return m_virtualTable;
     }
 
@@ -81,12 +78,6 @@ final class BufferedReferenceTable extends AbstractReferenceTable {
     @SuppressWarnings("resource")
     @Override
     public Map<UUID, RowAccessible> getSources() {
-        return Collections.singletonMap(getId(), VirtualTableUtils.createRowAccessible(m_schema, getBufferedTable()));
+        return Map.of(getId(), VirtualTableUtils.createRowAccessible(getSchema(), getBufferedTable()));
     }
-
-    @Override
-    public ColumnarValueSchema getSchema() {
-        return m_schema;
-    }
-
 }

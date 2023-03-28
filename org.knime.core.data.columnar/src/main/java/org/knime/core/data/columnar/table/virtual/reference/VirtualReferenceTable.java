@@ -51,8 +51,8 @@ package org.knime.core.data.columnar.table.virtual.reference;
 import java.util.Map;
 import java.util.UUID;
 
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.virtual.VirtualTable;
@@ -75,7 +75,7 @@ final class VirtualReferenceTable extends AbstractReferenceTable {
     }
 
     @Override
-    public VirtualTable getVirtualTable() {
+    public ColumnarVirtualTable getVirtualTable() {
         return m_table.getVirtualTable();
     }
 
@@ -83,10 +83,4 @@ final class VirtualReferenceTable extends AbstractReferenceTable {
     public Map<UUID, RowAccessible> getSources() {
         return m_table.collectSources();
     }
-
-    @Override
-    public ColumnarValueSchema getSchema() {
-        return m_table.getSchema();
-    }
-
 }

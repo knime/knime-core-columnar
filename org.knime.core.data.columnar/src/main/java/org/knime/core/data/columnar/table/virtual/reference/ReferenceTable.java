@@ -53,6 +53,7 @@ import java.util.UUID;
 
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.virtual.VirtualTable;
@@ -65,7 +66,7 @@ import org.knime.core.table.virtual.VirtualTable;
  */
 public interface ReferenceTable {
 
-    VirtualTable getVirtualTable();
+    ColumnarVirtualTable getVirtualTable();
 
     Map<UUID, RowAccessible> getSources();
 
@@ -73,6 +74,7 @@ public interface ReferenceTable {
 
     UUID getId();
 
-    ColumnarValueSchema getSchema();
-
+    default ColumnarValueSchema getSchema() {
+        return getVirtualTable().getSchema();
+    }
 }

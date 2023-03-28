@@ -69,7 +69,7 @@ import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
-import org.knime.core.table.virtual.spec.ColumnFilterTransformSpec;
+import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
 import org.knime.core.util.DuplicateChecker;
 import org.knime.core.util.DuplicateKeyException;
@@ -140,7 +140,7 @@ public final class TableTransformUtils {
             virtualTable = filterRowKey(virtualTable);
             rowIDColumnIndex += numColumnsInFirstTable - 1;
             final int finalRowIDCol = rowIDColumnIndex;
-            virtualTable = virtualTable.permute(//
+            virtualTable = virtualTable.selectColumns(//
                 IntStream.concat(//
                     IntStream.of(rowIDColumnIndex), // move RowID column first
                     IntStream.range(0, numColumns(virtualTable)) // fill in remaining columns
@@ -155,10 +155,7 @@ public final class TableTransformUtils {
     }
 
     private static VirtualTable filterRowKey(final VirtualTable table) {
-        return table.filterColumns(//
-            IntStream.range(1, table.getSchema().numColumns())//
-                .toArray()//
-        );
+        return table.dropColumns(0);
     }
 
     private static VirtualTable asSource(final ReferenceTable table) {
@@ -167,7 +164,7 @@ public final class TableTransformUtils {
 
     static List<TableTransformSpec> createAppendTransformations(final DataTableSpec[] specs) {
         final var selection = filterOutRedundantRowKeyColumns(specs);
-        return List.of(new AppendTransformSpec(), new ColumnFilterTransformSpec(selection));
+        return List.of(new AppendTransformSpec(), new SelectColumnsTransformSpec(selection));
     }
 
     private static int[] filterOutRedundantRowKeyColumns(final DataTableSpec[] specs) {

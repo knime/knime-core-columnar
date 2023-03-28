@@ -52,8 +52,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.virtual.VirtualTable;
@@ -68,13 +68,13 @@ final class ColumnarContainerReferenceTable extends AbstractReferenceTable {
 
     private final AbstractColumnarContainerTable m_table;
 
-    private final VirtualTable m_virtualTable;
+    private final ColumnarVirtualTable m_virtualTable;
 
     ColumnarContainerReferenceTable(final BufferedDataTable bufferedTable, final UUID id,
         final AbstractColumnarContainerTable table) {
         super(bufferedTable, id);
         m_table = table;
-        m_virtualTable = new VirtualTable(id, table.getSchema(), true);
+        m_virtualTable = new ColumnarVirtualTable(id, table.getSchema(), true);
     }
 
     @SuppressWarnings("resource") // we close the RowAccessible by closing m_cachedOutput
@@ -84,12 +84,7 @@ final class ColumnarContainerReferenceTable extends AbstractReferenceTable {
     }
 
     @Override
-    public VirtualTable getVirtualTable() {
+    public ColumnarVirtualTable getVirtualTable() {
         return m_virtualTable;
-    }
-
-    @Override
-    public ColumnarValueSchema getSchema() {
-        return m_table.getSchema();
     }
 }

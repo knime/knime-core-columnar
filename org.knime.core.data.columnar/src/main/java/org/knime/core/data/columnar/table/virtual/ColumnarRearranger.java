@@ -50,18 +50,21 @@ package org.knime.core.data.columnar.table.virtual;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataCellTypeConverter;
 import org.knime.core.data.DataColumnSpec;
@@ -79,7 +82,7 @@ import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.CellFactory;
@@ -91,7 +94,6 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyValueFactory;
-import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.WriteValue;
@@ -102,9 +104,12 @@ import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.Node;
 import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.StringAccess;
 import org.knime.core.table.access.WriteAccess;
+import org.knime.core.table.row.RowWriteAccessible;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
-import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
+import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerWithRowIndexFactory;
 
 /**
  * Handles the construction (and optimization) of virtual tables that are generated via the ExecutionContext in a node.
@@ -153,30 +158,33 @@ public final class ColumnarRearranger {
             .filter(ColumnarRearranger::isAppendedColumn)//
             .toList();
         var existingColumns = rearrangedColumns.stream()//
-            .filter(c -> !isAppendedColumn(c))//
+            .filter(Predicate.not(ColumnarRearranger::isAppendedColumn))//
             // ensure that the existing columns are in the order they are in the input table
-            .sorted((l, r) -> Integer.compare(l.getOriginalIndex(), r.getOriginalIndex()))//
+            .sorted(Comparator.comparing(RearrangedColumn::getOriginalIndex))
             .toList();
-        var tableToRearrange = asFragmentSource(refTable).filterColumns(//
+
+        var tableToRearrange = asFragmentSource(refTable).selectColumns(//
             addRowIDIndex(//
                 existingColumns.stream()//
                     .mapToInt(RearrangedColumn::getOriginalIndex)//
             ).toArray()//
         );
 
+        // tableToRearrange := input table filtered to keep only (RowID and) columns that are used un-converted.
+        // keeps the same order of columns as in input table
+        // tableToRearrange := tableToRearrange with the newly created columns (converted and mapped) appended
+        // then pass that to rearrange(...)
         if (!newColumns.isEmpty()) {
             var appendTable = createAppendTable(refTable, newColumns, progressMonitor, table.size());
             refTables.add(appendTable);
-            var appendTableSource = asFragmentSource(appendTable)
-                // filter out the void row key column
-                .filterColumns(IntStream.range(1, newColumns.size() + 1).toArray());
-            tableToRearrange = tableToRearrange.append(List.of(appendTableSource));
+            var appendTableSource = asFragmentSource(appendTable).dropColumns(0); // filter out the void row key column
+            tableToRearrange = tableToRearrange.append(appendTableSource);
         }
 
         var rearrangedTable = rearrange(newColumns, existingColumns, tableToRearrange);
 
         return new VirtualTableExtensionTable(refTables.toArray(ReferenceTable[]::new),
-            rearrangedTable.getVirtualTable(), rearrangedTable.getSchema(), table.size(), m_tableIdSupplier.getAsInt());
+            rearrangedTable, table.size(), m_tableIdSupplier.getAsInt());
 
     }
 
@@ -192,7 +200,7 @@ public final class ColumnarRearranger {
             permutation[col.getGlobalIndex() + 1] = i;
             i++;
         }
-        return tableToRearrange.permute(permutation);
+        return tableToRearrange.selectColumns(permutation);
     }
 
     private static IntStream addRowIDIndex(final IntStream indicesWithoutRowID) {
@@ -207,15 +215,15 @@ public final class ColumnarRearranger {
         return new ColumnarVirtualTable(table.getId(), table.getSchema(), true);
     }
 
-    private ReferenceTable createAppendTable(final ReferenceTable table, final List<RearrangedColumn> columnsToMap,
+    private ReferenceTable createAppendTable(final ReferenceTable table, final List<RearrangedColumn> newColumns,
         final ExecutionMonitor monitor, final long size)
         throws VirtualTableIncompatibleException, CanceledExecutionException {
         var schema = table.getSchema();
         var inputValueFactories = new GenericValueFactory[schema.numColumns()];
         Arrays.setAll(inputValueFactories, i -> new GenericValueFactory(schema.getValueFactory(i)));
-        var sourceTable = new ColumnarVirtualTable(table.getVirtualTable(), schema);
+        var sourceTable = table.getVirtualTable();
 
-        var columnsToConvert = columnsToMap.stream()//
+        var columnsToConvert = newColumns.stream()//
             .filter(RearrangedColumn::isConvertedColumn)//
             .collect(Collectors.toList());
         var mappedColumns = new LinkedHashMap<RearrangedColumn, ColumnarVirtualTable>();
@@ -225,7 +233,7 @@ public final class ColumnarRearranger {
             mappedColumns.putAll(conversionResult.convertedColumns());
         }
 
-        var columnsToCreate = columnsToMap.stream()//
+        var columnsToCreate = newColumns.stream()//
             .filter(c -> c.isNewColumn())//
             .collect(Collectors.toList());
 
@@ -238,7 +246,7 @@ public final class ColumnarRearranger {
         }
 
         var mappedColumnList = mappedColumns.entrySet().stream()//
-            .sorted((l, r) -> Integer.compare(l.getKey().getNewColIndex(), r.getKey().getNewColIndex()))//
+            .sorted(Comparator.comparingInt(e -> e.getKey().getNewColIndex()))
             .map(Map.Entry::getValue)//
             .toList();
 
@@ -264,48 +272,50 @@ public final class ColumnarRearranger {
         var createdColumns = new LinkedHashMap<RearrangedColumn, ColumnarVirtualTable>();
         for (var col : columnsToCreate) {
             var cellFactoryTable = cellFactoryTables.computeIfAbsent(col.getCellFactory(), mapBuilder::map);
-            var createdCol = cellFactoryTable.filterColumns(col.getIndexInFactory());
+            var createdCol = cellFactoryTable.selectColumns(col.getIndexInFactory());
             createdColumns.put(col, createdCol);
         }
         return createdColumns;
     }
 
+
     private ReferenceTable materializeAppendTable(final ReferenceTable table, final Progress progress,
         final ColumnarVirtualTable sourceTable, final ColumnarVirtualTable appendedColumns)
         throws CanceledExecutionException, VirtualTableIncompatibleException {
-        var appendedColsWithOriginalRowID = sourceTable.filterColumns(0).append(List.of(appendedColumns));
 
-        // the cursor contains the original rowID for progress reporting while the container has a void row key
-        // since it is filtered out anyway when the table is appended to the input table
-        var appendCursorSchema = appendedColsWithOriginalRowID.getSchema();
-        final var executor =
-            new GraphVirtualTableExecutor(appendedColsWithOriginalRowID.getVirtualTable().getProducingTransform());
-        try (final var container = createAppendContainer(appendedColumns.getSchema(), m_tableIdSupplier.getAsInt());
-                var writeCursor = container.createCursor();
-                var mappedRows = executor.execute(table.getSources()).get(0);
-                var readCursor = mappedRows.createCursor()) {
-            var accessRow = readCursor.access();
-            var rowRead = VirtualTableUtils.createRowRead(appendCursorSchema, accessRow,
-                new DefaultColumnSelection(mappedRows.getSchema().numColumns()));
-            for (long r = 0; readCursor.forward(); r++) {
-                // exploits that VoidRowKeyWriteValue#setRowKey is a noop
-                writeCursor.forward().setFrom(rowRead);
-                progress.update(r, rowRead);
+        ProgressListenerWithRowIndexFactory progressListenerFactory = inputs -> {
+                RowKeyValue rowKey = ((StringAccess.StringReadAccess)inputs[0])::getStringValue;
+                return rowIndex -> progress.update(rowIndex, rowKey);
+        };
+
+        var sinkUUID= UUID.randomUUID();
+        var tableToMaterialize = sourceTable.selectColumns(0) // RowID
+            .append(appendedColumns) // columns to create
+            .progress(progressListenerFactory, 0)
+            .materialize(sinkUUID);
+        var executor = new GraphVirtualTableExecutor(tableToMaterialize.getProducingTransform());
+        try (var container = createAppendContainer(appendedColumns.getSchema(), m_tableIdSupplier.getAsInt())) {
+            try {
+                executor.execute(table.getSources(), Map.of(sinkUUID, (RowWriteAccessible)container));
+            } catch (CancellationException ex) {
+                throw new CanceledExecutionException(ex.getMessage());
+            } catch (CompletionException ex) {
+                throw ex.getCause();
             }
             var appendTable = container.finish();
-            return ReferenceTables.createReferenceTable(UUID.randomUUID(), appendTable);
+            return ReferenceTables.createReferenceTable(sinkUUID, appendTable);
         } catch (CanceledExecutionException canceledException) {
             // this stunt is necessary because ColumnarRowContainerUtils.create throws Exception
             throw canceledException;
         } catch (VirtualTableIncompatibleException ex) {
             throw ex;
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             throw new IllegalStateException("Failed to create append table.", ex);
         }
     }
 
     private interface Progress {
-        void update(final long rowIndex, final RowRead rowRead) throws CanceledExecutionException;
+        void update(final long rowIndex, final RowKeyValue rowKey);
     }
 
     private abstract static class AbstractProgress implements Progress {
@@ -317,7 +327,6 @@ public final class ColumnarRearranger {
             m_monitor = monitor;
             m_size = size;
         }
-
     }
 
     private static final class SimpleProgress extends AbstractProgress {
@@ -327,11 +336,14 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public void update(final long rowIndex, final RowRead rowRead) throws CanceledExecutionException {
+        public void update(final long rowIndex, final RowKeyValue rowKey) {
             m_monitor.setProgress(rowIndex + 1 / ((double)m_size));
-            m_monitor.checkCanceled();
+            try {
+                m_monitor.checkCanceled();
+            } catch (CanceledExecutionException ex) {
+                throw new CompletionException(ex);
+            }
         }
-
     }
 
     private static final class CellFactoryProgress extends AbstractProgress {
@@ -343,11 +355,14 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public void update(final long rowIndex, final RowRead rowRead) throws CanceledExecutionException {
-            m_cellFactory.setProgress(rowIndex + 1, m_size, new RowKey(rowRead.getRowKey().getString()), m_monitor);
-            m_monitor.checkCanceled();
+        public void update(final long rowIndex, final RowKeyValue rowKey) {
+            m_cellFactory.setProgress(rowIndex + 1, m_size, new RowKey(rowKey.getString()), m_monitor);
+            try {
+                m_monitor.checkCanceled();
+            } catch (CanceledExecutionException ex) {
+                throw new CompletionException(ex);
+            }
         }
-
     }
 
     private ConversionResult convertColumns(final ColumnarVirtualTable table,
@@ -355,23 +370,25 @@ public final class ColumnarRearranger {
         var convertedTable = table;
         var convertedColumns = new LinkedHashMap<RearrangedColumn, ColumnarVirtualTable>();
         int numColumns = table.getSchema().numColumns();
+        var mapBuilder = new MapBuilder(convertedTable);
         for (var columnToConvert : columnsToConvert) {
-            // the MapBuilder has to be recreated in each iteration because the same column might be converted
-            // multiple times. This doesn't make sense but is supported by the API, so we also have to implement
-            // it to stay backwards compatible.
-            var mapBuilder = new MapBuilder(convertedTable);
             int colIdxIncludingRowID = columnToConvert.getConverterIndex() + 1;
             var convertedColumn = mapBuilder.convert(columnToConvert.getConverter(), colIdxIncludingRowID);
             convertedColumns.put(columnToConvert, convertedColumn);
+
             var insertPermutation = IntStream.range(0, numColumns)//
-                    .map(i -> i < colIdxIncludingRowID ? i : (i == colIdxIncludingRowID ? (numColumns - 1) : i - 1))
-                    .toArray();
-            var filter = IntStream.range(0, numColumns)//
-                .filter(i -> i != colIdxIncludingRowID)//
-                .toArray();
-            convertedTable = convertedTable.filterColumns(filter)//
-                .append(List.of(convertedColumn))//
-                .permute(insertPermutation);
+                    .map(i -> {
+                        if (i < colIdxIncludingRowID) {
+                            return i;
+                        } else if (i == colIdxIncludingRowID) {
+                            return numColumns - 1;
+                        } else {
+                            return i - 1;
+                        }
+                    }).toArray();
+            convertedTable = convertedTable.dropColumns(colIdxIncludingRowID)//
+                .append(convertedColumn)//
+                .selectColumns(insertPermutation);
         }
         return new ConversionResult(convertedTable, convertedColumns);
     }
@@ -442,7 +459,7 @@ public final class ColumnarRearranger {
         }
     }
 
-    private static final class ConverterFactory implements ColumnarMapperFactory {
+    private static final class ConverterFactory implements ColumnarMapperWithRowIndexFactory {
         private final DataCellTypeConverter m_converter;
 
         private final ColumnarValueSchema m_outputSchema;
@@ -470,26 +487,13 @@ public final class ColumnarRearranger {
             var inputAccess = inputs[0];
             var inputValue = new NullableReadValue(m_inputValueFactory.createReadValue(inputAccess), inputAccess);
             var outputAccess = outputs[0];
-            var outputValue = m_outputValueFactory.createWriteValue(outputAccess);
-            return r -> {
-                var convertedCell = m_converter.callConvert(inputValue.getDataCell());
-                if (convertedCell.isMissing()) {
-                    outputAccess.setMissing();
-                } else {
-                    unsafeSetValue(outputValue, convertedCell);
-                }
-            };
-        }
-
-        @SuppressWarnings("unchecked")
-        private static <D extends DataValue> void unsafeSetValue(final WriteValue<D> writeValue,
-            final DataValue value) {
-            writeValue.setValue((D)value);
+            var outputValue = new NullableWriteValue<>(m_outputValueFactory.createWriteValue(outputAccess), outputAccess);
+            return r -> outputValue.setDataCell(m_converter.callConvert(inputValue.getDataCell()));
         }
 
     }
 
-    private static class CellFactoryMap implements ColumnarMapperFactory {
+    private static class CellFactoryMap implements ColumnarMapperWithRowIndexFactory {
 
         private final GenericValueFactory[] m_readValueFactories;
 
@@ -504,8 +508,12 @@ public final class ColumnarRearranger {
             m_readValueFactories = inputValueFactories;
             m_writeValueFactories = outputValueFactories;
             m_cellFactory = cellFactory;
-            m_schema = ColumnarValueSchemaUtils.create(new DataTableSpec(cellFactory.getColumnSpecs()), Stream
-                .of(outputValueFactories).map(GenericValueFactory::getValueFactory).toArray(ValueFactory<?, ?>[]::new));
+            m_schema = ColumnarValueSchemaUtils.create(//
+                new DataTableSpec(cellFactory.getColumnSpecs()), //
+                Stream.of(outputValueFactories)//
+                    .map(GenericValueFactory::getValueFactory)//
+                    .toArray(ValueFactory<?, ?>[]::new)//
+            );
         }
 
         @Override
@@ -527,7 +535,7 @@ public final class ColumnarRearranger {
 
     }
 
-    private static final class CellFactoryMapper implements MapperFactory.Mapper {
+    private static final class CellFactoryMapper implements MapperWithRowIndexFactory.Mapper {
 
         private final NullableWriteValue<?>[] m_writeValues;
 
@@ -633,7 +641,7 @@ public final class ColumnarRearranger {
     }
 
     /**
-     * Helper class that hides the generics of {@link ValueFactory} from clients that can't possibly no them. Requires
+     * Helper class that hides the generics of {@link ValueFactory} from clients that can't possibly know them. Requires
      * unsafe casts to create the {@link ReadValue Read-} and {@link WriteValue WriteValues}.
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany

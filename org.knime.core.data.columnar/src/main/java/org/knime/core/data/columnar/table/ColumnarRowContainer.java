@@ -56,12 +56,16 @@ import org.knime.core.data.v2.RowContainer;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
+import org.knime.core.table.cursor.WriteCursor;
+import org.knime.core.table.row.RowWriteAccessible;
+import org.knime.core.table.row.WriteAccessRow;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-final class ColumnarRowContainer implements RowContainer {
+final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
 
     @SuppressWarnings("resource") // Columnar table will be closed along with row container.
     static ColumnarRowContainer create(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
@@ -124,5 +128,18 @@ final class ColumnarRowContainer implements RowContainer {
      */
     void setMaxPossibleValues(final int maxPossibleValues) {
         m_columnarTable.setMaxPossibleValues(maxPossibleValues);
+    }
+
+
+    // -- implement RowWriteAccessible --
+
+    @Override
+    public ColumnarSchema getSchema() {
+        return m_columnarTable.getSchema();
+    }
+
+    @Override
+    public WriteCursor<WriteAccessRow> getWriteCursor() {
+        return m_columnarTable.getWriteCursor();
     }
 }
