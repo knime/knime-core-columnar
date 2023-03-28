@@ -403,13 +403,22 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return new ColumnarRowIterator(cursor());
     }
 
+    @SuppressWarnings("resource")
     @Override
     public CloseableRowIterator iteratorWithFilter(final TableFilter filter) {
         if (TableFilterUtils.hasFilter(filter)) {
-            return new ColumnarRowIterator(cursor(filter));
+            var filteredCursor = cursor(filter);
+            return filter.getMaterializeColumnIndices()
+                .map(m -> FilteredColumnarRowIteratorFactory.create(filteredCursor, m))
+                .orElseGet(() -> new ColumnarRowIterator(filteredCursor));
         } else {
             return iterator();
         }
+    }
+
+    @Override
+    public CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
+        return iteratorWithFilter(filter);
     }
 
     @Override
