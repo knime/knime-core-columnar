@@ -195,7 +195,7 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
         try {
             m_gridWriter.flush();
         } catch (IOException ex) {
-            throw new IllegalStateException("Failed to flush.");
+            throw new IllegalStateException("Failed to flush.", ex);
         }
     }
 
