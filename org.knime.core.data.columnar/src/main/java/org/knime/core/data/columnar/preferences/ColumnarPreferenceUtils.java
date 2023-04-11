@@ -285,8 +285,8 @@ public final class ColumnarPreferenceUtils {
      */
     public static ExecutorService getSerializeExecutor() {
         if (serializeExecutor == null) {
-            serializeExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
-                r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
+            serializeExecutor = Executors.newFixedThreadPool(getNumThreads(),
+                r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet()));
         }
         return serializeExecutor;
     }
@@ -383,8 +383,8 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getPersistExecutor() {
         if (persistExecutor == null) {
-            persistExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
-                r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet())));
+            persistExecutor = Executors.newFixedThreadPool(getNumThreads(),
+                r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet()));
         }
         return persistExecutor;
     }

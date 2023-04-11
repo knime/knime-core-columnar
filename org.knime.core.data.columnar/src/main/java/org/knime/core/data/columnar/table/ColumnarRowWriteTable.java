@@ -52,6 +52,7 @@ import java.io.Flushable;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -63,6 +64,7 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
+import org.knime.core.data.columnar.util.PinnedContextExecutorService;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.NodeLogger;
@@ -120,21 +122,21 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
         if (settings.isUseCaching()) {
             builder //
                 .useColumnDataCache( //
-                    ColumnarPreferenceUtils.getColumnDataCache(), ColumnarPreferenceUtils.getPersistExecutor())
+                    ColumnarPreferenceUtils.getColumnDataCache(), pinNodeContext(ColumnarPreferenceUtils.getPersistExecutor()))
                 .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
                 .useHeapCache( //
-                    ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
-                    ColumnarPreferenceUtils.getSerializeExecutor());
+                    ColumnarPreferenceUtils.getHeapCache(), pinNodeContext(ColumnarPreferenceUtils.getPersistExecutor()),
+                    pinNodeContext(ColumnarPreferenceUtils.getSerializeExecutor()));
         }
         builder.enableDictEncoding(true);
         if (settings.isCalculateDomains()) {
             builder.useDomainCalculation( //
                 new DefaultDomainWritableConfig(m_schema, settings.getMaxPossibleNominalDomainValues(),
                     settings.isInitializeDomains()),
-                ColumnarPreferenceUtils.getDomainCalcExecutor());
+                pinNodeContext(ColumnarPreferenceUtils.getDomainCalcExecutor()));
         }
         if (settings.isCheckDuplicateRowKeys()) {
-            builder.useDuplicateChecking(ColumnarPreferenceUtils.getDuplicateCheckExecutor());
+            builder.useDuplicateChecking(pinNodeContext(ColumnarPreferenceUtils.getDuplicateCheckExecutor()));
         }
         m_store = builder.build();
         // Will return null if the builder did not include domain calculation.
@@ -146,6 +148,10 @@ public final class ColumnarRowWriteTable implements AutoCloseable {
 
     BatchStore getStore() {
         return m_store;
+    }
+
+    private static ExecutorService pinNodeContext(final ExecutorService executor) {
+        return new PinnedContextExecutorService(executor);
     }
 
     /**
