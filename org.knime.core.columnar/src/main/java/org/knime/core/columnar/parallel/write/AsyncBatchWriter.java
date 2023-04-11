@@ -210,7 +210,7 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
         if (newCapacity > m_currentBatch.capacity()) {
             m_currentBatch.expand(newCapacity);
             m_finalizeBatchBarrier.set(m_columnWriters.length);
-            m_batchCapacity.set(newCapacity);
+            m_batchCapacity.set(m_currentBatch.capacity());
         } else {
             finishBatch(m_batchCapacity.get());
             startBatch();
@@ -225,6 +225,7 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
     private void finishBatch(final int batchLength) {
         assert allColumnWritersHaveExpectedIndex(batchLength) : "The column writers are out of sync.";
         var finishedBatch = m_currentBatch.close(batchLength);
+        m_currentBatch = null;
         try {
             m_writer.write(finishedBatch);
         } catch (IOException ex) {
@@ -235,10 +236,11 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
     }
 
     @Override
-    public void finishLastBatch() throws IOException {
+    public void flush() throws IOException {
         var currentBatchLength = getCurrentBatchLength();
         if (currentBatchLength > 0) {
             finishBatch(currentBatchLength);
+            startBatch();
         }
     }
 
@@ -262,9 +264,10 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
     @Override
     public void close() throws IOException {
         // TODO how to tell the column writers that we are done?
-        m_currentBatch.release();
-        m_currentBatch = null;
-        m_writer.close();
+        if (m_currentBatch != null) {
+            m_currentBatch.release();
+            m_currentBatch = null;
+        }
     }
 
     private final class AsyncDataWriter implements DataWriter<WriteAccess>, ColumnDataIndex {
@@ -295,8 +298,9 @@ public final class AsyncBatchWriter implements GridWriter<WriteAccess> {
         public boolean canWrite() {
             // assuming m_batchCapacity goes up, only update our local
             // non-volatile copy if we would exceed the last-known value.
-            if ( m_idx >= m_capacity )
+            if ( m_idx >= m_capacity ) {
                 m_capacity = m_batchCapacity.get();
+            }
             return m_idx < m_capacity;
 //            return m_idx < m_batchCapacity.get();
         }

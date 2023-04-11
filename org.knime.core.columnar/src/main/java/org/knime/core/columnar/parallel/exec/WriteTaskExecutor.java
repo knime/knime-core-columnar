@@ -53,11 +53,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -78,7 +78,7 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
 
     private final List<DataWriter<A>> m_columnWriters;
 
-    private Future<?> m_currentTaskFuture;
+    private CompletableFuture<?> m_currentTaskFuture;
 
     private final AtomicBoolean m_open = new AtomicBoolean(true);
 
@@ -100,7 +100,8 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
         m_columnWriters = IntStream.range(0, gridWriter.numWriters())//
             .mapToObj(gridWriter::getDataWriter)//
             .collect(Collectors.toList());
-        m_currentTaskFuture = m_executor.submit(this::scheduleColumnTasks);
+//        m_currentTaskFuture = m_executor.submit(this::scheduleColumnTasks);
+        m_currentTaskFuture = CompletableFuture.completedFuture(null);
         m_callableAdapter = callableAdapter;
     }
 
@@ -176,28 +177,33 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
         if (m_waitingForFinish.get()) {
             throw new IllegalStateException("Waiting for the queue to be finished. No more tasks can be added.");
         }
+        m_currentTaskFuture = m_currentTaskFuture.thenRunAsync(new RowTaskBatchRunnable(t), m_executor);
+//        try {
+//            m_tasks.put(t);
+//        } catch (InterruptedException ex) {
+//            Thread.currentThread().interrupt();
+//            throw new IllegalStateException("Writing has been interrupted.", ex);
+//        }
+    }
+
+    public void flush() throws InterruptedException {
         try {
-            m_tasks.put(t);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Writing has been interrupted.", ex);
+            m_currentTaskFuture.get();
+        } catch (ExecutionException ex) { // NOSONAR
+            throw new IllegalStateException("Asynchronous writing failed.", ex.getCause());
+        }
+        try {
+            m_gridWriter.flush();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to flush.");
         }
     }
 
     public void await() throws InterruptedException {
         m_waitingForFinish.set(true);
         // insert the poison pill
-        m_tasks.put(m_poisonPill);
-        try {
-            m_currentTaskFuture.get();
-        } catch (ExecutionException ex) {//NOSONAR just a wrapper
-            throw new IllegalStateException("Asynchronous writing failed.", ex.getCause());
-        }
-        try {
-            m_gridWriter.finishLastBatch();
-        } catch (IOException ex) {
-            throw new IllegalStateException("Failed to finish last batch.", ex);
-        }
+//        m_tasks.put(m_poisonPill);
+        flush();
     }
 
     @Override
@@ -206,6 +212,32 @@ public final class WriteTaskExecutor<A> implements Consumer<RowTaskBatch<A>>, Au
             m_tasks.forEach(RowTaskBatch::close);
             m_currentTaskFuture.cancel(true);
         }
+    }
+
+    private final class RowTaskBatchRunnable implements Runnable {
+
+        private final RowTaskBatch<A> m_batch;
+
+        RowTaskBatchRunnable(final RowTaskBatch<A> batch) {
+            m_batch = batch;
+        }
+
+        @Override
+        public void run() {
+            final List<ForkJoinTask<Boolean>> columnTasks = new ArrayList<>();
+            for (int c = 0; c < m_columnWriters.size(); c++) { //NOSONAR
+                var writer = m_columnWriters.get(c);
+                var columnWriteTask = m_batch.createColumnTask(c, writer.getAccess());
+                columnTasks.add(
+                    ForkJoinTask.adapt(m_callableAdapter.apply(new ColumnWriteTaskRunner(writer, columnWriteTask))));
+            }
+            ForkJoinTask.invokeAll(columnTasks);
+            while (m_open.get() && columnTasks.stream().anyMatch(columnTask -> !columnTask.join())) {
+                columnTasks.forEach(ForkJoinTask::reinitialize);
+                ForkJoinTask.invokeAll(columnTasks);
+            }
+        }
+
     }
 
     private final class ColumnWriteTaskRunner implements Callable<Boolean> {

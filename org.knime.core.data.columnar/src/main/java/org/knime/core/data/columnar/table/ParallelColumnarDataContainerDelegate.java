@@ -72,7 +72,6 @@ import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.WriteValue;
-import org.knime.core.node.workflow.NodeContext;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.util.ThreadUtils;
 
@@ -138,6 +137,17 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
         m_size++;
     }
 
+    @Override
+    public void flushRows() {
+        m_dispatcher.dispatchLastBatch();
+        try {
+            m_writeExec.flush();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for flush.");
+        }
+    }
+
     @SuppressWarnings("resource") // the task is closed by the executor once it is finished
     private void scheduleBatch(final DataRow[] rows) {
         m_writeExec.accept(new RowBatchWriteTask(m_schema, rows));
@@ -182,10 +192,11 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Interrupted while waiting for the table writing to finish.", ex);
+            } finally {
+                closeAsyncResources();
             }
             @SuppressWarnings("resource") // is managed by m_containerTable
             final ColumnarRowReadTable finishedColumnarTable = m_writeTable.finish(m_size);
-            closeAsyncResources();
             m_containerTable =
                 UnsavedColumnarContainerTable.create(m_id, finishedColumnarTable, m_writeTable.getStoreFlusher());
         }

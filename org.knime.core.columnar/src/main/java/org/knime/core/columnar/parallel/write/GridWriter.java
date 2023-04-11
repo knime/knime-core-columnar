@@ -63,6 +63,6 @@ public interface GridWriter<A> extends Closeable {
 
     int numWriters();
 
-    void finishLastBatch() throws IOException;
+    void flush() throws IOException;
 
 }
