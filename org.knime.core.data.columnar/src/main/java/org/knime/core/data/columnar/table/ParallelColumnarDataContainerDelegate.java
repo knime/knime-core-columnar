@@ -49,8 +49,6 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -139,7 +137,7 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
 
     @Override
     public void flushRows() {
-        m_dispatcher.dispatchLastBatch();
+        m_dispatcher.flush();
         try {
             m_writeExec.flush();
         } catch (InterruptedException ex) {
@@ -156,28 +154,40 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
     private static final class DataRowBatchTaskDispatcher {
         private final int m_batchSize;
 
-        private final List<DataRow> m_batch;
+        private final DataRow[] m_batch;
 
         private final Consumer<DataRow[]> m_batchConsumer;
 
+        private int m_idx;
+
         DataRowBatchTaskDispatcher(final int batchSize, final Consumer<DataRow[]> batchConsumer) {
             m_batchSize = batchSize;
-            m_batch = new ArrayList<>(batchSize);
+            m_batch = new DataRow[batchSize];
             m_batchConsumer = batchConsumer;
         }
 
         void addRow(final DataRow row) {
-            m_batch.add(row);
-            if (m_batch.size() == m_batchSize) {
-                m_batchConsumer.accept(m_batch.toArray(DataRow[]::new));
-                m_batch.clear();
+            m_batch[m_idx++] = row;
+            if (m_idx == m_batchSize) {
+                dispatchBatch();
             }
         }
 
-        void dispatchLastBatch() {
-            if (!m_batch.isEmpty()) {
-                m_batchConsumer.accept(m_batch.toArray(DataRow[]::new));
+        void flush() {
+            if (m_idx > 0) {
+                dispatchBatch();
             }
+        }
+
+        private void dispatchBatch() {
+            m_batchConsumer.accept(copyBatch());
+            m_idx = 0;
+        }
+
+        private DataRow[] copyBatch() {
+            var copy = new DataRow[m_idx];
+            System.arraycopy(m_batch, 0, copy, 0, m_idx);
+            return copy;
         }
     }
 
@@ -185,7 +195,7 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
     public void close() {
         if (!m_closed) {
             m_closed = true;
-            m_dispatcher.dispatchLastBatch();
+            m_dispatcher.flush();
 
             try {
                 m_writeExec.await();
