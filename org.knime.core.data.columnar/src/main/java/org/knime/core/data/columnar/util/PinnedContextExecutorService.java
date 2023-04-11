@@ -153,7 +153,7 @@ public final class PinnedContextExecutorService implements ExecutorService {
     }
 
     private <T> Callable<T> wrap(final Callable<T> task) {
-        return new CallableWithContext<>(task);
+        return new CallableWithContext<>(task, m_context);
     }
 
     private Runnable wrap(final Runnable runnable) {
@@ -180,12 +180,15 @@ public final class PinnedContextExecutorService implements ExecutorService {
 
     }
 
-    private final class CallableWithContext<T> implements Callable<T> {
+    public static final class CallableWithContext<T> implements Callable<T> {
 
         private final Callable<T> m_callable;
 
-        CallableWithContext(final Callable<T> callable) {
+        private final NodeContext m_context;
+
+        public CallableWithContext(final Callable<T> callable, final NodeContext context) {
             m_callable = callable;
+            m_context = context;
         }
 
         @Override

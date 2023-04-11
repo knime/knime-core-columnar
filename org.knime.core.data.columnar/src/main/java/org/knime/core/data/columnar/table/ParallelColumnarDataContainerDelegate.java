@@ -66,10 +66,12 @@ import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.util.PinnedContextExecutorService.CallableWithContext;
 import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.node.workflow.NodeContext;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.util.ThreadUtils;
 
@@ -124,7 +126,9 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
 //            new FixedCapacityStrategy(32_000)
             new AdjustingCapacityStrategy(ColumnarParameters.CAPACITY_INIT, ColumnarParameters.BATCH_SIZE_TARGET, ColumnarParameters.CAPACITY_MAX)
             );
-        m_writeExec = new WriteTaskExecutor<>(m_batchWriter, EXECUTOR, RowBatchWriteTask.NULL, ThreadUtils::callableWithContext);
+        var context = NodeContext.getContext();
+        m_writeExec = new WriteTaskExecutor<>(m_batchWriter, EXECUTOR,
+                RowBatchWriteTask.NULL, c -> new CallableWithContext<>(c, context));
         m_dispatcher = new DataRowBatchTaskDispatcher(100, this::scheduleBatch);
         m_id = tableId;
     }
@@ -167,7 +171,8 @@ final class ParallelColumnarDataContainerDelegate implements DataContainerDelega
         }
 
         void addRow(final DataRow row) {
-            m_batch[m_idx++] = row;
+            m_batch[m_idx] = row;
+            m_idx++;
             if (m_idx == m_batchSize) {
                 dispatchBatch();
             }
