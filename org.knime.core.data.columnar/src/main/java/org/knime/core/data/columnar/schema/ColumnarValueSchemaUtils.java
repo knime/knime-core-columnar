@@ -54,9 +54,12 @@ import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.meta.DataColumnMetaData;
+import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.RowKeyValueFactory;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaLoadContext;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
@@ -136,7 +139,7 @@ public final class ColumnarValueSchemaUtils {
 
     /**
      * Create a new {@link ColumnarValueSchema} based on a {@link DataTableSpec} and {@link ValueFactory ValueFactories}.
-     * 
+     *
      * @param spec of the table
      * @param valueFactories for the columns including the RowID
      * @return a new {@link ColumnarValueSchema}
@@ -146,8 +149,24 @@ public final class ColumnarValueSchemaUtils {
     }
 
     /**
-     * Checks if a schema includes a RowID column.
+     * Creates a ColumnarValueSchema for the provided parameters.
      * 
+     * @param spec to create the value schema for
+     * @param rowIDType the type of RowID to use
+     * @param fsHandler FileStoreHandler used by some ValueFactories
+     * @return a new schema corresponding to spec
+     */
+    public static final ColumnarValueSchema create(final DataTableSpec spec, final RowKeyType rowIDType,
+        final IWriteFileStoreHandler fsHandler) {
+        var valueFactories = Stream.concat(Stream.of(ValueFactoryUtils.getRowKeyValueFactory(rowIDType)), spec.stream()//
+            .map(DataColumnSpec::getType)//
+            .map(t -> ValueFactoryUtils.getValueFactory(t, fsHandler))).toArray(ValueFactory<?, ?>[]::new);
+        return create(spec, valueFactories);
+    }
+
+    /**
+     * Checks if a schema includes a RowID column.
+     *
      * @param schema to check
      * @return true if the schema has a RowID column
      */
