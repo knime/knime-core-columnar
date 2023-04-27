@@ -72,7 +72,6 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
@@ -82,6 +81,8 @@ import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.columnar.table.virtual.NullableValues.NullableReadValue;
+import org.knime.core.data.columnar.table.virtual.NullableValues.NullableWriteValue;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.CellFactory;
@@ -90,12 +91,10 @@ import org.knime.core.data.container.ColumnRearrangerUtils;
 import org.knime.core.data.container.ColumnRearrangerUtils.RearrangedColumn;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
-import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyValueFactory;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
-import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.value.VoidRowKeyFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -232,8 +231,8 @@ public final class ColumnarRearranger {
         final ExecutionMonitor monitor, final long size)
         throws VirtualTableIncompatibleException, CanceledExecutionException {
         var schema = table.getSchema();
-        var inputValueFactories = new GenericValueFactory[schema.numColumns()];
-        Arrays.setAll(inputValueFactories, i -> new GenericValueFactory(schema.getValueFactory(i)));
+        var inputValueFactories = new UntypedValueFactory[schema.numColumns()];
+        Arrays.setAll(inputValueFactories, i -> new UntypedValueFactory(schema.getValueFactory(i)));
         var sourceTable = table.getVirtualTable();
 
         // columns produced by DataCellTypeConverters
@@ -470,7 +469,7 @@ public final class ColumnarRearranger {
      */
     private final class MapBuilder {
 
-        private final GenericValueFactory[] m_inputValueFactories;
+        private final UntypedValueFactory[] m_inputValueFactories;
 
         // currently includes all columns
         private final int[] m_inputIndices;
@@ -480,8 +479,8 @@ public final class ColumnarRearranger {
         MapBuilder(final ColumnarVirtualTable sourceTable) {
             m_sourceTable = sourceTable;
             var schema = m_sourceTable.getSchema();
-            m_inputValueFactories = new GenericValueFactory[schema.numColumns()];
-            Arrays.setAll(m_inputValueFactories, i -> new GenericValueFactory(schema.getValueFactory(i)));
+            m_inputValueFactories = new UntypedValueFactory[schema.numColumns()];
+            Arrays.setAll(m_inputValueFactories, i -> new UntypedValueFactory(schema.getValueFactory(i)));
             m_inputIndices = IntStream.range(0, m_inputValueFactories.length).toArray();
         }
 
@@ -516,13 +515,13 @@ public final class ColumnarRearranger {
             var valueFactories = Stream.of(outputSpecs)//
                 .map(DataColumnSpec::getType)//
                 .map(this::getValueFactory)//
-                .toArray(GenericValueFactory[]::new);
+                .toArray(UntypedValueFactory[]::new);
             var cellFactoryMap = new CellFactoryMap(m_inputValueFactories, valueFactories, cellFactory);
             return m_sourceTable.map(cellFactoryMap, m_inputIndices);
         }
 
-        private GenericValueFactory getValueFactory(final DataType type) {
-            return new GenericValueFactory(ValueFactoryUtils.getValueFactory(type, m_fsHandler));
+        private UntypedValueFactory getValueFactory(final DataType type) {
+            return new UntypedValueFactory(ValueFactoryUtils.getValueFactory(type, m_fsHandler));
         }
     }
 
@@ -531,16 +530,16 @@ public final class ColumnarRearranger {
 
         private final ColumnarValueSchema m_outputSchema;
 
-        private final GenericValueFactory m_inputValueFactory;
+        private final UntypedValueFactory m_inputValueFactory;
 
-        private final GenericValueFactory m_outputValueFactory;
+        private final UntypedValueFactory m_outputValueFactory;
 
-        ConverterFactory(final DataCellTypeConverter converter, final GenericValueFactory inputValueFactory,
-            final GenericValueFactory outputValueFactory, final DataColumnSpec convertedSpec) {
+        ConverterFactory(final DataCellTypeConverter converter, final UntypedValueFactory inputValueFactory,
+            final UntypedValueFactory outputValueFactory, final DataColumnSpec convertedSpec) {
             m_inputValueFactory = inputValueFactory;
             m_outputValueFactory = outputValueFactory;
             m_outputSchema = ColumnarValueSchemaUtils.create(new DataTableSpec(convertedSpec),
-                new ValueFactory<?, ?>[]{outputValueFactory.m_valueFactory});
+                new ValueFactory<?, ?>[]{outputValueFactory.getValueFactory()});
             m_converter = converter;
         }
 
@@ -550,11 +549,11 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var inputAccess = inputs[0];
             var inputValue = new NullableReadValue(m_inputValueFactory.createReadValue(inputAccess), inputAccess);
             var outputAccess = outputs[0];
-            var outputValue = new NullableWriteValue<>(m_outputValueFactory.createWriteValue(outputAccess), outputAccess);
+            var outputValue = new NullableWriteValue(m_outputValueFactory.createWriteValue(outputAccess), outputAccess);
             return r -> outputValue.setDataCell(m_converter.callConvert(inputValue.getDataCell()));
         }
 
@@ -562,36 +561,36 @@ public final class ColumnarRearranger {
 
     private static class CellFactoryMap implements ColumnarMapperWithRowIndexFactory {
 
-        private final GenericValueFactory[] m_readValueFactories;
+        private final UntypedValueFactory[] m_readValueFactories;
 
-        private final GenericValueFactory[] m_writeValueFactories;
+        private final UntypedValueFactory[] m_writeValueFactories;
 
         private final CellFactory m_cellFactory;
 
         private ColumnarValueSchema m_schema;
 
-        CellFactoryMap(final GenericValueFactory[] inputValueFactories,
-            final GenericValueFactory[] outputValueFactories, final CellFactory cellFactory) {
+        CellFactoryMap(final UntypedValueFactory[] inputValueFactories,
+            final UntypedValueFactory[] outputValueFactories, final CellFactory cellFactory) {
             m_readValueFactories = inputValueFactories;
             m_writeValueFactories = outputValueFactories;
             m_cellFactory = cellFactory;
             m_schema = ColumnarValueSchemaUtils.create(//
                 new DataTableSpec(cellFactory.getColumnSpecs()), //
                 Stream.of(outputValueFactories)//
-                    .map(GenericValueFactory::getValueFactory)//
+                    .map(UntypedValueFactory::getValueFactory)//
                     .toArray(ValueFactory<?, ?>[]::new)//
             );
         }
 
         @Override
-        public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var rowKey = (RowKeyValue)m_readValueFactories[0].createReadValue(inputs[0]);
             var readValues = IntStream.range(1, inputs.length)//
                 .mapToObj(i -> new NullableReadValue(m_readValueFactories[i].createReadValue(inputs[i]), inputs[i]))
                 .toArray(NullableReadValue[]::new);
             var writeValues = new NullableWriteValue[outputs.length];
             Arrays.setAll(writeValues,
-                i -> new NullableWriteValue<>(m_writeValueFactories[i].createWriteValue(outputs[i]), outputs[i]));
+                i -> new NullableWriteValue(m_writeValueFactories[i].createWriteValue(outputs[i]), outputs[i]));
             return new CellFactoryMapper(rowKey, readValues, writeValues, m_cellFactory);
         }
 
@@ -604,14 +603,14 @@ public final class ColumnarRearranger {
 
     private static final class CellFactoryMapper implements MapperWithRowIndexFactory.Mapper {
 
-        private final NullableWriteValue<?>[] m_writeValues;
+        private final NullableWriteValue[] m_writeValues;
 
         private final CellFactory m_cellFactory;
 
         private final ReadValueRow m_row;
 
         CellFactoryMapper(final RowKeyValue rowKey, final NullableReadValue[] readValues,
-            final NullableWriteValue<?>[] writeValues, final CellFactory cellFactory) {
+            final NullableWriteValue[] writeValues, final CellFactory cellFactory) {
             m_row = new ReadValueRow(rowKey, readValues);
             m_writeValues = writeValues;
             m_cellFactory = cellFactory;
@@ -662,86 +661,4 @@ public final class ColumnarRearranger {
 
     }
 
-
-    private static final class NullableWriteValue<D extends DataValue> {
-
-        private final WriteValue<D> m_writeValue;
-
-        private final WriteAccess m_writeAccess;
-
-        NullableWriteValue(final WriteValue<D> writeValue, final WriteAccess writeAccess) {
-            m_writeValue = writeValue;
-            m_writeAccess = writeAccess;
-        }
-
-        @SuppressWarnings("unchecked")
-        void setDataCell(final DataCell cell) {
-            if (cell.isMissing()) {
-                m_writeAccess.setMissing();
-            } else {
-                m_writeValue.setValue((D)cell);
-            }
-        }
-
-    }
-
-    private static final class NullableReadValue {
-
-        private static final DataCell MISSING = DataType.getMissingCell();
-
-        private final ReadValue m_readValue;
-
-        private final ReadAccess m_readAccess;
-
-        NullableReadValue(final ReadValue readValue, final ReadAccess readAccess) {
-            m_readValue = readValue;
-            m_readAccess = readAccess;
-        }
-
-        DataCell getDataCell() {
-            if (m_readAccess.isMissing()) {
-                return MISSING;
-            } else {
-                return m_readValue.getDataCell();
-            }
-        }
-    }
-
-    /**
-     * Helper class that hides the generics of {@link ValueFactory} from clients that can't possibly know them. Requires
-     * unsafe casts to create the {@link ReadValue Read-} and {@link WriteValue WriteValues}.
-     *
-     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-     */
-    private static class GenericValueFactory {
-        private final ValueFactory<?, ?> m_valueFactory;
-
-        GenericValueFactory(final ValueFactory<?, ?> valueFactory) {
-            m_valueFactory = valueFactory;
-        }
-
-        ValueFactory<?, ?> getValueFactory() {
-            return m_valueFactory;
-        }
-
-        ReadValue createReadValue(final ReadAccess access) {
-            return createReadValue(m_valueFactory, access);
-        }
-
-        @SuppressWarnings("unchecked")
-        private static <R extends ReadAccess> ReadValue createReadValue(final ValueFactory<R, ?> valueFactory,
-            final ReadAccess access) {
-            return valueFactory.createReadValue((R)access);
-        }
-
-        WriteValue<?> createWriteValue(final WriteAccess access) {
-            return createWriteValue(m_valueFactory, access);
-        }
-
-        @SuppressWarnings("unchecked")
-        private static <W extends WriteAccess> WriteValue<?> createWriteValue(final ValueFactory<?, W> valueFactory,
-            final WriteAccess access) {
-            return valueFactory.createWriteValue((W)access);
-        }
-    }
 }
