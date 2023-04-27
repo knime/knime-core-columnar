@@ -2,6 +2,7 @@
 <?eclipse version="3.4"?>
 <plugin>
    <extension-point id="ColumnStoreFactory" name="org.knime.core.data.columnar" schema="schema/ColumnStoreFactory.exsd"/>
+   <extension-point id="Persistence" name="Persistence" schema="schema/Persistence.exsd"/>
    <extension
          point="org.knime.core.ExtensionTable">
       <ExtensionTableLoader
