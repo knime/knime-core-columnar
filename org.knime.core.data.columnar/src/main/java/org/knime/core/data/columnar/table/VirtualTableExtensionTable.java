@@ -66,6 +66,7 @@ import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
+import org.knime.core.data.columnar.table.virtual.TableTransformNodeSettingsPersistor;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
@@ -98,7 +99,6 @@ import org.knime.core.table.virtual.spec.TableTransformSpec;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 /**
  *
@@ -110,7 +110,9 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
  */
 public final class VirtualTableExtensionTable extends ExtensionTable {
 
-    private static final String CFG_VIRTUAL_TABLE_FRAGMENT = "VIRTUAL_TABLE_FRAGMENT";
+    private static final String CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1 = "VIRTUAL_TABLE_FRAGMENT";
+
+    private static final String CFG_VIRTUAL_TABLE_FRAGMENT = "virtual_table_fragment";
 
     private static final String CFG_REF_TABLE_IDS = "REF_TABLE_IDS";
 
@@ -181,7 +183,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
                 ex);
         }
         try {
-            m_tableTransformFragment = loadTableTransformFragment(settings, m_referenceTables);
+            m_tableTransformFragment = loadTableTransformFragment(settings, m_referenceTables, context);
         } catch (IOException ex) {
             throw new InvalidSettingsException("Error while deserializing transformation ", ex);
         }
@@ -227,11 +229,15 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     }
 
     private static TableTransform loadTableTransformFragment(final NodeSettingsRO settings,
-        final ReferenceTable[] referenceTables)
+        final ReferenceTable[] referenceTables, final LoadContext ctx)
         throws JsonProcessingException, InvalidSettingsException {
         var objectMapper = new ObjectMapper();
-        if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT)) {
-            return TableTransformSerializer.load(objectMapper.readTree(settings.getString(CFG_VIRTUAL_TABLE_FRAGMENT)));
+        if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)) {
+            // before 5.1 we stored the transform as JSON
+            return TableTransformSerializer.load(objectMapper.readTree(settings.getString(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)));
+        } else if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT)) {
+            return TableTransformNodeSettingsPersistor.load(settings.getNodeSettings(CFG_VIRTUAL_TABLE_FRAGMENT),
+                ctx::getDataRepository);
         } else {
             // in 4.5 we stored a list of TableTransformSpecs as opposed to a complete TableTransform or VirtualTable
             var transformSpecs = reconstructSpecsFromStringArray(settings.getStringArray(CFG_TRANSFORMSPECS));
@@ -343,14 +349,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
                 .map(UUID::toString)//
                 .toArray(String[]::new)//
         );
-        settings.addString(CFG_VIRTUAL_TABLE_FRAGMENT, getVirtualTableFragmentStringRepresentation());
-    }
-
-    private String getVirtualTableFragmentStringRepresentation() throws JsonProcessingException {
-        final var factory = new JsonNodeFactory(false);
-        var tableTransformJson = TableTransformSerializer.save(m_tableTransformFragment, factory);
-        final var mapper = new ObjectMapper();
-        return mapper.writeValueAsString(tableTransformJson);
+        TableTransformNodeSettingsPersistor.save(m_tableTransformFragment,
+            settings.addNodeSettings(CFG_VIRTUAL_TABLE_FRAGMENT));
     }
 
     @Override
