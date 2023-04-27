@@ -66,17 +66,34 @@ import org.knime.core.node.Node;
 public final class ReferenceTables {
 
     /**
-     * Creates a ReferenceTable with the provided ID that is backed by the provided BufferedDataTable.
-     *
-     * @param id of the reference table
-     * @param table backing the reference table
-     * @return a ReferenceTable with the given id that is backed by the given table
-     * @throws VirtualTableIncompatibleException if the table is not compatible with the ColumnarTableBackend
+     * Wraps the given BufferedDataTables into ReferenceTables that can be used as references in a
+     * VirtualTableExtensionTable.
+     * 
+     * @param tables to wrap into ReferenceTables
+     * @return ReferenceTables that wrap the provided input tables
+     * @throws VirtualTableIncompatibleException if any of the tables is not compatible with virtual columnar tables
      */
-    @SuppressWarnings("resource")// the caller must handle the life-cycle of the returned table
+    public static ReferenceTable[] createReferenceTables(final BufferedDataTable[] tables)
+        throws VirtualTableIncompatibleException {
+        var refTables = new ReferenceTable[tables.length];
+        for (int i = 0; i < tables.length; i++) {
+            refTables[i] = createReferenceTable(tables[i]);
+        }
+        return refTables;
+    }
+
+    /**
+     * Wraps a BufferedDataTable into a ReferenceTable that can be used as reference in a VirtualTableExtensionTable.
+     * 
+     * @param id unique identifier for the table
+     * @param table to turn into a ReferenceTable
+     * @return a ReferenceTable wrapping the input table
+     * @throws VirtualTableIncompatibleException if the input table is not compatible with columnar virtual tables
+     */
+    @SuppressWarnings("resource") // the caller must handle the life-cycle of the returned table
     public static ReferenceTable createReferenceTable(final UUID id, final BufferedDataTable table)
         throws VirtualTableIncompatibleException {
-        final var extensionTable = extractExtensionTable(table);
+        final ExtensionTable extensionTable = extractExtensionTable(table);
         if (extensionTable instanceof VirtualTableExtensionTable) {
             final VirtualTableExtensionTable virtualExtensionTable = (VirtualTableExtensionTable)extensionTable;
             return new VirtualReferenceTable(table, id, virtualExtensionTable);
@@ -87,6 +104,19 @@ public final class ReferenceTables {
             // we end up here if the reference tables are not extension tables (e.g. RearrangeColumnsTable)
             return new BufferedReferenceTable(table, id);
         }
+    }
+
+    /**
+     * Convenience method for wrapping a BufferedDataTable into a ReferenceTable.
+     * Creates a new {@link UUID id} via {@link UUID#randomUUID()}.
+     * 
+     * @param table to wrap
+     * @return a ReferenceTable that wraps the provided BufferedDataTable
+     * @throws VirtualTableIncompatibleException if the provided table is not compatible with columnar virtual tables
+     */
+    public static ReferenceTable createReferenceTable(final BufferedDataTable table)
+        throws VirtualTableIncompatibleException {
+        return createReferenceTable(UUID.randomUUID(), table);
     }
 
     private static ExtensionTable extractExtensionTable(final BufferedDataTable table) {
