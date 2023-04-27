@@ -233,11 +233,6 @@ public final class ColumnarVirtualTable {
         return new ColumnarVirtualTable(new TableTransform(transforms, transformSpec), schema);
     }
 
-    ColumnarVirtualTable map(final ColumnarMapperFactory mapperFactory, final int... columnIndices) {
-        final TableTransformSpec transformSpec = new MapTransformSpec(columnIndices, mapperFactory);
-        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), mapperFactory.getOutputSchema());
-    }
-
     /**
      * A {@link MapperFactory} whose {@link #getOutputSchema()} method returns a {@link ColumnarValueSchema}.
      *
@@ -316,32 +311,8 @@ public final class ColumnarVirtualTable {
     //              return map(c,f,this);
     //          }
     ColumnarVirtualTable map(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
-        return map(wrapAsMapperFactory(mapperFactory), columnIndices);
-    }
-
-    // FIXME This is a hack that only works because the comp graph is processed sequentially.
-    //       Implement proper RowIndex propagation instead.
-    private static ColumnarMapperFactory wrapAsMapperFactory(final ColumnarMapperWithRowIndexFactory factory) {
-        return new ColumnarMapperFactory() {
-            @Override
-            public ColumnarValueSchema getOutputSchema() {
-                return factory.getOutputSchema();
-            }
-
-            @Override
-            public Runnable createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
-                Mapper mapper = factory.createMapper(inputs, outputs);
-                return new Runnable() {
-                    private long m_rowIndex = 0;
-
-                    @Override
-                    public void run() {
-                        mapper.map(m_rowIndex);
-                        m_rowIndex++;
-                    }
-                };
-            }
-        };
+        final TableTransformSpec transformSpec = new MapTransformSpec(columnIndices, mapperFactory);
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), mapperFactory.getOutputSchema());
     }
 
 
