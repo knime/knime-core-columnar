@@ -64,6 +64,7 @@ import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarRearranger;
+import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.BufferedTableBackend;
@@ -294,6 +295,16 @@ public final class ColumnarTableBackend implements TableBackend {
             return slicedTable;
         } catch (VirtualTableIncompatibleException ex) {//NOSONAR
             return OLD_BACKEND.slice(exec, table, slice, tableIdSupplier);
+        }
+    }
+
+    @Override
+    public KnowsRowCountTable replaceSpec(final ExecutionContext exec, final BufferedDataTable table,
+        final DataTableSpec newSpec, final IntSupplier tableIDSupplier) {
+        try {
+            return new ColumnarSpecReplacer(exec, tableIDSupplier).replaceSpec(table, newSpec);
+        } catch (VirtualTableIncompatibleException ex) {
+            return OLD_BACKEND.replaceSpec(exec, table, newSpec, tableIDSupplier);
         }
     }
 
