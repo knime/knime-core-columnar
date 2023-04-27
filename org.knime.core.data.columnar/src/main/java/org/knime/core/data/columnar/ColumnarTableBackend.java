@@ -46,12 +46,11 @@
  */
 package org.knime.core.data.columnar;
 
-import static java.util.stream.Collectors.toList;
+import static org.knime.core.data.columnar.table.virtual.reference.ReferenceTables.createReferenceTables;
 
 import java.util.UUID;
 import java.util.function.IntSupplier;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
@@ -63,6 +62,7 @@ import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.ColumnarConcatenater;
 import org.knime.core.data.columnar.table.virtual.ColumnarRearranger;
 import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
@@ -166,26 +166,17 @@ public final class ColumnarTableBackend implements TableBackend {
     }
 
     @Override
-    public KnowsRowCountTable concatenate(final ExecutionMonitor exec, final IntSupplier tableIdSupplier,
-        final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck, final BufferedDataTable... tables)
-        throws CanceledExecutionException {
-        if (duplicatesPreCheck && rowKeyDuplicateSuffix == null) {
-            try {
-                var concatenatedSchema = VirtualTableSchemaUtils.concatenateSchemas(tables);
-                TableTransformUtils.checkForDuplicateKeys(exec, tables);
-                final long concatenatedSize = TableTransformUtils.concatenatedSize(tables);
-                var refTables = createReferenceTables(tables);
-                var sources = Stream.of(refTables)//
-                        .map(r -> new VirtualTable(r.getId(), r.getSchema()))//
-                        .collect(toList());
-                var virtualTableFragment = sources.get(0).concatenate(sources.subList(1, sources.size()));
-                return new VirtualTableExtensionTable(refTables, virtualTableFragment,
-                    concatenatedSchema, concatenatedSize, tableIdSupplier.getAsInt());
-            } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
-                LOGGER.debug("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.");
-            }
+    public KnowsRowCountTable concatenate(final ExecutionContext exec, final ExecutionMonitor progressMonitor,
+        final IntSupplier tableIdSupplier, final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck,
+        final BufferedDataTable... tables) throws CanceledExecutionException {
+        try {
+            return new ColumnarConcatenater(tableIdSupplier, exec, duplicatesPreCheck, rowKeyDuplicateSuffix)
+                .concatenate(tables, progressMonitor);
+        } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
+            LOGGER.debug("Can't concatenate tables with Columnar Table Backend, falling back on the old backend.");
+            return OLD_BACKEND.concatenate(null, exec, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck,
+                tables);
         }
-        return OLD_BACKEND.concatenate(exec, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck, tables);
     }
 
     @Override
@@ -236,14 +227,6 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
 
-    private static ReferenceTable[] createReferenceTables(final BufferedDataTable... tables)
-        throws VirtualTableIncompatibleException {
-        var refTables = new ReferenceTable[tables.length];
-        for (int i = 0; i < refTables.length; i++) {
-            refTables[i] = ReferenceTables.createReferenceTable(UUID.randomUUID(), tables[i]);
-        }
-        return refTables;
-    }
 
     @Override
     public KnowsRowCountTable rearrange(final ExecutionMonitor progressMonitor, final IntSupplier tableIdSupplier,

@@ -205,13 +205,22 @@ public final class VirtualTableSchemaUtils {
         return rearrangeSchemas(refSchema, EMPTY, rearranger.createSpec(), i -> true);
     }
 
-    private static DataTableSpec[] extractSpecs(final ColumnarValueSchema[] schemas) {
+    /**
+     * @param schemas to extract the DataTableSpecs from
+     * @return the extracted DataTableSpecs
+     */
+    public static DataTableSpec[] extractSpecs(final ColumnarValueSchema[] schemas) {
         return Stream.of(schemas)//
             .map(ColumnarValueSchema::getSourceSpec)//
             .toArray(DataTableSpec[]::new);
     }
 
-    private static ColumnarValueSchema[] extractSchemas(final BufferedDataTable[] tables)
+    /**
+     * @param tables to extract the ColumnarValueSchemas from
+     * @return the extracted schemas
+     * @throws VirtualTableIncompatibleException if any of the tables is not compatible with columnar virtual tables
+     */
+    public static ColumnarValueSchema[] extractSchemas(final BufferedDataTable[] tables)
         throws VirtualTableIncompatibleException {
         var schemas = new ColumnarValueSchema[tables.length];
         for (int i = 0; i < schemas.length; i++) {//NOSONAR

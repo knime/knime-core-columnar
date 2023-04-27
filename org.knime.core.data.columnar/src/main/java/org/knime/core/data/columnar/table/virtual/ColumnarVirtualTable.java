@@ -73,6 +73,7 @@ import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
+import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
@@ -262,6 +263,21 @@ public final class ColumnarVirtualTable {
         ColumnarValueSchema getOutputSchema();
     }
 
+    ColumnarVirtualTable concatenate(final List<ColumnarVirtualTable> tables) {
+        CheckUtils.checkArgument(
+            tables.stream().map(ColumnarVirtualTable::getSchema).allMatch(this::isConcatenateCompatible),
+            "The schemas are not compatible for concatenation, i.e. don't have the same types and column names.");
+        var incomingTransforms = collectTransforms(tables);
+        return new ColumnarVirtualTable(new TableTransform(incomingTransforms, new ConcatenateTransformSpec()),
+            m_valueSchema);
+    }
+    private boolean isConcatenateCompatible(final ColumnarValueSchema schema) {
+        return m_valueSchema.numColumns() == schema.numColumns()//
+            && m_valueSchema.getSourceSpec().equalStructure(schema.getSourceSpec())//
+            && IntStream.range(0, m_valueSchema.numColumns())
+                .allMatch(i -> ValueFactoryUtils.areEqual(m_valueSchema.getValueFactory(i), schema.getValueFactory(i)));
+    }
+
     private static ColumnarVirtualTable filterRowID(final ColumnarVirtualTable table) {
         return hasRowID(table.getSchema()) ? table.dropColumns(0) : table;
     }
@@ -325,7 +341,6 @@ public final class ColumnarVirtualTable {
         final TableTransformSpec transformSpec = new MapTransformSpec(columnIndices, mapperFactory);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), mapperFactory.getOutputSchema());
     }
-
 
 
     // TODO (TP) Implement ProgressTransformSpec handling.
