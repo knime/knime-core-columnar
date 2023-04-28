@@ -96,31 +96,57 @@ import com.google.common.collect.Collections2;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
 public final class ColumnarVirtualTable {
 
     private final TableTransform m_transform;
 
     private final ColumnarValueSchema m_valueSchema;
 
-    public ColumnarVirtualTable(final UUID sourceIdentifier, final ColumnarValueSchema schema, final boolean lookahead) {
-        m_transform = new TableTransform(new SourceTransformSpec(sourceIdentifier, new SourceTableProperties(schema, lookahead)));
+    /**
+     * Constructs a ColumnarVirtualTable around a source table.
+     *
+     * @param sourceIdentifier ID of the source
+     * @param schema of the source
+     * @param lookahead flag indicating whether the source is capable of lookahead
+     */
+    public ColumnarVirtualTable(final UUID sourceIdentifier, final ColumnarValueSchema schema,
+        final boolean lookahead) {
+        m_transform =
+            new TableTransform(new SourceTransformSpec(sourceIdentifier, new SourceTableProperties(schema, lookahead)));
         m_valueSchema = schema;
     }
 
+    /**
+     * Constructs a ColumnarVirtualTable from a transform and the schema of the output of the transform.
+     *
+     * @param transform of the table
+     * @param schema of the table
+     */
     public ColumnarVirtualTable(final TableTransform transform,final ColumnarValueSchema schema) {
         m_transform = transform;
         m_valueSchema = schema;
     }
 
+    /**
+     * @return the schema of the table
+     */
     public ColumnarValueSchema getSchema() {
         return m_valueSchema;
     }
 
+    /**
+     * @return the transform that creates the table
+     */
     public TableTransform getProducingTransform() {
         return m_transform;
     }
 
+    /**
+     * Selects columns from the table in a particular order.
+     *
+     * @param columnIndices indices of the columns to select
+     * @return the table consisting of the selected columns in the order they were selected
+     */
     public ColumnarVirtualTable selectColumns(final int... columnIndices) {
         final TableTransformSpec transformSpec = new SelectColumnsTransformSpec(columnIndices);
         final ColumnarValueSchema schema = selectColumns(m_valueSchema, columnIndices);
@@ -151,19 +177,44 @@ public final class ColumnarVirtualTable {
         return createColumnarValueSchema(valueFactories, specCreator.createSpec());
     }
 
-    public ColumnarVirtualTable dropColumns(final int... columnIndices) {
+    /**
+     * Drops columns in the table.
+     *
+     * @param columnIndices of the columns to drop
+     * @return the table without the dropped columns
+     */
+    ColumnarVirtualTable dropColumns(final int... columnIndices) {
         return selectColumns(indicesAfterDrop(m_valueSchema.numColumns(), columnIndices));
     }
 
-    public ColumnarVirtualTable keepOnlyColumns(final int... columnIndices) {
+    /**
+     * Keeps only the specified columns.
+     *
+     * @param columnIndices of the columns to keep
+     * @return the table with only the kept columns
+     */
+    ColumnarVirtualTable keepOnlyColumns(final int... columnIndices) {
         return selectColumns(indicesAfterKeepOnly(columnIndices));
     }
 
+    /**
+     * Slices the table along the row dimension
+     *
+     * @param from index of the first row to include (inclusive)
+     * @param to end index of the slice (exclusive)
+     * @return the sliced table consisting only of the rows in [from, to)
+     */
     public ColumnarVirtualTable slice(final long from, final long to) {
         final TableTransformSpec transformSpec = new SliceTransformSpec(from, to);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
 
+    /**
+     * Appends the provided table to this table.
+     *
+     * @param table to append
+     * @return the appended table
+     */
     public ColumnarVirtualTable append(final ColumnarVirtualTable table) {
         return append(List.of(table));
     }
@@ -300,7 +351,7 @@ public final class ColumnarVirtualTable {
     //      true} but this should be fixed, because it stands in the way of
     //      optimizations, destroys lookahead capability for no reason, etc...
     // TODO (TP) rename to "observe()"? (ObserverFactory, ObserverWithRowIndexFactory, etc?)
-    public ColumnarVirtualTable progress(final ProgressListenerFactory factory, final int... columnIndices) {
+    private ColumnarVirtualTable progress(final ProgressListenerFactory factory, final int... columnIndices) {
         final TableTransformSpec transformSpec = new RowFilterTransformSpec(columnIndices, wrapAsRowFilterFactory(factory));
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
@@ -315,11 +366,19 @@ public final class ColumnarVirtualTable {
         };
     }
 
-    public ColumnarVirtualTable progress(final ProgressListenerWithRowIndexFactory factory, final int... columnIndices) {
+    /**
+     * Adds a progress (observer) to the table.
+     *
+     * @param factory for the progress listener
+     * @param columnIndices indices the progress listener observes
+     * @return table containing the progress listener
+     */
+    ColumnarVirtualTable progress(final ProgressListenerWithRowIndexFactory factory, final int... columnIndices) {
         return progress(wrapAsProgressListenerFactory(factory), columnIndices);
     }
 
-    private static ProgressListenerFactory wrapAsProgressListenerFactory(final ProgressListenerWithRowIndexFactory factory) {
+    private static ProgressListenerFactory
+        wrapAsProgressListenerFactory(final ProgressListenerWithRowIndexFactory factory) {
         return new ProgressListenerFactory() {
             @Override
             public Runnable createProgressListener(final ReadAccess[] inputs) {
