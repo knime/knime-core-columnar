@@ -48,7 +48,9 @@
  */
 package org.knime.core.columnar.batch;
 
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.knime.core.columnar.ReferenceCounter;
 import org.knime.core.columnar.data.NullableReadData;
@@ -64,6 +66,8 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
 
     private final int m_length;
 
+    private final AtomicLong m_size;
+
     /**
      * @param data the array of data comprising this batch
      */
@@ -74,11 +78,13 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
             length = Math.max(length, d.length());
         }
         m_length = length;
+        m_size = new AtomicLong(-1);
     }
 
-    private DefaultReadBatch(final NullableReadData[] data, final ReferenceCounter refCounter, final int length) {
-        super(data, refCounter);
-        m_length = length;
+    private DefaultReadBatch(final NullableReadData[] data, final DefaultReadBatch toCopy) {
+        super(data, toCopy.m_refCounter);
+        m_length = toCopy.m_length;
+        m_size = new AtomicLong(toCopy.m_size.get());
     }
 
     @Override
@@ -86,7 +92,7 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
         var transformedDatas = IntStream.range(0, m_data.length)
                 .mapToObj(i -> dataOperator.transform(i, m_data[i]))
                 .toArray(NullableReadData[]::new);
-        return new DefaultReadBatch(transformedDatas, m_refCounter, m_length);
+        return new DefaultReadBatch(transformedDatas, this);
     }
 
     @Override
@@ -97,6 +103,11 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
     @Override
     public int length() {
         return m_length;
+    }
+
+    @Override
+    public final long sizeOf() {
+        return m_size.updateAndGet(s -> s == -1 ? Stream.of(m_data).mapToLong(NullableReadData::sizeOf).sum() : s);
     }
 
 }

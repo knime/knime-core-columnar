@@ -49,7 +49,9 @@
 package org.knime.core.columnar.batch;
 
 import java.util.Arrays;
+import java.util.stream.Stream;
 
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.WriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -85,6 +87,11 @@ public final class DefaultWriteBatch extends AbstractBatch<NullableWriteData> im
             newCapacity = Math.min(newCapacity, data.capacity());
         }
         m_capacity = newCapacity;
+    }
+
+    @Override
+    public final long sizeOf() {
+        return Stream.of(m_data).mapToLong(ReferencedData::sizeOf).sum();
     }
 
     @Override

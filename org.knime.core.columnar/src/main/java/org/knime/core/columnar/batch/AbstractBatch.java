@@ -85,11 +85,6 @@ abstract class AbstractBatch<D extends ReferencedData> implements Batch<D> {
     }
 
     @Override
-    public final long sizeOf() {
-        return Arrays.stream(m_data).mapToLong(ReferencedData::sizeOf).sum();
-    }
-
-    @Override
     public final D get(final int index) {
         return m_data[index];
     }

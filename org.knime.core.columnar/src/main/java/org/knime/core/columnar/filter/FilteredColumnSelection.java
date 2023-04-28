@@ -52,6 +52,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
@@ -112,6 +113,8 @@ public final class FilteredColumnSelection implements ColumnSelection {
         private final int m_length;
 
         private final ReferenceCounter m_refCounter;
+
+        private final AtomicLong m_size = new AtomicLong(-1);
 
         /**
          * Constructor.
@@ -193,7 +196,8 @@ public final class FilteredColumnSelection implements ColumnSelection {
 
         @Override
         public long sizeOf() {
-            return m_data.values().stream().mapToLong(ReferencedData::sizeOf).sum();
+            return m_size
+                .updateAndGet(s -> s == -1 ? m_data.values().stream().mapToLong(ReferencedData::sizeOf).sum() : s);
         }
 
         @Override
