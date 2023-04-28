@@ -55,6 +55,7 @@ import java.nio.file.Path;
 
 import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.container.DataContainer;
+import org.knime.core.node.workflow.NodeContext;
 
 /**
  * {@link FileHandle} that creates its file lazily when it is first needed.
@@ -66,6 +67,8 @@ final class TempFileHandle implements FileHandle {
     private File m_file = null;
 
     private Path m_path = null;
+
+    private final NodeContext m_context = NodeContext.getContext();
 
     @Override
     public synchronized File asFile() {
@@ -86,11 +89,14 @@ final class TempFileHandle implements FileHandle {
 
     private synchronized void init() {
         if (m_file == null) {
+            NodeContext.pushContext(m_context);
             try {
                 m_file = DataContainer.createTempFile(".knable");
                 m_path = m_file.toPath();
             } catch (IOException ex) {
                 throw new IllegalStateException(ex);
+            } finally {
+                NodeContext.removeLastContext();
             }
         }
     }
