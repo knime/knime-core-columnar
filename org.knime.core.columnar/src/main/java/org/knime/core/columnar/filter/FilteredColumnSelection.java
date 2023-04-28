@@ -195,6 +195,11 @@ public final class FilteredColumnSelection implements ColumnSelection {
         }
 
         @Override
+        public boolean tryRetain() {
+            return m_refCounter.tryRetain();
+        }
+
+        @Override
         public long sizeOf() {
             return m_size
                 .updateAndGet(s -> s == -1 ? m_data.values().stream().mapToLong(ReferencedData::sizeOf).sum() : s);

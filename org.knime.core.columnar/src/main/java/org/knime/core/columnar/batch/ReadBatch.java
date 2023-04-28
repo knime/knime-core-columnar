@@ -88,6 +88,13 @@ public interface ReadBatch extends Batch<NullableReadData>, NullableReadData {
     ReadBatch transform(DataTransformer transformer);
 
     /**
+     * Tries to retain this batch.
+     *
+     * @return true if the retain was successful (i.e. the batch has not already been released) or false otherwise
+     */
+    boolean tryRetain();
+
+    /**
      * Transforms data objects.
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany

@@ -75,10 +75,18 @@ public final class ReferenceCounter {
      * @see ReferencedData#retain()
      */
     public void retain() {
-        int count = m_counter.getAndUpdate(x -> x > 0 ? (x + 1) : x);
-        if (count < 1) {
+        if (!tryRetain()) {
             throw new IllegalStateException("Attempted retain after ReferencedData has already been released.");
         }
+    }
+
+    /**
+     * Tries to retain the object.
+     *
+     * @return true if the object has not already been released or false otherwise
+     */
+    public boolean tryRetain() {
+        return m_counter.getAndUpdate(x -> x > 0 ? (x + 1) : x) > 0;
     }
 
     /**
