@@ -55,6 +55,8 @@ import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.cache.batch.ReadBatchWriteCache;
+import org.knime.core.columnar.cache.batch.SharedReadBatchCache;
 import org.knime.core.columnar.cache.data.ReadDataCache;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.ObjectCache;
@@ -69,6 +71,7 @@ import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.domain.DomainWritableConfig;
 import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
+import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
@@ -116,6 +119,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         private DomainWritableConfig m_domainCalculationConfig = null;
 
         private ExecutorService m_domainCalculationExecutor = null;
+
+        private SharedReadBatchCache m_readBatchCache;
 
         /**
          * Create a {@link ColumnarBatchStoreBuilder} with given write and read delegates
@@ -176,6 +181,18 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             final ExecutorService exec) {
             m_columnDataCache = cache;
             m_columnDataCacheExecutor = exec;
+            return this;
+        }
+
+        /**
+         * The ReadBatchCache is the most top-level cache in the architecture that caches fully processed batches that
+         * can be read used without further processing.
+         *
+         * @param cache the cache to use or {@code null} if the ReadBatchCache should be disabled
+         * @return this builder
+         */
+        public ColumnarBatchStoreBuilder useReadBatchCache(final SharedReadBatchCache cache) {
+            m_readBatchCache = cache;
             return this;
         }
 
@@ -275,7 +292,19 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             m_writable = m_domainWritable;
         }
 
+        initReadBatchCache(builder.m_readBatchCache);
+
+
         m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getFileHandle());
+    }
+
+    private void initReadBatchCache(final SharedReadBatchCache cache) {
+        if (cache == null || cache.getMaxSizeInBytes() == 0) {
+            return;
+        }
+        var batchCache = new ReadBatchWriteCache(m_writable, m_readable, cache);
+        m_readable = batchCache;
+        m_writable = batchCache;
     }
 
     private void initHeapCache(final SharedObjectCache heapCache, final ExecutorService persistExec,

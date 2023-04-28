@@ -127,7 +127,8 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
                 .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
                 .useHeapCache( //
                     ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
-                    ColumnarPreferenceUtils.getSerializeExecutor());
+                    ColumnarPreferenceUtils.getSerializeExecutor())//
+                .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache());
         }
         builder.enableDictEncoding(true);
         if (settings.isCalculateDomains()) {

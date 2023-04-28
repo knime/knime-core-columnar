@@ -78,6 +78,7 @@ import javax.management.ReflectionException;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.knime.core.columnar.batch.BatchWritable;
+import org.knime.core.columnar.cache.batch.SharedReadBatchCache;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.cache.object.shared.SoftReferencedObjectCache;
@@ -161,6 +162,8 @@ public final class ColumnarPreferenceUtils {
 
     // lazily initialized
     private static SharedReadDataCache columnDataCache;
+
+    private static SharedReadBatchCache batchCache;
 
     private static final AtomicLong PERSIST_THREAD_COUNT = new AtomicLong();
 
@@ -376,8 +379,24 @@ public final class ColumnarPreferenceUtils {
                     "Column Data Cache is configured to be of size %d MB, but only %d MB of memory are available.",
                     columnDataCacheSize >> 20, totalFreeMemorySize >> 20);
             }
+            // TODO AP-20371: Clear data cache if the overall off-heap size becomes critical
         }
         return columnDataCache;
+    }
+
+    private static long getOffheapSizeInBytes() {
+        return (long)getColumnDataCacheSize() << 20;
+    }
+
+    /**
+     * @return the SharedReadBatchCache
+     */
+    public static synchronized SharedReadBatchCache getReadBatchCache() {
+        if (batchCache == null) {
+            batchCache = new SharedReadBatchCache((long)(getOffheapSizeInBytes() * 0.8));
+            // TODO AP-20371: Clear batch cache if the overall off-heap size becomes critical
+        }
+        return batchCache;
     }
 
     /**

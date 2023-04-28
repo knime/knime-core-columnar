@@ -105,6 +105,7 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
         return new ColumnarBatchReadStoreBuilder(store) //
             .enableDictEncoding(true) //
             .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache()) //
+            .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache())//
             .useHeapCache(ColumnarPreferenceUtils.getHeapCache()) //
             .build();
     }

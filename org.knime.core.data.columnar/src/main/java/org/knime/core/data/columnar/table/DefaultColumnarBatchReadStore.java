@@ -52,6 +52,8 @@ import java.io.IOException;
 
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.cache.batch.ReadBatchReadCache;
+import org.knime.core.columnar.cache.batch.SharedReadBatchCache;
 import org.knime.core.columnar.cache.data.ReadDataReadCache;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.ObjectReadCache;
@@ -84,6 +86,8 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
         private boolean m_dictEncodingEnabled = false;
 
+        private SharedReadBatchCache m_readBatchCache;
+
         /**
          * Create a {@link ColumnarBatchReadStoreBuilder} with given write and read delegates
          *
@@ -112,6 +116,18 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
          */
         public ColumnarBatchReadStoreBuilder useColumnDataCache(final SharedReadDataCache cache) {
             m_columnDataCache = cache;
+            return this;
+        }
+
+        /**
+         * The ReadBatchCache is the most top-level cache in the architecture that caches fully processed batches that
+         * can be read used without further processing.
+         *
+         * @param cache the cache to use or {@code null} if the ReadBatchCache should be disabled
+         * @return this builder
+         */
+        public ColumnarBatchReadStoreBuilder useReadBatchCache(final SharedReadBatchCache cache) {
+            m_readBatchCache = cache;
             return this;
         }
 
@@ -155,9 +171,18 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
         initHeapCache(builder.m_heapCache);
 
+        initReadBatchCache(builder);
 
         m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(),
             builder.m_readStore.batchLength(), builder.m_readStore.getFileHandle());
+    }
+
+    private void initReadBatchCache(final ColumnarBatchReadStoreBuilder builder) {
+        if (builder.m_readBatchCache == null || builder.m_columnDataCache.getMaxSizeInBytes() == 0) {
+            return;
+        }
+        m_readable = new ReadBatchReadCache(m_readable, builder.m_readBatchCache,
+            builder.m_readStore.numBatches());
     }
 
     private void initHeapCache(final SharedObjectCache heapCache) {
