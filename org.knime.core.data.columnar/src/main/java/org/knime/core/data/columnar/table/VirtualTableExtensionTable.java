@@ -66,8 +66,9 @@ import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
-import org.knime.core.data.columnar.table.virtual.TableTransformNodeSettingsPersistor;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
+import org.knime.core.data.columnar.table.virtual.persist.TableTransformNodeSettingsPersistor;
+import org.knime.core.data.columnar.table.virtual.persist.TableTransformSerializer;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.CloseableRowIterator;
@@ -92,7 +93,6 @@ import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
 import org.knime.core.table.virtual.exec.VirtualTableExecutor;
-import org.knime.core.table.virtual.serialization.TableTransformSerializer;
 import org.knime.core.table.virtual.spec.SourceTableProperties;
 import org.knime.core.table.virtual.spec.SourceTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
@@ -216,28 +216,17 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         return referenceTables;
     }
 
-    private static List<TableTransformSpec> reconstructSpecsFromStringArray(final String[] serializedSpecs)
-        throws JsonProcessingException {
-        final List<TableTransformSpec> specs = new ArrayList<>(serializedSpecs.length);
-        var objectMapper = new ObjectMapper();
-        for (String serializedSpec : serializedSpecs) {
-            TableTransformSpec spec =
-                TableTransformSerializer.deserializeTransformSpec(objectMapper.readTree(serializedSpec));
-            specs.add(spec);
-        }
-        return specs;
-    }
-
     private static TableTransform loadTableTransformFragment(final NodeSettingsRO settings,
         final ReferenceTable[] referenceTables, final LoadContext ctx)
         throws JsonProcessingException, InvalidSettingsException {
         var objectMapper = new ObjectMapper();
-        if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)) {
-            // before 5.1 we stored the transform as JSON
-            return TableTransformSerializer.load(objectMapper.readTree(settings.getString(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)));
-        } else if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT)) {
+        if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT)) {
             return TableTransformNodeSettingsPersistor.load(settings.getNodeSettings(CFG_VIRTUAL_TABLE_FRAGMENT),
                 ctx::getDataRepository);
+        } else if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)) {
+            // before 5.1 we stored the transform as JSON
+            return TableTransformSerializer
+                .load(objectMapper.readTree(settings.getString(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)));
         } else {
             // in 4.5 we stored a list of TableTransformSpecs as opposed to a complete TableTransform or VirtualTable
             var transformSpecs = reconstructSpecsFromStringArray(settings.getStringArray(CFG_TRANSFORMSPECS));
@@ -256,6 +245,18 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             return tableTransform;
         }
     }
+
+    private static List<TableTransformSpec> reconstructSpecsFromStringArray(final String[] serializedSpecs)
+            throws JsonProcessingException {
+            final List<TableTransformSpec> specs = new ArrayList<>(serializedSpecs.length);
+            var objectMapper = new ObjectMapper();
+            for (String serializedSpec : serializedSpecs) {
+                TableTransformSpec spec =
+                    TableTransformSerializer.deserializeTransformSpec(objectMapper.readTree(serializedSpec));
+                specs.add(spec);
+            }
+            return specs;
+        }
 
     /**
      * Constructor.
