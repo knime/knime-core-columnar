@@ -46,7 +46,7 @@
  * History
  *   Mar 14, 2023 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table.virtual;
+package org.knime.core.data.columnar.table.virtual.persist;
 
 import java.util.Map;
 import java.util.Optional;

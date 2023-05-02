@@ -68,14 +68,12 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.table.access.ReadAccess;
-import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
-import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory.Mapper;
 import org.knime.core.table.virtual.spec.MaterializeTransformSpec;
 import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerFactory;
 import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerWithRowIndexFactory;
@@ -238,7 +236,7 @@ public final class ColumnarVirtualTable {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    interface ColumnarMapperFactory extends MapperFactory {
+    public interface ColumnarMapperFactory extends MapperFactory {
         @Override
         ColumnarValueSchema getOutputSchema();
     }
@@ -246,7 +244,7 @@ public final class ColumnarVirtualTable {
     /**
      * A {@link MapperWithRowIndexFactory} whose {@link #getOutputSchema()} method returns a {@link ColumnarValueSchema}.
      */
-    interface ColumnarMapperWithRowIndexFactory extends MapperWithRowIndexFactory {
+    public interface ColumnarMapperWithRowIndexFactory extends MapperWithRowIndexFactory {
         @Override
         ColumnarValueSchema getOutputSchema();
     }

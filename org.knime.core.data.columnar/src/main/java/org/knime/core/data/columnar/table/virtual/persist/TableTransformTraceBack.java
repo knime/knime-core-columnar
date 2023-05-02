@@ -44,63 +44,56 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Mar 14, 2023 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   May 2, 2023 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table.virtual;
+package org.knime.core.data.columnar.table.virtual.persist;
 
-import org.knime.core.data.IDataRepository;
-import org.knime.core.node.InvalidSettingsException;
-import org.knime.core.node.NodeSettingsRO;
-import org.knime.core.node.NodeSettingsWO;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-/**
- * Persistor for saving and loading objects to and from NodeSettings.
- * Implementations must
- * <ul>
- * <li>be public (even though they might be a static inner class of a package-private or even private class)
- * <li>provide a constructor with no arguments
- * </ul>
- *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
- * @param <F> the type of ColumnarMapperFactory the persistor persists
- */
-public interface Persistor<F> {
+import org.knime.core.table.virtual.TableTransform;
 
-    /**
-     * Saves the given factory into the settings object.
-     *
-     * @param factory to save
-     * @param settings to save to
-     */
-    void save(final F factory, final NodeSettingsWO settings);
+final class TableTransformTraceBack {
 
-    /**
-     * Loads a factory from the given settings and the provided context.
-     *
-     * @param settings to load from
-     * @param context of the loading
-     * @return the loaded factory
-     * @throws InvalidSettingsException if the settings are invalid
-     */
-    F load(final NodeSettingsRO settings, final LoadContext context) throws InvalidSettingsException;
+    private final Set<TableTransform> m_sourceTransforms = new LinkedHashSet<>();
 
-    /**
-     * @return the {@link Class} of the persisted objects
-     */
-    Class<? extends F> getPersistedType();
+    private final Map<TableTransform, List<TableTransform>> m_childrenTransforms = new LinkedHashMap<>();
 
-    /**
-     * Represents the context in which a MapperFactory is loaded.
-     *
-     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-     */
-    interface LoadContext {
-
-    	/**
-    	 * Provides access to the data repository of the current context (typically a workflow).
-    	 *
-    	 * @return the data repository of the current context
-    	 */
-        IDataRepository getDataRepository();
+    TableTransformTraceBack(final TableTransform transform) {
+        traceBack(transform);
     }
+
+    private void traceBack(final TableTransform transform) {
+        final List<TableTransform> parents = transform.getPrecedingTransforms();
+        if (parents.isEmpty()) {
+            m_sourceTransforms.add(transform);
+        } else {
+            for (final TableTransform parent : parents) {
+                List<TableTransform> children = m_childrenTransforms.get(parent);
+                if (children == null) {
+                    children = new ArrayList<>();
+                    children.add(transform);
+                    m_childrenTransforms.put(parent, children);
+                    traceBack(parent);
+                } else {
+                    children.add(transform);
+                }
+            }
+        }
+    }
+
+    Collection<TableTransform> getSources() {
+        return Collections.unmodifiableCollection(m_sourceTransforms);
+    }
+
+    List<TableTransform> getChildren(final TableTransform transform) {
+        return m_childrenTransforms.getOrDefault(transform, List.of());
+    }
+
 }

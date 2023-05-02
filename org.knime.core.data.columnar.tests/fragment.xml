@@ -4,8 +4,8 @@
    <extension
          point="org.knime.core.data.columnar.Persistence">
       <persistence
-            persistable="org.knime.core.data.columnar.table.virtual.TableTransformNodeSettingsPersistorTest$TestMapperFactory"
-            persistor="org.knime.core.data.columnar.table.virtual.TableTransformNodeSettingsPersistorTest$TestMapperFactory$TestMapperFactoryPersistor">
+            persistable="org.knime.core.data.columnar.table.virtual.persist.TableTransformNodeSettingsPersistorTest$TestMapperFactory"
+            persistor="org.knime.core.data.columnar.table.virtual.persist.TableTransformNodeSettingsPersistorTest$TestMapperFactory$TestMapperFactoryPersistor">
       </persistence>
    </extension>
 

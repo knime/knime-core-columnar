@@ -46,7 +46,7 @@
  * History
  *   Mar 10, 2023 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table.virtual;
+package org.knime.core.data.columnar.table.virtual.persist;
 
 import static java.util.stream.Collectors.toUnmodifiableMap;
 
@@ -56,7 +56,6 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -91,7 +90,7 @@ import com.google.common.collect.Lists;
  */
 public final class TableTransformNodeSettingsPersistor {
 
-    private static Map<Class<? extends TableTransformSpec>, TransformSpecPersistor> SPEC_TO_PERSISTOR =
+    private static final Map<Class<? extends TableTransformSpec>, TransformSpecPersistor> SPEC_TO_PERSISTOR =
         Stream.of(TransformSpecPersistor.values())
             .collect(toUnmodifiableMap(TransformSpecPersistor::specClass, Function.identity()));
 
@@ -151,7 +150,6 @@ public final class TableTransformNodeSettingsPersistor {
             resolveTransformsTree(i, transformSpecs, parentTransforms, transforms);
         }
 
-        // TODO: support returning multi-output graphs
         return transforms.get(leafTransforms.iterator().next());
 
     }
@@ -163,8 +161,6 @@ public final class TableTransformNodeSettingsPersistor {
         return persistor.load(specSettings.getNodeSettings("internal"), ctx);
     }
 
-    // TODO: our save logic guarantees a topological ordering of the saved graph representation.
-    // This should allow us to simplify this method (i.e. getting rid of the recursion).
     private static void resolveTransformsTree(final int specIndex, final List<TableTransformSpec> transformSpecs,
         final Map<Integer, Map<Integer, Integer>> parentTransforms, final Map<Integer, TableTransform> transforms) {
         if (transforms.containsKey(specIndex)) {
@@ -187,32 +183,10 @@ public final class TableTransformNodeSettingsPersistor {
 
     private static final class TableTransformSaver {
 
-        private final Set<TableTransform> m_sourceTransforms = new LinkedHashSet<>();
-
-        private final Map<TableTransform, List<TableTransform>> m_childrenTransforms = new LinkedHashMap<>();
+        private final TableTransformTraceBack m_traceBack;
 
         public TableTransformSaver(final TableTransform transform) {
-            traceBack(transform);
-        }
-
-        // TODO pull into knime-core-table
-        private void traceBack(final TableTransform transform) {
-            final List<TableTransform> parents = transform.getPrecedingTransforms();
-            if (parents.isEmpty()) {
-                m_sourceTransforms.add(transform);
-            } else {
-                for (final TableTransform parent : parents) {
-                    List<TableTransform> children = m_childrenTransforms.get(parent);
-                    if (children == null) {
-                        children = new ArrayList<>();
-                        children.add(transform);
-                        m_childrenTransforms.put(parent, children);
-                        traceBack(parent);
-                    } else {
-                        children.add(transform);
-                    }
-                }
-            }
+            m_traceBack = new TableTransformTraceBack(transform);
         }
 
         public void save(final NodeSettingsWO settings) {
@@ -221,9 +195,9 @@ public final class TableTransformNodeSettingsPersistor {
 
             final NodeSettingsWO transformSettings = settings.addNodeSettings("transforms");
             final NodeSettingsWO connectionSettings = settings.addNodeSettings("connections");
-            int connectionCount = 0;
+            int connectionCount = 0;//NOSONAR
 
-            m_sourceTransforms.forEach(transformsToTraverse::push);
+            m_traceBack.getSources().forEach(transformsToTraverse::push);
 
             while (!transformsToTraverse.isEmpty()) {
                 final TableTransform transform = transformsToTraverse.pop();
@@ -231,8 +205,7 @@ public final class TableTransformNodeSettingsPersistor {
                 // Push children in reverse order. This is not necessary to guarantee the correctness of the
                 // serialization logic, but it keeps the serialized format more intuitive (because transforms will
                 // appear in the order in which they were defined programmatically).
-                Lists.reverse(m_childrenTransforms.getOrDefault(transform, Collections.emptyList()))
-                    .forEach(transformsToTraverse::push);
+                Lists.reverse(m_traceBack.getChildren(transform)).forEach(transformsToTraverse::push);
 
                 if (transformIds.containsKey(transform)) {
                     continue;
@@ -282,7 +255,7 @@ public final class TableTransformNodeSettingsPersistor {
     }
 
     @FunctionalInterface
-    interface TransformSpecSaver<T extends TableTransformSpec> {
+    interface TransformSpecSaver<T extends TableTransformSpec> {//NOSONAR
         void save(T transformSpec, NodeSettingsWO settings);
     }
 
