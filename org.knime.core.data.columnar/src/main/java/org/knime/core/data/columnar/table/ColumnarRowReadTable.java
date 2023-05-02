@@ -57,6 +57,7 @@ import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
+import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
@@ -81,6 +82,8 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
     private final ColumnStoreFactory m_storeFactory;
 
     private final ColumnarBatchReadStore m_store;
+
+    private final ColumnarRandomAccessRowIterable m_randomAccessIterable;
 
     private final long m_size;
 
@@ -122,6 +125,7 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
         m_storeFactory = storeFactory;
         m_store = store;
         m_size = size;
+        m_randomAccessIterable = new ColumnarRandomAccessRowIterable(store, size, schema);
     }
 
     /**
@@ -195,8 +199,13 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
             .createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size, filter));
     }
 
+    CloseableRowIterator createRowIterator() {
+        return m_randomAccessIterable.iterator();
+    }
+
     @Override
     public void close() throws IOException {
+        m_randomAccessIterable.close();
         m_rowCursorTracker.close();
         m_cursorTracker.close();
         m_store.close();

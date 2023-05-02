@@ -252,7 +252,8 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
     @SuppressWarnings("resource") // Cursor will be closed along with iterator.
     @Override
     public final CloseableRowIterator iterator() {
-        return new ColumnarRowIterator(cursor());
+//        return new ColumnarRowIterator(cursor());
+        return m_columnarTable.createRowIterator();
     }
 
     @Override
