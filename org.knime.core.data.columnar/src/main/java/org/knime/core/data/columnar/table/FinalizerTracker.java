@@ -42,66 +42,49 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
+ * 
  * History
- *   Feb 4, 2022 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   May 2, 2023 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.core.data.columnar.table;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 
-import org.knime.core.data.v2.RowCursor;
-import org.knime.core.table.cursor.Cursor;
-import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 
-/**
- * Tracks {@link Closeable} cursors emitted by tables and makes sure that their resources are properly released if
- * <ul>
- * <li> They are no longer referenced but haven't been closed, yet.
- * <li> The emitting table is closed before the cursors released their resources.
- * </ul>
- *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
- */
-final class CursorTracker<C extends Closeable> implements Closeable {
+import com.google.common.cache.CacheBuilder;
 
-    private final UnaryOperator<C> m_finalizerFactory;
+final class FinalizerTracker implements Closeable {
 
-    private final FinalizerTracker m_openFinalizers;
+    private final Set<Finalizer> m_openFinalizers = finalizerSet();
 
-    private CursorTracker(final UnaryOperator<C> finalizerFactory, final FinalizerTracker trackedCursors) {
-        m_finalizerFactory = finalizerFactory;
-        m_openFinalizers = trackedCursors;
+    @SuppressWarnings("unchecked")
+    private static Set<Finalizer> finalizerSet() {
+        @SuppressWarnings("rawtypes")
+        Map map = CacheBuilder.newBuilder().weakKeys().build().asMap();
+        return Collections.newSetFromMap(map);
     }
 
-    @SuppressWarnings("resource")
-    static <A> CursorTracker<Cursor<A>> createCursorTracker() {
-        var openFinalizers = new FinalizerTracker();
-        return new CursorTracker<>(c -> CursorsWithFinalizer.cursor(c, openFinalizers::add), openFinalizers);
-    }
-
-    @SuppressWarnings("resource")
-    static <A> CursorTracker<LookaheadCursor<A>> createLookaheadCursorTracker() {
-        var openFinalizers = new FinalizerTracker();
-        return new CursorTracker<>(c -> CursorsWithFinalizer.lookaheadCursor(c, openFinalizers::add), openFinalizers);
-    }
-
-    @SuppressWarnings("resource")
-    static CursorTracker<RowCursor> createRowCursorTracker() {
-        var openFinalizers = new FinalizerTracker();
-        return new CursorTracker<>(c -> CursorsWithFinalizer.rowCursor(c, openFinalizers::add), openFinalizers);
-    }
-
-    @SuppressWarnings("resource")
-    C createTrackedCursor(final Supplier<C> cursorSupplier) {
-        return m_finalizerFactory.apply(cursorSupplier.get());
+    void add(final Finalizer finalizer) {
+        m_openFinalizers.add(finalizer);
     }
 
     @Override
     public void close() throws IOException {
-        m_openFinalizers.close();
+
+        var exceptions = new ArrayList<Exception>();
+        for (var finalizer : m_openFinalizers) {
+            finalizer.releaseResourcesAndLogOutput();
+        }
+        m_openFinalizers.clear();
+        if (!exceptions.isEmpty()) {
+            throw new IOException("Exception while closing tracked cursor.", exceptions.get(0));
+        }
     }
+
 }
