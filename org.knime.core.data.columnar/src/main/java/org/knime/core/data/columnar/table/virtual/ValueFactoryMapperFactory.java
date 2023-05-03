@@ -174,16 +174,6 @@ final class ValueFactoryMapperFactory implements ColumnarMapperWithRowIndexFacto
                 i++;
             }
         }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public Class<? extends ValueFactoryMapperFactory> getPersistedType() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
     }
 
     private IWriteFileStoreHandler getFsHandler() {

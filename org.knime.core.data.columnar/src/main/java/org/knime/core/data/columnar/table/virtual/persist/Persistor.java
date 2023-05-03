@@ -85,11 +85,6 @@ public interface Persistor<F> {
     F load(final NodeSettingsRO settings, final LoadContext context) throws InvalidSettingsException;
 
     /**
-     * @return the {@link Class} of the persisted objects
-     */
-    Class<? extends F> getPersistedType();
-
-    /**
      * Represents the context in which a MapperFactory is loaded.
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany

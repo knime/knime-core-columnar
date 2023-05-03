@@ -105,7 +105,7 @@ final class PersistenceRegistry {
         }
     }
 
-    private record Persistence(String persistableClass, UntypedPersistor persistor) {
+    private record Persistence(String persistableClass, UntypedPersistor persistor) {//NOSONAR
     }
 
     static Optional<UntypedPersistor> getPersistor(final Class<?> persistableClass) {
@@ -146,11 +146,6 @@ final class PersistenceRegistry {
         private static <F> void uncheckedSave(final Object factory, final Persistor<F> persistor,
             final NodeSettingsWO settings) {
             persistor.save((F)factory, settings);
-        }
-
-        @Override
-        public Class<?> getPersistedType() {
-            return m_typedPersistor.getPersistedType();
         }
 
     }

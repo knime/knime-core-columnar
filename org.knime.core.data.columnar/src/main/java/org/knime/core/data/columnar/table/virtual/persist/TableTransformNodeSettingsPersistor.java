@@ -311,17 +311,13 @@ public final class TableTransformNodeSettingsPersistor {
                 (t, s) -> {
                     s.addIntArray("column_indices", t.getColumnSelection());
                     var mapperFactory = t.getMapperFactory();
-                    if (mapperFactory instanceof ColumnarMapperWithRowIndexFactory columnarMapperFactory) {
-                        var factoryClass = columnarMapperFactory.getClass();
-                        var persistor =
+                    var factoryClass = mapperFactory.getClass();
+                    var persistor =
                             PersistenceRegistry.getPersistor(factoryClass)
-                                .orElseThrow(() -> new IllegalArgumentException(
-                                    "No persistor for %s registered.".formatted(factoryClass)));
-                        s.addString("mapper_factory_class", factoryClass.getName());
-                        persistor.save(columnarMapperFactory, s.addNodeSettings("mapper_factory_settings"));
-                    } else {
-                        throw new IllegalArgumentException("Only ColumnarMapperFactories can be persisted.");
-                    }
+                            .orElseThrow(() -> new IllegalArgumentException(
+                                "No persistor for %s registered.".formatted(factoryClass)));
+                    s.addString("mapper_factory_class", factoryClass.getName());
+                    persistor.save(mapperFactory, s.addNodeSettings("mapper_factory_settings"));
                 }
                 );
 
