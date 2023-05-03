@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.Flushable;
+import java.io.IOException;
 
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.store.BatchStore;
@@ -69,4 +70,12 @@ public interface ColumnarBatchStore extends BatchStore, ColumnarBatchReadStore, 
      * @return get the underlying {@link BatchWritable}
      */
     BatchWritable getWritableDelegate();
+
+    /**
+     * Ensures that all objects are serialized to their raw representation.
+     * @throws IOException if serialization of objects fails
+     */
+    default void flushObjects() throws IOException {
+
+    }
 }

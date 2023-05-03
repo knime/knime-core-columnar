@@ -132,7 +132,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
      * Make sure the current contents of this {@link ColumnarRowWriteCursor} have been
      * written to disk. Blocks until this is true. Does not close this cursor.
      */
-    void flush() {
+    public void flush() {
         try {
             m_accessCursor.flush();
         } catch (IOException ex) {

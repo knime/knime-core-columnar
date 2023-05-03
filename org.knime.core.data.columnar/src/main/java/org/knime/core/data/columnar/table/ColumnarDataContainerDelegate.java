@@ -45,6 +45,7 @@
  */
 package org.knime.core.data.columnar.table;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -68,7 +69,6 @@ import org.knime.core.data.container.DataContainerException;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.data.v2.RowWrite;
-import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.workflow.NodeContext;
 import org.knime.core.util.DuplicateKeyException;
@@ -99,7 +99,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
         MAX_NUM_THREADS = ASYNC_EXECUTORS.getMaximumPoolSize();
     }
 
-    private final RowWriteCursor m_delegateCursor;
+    private final ColumnarRowWriteCursor m_delegateCursor;
 
     private final DataTableSpec m_spec;
 
@@ -155,7 +155,8 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
     private ContainerTable m_containerTable;
 
-    ColumnarDataContainerDelegate(final DataTableSpec spec, final ColumnarRowContainer container, final ColumnarRowWriteTableSettings settings) {
+    ColumnarDataContainerDelegate(final DataTableSpec spec, final ColumnarRowContainer container,
+        final ColumnarRowWriteTableSettings settings) {
         m_delegateContainer = container;
         m_delegateCursor = container.createCursor();
         m_spec = spec;
@@ -337,6 +338,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     private void internalFlush() {
         submit();
         waitForAndHandleFuture();
+        try {
+            m_delegateContainer.flushObjects();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to flush objects.", ex);
+        }
     }
 
     @Override

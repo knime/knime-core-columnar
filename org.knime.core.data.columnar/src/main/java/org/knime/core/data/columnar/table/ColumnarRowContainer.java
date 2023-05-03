@@ -94,6 +94,10 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
         return m_columnarTable.createCursor();
     }
 
+    void flushObjects() throws IOException {
+        m_columnarTable.flushObjects();
+    }
+
     @SuppressWarnings("resource")
     @Override
     public BufferedDataTable finish() {

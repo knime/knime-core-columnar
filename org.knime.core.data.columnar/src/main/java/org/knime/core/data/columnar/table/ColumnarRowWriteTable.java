@@ -147,6 +147,10 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
         m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, m_writeCursor, m_store);
     }
 
+    void flushObjects() throws IOException {
+        m_store.flushObjects();
+    }
+
     /**
      * @return This table's write-only cursor.
      * @implNote Currently only a single cursor is supported, i.e., it is always the same cursor instance that is
