@@ -38,6 +38,11 @@
 	</modules>
 	<repositories>
 		<repository>
+			<id>p2-knime-core-table</id>
+			<layout>p2</layout>
+			<url>${knime.core.table.p2}</url>
+		</repository>
+		<repository>
 			<id>p2-knime-core</id>
 			<layout>p2</layout>
 			<url>${knime.core.p2}</url>
