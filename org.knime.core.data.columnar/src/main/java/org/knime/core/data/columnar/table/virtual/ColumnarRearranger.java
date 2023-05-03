@@ -346,6 +346,8 @@ public final class ColumnarRearranger {
             throw canceledException;
         } catch (VirtualTableIncompatibleException ex) {
             throw ex;
+        } catch (RuntimeException ex) {
+            throw ex;
         } catch (Throwable ex) {
             throw new IllegalStateException("Failed to create append table.", ex);
         }
