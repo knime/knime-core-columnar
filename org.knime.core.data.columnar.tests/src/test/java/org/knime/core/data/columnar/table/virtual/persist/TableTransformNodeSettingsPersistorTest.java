@@ -66,10 +66,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
-import org.knime.core.data.columnar.table.virtual.persist.Persistor;
-import org.knime.core.data.columnar.table.virtual.persist.TableTransformNodeSettingsPersistor;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowDataRepository;
 import org.knime.core.data.v2.ValueFactory;
@@ -398,11 +395,6 @@ final class TableTransformNodeSettingsPersistorTest {
             @Override
             public void save(final TestMapperFactory factory, final NodeSettingsWO settings) {
                 settings.addInt("increment", factory.m_increment);
-            }
-
-            @Override
-            public Class<? extends TestMapperFactory> getPersistedType() {
-                return TestMapperFactory.class;
             }
 
         }
