@@ -62,30 +62,30 @@ import org.knime.core.node.NodeSettingsWO;
  * </ul>
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
- * @param <F> the type of ColumnarMapperFactory the persistor persists
+ * @param <T> the type of object the persistor persists
  */
-public interface Persistor<F> {
+public interface Persistor<T> {
 
     /**
-     * Saves the given factory into the settings object.
+     * Saves the given object into the settings object.
      *
      * @param factory to save
      * @param settings to save to
      */
-    void save(final F factory, final NodeSettingsWO settings);
+    void save(final T factory, final NodeSettingsWO settings);
 
     /**
-     * Loads a factory from the given settings and the provided context.
+     * Loads an object from the given settings and the provided context.
      *
      * @param settings to load from
      * @param context of the loading
-     * @return the loaded factory
+     * @return the loaded object
      * @throws InvalidSettingsException if the settings are invalid
      */
-    F load(final NodeSettingsRO settings, final LoadContext context) throws InvalidSettingsException;
+    T load(final NodeSettingsRO settings, final LoadContext context) throws InvalidSettingsException;
 
     /**
-     * Represents the context in which a MapperFactory is loaded.
+     * Represents the context in which an object is loaded.
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
