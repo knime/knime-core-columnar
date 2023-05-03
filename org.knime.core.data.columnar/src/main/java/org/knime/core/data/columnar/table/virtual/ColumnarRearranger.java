@@ -395,7 +395,7 @@ public final class ColumnarRearranger {
 
         @Override
         public void update(final long rowIndex, final RowKeyValue rowKey) {
-            m_cellFactory.setProgress(rowIndex + 1, m_size, new RowKey(rowKey.getString()), m_monitor);
+            m_cellFactory.setProgress(rowIndex, m_size, new RowKey(rowKey.getString()), m_monitor);
             try {
                 m_monitor.checkCanceled();
             } catch (CanceledExecutionException ex) {
