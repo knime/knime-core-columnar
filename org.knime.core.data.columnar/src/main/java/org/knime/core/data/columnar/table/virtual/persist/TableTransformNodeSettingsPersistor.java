@@ -95,11 +95,51 @@ public final class TableTransformNodeSettingsPersistor {
             .collect(toUnmodifiableMap(TransformSpecPersistor::specClass, Function.identity()));
 
     /**
-     * @param transform to save
+     * @param tableTransform to save
      * @param settings to save to
      */
-    public static void save(final TableTransform transform, final NodeSettingsWO settings) {
-        new TableTransformSaver(transform).save(settings);
+    public static void save(final TableTransform tableTransform, final NodeSettingsWO settings) {
+        var traceBack = new TableTransformTraceBack(tableTransform);
+        final Deque<TableTransform> transformsToTraverse = new ArrayDeque<>();
+        final Map<TableTransform, Integer> transformIds = new IdentityHashMap<>();
+
+        final NodeSettingsWO transformSettings = settings.addNodeSettings("transforms");
+        final NodeSettingsWO connectionSettings = settings.addNodeSettings("connections");
+        int connectionCount = 0;//NOSONAR
+
+        traceBack.getSources().forEach(transformsToTraverse::push);
+
+        while (!transformsToTraverse.isEmpty()) {
+            final TableTransform transform = transformsToTraverse.pop();
+
+            // Push children in reverse order. This is not necessary to guarantee the correctness of the
+            // serialization logic, but it keeps the serialized format more intuitive (because transforms will
+            // appear in the order in which they were defined programmatically).
+            Lists.reverse(traceBack.getChildren(transform)).forEach(transformsToTraverse::push);
+
+            if (transformIds.containsKey(transform)) {
+                continue;
+            }
+
+            final List<TableTransform> parentTransforms = transform.getPrecedingTransforms();
+            if (!parentTransforms.isEmpty() && !parentTransforms.stream().allMatch(transformIds::containsKey)) {
+                // We cannot process the transform yet because not all parents have been visited; guarantees
+                // topological ordering.
+                transformsToTraverse.addLast(transform);
+                continue;
+            }
+
+            int id = transformIds.size();
+            saveTransformSpec(transform.getSpec(), transformSettings.addNodeSettings(Integer.toString(id)));
+            transformIds.put(transform, id);
+
+            for (int i = 0; i < parentTransforms.size(); i++) {//NOSONAR
+                final TableTransform parentTransform = parentTransforms.get(i);
+                final var connection = connectionSettings.addNodeSettings(Integer.toString(connectionCount));
+                connectionCount++;
+                saveConnection(transformIds.get(parentTransform), id, i, connection);
+            }
+        }
     }
 
     /**
@@ -137,16 +177,16 @@ public final class TableTransformNodeSettingsPersistor {
         final Map<Integer, Map<Integer, Integer>> parentTransforms = new HashMap<>();
         for (final var key : connectionSettings) {
             var connection = connectionSettings.getNodeSettings(key);
-            final int fromTransform = connection.getNodeSettings("from").getInt("transform");
+            final int fromTransform = connection.getNodeSettings("from").getInt("transform");//NOSONAR
             leafTransforms.remove(fromTransform);
             final NodeSettingsRO to = connection.getNodeSettings("to");
-            final int toTransform = to.getInt("transform");
-            final int toPort = to.getInt("port");
+            final int toTransform = to.getInt("transform");//NOSONAR
+            final int toPort = to.getInt("port");//NOSONAR
             parentTransforms.computeIfAbsent(toTransform, k -> new HashMap<>()).put(toPort, fromTransform);
         }
 
         final Map<Integer, TableTransform> transforms = new HashMap<>();
-        for (int i = 0; i < transformSpecs.size(); i++) {
+        for (int i = 0; i < transformSpecs.size(); i++) {//NOSONAR
             resolveTransformsTree(i, transformSpecs, parentTransforms, transforms);
         }
 
@@ -170,7 +210,7 @@ public final class TableTransformNodeSettingsPersistor {
         final List<TableTransform> resolvedParents;
         if (parents != null) {
             resolvedParents = new ArrayList<>(parents.size());
-            for (int j = 0; j < parents.size(); j++) {
+            for (int j = 0; j < parents.size(); j++) {//NOSONAR
                 final int parentSpecIndex = parents.get(j);
                 resolveTransformsTree(parentSpecIndex, transformSpecs, parentTransforms, transforms);
                 resolvedParents.add(transforms.get(parentSpecIndex));
@@ -179,60 +219,6 @@ public final class TableTransformNodeSettingsPersistor {
             resolvedParents = Collections.emptyList();
         }
         transforms.put(specIndex, new TableTransform(resolvedParents, transformSpecs.get(specIndex)));
-    }
-
-    private static final class TableTransformSaver {
-
-        private final TableTransformTraceBack m_traceBack;
-
-        public TableTransformSaver(final TableTransform transform) {
-            m_traceBack = new TableTransformTraceBack(transform);
-        }
-
-        public void save(final NodeSettingsWO settings) {
-            final Deque<TableTransform> transformsToTraverse = new ArrayDeque<>();
-            final Map<TableTransform, Integer> transformIds = new IdentityHashMap<>();
-
-            final NodeSettingsWO transformSettings = settings.addNodeSettings("transforms");
-            final NodeSettingsWO connectionSettings = settings.addNodeSettings("connections");
-            int connectionCount = 0;//NOSONAR
-
-            m_traceBack.getSources().forEach(transformsToTraverse::push);
-
-            while (!transformsToTraverse.isEmpty()) {
-                final TableTransform transform = transformsToTraverse.pop();
-
-                // Push children in reverse order. This is not necessary to guarantee the correctness of the
-                // serialization logic, but it keeps the serialized format more intuitive (because transforms will
-                // appear in the order in which they were defined programmatically).
-                Lists.reverse(m_traceBack.getChildren(transform)).forEach(transformsToTraverse::push);
-
-                if (transformIds.containsKey(transform)) {
-                    continue;
-                }
-
-                final List<TableTransform> parentTransforms = transform.getPrecedingTransforms();
-                if (!parentTransforms.isEmpty() && !parentTransforms.stream().allMatch(transformIds::containsKey)) {
-                    // We cannot process the transform yet because not all parents have been visited; guarantees
-                    // topological ordering.
-                    transformsToTraverse.addLast(transform);
-                    continue;
-                }
-
-                int id = transformIds.size();
-                saveTransformSpec(transform.getSpec(), transformSettings.addNodeSettings(Integer.toString(id)));
-                transformIds.put(transform, id);
-
-                for (int i = 0; i < parentTransforms.size(); i++) {
-                    final TableTransform parentTransform = parentTransforms.get(i);
-                    final var connection = connectionSettings.addNodeSettings(Integer.toString(connectionCount));
-                    connectionCount++;
-                    saveConnection(transformIds.get(parentTransform), id, i, connection);
-                }
-            }
-
-        }
-
     }
 
     static <T extends TableTransformSpec> void saveTransformSpec(final T transformSpec, final NodeSettingsWO settings) {
@@ -308,7 +294,7 @@ public final class TableTransformNodeSettingsPersistor {
                         persistor.load(s.getNodeSettings("mapper_factory_settings"), c::getDataRepository);
                     return new MapTransformSpec(s.getIntArray("column_indices"), mapperFactoryWithIndex);
                 },
-                (t, s) -> {
+                (t, s) -> {//NOSONAR
                     s.addIntArray("column_indices", t.getColumnSelection());
                     var mapperFactory = t.getMapperFactory();
                     var factoryClass = mapperFactory.getClass();
