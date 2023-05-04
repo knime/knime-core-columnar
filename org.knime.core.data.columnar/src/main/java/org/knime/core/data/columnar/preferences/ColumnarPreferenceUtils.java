@@ -304,7 +304,7 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized SharedBatchWritableCache getSmallTableCache() {
         if (smallTableCache == null) {
-            final long smallTableCacheSize = (long)getSmallTableCacheSize() << 20;
+            long smallTableCacheSize = (long)getSmallTableCacheSize() << 20;
             long totalFreeMemorySize = getTotalFreeMemorySize();
 
             if (operatingSystemIsMac()) {
@@ -321,6 +321,7 @@ public final class ColumnarPreferenceUtils {
                 LOGGER.warn(
                     "Small Table Cache is disabled. Consider enabling it in the Columnar Table Backend preferences");
             } else if (smallTableCacheSize <= totalFreeMemorySize) {
+                LOGGER.infoWithFormat("Small Table Cache size is %d MB", smallTableCacheSize >> 20);
                 smallTableCache =
                     new SharedBatchWritableCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
             } else {
@@ -367,6 +368,7 @@ public final class ColumnarPreferenceUtils {
                 LOGGER.warn(
                     "Column Data Cache is disabled. Consider enabling it in the Columnar Table Backend preferences");
             } else if (columnDataCacheSize <= totalFreeMemorySize) {
+                LOGGER.infoWithFormat("Column Data Cache size is %d MB.", columnDataCacheSize >> 20);
                 columnDataCache = new SharedReadDataCache(columnDataCacheSize, getNumThreads());
             } else {
                 columnDataCache = new SharedReadDataCache(totalFreeMemorySize, getNumThreads());
