@@ -199,7 +199,8 @@ public final class ColumnarSpecReplacer {
                     new UntypedValueFactory(outputValueFactory));
                 mappings.add(mapping);
             } else {
-                // TODO the old backend doesn't check this but it isn't clear what happens if it is violated
+                // the row-based backend does not validate the types of the new spec but here we have to do it
+                // because we have to ensure that we have the correct ValueFactories
                 throw new IllegalArgumentException(
                     "The output type %s in column %s must be the same or a super type of the input type %s."
                         .formatted(outputType, columnIndex, inputType));
