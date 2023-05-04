@@ -54,8 +54,7 @@ import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 
 /**
- * Persistor for saving and loading objects to and from NodeSettings.
- * Implementations must
+ * Persistor for saving and loading objects to and from NodeSettings. Implementations must
  * <ul>
  * <li>be public (even though they might be a static inner class of a package-private or even private class)
  * <li>provide a constructor with no arguments
@@ -91,11 +90,11 @@ public interface Persistor<T> {
      */
     interface LoadContext {
 
-    	/**
-    	 * Provides access to the data repository of the current context (typically a workflow).
-    	 *
-    	 * @return the data repository of the current context
-    	 */
+        /**
+         * Provides access to the data repository of the current context (typically a workflow).
+         *
+         * @return the data repository of the current context
+         */
         IDataRepository getDataRepository();
     }
 }
