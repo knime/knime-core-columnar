@@ -3,7 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: KNIME Core - Columnar Data Plugin
 Bundle-SymbolicName: org.knime.core.data.columnar;singleton:=true
 Automatic-Module-Name: org.knime.core.data.columnar
-Bundle-Version: 4.7.1.qualifier
+Bundle-Version: 4.7.3.qualifier
 Bundle-Vendor: KNIME AG
 Bundle-RequiredExecutionEnvironment: JavaSE-11
 Bundle-ActivationPolicy: lazy
