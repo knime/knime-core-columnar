@@ -112,7 +112,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private static final String CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1 = "VIRTUAL_TABLE_FRAGMENT";
 
-    private static final String CFG_VIRTUAL_TABLE_FRAGMENT = "virtual_table_fragment";
+    private static final String CFG_VIRTUAL_TABLE_FRAGMENT = "virtual_table_fragment_5_1";
 
     private static final String CFG_REF_TABLE_IDS = "REF_TABLE_IDS";
 
