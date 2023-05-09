@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -112,22 +113,23 @@ public final class TableTransformNodeSettingsPersistor {
         while (!transformsToTraverse.isEmpty()) {
             final TableTransform transform = transformsToTraverse.pop();
 
-            // Push children in reverse order. This is not necessary to guarantee the correctness of the
-            // serialization logic, but it keeps the serialized format more intuitive (because transforms will
-            // appear in the order in which they were defined programmatically).
-            Lists.reverse(traceBack.getChildren(transform)).forEach(transformsToTraverse::push);
 
             if (transformIds.containsKey(transform)) {
                 continue;
             }
 
             final List<TableTransform> parentTransforms = transform.getPrecedingTransforms();
-            if (!parentTransforms.isEmpty() && !parentTransforms.stream().allMatch(transformIds::containsKey)) {
+            if (parentTransforms.stream().anyMatch(Predicate.not(transformIds::containsKey))) {
                 // We cannot process the transform yet because not all parents have been visited; guarantees
                 // topological ordering.
                 transformsToTraverse.addLast(transform);
                 continue;
             }
+
+            // Push children in reverse order. This is not necessary to guarantee the correctness of the
+            // serialization logic, but it keeps the serialized format more intuitive (because transforms will
+            // appear in the order in which they were defined programmatically).
+            Lists.reverse(traceBack.getChildren(transform)).forEach(transformsToTraverse::push);
 
             int id = transformIds.size();
             saveTransformSpec(transform.getSpec(), transformSettings.addNodeSettings(Integer.toString(id)));
