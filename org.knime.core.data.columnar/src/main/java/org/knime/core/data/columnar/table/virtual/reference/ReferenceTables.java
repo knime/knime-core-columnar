@@ -68,7 +68,7 @@ public final class ReferenceTables {
     /**
      * Wraps the given BufferedDataTables into ReferenceTables that can be used as references in a
      * VirtualTableExtensionTable.
-     * 
+     *
      * @param tables to wrap into ReferenceTables
      * @return ReferenceTables that wrap the provided input tables
      * @throws VirtualTableIncompatibleException if any of the tables is not compatible with virtual columnar tables
@@ -76,7 +76,7 @@ public final class ReferenceTables {
     public static ReferenceTable[] createReferenceTables(final BufferedDataTable[] tables)
         throws VirtualTableIncompatibleException {
         var refTables = new ReferenceTable[tables.length];
-        for (int i = 0; i < tables.length; i++) {
+        for (int i = 0; i < tables.length; i++) {//NOSONAR
             refTables[i] = createReferenceTable(tables[i]);
         }
         return refTables;
@@ -84,7 +84,7 @@ public final class ReferenceTables {
 
     /**
      * Wraps a BufferedDataTable into a ReferenceTable that can be used as reference in a VirtualTableExtensionTable.
-     * 
+     *
      * @param id unique identifier for the table
      * @param table to turn into a ReferenceTable
      * @return a ReferenceTable wrapping the input table
@@ -93,7 +93,7 @@ public final class ReferenceTables {
     @SuppressWarnings("resource") // the caller must handle the life-cycle of the returned table
     public static ReferenceTable createReferenceTable(final UUID id, final BufferedDataTable table)
         throws VirtualTableIncompatibleException {
-        final ExtensionTable extensionTable = extractExtensionTable(table);
+        final var extensionTable = extractExtensionTable(table);
         if (extensionTable instanceof VirtualTableExtensionTable) {
             final VirtualTableExtensionTable virtualExtensionTable = (VirtualTableExtensionTable)extensionTable;
             return new VirtualReferenceTable(table, id, virtualExtensionTable);
@@ -109,7 +109,7 @@ public final class ReferenceTables {
     /**
      * Convenience method for wrapping a BufferedDataTable into a ReferenceTable.
      * Creates a new {@link UUID id} via {@link UUID#randomUUID()}.
-     * 
+     *
      * @param table to wrap
      * @return a ReferenceTable that wraps the provided BufferedDataTable
      * @throws VirtualTableIncompatibleException if the provided table is not compatible with columnar virtual tables
