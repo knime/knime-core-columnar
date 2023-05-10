@@ -90,7 +90,7 @@ public final class TableTransformSerializer {
     public static TableTransformSpec deserializeTransformSpec(final JsonNode transformSpecConfig) {
         final String type = transformSpecConfig.get("type").textValue();
         var loader = getLoader(type);
-        return loader.apply(transformSpecConfig);
+        return loader.apply(transformSpecConfig.get("config"));
     }
 
     private static Function<JsonNode, TableTransformSpec> getLoader(final String transformSpecType) {//NOSONAR
