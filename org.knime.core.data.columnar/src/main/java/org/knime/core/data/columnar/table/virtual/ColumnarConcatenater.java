@@ -349,16 +349,20 @@ public final class ColumnarConcatenater {
             try {
                 addKeys(progress, checker, tables[i]);
             } catch (DuplicateKeyException ex) {
-                throw new IllegalArgumentException("Duplicate row key \"" + ex.getKey() + "\" in table with index " + i,
-                    ex);
+                var key = ex.getKey();
+                throw new DuplicateKeyException(
+                    "Duplicate RowID '%s' in table with index %s.".formatted(key, i), key);
             } catch (IOException ex) {
-                throw new IllegalArgumentException("An I/O problem occurred while checking for duplicate RowIDs.", ex);
+                throw new IllegalStateException("An I/O problem occurred while checking for duplicate RowIDs.", ex);
             }
         }
         try {
             checker.checkForDuplicates();
-        } catch (DuplicateKeyException | IOException ex) {
-            throw new IllegalArgumentException("Duplicate RowIDs", ex);
+        } catch (DuplicateKeyException ex) {
+            var key = ex.getKey();
+            throw new DuplicateKeyException("Duplicate RowID '%s' detected.".formatted(key), key);
+        } catch (IOException ex) {
+            throw new IllegalStateException("An I/O problem occurred while checking for duplicate RowIDs.", ex);
         }
     }
 
