@@ -66,7 +66,9 @@ import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
+import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
@@ -229,6 +231,17 @@ public final class ColumnarVirtualTable {
         var schema = appendSchemas(collectSchemas(tablesWithoutRowIDs));
         var transforms = collectTransforms(tablesWithoutRowIDs);
         return new ColumnarVirtualTable(new TableTransform(transforms, transformSpec), schema);
+    }
+
+    ColumnarVirtualTable replaceSchema(final ColumnarValueSchema schema) {
+        CheckUtils.checkArgument(schema.numColumns() == m_valueSchema.numColumns(), "The number of columns must match");
+        for (int i = 0; i < schema.numColumns(); i++) {//NOSONAR
+            var currentValueFactory = m_valueSchema.getValueFactory(i);
+            var newValueFactory = schema.getValueFactory(i);
+            CheckUtils.checkArgument(ValueFactoryUtils.areEqual(currentValueFactory, newValueFactory),
+                "The ValueFactories in column %s don't match.", i);
+        }
+        return new ColumnarVirtualTable(m_transform, schema);
     }
 
     /**

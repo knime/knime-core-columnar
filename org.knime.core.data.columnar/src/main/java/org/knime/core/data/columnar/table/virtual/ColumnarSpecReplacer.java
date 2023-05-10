@@ -115,7 +115,7 @@ public final class ColumnarSpecReplacer {
         var sourceFragment = new ColumnarVirtualTable(referenceTable.getId(), inputSchema, true);
         ColumnarVirtualTable outputTable;
         if (mappings.isEmpty()) {
-            outputTable = sourceFragment;
+            outputTable = sourceFragment.replaceSchema(outputSchema);
         } else {
             outputTable = upcast(sourceFragment, mappings, m_fsHandler);
         }
