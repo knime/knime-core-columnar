@@ -48,9 +48,9 @@
  */
 package org.knime.core.columnar.cache.batch;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
-import java.util.function.IntFunction;
 
 import org.knime.core.columnar.batch.ReadBatch;
 
@@ -64,14 +64,18 @@ final class LocalReadBatchCache {
 
     private final AtomicReferenceArray<WeakReference<ReadBatch>> m_localCache;
 
-    private final IntFunction<ReadBatch> m_loader;
+    private final IndexBatchLoader m_loader;
 
-    LocalReadBatchCache(final IntFunction<ReadBatch> loader, final int numBatches) {
+    LocalReadBatchCache(final IndexBatchLoader loader, final int numBatches) {
         m_loader = loader;
         m_localCache = new AtomicReferenceArray<>(numBatches);
     }
 
-    ReadBatch readRetained(final int index) {
+    public interface IndexBatchLoader {
+        ReadBatch load(int batchIndex) throws IOException;
+    }
+
+    ReadBatch readRetained(final int index) throws IOException {
         var locallyCached = m_localCache.get(index);
         if (locallyCached != null) {
             var batch = locallyCached.get();
@@ -82,7 +86,7 @@ final class LocalReadBatchCache {
         // we accept that multiple threads might load the same batch to avoid synchronization costs
         // since this batch doesn't retain the batches, it is fine if the WeakReferences for the same index
         // are overwritten in such a scenario
-        var batch = m_loader.apply(index);
+        var batch = m_loader.load(index);
         m_localCache.set(index, new WeakReference<>(batch));
         return batch;
     }

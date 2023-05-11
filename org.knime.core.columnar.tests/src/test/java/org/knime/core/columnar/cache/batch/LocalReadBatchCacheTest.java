@@ -55,10 +55,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.function.IntFunction;
-
 import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.cache.batch.LocalReadBatchCache.IndexBatchLoader;
 import org.mockito.Mockito;
 
 /**
@@ -73,43 +72,41 @@ final class LocalReadBatchCacheTest {
     void testCacheReloadsIfRetainFails() throws Exception {
         var batch = mock(ReadBatch.class);
         when(batch.tryRetain()).thenReturn(true, false);
-        @SuppressWarnings("unchecked")
-        IntFunction<ReadBatch> loader = mock(IntFunction.class);
-        when(loader.apply(anyInt())).thenReturn(batch);
+        IndexBatchLoader loader = mock(IndexBatchLoader.class);
+        when(loader.load(anyInt())).thenReturn(batch);
         var cache = new LocalReadBatchCache(loader, 1);
 
         var batchFromCache = cache.readRetained(0);
         assertEquals(batch, batchFromCache, "Unexpected batch returned.");
-        verify(loader).apply(0);
+        verify(loader).load(0);
         verify(batch, Mockito.never()).tryRetain();
 
         batchFromCache = cache.readRetained(0);
         assertEquals(batch, batchFromCache, "Unexpected batch returned.");
         verify(batch).tryRetain();
-        verify(loader).apply(0);
+        verify(loader).load(0);
 
         batchFromCache = cache.readRetained(0);
         assertEquals(batch, batchFromCache, "Unexpected batch returned.");
         verify(batch, times(2)).tryRetain();
-        verify(loader, times(2)).apply(0);
+        verify(loader, times(2)).load(0);
     }
 
     @Test
     void testCacheReloadsIfBatchIsGCed() throws Exception {
         var batch = mock(ReadBatch.class);
-        @SuppressWarnings("unchecked")
-        IntFunction<ReadBatch> loader = mock(IntFunction.class);
-        when(loader.apply(anyInt())).thenReturn(batch);
+        IndexBatchLoader loader = mock(IndexBatchLoader.class);
+        when(loader.load(anyInt())).thenReturn(batch);
         var cache = new LocalReadBatchCache(loader, 1);
         var batchFromCache = cache.readRetained(0);
         assertEquals(batch, batchFromCache, "Unexpected batch returned.");
-        verify(loader).apply(0);
+        verify(loader).load(0);
 
         batch = mock(ReadBatch.class);
-        when(loader.apply(anyInt())).thenReturn(batch);
+        when(loader.load(anyInt())).thenReturn(batch);
         System.gc();
         batchFromCache = cache.readRetained(0);
         assertEquals(batch, batchFromCache, "Unexpected batch returned.");
-        verify(loader, times(2)).apply(0);
+        verify(loader, times(2)).load(0);
     }
 }

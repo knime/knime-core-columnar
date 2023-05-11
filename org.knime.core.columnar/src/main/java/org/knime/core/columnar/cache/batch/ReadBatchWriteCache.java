@@ -201,12 +201,12 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
             return m_localCache.readRetained(index);
         }
 
-        private ReadBatch readFromSharedCache(final int index) {
+        private ReadBatch readFromSharedCache(final int index) throws IOException {
             var id = new BatchId(ReadBatchWriteCache.this, m_selection, index);
             return m_cache.getRetained(id, () -> getFullOrReadFromDelegate(index));
         }
 
-        private ReadBatch getFullOrReadFromDelegate(final int index) {
+        private ReadBatch getFullOrReadFromDelegate(final int index) throws IOException {
             // having more data is not a problem therefore we can use the full batch which might still be in the cache
             // from writing
             var id = new BatchId(ReadBatchWriteCache.this, m_allColumns, index);

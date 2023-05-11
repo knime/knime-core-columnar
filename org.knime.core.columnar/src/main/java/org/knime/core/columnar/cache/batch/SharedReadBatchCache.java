@@ -48,12 +48,12 @@
  */
 package org.knime.core.columnar.cache.batch;
 
+import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Supplier;
 
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -144,21 +144,41 @@ public final class SharedReadBatchCache {
      * @param supplier called on cache miss, must return an already retained batch
      * @return the retained batch (i.e. the batch is guaranteed to not have been released)
      */
-    ReadBatch getRetained(final BatchId id, final Supplier<ReadBatch> supplier) {
+    ReadBatch getRetained(final BatchId id, final Loader<ReadBatch> supplier) throws IOException {
         return ensureNoClear(() -> getRetainedInternal(id, supplier));
     }
 
-    private ReadBatch getRetainedInternal(final BatchId id, final Supplier<ReadBatch> supplier) {
+    /**
+     * A Loader loads an object on cache miss.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     * @param <T> the types of objects that are loaded
+     */
+    @FunctionalInterface
+    public interface Loader<T> {
+
+        /**
+         * @return the loaded object
+         * @throws IOException if the object can't be loaded
+         */
+        T load() throws IOException;
+    }
+
+    private ReadBatch getRetainedInternal(final BatchId id, final Loader<ReadBatch> loader) throws IOException {
         try {
-            var batch = m_cache.get(id, supplier::get);
+            var batch = m_cache.get(id, loader::load);
             batch.retain();
             return batch;
         } catch (ExecutionException ex) {//NOSONAR ExecutionExceptions are just wrappers
-            throw new IllegalStateException("Failed to load ReadBatch.", ex.getCause());
+            var cause = ex.getCause();
+            if (cause instanceof IOException ioEx) {
+                throw ioEx;
+            }
+            throw new IllegalStateException("Failed to load ReadBatch.", cause);
         }
     }
 
-    Optional<ReadBatch> getRetained(final BatchId id) {
+    Optional<ReadBatch> getRetained(final BatchId id) throws IOException {
         return ensureNoClear(() -> getRetainedInternal(id));
     }
 
@@ -168,10 +188,10 @@ public final class SharedReadBatchCache {
         return batch;
     }
 
-    private <T> T ensureNoClear(final Supplier<T> supplier) {
+    private <T> T ensureNoClear(final Loader<T> loader) throws IOException {
         m_readWriteLock.readLock().lock();
         try {
-            return supplier.get();
+            return loader.load();
         } finally {
             m_readWriteLock.readLock().unlock();
         }

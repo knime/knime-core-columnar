@@ -56,14 +56,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.cache.batch.SharedReadBatchCache.BatchId;
+import org.knime.core.columnar.cache.batch.SharedReadBatchCache.Loader;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 
@@ -97,19 +98,19 @@ final class SharedReadBatchCacheTest {
         assertTrue(optionalBatch.isEmpty(), "No batch has been cached yet.");
 
         @SuppressWarnings("unchecked")
-        Supplier<ReadBatch> mockSupplier = mock(Supplier.class);
-        when(mockSupplier.get()).thenReturn(m_batch);
+        Loader<ReadBatch> mockSupplier = mock(Loader.class);
+        when(mockSupplier.load()).thenReturn(m_batch);
 
         var batch = m_cache.getRetained(m_id, mockSupplier);
         assertEquals(m_batch, batch, "Wrong batch returned.");
         verify(batch).retain();
-        verify(mockSupplier).get();
+        verify(mockSupplier).load();
 
         batch = m_cache.getRetained(m_id, mockSupplier);
         assertEquals(m_batch, batch, "Wrong batch returned.");
         verify(batch, times(2)).retain();
         // get shouldn't be called again because the batch is now in the cache
-        verify(mockSupplier).get();
+        verify(mockSupplier).load();
 
         optionalBatch = m_cache.getRetained(m_id);
         assertTrue(optionalBatch.isPresent(), "The batch is now in the cache.");
@@ -164,20 +165,28 @@ final class SharedReadBatchCacheTest {
 
         var getRetainedWithSupplierThread = new Thread(() -> {
             while (runRetains.get()) {
+                try {
                 var batch = m_cache.getRetained(m_id, TestBatch::new);
                 if (isReleased(batch)) {
                     getRetainReturnedReleasedBatch.set(true);
                     return;
                 }
+                } catch (IOException ex) {
+                    throw new IllegalStateException(ex);
+                }
             }
         });
         var getRetainedThread = new Thread(() -> {
-            while (runRetains.get()) {
-                var batch = m_cache.getRetained(m_id);
-                if (batch.isPresent() && isReleased(batch.get())) {
-                    getRetainReturnedReleasedBatch.set(true);
-                    return;
+            try {
+                while (runRetains.get()) {
+                    var batch = m_cache.getRetained(m_id);
+                    if (batch.isPresent() && isReleased(batch.get())) {
+                        getRetainReturnedReleasedBatch.set(true);
+                        return;
+                    }
                 }
+            } catch (IOException ex) {
+                throw new IllegalStateException(ex);
             }
         });
 

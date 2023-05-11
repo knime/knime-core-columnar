@@ -148,17 +148,13 @@ public final class ReadBatchReadCache implements RandomAccessBatchReadable {
             return m_localCache.readRetained(index);
         }
 
-        private ReadBatch getFromSharedCache(final int index) {
+        private ReadBatch getFromSharedCache(final int index) throws IOException {
             var id = new BatchId(ReadBatchReadCache.this, m_selection, index);
             return m_sharedCache.getRetained(id, () -> readFromSource(index));
         }
 
-        private ReadBatch readFromSource(final int index) {
-            try {
-                return m_source.readRetained(index);
-            } catch (IOException ex) {
-                throw new IllegalStateException("Failed to read batch.", ex);
-            }
+        private ReadBatch readFromSource(final int index) throws IOException {
+            return m_source.readRetained(index);
         }
 
     }
