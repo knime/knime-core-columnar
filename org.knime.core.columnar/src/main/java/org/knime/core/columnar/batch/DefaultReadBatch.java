@@ -50,7 +50,6 @@ package org.knime.core.columnar.batch;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import org.knime.core.columnar.data.NullableReadData;
 
@@ -106,7 +105,7 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
 
     @Override
     public final long sizeOf() {
-        return m_size.updateAndGet(s -> s == -1 ? Stream.of(m_data).mapToLong(NullableReadData::sizeOf).sum() : s);
+        return m_size.updateAndGet(s -> s == -1 ? super.sizeOf() : s);
     }
 
     @Override
