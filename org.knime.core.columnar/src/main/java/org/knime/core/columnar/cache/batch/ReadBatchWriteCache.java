@@ -178,7 +178,7 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
 
         private final ColumnSelection m_selection;
 
-        // assumes that no more batches are written -> needs to be changed once we allow reading while writing
+        // AP-15959: Assumes that no more batches are written -> needs to be changed once we allow reading while writing
         private final LocalReadBatchCache m_localCache =
             new LocalReadBatchCache(this::readFromSharedCache, m_writer.m_numBatches);
 
