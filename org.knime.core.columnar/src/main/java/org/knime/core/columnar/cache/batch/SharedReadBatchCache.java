@@ -212,12 +212,11 @@ public final class SharedReadBatchCache {
             m_source = source;
             m_selection = selection;
             m_index = index;
-            // TODO improve hashcode function
-            m_hashCode = source.hashCode() + 13 * selection.hashCode() + 13 * index;
+            m_hashCode = System.identityHashCode(source) + 13 * selection.hashCode() + 37 * index;
         }
 
         boolean isFrom(final Object source) {
-            return m_source.equals(source);
+            return m_source == source;
         }
 
         @Override
@@ -236,7 +235,7 @@ public final class SharedReadBatchCache {
             if (obj instanceof BatchId) {
                 var batchId = (BatchId)obj;
                 return m_index == batchId.m_index//
-                    && m_source.equals(batchId.m_source)//
+                    && m_source == batchId.m_source//
                     && m_selection.equals(batchId.m_selection);
             }
             return false;
