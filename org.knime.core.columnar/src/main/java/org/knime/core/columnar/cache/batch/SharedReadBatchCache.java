@@ -56,6 +56,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -68,6 +70,8 @@ import com.google.common.cache.Weigher;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public final class SharedReadBatchCache {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SharedReadBatchCache.class);
 
     private final Cache<BatchId, ReadBatch> m_cache;
 
@@ -82,10 +86,11 @@ public final class SharedReadBatchCache {
      */
     public SharedReadBatchCache(final long cacheSizeInBytes) {
         m_cacheSizeInBytes = cacheSizeInBytes;
+        var cacheSizeInKBytes = Math.max(cacheSizeInBytes / 1024, 1);
         m_cache = CacheBuilder.newBuilder()//
                 .removalListener(SharedReadBatchCache::evictBatch)//
                 .weigher(SharedReadBatchCache::weighBatch)//
-                .maximumWeight(cacheSizeInBytes)//
+                .maximumWeight(cacheSizeInKBytes)//
                 .build();
     }
 
@@ -100,14 +105,18 @@ public final class SharedReadBatchCache {
         removal.getValue().release();
     }
 
+    private static long toKBytes(final long bytes) {
+        return Math.max(bytes / 1024, 1);
+    }
+
     /**
      * @param id of the batch being added. Just present to match the {@link Weigher} signature
      */
     private static int weighBatch(final BatchId id, final ReadBatch batch) {
-        var weight = batch.sizeOf();
+        var weight = toKBytes(batch.sizeOf());
         if (weight > Integer.MAX_VALUE) {
-            throw new IllegalStateException(
-                "Size of data (%s) exceeds maximum weight (%s)".formatted(weight, Integer.MAX_VALUE));
+            LOGGER.error("Size of batch ({}) exceeds maximum weight ({}).", weight, Integer.MAX_VALUE);
+            weight = Integer.MAX_VALUE;
         }
         return (int)weight;
     }
