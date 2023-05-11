@@ -51,7 +51,6 @@ package org.knime.core.columnar.cache.batch;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -87,7 +86,6 @@ public final class SharedReadBatchCache {
                 .removalListener(SharedReadBatchCache::evictBatch)//
                 .weigher(SharedReadBatchCache::weighBatch)//
                 .maximumWeight(cacheSizeInBytes)//
-                .expireAfterAccess(5, TimeUnit.MINUTES)// TODO make configurable
                 .build();
     }
 
@@ -118,7 +116,6 @@ public final class SharedReadBatchCache {
      * Releases all held batches and clears the cache.
      */
     public void clear() {
-        // TODO necessary with Guava Cache?
         // we have to wait until all getRetained calls are finished in order to avoid race conditions between
         // their retains and the releases of this call
         m_readWriteLock.writeLock().lock();
