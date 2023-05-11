@@ -259,7 +259,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             Arrays.setAll(futures,
                 i -> m_cachedDataFactories[i].getCachedDataFuture(batch.get(i)));
             m_future = CompletableFuture.allOf(futures).thenRunAsync(() -> { // NOSONAR
-                var serializedBatch = batch.transform((i, d) -> (NullableReadData)futures[i].join());
+                var serializedBatch = batch.decorate((i, d) -> (NullableReadData)futures[i].join());
                 try {
                     m_writerDelegate.write(serializedBatch);
                 } catch (IOException e) {
@@ -329,7 +329,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             }
 
             final ReadBatch batch = m_readerDelegate.readRetained(index);
-            return batch.transform((i, d) -> m_cachedDataFactories[i].createReadData(d, createId(i, index)));
+            return batch.decorate((i, d) -> m_cachedDataFactories[i].createReadData(d, createId(i, index)));
         }
 
         @Override

@@ -197,7 +197,7 @@ public class DictEncodedBatchWriter implements BatchWriter {
     @Override
     public void write(final ReadBatch batch) throws IOException {
         // Replace all DictEncoded Data objects by the content that they wrap
-        m_delegate.write(batch.transform((i, d) -> unpack(d)));
+        m_delegate.write(batch.decorate((i, d) -> unpack(d)));
     }
 
     private static NullableReadData unpack(NullableReadData data) {

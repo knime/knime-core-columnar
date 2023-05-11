@@ -252,7 +252,7 @@ final class SharedReadBatchCacheTest {
         }
 
         @Override
-        public ReadBatch transform(final DataTransformer transformer) {
+        public ReadBatch decorate(final DataDecorator transformer) {
             throw new UnsupportedOperationException();
         }
 

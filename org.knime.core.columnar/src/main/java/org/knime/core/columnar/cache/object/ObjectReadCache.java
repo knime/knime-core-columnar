@@ -123,7 +123,7 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
         @Override
         public ReadBatch readRetained(final int index) throws IOException {
             final ReadBatch batch = m_readerDelegate.readRetained(index);
-            return batch.transform((i, d) -> m_cachedDataFactories[i].createReadData(d, createId(i, index)));
+            return batch.decorate((i, d) -> m_cachedDataFactories[i].createReadData(d, createId(i, index)));
         }
 
         @Override

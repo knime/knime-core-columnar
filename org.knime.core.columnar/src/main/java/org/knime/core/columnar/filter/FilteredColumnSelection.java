@@ -136,9 +136,9 @@ public final class FilteredColumnSelection implements ColumnSelection {
         }
 
         @Override
-        public ReadBatch transform(final DataTransformer transformer) {
+        public ReadBatch decorate(final DataDecorator transformer) {
             var transformedData = m_data.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, e -> transformer.transform(e.getKey(), e.getValue())));
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> transformer.decorate(e.getKey(), e.getValue())));
             return new FilteredReadBatch(transformedData, m_numColumns, m_refCounter, m_length);
         }
 

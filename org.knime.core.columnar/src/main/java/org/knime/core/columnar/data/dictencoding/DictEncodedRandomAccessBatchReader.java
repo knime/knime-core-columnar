@@ -95,7 +95,7 @@ public class DictEncodedRandomAccessBatchReader implements RandomAccessBatchRead
     @Override
     public ReadBatch readRetained(final int index) throws IOException {
         final var batch = m_delegate.readRetained(index);
-        return batch.transform(this::wrapDictEncodedData);
+        return batch.decorate(this::wrapDictEncodedData);
     }
 
     private NullableReadData wrapDictEncodedData(final int index, final NullableReadData data) {

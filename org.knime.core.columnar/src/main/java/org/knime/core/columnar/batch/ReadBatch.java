@@ -85,7 +85,7 @@ public interface ReadBatch extends Batch<NullableReadData>, NullableReadData {
      * @param transformer for transforming the data of this batch
      * @return a new batch with the transformed data that shares the references with this batch
      */
-    ReadBatch transform(DataTransformer transformer);
+    ReadBatch decorate(DataDecorator transformer);
 
     /**
      * Tries to retain this batch.
@@ -100,8 +100,21 @@ public interface ReadBatch extends Batch<NullableReadData>, NullableReadData {
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
     @FunctionalInterface
-    interface DataTransformer {
-        NullableReadData transform(int dataIndex, NullableReadData data);
+    interface DataDecorator {
+
+        /**
+         * Decorates the provided data. The decorated data must fulfill the following conditions:
+         * <ul>
+         * <li> It doesn't change the {@link NullableReadData#length()}
+         * <li> It doesn't change the {@link NullableReadData#sizeOf()}
+         * <li> It uses the same underlying resources
+         * </ul>
+         *
+         * @param dataIndex index of the data in the batch
+         * @param data to decorate
+         * @return the decorated data
+         */
+        NullableReadData decorate(int dataIndex, NullableReadData data);
     }
 
 }

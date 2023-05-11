@@ -86,9 +86,9 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
     }
 
     @Override
-    public ReadBatch transform(final DataTransformer dataOperator) {
+    public ReadBatch decorate(final DataDecorator dataOperator) {
         var transformedDatas = IntStream.range(0, m_data.length)
-                .mapToObj(i -> dataOperator.transform(i, m_data[i]))
+                .mapToObj(i -> dataOperator.decorate(i, m_data[i]))
                 .toArray(NullableReadData[]::new);
         return new DefaultReadBatch(transformedDatas, this);
     }
