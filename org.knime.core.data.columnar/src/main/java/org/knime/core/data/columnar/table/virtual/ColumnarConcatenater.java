@@ -74,7 +74,9 @@ import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer.ColumnCast;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.columnar.table.virtual.TableCasterFactory.CastOperation;
+import org.knime.core.data.columnar.table.virtual.persist.Persistor;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.DataContainerSettings;
@@ -85,12 +87,17 @@ import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
+import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.data.v2.value.VoidRowKeyFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
+import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.Node;
+import org.knime.core.node.NodeSettingsRO;
+import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.StringAccess.StringWriteAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.util.DuplicateChecker;
 import org.knime.core.util.DuplicateKeyException;
@@ -116,6 +123,8 @@ public final class ColumnarConcatenater {
 
     private final boolean m_checkForDuplicateIDs;
 
+    private final boolean m_generateNewRowIDs;
+
     private final String m_rowIDSuffix;
 
     private final IWriteFileStoreHandler m_fsHandler;
@@ -127,14 +136,16 @@ public final class ColumnarConcatenater {
      * @param exec for creating tables
      * @param checkForDuplicateIDs whether RowIDs should be checked for duplicates
      * @param rowIDSuffix used for uniquifying RowIDs
+     * @param generateNewRowIDs whether new RowIDs should be generated (i.e. Row0, Row1, ...)
      */
     public ColumnarConcatenater(final IntSupplier tableIdSupplier, final ExecutionContext exec,
-        final boolean checkForDuplicateIDs, final String rowIDSuffix) {
+        final boolean checkForDuplicateIDs, final String rowIDSuffix, final boolean generateNewRowIDs) {
         m_exec = exec;
         m_tableIdSupplier = tableIdSupplier;
         m_checkForDuplicateIDs = checkForDuplicateIDs;
         m_rowIDSuffix = rowIDSuffix;
         m_fsHandler = Node.invokeGetFileStoreHandler(exec);
+        m_generateNewRowIDs = generateNewRowIDs;
     }
 
     /**
@@ -163,8 +174,45 @@ public final class ColumnarConcatenater {
         }
         var virtualTable = first.concatenate(preparedTables);
 
+        if (m_generateNewRowIDs) {
+            var rowIDTable = virtualTable.map(new RowIDGenerator(), 0);
+            virtualTable = rowIDTable.append(virtualTable);
+        }
+
         return new VirtualTableExtensionTable(tablePrepper.getReferenceTables(), virtualTable, concatenatedSize,
             m_tableIdSupplier.getAsInt());
+    }
+
+    private static final class RowIDGenerator implements ColumnarMapperWithRowIndexFactory {
+
+        @Override
+        public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+            var stringAccess = (StringWriteAccess) outputs[0];
+            return i -> stringAccess.setStringValue("Row" + i);
+        }
+
+        @Override
+        public ColumnarValueSchema getOutputSchema() {
+            return ColumnarValueSchemaUtils.create(
+                new DataTableSpec(), new ValueFactory<?, ?>[] {DefaultRowKeyValueFactory.INSTANCE});
+        }
+
+        @SuppressWarnings("unused") // registered at extension point
+        public static final class RowIDGeneratorPersistor implements Persistor<RowIDGenerator> {
+
+            @Override
+            public void save(final RowIDGenerator factory, final NodeSettingsWO settings) {
+                // nothing to save
+            }
+
+            @Override
+            public RowIDGenerator load(final NodeSettingsRO settings, final LoadContext context)
+                throws InvalidSettingsException {
+                return new RowIDGenerator();
+            }
+
+        }
+
     }
 
     private ColumnarValueSchema concatenate(final ColumnarValueSchema[] schemas) {

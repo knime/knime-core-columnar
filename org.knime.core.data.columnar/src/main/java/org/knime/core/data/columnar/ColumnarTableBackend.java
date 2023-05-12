@@ -180,13 +180,30 @@ public final class ColumnarTableBackend implements TableBackend {
         final IntSupplier tableIdSupplier, final String rowKeyDuplicateSuffix, final boolean duplicatesPreCheck,
         final BufferedDataTable... tables) throws CanceledExecutionException {
         try {
-            return new ColumnarConcatenater(tableIdSupplier, exec, duplicatesPreCheck, rowKeyDuplicateSuffix)
-                .concatenate(Stream.of(tables).map(t -> preprocessTable(t, exec)).toArray(BufferedDataTable[]::new),
+            return new ColumnarConcatenater(tableIdSupplier, exec, duplicatesPreCheck, rowKeyDuplicateSuffix, false)
+                .concatenate(preprocessTables(exec, tables),
                     progressMonitor);
         } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
             logFallback();
-            return OLD_BACKEND.concatenate(null, exec, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck,
+            return OLD_BACKEND.concatenate(exec, progressMonitor, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck,
                 tables);
+        }
+    }
+
+    private static BufferedDataTable[] preprocessTables(final ExecutionContext exec,
+        final BufferedDataTable... tables) {
+        return Stream.of(tables).map(t -> preprocessTable(t, exec)).toArray(BufferedDataTable[]::new);
+    }
+
+    @Override
+    public KnowsRowCountTable concatenateWithNewRowIDs(final ExecutionContext exec,
+        final IntSupplier tableIdSupplier, final BufferedDataTable... tables) {
+        try {
+            return new ColumnarConcatenater(tableIdSupplier, exec, false, null, true)
+                    .concatenate(preprocessTables(exec, tables), exec);
+        } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
+            logFallback();
+            return OLD_BACKEND.concatenateWithNewRowIDs(exec, tableIdSupplier, tables);
         }
     }
 
