@@ -85,7 +85,7 @@ final class SharedReadBatchCacheTest {
 
     @BeforeEach
     void setup() {
-        m_cache = new SharedReadBatchCache(1024);
+        m_cache = new SharedReadBatchCache(8 << 10); // 8KiB
         // TODO do via annotation
         m_batch = mock(ReadBatch.class);
         m_selection = mock(ColumnSelection.class);

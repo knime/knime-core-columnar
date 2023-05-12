@@ -90,7 +90,7 @@ abstract class AbstractBatchCacheTest {
         m_reader = mock(RandomAccessBatchReader.class);
         m_batch = mock(ReadBatch.class);
         m_readable = mock(RandomAccessBatchReadable.class);
-        m_sharedCache = new SharedReadBatchCache(1024);
+        m_sharedCache = new SharedReadBatchCache(8 << 10); // 8KiB
         m_selection = new DefaultColumnSelection(4);
     }
 
