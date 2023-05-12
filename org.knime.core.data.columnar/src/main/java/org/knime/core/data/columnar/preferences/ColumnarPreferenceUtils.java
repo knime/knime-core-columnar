@@ -286,7 +286,7 @@ public final class ColumnarPreferenceUtils {
     /**
      * @return the executor for serializing object data
      */
-    public static ExecutorService getSerializeExecutor() {
+    public synchronized static ExecutorService getSerializeExecutor() {
         if (serializeExecutor == null) {
             serializeExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
                 r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
