@@ -96,7 +96,6 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
         public <T> T getObject(final ObjectDeserializer<T> deserializer) {
             return m_data.getObject(m_index.getIndex(), deserializer);
         }
-
     }
 
     static final class ColumnarVarBinaryWriteAccess extends AbstractWriteAccess<VarBinaryWriteData>

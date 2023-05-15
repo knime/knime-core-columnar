@@ -121,7 +121,6 @@ public final class VarBinaryData {
          * @return the object at the given index (row)
          */
         <T> T getObject(int index, ObjectDeserializer<T> deserializer);
-
     }
 
 }

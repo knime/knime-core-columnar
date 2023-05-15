@@ -48,6 +48,9 @@
  */
 package org.knime.core.columnar.cache.object;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -169,6 +172,7 @@ final class CachedVarBinaryData {
         }
 
         final class CachedVarBinaryReadData extends AbstractCachedValueReadData implements VarBinaryReadData {
+            private VarBinaryReadData m_readData;
 
             CachedVarBinaryReadData(final int length) {
                 super(length);
@@ -176,7 +180,31 @@ final class CachedVarBinaryData {
 
             @Override
             public byte[] getBytes(final int index) {
-                return (byte[])m_data[index];
+                // early termination if we have the right kind of data cached
+                if (m_data[index] instanceof byte[] bytes) {
+                    return bytes;
+                }
+
+                // Otherwise we can either fetch the bytes from the underlying delegate.
+                // We don't store this data though, because m_data contains the unserialized Java object
+                // which we might want to access directly via getObject.
+                if (m_readData != null) {
+                    return m_readData.getBytes(index);
+                } else {
+                    // or serialize the currently stored object
+                    return serializeObject(m_data[index], m_serializers[index]);
+                }
+            }
+
+            @SuppressWarnings("unchecked")
+            private <T> byte[] serializeObject(final T value, final ObjectSerializer<?> serializer) {
+                var outStream = new ByteArrayOutputStream();
+                try {
+                    ((ObjectSerializer<T>)serializer).serialize(new DataOutputStream(outStream), value);
+                } catch (IOException ex) {
+                    throw new IllegalStateException("Error while retrieving serialized bytes from CachedVarBinary data", ex);
+                }
+                return outStream.toByteArray();
             }
 
             @SuppressWarnings("unchecked")
@@ -187,9 +215,9 @@ final class CachedVarBinaryData {
 
             @Override
             public synchronized VarBinaryReadData closeWriteDelegate() {
-                VarBinaryReadData out = super.closeWriteDelegate();
+                m_readData = super.closeWriteDelegate();
                 m_serializers = null;
-                return out;
+                return m_readData;
             }
 
         }
