@@ -71,7 +71,6 @@ import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.domain.DomainWritableConfig;
 import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
-import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
@@ -278,6 +277,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             m_writable = dictEncoded;
         }
 
+        initReadBatchCache(builder.m_readBatchCache);
+
         initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
 
 
@@ -292,7 +293,6 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             m_writable = m_domainWritable;
         }
 
-        initReadBatchCache(builder.m_readBatchCache);
 
 
         m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getFileHandle());
