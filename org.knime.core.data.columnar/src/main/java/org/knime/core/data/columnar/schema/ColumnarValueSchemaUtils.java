@@ -150,7 +150,7 @@ public final class ColumnarValueSchemaUtils {
 
     /**
      * Creates a ColumnarValueSchema for the provided parameters.
-     * 
+     *
      * @param spec to create the value schema for
      * @param rowIDType the type of RowID to use
      * @param fsHandler FileStoreHandler used by some ValueFactories
@@ -209,6 +209,19 @@ public final class ColumnarValueSchemaUtils {
         }
         final var sourceName = source.getSourceSpec().getName();
         return new UpdatedColumnarValueSchema(new DataTableSpec(sourceName, result), source);
+    }
+
+    /**
+     * Changes the DataTableSpec in the schema.
+     *
+     * @param schema to updated
+     * @param spec to update the schema with (may have e.g. a different domains or different column names)
+     * @return the schema with the updated spec
+     * @throws IllegalArgumentException if the types in schema and spec don't match
+     */
+    public static final ColumnarValueSchema updateDataTableSpec(final ColumnarValueSchema schema,
+        final DataTableSpec spec) {
+        return new UpdatedColumnarValueSchema(spec, schema);
     }
 
     private enum EmptyColumnarValueSchema implements ColumnarValueSchema {

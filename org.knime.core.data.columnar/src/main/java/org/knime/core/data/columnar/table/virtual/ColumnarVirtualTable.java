@@ -65,6 +65,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
@@ -264,13 +265,25 @@ public final class ColumnarVirtualTable {
     }
 
     ColumnarVirtualTable concatenate(final List<ColumnarVirtualTable> tables) {
-        CheckUtils.checkArgument(
-            tables.stream().map(ColumnarVirtualTable::getSchema).allMatch(this::isConcatenateCompatible),
+        CheckUtils.checkArgument(tables.stream()//
+            .map(ColumnarVirtualTable::getSchema)//
+            .allMatch(this::isConcatenateCompatible), //
             "The schemas are not compatible for concatenation, i.e. don't have the same types and column names.");
         var incomingTransforms = collectTransforms(tables);
+
         return new ColumnarVirtualTable(new TableTransform(incomingTransforms, new ConcatenateTransformSpec()),
-            m_valueSchema);
+            concatenateDomainAndMetaData(tables.stream().map(ColumnarVirtualTable::getSchema)));
     }
+
+    private ColumnarValueSchema concatenateDomainAndMetaData(final Stream<ColumnarValueSchema> schemas) {
+        var mergedSpec = ConcatenateTable.createSpec(//
+            Stream.concat(Stream.of(m_valueSchema), schemas)//
+                .map(ColumnarValueSchema::getSourceSpec)//
+                .toArray(DataTableSpec[]::new)//
+        );
+        return ColumnarValueSchemaUtils.updateDataTableSpec(m_valueSchema, mergedSpec);
+    }
+
     private boolean isConcatenateCompatible(final ColumnarValueSchema schema) {
         return m_valueSchema.numColumns() == schema.numColumns()//
             && m_valueSchema.getSourceSpec().equalStructure(schema.getSourceSpec())//
