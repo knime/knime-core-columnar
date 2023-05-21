@@ -50,15 +50,9 @@ package org.knime.core.data.columnar;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
-import java.util.stream.Stream;
 
-import org.knime.core.data.DataTable;
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.DataTableSpecCreator;
-import org.knime.core.data.append.AppendedRowsTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -67,9 +61,6 @@ import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.virtual.VirtualTable;
-import org.knime.core.table.virtual.spec.AppendTransformSpec;
-import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
-import org.knime.core.table.virtual.spec.TableTransformSpec;
 
 /**
  * Utility class that contains various methods for dealing with TableTransforms in ColumnarTableBackend.
@@ -77,32 +68,6 @@ import org.knime.core.table.virtual.spec.TableTransformSpec;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public final class TableTransformUtils {
-
-    static DataTableSpec concatenateSpec(final BufferedDataTable[] tables) {
-        return AppendedRowsTable.generateDataTableSpec(extractSpecs(tables));
-    }
-
-    private static DataTableSpec[] extractSpecs(final BufferedDataTable[] referenceTables) {
-        return Stream.of(referenceTables)//
-            .map(DataTable::getDataTableSpec)//
-            .toArray(DataTableSpec[]::new);
-    }
-
-    static DataTableSpec appendSpec(final BufferedDataTable[] tables) {
-        return createAppendSpec(extractSpecs(tables));
-    }
-
-    private static DataTableSpec createAppendSpec(final DataTableSpec[] specs) {
-        final var creator = new DataTableSpecCreator(specs[0]);
-        for (var i = 1; i < specs.length; i++) {
-            creator.addColumns(specs[i]);
-        }
-        return creator.createSpec();
-    }
-
-    static long concatenatedSize(final BufferedDataTable[] tables) {
-        return sizeStream(tables).sum();
-    }
 
     private static LongStream sizeStream(final BufferedDataTable[] tables) {
         return Arrays.stream(tables).mapToLong(BufferedDataTable::size);
@@ -155,27 +120,6 @@ public final class TableTransformUtils {
 
     private static VirtualTable asSource(final ReferenceTable table) {
         return new VirtualTable(table.getId(), table.getSchema(), true);
-    }
-
-    static List<TableTransformSpec> createAppendTransformations(final DataTableSpec[] specs) {
-        final var selection = filterOutRedundantRowKeyColumns(specs);
-        return List.of(new AppendTransformSpec(), new SelectColumnsTransformSpec(selection));
-    }
-
-    private static int[] filterOutRedundantRowKeyColumns(final DataTableSpec[] specs) {
-        final var totalColumns = Arrays.stream(specs).mapToInt(DataTableSpec::getNumColumns).sum() + 1;
-        final var selection = new int[totalColumns];
-        var idx = 1;
-        var filteredIdx = 1;
-        for (DataTableSpec spec : specs) {
-            for (var i = 0; i < spec.getNumColumns(); i++) {
-                selection[idx] = filteredIdx;
-                idx++;
-                filteredIdx++;
-            }
-            filteredIdx++;
-        }
-        return selection;
     }
 
     static void checkRowKeysMatch(final ExecutionMonitor exec, final BufferedDataTable... tables)
