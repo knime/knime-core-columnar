@@ -137,6 +137,11 @@ public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData, Arro
     }
 
     @Override
+    public void testSlicedSetMissing() { // NOSONAR
+        // Void data does not support missing values
+    }
+
+    @Override
     public void testWriteReadMissing() { // NOSONAR
         // Void data does not support missing values
     }

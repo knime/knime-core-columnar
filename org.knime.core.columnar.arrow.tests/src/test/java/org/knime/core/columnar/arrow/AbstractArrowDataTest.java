@@ -284,6 +284,38 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         readData.release();
     }
 
+    /** Test reading and writing missing values in sliced data */
+    @Test
+    public void testSlicedSetMissing() {
+        final int numValues = 32;
+        final int sliceStart = 20;
+        final int sliceLength = 12;
+
+        final W writeData = createWrite(numValues);
+        // Write into a slice
+        final W slicedWrite = castW(writeData.slice(sliceStart));
+        for (int i = 0; i < sliceLength; i++) {
+            if (i % 2 == 0) {
+                setValue(slicedWrite, i, i);
+            } else {
+                slicedWrite.setMissing(i);
+            }
+        }
+
+        // Read the slice
+        final R readData = castR(writeData.close(numValues));
+        final R slicedRead = castR(readData.slice(sliceStart, sliceLength));
+        for (int i = 0; i < sliceLength; i++) {
+            if (i % 2 == 0) {
+                assertFalse(slicedRead.isMissing(i));
+            } else {
+                assertTrue(slicedRead.isMissing(i));
+            }
+        }
+
+        readData.release();
+    }
+
     /** Test slice of slice and writing of sliced data */
     @Test
     public void testSliceOfSlice() {
