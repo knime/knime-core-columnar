@@ -105,7 +105,8 @@ public final class ArrowStructData {
             // NB: We don't need to call m_vector.setNull because it is always null until #close
             // Set all children to missing
             for (final NullableWriteData child : m_children) {
-                child.setMissing(m_offset + index);
+                // children have their own offset (see slice)
+                child.setMissing(index);
             }
         }
 
