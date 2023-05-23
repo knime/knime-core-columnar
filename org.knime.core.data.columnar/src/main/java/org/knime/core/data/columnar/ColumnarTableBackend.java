@@ -354,7 +354,7 @@ public final class ColumnarTableBackend implements TableBackend {
     }
 
     private static BufferedDataTable rewriteTable(final BufferedDataTable table, final ExecutionContext exec) {
-        try (var rowContainer = exec.createRowContainer(table.getDataTableSpec());
+        try (var rowContainer = exec.createRowContainer(table.getDataTableSpec(), true);
                 var writeCursor = rowContainer.createCursor();
                 var readCursor = table.cursor()) {
             while (readCursor.canForward()) {
