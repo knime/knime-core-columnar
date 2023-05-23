@@ -73,6 +73,7 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
+import org.knime.core.table.virtual.spec.AppendMissingValuesTransformSpec;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
@@ -233,6 +234,23 @@ public final class ColumnarVirtualTable {
         var schema = appendSchemas(collectSchemas(tablesWithoutRowIDs));
         var transforms = collectTransforms(tablesWithoutRowIDs);
         return new ColumnarVirtualTable(new TableTransform(transforms, transformSpec), schema);
+    }
+
+    ColumnarVirtualTable appendMissingValueColumns(final ColumnarValueSchema missing) {
+        var missingSchema = dropRowID(missing);
+        var newSchema = appendSchemas(List.of(m_valueSchema, missingSchema));
+        var transformSpec = new AppendMissingValuesTransformSpec(missingSchema);
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), newSchema);
+    }
+
+    private static ColumnarValueSchema dropRowID(final ColumnarValueSchema schema) {
+        if (ColumnarValueSchemaUtils.hasRowID(schema)) {
+            return ColumnarValueSchemaUtils.create(schema.getSourceSpec(),
+                IntStream.range(1, schema.numColumns())//
+                .mapToObj(schema::getValueFactory)//
+                .toArray(ValueFactory<?, ?>[]::new));
+        }
+        return schema;
     }
 
     ColumnarVirtualTable replaceSchema(final ColumnarValueSchema schema) {

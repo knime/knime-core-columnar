@@ -67,12 +67,19 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.virtual.TableTransform;
+import org.knime.core.table.virtual.spec.AppendMissingValuesTransformSpec;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.IdentityTransformSpec;
@@ -307,7 +314,20 @@ public final class TableTransformNodeSettingsPersistor {
                     s.addString("mapper_factory_class", factoryClass.getName());
                     persistor.save(mapperFactory, s.addNodeSettings("mapper_factory_settings"));
                 }
-                );
+                ),
+            APPEND_MISSING(//
+                AppendMissingValuesTransformSpec.class, //
+                (s, c) -> {
+                    return new AppendMissingValuesTransformSpec(loadMissingColumnsSchema(s, c.getDataRepository()));
+                }, (t, s) -> {
+                    var schema = t.getAppendedSchema();
+                    if (schema instanceof ColumnarValueSchema valueSchema) {
+                        saveMissingColumnsSchema(valueSchema, s);
+                    } else {
+                        throw new UnsupportedOperationException(
+                            "Append missing transforms can only be persisted if they use a ColumnarValueSchema");
+                    }
+                });
 
         private final TransformSpecSaver<?> m_saver;
 
@@ -340,6 +360,30 @@ public final class TableTransformNodeSettingsPersistor {
             return m_specClass;
         }
 
+    }
+
+    private static void saveMissingColumnsSchema(final ColumnarValueSchema schema, final NodeSettingsWO settings) {
+        CheckUtils.checkArgument(!ColumnarValueSchemaUtils.hasRowID(schema),
+            "A schema used for appending missing values must not have a RowID column because RowIDs can't be missing.");
+        schema.getSourceSpec().save(settings.addNodeSettings("data_table_spec"));
+        var valueFactorySettings = settings.addNodeSettings("value_factories");
+        for (int i = 0; i < schema.numColumns(); i++) {
+            ValueFactoryUtils.saveValueFactory(schema.getValueFactory(i),
+                valueFactorySettings.addNodeSettings(Integer.toString(i)));
+        }
+    }
+
+    private static ColumnarValueSchema loadMissingColumnsSchema(final NodeSettingsRO settings,
+        final IDataRepository dataRepository) throws InvalidSettingsException {
+        var tableSpec = DataTableSpec.load(settings.getNodeSettings("data_table_spec"));
+        // the schema contains no RowID
+        var valueFactories = new ValueFactory<?, ?>[tableSpec.getNumColumns()];
+        var valueFactorySettings = settings.getNodeSettings("value_factories");
+        for (int i = 0; i < valueFactories.length; i++) {//NOSONAR
+            valueFactories[i] = ValueFactoryUtils
+                .loadValueFactory(valueFactorySettings.getNodeSettings(Integer.toString(i)), dataRepository);
+        }
+        return ColumnarValueSchemaUtils.create(tableSpec, valueFactories);
     }
 
 }
