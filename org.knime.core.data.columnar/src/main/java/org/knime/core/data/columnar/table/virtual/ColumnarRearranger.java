@@ -321,7 +321,8 @@ public final class ColumnarRearranger {
 
         ProgressListenerWithRowIndexFactory progressListenerFactory = inputs -> {
                 RowKeyValue rowKey = ((StringAccess.StringReadAccess)inputs[0])::getStringValue;
-                return rowIndex -> progress.update(rowIndex, rowKey);
+                // use 1 based indexing
+                return rowIndex -> progress.update(rowIndex + 1, rowKey);
         };
 
         var sinkUUID= UUID.randomUUID();
@@ -375,7 +376,7 @@ public final class ColumnarRearranger {
 
         @Override
         public void update(final long rowIndex, final RowKeyValue rowKey) {
-            m_monitor.setProgress(rowIndex + 1 / ((double)m_size));
+            m_monitor.setProgress(rowIndex / ((double)m_size));
             try {
                 m_monitor.checkCanceled();
             } catch (CanceledExecutionException ex) {
