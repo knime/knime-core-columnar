@@ -52,14 +52,17 @@ import static org.knime.core.data.v2.ValueFactoryUtils.areEqual;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.IntSupplier;
 
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataType;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
+import org.knime.core.data.columnar.table.virtual.ValueFactoryMapperFactory.CastType;
 import org.knime.core.data.columnar.table.virtual.ValueFactoryMapperFactory.ColumnMapperFactory;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
@@ -143,9 +146,9 @@ public final class ColumnarSpecReplacer {
     }
 
     record ColumnMapping(int columnIndex, DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
-        UntypedValueFactory outputValueFactory) {
+        UntypedValueFactory outputValueFactory, CastType mapPath) {
         ColumnMapperFactory createMapperFactory() {
-            return new ColumnMapperFactory(outputSpec, inputValueFactory, outputValueFactory);
+            return new ColumnMapperFactory(outputSpec, inputValueFactory, outputValueFactory, mapPath);
         }
     }
 
@@ -192,21 +195,28 @@ public final class ColumnarSpecReplacer {
             var outputType = outputColumn.getType();
             var inputValueFactory = inputSchema.getValueFactory(i);
             var outputValueFactory = outputSchema.getValueFactory(i);
-            if (outputType.equals(inputType)) {
-                continue;
-            } else if (outputType.isASuperTypeOf(inputType) && !areEqual(inputValueFactory, outputValueFactory)) {
-                var mapping = new ColumnMapping(i, outputColumn, new UntypedValueFactory(inputValueFactory),
-                    new UntypedValueFactory(outputValueFactory));
-                mappings.add(mapping);
-            } else {
-                // the row-based backend does not validate the types of the new spec but here we have to do it
-                // because we have to ensure that we have the correct ValueFactories
-                throw new IllegalArgumentException(
-                    "The output type %s in column %s must be the same or a super type of the input type %s."
-                        .formatted(outputType, columnIndex, inputType));
-            }
+            final int finalI = i;
+            determineCastType(inputType, outputType).ifPresent(c -> mappings.add(new ColumnMapping(finalI, outputColumn,
+                new UntypedValueFactory(inputValueFactory), new UntypedValueFactory(outputValueFactory), c)));
         }
         return mappings;
+    }
+
+    private static Optional<CastType> determineCastType(final DataType inputType, final DataType outputType) {
+        if (inputType.equals(outputType)) {
+            return Optional.empty();
+        }
+
+        if (inputType.isASuperTypeOf(outputType)) {
+            return Optional.of(CastType.DOWNCAST);
+        } else if (outputType.isASuperTypeOf(inputType)) {
+            return Optional.of(CastType.UPCAST);
+        } else {
+            throw new IllegalArgumentException(
+                ("The input type '%s' and the output type '%s' are not related to each other "
+                    + "and therefore casting is not possible.").formatted(inputType, outputType));
+        }
+
     }
 
 }
