@@ -74,7 +74,7 @@ import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer.ColumnMapping;
-import org.knime.core.data.columnar.table.virtual.ValueFactoryMapperFactory.CastType;
+import org.knime.core.data.columnar.table.virtual.TableCasterFactory.CastType;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.DataContainerSettings;
@@ -286,7 +286,7 @@ public final class ColumnarConcatenater {
             // we start a new fragment here
             var virtualTable = new ColumnarVirtualTable(table.getId(), table.getSchema(), true);
             if (!columnMappings.isEmpty()) {
-                virtualTable = ColumnarSpecReplacer.upcast(virtualTable, columnMappings, m_fsHandler);
+                virtualTable = ColumnarSpecReplacer.cast(virtualTable, columnMappings, m_fsHandler);
             }
             if (m_rowIDUniquifier != null) {
                 var rowIDTable = m_rowIDUniquifier.uniquifyRowIDs(table.getBufferedTable(), progress);

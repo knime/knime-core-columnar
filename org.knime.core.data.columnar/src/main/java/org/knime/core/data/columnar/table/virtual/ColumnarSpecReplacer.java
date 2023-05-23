@@ -62,8 +62,8 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
-import org.knime.core.data.columnar.table.virtual.ValueFactoryMapperFactory.CastType;
-import org.knime.core.data.columnar.table.virtual.ValueFactoryMapperFactory.ColumnMapperFactory;
+import org.knime.core.data.columnar.table.virtual.TableCasterFactory.CastType;
+import org.knime.core.data.columnar.table.virtual.TableCasterFactory.ColumnCasterFactory;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
@@ -120,7 +120,7 @@ public final class ColumnarSpecReplacer {
         if (mappings.isEmpty()) {
             outputTable = sourceFragment.replaceSchema(outputSchema);
         } else {
-            outputTable = upcast(sourceFragment, mappings, m_fsHandler);
+            outputTable = cast(sourceFragment, mappings, m_fsHandler);
         }
 
         return new VirtualTableExtensionTable(new ReferenceTable[]{referenceTable}, outputTable, table.size(),
@@ -133,12 +133,12 @@ public final class ColumnarSpecReplacer {
      * @param fsHandler used to initialize FileStoreAwareValueFactories
      * @return the input table with the upcasted columns
      */
-    static ColumnarVirtualTable upcast(final ColumnarVirtualTable table, final List<ColumnMapping> mappings,
+    static ColumnarVirtualTable cast(final ColumnarVirtualTable table, final List<ColumnMapping> mappings,
         final IWriteFileStoreHandler fsHandler) {
         var inputSchema = table.getSchema();
         var indexFilters = createIndexFilters(mappings, inputSchema.numColumns());
         var mappedColumns =
-            table.map(new ValueFactoryMapperFactory(mappings.stream().map(ColumnMapping::createMapperFactory).toList(),
+            table.map(new TableCasterFactory(mappings.stream().map(ColumnMapping::createCasterFactory).toList(),
                 fsHandler.getDataRepository()), indexFilters.mappedColumns());
         return table.selectColumns(indexFilters.unmappedColumns())//
             .append(List.of(mappedColumns))//
@@ -147,8 +147,8 @@ public final class ColumnarSpecReplacer {
 
     record ColumnMapping(int columnIndex, DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
         UntypedValueFactory outputValueFactory, CastType mapPath) {
-        ColumnMapperFactory createMapperFactory() {
-            return new ColumnMapperFactory(outputSpec, inputValueFactory, outputValueFactory, mapPath);
+        ColumnCasterFactory createCasterFactory() {
+            return new ColumnCasterFactory(outputSpec, inputValueFactory, outputValueFactory, mapPath);
         }
     }
 
