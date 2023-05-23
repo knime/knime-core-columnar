@@ -36,8 +36,8 @@
    <extension
          point="org.knime.core.data.columnar.Persistence">
       <persistence
-            persistable="org.knime.core.data.columnar.table.virtual.ValueFactoryMapperFactory"
-            persistor="org.knime.core.data.columnar.table.virtual.ValueFactoryMapperFactory$ValueFactoryMapperPersistor">
+            persistable="org.knime.core.data.columnar.table.virtual.TableCasterFactory"
+            persistor="org.knime.core.data.columnar.table.virtual.TableCasterFactory$TableCasterFactoryPersistor">
       </persistence>
    </extension>
 </plugin>

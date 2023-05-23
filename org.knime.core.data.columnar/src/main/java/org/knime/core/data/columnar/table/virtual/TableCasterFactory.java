@@ -81,9 +81,9 @@ import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFact
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class ValueFactoryMapperFactory implements ColumnarMapperWithRowIndexFactory {
+final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
 
-    private final List<ColumnMapperFactory> m_mappings;
+    private final List<ColumnCasterFactory> m_casts;
 
     private final IDataRepository m_dataRepo;
 
@@ -97,20 +97,20 @@ final class ValueFactoryMapperFactory implements ColumnarMapperWithRowIndexFacto
          */
         DOWNCAST((r, w) -> i -> w.setDataCell(r.getDataCell()));
 
-        private final BiFunction<NullableReadValue, NullableWriteValue, MapperWithRowIndexFactory.Mapper> m_mapperFactory;
+        private final BiFunction<NullableReadValue, NullableWriteValue, MapperWithRowIndexFactory.Mapper> m_casterFactory;
 
         private CastType(
             final BiFunction<NullableReadValue, NullableWriteValue, MapperWithRowIndexFactory.Mapper> mapperFactory) {
-            m_mapperFactory = mapperFactory;
+            m_casterFactory = mapperFactory;
         }
 
         MapperWithRowIndexFactory.Mapper createMapper(final NullableReadValue readValue,
             final NullableWriteValue writeValue) {
-            return m_mapperFactory.apply(readValue, writeValue);
+            return m_casterFactory.apply(readValue, writeValue);
         }
     }
 
-    record ColumnMapperFactory(DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
+    record ColumnCasterFactory(DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
         UntypedValueFactory outputValueFactory, CastType mapPath) {
         MapperWithRowIndexFactory.Mapper createMapper(final ReadAccess readAccess, final WriteAccess writeAccess) {
             var readValue = inputValueFactory.createNullableReadValue(readAccess);
@@ -119,8 +119,8 @@ final class ValueFactoryMapperFactory implements ColumnarMapperWithRowIndexFacto
         }
     }
 
-    ValueFactoryMapperFactory(final List<ColumnMapperFactory> mappings, final IDataRepository dataRepo) {
-        m_mappings = mappings;
+    TableCasterFactory(final List<ColumnCasterFactory> casts, final IDataRepository dataRepo) {
+        m_casts = casts;
         m_dataRepo = dataRepo;
     }
 
@@ -128,15 +128,15 @@ final class ValueFactoryMapperFactory implements ColumnarMapperWithRowIndexFacto
     @Override
     public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
         initOutputValueFactoriesForWriting();
-        var mappers = IntStream.range(0, m_mappings.size())//
-            .mapToObj(i -> m_mappings.get(i).createMapper(inputs[i], outputs[i]))//
+        var mappers = IntStream.range(0, m_casts.size())//
+            .mapToObj(i -> m_casts.get(i).createMapper(inputs[i], outputs[i]))//
             .toList();
         return r -> mappers.forEach(m -> m.map(r));
     }
 
     private void initOutputValueFactoriesForWriting() {
         var fsHandler = getFsHandler();
-        for (var mapping : m_mappings) {
+        for (var mapping : m_casts) {
             mapping.outputValueFactory().initFsHandler(fsHandler);
         }
     }
@@ -144,32 +144,32 @@ final class ValueFactoryMapperFactory implements ColumnarMapperWithRowIndexFacto
     @Override
     public ColumnarValueSchema getOutputSchema() {
         var spec = new DataTableSpec(//
-            m_mappings.stream()//
-                .map(ColumnMapperFactory::outputSpec)//
+            m_casts.stream()//
+                .map(ColumnCasterFactory::outputSpec)//
                 .toArray(DataColumnSpec[]::new)//
         );
-        var valueFactories = m_mappings.stream()//
-            .map(ColumnMapperFactory::outputValueFactory)//
+        var valueFactories = m_casts.stream()//
+            .map(ColumnCasterFactory::outputValueFactory)//
             .map(UntypedValueFactory::getValueFactory)//
             .toArray(ValueFactory<?, ?>[]::new);
         return ColumnarValueSchemaUtils.create(spec, valueFactories);
     }
 
     /**
-     * Persistor for SpecMapperFactory.
+     * Persistor for TableCasterFactory.
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    public static final class ValueFactoryMapperPersistor implements Persistor<ValueFactoryMapperFactory> {
+    public static final class TableCasterFactoryPersistor implements Persistor<TableCasterFactory> {
 
         @Override
-        public ValueFactoryMapperFactory load(final NodeSettingsRO settings, final LoadContext ctx)
+        public TableCasterFactory load(final NodeSettingsRO settings, final LoadContext ctx)
             throws InvalidSettingsException {
             var inputValueFactorySettings = settings.getNodeSettings("inputValueFactories");
             var outputValueFactorySettings = settings.getNodeSettings("outputValueFactories");
             var outputSpec = DataTableSpec.load(settings.getNodeSettings("outputSpec"));
             var mapPaths = Stream.of(settings.getStringArray("mapPaths")).map(CastType::valueOf).toArray(CastType[]::new);
-            var mappings = new ArrayList<ColumnMapperFactory>();
+            var mappings = new ArrayList<ColumnCasterFactory>();
             var dataRepository = ctx.getDataRepository();
             for (int i = 0; i < outputSpec.getNumColumns(); i++) {
                 var key = Integer.toString(i);
@@ -181,20 +181,20 @@ final class ValueFactoryMapperFactory implements ColumnarMapperWithRowIndexFacto
                 var outputValueFactory = ValueFactoryUtils
                     .loadValueFactory(outputValueFactorySettings.getNodeSettings(key), dataRepository);
                 var mapping =
-                    new ColumnMapperFactory(outputSpec.getColumnSpec(i), new UntypedValueFactory(inputValueFactory),
+                    new ColumnCasterFactory(outputSpec.getColumnSpec(i), new UntypedValueFactory(inputValueFactory),
                         new UntypedValueFactory(outputValueFactory), mapPaths[i]);
                 mappings.add(mapping);
             }
-            return new ValueFactoryMapperFactory(mappings, dataRepository);
+            return new TableCasterFactory(mappings, dataRepository);
         }
 
         @Override
-        public void save(final ValueFactoryMapperFactory factory, final NodeSettingsWO settings) {
+        public void save(final TableCasterFactory factory, final NodeSettingsWO settings) {
             var inputValueFactorySettings = settings.addNodeSettings("inputValueFactories");
             var outputValueFactorySettings = settings.addNodeSettings("outputValueFactories");
             int i = 0;
             factory.getOutputSchema().getSourceSpec().save(settings.addNodeSettings("outputSpec"));
-            for (var mapping : factory.m_mappings) {
+            for (var mapping : factory.m_casts) {
                 String key = Integer.toString(i);
                 ValueFactoryUtils.saveValueFactory(mapping.inputValueFactory().getValueFactory(),
                     inputValueFactorySettings.addNodeSettings(key));
@@ -203,8 +203,8 @@ final class ValueFactoryMapperFactory implements ColumnarMapperWithRowIndexFacto
                 i++;
             }
             settings.addStringArray("mapPaths",//
-                factory.m_mappings.stream()//
-                .map(ColumnMapperFactory::mapPath)//
+                factory.m_casts.stream()//
+                .map(ColumnCasterFactory::mapPath)//
                 .map(CastType::name)//
                 .toArray(String[]::new));
         }
