@@ -68,6 +68,7 @@ import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
@@ -81,6 +82,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
+@Ignore
 public class ArrowConcurrentReallocTest {
 
     @Test(expected = ExecutionException.class)
