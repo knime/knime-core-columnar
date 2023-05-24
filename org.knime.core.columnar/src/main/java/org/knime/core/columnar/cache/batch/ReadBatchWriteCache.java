@@ -50,6 +50,7 @@ package org.knime.core.columnar.cache.batch;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
@@ -140,7 +141,7 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
 
         private BatchWriter m_delegateWriter;
 
-        private int m_numBatches;
+        private final AtomicInteger m_numBatches = new AtomicInteger();
 
         CachingBatchWriter(final BatchWriter writer) {
             m_delegateWriter = writer;
@@ -165,8 +166,7 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
         public void write(final ReadBatch batch) throws IOException {
             checkOpen();
             batch.retain();
-            m_cache.put(new BatchId(ReadBatchWriteCache.this, m_allColumns, m_numBatches), batch);
-            m_numBatches++;
+            m_cache.put(new BatchId(ReadBatchWriteCache.this, m_allColumns, m_numBatches.getAndIncrement()), batch);
             m_delegateWriter.write(batch);
         }
 
@@ -180,7 +180,7 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
 
         // AP-15959: Assumes that no more batches are written -> needs to be changed once we allow reading while writing
         private final LocalReadBatchCache m_localCache =
-            new LocalReadBatchCache(this::readFromSharedCache, m_writer.m_numBatches);
+            new LocalReadBatchCache(this::readFromSharedCache, m_writer.m_numBatches.get());
 
         CachingBatchReader(final ColumnSelection selection) {
             m_selection = selection;
@@ -195,7 +195,7 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
         @Override
         public ReadBatch readRetained(final int index) throws IOException {
             checkOpen();
-            if (index >= m_writer.m_numBatches) {
+            if (index >= m_writer.m_numBatches.get()) {
                 throw new IndexOutOfBoundsException(index);
             }
             return m_localCache.readRetained(index);
