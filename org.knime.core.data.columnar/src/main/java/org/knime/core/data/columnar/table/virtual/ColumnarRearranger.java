@@ -328,7 +328,11 @@ public final class ColumnarRearranger {
         var sinkUUID= UUID.randomUUID();
         var tableToMaterialize = sourceTable.selectColumns(0) // RowID
             .append(appendedColumns) // columns to create
-            .progress(progressListenerFactory, 0)
+            // observe all created columns to ensure that the progress update happens after the map
+            // because some CellFactories (e.g. in the Math Formula node) expect this call order
+            // see also the implementation in RearrangeColumnsTable
+            .progress(progressListenerFactory,
+                IntStream.rangeClosed(0, appendedColumns.getSchema().numColumns()).toArray())
             .materialize(sinkUUID);
         var executor = new GraphVirtualTableExecutor(tableToMaterialize.getProducingTransform());
         try (var container = createAppendContainer(appendedColumns.getSchema(), m_tableIdSupplier.getAsInt())) {
