@@ -292,7 +292,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
     }
 
     // TODO (TP): should this be synchronized? If used multi-threaded, this might lose futures?
-    void enqueueRunnable(final Runnable r) {
+    synchronized void enqueueRunnable(final Runnable r) {
         m_future = m_future.thenRunAsync(r, m_executor);
     }
 
