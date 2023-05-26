@@ -49,6 +49,7 @@
 package org.knime.core.columnar.cache.batch;
 
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -118,6 +119,12 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+        try {
+            m_writer.m_awaitClose.await();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for writer to be closed.");
+        }
         return new CachingBatchReader(selection);
     }
 
@@ -143,6 +150,8 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
 
         private final AtomicInteger m_numBatches = new AtomicInteger();
 
+        private final CountDownLatch m_awaitClose = new CountDownLatch(1);
+
         CachingBatchWriter(final BatchWriter writer) {
             m_delegateWriter = writer;
         }
@@ -154,6 +163,7 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
                 // remove the reference as this writer will live longer than the delegate needs to
                 m_delegateWriter = null;
             }
+            m_awaitClose.countDown();
         }
 
         @Override

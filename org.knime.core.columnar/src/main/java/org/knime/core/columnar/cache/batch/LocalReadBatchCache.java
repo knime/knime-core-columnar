@@ -67,6 +67,9 @@ final class LocalReadBatchCache {
     private final IndexBatchLoader m_loader;
 
     LocalReadBatchCache(final IndexBatchLoader loader, final int numBatches) {
+        if (numBatches == 0) {
+            throw new IllegalArgumentException("No batches to read.");
+        }
         m_loader = loader;
         m_localCache = new AtomicReferenceArray<>(numBatches);
     }
