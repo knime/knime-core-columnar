@@ -73,8 +73,8 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
-import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer.ColumnMapping;
-import org.knime.core.data.columnar.table.virtual.TableCasterFactory.CastType;
+import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer.ColumnCast;
+import org.knime.core.data.columnar.table.virtual.TableCasterFactory.CastOperation;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.DataContainerSettings;
@@ -271,7 +271,7 @@ public final class ColumnarConcatenater {
             m_referenceTables.add(table);
             var schema = table.getSchema();
             var spec = schema.getSourceSpec();
-            var columnMappings = new ArrayList<ColumnMapping>();
+            var columnMappings = new ArrayList<ColumnCast>();
             for (int c = 0; c < spec.getNumColumns(); c++) {
                 var colSpec = spec.getColumnSpec(c);
                 var concatenateValueFactory = m_valueFactoriesPerColumn.get(colSpec.getName());
@@ -279,8 +279,8 @@ public final class ColumnarConcatenater {
                 if (!ValueFactoryUtils.areEqual(concatenateValueFactory, valueFactory)) {
                     var outputColSpec = m_concatenatedSpec.getColumnSpec(colSpec.getName());
                     // in concatenate we always perform an upcast, so MapPath.DATA_VALUE is appropriate here
-                    columnMappings.add(new ColumnMapping(c + 1, outputColSpec, new UntypedValueFactory(valueFactory),
-                        new UntypedValueFactory(concatenateValueFactory), CastType.UPCAST));
+                    columnMappings.add(new ColumnCast(c + 1, outputColSpec, new UntypedValueFactory(valueFactory),
+                        new UntypedValueFactory(concatenateValueFactory), CastOperation.UPCAST));
                 }
             }
             // we start a new fragment here

@@ -62,7 +62,7 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
-import org.knime.core.data.columnar.table.virtual.TableCasterFactory.CastType;
+import org.knime.core.data.columnar.table.virtual.TableCasterFactory.CastOperation;
 import org.knime.core.data.columnar.table.virtual.TableCasterFactory.ColumnCasterFactory;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
@@ -96,13 +96,14 @@ public final class ColumnarSpecReplacer {
     }
 
     /**
-     * Replaces the spec of the input table. For each column the type in the outputSpec must be the same or a super-type
-     * of the type in the input table.
+     * Replaces the spec of the input table. For each column the output type must be related to the input type, i.e. the
+     * output type must be a supertype of the input type or vise-versa.
      *
      * @param table to replace the spec of
      * @param outputSpec the new spec
      * @return the table with the replaced spec
      * @throws VirtualTableIncompatibleException if the input table is not compatible with virtual tables
+     * @throws IllegalArgumentException if the input and output type of any column are not related
      */
     public VirtualTableExtensionTable replaceSpec(final BufferedDataTable table, final DataTableSpec outputSpec)
         throws VirtualTableIncompatibleException {
@@ -114,13 +115,13 @@ public final class ColumnarSpecReplacer {
         var outputSchema = ColumnarValueSchemaUtils.create(outputSpec, RowKeyType.CUSTOM, m_fsHandler);
 
         var inputSchema = referenceTable.getSchema();
-        var mappings = determineMappings(inputSchema, outputSchema);
+        var casts = determineCasts(inputSchema, outputSchema);
         var sourceFragment = new ColumnarVirtualTable(referenceTable.getId(), inputSchema, true);
         ColumnarVirtualTable outputTable;
-        if (mappings.isEmpty()) {
+        if (casts.isEmpty()) {
             outputTable = sourceFragment.replaceSchema(outputSchema);
         } else {
-            outputTable = cast(sourceFragment, mappings, m_fsHandler);
+            outputTable = cast(sourceFragment, casts, m_fsHandler);
         }
 
         return new VirtualTableExtensionTable(new ReferenceTable[]{referenceTable}, outputTable, table.size(),
@@ -128,63 +129,63 @@ public final class ColumnarSpecReplacer {
     }
 
     /**
-     * @param table to map
-     * @param mappings applying the individual maps
+     * @param table to cast
+     * @param casts applying the individual casts
      * @param fsHandler used to initialize FileStoreAwareValueFactories
-     * @return the input table with the upcasted columns
+     * @return the input table with the casted columns
      */
-    static ColumnarVirtualTable cast(final ColumnarVirtualTable table, final List<ColumnMapping> mappings,
+    static ColumnarVirtualTable cast(final ColumnarVirtualTable table, final List<ColumnCast> casts,
         final IWriteFileStoreHandler fsHandler) {
         var inputSchema = table.getSchema();
-        var indexFilters = createIndexFilters(mappings, inputSchema.numColumns());
-        var mappedColumns =
-            table.map(new TableCasterFactory(mappings.stream().map(ColumnMapping::createCasterFactory).toList(),
-                fsHandler.getDataRepository()), indexFilters.mappedColumns());
-        return table.selectColumns(indexFilters.unmappedColumns())//
-            .append(List.of(mappedColumns))//
+        var indexFilters = createIndexFilters(casts, inputSchema.numColumns());
+        var castedColumns =
+            table.map(new TableCasterFactory(casts.stream().map(ColumnCast::createCasterFactory).toList(),
+                fsHandler.getDataRepository()), indexFilters.castedColumns());
+        return table.selectColumns(indexFilters.unCastedColumns())//
+            .append(List.of(castedColumns))//
             .selectColumns(indexFilters.mergePermutation());
     }
 
-    record ColumnMapping(int columnIndex, DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
-        UntypedValueFactory outputValueFactory, CastType mapPath) {
+    record ColumnCast(int columnIndex, DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
+        UntypedValueFactory outputValueFactory, CastOperation castOperation) {
         ColumnCasterFactory createCasterFactory() {
-            return new ColumnCasterFactory(outputSpec, inputValueFactory, outputValueFactory, mapPath);
+            return new ColumnCasterFactory(outputSpec, inputValueFactory, outputValueFactory, castOperation);
         }
     }
 
-    private static IndexFilters createIndexFilters(final List<ColumnMapping> mappings, final int numColumns) {
-        var mappedColumns = new int[mappings.size()];
-        var numUnmapped = numColumns - mappings.size();
-        var unmappedColumns = new int[numUnmapped];
+    private static IndexFilters createIndexFilters(final List<ColumnCast> mappings, final int numColumns) {
+        var castedColumns = new int[mappings.size()];
+        var numCasted = numColumns - mappings.size();
+        var unCastedColumns = new int[numCasted];
         var mergePermutation = new int[numColumns];
-        int mappedIndex = 0;
-        int unmappedIndex = 0;
-        var mappingIterator = mappings.iterator();
-        int currentMappingIndex = -1;
+        int castedIndex = 0;
+        int unCastedIndex = 0;
+        var castedIterator = mappings.iterator();
+        int currentCastedIndex = -1;
         for (int i = 0; i < numColumns; i++) {
-            if (currentMappingIndex < i && mappingIterator.hasNext()) {
-                currentMappingIndex = mappingIterator.next().columnIndex();
+            if (currentCastedIndex < i && castedIterator.hasNext()) {
+                currentCastedIndex = castedIterator.next().columnIndex();
             }
-            if (currentMappingIndex == i) {
-                mappedColumns[mappedIndex] = i;
-                mergePermutation[i] = numUnmapped + mappedIndex;
-                mappedIndex++;
+            if (currentCastedIndex == i) {
+                castedColumns[castedIndex] = i;
+                mergePermutation[i] = numCasted + castedIndex;
+                castedIndex++;
             } else {
-                unmappedColumns[unmappedIndex] = i;
-                mergePermutation[i] = unmappedIndex;
-                unmappedIndex++;
+                unCastedColumns[unCastedIndex] = i;
+                mergePermutation[i] = unCastedIndex;
+                unCastedIndex++;
             }
         }
-        return new IndexFilters(mappedColumns, unmappedColumns, mergePermutation);
+        return new IndexFilters(castedColumns, unCastedColumns, mergePermutation);
 
     }
 
-    record IndexFilters(int[] mappedColumns, int[] unmappedColumns, int[] mergePermutation) {
+    record IndexFilters(int[] castedColumns, int[] unCastedColumns, int[] mergePermutation) {
     }
 
-    private static List<ColumnMapping> determineMappings(final ColumnarValueSchema inputSchema,
+    private static List<ColumnCast> determineCasts(final ColumnarValueSchema inputSchema,
         final ColumnarValueSchema outputSchema) {
-        var mappings = new ArrayList<ColumnMapping>();
+        var casts = new ArrayList<ColumnCast>();
         CheckUtils.checkArgument(areEqual(inputSchema.getValueFactory(0), outputSchema.getValueFactory(0)),
             "The RowID ValueFactories must match.");
         for (int i = 1; i < inputSchema.numColumns(); i++) {
@@ -196,21 +197,21 @@ public final class ColumnarSpecReplacer {
             var inputValueFactory = inputSchema.getValueFactory(i);
             var outputValueFactory = outputSchema.getValueFactory(i);
             final int finalI = i;
-            determineCastType(inputType, outputType).ifPresent(c -> mappings.add(new ColumnMapping(finalI, outputColumn,
+            determineCastType(inputType, outputType).ifPresent(c -> casts.add(new ColumnCast(finalI, outputColumn,
                 new UntypedValueFactory(inputValueFactory), new UntypedValueFactory(outputValueFactory), c)));
         }
-        return mappings;
+        return casts;
     }
 
-    private static Optional<CastType> determineCastType(final DataType inputType, final DataType outputType) {
+    private static Optional<CastOperation> determineCastType(final DataType inputType, final DataType outputType) {
         if (inputType.equals(outputType)) {
             return Optional.empty();
         }
 
         if (inputType.isASuperTypeOf(outputType)) {
-            return Optional.of(CastType.DOWNCAST);
+            return Optional.of(CastOperation.DOWNCAST);
         } else if (outputType.isASuperTypeOf(inputType)) {
-            return Optional.of(CastType.UPCAST);
+            return Optional.of(CastOperation.UPCAST);
         } else {
             throw new IllegalArgumentException(
                 ("The input type '%s' and the output type '%s' are not related to each other "

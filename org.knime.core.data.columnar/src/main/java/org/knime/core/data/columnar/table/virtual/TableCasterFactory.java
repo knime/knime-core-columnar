@@ -87,7 +87,7 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
 
     private final IDataRepository m_dataRepo;
 
-    enum CastType {
+    enum CastOperation {
         /**
          * Maps via DataValue and avoids materializing the DataCell.
          */
@@ -99,23 +99,23 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
 
         private final BiFunction<NullableReadValue, NullableWriteValue, MapperWithRowIndexFactory.Mapper> m_casterFactory;
 
-        private CastType(
-            final BiFunction<NullableReadValue, NullableWriteValue, MapperWithRowIndexFactory.Mapper> mapperFactory) {
-            m_casterFactory = mapperFactory;
+        private CastOperation(
+            final BiFunction<NullableReadValue, NullableWriteValue, MapperWithRowIndexFactory.Mapper> casterFactory) {
+            m_casterFactory = casterFactory;
         }
 
-        MapperWithRowIndexFactory.Mapper createMapper(final NullableReadValue readValue,
+        MapperWithRowIndexFactory.Mapper createCaster(final NullableReadValue readValue,
             final NullableWriteValue writeValue) {
             return m_casterFactory.apply(readValue, writeValue);
         }
     }
 
     record ColumnCasterFactory(DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
-        UntypedValueFactory outputValueFactory, CastType mapPath) {
-        MapperWithRowIndexFactory.Mapper createMapper(final ReadAccess readAccess, final WriteAccess writeAccess) {
+        UntypedValueFactory outputValueFactory, CastOperation castOperation) {
+        MapperWithRowIndexFactory.Mapper createCaster(final ReadAccess readAccess, final WriteAccess writeAccess) {
             var readValue = inputValueFactory.createNullableReadValue(readAccess);
             var writeValue = outputValueFactory.createNullableWriteValue(writeAccess);
-            return mapPath.createMapper(readValue, writeValue);
+            return castOperation.createCaster(readValue, writeValue);
         }
     }
 
@@ -128,16 +128,16 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
     @Override
     public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
         initOutputValueFactoriesForWriting();
-        var mappers = IntStream.range(0, m_casts.size())//
-            .mapToObj(i -> m_casts.get(i).createMapper(inputs[i], outputs[i]))//
+        var casters = IntStream.range(0, m_casts.size())//
+            .mapToObj(i -> m_casts.get(i).createCaster(inputs[i], outputs[i]))//
             .toList();
-        return r -> mappers.forEach(m -> m.map(r));
+        return r -> casters.forEach(m -> m.map(r));
     }
 
     private void initOutputValueFactoriesForWriting() {
         var fsHandler = getFsHandler();
-        for (var mapping : m_casts) {
-            mapping.outputValueFactory().initFsHandler(fsHandler);
+        for (var cast : m_casts) {
+            cast.outputValueFactory().initFsHandler(fsHandler);
         }
     }
 
@@ -162,14 +162,24 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
      */
     public static final class TableCasterFactoryPersistor implements Persistor<TableCasterFactory> {
 
+        private static final String CFG_CAST_OPERATIONS = "castOperations";
+
+        private static final String CFG_OUTPUT_SPEC = "outputSpec";
+
+        private static final String CFG_OUTPUT_VALUE_FACTORIES = "outputValueFactories";
+
+        private static final String CFG_INPUT_VALUE_FACTORIES = "inputValueFactories";
+
         @Override
         public TableCasterFactory load(final NodeSettingsRO settings, final LoadContext ctx)
             throws InvalidSettingsException {
-            var inputValueFactorySettings = settings.getNodeSettings("inputValueFactories");
-            var outputValueFactorySettings = settings.getNodeSettings("outputValueFactories");
-            var outputSpec = DataTableSpec.load(settings.getNodeSettings("outputSpec"));
-            var mapPaths = Stream.of(settings.getStringArray("mapPaths")).map(CastType::valueOf).toArray(CastType[]::new);
-            var mappings = new ArrayList<ColumnCasterFactory>();
+            var inputValueFactorySettings = settings.getNodeSettings(CFG_INPUT_VALUE_FACTORIES);
+            var outputValueFactorySettings = settings.getNodeSettings(CFG_OUTPUT_VALUE_FACTORIES);
+            var outputSpec = DataTableSpec.load(settings.getNodeSettings(CFG_OUTPUT_SPEC));
+            var castOperations = Stream.of(settings.getStringArray(CFG_CAST_OPERATIONS))//
+                    .map(CastOperation::valueOf)//
+                    .toArray(CastOperation[]::new);
+            var casts = new ArrayList<ColumnCasterFactory>();
             var dataRepository = ctx.getDataRepository();
             for (int i = 0; i < outputSpec.getNumColumns(); i++) {
                 var key = Integer.toString(i);
@@ -180,20 +190,20 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
                 // from the NodeContext
                 var outputValueFactory = ValueFactoryUtils
                     .loadValueFactory(outputValueFactorySettings.getNodeSettings(key), dataRepository);
-                var mapping =
+                var cast =
                     new ColumnCasterFactory(outputSpec.getColumnSpec(i), new UntypedValueFactory(inputValueFactory),
-                        new UntypedValueFactory(outputValueFactory), mapPaths[i]);
-                mappings.add(mapping);
+                        new UntypedValueFactory(outputValueFactory), castOperations[i]);
+                casts.add(cast);
             }
-            return new TableCasterFactory(mappings, dataRepository);
+            return new TableCasterFactory(casts, dataRepository);
         }
 
         @Override
         public void save(final TableCasterFactory factory, final NodeSettingsWO settings) {
-            var inputValueFactorySettings = settings.addNodeSettings("inputValueFactories");
-            var outputValueFactorySettings = settings.addNodeSettings("outputValueFactories");
+            var inputValueFactorySettings = settings.addNodeSettings(CFG_INPUT_VALUE_FACTORIES);
+            var outputValueFactorySettings = settings.addNodeSettings(CFG_OUTPUT_VALUE_FACTORIES);
             int i = 0;
-            factory.getOutputSchema().getSourceSpec().save(settings.addNodeSettings("outputSpec"));
+            factory.getOutputSchema().getSourceSpec().save(settings.addNodeSettings(CFG_OUTPUT_SPEC));
             for (var mapping : factory.m_casts) {
                 String key = Integer.toString(i);
                 ValueFactoryUtils.saveValueFactory(mapping.inputValueFactory().getValueFactory(),
@@ -202,10 +212,10 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
                     outputValueFactorySettings.addNodeSettings(key));
                 i++;
             }
-            settings.addStringArray("mapPaths",//
+            settings.addStringArray(CFG_CAST_OPERATIONS,//
                 factory.m_casts.stream()//
-                .map(ColumnCasterFactory::mapPath)//
-                .map(CastType::name)//
+                .map(ColumnCasterFactory::castOperation)//
+                .map(CastOperation::name)//
                 .toArray(String[]::new));
         }
     }
