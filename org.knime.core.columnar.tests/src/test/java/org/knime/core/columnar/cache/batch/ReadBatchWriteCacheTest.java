@@ -117,6 +117,12 @@ final class ReadBatchWriteCacheTest extends AbstractBatchCacheTest {
         verify(m_writer).close();
     }
 
+    @Override
+    void testClosingReaderClosesDelegateReader() throws Exception {
+        writeBatch();
+        super.testClosingReaderClosesDelegateReader();
+    }
+
     @SuppressWarnings("resource")
     @Test
     void testWriteThenRead() throws Exception {
