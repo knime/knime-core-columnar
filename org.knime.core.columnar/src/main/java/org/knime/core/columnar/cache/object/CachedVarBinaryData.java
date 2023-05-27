@@ -238,7 +238,8 @@ final class CachedVarBinaryData {
 
         @Override
         public byte[] getBytes(final int index) {
-            if (m_data[index] == null) {
+            if (!(m_data[index] instanceof byte[])) {
+                // if not loaded yet or we loaded the object and not serialized bytes, we'll ask the delegate
                 m_data[index] = m_delegate.getBytes(index);
             }
             return (byte[])m_data[index];
@@ -247,7 +248,8 @@ final class CachedVarBinaryData {
         @SuppressWarnings("unchecked")
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-            if (m_data[index] == null) {
+            if (m_data[index] == null || (m_data[index] instanceof byte[])) {
+                // if not loaded yet or we loaded the serialized bytes instead of the object, we'll ask the delegate
                 m_data[index] = m_delegate.getObject(index, deserializer);
             }
             return (T)m_data[index];
