@@ -206,6 +206,11 @@ public final class DecoratingData {
         }
 
         @Override
+        public boolean setFrom(final NullableReadData data, final int readIdx, final int writeIdx) {
+            return m_delegate.setFrom(data, readIdx, writeIdx);
+        }
+
+        @Override
         public int capacity() {
             return m_delegate.capacity();
         }

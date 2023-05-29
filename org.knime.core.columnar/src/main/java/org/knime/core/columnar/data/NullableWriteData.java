@@ -68,4 +68,8 @@ public interface NullableWriteData extends WriteData {
     @Override
     NullableReadData close(int length);
 
+    default boolean setFrom(final NullableReadData data, final int readIdx, final int writeIdx) {
+        return false;
+    }
+
 }
