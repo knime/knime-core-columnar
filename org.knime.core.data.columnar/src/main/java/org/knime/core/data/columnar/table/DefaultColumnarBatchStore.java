@@ -70,13 +70,11 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.domain.DomainWritableConfig;
-import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
 import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.util.DuplicateChecker;
 import org.knime.core.util.ThreadUtils;
 
 /**
@@ -279,13 +277,13 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
         initReadBatchCache(builder.m_readBatchCache);
 
-        initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
+//        initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
 
 
-        if (builder.m_duplicateCheckExecutor != null) {
-            m_writable =
-                new DuplicateCheckWritable(m_writable, new DuplicateChecker(), builder.m_duplicateCheckExecutor);
-        }
+//        if (builder.m_duplicateCheckExecutor != null) {
+//            m_writable =
+//                new DuplicateCheckWritable(m_writable, new DuplicateChecker(), builder.m_duplicateCheckExecutor);
+//        }
 
         if (builder.m_domainCalculationConfig != null) {
             m_domainWritable =
