@@ -82,6 +82,10 @@ final class DenseColumnarRowRead implements RowRead {
         m_rowKeyValue = (RowKeyReadValue)m_values[0];
     }
 
+    ReadAccess[] getAccesses() {
+        return m_accesses;
+    }
+
     @Override
     public int getNumColumns() {
         // the row key is not a column in KNIME AP

@@ -109,6 +109,15 @@ public final class WriteAccessRowWrite implements RowWrite {
 
     @Override
     public void setFrom(final RowRead values) {
+        // TODO introduce ColumnarRowRead that provides the accesses/ReadAccessRow
+        if (values instanceof DenseColumnarRowRead columnarRowRead) {
+            var readAccesses = columnarRowRead.getAccesses();
+            for (int i = 0; i < m_accesses.size(); i++) {
+                m_accesses.getWriteAccess(i).setFrom(readAccesses[i]);
+            }
+            return;
+        }
+
         assert values.getNumColumns() == getNumColumns();
         setRowKey(values.getRowKey());
         for (var i = 0; i < values.getNumColumns(); i++) {
