@@ -272,6 +272,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
      * @param row the row to be written
      */
     private void writeRowIntoCursor(final DataRow row) {
+        // TODO if we put a RowRead underneath the random access rows
+        // we could unpack it here and feed it into RowWrite#setFrom(RowRead)
+        // if (row instanceof RandomAccessRow randomAccessRow) {
+        //    rowWrite.setFrom(randomAccessRow.getRowRead())
+        // }
         final RowWrite rowWrite = m_delegateCursor.forward();
         rowWrite.setRowKey(row.getKey());
         for (int i = 0; i < m_numColumns; i++) {
