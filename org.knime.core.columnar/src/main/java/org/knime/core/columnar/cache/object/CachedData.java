@@ -140,8 +140,12 @@ final class CachedData {
         void flush();
 
         @Override
-        CachedReadData close(int length);
+        CachedWriteReadData close(int length);
 
+    }
+
+    interface CachedReadData extends NullableReadData {
+        NullableReadData getDelegate();
     }
 
     /**
@@ -149,7 +153,7 @@ final class CachedData {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    interface CachedReadData extends NullableReadData {
+    interface CachedWriteReadData extends CachedReadData {
 
         /**
          * Called for column-level data object i.e. data objects that are not a child of a struct or list
@@ -177,7 +181,7 @@ final class CachedData {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    interface CachedValueReadData extends CachedReadData {
+    interface CachedValueReadData extends CachedWriteReadData {
 
         /**
          * @return the Objects held by this CachedReadData.
@@ -190,7 +194,7 @@ final class CachedData {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    interface CachedLoadingReadData extends NullableReadData {
+    interface CachedLoadingReadData extends CachedReadData {
 
         /**
          * Similar to {@link #retain()}, just for the cached data.

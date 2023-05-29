@@ -159,7 +159,10 @@ final class AbstractCachedValueData {
 
             @Override
             public boolean isMissing(final int index) {
-                return m_data[index] == null;
+                if (m_isSet[index]) {
+                    return m_data[index] == null;
+                }
+                return m_readDelegate.isMissing(index);
             }
 
             @Override
@@ -175,6 +178,8 @@ final class AbstractCachedValueData {
         }
 
         T[] m_data;
+
+        boolean[] m_isSet;
 
         private final ExecutorService m_serializationExecutor;
 
@@ -204,6 +209,7 @@ final class AbstractCachedValueData {
             final CountUpDownLatch latch, final Consumer<Object> cache) {
             super(delegate);
             m_data = data;
+            m_isSet = new boolean[data.length];
             m_serializationExecutor = executor;
             m_serializationLatch = latch;
             m_cache = cache;
@@ -213,6 +219,18 @@ final class AbstractCachedValueData {
         public void setMissing(final int index) {
             // as per contract, setObject / setMissing is only ever called for ascending indices
             // m_data[index] is already null; no need to explicitly set it to null here
+        }
+
+        @Override
+        public boolean setFrom(final NullableReadData data, final int readIdx, final int writeIdx) {
+            // we first have to make sure that all objects set by value are already serialized
+            flush();
+            if (super.setFrom(data, readIdx, writeIdx)) {
+                m_setIndex = writeIdx;
+                m_highestDispatchedSerializationIndex = writeIdx;
+                return true;
+            }
+            return false;
         }
 
         @Override
@@ -268,7 +286,9 @@ final class AbstractCachedValueData {
 
         @Override
         public void expandCache() {
-            m_data = Arrays.copyOf(m_data, m_delegate.capacity());
+            int capacity = m_delegate.capacity();
+            m_data = Arrays.copyOf(m_data, capacity);
+            m_isSet = Arrays.copyOf(m_isSet, capacity);
         }
 
         @Override
@@ -314,6 +334,9 @@ final class AbstractCachedValueData {
 
             final var highest = m_setIndex;
             final var lowest = m_highestDispatchedSerializationIndex;
+            if (highest == lowest) {
+                return;
+            }
 
             m_serializationLatch.countUp();
             m_future = m_future.thenRunAsync(() -> serializeRange(lowest + 1, highest + 1), m_serializationExecutor);
@@ -324,6 +347,7 @@ final class AbstractCachedValueData {
 
         void onSet(final int index) {
             m_setIndex = index;
+            m_isSet[index] = true;
 
             if (m_setIndex > m_highestDispatchedSerializationIndex + SERIALIZATION_DELAY) {
                 dispatchSerialization();

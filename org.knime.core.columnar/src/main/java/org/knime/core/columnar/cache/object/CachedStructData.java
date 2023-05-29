@@ -59,7 +59,7 @@ import org.knime.core.columnar.cache.object.AbstractCachedNestedData.AbstractCac
 import org.knime.core.columnar.cache.object.AbstractCachedNestedData.AbstractNestedCachedWriteData;
 import org.knime.core.columnar.cache.object.CachedData.CachedDataFactory;
 import org.knime.core.columnar.cache.object.CachedData.CachedLoadingReadData;
-import org.knime.core.columnar.cache.object.CachedData.CachedReadData;
+import org.knime.core.columnar.cache.object.CachedData.CachedWriteReadData;
 import org.knime.core.columnar.cache.object.CachedData.CachedWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -134,15 +134,15 @@ final class CachedStructData {
         public CachedStructReadData close(final int length) {
             var inner = Stream.of(m_children)//
                 .map(c -> c.close(length))//
-                .toArray(CachedReadData[]::new);
+                .toArray(CachedWriteReadData[]::new);
             return new CachedStructReadData(length, inner);
         }
 
         final class CachedStructReadData extends AbstractCachedReadData implements StructReadData {
 
-            private final CachedReadData[] m_innerReadCaches;
+            private final CachedWriteReadData[] m_innerReadCaches;
 
-            CachedStructReadData(final int length, final CachedReadData[] innerReadCaches) {
+            CachedStructReadData(final int length, final CachedWriteReadData[] innerReadCaches) {
                 super(length);
                 m_innerReadCaches = innerReadCaches;
             }

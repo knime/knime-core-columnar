@@ -58,7 +58,7 @@ import org.knime.core.columnar.cache.object.AbstractCachedNestedData.AbstractCac
 import org.knime.core.columnar.cache.object.AbstractCachedNestedData.AbstractNestedCachedWriteData;
 import org.knime.core.columnar.cache.object.CachedData.CachedDataFactory;
 import org.knime.core.columnar.cache.object.CachedData.CachedLoadingReadData;
-import org.knime.core.columnar.cache.object.CachedData.CachedReadData;
+import org.knime.core.columnar.cache.object.CachedData.CachedWriteReadData;
 import org.knime.core.columnar.cache.object.CachedData.CachedWriteData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
@@ -146,12 +146,12 @@ final class CachedListData {
 
         @Override
         public CachedListReadData close(final int length) {
-            var readElements = new CachedReadData[length];
+            var readElements = new CachedWriteReadData[length];
             Arrays.setAll(readElements, this::closeIfPresent);
             return new CachedListReadData(length, readElements);
         }
 
-        private CachedReadData closeIfPresent(final int index) {
+        private CachedWriteReadData closeIfPresent(final int index) {
             var element = m_children[index];
             if (element != null) {
                 return element.close(m_elementSizes[index]);
@@ -162,9 +162,9 @@ final class CachedListData {
 
         final class CachedListReadData extends AbstractCachedReadData implements ListReadData {
 
-            private final CachedReadData[] m_readElements;
+            private final CachedWriteReadData[] m_readElements;
 
-            CachedListReadData(final int length, final CachedReadData[] readElements) {
+            CachedListReadData(final int length, final CachedWriteReadData[] readElements) {
                 super(length);
                 m_readElements = readElements;
             }

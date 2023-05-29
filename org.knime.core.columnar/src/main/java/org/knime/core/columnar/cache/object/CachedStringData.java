@@ -147,7 +147,12 @@ final class CachedStringData {
 
             @Override
             public String getString(final int index) {
-                return m_data[index];
+                if (m_isSet[index]) {
+                    return m_data[index];
+                } else {
+                    m_data[index] = m_readDelegate.getString(index);
+                    return m_data[index];
+                }
             }
 
         }

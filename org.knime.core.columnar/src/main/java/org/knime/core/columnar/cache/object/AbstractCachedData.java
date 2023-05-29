@@ -57,6 +57,7 @@ import org.knime.core.columnar.cache.object.CachedData.CachedDataFactory;
 import org.knime.core.columnar.cache.object.CachedData.CachedLoadingReadData;
 import org.knime.core.columnar.cache.object.CachedData.CachedReadData;
 import org.knime.core.columnar.cache.object.CachedData.CachedWriteData;
+import org.knime.core.columnar.cache.object.CachedData.CachedWriteReadData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 
@@ -84,7 +85,7 @@ final class AbstractCachedData {
 
         @Override
         public CompletableFuture<NullableReadData> getCachedDataFuture(final NullableReadData data) {
-            final var heapCachedData = (CachedReadData)data;
+            final var heapCachedData = (CachedWriteReadData)data;
             return CompletableFuture.supplyAsync(() -> {
                 m_unclosedData.remove(heapCachedData.getWriteData());
                 return heapCachedData.closeWriteDelegate();
@@ -139,12 +140,20 @@ final class AbstractCachedData {
         }
 
         @Override
+        public boolean setFrom(final NullableReadData data, final int readIdx, final int writeIdx) {
+            if (data instanceof CachedReadData readData) {
+                return m_delegate.setFrom(readData.getDelegate(), readIdx, writeIdx);
+            }
+            return false;
+        }
+
+        @Override
         public long sizeOf() {
             flush();
             return m_delegate.sizeOf();
         }
 
-        abstract class AbstractCachedReadData implements CachedReadData {
+        abstract class AbstractCachedReadData implements CachedWriteReadData {
 
             private final int m_length;
 
@@ -168,6 +177,11 @@ final class AbstractCachedData {
                 } else {
                     m_numRetainsPriorSerialize++;
                 }
+            }
+
+            @Override
+            public NullableReadData getDelegate() {
+                return m_readDelegate;
             }
 
             @Override
@@ -206,6 +220,7 @@ final class AbstractCachedData {
 
                 return m_readDelegate;
             }
+
 
             @Override
             public CachedWriteData getWriteData() {
@@ -262,6 +277,11 @@ final class AbstractCachedData {
         @Override
         public long sizeOf() {
             return m_delegate.sizeOf();
+        }
+
+        @Override
+        public NullableReadData getDelegate() {
+            return m_delegate;
         }
 
     }
