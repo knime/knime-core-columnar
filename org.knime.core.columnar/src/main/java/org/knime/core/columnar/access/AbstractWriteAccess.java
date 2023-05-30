@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.access;
 
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.access.DelegatingReadAccesses.DelegatingReadAccess;
 import org.knime.core.table.access.ReadAccess;
@@ -73,15 +74,15 @@ abstract class AbstractWriteAccess<T extends NullableWriteData> implements Colum
 
     @Override
     public final void setFrom(final ReadAccess access) {
-//        var columnarAccess = unpack(access);
-//        if (columnarAccess != null) {
-//            NullableReadData data = columnarAccess.m_data;
-//            var readIdx = columnarAccess.m_index.getIndex();
-//            var writeIdx = m_index.getIndex();
-//            if (m_data.setFrom(data, readIdx, writeIdx)) {
-//                return;
-//            }
-//        }
+        var columnarAccess = unpack(access);
+        if (columnarAccess != null) {
+            NullableReadData data = columnarAccess.m_data;
+            var readIdx = columnarAccess.m_index.getIndex();
+            var writeIdx = m_index.getIndex();
+            if (m_data.setFrom(data, readIdx, writeIdx)) {
+                return;
+            }
+        }
 
         if (access.isMissing()) {
             setMissing();
