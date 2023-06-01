@@ -183,9 +183,20 @@ public final class ColumnarRearranger {
 
         var rearrangedTable = rearrange(newColumns, existingColumns, tableToRearrange);
 
+        // the RearrangeColumnsTable removes the table name and table properties, so we do the same
+        rearrangedTable = dropOldSpecNameAndProperties(rearrangedTable);
+
         return new VirtualTableExtensionTable(refTables.toArray(ReferenceTable[]::new),
             rearrangedTable, table.size(), m_tableIdSupplier.getAsInt());
 
+    }
+
+    private static ColumnarVirtualTable dropOldSpecNameAndProperties(final ColumnarVirtualTable rearrangedTable) {
+        var rearrangedSchema = rearrangedTable.getSchema();
+        var rearrangedSpec = rearrangedSchema.getSourceSpec();
+        var columns = rearrangedSpec.stream().toArray(DataColumnSpec[]::new);
+        return rearrangedTable
+            .replaceSchema(ColumnarValueSchemaUtils.updateDataTableSpec(rearrangedSchema, new DataTableSpec(columns)));
     }
 
     private static ColumnarVirtualTable rearrange(final List<RearrangedColumn> newColumns,
