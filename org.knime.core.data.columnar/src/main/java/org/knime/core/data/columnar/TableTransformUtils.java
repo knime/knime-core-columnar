@@ -150,9 +150,9 @@ public final class TableTransformUtils {
     static void checkAllSameSize(final BufferedDataTable... tables) {
         final var size = tables[0].size();
         for (var i = 1; i < tables.length; i++) {
-            if (size != tables[i].size()) {
-                throw new IllegalArgumentException("Not all tables have the same number of rows.");
-            }
+            var otherSize = tables[i].size();
+            CheckUtils.checkArgument(size == otherSize, "Tables can't be joined, non matching row counts: %s vs. %s",
+                size, otherSize);
         }
     }
 
