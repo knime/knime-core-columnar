@@ -50,6 +50,7 @@ import java.io.Flushable;
 import java.io.IOException;
 
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
+import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.virtual.WriteAccessRowWrite;
@@ -74,11 +75,9 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteCursor.class);
 
-    private final WriteCursor<WriteAccessRow> m_accessCursor;
+    private final ColumnarWriteCursor m_accessCursor;
 
     private final RowWrite m_rowWrite;
-
-    private long m_size = 0;
 
     private final Flushable m_flushOnForward;
 
@@ -104,7 +103,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
                 LOGGER.error("Could not flush cursor during forward", ex);
             }
         }
-        m_size++;
         return m_accessCursor.forward() ? m_rowWrite : null;
     }
 
@@ -125,13 +123,14 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     }
 
     long size() {
-        return m_size;
+        return m_accessCursor.getNumForwards();
     }
 
     /**
      * Make sure the current contents of this {@link ColumnarRowWriteCursor} have been
      * written to disk. Blocks until this is true. Does not close this cursor.
      */
+    @SuppressWarnings("javadoc")
     public void flush() {
         try {
             m_accessCursor.flush();

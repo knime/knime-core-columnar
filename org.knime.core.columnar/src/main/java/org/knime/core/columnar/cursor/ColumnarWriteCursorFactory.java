@@ -84,8 +84,22 @@ public final class ColumnarWriteCursorFactory {
      * @param store the underlying storage
      * @return the {@link WriteCursor}
      */
-    public static WriteCursor<WriteAccessRow> createWriteCursor(final BatchStore store) {
-        return new ColumnarWriteCursor(store);
+    public static ColumnarWriteCursor createWriteCursor(final BatchStore store) {
+        return new ColumnarWriteCursorImpl(store);
+    }
+
+    /**
+     * A {@link WriteCursor} that is backed by a {@link BatchWriter} and tracks the number of times {@link #forward()}
+     * is called.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    public interface ColumnarWriteCursor extends WriteCursor<WriteAccessRow> {
+
+        /**
+         * @return the number of times {@link #forward()} has been called successfully on this cursor
+         */
+        long getNumForwards();
     }
 
     /**
@@ -94,8 +108,8 @@ public final class ColumnarWriteCursorFactory {
      * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
      * @author Marc Bux, KNIME GmbH, Berlin, Germany
      */
-    private static final class ColumnarWriteCursor
-        implements WriteCursor<WriteAccessRow>, ColumnDataIndex, WriteAccessRow {
+    private static final class ColumnarWriteCursorImpl
+        implements ColumnarWriteCursor, ColumnDataIndex, WriteAccessRow {
 
         // the initial capacity (in number of held elements) of a single chunk
         // arrow has a minimum capacity of 2
@@ -132,7 +146,9 @@ public final class ColumnarWriteCursorFactory {
 
         private boolean m_adjusting;
 
-        ColumnarWriteCursor(final BatchStore store) {
+        private long m_numForwards;
+
+        ColumnarWriteCursorImpl(final BatchStore store) {
             m_writer = store.getWriter();
             m_adjusting = true;
 
@@ -147,12 +163,19 @@ public final class ColumnarWriteCursorFactory {
 
         @Override
         public final boolean forward() {
+            m_numForwards++;
             m_currentIndex++;
             if (m_currentIndex > m_currentMaxIndex) {
                 switchToNextData();
             }
             return true;
         }
+
+        @Override
+        public long getNumForwards() {
+            return m_numForwards;
+        }
+
 
         @Override
         public int size() {
