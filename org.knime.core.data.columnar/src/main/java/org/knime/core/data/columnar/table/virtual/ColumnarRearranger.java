@@ -355,7 +355,7 @@ public final class ColumnarRearranger {
                 throw ex.getCause();
             }
             var appendTable = container.finish();
-            return ReferenceTables.createReferenceTable(sinkUUID, appendTable);
+            return ReferenceTables.createClearableReferenceTable(sinkUUID, appendTable);
         } catch (CanceledExecutionException canceledException) {
             // this stunt is necessary because ColumnarRowContainerUtils.create throws Exception
             throw canceledException;

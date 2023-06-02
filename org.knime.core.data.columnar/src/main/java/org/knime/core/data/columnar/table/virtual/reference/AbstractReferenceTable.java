@@ -75,6 +75,12 @@ abstract class AbstractReferenceTable implements ReferenceTable {
     }
 
     @Override
+    public void clearIfNecessary() {
+        // most reference tables don't need to be cleared because they are managed by the node
+    }
+
+
+    @Override
     public UUID getId() {
         return m_id;
     }

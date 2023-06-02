@@ -99,12 +99,32 @@ public final class ReferenceTables {
             return new VirtualReferenceTable(table, id, virtualExtensionTable);
         } else if (extensionTable instanceof AbstractColumnarContainerTable) {
             final AbstractColumnarContainerTable columnarTable = (AbstractColumnarContainerTable)extensionTable;
-            return new ColumnarContainerReferenceTable(table, id, columnarTable);
+            return new ColumnarContainerReferenceTable(table, id, columnarTable, false);
         } else {
             // we end up here if the reference tables are not extension tables (e.g. RearrangeColumnsTable)
             return new BufferedReferenceTable(table, id);
         }
     }
+
+    /**
+     * Creates a {@link ReferenceTable} that clears the underlying table on {@link ReferenceTable#clearIfNecessary()}.
+     *
+     * @param id of the reference table
+     * @param table the underlying table (the delegate must be an AbstractColumnarContainerTable)
+     * @return the reference table
+     * @throws IllegalArgumentException if the underlying table is not an AbstractColumnarContainerTable
+     */
+    @SuppressWarnings("resource")
+    public static ReferenceTable createClearableReferenceTable(final UUID id, final BufferedDataTable table) {
+        var extensionTable = extractExtensionTable(table);
+        if (extensionTable instanceof AbstractColumnarContainerTable columnarContainerTable) {
+            return new ColumnarContainerReferenceTable(table, id, columnarContainerTable, true);
+        } else {
+            throw new IllegalArgumentException(
+                "Only columnar container tables are supposed to be cleared by their referent.");
+        }
+    }
+
 
     /**
      * Convenience method for wrapping a BufferedDataTable into a ReferenceTable.

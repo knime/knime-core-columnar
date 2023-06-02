@@ -70,11 +70,14 @@ final class ColumnarContainerReferenceTable extends AbstractReferenceTable {
 
     private final ColumnarVirtualTable m_virtualTable;
 
+    private final boolean m_clearOnClear;
+
     ColumnarContainerReferenceTable(final BufferedDataTable bufferedTable, final UUID id,
-        final AbstractColumnarContainerTable table) {
+        final AbstractColumnarContainerTable table, final boolean clearOnClear) {
         super(bufferedTable, id);
         m_table = table;
         m_virtualTable = new ColumnarVirtualTable(id, table.getSchema(), true);
+        m_clearOnClear = clearOnClear;
     }
 
     @SuppressWarnings("resource") // we close the RowAccessible by closing m_cachedOutput
@@ -86,5 +89,12 @@ final class ColumnarContainerReferenceTable extends AbstractReferenceTable {
     @Override
     public ColumnarVirtualTable getVirtualTable() {
         return m_virtualTable;
+    }
+
+    @Override
+    public void clearIfNecessary() {
+        if (m_clearOnClear) {
+            m_table.clear();
+        }
     }
 }

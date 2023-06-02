@@ -74,6 +74,12 @@ public interface ReferenceTable {
 
     UUID getId();
 
+    /**
+     * Clears the ReferenceTable if it needs to be cleared.
+     * An example for this is the appended table created by the ColumnarRearranger.
+     */
+    void clearIfNecessary();
+
     default ColumnarValueSchema getSchema() {
         return getVirtualTable().getSchema();
     }

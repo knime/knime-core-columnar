@@ -383,6 +383,9 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             LOGGER.debug("Exception while closing open cursors.", ex);
         }
         clearOutputCache();
+        for (var referenceTable : m_referenceTables) {
+            referenceTable.clearIfNecessary();
+        }
     }
 
     private void clearOutputCache() {
