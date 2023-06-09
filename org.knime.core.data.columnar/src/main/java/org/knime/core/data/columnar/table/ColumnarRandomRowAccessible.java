@@ -54,11 +54,11 @@ import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.data.columnar.table.ColumnarReadAccessRowFactory.ColumnarReadAccessRow;
 import org.knime.core.table.row.RandomRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
-import org.knime.core.table.row.Selection.ColumnSelection;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -100,9 +100,7 @@ final class ColumnarRandomRowAccessible implements RandomRowAccessible {
 
     @Override
     public RandomAccessCursor createCursor() {
-        var indexInBatch = new MutableColumnDataIndex();
-        var row = m_rowFactory.createRow(indexInBatch, ColumnSelection.all());
-        return new ColumnarRandomAccessCursor(row, indexInBatch, Selection.all());
+        return createCursor(Selection.all());
     }
 
     @Override
@@ -168,8 +166,8 @@ final class ColumnarRandomRowAccessible implements RandomRowAccessible {
             m_rowRangeSize = m_to - m_from;
         }
 
-        private org.knime.core.columnar.filter.ColumnSelection convertColumnSelection(final Selection selection) {
-            return org.knime.core.columnar.filter.ColumnSelection.fromSelection(selection, m_store.getSchema().numColumns());
+        private ColumnSelection convertColumnSelection(final Selection selection) {
+            return ColumnSelection.fromSelection(selection, getSchema().numColumns());
         }
 
         private int getBatchIndex(final long rowIndex) {
