@@ -54,8 +54,6 @@ import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.filter.DefaultColumnSelection;
-import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.data.columnar.table.ColumnarReadAccessRowFactory.ColumnarReadAccessRow;
 import org.knime.core.table.row.RandomRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
@@ -156,7 +154,7 @@ final class ColumnarRandomRowAccessible implements RandomRowAccessible {
 
         ColumnarRandomAccessCursor(final ColumnarReadAccessRow readAccessRow,
             final MutableColumnDataIndex indexInBatch, final Selection selection) {
-            m_batchReader = m_store.createRandomAccessReader(convertColumnSelection(selection.columns()));
+            m_batchReader = m_store.createRandomAccessReader(convertColumnSelection(selection));
             m_readAccessRow = readAccessRow;
             m_indexInBatch = indexInBatch;
             var rowSelection = selection.rows();
@@ -170,13 +168,8 @@ final class ColumnarRandomRowAccessible implements RandomRowAccessible {
             m_rowRangeSize = m_to - m_from;
         }
 
-        private org.knime.core.columnar.filter.ColumnSelection convertColumnSelection(final ColumnSelection selection) {
-            var numColumns = m_store.getSchema().numColumns();
-            if (selection.allSelected()) {
-                return new DefaultColumnSelection(numColumns);
-            } else {
-                return new FilteredColumnSelection(numColumns, selection.getSelected());
-            }
+        private org.knime.core.columnar.filter.ColumnSelection convertColumnSelection(final Selection selection) {
+            return org.knime.core.columnar.filter.ColumnSelection.fromSelection(selection, m_store.getSchema().numColumns());
         }
 
         private int getBatchIndex(final long rowIndex) {
