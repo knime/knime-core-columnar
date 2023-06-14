@@ -58,8 +58,8 @@ import org.knime.core.table.schema.ColumnarSchema;
 public interface ColumnStoreFactory {
 
     /**
-     * Creates a new {@link BatchStore}, writing data to and reading data from the provided file.
-     * Expects that the provided file does not exist yet, if it does, it will be overwritten.
+     * Creates a new {@link BatchStore}, writing data to and reading data from the provided file. Expects that the
+     * provided file does not exist yet, if it does, it will be overwritten.
      *
      * @param schema the columnar schema of the to-be-created store
      * @param fileHandle to write data to
@@ -76,4 +76,13 @@ public interface ColumnStoreFactory {
      */
     BatchReadStore createReadStore(Path path);
 
+    /**
+     * Set a limit on off heap memory that can be allocated by stores created by this factory. This method is called
+     * exactly once by the framework before {@link #createStore(ColumnarSchema, FileHandle)} or
+     * {@link #createReadStore(Path)} are called.
+     *
+     * @param limit the memory limit in bytes
+     * @apiNote only called by the framework - must not be called by clients
+     */
+    void setOffHeapMemoryLimit(long limit);
 }

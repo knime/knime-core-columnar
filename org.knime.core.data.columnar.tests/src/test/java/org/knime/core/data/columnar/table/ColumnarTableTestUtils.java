@@ -91,6 +91,11 @@ final class ColumnarTableTestUtils {
         public BatchReadStore createReadStore(final Path path) {
             throw new UnsupportedOperationException("Loading from file not supported by test column store.");
         }
+
+        @Override
+        public void setOffHeapMemoryLimit(final long limit) {
+            // this test store does not care about limits
+        }
     }
 
     static ColumnarValueSchema createSchema(final int nCols) {

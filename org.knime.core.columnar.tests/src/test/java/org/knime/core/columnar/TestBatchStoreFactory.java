@@ -72,4 +72,8 @@ public final class TestBatchStoreFactory implements ColumnStoreFactory {
         throw new UnsupportedOperationException("not implemented");
     }
 
+    @Override
+    public void setOffHeapMemoryLimit(final long limit) {
+        // this test store does not care about limits
+    }
 }

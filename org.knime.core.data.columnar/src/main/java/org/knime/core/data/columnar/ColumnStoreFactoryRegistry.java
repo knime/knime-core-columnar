@@ -57,6 +57,7 @@ import org.eclipse.core.runtime.IExtensionPoint;
 import org.eclipse.core.runtime.IExtensionRegistry;
 import org.eclipse.core.runtime.Platform;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 
 import com.google.common.base.Preconditions;
 
@@ -99,6 +100,8 @@ public final class ColumnStoreFactoryRegistry {
             factory = (ColumnStoreFactory)configurationElements[0].createExecutableExtension("factory");
             Preconditions.checkState(factory != null, "Contribution to extension point \"%s\", contributed by \"%s\", "
                     + "must not be null", configurationElements[0].getContributor().getName());
+            // Set the memory limit
+            factory.setOffHeapMemoryLimit(ColumnarPreferenceUtils.getOffHeapMemoryLimit());
         } catch (CoreException | IllegalStateException ex) {
             exception = ex;
         }

@@ -410,4 +410,13 @@ public final class ColumnarPreferenceUtils {
         return persistExecutor;
     }
 
+    public static long getOffHeapMemoryLimit() {
+        // TODO(AP-20412) make configurable via the preference page
+        var limitInMB = Integer.getInteger("knime.max.offheap.size");
+        if (limitInMB == null) {
+            return Long.MAX_VALUE;
+        } else {
+            return (long)limitInMB << 20;
+        }
+    }
 }
