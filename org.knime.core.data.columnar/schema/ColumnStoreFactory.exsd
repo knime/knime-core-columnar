@@ -26,13 +26,13 @@ This extension point is not meant to be implemented outside the KNIME core.
 
    <element name="ColumnStoreFactory">
       <complexType>
-         <attribute name="factory" type="string" use="required">
+         <attribute name="factoryCreator" type="string" use="required">
             <annotation>
                <documentation>
-                  Implementation of org.knime.core.columnar.store.ColumnStoreFactory interface
+                  Implementation of org.knime.core.columnar.store.ColumnStoreFactoryCreator interface
                </documentation>
                <appinfo>
-                  <meta.attribute kind="java" basedOn=":org.knime.core.columnar.store.ColumnStoreFactory"/>
+                  <meta.attribute kind="java" basedOn=":org.knime.core.columnar.store.ColumnStoreFactoryCreator"/>
                </appinfo>
             </annotation>
          </attribute>

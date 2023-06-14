@@ -57,6 +57,8 @@ import org.eclipse.core.runtime.IExtensionPoint;
 import org.eclipse.core.runtime.IExtensionRegistry;
 import org.eclipse.core.runtime.Platform;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.ColumnStoreFactoryCreator;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 
 import com.google.common.base.Preconditions;
 
@@ -96,9 +98,11 @@ public final class ColumnStoreFactoryRegistry {
                 throw new IllegalStateException(String.format("Multiple registrations to extension point \"%s\" (from "
                         + "%s) -- make sure to have exactly one installed. Won't use any", EXT_POINT_ID, contributors));
             }
-            factory = (ColumnStoreFactory)configurationElements[0].createExecutableExtension("factory");
-            Preconditions.checkState(factory != null, "Contribution to extension point \"%s\", contributed by \"%s\", "
-                    + "must not be null", configurationElements[0].getContributor().getName());
+            var creator = (ColumnStoreFactoryCreator)configurationElements[0].createExecutableExtension("factoryCreator");
+            factory = creator.createFactory(ColumnarPreferenceUtils.getOffHeapMemoryLimit());
+            Preconditions.checkState(factory != null,
+                "Contribution to extension point \"%s\", contributed by \"%s\", " + "must not be null",
+                configurationElements[0].getContributor().getName());
         } catch (CoreException | IllegalStateException ex) {
             exception = ex;
         }
