@@ -112,8 +112,8 @@ public final class ReadBatchWriteCache implements BatchWritable, RandomAccessBat
     public void close() throws IOException {
         if (!m_closed.getAndSet(true)) {
             m_cache.evictAllFromSource(this);
-            m_readDelegate.close();
             m_writer.close();
+            m_readDelegate.close();
         }
     }
 
