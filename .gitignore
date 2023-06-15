@@ -2,7 +2,7 @@
 **/target/
 */build/
 *.jar
-*/.polyglot.build.properties 
+*/.polyglot.*
 **/.flattened-pom.xml
 **/CHANGELOG.md
 .idea/
