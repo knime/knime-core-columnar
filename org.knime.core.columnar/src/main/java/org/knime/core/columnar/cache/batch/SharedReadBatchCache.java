@@ -56,6 +56,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,6 +93,16 @@ public final class SharedReadBatchCache {
                 .weigher(SharedReadBatchCache::weighBatch)//
                 .maximumWeight(cacheSizeInKBytes)//
                 .build();
+
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(() -> {
+            if (m_cache.size() > 1) {
+                LOGGER.debug("Received off-heap memory alert. Clearing cache.");
+                clear();
+                return true;
+            }
+            LOGGER.debug("Received off-heap memory alert. Doing nothing because cache is empty.");
+            return false;
+        });
     }
 
     /**
