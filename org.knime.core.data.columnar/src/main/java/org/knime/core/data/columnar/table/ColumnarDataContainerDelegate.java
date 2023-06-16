@@ -110,6 +110,8 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     /** Flag indicating the memory state. */
     private boolean m_memoryLowState;
 
+    private boolean m_errorState;
+
     private boolean m_closed = false;
 
     private boolean m_cleared = false;
@@ -309,11 +311,24 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
         // wait until we are allowed to submit a new runnable
         try {
+            // BUG:
+            // - Many batches acquire the semaphore here and queue their runnables
+            // - The main thread is blocked here for the next batch
+            // - The running batch writer fails with an exception and releases the semaphore
+            //   - The future is not yet failed
+            // - The main thread queues its runnable and fills up the next batch and ends up here again
+            // - The future finally fails
+            // - None of the queued runnables run -> No semaphores are released
             m_numPendingBatches.acquire();
         } catch (InterruptedException e) {
             throw wrap(e);
         }
 
+        // TODO this is not a good solution to the described bug
+        if (m_errorState) {
+            m_numPendingBatches.release();
+            return;
+        }
         m_future = m_future.thenRunAsync(new ContainerRunnable(m_curBatch), ASYNC_EXECUTORS);
 
         // reset batch
@@ -408,6 +423,8 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
             NodeContext.pushContext(m_nodeContext);
             try {
                 m_rows.forEach(r -> writeRowIntoCursor(r));
+            } catch (final Throwable th) {
+                m_errorState = true;
             } finally {
                 NodeContext.removeLastContext();
                 m_numPendingBatches.release();
