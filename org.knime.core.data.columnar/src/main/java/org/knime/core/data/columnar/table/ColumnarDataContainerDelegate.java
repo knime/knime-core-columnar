@@ -110,6 +110,12 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     /** Flag indicating the memory state. */
     private boolean m_memoryLowState;
 
+    /**
+     * Flag indicating that a {@link ContainerRunnable} failed. This is set before {@link #m_numPendingBatches} is
+     * released to prevent new {@link ContainerRunnable}s from being queued.
+     */
+    private final AtomicBoolean m_errorState = new AtomicBoolean(false);
+
     private boolean m_closed = false;
 
     private boolean m_cleared = false;
@@ -194,8 +200,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
     }
 
     /**
-     * Wait for {@code m_future} to complete (normally or exceptionally).
-     * Rethrow exceptions.
+     * Wait for {@code m_future} to complete (normally or exceptionally). Rethrow exceptions.
      */
     private void waitForAndHandleFuture() {
         try {
@@ -314,6 +319,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
             throw wrap(e);
         }
 
+        if (m_errorState.get()) {
+            m_numPendingBatches.release();
+            waitForAndHandleFuture(); // Wait for the error and throw it
+            return;
+        }
         m_future = m_future.thenRunAsync(new ContainerRunnable(m_curBatch), ASYNC_EXECUTORS);
 
         // reset batch
@@ -407,7 +417,10 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
 
             NodeContext.pushContext(m_nodeContext);
             try {
-                m_rows.forEach(r -> writeRowIntoCursor(r));
+                m_rows.forEach(ColumnarDataContainerDelegate.this::writeRowIntoCursor);
+            } catch (final Throwable th) { // NOSONAR: We want to set the error state on all errors (we do not try to recover)
+                m_errorState.set(true);
+                throw th;
             } finally {
                 NodeContext.removeLastContext();
                 m_numPendingBatches.release();
