@@ -52,6 +52,9 @@ import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.cache.EvictingCache;
 import org.knime.core.columnar.cache.SizeBoundLruCache;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A cache for storing data that can be shared between multiple {@link ReadDataCache ReadDataCaches} and
@@ -60,6 +63,8 @@ import org.knime.core.columnar.data.NullableReadData;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class SharedReadDataCache {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SharedReadDataCache.class);
 
     private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_cache;
 
@@ -72,6 +77,16 @@ public final class SharedReadDataCache {
     public SharedReadDataCache(final long cacheSizeBytes, final int concurrencyLevel) {
         m_cache = new SizeBoundLruCache<>(cacheSizeBytes, concurrencyLevel);
         m_cacheSizeBytes = cacheSizeBytes;
+
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(() -> {
+            if (m_cache.size() > 0) {
+                LOGGER.debug("Received off-heap memory alert. Clearing cache.");
+                m_cache.invalidateAll();
+                return true;
+            }
+            LOGGER.debug("Received off-heap memory alert. Doing nothing because cache is empty.");
+            return false;
+        });
     }
 
     /**
