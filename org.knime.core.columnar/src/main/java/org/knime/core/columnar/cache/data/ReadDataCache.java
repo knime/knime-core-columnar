@@ -300,8 +300,18 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
         try {
             m_future.get();
         } catch (final ExecutionException e) {
-            throw new IllegalStateException("Failed to asynchronously write cached rows to file.", e);
+            throw wrap(e.getCause());
         }
+    }
+
+    private static RuntimeException wrap(final Throwable t) {
+        final String error;
+        if (t.getMessage() != null) {
+            error = t.getMessage();
+        } else {
+            error = "Failed to asynchronously write cached rows to file.";
+        }
+        return new IllegalStateException(error, t);
     }
 
     @Override
