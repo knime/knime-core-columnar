@@ -122,4 +122,6 @@ public interface EvictingCache<K, D extends ReferencedData> {
      */
     int size();
 
+    void invalidateAll();
+
 }
