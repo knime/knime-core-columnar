@@ -48,25 +48,15 @@
  */
 package org.knime.core.data.columnar.preferences;
 
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.COLUMN_DATA_CACHE_SIZE_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.HEAP_CACHE_NAME_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.NUM_THREADS_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.SMALL_TABLE_CACHE_SIZE_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.SMALL_TABLE_THRESHOLD_KEY;
-import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.USE_DEFAULTS_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.OFF_HEAP_MEM_LIMIT_KEY;
 
 import java.util.function.UnaryOperator;
 
-import org.eclipse.jface.preference.BooleanFieldEditor;
-import org.eclipse.jface.preference.ComboFieldEditor;
 import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.preference.IntegerFieldEditor;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
@@ -75,6 +65,7 @@ import org.knime.core.ui.util.SWTUtilities;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 public final class ColumnarPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
@@ -82,25 +73,7 @@ public final class ColumnarPreferencePage extends FieldEditorPreferencePage impl
         s -> String.format("Changes to the %s require a restart of the workbenck to become effective.%n"
             + "Do you want to restart the workbench now?", s);
 
-    private final int m_numThreads;
-
-    private final String m_heapCacheName;
-
-    private final int m_smallTableCacheSize;
-
-    private final int m_columnDataCacheSize;
-
-    private IntegerFieldEditor m_numThreadsEditor;
-
-    private ComboFieldEditor m_heapCacheNameEditor;
-
-    private IntegerFieldEditor m_smallTableCacheSizeEditor;
-
-    private IntegerFieldEditor m_smallTableThresholdEditor;
-
-    private IntegerFieldEditor m_columnDataCacheSizeEditor;
-
-    private Label m_warning;
+    private final int m_activeOffHeapMemoryLimit;
 
     private boolean m_apply;
 
@@ -109,10 +82,7 @@ public final class ColumnarPreferencePage extends FieldEditorPreferencePage impl
      */
     public ColumnarPreferencePage() {
         super(GRID);
-        m_numThreads = ColumnarPreferenceUtils.getNumThreads();
-        m_heapCacheName = ColumnarPreferenceUtils.getHeapCacheName();
-        m_smallTableCacheSize = ColumnarPreferenceUtils.getSmallTableCacheSize();
-        m_columnDataCacheSize = ColumnarPreferenceUtils.getColumnDataCacheSize();
+        m_activeOffHeapMemoryLimit = ColumnarPreferenceUtils.getOffHeapMemoryLimitMB();
     }
 
     @Override
@@ -125,125 +95,10 @@ public final class ColumnarPreferencePage extends FieldEditorPreferencePage impl
     @Override
     protected void createFieldEditors() {
         final Composite parent = getFieldEditorParent();
-        final int numAvailableProcessors = ColumnarPreferenceUtils.getNumAvailableProcessors();
-        final int usablePhysicalMemorySizeMB = ColumnarPreferenceUtils.getUsablePhysicalMemorySizeMB();
-
-        final BooleanFieldEditor useDefaultsEditor =
-            new BooleanFieldEditor(USE_DEFAULTS_KEY, "Use default values", parent) {
-                @Override
-                protected void valueChanged(final boolean oldValue, final boolean newValue) {
-                    super.valueChanged(oldValue, newValue);
-                    updateFields(newValue);
-                }
-            };
-        addField(useDefaultsEditor);
-
-        m_numThreadsEditor =
-            new IntegerFieldEditor(NUM_THREADS_KEY, "Number of threads for asynchronous processing", parent) {
-                @Override
-                protected void valueChanged() {
-                    super.valueChanged();
-                    if (isValid() && getIntValue() > numAvailableProcessors) {
-                        showErrorMessage(String.format(
-                            "Number of threads should not be larger than the number of available processors (%d).",
-                            numAvailableProcessors));
-                    }
-
-                }
-            };
-        m_numThreadsEditor.setValidRange(1, Integer.MAX_VALUE);
-        addField(m_numThreadsEditor);
-
-        m_heapCacheNameEditor = new ComboFieldEditor(HEAP_CACHE_NAME_KEY, "Caching strategy for complex data",
-            new String[][]{{"minimize memory usage", ColumnarPreferenceUtils.HeapCache.WEAK.name()},
-                {"maximize performance", ColumnarPreferenceUtils.HeapCache.SOFT.name()}},
-            parent);
-        addField(m_heapCacheNameEditor);
-
-        m_smallTableCacheSizeEditor =
-            new IntegerFieldEditor(SMALL_TABLE_CACHE_SIZE_KEY, "Size of small table cache (in MB)", parent) {
-                @Override
-                protected void valueChanged() {
-                    super.valueChanged();
-                    if (m_smallTableThresholdEditor.isValid() && isValid()
-                        && m_smallTableThresholdEditor.getIntValue() > getIntValue()) {
-                        showErrorMessage(
-                            "Maximum small table size should not be larger than the size of the small table cache.");
-                    }
-                    if (cacheSizeExceeded(usablePhysicalMemorySizeMB)) {
-                        showErrorMessage(String.format(
-                            "Combined size of caches should not be larger than usable physical memory size (%d).",
-                            usablePhysicalMemorySizeMB));
-                    }
-                }
-            };
-        addField(m_smallTableCacheSizeEditor);
-
-        m_smallTableThresholdEditor = new IntegerFieldEditor(SMALL_TABLE_THRESHOLD_KEY,
-            "Size up to which table is considered small (in MB)", parent) {
-            @Override
-            protected void valueChanged() {
-                super.valueChanged();
-                if (isValid() && m_smallTableCacheSizeEditor.isValid()
-                    && getIntValue() > m_smallTableCacheSizeEditor.getIntValue()) {
-                    showErrorMessage(
-                        "Maximum small table size should not be larger than the size of the small table cache.");
-                }
-            }
-        };
-        m_smallTableThresholdEditor.setValidRange(0, Integer.MAX_VALUE / (1 << 20));
-        addField(m_smallTableThresholdEditor);
-
-        m_columnDataCacheSizeEditor =
-            new IntegerFieldEditor(COLUMN_DATA_CACHE_SIZE_KEY, "Size of data cache (in MB)", parent) {
-                @Override
-                protected void valueChanged() {
-                    super.valueChanged();
-                    if (cacheSizeExceeded(usablePhysicalMemorySizeMB)) {
-                        showErrorMessage(String.format(
-                            "Combined size of caches should not be larger than usable physical memory size (%d).",
-                            usablePhysicalMemorySizeMB));
-                    }
-                }
-            };
-        addField(m_columnDataCacheSizeEditor);
-
-        m_warning = new Label(parent, SWT.NONE);
-        final Color red = new Color(parent.getDisplay(), 255, 0, 0);
-        m_warning.setForeground(red);
-        m_warning.addDisposeListener(e -> red.dispose());
-        m_warning.setLayoutData(new GridData(SWT.FILL, SWT.BEGINNING, true, true, 2, 2));
-
-        updateFields(ColumnarPreferenceUtils.useDefaults());
-    }
-
-    private void updateFields(final boolean useDefaults) {
-        final Composite parent = getFieldEditorParent();
-
-        m_numThreadsEditor.setEnabled(!useDefaults, parent);
-        m_heapCacheNameEditor.setEnabled(!useDefaults, parent);
-        m_smallTableCacheSizeEditor.setEnabled(!useDefaults, parent);
-        m_smallTableThresholdEditor.setEnabled(!useDefaults, parent);
-        m_columnDataCacheSizeEditor.setEnabled(!useDefaults, parent);
-
-        if (useDefaults) {
-            m_warning.setText(" \n ");
-        } else {
-            m_warning.setText("Warning: Changes to these settings can have a serious impact on the performance\n"
-                + "of KNIME Analytics Platform and overall system stability. Proceed with caution.");
-        }
-    }
-
-    private boolean cacheSizeExceeded(final int usablePhysicalMemorySizeMB) {
-        return m_columnDataCacheSizeEditor.isValid() && m_smallTableCacheSizeEditor.isValid()
-            && m_columnDataCacheSizeEditor.getIntValue()
-                + m_smallTableCacheSizeEditor.getIntValue() > usablePhysicalMemorySizeMB;
-    }
-
-    @Override
-    protected void performDefaults() {
-        super.performDefaults();
-        updateFields(true);
+        var offHeapMemoryLimitEditor =
+            new IntegerFieldEditor(OFF_HEAP_MEM_LIMIT_KEY, "Off-Heap Memory Limit (in MB)", parent);
+        offHeapMemoryLimitEditor.setValidRange(1024, Integer.MAX_VALUE);
+        addField(offHeapMemoryLimitEditor);
     }
 
     // code from here on out mostly copied from org.knime.workbench.ui.preferences.HeadlessPreferencePage
@@ -278,27 +133,9 @@ public final class ColumnarPreferencePage extends FieldEditorPreferencePage impl
             return;
         }
 
-        if (m_numThreads != ColumnarPreferenceUtils.getNumThreads()) {
+        if (m_activeOffHeapMemoryLimit != ColumnarPreferenceUtils.getOffHeapMemoryLimitMB()) {
             Display.getDefault()
-                .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("thread pool size")));
-            return;
-        }
-
-        if (!m_heapCacheName.equals(ColumnarPreferenceUtils.getHeapCacheName())) {
-            Display.getDefault()
-                .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("heap cache")));
-            return;
-        }
-
-        if (m_smallTableCacheSize != ColumnarPreferenceUtils.getSmallTableCacheSize()) {
-            Display.getDefault()
-                .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("small table cache size")));
-            return;
-        }
-
-        if (m_columnDataCacheSize != ColumnarPreferenceUtils.getColumnDataCacheSize()) {
-            Display.getDefault()
-                .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("data cache size")));
+                .asyncExec(() -> promptRestartWithMessage(RESTART_MESSAGE_OPERATOR.apply("off-heap memory limit")));
         }
     }
 
