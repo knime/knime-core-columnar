@@ -51,12 +51,17 @@ package org.knime.core.columnar.cache.writable;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.cache.EvictingCache;
 import org.knime.core.columnar.cache.SizeBoundLruCache;
+import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A cache for storing entire {@link BatchWritable BatchWritables} up to a given size. The cache can be shared between
  * multiple {@link BatchWritableCache BatchWritableCaches}.
  */
 public final class SharedBatchWritableCache {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SharedBatchWritableCache.class);
 
     private final int m_sizeThreshold;
 
@@ -73,6 +78,16 @@ public final class SharedBatchWritableCache {
         m_sizeThreshold = sizeThreshold;
         m_cache = new SizeBoundLruCache<>(cacheSize, concurrencyLevel);
         m_cacheSize = cacheSize;
+
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(() -> {
+            if (m_cache.size() > 0) {
+                LOGGER.debug("Received off-heap memory alert. Clearing cache.");
+                m_cache.invalidateAll();
+                return true;
+            }
+            LOGGER.debug("Received off-heap memory alert. Doing nothing because cache is empty.");
+            return false;
+        });
     }
 
     /**
