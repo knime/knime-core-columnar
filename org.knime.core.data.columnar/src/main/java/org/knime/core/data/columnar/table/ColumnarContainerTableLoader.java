@@ -71,8 +71,9 @@ public final class ColumnarContainerTableLoader implements ExtensionTableLoader 
 
     @Override
     public boolean canLoad(final String type) {
-        return singletonColumnStoreFactoryAvailable()
-            && type.equalsIgnoreCase(UnsavedColumnarContainerTable.class.getName());
+        return singletonColumnStoreFactoryAvailable() && //
+            (type.equalsIgnoreCase(UnsavedColumnarContainerTable.class.getName())
+                || type.equalsIgnoreCase(SavedColumnarContainerTable.class.getName()));
     }
 
     /**

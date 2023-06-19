@@ -47,6 +47,9 @@ package org.knime.core.data.columnar.table;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileSystemException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -124,8 +127,22 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         m_tableId = -1;
         final var size = settings.getLong(CFG_TABLE_SIZE);
         final ColumnStoreFactory factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
-        final var dataPath = context.getDataFileRef().getFile().toPath();
-        final BatchReadStore readStore = factory.createReadStore(dataPath);
+        // location in saved workflow, e.g. "Foo (#1)/port_1/data.file"
+        final var dataFileRef = context.getDataFileRef();
+        final Path tempDataPath;
+        dataFileRef.lock();
+        try {
+            final var tPath = new TempFileHandle().asPath(); // determines proper temp file name (+context)
+            Files.delete(tPath); // empty temp file, just created - needs to be deleted
+            tempDataPath = hardLinkOrCopy(dataFileRef.getFile().toPath(), tPath);
+        } catch (IOException ioe) {
+            throw new InvalidSettingsException(
+                String.format("Unable to store workflow data to temp: %s", ioe.getMessage()), ioe);
+        } finally {
+            dataFileRef.unlock();
+        }
+
+        final BatchReadStore readStore = factory.createReadStore(tempDataPath);
         var schema = ColumnarValueSchemaUtils.load(readStore.getSchema(), context);
         m_columnarTable = new ColumnarRowReadTable(schema, factory, readStore, size);
     }
@@ -146,6 +163,9 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         settings.addLong(CFG_TABLE_SIZE, m_columnarTable.size());
         settings.addString(CFG_FACTORY_TYPE, m_columnarTable.getStoreFactory().getClass().getName());
         m_columnarTable.getSchema().save(settings);
+        @SuppressWarnings("resource") // Store's life cycle is handled by super class.
+        final var store = getStore();
+        hardLinkOrCopy(store.getFileHandle().asPath(), f.toPath());
     }
 
     @Override
@@ -199,6 +219,9 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         } catch (final IOException e) {
             LOGGER.error(String.format("Exception while clearing ContainerTable: %s", e.getMessage()), e);
         }
+        @SuppressWarnings("resource") // Store's life cycle is handled by super class.
+        final BatchReadStore store = getStore();
+        store.getFileHandle().delete();
     }
 
     @Override
@@ -276,4 +299,26 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
             return m_columnarTable.createCursor(selection);
         }
     }
+
+    private static boolean hasReportedUnsupportedCreationOfHardLinks;
+
+    /**
+     * Attempts to create a hard link from source to target to avoid unnecessary copying. If that is not supported (file
+     * system doesn't support it or paths living on different file system) a copy is performed instead.
+     */
+    static Path hardLinkOrCopy(final Path sourceFilePath, final Path targetFilePath) throws IOException {
+        try {
+            return Files.createLink(targetFilePath, sourceFilePath);
+        } catch (UnsupportedOperationException | FileSystemException unsupportedException) {
+            if (!hasReportedUnsupportedCreationOfHardLinks) {
+                hasReportedUnsupportedCreationOfHardLinks = true;
+                LOGGER.warn(
+                    "Creation of hard links not supported, will copy files instead (and suppress further warnings)",
+                    unsupportedException);
+            }
+            LOGGER.debugWithFormat("Copying file %s to temp (creating of hard links not supported)", sourceFilePath);
+            return Files.copy(sourceFilePath, targetFilePath);
+        }
+    }
+
 }

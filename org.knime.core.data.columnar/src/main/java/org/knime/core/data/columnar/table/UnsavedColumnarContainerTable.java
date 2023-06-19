@@ -51,9 +51,7 @@ package org.knime.core.data.columnar.table;
 import java.io.File;
 import java.io.Flushable;
 import java.io.IOException;
-import java.nio.file.Files;
 
-import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.node.CanceledExecutionException;
@@ -121,18 +119,7 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     @Override
     protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
         throws IOException, CanceledExecutionException {
-        super.saveToFileOverwrite(f, settings, exec);
         m_storeFlusher.flush();
-        @SuppressWarnings("resource") // Store's life cycle is handled by super class.
-        final var store = getStore();
-        Files.copy(store.getFileHandle().asPath(), f.toPath());
-    }
-
-    @Override
-    public void clear() {
-        super.clear();
-        @SuppressWarnings("resource") // Store's life cycle is handled by super class.
-        final BatchReadStore store = getStore();
-        store.getFileHandle().delete();
+        super.saveToFileOverwrite(f, settings, exec);
     }
 }
