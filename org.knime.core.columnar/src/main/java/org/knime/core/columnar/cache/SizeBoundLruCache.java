@@ -45,8 +45,6 @@
  */
 package org.knime.core.columnar.cache;
 
-import java.util.Map;
-
 import org.knime.core.columnar.ReferencedData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +76,7 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
         }
     }
 
-    private final Map<K, DataWithEvictor<K, D>> m_lruCache;
+    private final Cache<K, DataWithEvictor<K, D>> m_cache;
 
     /**
      * @param maxSize the total size (in bytes) the cache should be able to hold
@@ -104,16 +102,14 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
             }
         };
 
-        final Cache<K, DataWithEvictor<K, D>> cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel)
+        m_cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel)
             .maximumWeight(maxSize).weigher(weigher).removalListener(removalListener).build();
-
-        m_lruCache = cache.asMap();
     }
 
     @Override
     public void put(final K key, final D data, final Evictor<? super K, ? super D> evictor) {
         data.retain();
-        m_lruCache.compute(key, (k, d) -> {
+        m_cache.asMap().compute(key, (k, d) -> {
             if (d != null) {
                 d.m_data.release(); // if we replace data, we have to make sure to release the old data
             }
@@ -123,7 +119,7 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
     @Override
     public D getRetained(final K key) {
-        final DataWithEvictor<K, D> cached = m_lruCache.get(key);
+        final DataWithEvictor<K, D> cached = m_cache.asMap().get(key);
         if (cached == null) {
             return null;
         }
@@ -138,13 +134,17 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
     @Override
     public D removeRetained(final K key) {
-        final DataWithEvictor<K, D> removed = m_lruCache.remove(key);
+        final DataWithEvictor<K, D> removed = m_cache.asMap().remove(key);
         return removed == null ? null : removed.m_data;
     }
 
     @Override
     public int size() {
-        return m_lruCache.size();
+        return m_cache.asMap().size();
     }
 
+    @Override
+    public void invalidateAll() {
+        m_cache.invalidateAll();
+    }
 }
