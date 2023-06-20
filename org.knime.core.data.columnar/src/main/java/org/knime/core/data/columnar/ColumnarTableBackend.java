@@ -159,7 +159,7 @@ public final class ColumnarTableBackend implements TableBackend {
     public String getDescription() {
         return "The Columnar Table Backend extension uses a different\n"
             + "underlying data layer based on a columnar representation,\n"
-            + "which gives noticable speed-ups over the default format.\n\n"
+            + "which gives noticable speed-ups over the row-based format.\n\n"
             + "Please also review the settings in the KNIME preferences\n"
             + "(File -> Preferences -> KNIME -> Table Backend -> Columnar Backend)\n";
     }
