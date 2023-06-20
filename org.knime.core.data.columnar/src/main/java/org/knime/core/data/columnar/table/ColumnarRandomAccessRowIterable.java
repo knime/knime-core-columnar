@@ -74,6 +74,7 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.row.RandomRowAccessible;
 import org.knime.core.table.row.RandomRowAccessible.RandomAccessCursor;
+import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
 
@@ -206,7 +207,7 @@ final class ColumnarRandomAccessRowIterable implements CloseableDataRowIterable,
 
     private final class ColumnCursor implements Closeable {
 
-        private final RandomAccessCursor m_cursor;
+        private final RandomAccessCursor<ReadAccessRow> m_cursor;
 
         private final ReadAccess m_readAccess;
 
