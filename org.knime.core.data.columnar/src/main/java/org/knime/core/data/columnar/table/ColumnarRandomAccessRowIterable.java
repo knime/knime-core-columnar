@@ -58,6 +58,7 @@ import java.util.stream.IntStream;
 
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.cursor.ColumnarRandomRowAccessible;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.DataCell;

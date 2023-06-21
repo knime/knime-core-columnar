@@ -46,7 +46,7 @@
  * History
  *   Mar 17, 2023 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.columnar.cursor;
 
 import java.io.IOException;
 
@@ -54,7 +54,6 @@ import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.cursor.ColumnarReadAccessRowFactory;
 import org.knime.core.columnar.cursor.ColumnarReadAccessRowFactory.ColumnarReadAccessRow;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.table.row.RandomRowAccessible;
@@ -67,7 +66,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarRandomRowAccessible implements RandomRowAccessible {
+public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandomRowAccessible implements RandomRowAccessible {
 
     private final RandomAccessBatchReadable m_store;
 
@@ -77,7 +76,7 @@ final class ColumnarRandomRowAccessible implements RandomRowAccessible {
 
     private final ColumnarReadAccessRowFactory m_rowFactory;
 
-    ColumnarRandomRowAccessible(final RandomAccessBatchReadable store, final long numRows, final int batchLength) {
+    public /* TODO (TP) remove public modifier (again) */ ColumnarRandomRowAccessible(final RandomAccessBatchReadable store, final long numRows, final int batchLength) {
         m_store = store;
         m_numRows = numRows;
         m_batchLength = batchLength;
