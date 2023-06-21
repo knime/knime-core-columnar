@@ -46,7 +46,7 @@
  * History
  *   Apr 13, 2023 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.columnar.cursor;
 
 import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
@@ -63,20 +63,20 @@ import org.knime.core.table.schema.DataSpec;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarReadAccessRowFactory {
+public /* TODO (TP) remove public modifier (again) */ final class ColumnarReadAccessRowFactory {
 
     private final ColumnarSchema m_schema;
 
-    ColumnarReadAccessRowFactory(final ColumnarSchema schema) {
+    public /* TODO (TP) remove public modifier (again) */ ColumnarReadAccessRowFactory(final ColumnarSchema schema) {
         m_schema = schema;
     }
 
-    interface ColumnarReadAccessRow extends ReadAccessRow {
+    public /* TODO (TP) remove public modifier (again) */ interface ColumnarReadAccessRow extends ReadAccessRow {
 
         void setBatch(ReadBatch batch);
     }
 
-    ColumnarReadAccessRow createRow(final ColumnDataIndex indexInBatch, final ColumnSelection columnSelection) {
+    public /* TODO (TP) remove public modifier (again) */ ColumnarReadAccessRow createRow(final ColumnDataIndex indexInBatch, final ColumnSelection columnSelection) {
         if (columnSelection.allSelected()) {
             return new FullColumnarReadAccessRow(m_schema.specStream()//
                 .map(s -> createReadAccess(s, indexInBatch))//

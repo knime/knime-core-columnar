@@ -61,6 +61,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.cursor.ColumnarReadAccessRowFactory;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.NullableReadData;
