@@ -53,6 +53,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -82,18 +83,19 @@ final class ColumnarOffHeapMemoryAlertSystemTest {
             return called.getAndSet(true);
         };
 
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(countingListener);
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(clearingListener);
-        var cleared = ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+        var memAlertSystem = createTestInstance();
+        memAlertSystem.addMemoryListener(countingListener);
+        memAlertSystem.addMemoryListener(clearingListener);
+        var cleared = memAlertSystem.sendMemoryAlert();
         assertFalse("Must not return cleared on the first call", cleared);
         assertEquals("Exactly 1 alert must be sent to the listeners", 1, alerts.get());
 
-        cleared = ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+        cleared = memAlertSystem.sendMemoryAlert();
         assertTrue("Must return cleared on the second call", cleared);
         assertEquals("Exactly 2 alerts must be sent to the listeners", 2, alerts.get());
 
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.removeMemoryListener(countingListener);
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.removeMemoryListener(clearingListener);
+        memAlertSystem.removeMemoryListener(countingListener);
+        memAlertSystem.removeMemoryListener(clearingListener);
     }
 
     @Test
@@ -112,12 +114,14 @@ final class ColumnarOffHeapMemoryAlertSystemTest {
             alerts.incrementAndGet();
             return false;
         };
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(countingListener);
+
+        var memAlertSystem = createTestInstance();
+        memAlertSystem.addMemoryListener(countingListener);
 
         // Setup the threads
         Runnable memoryAlertRunnable = () -> {
             try {
-                ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+                memAlertSystem.sendMemoryAlert();
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 fail("Thread got interrupted unexpectedly");
@@ -137,15 +141,17 @@ final class ColumnarOffHeapMemoryAlertSystemTest {
 
         assertEquals("Exactly 1 alert must be sent to the listeners", 1, alerts.get());
 
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.removeMemoryListener(countingListener);
+        memAlertSystem.removeMemoryListener(countingListener);
     }
 
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void testDeadlockOnMemoryAlertInListener() throws InterruptedException {
+        var memAlertSystem = createTestInstance();
+
         OffHeapMemoryAlertListener listenerWithAlert = () -> {
             try {
-                var cleared = ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+                var cleared = memAlertSystem.sendMemoryAlert();
                 assertFalse("Memory alerts inside listeners must return false", cleared);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
@@ -160,13 +166,25 @@ final class ColumnarOffHeapMemoryAlertSystemTest {
             return false;
         };
 
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(listenerWithAlert);
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(countingListener);
-        boolean cleared = ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+        memAlertSystem.addMemoryListener(listenerWithAlert);
+        memAlertSystem.addMemoryListener(countingListener);
+        boolean cleared = memAlertSystem.sendMemoryAlert();
         assertEquals("Exactly one alert must be sent to the listeners", 1, alerts.get());
         assertTrue("Must return cleared from the listener", cleared);
 
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.removeMemoryListener(listenerWithAlert);
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.removeMemoryListener(countingListener);
+        memAlertSystem.removeMemoryListener(listenerWithAlert);
+        memAlertSystem.removeMemoryListener(countingListener);
+    }
+
+    /** Create an instance of the {@link ColumnarOffHeapMemoryAlertSystem} for testing using reflection */
+    private static ColumnarOffHeapMemoryAlertSystem createTestInstance() {
+        try {
+            var constructor = ColumnarOffHeapMemoryAlertSystem.class.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
+                | NoSuchMethodException | SecurityException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 }
