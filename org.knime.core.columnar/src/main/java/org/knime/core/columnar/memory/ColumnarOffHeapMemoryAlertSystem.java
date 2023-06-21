@@ -78,6 +78,9 @@ public final class ColumnarOffHeapMemoryAlertSystem {
     /** Semaphore for blocking access to sending the memory alert - blocked threads will use the last result */
     private final Semaphore m_semaphore = new Semaphore(1);
 
+    /** Id of the thread that runs the memory alert (NOTE: Threads only have positive ids) */
+    private long m_runningThreadId = -1;
+
     private ColumnarOffHeapMemoryAlertSystem() {
     }
 
@@ -90,18 +93,23 @@ public final class ColumnarOffHeapMemoryAlertSystem {
      *             other thread
      */
     public boolean sendMemoryAlert() throws InterruptedException {
-        // TODO is a deadlock possible?
-        // 1. Memory alert is called
-        // 2. A listener needs to allocate memory to release memory (for example to run compression before serializing data to disc)
-        // 3. While allocating another memory alert is triggered
-        // 4. The new memory alert cannot acquire the semaphore and waits for itself?
+        if (Thread.currentThread().getId() == m_runningThreadId) {
+            // Do not call the listeners again if this thread runs the memory alert already earlier on the call stack
+            return false;
+        }
 
         if (m_semaphore.tryAcquire()) {
             // No other thread is running:
             // This thread calls the memory alert on the listeners
             LOGGER.debug("Received off-heap memory alert. Calling listeners to release memory.");
+
+            // We remember the thread id to prevent this thread from waiting in this method later in the call stack if a
+            // listener causes another memory alert
+            m_runningThreadId = Thread.currentThread().getId();
             var result = callMemoryAlertForListeners();
             m_lastReleaseResult.set(result);
+            m_runningThreadId = -1;
+
             m_semaphore.release();
             LOGGER.debug(result ? "Memory was released." : "No memory was released");
             return result;

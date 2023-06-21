@@ -53,10 +53,12 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem.OffHeapMemoryAlertListener;
 
 /**
@@ -135,6 +137,36 @@ final class ColumnarOffHeapMemoryAlertSystemTest {
 
         assertEquals("Exactly 1 alert must be sent to the listeners", 1, alerts.get());
 
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.removeMemoryListener(countingListener);
+    }
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    void testDeadlockOnMemoryAlertInListener() throws InterruptedException {
+        OffHeapMemoryAlertListener listenerWithAlert = () -> {
+            try {
+                var cleared = ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+                assertFalse("Memory alerts inside listeners must return false", cleared);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(ex);
+            }
+            return true;
+        };
+
+        var alerts = new AtomicInteger(0);
+        OffHeapMemoryAlertListener countingListener = () -> {
+            alerts.incrementAndGet();
+            return false;
+        };
+
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(listenerWithAlert);
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(countingListener);
+        boolean cleared = ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+        assertEquals("Exactly one alert must be sent to the listeners", 1, alerts.get());
+        assertTrue("Must return cleared from the listener", cleared);
+
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.removeMemoryListener(listenerWithAlert);
         ColumnarOffHeapMemoryAlertSystem.INSTANCE.removeMemoryListener(countingListener);
     }
 }
