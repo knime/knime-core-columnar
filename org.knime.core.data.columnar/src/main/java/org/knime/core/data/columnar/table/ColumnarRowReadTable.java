@@ -125,6 +125,9 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
         m_storeFactory = storeFactory;
         m_store = store;
         m_size = size;
+        // TODO (TP)
+//        m_randomRowAccessible = new ColumnarRandomRowAccessible(new AllColumnsRandomAccessBatchReadable(store), numRows,
+//            store.batchLength());
         m_randomAccessIterable = new ColumnarRandomAccessRowIterable(store, size, schema);
     }
 

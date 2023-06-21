@@ -89,6 +89,7 @@ public interface RandomAccessBatchReadable extends BatchReadable {
      */
     default RandomAccessBatchReader createRandomAccessReader() {
         return createRandomAccessReader(new DefaultColumnSelection(getSchema().numColumns()));
+        // TODO (TP) return createRandomAccessReader(ColumnSelection.fromSelection(Selection.all(), getSchema().numColumns()));
     }
 
 }
