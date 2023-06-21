@@ -63,20 +63,20 @@ import org.knime.core.table.schema.DataSpec;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public /* TODO (TP) remove public modifier (again) */ final class ColumnarReadAccessRowFactory {
+final class ColumnarReadAccessRowFactory {
 
     private final ColumnarSchema m_schema;
 
-    public /* TODO (TP) remove public modifier (again) */ ColumnarReadAccessRowFactory(final ColumnarSchema schema) {
+    ColumnarReadAccessRowFactory(final ColumnarSchema schema) {
         m_schema = schema;
     }
 
-    public /* TODO (TP) remove public modifier (again) */ interface ColumnarReadAccessRow extends ReadAccessRow {
+    interface ColumnarReadAccessRow extends ReadAccessRow {
 
         void setBatch(ReadBatch batch);
     }
 
-    public /* TODO (TP) remove public modifier (again) */ ColumnarReadAccessRow createRow(final ColumnDataIndex indexInBatch, final ColumnSelection columnSelection) {
+    ColumnarReadAccessRow createRow(final ColumnDataIndex indexInBatch, final ColumnSelection columnSelection) {
         if (columnSelection.allSelected()) {
             return new FullColumnarReadAccessRow(m_schema.specStream()//
                 .map(s -> createReadAccess(s, indexInBatch))//
