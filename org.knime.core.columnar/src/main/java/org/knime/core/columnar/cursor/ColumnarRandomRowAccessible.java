@@ -66,6 +66,8 @@ import org.knime.core.table.schema.ColumnarSchema;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
+//TODO (TP) rename to ColumnarRowAccessible
+//TODO (TP) move to more appropriate package (with ColumnarReadAccessRowFactory and ColumnarReadAccessRowFactoryTest)
 public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandomRowAccessible implements RandomRowAccessible {
 
     private final RandomAccessBatchReadable m_store;
@@ -99,12 +101,12 @@ public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandom
     }
 
     @Override
-    public RandomAccessCursor createCursor() {
+    public RandomAccessCursor<ReadAccessRow> createCursor() {
         return createCursor(Selection.all());
     }
 
     @Override
-    public RandomAccessCursor createCursor(final Selection selection) {
+    public RandomAccessCursor<ReadAccessRow> createCursor(final Selection selection) {
         final var indexInBatch = new MutableColumnDataIndex();
         var row = m_rowFactory.createRow(indexInBatch, selection.columns());
         return new ColumnarRandomAccessCursor(row, indexInBatch, selection);
@@ -128,9 +130,12 @@ public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandom
             m_index = index;
         }
 
+        public void increment() {
+            ++m_index;
+        }
     }
 
-    private final class ColumnarRandomAccessCursor implements RandomAccessCursor {
+    private final class ColumnarRandomAccessCursor implements RandomAccessCursor<ReadAccessRow> {
 
         private final RandomAccessBatchReader m_batchReader;
 
@@ -138,21 +143,26 @@ public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandom
 
         private final ColumnarReadAccessRow m_readAccessRow;
 
-        private long m_currentRow = -1;
+        // first row in selection (inclusive)
+        private final long m_from;
 
-        private int m_currentBatchIndex = -1;
+        // last row + 1 in selection (exclusive)
+        private final long m_to;
+
+        // first row in the current batch (inclusive)
+        private long m_batchFromRow = Long.MAX_VALUE;
+
+        // last row + 1 in the current batch (exclusive)
+        private long m_batchToRow= -1;
+
+        // the current row. relative to the start of the table
+        private long m_row;
 
         private ReadBatch m_currentBatch;
 
-        private long m_from;
-
-        private long m_to;
-
-        private long m_rowRangeSize;
-
         ColumnarRandomAccessCursor(final ColumnarReadAccessRow readAccessRow,
             final MutableColumnDataIndex indexInBatch, final Selection selection) {
-            m_batchReader = m_store.createRandomAccessReader(convertColumnSelection(selection));
+            m_batchReader = m_store.createRandomAccessReader(convertColumnSelection(selection)); // TODO (TP): move convertColumnSelection() logic into m_store.createRandomAccessReader(...)
             m_readAccessRow = readAccessRow;
             m_indexInBatch = indexInBatch;
             var rowSelection = selection.rows();
@@ -163,49 +173,62 @@ public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandom
                 m_from = rowSelection.fromIndex();
                 m_to = rowSelection.toIndex();
             }
-            m_rowRangeSize = m_to - m_from;
+            m_row = m_from - 1;
         }
 
         private ColumnSelection convertColumnSelection(final Selection selection) {
             return ColumnSelection.fromSelection(selection, getSchema().numColumns());
         }
 
-        private int getBatchIndex(final long rowIndex) {
-            return (int)(rowIndex / m_batchLength);
-        }
-
-        private int getIndexInBatch(final long rowIndex) {
-            return (int)(rowIndex % m_batchLength);
-        }
-
         @Override
         public boolean forward() {
-            if (canForward()) {
-                moveTo(m_currentRow + 1);
-                return true;
+            if (++m_row < m_batchToRow) {
+                m_indexInBatch.increment();
+            } else {
+                // moving to a different batch
+                // bounds checking first
+                if (m_row >= m_to) {
+                    return false;
+                }
+                switchCurrentBatch();
             }
-            return false;
+            return true;
         }
 
         @Override
         public void moveTo(final long row) {
-            if (row == m_currentRow) {
-                return;
+            // N.B. The row argument is relative to m_from.
+            //      m_row is the "true" row-index.
+            m_row = row + m_from;
+            if (m_row >= m_batchFromRow && m_row < m_batchToRow) {
+                m_indexInBatch.setIndex((int)(m_row - m_batchFromRow));
+            } else {
+                // moving to a different batch
+                // bounds checking first
+                if (m_row < m_from || m_row >= m_to) {
+                    m_row = m_to; // so that canForward()/forward() will work correctly
+                    throw new IndexOutOfBoundsException();
+                }
+                switchCurrentBatch();
             }
+        }
 
-            if (row < 0 || row >= m_rowRangeSize) {
-                throw new IndexOutOfBoundsException();
+        private void switchCurrentBatch() {
+            final long batchIndex = m_row / m_batchLength;
+            m_batchFromRow = Math.max(m_from, m_batchLength * batchIndex);
+            m_batchToRow = Math.min(m_to, m_batchLength * (batchIndex + 1));
+
+            releaseCurrentBatch();
+            m_currentBatch = readBatch((int)batchIndex);
+            m_readAccessRow.setBatch(m_currentBatch);
+
+            m_indexInBatch.setIndex((int)(m_row - m_batchFromRow));
+        }
+
+        private void releaseCurrentBatch() {
+            if (m_currentBatch != null) {
+                m_currentBatch.release();
             }
-            m_currentRow = row;
-            var trueRowIndex = row + m_from;
-            var oldBatchIndex = m_currentBatchIndex;
-            m_currentBatchIndex = getBatchIndex(trueRowIndex);
-            if (m_currentBatchIndex != oldBatchIndex) {
-                releaseCurrentBatch();
-                m_currentBatch = readBatch(m_currentBatchIndex);
-                m_readAccessRow.setBatch(m_currentBatch);
-            }
-            m_indexInBatch.setIndex(getIndexInBatch(trueRowIndex));
         }
 
         private ReadBatch readBatch(final int batchIndex) {
@@ -216,15 +239,9 @@ public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandom
             }
         }
 
-        private void releaseCurrentBatch() {
-            if (m_currentBatch != null) {
-                m_currentBatch.release();
-            }
-        }
-
         @Override
         public boolean canForward() {
-            return m_currentRow < m_rowRangeSize;
+            return (m_row + 1) < m_to;
         }
 
         @Override
