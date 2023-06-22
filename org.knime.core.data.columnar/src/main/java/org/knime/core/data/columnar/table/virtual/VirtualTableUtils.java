@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -66,6 +67,7 @@ import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
@@ -152,6 +154,7 @@ public final class VirtualTableUtils {
      * @param columnSelection specifies which columns are included
      * @return a {@link RowRead} that is backed by the provided {@link ReadAccessRow}
      */
+    // TODO (TP) Remove?
     public static RowRead createRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow,
         final ColumnSelection columnSelection) {
         if (isSparse(columnSelection)) {
@@ -161,9 +164,30 @@ public final class VirtualTableUtils {
         }
     }
 
+    // TODO (TP) Remove?
     private static boolean isSparse(final ColumnSelection columnSelection) {
         return columnSelection != null && IntStream.range(0, columnSelection.numColumns())//
             .anyMatch(i -> !columnSelection.isSelected(i));
+    }
+
+    /**
+     * Creates a {@link RowRead} that wraps the provided {@link ReadAccessRow} and respects the provided
+     * {@link ColumnSelection}.
+     *
+     * @param schema of the table
+     * @param accessRow to wrap
+     * @param columnSelection specifies which columns are included
+     * @return a {@link RowRead} that is backed by the provided {@link ReadAccessRow}
+     */
+    public static RowRead createRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow,
+        final Selection.ColumnSelection columnSelection) {
+        if (columnSelection.allSelected()) {
+            return new DenseColumnarRowRead(schema, accessRow);
+        } else {
+            final int numColumns = schema.numColumns();
+            final ColumnSelection selection = new FilteredColumnSelection(numColumns, columnSelection.getSelected(0, numColumns));
+            return new SparseColumnarRowRead(schema, accessRow, selection);
+        }
     }
 
     /**

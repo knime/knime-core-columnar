@@ -55,6 +55,7 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.data.container.filter.TableFilter;
+import org.knime.core.table.row.Selection;
 
 /**
  * Utility class for dealing with the {@link TableFilter} API.
@@ -152,6 +153,36 @@ public final class TableFilterUtils {
         return filter.getMaterializeColumnIndices()//
             .map(TableFilterUtils::toSortedIntArrayWithRowKey)//
             .map(i -> new FilteredColumnSelection(numColumns, i));
+    }
+
+    /**
+     * Creates a {@link Selection} based on the provided {@link TableFilter}.
+     *
+     * @param filter to extract the to index from
+     * @param size number of rows in the table that is filtered
+     * @return the to index defined in TableFilter or {@code size - 1} if no to index is specified
+     */
+    public static Selection createSelection(final TableFilter filter, final long size) {
+        Selection selection = Selection.all();
+        if (filter != null) {
+            final Optional<Long> fromRow = filter.getFromRowIndex();
+            final Optional<Long> toRow = filter.getToRowIndex();
+            if (fromRow.isPresent() || toRow.isPresent()) {
+                // toRow in Selection is exclusive, toRow in TableFilter is inclusive
+                selection = selection.retainRows(fromRow.orElse(0L), toRow.orElse(size - 1) + 1);
+            }
+            final Optional<Set<Integer>> materializeColumnIndices = filter.getMaterializeColumnIndices();
+            if (materializeColumnIndices.isPresent()) {
+                var filterCols = materializeColumnIndices.get();
+                final int[] columns = new int[filterCols.size() + 1]; // the first column is the row key and has to always be included
+                int i = 1;
+                for (int filterCol : filterCols) {
+                    columns[i++] = filterCol + 1; // the table filter doesn't include the row key as first column
+                }
+                selection = selection.retainColumns(columns);
+            }
+        }
+        return selection;
     }
 
     private TableFilterUtils() {

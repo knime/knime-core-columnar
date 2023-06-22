@@ -46,7 +46,6 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.filter.BatchRange;
@@ -64,6 +63,7 @@ import org.knime.core.data.v2.RowRead;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
+import org.knime.core.table.row.Selection;
 
 /**
  * Columnar implementations of {@link RowCursor} for reading data from columnar table backend.
@@ -111,8 +111,16 @@ final class ColumnarRowCursorFactory {
 
         private final RowRead m_rowRead;
 
+        // TODO (TP) Remove?
         private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate, final ColumnarValueSchema schema,
             final ColumnSelection selection) {
+            m_delegate = delegate;
+            ReadAccessRow access = delegate.access();
+            m_rowRead = VirtualTableUtils.createRowRead(schema, access, selection);
+        }
+
+        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate, final ColumnarValueSchema schema,
+            final Selection.ColumnSelection selection) {
             m_delegate = delegate;
             ReadAccessRow access = delegate.access();
             m_rowRead = VirtualTableUtils.createRowRead(schema, access, selection);
