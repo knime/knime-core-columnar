@@ -125,7 +125,7 @@ public final class ColumnarVirtualTable {
      * @param transform of the table
      * @param schema of the table
      */
-    public ColumnarVirtualTable(final TableTransform transform,final ColumnarValueSchema schema) {
+    public ColumnarVirtualTable(final TableTransform transform, final ColumnarValueSchema schema) {
         m_transform = transform;
         m_valueSchema = schema;
     }
