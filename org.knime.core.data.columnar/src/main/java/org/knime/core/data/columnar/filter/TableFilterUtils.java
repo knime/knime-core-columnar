@@ -158,7 +158,8 @@ public final class TableFilterUtils {
     /**
      * Creates a {@link Selection} based on the provided {@link TableFilter}.
      *
-     * @param filter to extract the to index from
+     * @param filter to create the {@code Selection} from. If {@code filter==null}, the full {@link Selection#all()} is
+     *            returned (containing all rows and columns).
      * @param size number of rows in the table that is filtered
      * @return the to index defined in TableFilter or {@code size - 1} if no to index is specified
      */
