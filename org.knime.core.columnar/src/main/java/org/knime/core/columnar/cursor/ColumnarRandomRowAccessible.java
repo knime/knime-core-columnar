@@ -68,7 +68,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 //TODO (TP) rename to ColumnarRowAccessible
 //TODO (TP) move to more appropriate package (with ColumnarReadAccessRowFactory and ColumnarReadAccessRowFactoryTest)
-public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandomRowAccessible implements RandomRowAccessible {
+public final class ColumnarRandomRowAccessible implements RandomRowAccessible {
 
     private final RandomAccessBatchReadable m_store;
 
@@ -78,7 +78,7 @@ public /* TODO (TP) remove public modifier (again) */ final class ColumnarRandom
 
     private final ColumnarReadAccessRowFactory m_rowFactory;
 
-    public /* TODO (TP) remove public modifier (again) */ ColumnarRandomRowAccessible(final RandomAccessBatchReadable store, final long numRows, final int batchLength) {
+    public ColumnarRandomRowAccessible(final RandomAccessBatchReadable store, final long numRows, final int batchLength) {
         m_store = store;
         m_numRows = numRows;
         m_batchLength = batchLength;
