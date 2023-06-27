@@ -65,7 +65,6 @@ import org.knime.core.columnar.cache.batch.SharedReadBatchCache;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.cache.object.shared.SoftReferencedObjectCache;
-import org.knime.core.columnar.cache.object.shared.WeakReferencedObjectCache;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.data.columnar.ColumnarTableBackend;
 import org.knime.core.data.util.memory.MemoryAlert;
@@ -82,35 +81,6 @@ import org.osgi.framework.FrameworkUtil;
 public final class ColumnarPreferenceUtils {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarPreferenceUtils.class);
-
-    enum HeapCache {
-
-            WEAK {
-                @Override
-                SharedObjectCache createCache() {
-                    return new WeakReferencedObjectCache();
-                }
-            },
-
-            SOFT {
-                @Override
-                SharedObjectCache createCache() {
-                    final SoftReferencedObjectCache cache = new SoftReferencedObjectCache();
-
-                    MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
-                        @Override
-                        protected boolean memoryAlert(final MemoryAlert alert) {
-                            cache.invalidate();
-                            return false;
-                        }
-                    });
-
-                    return cache;
-                }
-            };
-
-        abstract SharedObjectCache createCache();
-    }
 
     private static final String COLUMNAR_SYMBOLIC_NAME =
         FrameworkUtil.getBundle(ColumnarTableBackend.class).getSymbolicName();
@@ -191,7 +161,17 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized SharedObjectCache getHeapCache() {
         if (heapCache == null) {
-            heapCache = HeapCache.WEAK.createCache();
+            // NB: We always use the SoftReferencedObjectCache because it optimizes for performance compared to the
+            // WeakReferencedObjectCache and we do not want to give the user too many options (see AP-20412)
+            final var cache = new SoftReferencedObjectCache();
+            MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
+                @Override
+                protected boolean memoryAlert(final MemoryAlert alert) {
+                    cache.invalidate();
+                    return false;
+                }
+            });
+            heapCache = cache;
         }
         return heapCache;
     }
