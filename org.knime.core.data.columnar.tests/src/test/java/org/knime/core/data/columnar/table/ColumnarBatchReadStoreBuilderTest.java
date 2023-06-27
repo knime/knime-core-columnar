@@ -57,7 +57,7 @@ import org.junit.Test;
 import org.knime.core.columnar.cache.data.ReadDataReadCache;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.ObjectReadCache;
-import org.knime.core.columnar.cache.object.shared.WeakReferencedObjectCache;
+import org.knime.core.columnar.cache.object.shared.SoftReferencedObjectCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchReadable;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestBatchStore;
@@ -110,7 +110,7 @@ public class ColumnarBatchReadStoreBuilderTest extends ColumnarTest {
     @Test
     public void testHeapCache() throws IOException {
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
-            final var cache = new WeakReferencedObjectCache();
+            final var cache = new SoftReferencedObjectCache();
             final var builder = new ColumnarBatchReadStoreBuilder(delegate)
                     .useHeapCache(cache);
             try (final var wrappedStore = builder.build();
@@ -136,7 +136,7 @@ public class ColumnarBatchReadStoreBuilderTest extends ColumnarTest {
     @Test
     public void testHeapCacheAfterColumnDataCache() throws IOException {
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
-            final var heapCache = new WeakReferencedObjectCache();
+            final var heapCache = new SoftReferencedObjectCache();
             final var columnDataCache = new SharedReadDataCache(64, 2);
             final var builder = new ColumnarBatchReadStoreBuilder(delegate)
                     .useHeapCache(heapCache)
@@ -151,7 +151,7 @@ public class ColumnarBatchReadStoreBuilderTest extends ColumnarTest {
     @Test
     public void testHeapCacheAfterDictEncoding() throws IOException {
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
-            final var heapCache = new WeakReferencedObjectCache();
+            final var heapCache = new SoftReferencedObjectCache();
             final var builder = new ColumnarBatchReadStoreBuilder(delegate)
                     .useHeapCache(heapCache)
                     .enableDictEncoding(true);

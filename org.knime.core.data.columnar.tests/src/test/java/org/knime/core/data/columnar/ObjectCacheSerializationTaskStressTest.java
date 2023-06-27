@@ -23,7 +23,7 @@ import org.junit.Test;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
-import org.knime.core.columnar.cache.object.shared.WeakReferencedObjectCache;
+import org.knime.core.columnar.cache.object.shared.SoftReferencedObjectCache;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
@@ -80,7 +80,7 @@ public class ObjectCacheSerializationTaskStressTest {
                 new SharedBatchWritableCache(smallTableCacheSizeThresholdInBytes, smallTableCachSizeInBytes, 2);
             final var builder = new ColumnarBatchStoreBuilder(store);
             builder.useColumnDataCache(columnDataCache, persistExecutor).useSmallTableCache(smallTableCache);
-            builder.useHeapCache(new WeakReferencedObjectCache(), persistExecutor, serializeExecutor);
+            builder.useHeapCache(new SoftReferencedObjectCache(), persistExecutor, serializeExecutor);
             builder.useDomainCalculation(
                 new DefaultDomainWritableConfig(createColumnarValueSchema(numDataColumnsOfChunks), 100, true),
                 domainCalcExecutor);
