@@ -48,6 +48,7 @@ package org.knime.core.columnar.arrow;
 import java.nio.file.Path;
 
 import org.apache.arrow.memory.AllocationListener;
+import org.apache.arrow.memory.AllocationOutcome;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.bytedeco.javacpp.Loader;
@@ -58,6 +59,7 @@ import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
+import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.columnar.store.ColumnStoreFactoryCreator;
 import org.knime.core.columnar.store.FileHandle;
@@ -72,6 +74,8 @@ import org.slf4j.LoggerFactory;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 public class ArrowColumnStoreFactory implements ColumnStoreFactory {
+
+    private static final double MEMORY_ALERT_THRESHOLD = 0.9;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArrowColumnStoreFactory.class);
 
@@ -114,15 +118,20 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     private ArrowColumnStoreFactory(final long memoryLimit) {
         m_allocator = new RootAllocator(new AllocationListener() {
-            /*
-             * TODO Notify the caches
-             *
-             * On new allocations:
-             * If we are over 90% of the limit after the allocation, notify the caches.
-             *
-             * On failed allocations:
-             * Notify the caches and wait for them to release something. If they return that something was released, we can retry the allocation.
-             */
+
+            @Override
+            public void onAllocation(final long size) {
+                if (m_allocator.getAllocatedMemory() > memoryLimit * MEMORY_ALERT_THRESHOLD) {
+                    LOGGER.debug("Memory over {}%. Calling memory alert.", (int)(100 * MEMORY_ALERT_THRESHOLD));
+                    memoryAlert();
+                }
+            }
+
+            @Override
+            public boolean onFailedAllocation(final long size, final AllocationOutcome outcome) {
+                LOGGER.debug("Allocation of {} bytes failed. Calling memory alert.", size);
+                return memoryAlert();
+            }
 
         }, memoryLimit);
         m_compression = ArrowCompressionUtil.getDefaultCompression();
@@ -159,6 +168,17 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     private BufferAllocator newChildAllocator(final String name) {
         return m_allocator.newChildAllocator(name, 0, m_allocator.getLimit());
+    }
+
+    private static boolean memoryAlert() {
+        try {
+            return ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+        } catch (final InterruptedException ex) {
+            // Interrupted while waiting on the listeners reacting on the alert
+            // We do not re-throw the exception because the AllocationListener should not throw an exception
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     /** {@link ColumnStoreFactoryCreator} for {@link ArrowColumnStoreFactory}. Used by the columnar framework. */
