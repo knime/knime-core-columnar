@@ -64,7 +64,6 @@ import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
-import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
@@ -189,6 +188,7 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
      *            cursor.
      * @return A newly constructed cursor that allows to read this table's data.
      */
+    @SuppressWarnings("resource")
     public RowCursor createRowCursor(final TableFilter filter) {
         if (filter != null) {
             filter.validate(m_schema.getSourceSpec(), m_size);
@@ -203,7 +203,11 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
             }
         }
         final Selection selection = TableFilterUtils.createSelection(filter, m_size);
-        final RowCursor rowCursor = new DefaultRowCursor(m_rowAccessible.createCursor(selection), m_schema, selection.columns());
+        final LookaheadCursor<ReadAccessRow> cursor = m_rowAccessible.createCursor(selection);
+        final RowRead rowRead = VirtualTableUtils.createRowRead(m_schema, cursor.access(), selection.columns());
+        final RowCursor rowCursor = new ColumnarRowCursor(rowRead, cursor);
+
+        // we track the cursors, so that we can close them before closing m_store
         return m_rowCursorTracker.createTrackedCursor(() -> rowCursor);
     }
 
@@ -217,50 +221,6 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
         m_rowCursorTracker.close();
         m_cursorTracker.close();
         m_store.close();
-    }
-
-
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowReadTable.class);
-
-    private static final class DefaultRowCursor implements RowCursor {
-
-        private final LookaheadCursor<ReadAccessRow> m_delegate;
-
-        private final RowRead m_rowRead;
-
-        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate, final ColumnarValueSchema schema,
-            final Selection.ColumnSelection selection) {
-            m_delegate = delegate;
-            ReadAccessRow access = delegate.access();
-            m_rowRead = VirtualTableUtils.createRowRead(schema, access, selection);
-        }
-
-        @Override
-        public boolean canForward() {
-            return m_delegate.canForward();
-        }
-
-        @Override
-        public RowRead forward() {
-            return m_delegate.forward() ? m_rowRead : null;
-        }
-
-        @Override
-        public int getNumColumns() {
-            return m_rowRead.getNumColumns();
-        }
-
-        @Override
-        public void close() {
-            try {
-                m_delegate.close();
-            } catch (IOException ex) {
-                final String error = "Exception while closing batch reader.";
-                LOGGER.error(error, ex);
-                throw new IllegalStateException(error, ex);
-            }
-        }
-
     }
 
 }

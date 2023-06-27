@@ -48,11 +48,6 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import static java.util.stream.Collectors.toList;
-
-import java.util.List;
-import java.util.stream.IntStream;
-
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
@@ -64,15 +59,10 @@ import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.cursor.Cursors;
-import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.row.Selection;
-import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.DefaultColumnarSchema;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Provides utility functions for dealing with the conversion between the physical (accesses) and logical layer (values)
@@ -83,20 +73,22 @@ import org.knime.core.table.schema.traits.DataTraits;
 public final class VirtualTableUtils {
 
     /**
-     * Creates a RowCursor that has been filtered by a {@link TableFilter}.
+     * Creates a {@link RowCursor} that has been filtered by a {@link TableFilter}.
      *
-     * @param unfilteredSchema {@link ColumnarValueSchema} containing all columns (including unselected ones)
+     * @param filteredSchema {@link ColumnarValueSchema} containing only the selected columns
      * @param filteredCursor {@link Cursor} that contains only the selected columns and rows
      * @param columnSelection corresponding to the applied {@link TableFilter}
+     * @param numColumns number of columns in the (un-filtered) table (RowKey column is also counted)
+     *
      * @return a {@link RowCursor} with the unfiltered schema that only contains values for the selected columns
      */
     @SuppressWarnings("resource") // the lookaheadCursor is managed by the returned RowCursor
-    public static RowCursor createTableFilterRowCursor(final ColumnarValueSchema unfilteredSchema,
-        final Cursor<ReadAccessRow> filteredCursor, final ColumnSelection columnSelection) {
-        final ColumnarSchema filteredSchema = filter(unfilteredSchema, columnSelection);
-        final LookaheadCursor<ReadAccessRow> lookaheadCursor = Cursors.toLookahead(filteredSchema, filteredCursor);
-        final var rowRead = new FilteredRowRead(unfilteredSchema, lookaheadCursor.access(), columnSelection);
-        return new ColumnarRowCursor(rowRead, lookaheadCursor);
+    public static RowCursor createTableFilterRowCursor(final ColumnarValueSchema filteredSchema,
+        final Cursor<ReadAccessRow> filteredCursor, final Selection.ColumnSelection columnSelection, final int numColumns) {
+
+        final var filteredLookaheadCursor = Cursors.toLookahead(filteredSchema, filteredCursor);
+        final var filteredRowRead = new FilteredRowRead(filteredSchema, filteredLookaheadCursor.access(), columnSelection, numColumns);
+        return new ColumnarRowCursor(filteredRowRead, filteredLookaheadCursor);
     }
 
     /**
@@ -110,23 +102,8 @@ public final class VirtualTableUtils {
     public static RowCursor createColumnarRowCursor(final ColumnarValueSchema schema,
         final Cursor<ReadAccessRow> cursor) {
         final var lookaheadCursor = Cursors.toLookahead(schema, cursor);
-        final var accessRow = createRowRead(schema, lookaheadCursor.access());
+        final var accessRow = createRowRead(schema, lookaheadCursor.access(), Selection.all().columns());
         return new ColumnarRowCursor(accessRow, lookaheadCursor);
-    }
-
-    private static ColumnarSchema filter(final ColumnarSchema unfiltered, final ColumnSelection selection) {
-        final List<DataSpec> specs = getSelectedIndexStream(selection)
-            .mapToObj(unfiltered::getSpec)//
-            .collect(toList());
-        final List<DataTraits> traits = getSelectedIndexStream(selection)
-                .mapToObj(unfiltered::getTraits)//
-                .collect(toList());
-        return new DefaultColumnarSchema(specs, traits);
-    }
-
-    private static IntStream getSelectedIndexStream(final ColumnSelection selection) {
-        return IntStream.range(0, selection.numColumns())//
-                .filter(selection::isSelected);
     }
 
     /**
@@ -140,10 +117,6 @@ public final class VirtualTableUtils {
         CheckUtils.checkArgument(schema.getSourceSpec().equals(table.getDataTableSpec()),
             "The schema must match the table.");
         return new BufferedDataTableRowAccessible(table, schema);
-    }
-
-    private static RowRead createRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow) {
-        return new DenseColumnarRowRead(schema, accessRow);
     }
 
     /**

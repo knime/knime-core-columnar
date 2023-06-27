@@ -89,6 +89,7 @@ import org.knime.core.node.workflow.WorkflowDataRepository;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.row.Selection;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
@@ -483,8 +484,9 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public RowCursor cursor(final TableFilter filter) {
-        if (TableFilterUtils.hasFilter(filter)) {
-            return m_openCursors.createTrackedCursor(() -> createdFilteredRowCursor(filter));
+        Selection selection = TableFilterUtils.createSelection(filter, m_size);
+        if (!selection.allSelected()) {
+            return m_openCursors.createTrackedCursor(() -> createdFilteredRowCursor(selection));
         } else {
             // cursor() already does the tracking for us
             return cursor();
@@ -492,27 +494,36 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     }
 
     @SuppressWarnings("resource") // we track both the accessibles and the cursor using CloseableTracker
-    private RowCursor createdFilteredRowCursor(final TableFilter filter) {
-        var table = createFilteredVirtualTable(filter);
+    private RowCursor createdFilteredRowCursor(final Selection selection) {
+        var table = createFilteredVirtualTable(selection);
         final VirtualTableExecutor exec = new GraphVirtualTableExecutor(table.getProducingTransform());
         final List<RowAccessible> accessibles = exec.execute(collectSources());
         final Cursor<ReadAccessRow> physicalCursor = accessibles.get(0).createCursor();
-        var cursor = TableFilterUtils.createColumnSelection(filter, m_schema.numColumns())//
-            .map(s -> VirtualTableUtils.createTableFilterRowCursor(m_schema, physicalCursor, s))//
-            .orElseGet(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, physicalCursor));
+        final var cols = selection.columns();
+        final RowCursor cursor;
+        // TODO (TP) is this if-else really necessary here? Could this not all be handled by the same VirtualTableUtils method?
+        if ( !cols.allSelected() )
+        {
+            cursor = VirtualTableUtils.createTableFilterRowCursor(table.getSchema(), physicalCursor, cols, m_schema.numColumns());
+        }
+        else
+        {
+            cursor = VirtualTableUtils.createColumnarRowCursor(m_schema, physicalCursor);
+        }
         return new SourceClosingRowCursor(cursor, accessibles.toArray(Closeable[]::new));
     }
 
-    private ColumnarVirtualTable createFilteredVirtualTable(final TableFilter filter) {
+    private ColumnarVirtualTable createFilteredVirtualTable(final Selection selection) {
         var table = getVirtualTable();
 
-        if (TableFilterUtils.definesRowRange(filter)) {
-            table = table.slice(TableFilterUtils.extractFromIndex(filter),
-                TableFilterUtils.extractToIndex(filter, m_size) + 1);
+        var rows = selection.rows();
+        if (!rows.allSelected()) {
+            table = table.slice(rows.fromIndex(), rows.toIndex());
         }
 
-        if (TableFilterUtils.definesColumnFilter(filter)) {
-            table = table.selectColumns(TableFilterUtils.extractPhysicalColumnIndices(filter, m_schema.numColumns()));
+        var cols = selection.columns();
+        if (!cols.allSelected()) {
+            table = table.selectColumns(cols.getSelected());
         }
         return table;
     }

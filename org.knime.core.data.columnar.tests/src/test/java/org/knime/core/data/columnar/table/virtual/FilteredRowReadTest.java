@@ -53,18 +53,25 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
+import java.util.stream.IntStream;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.DoubleValue;
 import org.knime.core.data.IntValue;
+import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.table.access.BooleanAccess.BooleanReadAccess;
 import org.knime.core.table.access.DoubleAccess.DoubleReadAccess;
 import org.knime.core.table.access.IntAccess.IntReadAccess;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.StringAccess.StringReadAccess;
 import org.knime.core.table.row.ReadAccessRow;
+import org.knime.core.table.row.Selection;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -78,7 +85,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class FilteredRowReadTest {
 
     @Mock
-    private ColumnSelection m_columnSelection;
+    private Selection.ColumnSelection m_columnSelection;
 
     @Mock
     private ReadAccessRow m_readAccessRow;
@@ -99,7 +106,6 @@ public class FilteredRowReadTest {
 
     @Before
     public void init() {
-        when(m_columnSelection.numColumns()).thenReturn(TestHelper.SCHEMA.numColumns());
         m_accesses = new ReadAccess[] {m_rowKey, m_booleanAccess, m_intAccess, m_doubleAccess};
     }
 
@@ -107,8 +113,10 @@ public class FilteredRowReadTest {
     public void testFilterFirstColumn() {
         // the index 0 is the row key
         setupColumnSelection(0, 2, 3);
+        var filteredSchema = filteredSchema(TestHelper.SCHEMA, m_columnSelection.getSelected());
+        int numColumns = TestHelper.SCHEMA.numColumns();
         final FilteredRowRead rowRead =
-            new FilteredRowRead(TestHelper.SCHEMA, m_readAccessRow, m_columnSelection);
+            new FilteredRowRead(filteredSchema, m_readAccessRow, m_columnSelection, numColumns);
         when(m_rowKey.getStringValue()).thenReturn("Row0");
         assertEquals("Row0", rowRead.getRowKey().getString());
         assertNPE(rowRead, 0);
@@ -124,8 +132,10 @@ public class FilteredRowReadTest {
     @Test
     public void testGetNumColumns() {
         setupColumnSelection(0, 2, 3);
+        var filteredSchema = filteredSchema(TestHelper.SCHEMA, m_columnSelection.getSelected());
+        int numColumns = TestHelper.SCHEMA.numColumns();
         final FilteredRowRead rowRead =
-            new FilteredRowRead(TestHelper.SCHEMA, m_readAccessRow, m_columnSelection);
+                new FilteredRowRead(filteredSchema, m_readAccessRow, m_columnSelection, numColumns);
         assertEquals("Applying a TableFilter does not reduce the number of columns.", 3, rowRead.getNumColumns());
     }
 
@@ -138,10 +148,29 @@ public class FilteredRowReadTest {
         }
     }
 
+    private static ColumnarValueSchema filteredSchema(final ColumnarValueSchema schema, final int... columnIndices)
+    {
+        var valueFactories = IntStream.of(columnIndices)//
+                .mapToObj(schema::getValueFactory)//
+                .toArray(ValueFactory<?, ?>[]::new);
+        var originalSpec = schema.getSourceSpec();
+        var specCreator = new DataTableSpecCreator(originalSpec);
+        specCreator.dropAllColumns();
+        var permutationStream = IntStream.of(columnIndices);
+        // The RowID is not part of the DataTableSpec.
+        permutationStream = permutationStream
+                .filter(i -> i > 0) // skip if present
+                .map(i -> i - 1); // translate "indices including RowID" to "indices without RowID"
+        specCreator.addColumns(permutationStream.mapToObj(originalSpec::getColumnSpec).toArray(DataColumnSpec[]::new));
+        return ColumnarValueSchemaUtils.create(specCreator.createSpec(), valueFactories);
+    }
+
     private void setupColumnSelection(final int... included) {
         int idx = 0;
         for (int i : included) {
             when(m_columnSelection.isSelected(i)).thenReturn(true);
+            when(m_columnSelection.allSelected()).thenReturn(false);
+            when(m_columnSelection.getSelected()).thenReturn(included);
             when(m_readAccessRow.getAccess(idx)).thenReturn(m_accesses[i]);
             idx++;
         }

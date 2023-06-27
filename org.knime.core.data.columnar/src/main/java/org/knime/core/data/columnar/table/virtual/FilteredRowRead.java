@@ -48,22 +48,25 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
+import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.row.ReadAccessRow;
+import org.knime.core.table.row.Selection;
 
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 
 final class FilteredRowRead implements RowRead {
 
-    private final ColumnarValueSchema m_schema;
+    // number of columns (does not include RowKey)
+    private final int m_numColumns;
 
     private final TIntObjectMap<ReadValue> m_values;
 
@@ -71,27 +74,44 @@ final class FilteredRowRead implements RowRead {
 
     private final RowKeyReadValue m_rowKey;
 
-    FilteredRowRead(final ColumnarValueSchema unfilteredSchema, final ReadAccessRow filteredReadAccessRow,
-        final ColumnSelection selectedColumns) {
-        m_schema = unfilteredSchema;
+    /**
+     * Creates a {@link RowRead} for a table been filtered by a {@link TableFilter}.
+     * Wraps the accesses in the given {@code filteredReadAccessRow} as {@code DataValue}s, and inserts {@code null}s for non-selected columns.
+     *
+     * @param filteredSchema {@link ColumnarValueSchema} containing only the selected columns
+     * @param filteredReadAccessRow {@link ReadAccessRow} that contains only the selected columns and rows
+     * @param selectedColumns corresponding to the applied {@link TableFilter}
+     * @param numColumns the total number of columns in the table (including RowKey)
+     *
+     * @return a {@link RowCursor} with the unfiltered schema that only contains values for the selected columns
+     */
+    FilteredRowRead(final ColumnarValueSchema filteredSchema, final ReadAccessRow filteredReadAccessRow,
+        final Selection.ColumnSelection selectedColumns, final int numColumns) {
+
+        if ( !selectedColumns.isSelected(0)) {
+            throw new IllegalArgumentException("RowKey column 0 must be always included in the selection");
+        }
+        final int[] selected = (selectedColumns.allSelected()) //
+            ? selectedColumns.getSelected(0, filteredSchema.numColumns()) //
+            : selectedColumns.getSelected();
+
+        // the row key is not a column in KNIME
+        m_numColumns = numColumns - 1;
+
         m_values = new TIntObjectHashMap<>();
         m_accesses = new TIntObjectHashMap<>();
-        // TODO introduce method to efficiently iterate over selected indices
-        var unfilteredIndices = 0;
-        for (var i = 0; i < selectedColumns.numColumns(); i++) {
-            if (selectedColumns.isSelected(i)) {
-                final var access = filteredReadAccessRow.getAccess(unfilteredIndices);
-                m_accesses.put(i, access);
-                m_values.put(i, unfilteredSchema.getValueFactory(i).createReadValue(access));
-                unfilteredIndices++;
-            }
+        for (int i = 0; i < selected.length; i++) {
+            final var access = filteredReadAccessRow.getAccess(i);
+            final var readValue = filteredSchema.getValueFactory(i).createReadValue(access);
+            m_accesses.put(selected[i], access);
+            m_values.put(selected[i], readValue);
         }
         m_rowKey = (RowKeyReadValue)m_values.get(0);
     }
 
     @Override
     public int getNumColumns() {
-        return m_schema.numColumns() - 1;
+        return m_numColumns;
     }
 
     @SuppressWarnings("unchecked")
