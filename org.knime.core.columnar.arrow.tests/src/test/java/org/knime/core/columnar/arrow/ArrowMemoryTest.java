@@ -51,8 +51,10 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.arrow.memory.RootAllocator;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -87,25 +89,28 @@ public class ArrowMemoryTest {
         final int numLoops = 128;
 
         final ExecutorService pool = Executors.newFixedThreadPool(nThreads);
+        try (var allocator = new RootAllocator()) {
+            final ColumnStoreFactory factory =
+                new ArrowColumnStoreFactory(allocator, ArrowCompressionUtil.ARROW_LZ4_FRAME_COMPRESSION);
 
-        for (int l = 0; l < numLoops; l++) {
-            pool.submit(() -> {
-                final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
-                final ColumnarSchema schema = createWideSchema(DOUBLE, numColumns);
+            for (int l = 0; l < numLoops; l++) {
+                pool.submit(() -> {
+                    final ColumnarSchema schema = createWideSchema(DOUBLE, numColumns);
 
-                try (final BatchStore store =
-                    factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowFileSupplier())) {
-
-                    storeData(numChunks, chunkSize, numColumns, store);
-
-                    try (final BatchStore copyStore =
+                    try (final BatchStore store =
                         factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowFileSupplier())) {
 
-                        copyData(numChunks, store, copyStore);
+                        storeData(numChunks, chunkSize, numColumns, store);
+
+                        try (final BatchStore copyStore =
+                            factory.createStore(schema, ArrowTestUtils.createTmpKNIMEArrowFileSupplier())) {
+
+                            copyData(numChunks, store, copyStore);
+                        }
                     }
-                }
-                return null;
-            }).get();
+                    return null;
+                }).get();
+            }
         }
     }
 

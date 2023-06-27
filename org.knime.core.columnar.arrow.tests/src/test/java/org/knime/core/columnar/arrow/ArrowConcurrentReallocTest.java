@@ -70,6 +70,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.store.FileHandle;
@@ -198,60 +199,63 @@ public class ArrowConcurrentReallocTest {
         System.out.println(randomString.length());
 
         final int numValues = 64;
-        final var storeFactory = new ArrowColumnStoreFactory();
-        final Object lock = new Object();
+        try (var allocator = new RootAllocator()) {
+            final var storeFactory =
+                new ArrowColumnStoreFactory(allocator, ArrowCompressionUtil.ARROW_LZ4_FRAME_COMPRESSION);
+            final Object lock = new Object();
 
-        // Try 50 times to run into the race condition that crashes the JVM
-        for (int iteration = 0; iteration < 1; iteration++) {
+            // Try 50 times to run into the race condition that crashes the JVM
+            for (int iteration = 0; iteration < 1; iteration++) {
 
-            final FileHandle path = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
-            long cachedDataSize = 0;
+                final FileHandle path = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
+                long cachedDataSize = 0;
 
-            try (final ArrowBatchStore store = storeFactory.createStore(schema, path);
-                    final BatchWriter writer = store.getWriter()) {
-                final var writeBatch = writer.create(numValues);
-                final var data = (VarBinaryWriteData)writeBatch.get(0);
+                try (final ArrowBatchStore store = storeFactory.createStore(schema, path);
+                        final BatchWriter writer = store.getWriter()) {
+                    final var writeBatch = writer.create(numValues);
+                    final var data = (VarBinaryWriteData)writeBatch.get(0);
 
-                final var writingStartedLatch = new CountDownLatch(1);
+                    final var writingStartedLatch = new CountDownLatch(1);
 
-                var future = CompletableFuture.runAsync(() -> {
-                    // Fill data with large values in separate thread.
-                    // Writing large data leads to frequent realloc calls in
-                    // ArrowBufIO.ArrowBufDataOutput#ensureCapacity.
-                    for (int i = 0; i < numValues; i++) {
-                        synchronized (lock) {
-                            System.out.println("Write value " + i);
-                            data.setObject(i, randomString, (out, d) -> {
-                                out.writeUTF(d);
-                            });
+                    var future = CompletableFuture.runAsync(() -> {
+                        // Fill data with large values in separate thread.
+                        // Writing large data leads to frequent realloc calls in
+                        // ArrowBufIO.ArrowBufDataOutput#ensureCapacity.
+                        for (int i = 0; i < numValues; i++) {
+                            synchronized (lock) {
+                                System.out.println("Write value " + i);
+                                data.setObject(i, randomString, (out, d) -> {
+                                    out.writeUTF(d);
+                                });
+                            }
+
+                            if (i == 2) {
+                                writingStartedLatch.countDown();
+                            }
                         }
+                    });
 
-                        if (i == 2) {
-                            writingStartedLatch.countDown();
-                        }
+                    // Wait until writing has commenced, then interrupt this thread and call expand,
+                    // which seems to be the scenario in which Arrow causes a crash in an unsafe memory copy
+                    // operation. Was extremely reproducible on Windows, happened only very rarely on Linux.
+                    // See AP-16402.
+                    writingStartedLatch.await();
+                    //                Thread.currentThread().interrupt();
+                    synchronized (lock) {
+                        System.out.println("Expand");
+                        data.expand(numValues * 3);
                     }
-                });
+                    //                assertTrue(Thread.interrupted()); // clears the interrupt flag!
 
-                // Wait until writing has commenced, then interrupt this thread and call expand,
-                // which seems to be the scenario in which Arrow causes a crash in an unsafe memory copy
-                // operation. Was extremely reproducible on Windows, happened only very rarely on Linux.
-                // See AP-16402.
-                writingStartedLatch.await();
-                //                Thread.currentThread().interrupt();
-                synchronized (lock) {
-                    System.out.println("Expand");
-                    data.expand(numValues * 3);
+                    future.get();
+
+                    cachedDataSize = data.sizeOf(); // flushes
+                    final var readBatch = writeBatch.close(numValues);
+                    readBatch.release();
                 }
-                //                assertTrue(Thread.interrupted()); // clears the interrupt flag!
 
-                future.get();
-
-                cachedDataSize = data.sizeOf(); // flushes
-                final var readBatch = writeBatch.close(numValues);
-                readBatch.release();
+                assertTrue(cachedDataSize > 0);
             }
-
-            assertTrue(cachedDataSize > 0);
         }
     }
 }

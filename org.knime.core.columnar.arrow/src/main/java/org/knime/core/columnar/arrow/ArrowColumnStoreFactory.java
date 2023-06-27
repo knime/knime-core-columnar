@@ -47,6 +47,7 @@ package org.knime.core.columnar.arrow;
 
 import java.nio.file.Path;
 
+import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.bytedeco.javacpp.Loader;
@@ -57,9 +58,8 @@ import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
-import org.knime.core.columnar.store.BatchReadStore;
-import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.columnar.store.ColumnStoreFactoryCreator;
 import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.slf4j.Logger;
@@ -90,66 +90,42 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
             LOGGER.error("Failed to initialize LZ4 libraries. The Columnar Table Backend won't work properly.", th);
             throw th;
         }
+
+        // Register the extension types with arrow
+        ExtensionTypes.registerExtensionTypes();
     }
-
-    private static final RootAllocator ROOT = new RootAllocator();
-
-    private final BufferAllocator m_allocator;
-
-    private long m_initReservation;
-
-    private long m_maxAllocation;
 
     private final ArrowCompression m_compression;
 
-    /**
-     * Create a {@link ColumnStoreFactory} for Arrow using the default root allocator.
-     */
-    public ArrowColumnStoreFactory() {
-        this(ROOT);
-    }
+    private final BufferAllocator m_allocator;
 
     /**
-     * Create a {@link ColumnStoreFactory} for Arrow using the given allocator. For each {@link BatchStore} and
-     * {@link BatchReadStore} the allocator is used to create a child allocator.
+     * <b>Constructor for unit tests.</b> Create a {@link ColumnStoreFactory} for Arrow with the given compression for
+     * writing.
      *
-     * @param allocator the allocator to use
+     * @param allocator the allocator to use. Must be closed by the caller after it is done using the store
+     * @param compression the compression to use for writing
+     * @apiNote only use this constructor in unit tests
      */
-    public ArrowColumnStoreFactory(final BufferAllocator allocator) {
-        this(allocator, 0, allocator.getLimit());
-    }
-
-    /**
-     * Create a {@link ColumnStoreFactory} for Arrow using the given allocator. For each {@link BatchStore} and
-     * {@link BatchReadStore} the allocator is used to create a child allocator with the given initial reservation and
-     * max allocation.
-     *
-     * @param allocator the allocator to use
-     * @param initReservation the initial reservation for a child allocator
-     * @param maxAllocation the maximum alloaction for the child allocator
-     */
-    public ArrowColumnStoreFactory(final BufferAllocator allocator, final long initReservation,
-        final long maxAllocation) {
-        this(allocator, initReservation, maxAllocation, ArrowCompressionUtil.getDefaultCompression());
-    }
-
-    /**
-     * Create a {@link ColumnStoreFactory} for Arrow using the given allocator. For each {@link BatchStore} and
-     * {@link BatchReadStore} the allocator is used to create a child allocator with the given initial reservation and
-     * max allocation.
-     *
-     * @param allocator the allocator to use
-     * @param initReservation the initial reservation for a child allocator
-     * @param maxAllocation the maximum alloaction for the child allocator
-     * @param compression the compression to use for the store
-     */
-    public ArrowColumnStoreFactory(final BufferAllocator allocator, final long initReservation,
-        final long maxAllocation, final ArrowCompression compression) {
-        m_allocator = allocator;
-        m_initReservation = initReservation;
-        m_maxAllocation = maxAllocation;
+    public ArrowColumnStoreFactory(final BufferAllocator allocator, final ArrowCompression compression) {
         m_compression = compression;
-        ExtensionTypes.registerExtensionTypes();
+        m_allocator = allocator;
+    }
+
+    private ArrowColumnStoreFactory(final long memoryLimit) {
+        m_allocator = new RootAllocator(new AllocationListener() {
+            /*
+             * TODO Notify the caches
+             *
+             * On new allocations:
+             * If we are over 90% of the limit after the allocation, notify the caches.
+             *
+             * On failed allocations:
+             * Notify the caches and wait for them to release something. If they return that something was released, we can retry the allocation.
+             */
+
+        }, memoryLimit);
+        m_compression = ArrowCompressionUtil.getDefaultCompression();
     }
 
     @Override
@@ -182,6 +158,15 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     }
 
     private BufferAllocator newChildAllocator(final String name) {
-        return m_allocator.newChildAllocator(name, m_initReservation, m_maxAllocation);
+        return m_allocator.newChildAllocator(name, 0, m_allocator.getLimit());
+    }
+
+    /** {@link ColumnStoreFactoryCreator} for {@link ArrowColumnStoreFactory}. Used by the columnar framework. */
+    public static final class ArrowColumnStoreFactoryCreator implements ColumnStoreFactoryCreator {
+
+        @Override
+        public ArrowColumnStoreFactory createFactory(final long memoryLimit) {
+            return new ArrowColumnStoreFactory(memoryLimit);
+        }
     }
 }

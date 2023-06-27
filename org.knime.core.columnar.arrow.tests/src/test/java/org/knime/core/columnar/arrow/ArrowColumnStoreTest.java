@@ -67,8 +67,10 @@ import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.knime.core.columnar.arrow.ArrowColumnStoreFactory.ArrowColumnStoreFactoryCreator;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -96,12 +98,11 @@ import org.knime.core.table.schema.traits.DefaultDataTraits;
 public class ArrowColumnStoreTest {
 
     static FileHandle writePath;
+
     static FileHandle readPath;
 
-
     /**
-     * Before running the tests, we create temporary paths where ArrowBatchStores can write
-     * to, or read from.
+     * Before running the tests, we create temporary paths where ArrowBatchStores can write to, or read from.
      *
      * @throws IOException
      */
@@ -113,6 +114,7 @@ public class ArrowColumnStoreTest {
 
     /**
      * After each test, we clean up the temporary files so the next test can start from scratch
+     *
      * @throws IOException
      */
     @After
@@ -128,8 +130,8 @@ public class ArrowColumnStoreTest {
      * @throws IOException
      */
     @Test
-    public void testCreateWriterReaderDefaultAllocator() throws IOException {
-        testCreateWriterReader(new ArrowColumnStoreFactory());
+    public void testCreateWriterReader() throws IOException {
+        testCreateWriterReader(createStoreFactory(10000));
     }
 
     /**
@@ -137,11 +139,9 @@ public class ArrowColumnStoreTest {
      * allocating the data.
      */
     @Test
-    public void testCreateWriterReaderCustomUnsufficientAllocator() {
-        try (final RootAllocator allocator = new RootAllocator()) {
-            final ArrowColumnStoreFactory factory = new ArrowColumnStoreFactory(allocator, 10, 10);
-            assertThrows(OutOfMemoryException.class, () -> testCreateWriterReader(factory));
-        }
+    public void testCreateWriterReaderMemoryLimit() {
+        final var factory = createStoreFactory(10);
+        assertThrows(OutOfMemoryException.class, () -> testCreateWriterReader(factory));
     }
 
     /**
@@ -153,8 +153,7 @@ public class ArrowColumnStoreTest {
      */
     @Test
     @SuppressWarnings("resource")
-    public void testCreateWriterReaderCustomAllocator() throws IOException {
-        final int limit = 16385;
+    public void testCreateWriterReaderChildAllocators() throws IOException {
         final List<BufferAllocator> childAllocators = new ArrayList<>();
         final AllocationListener allocationListener = new AllocationListener() {
 
@@ -163,8 +162,9 @@ public class ArrowColumnStoreTest {
                 childAllocators.add(childAllocator);
             }
         };
-        try (final RootAllocator allocator = new RootAllocator(allocationListener, limit)) {
-            final ArrowColumnStoreFactory factory = new ArrowColumnStoreFactory(allocator, 0, limit);
+        try (final RootAllocator allocator = new RootAllocator(allocationListener, 16385)) {
+            final ArrowColumnStoreFactory factory =
+                new ArrowColumnStoreFactory(allocator, ArrowCompressionUtil.getDefaultCompression());
             testCreateWriterReader(factory);
         }
         assertEquals(2, childAllocators.size());
@@ -270,12 +270,11 @@ public class ArrowColumnStoreTest {
         final int chunkSize = 64;
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new DictionaryEncodedDataFactory()};
 
-                // Use the write store to write some data
+        // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator()) {
 
             @SuppressWarnings("resource")
-            final ArrowBatchWriter writer =
-                new ArrowBatchWriter(writePath, factories, ARROW_NO_COMPRESSION, allocator);
+            final ArrowBatchWriter writer = new ArrowBatchWriter(writePath, factories, ARROW_NO_COMPRESSION, allocator);
             ReadBatch batch;
 
             // Write batch 0
@@ -345,9 +344,9 @@ public class ArrowColumnStoreTest {
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
 
-        try (final RootAllocator allocator = new RootAllocator()) {
-            final ArrowColumnStoreFactory factory =
-                new ArrowColumnStoreFactory(allocator, 0, allocator.getLimit(), ARROW_NO_COMPRESSION);
+        try (var allocator = new RootAllocator()) {
+
+            final ArrowColumnStoreFactory factory = new ArrowColumnStoreFactory(allocator, ARROW_NO_COMPRESSION);
 
             // Use the write store to write some data
             @SuppressWarnings("resource")
@@ -533,5 +532,10 @@ public class ArrowColumnStoreTest {
     private static void assertBatchDataDict(final ReadBatch batch, final int chunkSize, final long seed) {
         final DictionaryEncodedData data = (DictionaryEncodedData)batch.get(0);
         ArrowTestUtils.checkData(data, chunkSize, seed);
+    }
+
+    /** Create an {@link ArrowColumnStoreFactory} and set the memory limit */
+    private static ArrowColumnStoreFactory createStoreFactory(final long limit) {
+        return new ArrowColumnStoreFactoryCreator().createFactory(limit);
     }
 }

@@ -61,6 +61,7 @@ import java.io.IOException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.knime.core.columnar.arrow.ArrowColumnStoreFactory.ArrowColumnStoreFactoryCreator;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
@@ -104,11 +105,11 @@ public class DictEncodedBatchStoreTest {
     public void testListOfDictEncodedString() throws IOException {
         var columnarSchema = ColumnarSchema.of(LIST.of(STRING(DICT_ENCODING)), STRING);
         var cache = new DictElementCache();
-        final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
+        final ColumnStoreFactory factory = createStoreFactory();
         try (BatchStore batchStore = factory.createStore(columnarSchema, m_tempPath)) {
-            try(BatchWriter baseWriter = batchStore.getWriter();
-                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)
-                ) {
+            try (BatchWriter baseWriter = batchStore.getWriter();
+                    DictEncodedBatchWriter wrappedWriter =
+                        new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)) {
                 var wrappedBatch = wrappedWriter.create(5);
 
                 final var data = (ListWriteData)wrappedBatch.get(0);
@@ -127,8 +128,8 @@ public class DictEncodedBatchStoreTest {
             }
 
             final var selection = new DefaultColumnSelection(columnarSchema.numColumns());
-            try(var wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)
-                ) {
+            try (var wrappedReader =
+                new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)) {
                 var batch = wrappedReader.readRetained(0);
 
                 final var data = (ListReadData)batch.get(0);
@@ -150,15 +151,15 @@ public class DictEncodedBatchStoreTest {
     public void testListOfDictEncodedVarBinary() throws IOException {
         var columnarSchema = ColumnarSchema.of(LIST.of(VARBINARY(DICT_ENCODING)), STRING);
         var cache = new DictElementCache();
-        final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
+        final ColumnStoreFactory factory = createStoreFactory();
 
         ObjectSerializer<String> serializer = (out, s) -> out.writeUTF(s);
         ObjectDeserializer<String> deserializer = in -> in.readUTF();
 
         try (BatchStore batchStore = factory.createStore(columnarSchema, m_tempPath)) {
-            try(BatchWriter baseWriter = batchStore.getWriter();
-                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)
-                ) {
+            try (BatchWriter baseWriter = batchStore.getWriter();
+                    DictEncodedBatchWriter wrappedWriter =
+                        new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)) {
                 var wrappedBatch = wrappedWriter.create(5);
 
                 final var data = (ListWriteData)wrappedBatch.get(0);
@@ -177,8 +178,8 @@ public class DictEncodedBatchStoreTest {
             }
 
             final var selection = new DefaultColumnSelection(columnarSchema.numColumns());
-            try(var wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)
-                ) {
+            try (var wrappedReader =
+                new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)) {
                 var batch = wrappedReader.readRetained(0);
 
                 final var data = (ListReadData)batch.get(0);
@@ -200,11 +201,11 @@ public class DictEncodedBatchStoreTest {
     public void testStructOfDictEncodedString() throws IOException {
         var columnarSchema = ColumnarSchema.of(STRUCT.of(STRING(DICT_ENCODING), STRING));
         var cache = new DictElementCache();
-        final ColumnStoreFactory factory = new ArrowColumnStoreFactory();
+        final ColumnStoreFactory factory = createStoreFactory();
         try (BatchStore batchStore = factory.createStore(columnarSchema, m_tempPath)) {
-            try(BatchWriter baseWriter = batchStore.getWriter();
-                DictEncodedBatchWriter wrappedWriter = new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)
-                ) {
+            try (BatchWriter baseWriter = batchStore.getWriter();
+                    DictEncodedBatchWriter wrappedWriter =
+                        new DictEncodedBatchWriter(baseWriter, columnarSchema, cache)) {
                 var wrappedBatch = wrappedWriter.create(5);
 
                 final var data = (StructWriteData)wrappedBatch.get(0);
@@ -228,8 +229,8 @@ public class DictEncodedBatchStoreTest {
             }
 
             final var selection = new DefaultColumnSelection(columnarSchema.numColumns());
-            try(var wrappedReader = new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)
-                ) {
+            try (var wrappedReader =
+                new DictEncodedRandomAccessBatchReader(batchStore, selection, columnarSchema, cache)) {
                 var batch = wrappedReader.readRetained(0);
 
                 final var data = (StructReadData)batch.get(0);
@@ -250,5 +251,9 @@ public class DictEncodedBatchStoreTest {
                 batch.release();
             }
         }
+    }
+
+    private static ArrowColumnStoreFactory createStoreFactory() {
+        return new ArrowColumnStoreFactoryCreator().createFactory(10000);
     }
 }
