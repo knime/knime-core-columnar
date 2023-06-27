@@ -502,12 +502,10 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         final var cols = selection.columns();
         final RowCursor cursor;
         // TODO (TP) is this if-else really necessary here? Could this not all be handled by the same VirtualTableUtils method?
-        if ( !cols.allSelected() )
-        {
-            cursor = VirtualTableUtils.createTableFilterRowCursor(table.getSchema(), physicalCursor, cols, m_schema.numColumns());
-        }
-        else
-        {
+        if (!cols.allSelected()) {
+            cursor = VirtualTableUtils.createTableFilterRowCursor(table.getSchema(), physicalCursor, cols,
+                m_schema.numColumns());
+        } else {
             cursor = VirtualTableUtils.createColumnarRowCursor(m_schema, physicalCursor);
         }
         return new SourceClosingRowCursor(cursor, accessibles.toArray(Closeable[]::new));
