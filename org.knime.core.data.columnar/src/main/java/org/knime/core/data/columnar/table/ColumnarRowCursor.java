@@ -46,7 +46,7 @@
  * History
  *   Jul 20, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.data.columnar.table.virtual;
+package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
 
@@ -61,27 +61,33 @@ import org.knime.core.table.row.ReadAccessRow;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class ColumnarRowCursor implements RowCursor {
+public final class ColumnarRowCursor implements RowCursor {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowCursor.class);
 
-    private final LookaheadCursor<ReadAccessRow> m_cursor;
+    private final LookaheadCursor<ReadAccessRow> m_delegate;
 
     private final RowRead m_rowRead;
 
-    ColumnarRowCursor(final RowRead accessRowRead, final LookaheadCursor<ReadAccessRow> cursor) {
-        m_cursor = cursor;
+    /**
+     * Create a {@link ColumnarRowCursor} that is backed by the given {@link LookaheadCursor}.
+     *
+     * @param accessRowRead a {@code RowRead} that is backed by {@code cursor}'s {@code ReadAccessRow}.
+     * @param cursor the cursor to wrap
+     */
+    public ColumnarRowCursor(final RowRead accessRowRead, final LookaheadCursor<ReadAccessRow> cursor) {
+        m_delegate = cursor;
         m_rowRead = accessRowRead;
     }
 
     @Override
     public RowRead forward() {
-        return m_cursor.forward() ? m_rowRead : null;
+        return m_delegate.forward() ? m_rowRead : null;
     }
 
     @Override
     public boolean canForward() {
-        return m_cursor.canForward();
+        return m_delegate.canForward();
     }
 
     @Override
@@ -92,9 +98,17 @@ final class ColumnarRowCursor implements RowCursor {
     @Override
     public void close() {
         try {
-            m_cursor.close();
+            m_delegate.close();
         } catch (IOException ex) {
-            LOGGER.error("Failed to close the underlying cursor.", ex);
+            // TODO (TP)
+            //   ColumnarRowCursor orginially did just
+            //     LOGGER.error("Failed to close the underlying cursor.", ex);
+            //   Is it okay to throw IllegalStateException, like in
+            //   ColumnarRowReadTable.DefaultRowCursor which we want to replace by
+            //   re-using this?
+            final String error = "Exception while closing batch reader.";
+            LOGGER.error(error, ex);
+            throw new IllegalStateException(error, ex);
         }
     }
 

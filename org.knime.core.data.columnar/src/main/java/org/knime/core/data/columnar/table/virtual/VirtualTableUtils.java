@@ -56,6 +56,7 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.columnar.table.ColumnarRowCursor;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;

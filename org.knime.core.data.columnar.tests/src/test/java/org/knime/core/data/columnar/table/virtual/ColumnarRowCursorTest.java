@@ -61,6 +61,7 @@ import java.io.IOException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.knime.core.data.columnar.table.ColumnarRowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
