@@ -55,6 +55,8 @@ import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Preconditions;
+
 /**
  * A cache for storing entire {@link BatchWritable BatchWritables} up to a given size. The cache can be shared between
  * multiple {@link BatchWritableCache BatchWritableCaches}.
@@ -75,6 +77,12 @@ public final class SharedBatchWritableCache {
      * @param concurrencyLevel the allowed concurrency among update operations
      */
     public SharedBatchWritableCache(final int sizeThreshold, final long cacheSize, final int concurrencyLevel) {
+        // NB: If the smallest number of tables that fit in the cache is smaller than the concurrencyLevel
+        // this can cause a deadlock
+        // TODO(AP-20535) make the cache robust against the deadlock and remove this precondition
+        Preconditions.checkArgument(cacheSize / sizeThreshold > concurrencyLevel,
+            "cacheSize / sizeThreshold must be larger than the cuncurrency level");
+
         m_sizeThreshold = sizeThreshold;
         m_cache = new SizeBoundLruCache<>(cacheSize, concurrencyLevel);
         m_cacheSize = cacheSize;

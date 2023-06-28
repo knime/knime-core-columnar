@@ -192,6 +192,8 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized SharedBatchWritableCache getSmallTableCache() {
         if (smallTableCache == null) {
+            // NB: The smallest number of tables that fit in the cache must be larger than the number of threads
+            // to prevent a deadlock in the small table cache (AP-20535)
             var smallTableCacheSize = 32l << 20; // 32 MB
             var smallTableThreshold = 1 << 20; // 1 MB
             LOGGER.infoWithFormat("Small Table Cache size is %d MB", smallTableCacheSize >> 20);
