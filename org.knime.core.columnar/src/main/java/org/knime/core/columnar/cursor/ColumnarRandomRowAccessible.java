@@ -215,14 +215,15 @@ public final class ColumnarRandomRowAccessible implements RandomRowAccessible {
 
         private void switchCurrentBatch() {
             final long batchIndex = m_row / m_batchLength;
-            m_batchFromRow = Math.max(m_from, m_batchLength * batchIndex);
+            final long firstRowInBatch = m_batchLength * batchIndex;
+            m_batchFromRow = Math.max(m_from, firstRowInBatch);
             m_batchToRow = Math.min(m_to, m_batchLength * (batchIndex + 1));
 
             releaseCurrentBatch();
             m_currentBatch = readBatch((int)batchIndex);
             m_readAccessRow.setBatch(m_currentBatch);
 
-            m_indexInBatch.setIndex((int)(m_row - m_batchFromRow));
+            m_indexInBatch.setIndex((int)(m_row - firstRowInBatch));
         }
 
         private void releaseCurrentBatch() {
