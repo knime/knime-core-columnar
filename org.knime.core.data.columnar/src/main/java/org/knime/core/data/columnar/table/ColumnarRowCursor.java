@@ -100,15 +100,7 @@ public final class ColumnarRowCursor implements RowCursor {
         try {
             m_delegate.close();
         } catch (IOException ex) {
-            // TODO (TP)
-            //   ColumnarRowCursor orginially did just
-            //     LOGGER.error("Failed to close the underlying cursor.", ex);
-            //   Is it okay to throw IllegalStateException, like in
-            //   ColumnarRowReadTable.DefaultRowCursor which we want to replace by
-            //   re-using this?
-            final String error = "Exception while closing batch reader.";
-            LOGGER.error(error, ex);
-            throw new IllegalStateException(error, ex);
+            LOGGER.error("Failed to close the underlying cursor.", ex);
         }
     }
 
