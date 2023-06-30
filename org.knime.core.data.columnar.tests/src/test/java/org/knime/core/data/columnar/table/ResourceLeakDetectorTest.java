@@ -129,18 +129,35 @@ public class ResourceLeakDetectorTest extends ColumnarTest {
         testCloseUnclosedCloseableOnGC(() -> createUnsavedColumnarContainerTable(0));
     }
 
-    @Test
-    public void testCloseUnclosedSingleBatchIteratorOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(1)) {
-            testCloseUnclosedCloseableOnGC(table::iterator);
-        }
+    private static void testCloseUnclosedIteratorOnTableGC(final Supplier<AutoCloseable> supplier) {
+        final int numOpenFinalizers = ResourceLeakDetector.getInstance().getNumOpenFinalizers();
+        @SuppressWarnings("resource")
+        AutoCloseable closeable = supplier.get(); // NOSONAR
+
+        final WeakReference<AutoCloseable> ref = new WeakReference<>(closeable);
+        closeable = null;
+        System.gc(); // NOSONAR
+        await().until(() -> ref.get() == null);
+
+        checkOpenFinalizers(numOpenFinalizers);
     }
 
     @Test
-    public void testCloseUnclosedMultiBatchIteratorOnGC() {
-        try (final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1)) {
-            testCloseUnclosedCloseableOnGC(table::iterator);
-        }
+    public void testCloseUnclosedSingleBatchIteratorOnTableGC() {
+        testCloseUnclosedIteratorOnTableGC(() -> {
+            final ExtensionTable table = createUnsavedColumnarContainerTable(1);
+            table.iterator();
+            return table;
+        } );
+    }
+
+    @Test
+    public void testCloseUnclosedMultiBatchIteratorOnTableGC() {
+        testCloseUnclosedIteratorOnTableGC(() -> {
+            final ExtensionTable table = createUnsavedColumnarContainerTable(CAPACITY + 1);
+            table.iterator();
+            return table;
+        } );
     }
 
     @Test
