@@ -80,7 +80,7 @@ public final class SharedBatchWritableCache {
         // NB: If the smallest number of tables that fit in the cache is smaller than the concurrencyLevel
         // this can cause a deadlock
         // TODO(AP-20535) make the cache robust against the deadlock and remove this precondition
-        Preconditions.checkArgument(cacheSize / sizeThreshold > concurrencyLevel,
+        Preconditions.checkArgument(cacheSize / sizeThreshold >= concurrencyLevel,
             "cacheSize / sizeThreshold must be larger than the cuncurrency level");
 
         m_sizeThreshold = sizeThreshold;
