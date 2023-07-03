@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.data.columnar.table.ColumnarRowCursorTest.compare;
@@ -366,6 +367,33 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     }
 
     @Test
+    public void testWriteReadNonValueFactoryDataCell()
+        throws IOException, ParserConfigurationException, SAXException, XMLStreamException {
+        final var type = MyNonValueFactoryCell.TYPE;
+        final var value = new MyNonValueFactoryCell("foo");
+        testWriteReadRows(//
+            (row, j, i) -> row.<WriteValue<DataCell>> getWriteValue(j).setValue(value), //
+            (row, j, i) -> assertEquals(value, row.<ReadValue> getValue(j).getDataCell()), //
+            type, //
+            (schema) -> {
+                final var logicalType = schema.getTraits(1).get(LogicalTypeTrait.class);
+                assertNotNull(logicalType);
+                // we explicitly check for the logical type because the DictEncodedDataCellValueFactory is not visible here
+                assertEquals(//
+                    "{\"value_factory_class\":\"org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory\""//
+                    + ",\"data_type\":{\"cell_class\":\"org.knime.core.data.columnar.table.MyNonValueFactoryCell\"}}",//
+                    logicalType.getLogicalType());
+                assertTrue(schema.getSpec(1) instanceof StructDataSpec);
+                final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);
+                assertTrue(structSpec.getDataSpec(0) instanceof VarBinaryDataSpec);
+                assertTrue(structSpec.getDataSpec(1) instanceof StringDataSpec);
+                final StructDataTraits structTraits = (StructDataTraits)schema.getTraits(1);
+                assertTrue(DictEncodingTrait.isEnabled(structTraits.getDataTraits(0)));
+                assertTrue(DictEncodingTrait.isEnabled(structTraits.getDataTraits(1)));
+            });
+    }
+
+    @Test
     public void testWriteReadXMLDataCell()
         throws IOException, ParserConfigurationException, SAXException, XMLStreamException {
         final var type = XMLCell.TYPE;
@@ -378,18 +406,16 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
             (schema) -> {
                 final var logicalType = schema.getTraits(1).get(LogicalTypeTrait.class);
                 assertNotNull(logicalType);
-                // we explicitly check for the logical type because the DictEncodedDataCellValueFactory is not visible here
                 assertEquals(//
-                    "{\"value_factory_class\":\"org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory\""//
-                    + ",\"data_type\":{\"cell_class\":\"org.knime.core.data.xml.XMLCell\"}}",//
+                    "{\"value_factory_class\":\"org.knime.core.data.xml.XMLValueFactory\"}", //
                     logicalType.getLogicalType());
                 assertTrue(schema.getSpec(1) instanceof StructDataSpec);
                 final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);
-                assertTrue(structSpec.getDataSpec(0) instanceof VarBinaryDataSpec);
-                assertTrue(structSpec.getDataSpec(1) instanceof StringDataSpec);
+                assertTrue(structSpec.getDataSpec(0) instanceof StringDataSpec); // File store key
+                assertTrue(structSpec.getDataSpec(1) instanceof VarBinaryDataSpec); // Blob data
                 final StructDataTraits structTraits = (StructDataTraits)schema.getTraits(1);
-                assertTrue(DictEncodingTrait.isEnabled(structTraits.getDataTraits(0)));
-                assertTrue(DictEncodingTrait.isEnabled(structTraits.getDataTraits(1)));
+                assertFalse(DictEncodingTrait.isEnabled(structTraits.getDataTraits(0)));
+                assertFalse(DictEncodingTrait.isEnabled(structTraits.getDataTraits(1)));
             });
     }
 

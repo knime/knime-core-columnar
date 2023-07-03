@@ -8,5 +8,15 @@
             persistor="org.knime.core.data.columnar.table.virtual.persist.TableTransformNodeSettingsPersistorTest$TestMapperFactory$TestMapperFactoryPersistor">
       </persistence>
    </extension>
+   <extension
+         point="org.knime.core.DataType">
+      <DataType
+            cellClass="org.knime.core.data.columnar.tests.DataCell:1">
+         <serializer
+               cellClass="org.knime.core.data.columnar.table.MyNonValueFactoryCell"
+               serializerClass="org.knime.core.data.columnar.table.MyNonValueFactoryCell$MyNonValueFactoryCellSerializer">
+         </serializer>
+      </DataType>
+   </extension>
 
 </fragment>
