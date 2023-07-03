@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.Weigher;
 
@@ -78,6 +79,8 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
     private final Cache<K, DataWithEvictor<K, D>> m_cache;
 
+    private boolean m_clearingCache = false;
+
     /**
      * @param maxSize the total size (in bytes) the cache should be able to hold
      * @param concurrencyLevel the allowed concurrency among update operations
@@ -95,15 +98,16 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
         };
 
         final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
-            if (removalNotification.wasEvicted()) {
+            if (removalNotification.wasEvicted()
+                || (m_clearingCache && removalNotification.getCause() == RemovalCause.EXPLICIT)) {
                 final DataWithEvictor<K, D> evicted = removalNotification.getValue();
                 evicted.m_evictor.evict(removalNotification.getKey(), evicted.m_data);
                 evicted.m_data.release();
             }
         };
 
-        m_cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel)
-            .maximumWeight(maxSize).weigher(weigher).removalListener(removalListener).build();
+        m_cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel).maximumWeight(maxSize).weigher(weigher)
+            .removalListener(removalListener).build();
     }
 
     @Override
@@ -145,6 +149,9 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
     @Override
     public void invalidateAll() {
+        m_clearingCache = true;
         m_cache.invalidateAll();
+        m_cache.cleanUp();
+        m_clearingCache = false;
     }
 }
