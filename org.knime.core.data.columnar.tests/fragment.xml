@@ -17,6 +17,9 @@
                serializerClass="org.knime.core.data.columnar.table.MyNonValueFactoryCell$MyNonValueFactoryCellSerializer">
          </serializer>
       </DataType>
+      <DataType
+            cellClass="org.knime.core.data.columnar.table.MyAdapterCell">
+      </DataType>
    </extension>
 
 </fragment>

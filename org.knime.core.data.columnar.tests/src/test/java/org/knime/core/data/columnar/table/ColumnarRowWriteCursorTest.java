@@ -52,6 +52,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.knime.core.data.columnar.table.ColumnarRowCursorTest.compare;
 import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createColumnarRowContainer;
 import static org.knime.core.data.columnar.table.ColumnarTableTestUtils.createUnsavedColumnarContainerTable;
@@ -65,6 +66,7 @@ import javax.xml.stream.XMLStreamException;
 
 import org.junit.Test;
 import org.knime.core.columnar.testing.ColumnarTest;
+import org.knime.core.data.AdapterCell;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataType;
 import org.knime.core.data.collection.ListCell;
@@ -381,7 +383,7 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
                 // we explicitly check for the logical type because the DictEncodedDataCellValueFactory is not visible here
                 assertEquals(//
                     "{\"value_factory_class\":\"org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory\""//
-                    + ",\"data_type\":{\"cell_class\":\"org.knime.core.data.columnar.table.MyNonValueFactoryCell\"}}",//
+                        + ",\"data_type\":{\"cell_class\":\"org.knime.core.data.columnar.table.MyNonValueFactoryCell\"}}", //
                     logicalType.getLogicalType());
                 assertTrue(schema.getSpec(1) instanceof StructDataSpec);
                 final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);
@@ -422,22 +424,33 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
     @Test
     public void testWriteReadAdapterXMLDataCell()
         throws IOException, ParserConfigurationException, SAXException, XMLStreamException {
-        final var type = XMLCell.TYPE;
+        final var type = MyAdapterCell.TYPE;
         final var xmlString = "<dummyXML>Test</dummyXML>";
         final var innerValue = XMLCellFactory.create(xmlString);
         final var value = new MyAdapterCell(innerValue, XMLValue.class);
 
         testWriteReadRows(//
             (row, j, i) -> row.<WriteValue<DataCell>> getWriteValue(j).setValue(value), //
-            (row, j, i) -> assertEquals(value, row.<ReadValue> getValue(j).getDataCell()), //
+            (row, j, i) -> {
+                var dataCell = row.<ReadValue> getValue(j).getDataCell();
+                assertInstanceOf(AdapterCell.class, dataCell);
+                assertTrue(((AdapterCell)dataCell).isAdaptable(XMLValue.class));
+                assertEquals(value, dataCell); //
+            }, //
             type, //
             (schema) -> {
                 final var logicalType = schema.getTraits(1).get(LogicalTypeTrait.class);
                 assertNotNull(logicalType);
-                // we explicitly check for the logical type because the DictEncodedDataCellValueFactory is not visible here
-                assertEquals(
-                    "{\"value_factory_class\":\"org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory\","
-                    + "\"data_type\":{\"cell_class\":\"org.knime.core.data.xml.XMLCell\"}}",
+                // The logical type doesn't contain the XMLValue as adapters are added per instance and are not part of the
+                // column's DataSpec
+                assertEquals(//
+                    "{" //
+                        + "\"value_factory_class\":\"org.knime.core.data.v2.value.cell.DictEncodedDataCellValueFactory\","
+                        + "\"data_type\":{"//
+                        + "\"cell_class\":\"org.knime.core.data.columnar.table.MyAdapterCell\"," //
+                        + "\"adapter_classes\":[\"org.knime.core.data.RWAdapterValue\",\"org.knime.core.data.AdapterValue\"," //
+                        + "\"org.knime.core.data.DataValue\"]" //
+                        + "}}", //
                     logicalType.getLogicalType());
                 assertTrue(schema.getSpec(1) instanceof StructDataSpec);
                 final StructDataSpec structSpec = (StructDataSpec)schema.getSpec(1);

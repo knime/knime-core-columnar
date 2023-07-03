@@ -65,6 +65,8 @@ import org.knime.core.data.DataValue;
 public class MyAdapterCell extends AdapterCell {
     private static final long serialVersionUID = 1L;
 
+    public static final DataType TYPE = DataType.getType(MyAdapterCell.class);
+
     @SafeVarargs
     public MyAdapterCell(final DataCell valueCell, final AdapterValue predefinedAdapters,
         final Class<? extends DataValue>... valueClasses) {
