@@ -62,10 +62,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.workflow.NodeContext;
 
 /**
+ * Note that there is a frequent case where the ResourceLeakDetector has to release resources: Iterators on tables using
+ * the old table API do not close the table. We cannot know when the iteration is finished and we can release the data.
+ * The only way is to check if the garbage collector collected the iterator.
+ *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 final class ResourceLeakDetector {
@@ -204,6 +209,8 @@ final class ResourceLeakDetector {
         m_poller.scheduleAtFixedRate(this::poll, POLL_PERIOD_MS, POLL_PERIOD_MS, TimeUnit.MILLISECONDS);
         m_enqueuedFinalizers = new ReferenceQueue<>();
         m_openFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(this::poll);
     }
 
     Finalizer createFinalizer(final Object referent, final AutoCloseable... closeables) {
@@ -234,13 +241,15 @@ final class ResourceLeakDetector {
         return m_openFinalizers.size();
     }
 
-    @SuppressWarnings("resource")
-    void poll() {
+    boolean poll() {
+        var releasedData = false;
         Finalizer finalizer;
         while ((finalizer = (Finalizer)m_enqueuedFinalizers.poll()) != null) {
             finalizer.releaseResourcesAndLogOutput();
             finalizer.clear();
+            releasedData = true;
         }
+        return releasedData;
     }
 
 }
