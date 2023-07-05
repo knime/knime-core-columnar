@@ -48,6 +48,7 @@ package org.knime.core.columnar.cache.data;
 import java.io.Flushable;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -75,9 +76,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A {@link BatchWritable} and {@link RandomAccessBatchReadable} that holds and provides written {@link ReadData} in a
- * fixed-size {@link SharedReadDataCache LRU cache} in memory. It asynchronously flushes written data on to a
- * delegate. When any unflushed data is evicted from the cache, it blocks until that data has been flushed. On cache
- * miss (i.e., when any evicted, flushed data is read), it blocks until all data is {@link Flushable#flush() flushed}.
+ * fixed-size {@link SharedReadDataCache LRU cache} in memory. It asynchronously flushes written data on to a delegate.
+ * When any unflushed data is evicted from the cache, it blocks until that data has been flushed. On cache miss (i.e.,
+ * when any evicted, flushed data is read), it blocks until all data is {@link Flushable#flush() flushed}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -88,28 +89,6 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for asynchronous write thread.";
 
     private final class ReadDataCacheWriter implements BatchWriter {
-
-        private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> { // NOSONAR
-            try {
-                final CountDownLatch latch = m_cachedData.remove(k);
-                if (latch != null) {
-                    latch.await();
-                }
-
-            } catch (InterruptedException e) {
-                // Restore interrupted state...
-                Thread.currentThread().interrupt();
-                // when interrupted here (e.g., because some other node that pushes data into the cache is cancelled), we
-                // either lose the unflushed, to-be-evicted data, because it will be released once evicted from the cache
-                // or we retain it and accept that we temporarily use up more off-heap memory than the cache allows
-                c.retain();
-                enqueueRunnable(c::release);
-                // We can easily get into this state when cancelling a node that writes a lot of data. A warning should
-                // therefore be sufficient here.
-                LOGGER.warn("{} Unflushed data evicted from cache. "
-                    + "Data will be retained and memory will be allocated until flushed.", ERROR_ON_INTERRUPT);
-            }
-        };
 
         private final BatchWriter m_writerDelegate;
 
@@ -127,11 +106,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
         @Override
         public synchronized void write(final ReadBatch batch) throws IOException {
 
-            batch.retain();
+            final var batchId = m_numBatches;
+            m_currentlyWritingBatches.putRetained(batchId, batch);
 
             handleDoneFuture();
 
-            final CountDownLatch batchFlushed = new CountDownLatch(1);
             enqueueRunnable(() -> { // NOSONAR
                 try {
                     if (!m_closed.get()) {
@@ -142,14 +121,13 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 } catch (IOException e) {
                     throw new IllegalStateException(String.format("Failed to write batch %d.", m_numBatches), e);
                 } finally {
-                    batch.release();
-                    batchFlushed.countDown();
+                    m_currentlyWritingBatches.remove(batchId);
                 }
             });
 
             for (int i = 0; i < getSchema().numColumns(); i++) {
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, m_numBatches);
-                m_cachedData.put(ccUID, batchFlushed);
+                m_cachedDataIds.put(ccUID, new Object());
                 m_globalCache.put(ccUID, batch.get(i), m_evictor);
             }
             m_numBatches++;
@@ -184,8 +162,6 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
     private final class ReadDataCacheReader implements RandomAccessBatchReader {
 
-        private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
-
         private final ColumnSelection m_selection;
 
         private final int[] m_selectedColumns;
@@ -197,6 +173,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
         @Override
         public ReadBatch readRetained(final int index) throws IOException {
+            var writingBatch = m_currentlyWritingBatches.getRetained(index);
+            if (writingBatch != null) {
+                return writingBatch;
+            }
+
             final int numColumns = m_selection.numColumns();
             final NullableReadData[] datas = new NullableReadData[numColumns];
             int[] missingCols = new int[m_selectedColumns.length];
@@ -225,10 +206,10 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
                 // we use the first column's id as a proxy for locking.
                 final ColumnDataUniqueId lockUID = new ColumnDataUniqueId(ReadDataCache.this, 0, index);
-                final CountDownLatch lock = m_cachedData.computeIfAbsent(lockUID, k -> new CountDownLatch(0));
+                final Object lock = m_cachedDataIds.computeIfAbsent(lockUID, k -> new Object());
                 synchronized (lock) {
                     try (RandomAccessBatchReader reader = m_readableDelegate
-                            .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
+                        .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
                         final ReadBatch batch = reader.readRetained(index);
                         for (int i : missingCols) {
                             final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, index);
@@ -238,7 +219,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                                 data.release();
                                 datas[i] = cachedData;
                             } else {
-                                m_cachedData.computeIfAbsent(ccUID, k -> new CountDownLatch(0));
+                                m_cachedDataIds.computeIfAbsent(ccUID, k -> new Object());
                                 m_globalCache.put(ccUID, data, m_evictor);
                                 datas[i] = data;
                             }
@@ -269,7 +250,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
     private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
-    private final Map<ColumnDataUniqueId, CountDownLatch> m_cachedData = new ConcurrentHashMap<>();
+    private final Map<ColumnDataUniqueId, Object> m_cachedDataIds = new ConcurrentHashMap<>();
+
+    private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedDataIds.remove(k);
+
+    private final ReadBatchRetainingMap m_currentlyWritingBatches = new ReadBatchRetainingMap();
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
@@ -280,9 +265,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
      * @param executor the executor to which to submit asynchronous writes to the delegate
      */
     @SuppressWarnings("resource")
-    public ReadDataCache(
-        final BatchWritable writable,
-        final RandomAccessBatchReadable readable,
+    public ReadDataCache(final BatchWritable writable, final RandomAccessBatchReadable readable,
         final SharedReadDataCache cache, final ExecutorService executor) {
 
         m_writer = new ReadDataCacheWriter(writable.getWriter());
@@ -358,7 +341,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
             releaseAllReferencedData();
 
-            m_cachedData.clear();
+            m_cachedDataIds.clear();
             m_readableDelegate.close();
         }
     }
@@ -387,23 +370,16 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
     }
 
     private void releaseAllReferencedData() {
-        // Drop all globally cached data referenced by this cache, because "release"-on-evict would
-        // no longer work once the delegate is closed.
-        for(final var entry : m_cachedData.entrySet()) {
+        // Drop all globally cached data referenced by this cache
+        for (final var entry : m_cachedDataIds.entrySet()) {
             final var ccUID = entry.getKey();
             final var lock = entry.getValue();
 
-            if (lock != null) {
-                try {
-                    lock.await();
-                } catch (InterruptedException ex) {
-                    LOGGER.error("Interrupted while waiting for cached data to be released");
+            synchronized (lock) {
+                final var data = m_globalCache.removeRetained(ccUID);
+                if (data != null) {
+                    data.release();
                 }
-            }
-
-            final var data = m_globalCache.removeRetained(ccUID);
-            if (data != null) {
-                data.release();
             }
         }
     }
@@ -418,5 +394,32 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             }
         }
         return j == numColumns ? selected : Arrays.copyOf(selected, j);
+    }
+
+    /**
+     * Helper class for remembering batches that we are currently writing. Using {@link #getRetained(int)} we can be
+     * sure that the batch won't get released before we are able to retain it.
+     */
+    private static final class ReadBatchRetainingMap {
+
+        private final Map<Integer, ReadBatch> m_batches = new HashMap<>();
+
+        public synchronized void putRetained(final int i, final ReadBatch batch) {
+            batch.retain();
+            m_batches.put(i, batch);
+        }
+
+        public synchronized void remove(final int i) {
+            m_batches.remove(i).release();
+        }
+
+        public synchronized ReadBatch getRetained(final int i) {
+            var batch = m_batches.get(i);
+            if (batch == null) {
+                return null;
+            }
+            batch.retain();
+            return batch;
+        }
     }
 }

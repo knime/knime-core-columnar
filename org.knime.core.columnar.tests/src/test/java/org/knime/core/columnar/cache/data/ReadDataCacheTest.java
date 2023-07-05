@@ -314,40 +314,38 @@ public class ReadDataCacheTest extends ColumnarTest {
         }
     }
 
-    @Test
-    public void testCacheBlocksOnEvictWhenAllDataUnflushed() throws IOException, InterruptedException {
-
+    @Test(timeout = 1000)
+    public void testWritingAfterDataReleasedFromCache() throws IOException, InterruptedException {
         final SharedReadDataCache cache = generateCache(1);
-        try (final TestBatchStore delegate1 = createDefaultTestColumnStore();
-                final ReadDataCache store1 = generateDefaultCachedColumnStore(delegate1, cache);
-                final TestDataTable table1 = createDefaultTestTable(delegate1);
-                final TestBatchStore delegate2 = createDefaultTestColumnStore();
-                final ReadDataCache store2 = generateDefaultCachedColumnStore(delegate2, cache);
-                final TestDataTable table2 = createDefaultTestTable(delegate2)) {
+        try (final TestBatchStore delegate = createDefaultTestColumnStore();
+                final ReadDataCache store = generateDefaultCachedColumnStore(delegate, cache);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
 
-            final CountDownLatch flushLatch1 = delayFlush(store1);
-            writeTable(store1, table1);
-            checkUnflushed(table1, delegate1);
+            // Start writing a table (blocked by flushLatch1)
+            final CountDownLatch flushLatch1 = delayFlush(store);
+            writeTable(store, table);
+            checkUnflushed(table, delegate);
             checkCacheSize(cache, 1);
 
-            // block on write, since table1 has not been flushed
-            checkCacheSize(cache, 1);
-            final CountDownLatch writeLatch2 = blockOnWriteAfterDelayedFlush(store2, table2);
-            checkCacheSize(cache, 1);
+            // Clear the cache - should work even if the write is still blocked
+            cache.getCache().invalidateAll();
+            checkCacheSize(cache, 0);
 
-            // wait for flush of table1
-            waitForFlush(store1, flushLatch1);
-            waitForWrite(writeLatch2);
+            // Flushing the table should still be blocked
+            assertFalse(tableInStore(delegate, table));
+            assertEquals(2, checkRefs(table)); // refs: TestDataTable + store | not: cache
 
-            assertEquals(1, checkRefs(table1)); // not held in the cache
-            checkFlushed(table1, delegate1);
-            checkCached(table2);
-            checkFlushed(table2, delegate2);
-            checkCacheSize(cache, 1);
+            // Finally flush the batch - this should still work
+            waitForFlush(store, flushLatch1);
+            assertEquals(1, checkRefs(table)); // refs: TestDataTable | not: cache + store
+
+            // The cache should still be empty and the table flushed
+            checkCacheSize(cache, 0);
+            checkFlushed(table, delegate);
         }
     }
 
-    @Test
+    @Test(timeout = 1000)
     public void testCacheDoesNotBlockOnEvictWhenEvictedDataFlushed() throws IOException, InterruptedException {
 
         final SharedReadDataCache cache = generateCache(2);
@@ -386,48 +384,6 @@ public class ReadDataCacheTest extends ColumnarTest {
             checkUncached(table1);
             checkFlushed(table1, delegate1);
             checkCached(table2);
-            checkFlushed(table2, delegate2);
-            checkCached(table3);
-            checkFlushed(table3, delegate3);
-            checkCacheSize(cache, 2);
-        }
-    }
-
-    @Test
-    public void testCacheBlocksOnEvictWhenEvictedDataUnflushed() throws IOException, InterruptedException {
-
-        final SharedReadDataCache cache = generateCache(2);
-        try (final TestBatchStore delegate1 = createDefaultTestColumnStore();
-                final ReadDataCache store1 = generateDefaultCachedColumnStore(delegate1, cache);
-                final TestDataTable table1 = createDefaultTestTable(delegate1);
-                final TestBatchStore delegate2 = createDefaultTestColumnStore();
-                final ReadDataCache store2 = generateDefaultCachedColumnStore(delegate2, cache);
-                final TestDataTable table2 = createDefaultTestTable(delegate2);
-                final TestBatchStore delegate3 = createDefaultTestColumnStore();
-                final ReadDataCache store3 = generateDefaultCachedColumnStore(delegate3, cache);
-                final TestDataTable table3 = createDefaultTestTable(delegate3)) {
-
-            writeTable(store1, table1);
-            store1.waitForAndHandleFuture(); // wait for flush of table1
-
-            final CountDownLatch flushLatch2 = delayFlush(store2);
-            final CountDownLatch flushLatch3 = delayFlush(store3);
-
-            writeTable(store2, table2); // cache & queue flush of table2
-            try (final TestDataTable reassembledTable1 = readAndCompareTable(store1, table1)) {
-                // read table1 to make table2 next in line for eviction
-            }
-
-            // block on write, since table2 has not been flushed
-            final CountDownLatch writeLatch3 = blockOnWriteAfterDelayedFlush(store3, table3);
-
-            waitForFlush(store2, flushLatch2);
-            waitForFlush(store3, flushLatch3);
-            waitForWrite(writeLatch3);
-
-            checkCached(table1);
-            checkFlushed(table1, delegate1);
-            checkUncached(table2);
             checkFlushed(table2, delegate2);
             checkCached(table3);
             checkFlushed(table3, delegate3);
@@ -516,7 +472,7 @@ public class ReadDataCacheTest extends ColumnarTest {
         }
     }
 
-    @Test(timeout=2000)
+    @Test(timeout = 2000)
     public void testNoDeadlockOnCloseWhileWriting() throws IOException, InterruptedException {
 
         final SharedReadDataCache cache = generateCache(1);
