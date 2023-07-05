@@ -127,8 +127,12 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
                 .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
                 .useHeapCache( //
                     ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
-                    ColumnarPreferenceUtils.getSerializeExecutor())//
-                .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache());
+                    ColumnarPreferenceUtils.getSerializeExecutor());//
+
+            // NOTE:
+            // We do not use the ReadBatchCache for now because it can cause a deadlock on a memory alert.
+            // The cache will be useful when we have random-access rows but this is not the case yet.
+            // .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache())
         }
         builder.enableDictEncoding(true);
         if (settings.isCalculateDomains()) {
@@ -231,7 +235,6 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
             m_store.getFileHandle().delete();
         }
     }
-
 
     // -- implement RowWriteAccessible --
 
