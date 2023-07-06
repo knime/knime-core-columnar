@@ -75,6 +75,11 @@ public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable 
     }
 
     @Override
+    public void throwOnWrite(final RuntimeException exception) {
+        m_testDelegate.throwOnWrite(exception);
+    }
+
+    @Override
     public List<TestData> getData() {
         return m_testDelegate.getData();
     }

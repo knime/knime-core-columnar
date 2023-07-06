@@ -489,4 +489,28 @@ public class ReadDataCacheTest extends ColumnarTest {
 
         checkCacheSize(cache, 0);
     }
+
+    @Test(timeout = 2000)
+    public void testExceptionHandlingOnWrite() throws IOException {
+        final var expectedError = "Expected exception on write";
+        final var cache = generateCache(1);
+        try (final TestBatchStore delegate = createDefaultTestColumnStore();
+                final ReadDataCache store = generateDefaultCachedColumnStore(delegate, cache);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
+
+            delegate.throwOnWrite(new RuntimeException(expectedError));
+            var flushLatch = delayFlush(store);
+            writeTable(store, table);
+
+            // Open for writing (which will throw an exception)
+            flushLatch.countDown();
+
+            // Close the store (should not deadlock)
+            store.close();
+
+            // Check that everything is cleared up
+            checkCacheSize(cache, 0);
+            assertEquals(1, checkRefs(table)); // Only retained here
+        }
+    }
 }
