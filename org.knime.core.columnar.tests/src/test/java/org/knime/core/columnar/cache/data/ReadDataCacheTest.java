@@ -49,6 +49,7 @@ import static org.awaitility.Awaitility.await;
 import static org.awaitility.Duration.ONE_HUNDRED_MILLISECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_BATCHES;
 import static org.knime.core.columnar.TestBatchStoreUtils.DEF_NUM_COLUMNS;
@@ -488,5 +489,29 @@ public class ReadDataCacheTest extends ColumnarTest {
         }
 
         checkCacheSize(cache, 0);
+    }
+
+    @Test(timeout = 2000)
+    public void testExceptionHandlingOnWrite() throws IOException {
+        final var expectedError = "Expected exception on write";
+        final var cache = generateCache(1);
+        try (final TestBatchStore delegate = createDefaultTestColumnStore();
+                final ReadDataCache store = generateDefaultCachedColumnStore(delegate, cache);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
+
+            delegate.throwOnWrite(new RuntimeException(expectedError));
+            var flushLatch = delayFlush(store);
+            writeTable(store, table);
+
+            // Open for writing (which will throw an exception)
+            flushLatch.countDown();
+
+            // TODO how should the caller get the exception? Via flush, or close?
+            assertThrows(expectedError, IllegalStateException.class, () -> store.close());
+
+            // Check that everything is cleared up
+            checkCacheSize(cache, 0);
+            assertEquals(1, checkRefs(table)); // Only retained here
+        }
     }
 }

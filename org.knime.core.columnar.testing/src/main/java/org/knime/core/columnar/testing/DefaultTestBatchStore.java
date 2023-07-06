@@ -109,6 +109,9 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             if (m_storeClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
+            if (m_exceptionOnWrite != null) {
+                throw m_exceptionOnWrite;
+            }
 
             waitForLatch();
             final Object[][] data = new Object[batch.numData()][];
@@ -125,7 +128,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
         @Override
         public void close() {
             if (!m_batches.isEmpty()) {
-                for (int b = 0; b < m_batches.size()-1; b++) {
+                for (int b = 0; b < m_batches.size() - 1; b++) {
                     assertEquals(m_maxDataLength, m_batches.get(b)[0].length);
                 }
 
@@ -198,6 +201,8 @@ public final class DefaultTestBatchStore implements TestBatchStore {
 
     private CountDownLatch m_latch;
 
+    private RuntimeException m_exceptionOnWrite;
+
     public static DefaultTestBatchStore create(final ColumnarSchema schema) {
         return create(schema, null);
     }
@@ -212,7 +217,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     private DefaultTestBatchStore(final ColumnarSchema schema, final FileHandle fileHandle) {
         m_schema = schema;
         m_factories = IntStream.range(0, schema.numColumns()) //
-            .mapToObj(i -> schema.getSpec(i).accept(TestSchemaMapper.INSTANCE, schema.getTraits(i)) )//
+            .mapToObj(i -> schema.getSpec(i).accept(TestSchemaMapper.INSTANCE, schema.getTraits(i)))//
             .toArray(TestDataFactory[]::new);
         m_fileHandle = fileHandle;
     }
@@ -232,6 +237,11 @@ public final class DefaultTestBatchStore implements TestBatchStore {
                 throw new IllegalStateException(e);
             }
         }
+    }
+
+    @Override
+    public void throwOnWrite(final RuntimeException exception) {
+        m_exceptionOnWrite = exception;
     }
 
     @Override
