@@ -51,20 +51,35 @@ package org.knime.core.data.columnar.preferences;
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils.COLUMNAR_STORE;
 
 import org.eclipse.core.runtime.preferences.AbstractPreferenceInitializer;
+import org.knime.core.node.NodeLogger;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 public final class ColumnarPreferenceInitializer extends AbstractPreferenceInitializer {
 
-
     static final String OFF_HEAP_MEM_LIMIT_KEY = "knime.core.data.columnar.off-heap-limit";
 
-    static final int OFF_HEAP_MEM_LIMIT_DEF = Math.max((int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20), 1024);
+    static final int OFF_HEAP_MEM_LIMIT_MIN = 1024;
+
+    static final int OFF_HEAP_MEM_LIMIT_DEF = computeDefaultOffHeapMemoryLimit();
 
     @Override
     public void initializeDefaultPreferences() {
         COLUMNAR_STORE.setDefault(OFF_HEAP_MEM_LIMIT_KEY, OFF_HEAP_MEM_LIMIT_DEF);
     }
 
+    private static int computeDefaultOffHeapMemoryLimit() {
+        var heapLimitMb = (int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20);
+        var physicalMemoryMb = (int)(ColumnarPreferenceUtils.getTotalPhysicalMemorySize() >> 20);
+        var heapLimitOrRestOfPhysicalMemory = Math.min(heapLimitMb, physicalMemoryMb - heapLimitMb);
+
+        if (heapLimitOrRestOfPhysicalMemory < OFF_HEAP_MEM_LIMIT_MIN) {
+            NodeLogger.getLogger(ColumnarPreferenceInitializer.class).warn(
+                "Configured heap memory limit does not leave enough free memory for the columnar backend off-heap memory. "
+                    + "Using " + OFF_HEAP_MEM_LIMIT_MIN + "Mb for the off-heap memory limit.");
+            return OFF_HEAP_MEM_LIMIT_MIN;
+        }
+        return heapLimitOrRestOfPhysicalMemory;
+    }
 }

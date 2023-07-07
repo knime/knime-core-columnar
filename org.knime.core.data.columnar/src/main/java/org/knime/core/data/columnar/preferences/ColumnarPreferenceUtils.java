@@ -58,6 +58,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.management.AttributeNotFoundException;
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanException;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+import javax.management.ReflectionException;
+
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.knime.core.columnar.batch.BatchWritable;
@@ -126,6 +133,23 @@ public final class ColumnarPreferenceUtils {
     static long getMaxHeapSize() {
         return Math.max(ManagementFactory.getMemoryPoolMXBeans().stream().filter(m -> m.getType() == MemoryType.HEAP)
             .map(MemoryPoolMXBean::getUsage).mapToLong(MemoryUsage::getMax).sum(), 0L);
+    }
+
+    static long getTotalPhysicalMemorySize() {
+        try {
+            // Unfortunately, there does not seem to be a safer way to determine the system's physical memory size.
+            // The closest alternative would be ManagementFactory.getOperatingSystemMXBean::getTotalPhysicalMemorySize,
+            // which is not supported in OpenJDK 8.
+            return Math
+                .max(
+                    ((Long)ManagementFactory.getPlatformMBeanServer().getAttribute(
+                        new ObjectName("java.lang", "type", "OperatingSystem"), "TotalPhysicalMemorySize")).longValue(),
+                    0L);
+        } catch (ClassCastException | InstanceNotFoundException | AttributeNotFoundException
+                | MalformedObjectNameException | ReflectionException | MBeanException ex) {
+            LOGGER.warn("Error while attempting to determine total physical memory size", ex);
+        }
+        return 0L;
     }
 
     private static int getNumThreads() {

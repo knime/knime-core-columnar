@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.preferences;
 
 import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.OFF_HEAP_MEM_LIMIT_KEY;
+import static org.knime.core.data.columnar.preferences.ColumnarPreferenceInitializer.OFF_HEAP_MEM_LIMIT_MIN;
 
 import java.util.function.UnaryOperator;
 
@@ -97,7 +98,7 @@ public final class ColumnarPreferencePage extends FieldEditorPreferencePage impl
         final Composite parent = getFieldEditorParent();
         var offHeapMemoryLimitEditor =
             new IntegerFieldEditor(OFF_HEAP_MEM_LIMIT_KEY, "Off-Heap Memory Limit (in MB)", parent);
-        offHeapMemoryLimitEditor.setValidRange(1024, Integer.MAX_VALUE);
+        offHeapMemoryLimitEditor.setValidRange(OFF_HEAP_MEM_LIMIT_MIN, Integer.MAX_VALUE);
         addField(offHeapMemoryLimitEditor);
     }
 
