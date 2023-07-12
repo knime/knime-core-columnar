@@ -18,6 +18,12 @@ properties([
 try {
     knimetools.defaultTychoBuild('org.knime.update.core.columnar')
 
+    workflowTests.runTests(
+        dependencies: [
+            repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep']
+        ]
+    )
+
     stage('Sonarqube analysis') {
         env.lastStage = env.STAGE_NAME
         workflowTests.runSonar()
