@@ -3,6 +3,8 @@ def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRAN
 
 library "knime-pipeline@$BN"
 
+def baseBranch = (BN == KNIMEConstants.NEXT_RELEASE_BRANCH ? "master" : BN.replace("releases/",""))
+
 properties([
     pipelineTriggers([
         upstream(
@@ -10,7 +12,16 @@ properties([
             ', knime-core-table/' + env.BRANCH_NAME.replaceAll('/', '%2F')
             )
     ]),
-    parameters(workflowTests.getConfigurationsAsParameters()),
+    parameters(
+        workflowTests.getConfigurationsAsParameters([columnarBackendDefault: true]) +
+        [
+            booleanParam(
+                defaultValue: true,
+                description: "Run knime-base workflow tests with the columnar backend",
+                name: "KNIME_BASE_WORKFLOW_TESTS",
+            ),
+        ],
+    ),
     buildDiscarder(logRotator(numToKeepStr: '5')),
     disableConcurrentBuilds()
 ])
@@ -23,6 +34,26 @@ try {
             repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep']
         ]
     )
+
+    if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
+        // TODO filter out workflows that are not supposed to work with the argument "testflowsRegex"
+        workflowTests.runTests(
+            testflowsDir: "Testflows (${baseBranch})/knime-base",
+            dependencies: [
+                repositories:  ["knime-base", "knime-expressions", "knime-core", "knime-core-ui", "knime-pmml", "knime-pmml-compilation",
+                "knime-pmml-translation", "knime-r", "knime-jep","knime-kerberos", "knime-database", "knime-datageneration",
+                "knime-filehandling", "knime-js-base", "knime-ensembles", "knime-distance", "knime-xml", "knime-jfreechart",
+                "knime-timeseries", "knime-python", "knime-python-legacy", "knime-conda", "knime-stats", "knime-h2o", "knime-weka", "knime-birt", "knime-svm",
+                "knime-js-labs", "knime-optimization", "knime-streaming", "knime-textprocessing", "knime-chemistry", "knime-python", "knime-testing-internal",
+                "knime-exttool", "knime-parquet", "knime-bigdata", "knime-bigdata-externals", "knime-cloud", "knime-js-core", "knime-office365",
+                "knime-database-proprietary","knime-svg", "knime-excel", "knime-wide-data", "knime-aws"],
+                ius: ["org.knime.features.chem.types.feature.group"]
+            ],
+            sidecarContainers: [
+                [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
+            ]
+        )
+    }
 
     stage('Sonarqube analysis') {
         env.lastStage = env.STAGE_NAME
