@@ -6,7 +6,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.knime</groupId>
-		<artifactId>knime-core-arrow</artifactId>
+		<artifactId>knime-core-columnar</artifactId>
 		<version>${revision}${changelist}</version>
 	</parent>
 	<artifactId>org.knime.core.columnar.arrow.tests</artifactId>
