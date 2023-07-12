@@ -1,7 +1,7 @@
 #!groovy
 def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRANCH_NAME : 'releases/2023-07'
 
-library "knime-pipeline@$BN"
+library "knime-pipeline@todo/AP-20697-run-base-tests-in-columnar"
 
 def baseBranch = (BN == KNIMEConstants.NEXT_RELEASE_BRANCH ? "master" : BN.replace("releases/",""))
 
