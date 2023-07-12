@@ -32,8 +32,11 @@
 		<module>org.knime.core.columnar</module>
 		<module>org.knime.core.columnar.testing</module>
 		<module>org.knime.core.columnar.tests</module>
+		<module>org.knime.core.columnar.arrow</module>
+		<module>org.knime.core.columnar.arrow.tests</module>
 		<module>org.knime.core.data.columnar</module>
 		<module>org.knime.core.data.columnar.tests</module>
+		<module>org.knime.features.core.columnar</module>
 		<module>org.knime.update.core.columnar</module>
 	</modules>
 	<repositories>
@@ -61,6 +64,31 @@
 			<id>p2-knime-tp</id>
 			<layout>p2</layout>
 			<url>${knime.tp.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-workbench</id>
+			<layout>p2</layout>
+			<url>${knime.workbench.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-js-core</id>
+			<layout>p2</layout>
+			<url>${knime.js.core.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-base</id>
+			<layout>p2</layout>
+			<url>${knime.base.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-svg</id>
+			<layout>p2</layout>
+			<url>${knime.svg.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-expressions</id>
+			<layout>p2</layout>
+			<url>${knime.expressions.p2}</url>
 		</repository>
 	</repositories>
 	

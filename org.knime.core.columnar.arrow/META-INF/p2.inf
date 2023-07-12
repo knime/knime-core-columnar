@@ -1,0 +1,9 @@
+instructions.install=\
+org.eclipse.equinox.p2.touchpoint.eclipse.addJvmArg(jvmArg:-Darrow.enable_unsafe_memory_access=true);\
+org.eclipse.equinox.p2.touchpoint.eclipse.addJvmArg(jvmArg:-Darrow.memory.debug.allocator=false);\
+org.eclipse.equinox.p2.touchpoint.eclipse.addJvmArg(jvmArg:-Darrow.enable_null_check_for_get=false);
+
+instructions.uninstall=\
+org.eclipse.equinox.p2.touchpoint.eclipse.removeJvmArg(jvmArg:-Darrow.enable_unsafe_memory_access=true);\
+org.eclipse.equinox.p2.touchpoint.eclipse.removeJvmArg(jvmArg:-Darrow.memory.debug.allocator=false);\
+org.eclipse.equinox.p2.touchpoint.eclipse.removeJvmArg(jvmArg:-Darrow.enable_null_check_for_get=false);
