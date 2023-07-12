@@ -59,6 +59,9 @@ import org.knime.core.data.v2.RowContainer;
  */
 public final class ColumnarRowWriteTableSettings {
 
+    /** a system property to disable all caches in a write table for testing */
+    private static final boolean DISABLE_CACHES = Boolean.getBoolean("knime.columnar.disablecaches.writetable");
+
     private final boolean m_initializeDomains;
 
     private final boolean m_calculateDomains;
@@ -151,7 +154,7 @@ public final class ColumnarRowWriteTableSettings {
     }
 
     boolean isUseCaching() {
-        return m_useCaching;
+        return !DISABLE_CACHES && m_useCaching;
     }
 
     boolean isForceSynchronousIO() {

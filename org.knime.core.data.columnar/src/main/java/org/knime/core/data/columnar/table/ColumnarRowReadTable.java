@@ -76,6 +76,9 @@ import org.knime.core.table.virtual.LookaheadRowAccessible;
  */
 public final class ColumnarRowReadTable implements LookaheadRowAccessible {
 
+    /** a system property to disable all caches in a read table for testing */
+    private static final boolean DISABLE_CACHES = Boolean.getBoolean("knime.columnar.disablecaches.readtable");
+
     private final ColumnarValueSchema m_schema;
 
     private final ColumnStoreFactory m_storeFactory;
@@ -102,12 +105,14 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
     }
 
     private static ColumnarBatchReadStore wrapInColumnarStore(final BatchReadStore store) {
-        return new ColumnarBatchReadStoreBuilder(store) //
-            .enableDictEncoding(true) //
-            .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache()) //
-            .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache())//
-            .useHeapCache(ColumnarPreferenceUtils.getHeapCache()) //
-            .build();
+        var builder = new ColumnarBatchReadStoreBuilder(store) //
+            .enableDictEncoding(true); //
+        if (!DISABLE_CACHES) {
+            builder.useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache()) //
+                .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache())//
+                .useHeapCache(ColumnarPreferenceUtils.getHeapCache()); //
+        }
+        return builder.build();
     }
 
     /**
