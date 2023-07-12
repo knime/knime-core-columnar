@@ -94,7 +94,7 @@ public final class ColumnarRowWriteTableSettings {
      */
     public ColumnarRowWriteTableSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
         final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO, final int rowBatchSize, final int maxPendingBatches) {
-        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO, rowBatchSize, maxPendingBatches);
+        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, false, forceSynchronousIO, rowBatchSize, maxPendingBatches);
     }
 
     /**
