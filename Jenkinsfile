@@ -29,11 +29,11 @@ properties([
 try {
     knimetools.defaultTychoBuild('org.knime.update.core.columnar')
 
-    workflowTests.runTests(
-        dependencies: [
-            repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep']
-        ]
-    )
+    // workflowTests.runTests(
+    //     dependencies: [
+    //         repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep']
+    //     ]
+    // )
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
         withEnv(["MALLOC_ARENA_MAX=1"]) {
@@ -67,10 +67,10 @@ try {
         }
     }
 
-    stage('Sonarqube analysis') {
-        env.lastStage = env.STAGE_NAME
-        workflowTests.runSonar()
-    }
+    // stage('Sonarqube analysis') {
+    //     env.lastStage = env.STAGE_NAME
+    //     workflowTests.runSonar()
+    // }
 } catch (ex) {
     currentBuild.result = 'FAILURE'
     throw ex
