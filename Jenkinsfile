@@ -23,7 +23,7 @@ properties([
         ],
     ),
     buildDiscarder(logRotator(numToKeepStr: '5')),
-    disableConcurrentBuilds()
+    // disableConcurrentBuilds()
 ])
 
 try {
