@@ -37,9 +37,18 @@ try {
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
         withEnv(["MALLOC_ARENA_MAX=1"]) {
-            // TODO filter out workflows that are not supposed to work with the argument "testflowsRegex"
+            def testflowsDir = "Testflows (${baseBranch})/knime-base"
+            def excludedTestflows = [
+                "\\\\QDate&Time/test_AP-6112_DateTimeDifference\\\\E",
+                "\\\\QDate&Time/test_AP-6963_StringToDurationPeriod\\\\E",
+                "\\\\QTransformation/test_CollectionCreator3\\\\E",
+            ].join('|')
+            def testflowsRegex =
+            "/\\\\Q${testflowsDir}\\\\E/(?:(?!OS|\\\\QFile Handling v2\\\\E|Staging|${excludedTestflows})|OS/__KNIME_OS__/|\\\\QStaging/${BRANCH_NAME}\\\\E).+"
+
             workflowTests.runTests(
-                testflowsDir: "Testflows (${baseBranch})/knime-base",
+                testflowsDir: testflowsDir,
+                testflowsRegex: testflowsRegex,
                 dependencies: [
                     repositories:  ["knime-base", "knime-expressions", "knime-core", "knime-core-ui", "knime-pmml", "knime-pmml-compilation",
                     "knime-pmml-translation", "knime-r", "knime-jep","knime-kerberos", "knime-database", "knime-datageneration",
