@@ -210,7 +210,10 @@ final class ResourceLeakDetector {
         m_enqueuedFinalizers = new ReferenceQueue<>();
         m_openFinalizers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(this::poll);
+        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(() -> {
+            System.gc();
+            return poll();
+        });
     }
 
     Finalizer createFinalizer(final Object referent, final AutoCloseable... closeables) {
