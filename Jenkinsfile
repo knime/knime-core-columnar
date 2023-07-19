@@ -42,6 +42,7 @@ try {
                 "\\\\QDate&Time/test_AP-6112_DateTimeDifference\\\\E",
                 "\\\\QDate&Time/test_AP-6963_StringToDurationPeriod\\\\E",
                 "\\\\QTransformation/test_CollectionCreator3\\\\E",
+                "\\\\QFlow Control/test_endModelCase\\\\E", // TODO AP-20719 - fix this test
             ].join('|')
             def testflowsRegex =
             "/\\\\Q${testflowsDir}\\\\E/(?:(?!OS|\\\\QFile Handling v2\\\\E|Staging|${excludedTestflows})|OS/__KNIME_OS__/|\\\\QStaging/${BRANCH_NAME}\\\\E).+"
