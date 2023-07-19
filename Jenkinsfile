@@ -36,23 +36,25 @@ try {
     )
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
-        // TODO filter out workflows that are not supposed to work with the argument "testflowsRegex"
-        workflowTests.runTests(
-            testflowsDir: "Testflows (${baseBranch})/knime-base",
-            dependencies: [
-                repositories:  ["knime-base", "knime-expressions", "knime-core", "knime-core-ui", "knime-pmml", "knime-pmml-compilation",
-                "knime-pmml-translation", "knime-r", "knime-jep","knime-kerberos", "knime-database", "knime-datageneration",
-                "knime-filehandling", "knime-js-base", "knime-ensembles", "knime-distance", "knime-xml", "knime-jfreechart",
-                "knime-timeseries", "knime-python", "knime-python-legacy", "knime-conda", "knime-stats", "knime-h2o", "knime-weka", "knime-birt", "knime-svm",
-                "knime-js-labs", "knime-optimization", "knime-streaming", "knime-textprocessing", "knime-chemistry", "knime-python", "knime-testing-internal",
-                "knime-exttool", "knime-parquet", "knime-bigdata", "knime-bigdata-externals", "knime-cloud", "knime-js-core", "knime-office365",
-                "knime-database-proprietary","knime-svg", "knime-excel", "knime-wide-data", "knime-aws"],
-                ius: ["org.knime.features.chem.types.feature.group"]
-            ],
-            sidecarContainers: [
-                [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
-            ]
-        )
+        withEnv(["MALLOC_ARENA_MAX=1"]) {
+            // TODO filter out workflows that are not supposed to work with the argument "testflowsRegex"
+            workflowTests.runTests(
+                testflowsDir: "Testflows (${baseBranch})/knime-base",
+                dependencies: [
+                    repositories:  ["knime-base", "knime-expressions", "knime-core", "knime-core-ui", "knime-pmml", "knime-pmml-compilation",
+                    "knime-pmml-translation", "knime-r", "knime-jep","knime-kerberos", "knime-database", "knime-datageneration",
+                    "knime-filehandling", "knime-js-base", "knime-ensembles", "knime-distance", "knime-xml", "knime-jfreechart",
+                    "knime-timeseries", "knime-python", "knime-python-legacy", "knime-conda", "knime-stats", "knime-h2o", "knime-weka", "knime-birt", "knime-svm",
+                    "knime-js-labs", "knime-optimization", "knime-streaming", "knime-textprocessing", "knime-chemistry", "knime-python", "knime-testing-internal",
+                    "knime-exttool", "knime-parquet", "knime-bigdata", "knime-bigdata-externals", "knime-cloud", "knime-js-core", "knime-office365",
+                    "knime-database-proprietary","knime-svg", "knime-excel", "knime-wide-data", "knime-aws"],
+                    ius: ["org.knime.features.chem.types.feature.group"]
+                ],
+                sidecarContainers: [
+                    [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
+                ]
+            )
+        }
     }
 
     stage('Sonarqube analysis') {
