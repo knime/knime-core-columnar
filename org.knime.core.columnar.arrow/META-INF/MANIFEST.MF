@@ -1,0 +1,26 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: KNIME Columnar Store Plugin - Arrow Implementation
+Bundle-SymbolicName: org.knime.core.columnar.arrow;singleton:=true
+Bundle-Version: 5.2.0.qualifier
+Bundle-ClassPath: .
+Bundle-Vendor: KNIME AG, Zurich, Switzerland
+Bundle-RequiredExecutionEnvironment: JavaSE-11
+Bundle-ActivationPolicy: lazy
+Require-Bundle: org.knime.core.columnar;bundle-version="[5.0.0,6.0.0)",
+ org.knime.core.table;bundle-version="[5.0.0,6.0.0)",
+ io.netty.all;bundle-version="[4.1.68,4.2.0)",
+ com.google.guava;bundle-version="[19.0.0,20.0.0)",
+ org.slf4j.api;bundle-version="[1.7.2,2.0.0)",
+ com.fasterxml.jackson.core.jackson-core;bundle-version="[2.10.2,3.0.0)",
+ com.fasterxml.jackson.core.jackson-databind;bundle-version="[2.10.2,3.0.0)",
+ com.fasterxml.jackson.core.jackson-annotations;bundle-version="[2.10.2,3.0.0)",
+ org.apache.arrow.format;bundle-version="[12.0.1,13.0.0)",
+ org.apache.arrow.memory-core;bundle-version="[12.0.1,13.0.0)",
+ org.apache.arrow.vector;bundle-version="[12.0.1,13.0.0)",
+ com.google.flatbuffers.java;bundle-version="[1.12.0,2.0.0)",
+ org.apache.commons.io;bundle-version="[2.6.0,3.0.0)",
+ org.bytedeco.javacpp;bundle-version="[1.5.8,2.0.0)",
+ org.bytedeco.lz4;bundle-version="[1.9.4,2.0.0)"
+Export-Package: org.knime.core.columnar.arrow,
+ org.knime.core.columnar.arrow.compress
