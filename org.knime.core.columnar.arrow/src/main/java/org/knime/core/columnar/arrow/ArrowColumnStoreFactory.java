@@ -79,6 +79,10 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArrowColumnStoreFactory.class);
 
+    private static final boolean DISABLE_HARD_MEMORY_LIMIT = Boolean.getBoolean("knime.columnar.disablehardmemorylimit");
+
+    private static final boolean DISABLE_MEMORY_ALERT = Boolean.getBoolean("knime.columnar.disablememoryalert");
+
     static {
         // AP-18253: Load LZ4 libs on startup to avoid concurrency issues when different threads try to load it
         // concurrently
@@ -133,7 +137,7 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
                 return memoryAlert();
             }
 
-        }, memoryLimit);
+        }, DISABLE_HARD_MEMORY_LIMIT ? Long.MAX_VALUE : memoryLimit);
         m_compression = ArrowCompressionUtil.getDefaultCompression();
     }
 
@@ -171,6 +175,9 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     }
 
     private static boolean memoryAlert() {
+        if (DISABLE_MEMORY_ALERT) {
+            return false;
+        }
         try {
             return ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
         } catch (final InterruptedException ex) {
