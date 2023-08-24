@@ -73,7 +73,7 @@ public final class ReferenceTables {
      * @return ReferenceTables that wrap the provided input tables
      * @throws VirtualTableIncompatibleException if any of the tables is not compatible with virtual columnar tables
      */
-    public static ReferenceTable[] createReferenceTables(final BufferedDataTable[] tables)
+    public static ReferenceTable[] createReferenceTables(final BufferedDataTable... tables)
         throws VirtualTableIncompatibleException {
         var refTables = new ReferenceTable[tables.length];
         for (int i = 0; i < tables.length; i++) {//NOSONAR

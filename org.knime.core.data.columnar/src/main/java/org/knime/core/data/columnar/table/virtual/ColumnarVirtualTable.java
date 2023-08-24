@@ -71,6 +71,7 @@ import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.AppendMissingValuesTransformSpec;
@@ -79,6 +80,7 @@ import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.MaskTransformSpec;
 import org.knime.core.table.virtual.spec.MaterializeTransformSpec;
 import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerFactory;
 import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerWithRowIndexFactory;
@@ -125,7 +127,7 @@ public final class ColumnarVirtualTable {
      * @param transform of the table
      * @param schema of the table
      */
-    public ColumnarVirtualTable(final TableTransform transform,final ColumnarValueSchema schema) {
+    public ColumnarVirtualTable(final TableTransform transform, final ColumnarValueSchema schema) {
         m_transform = transform;
         m_valueSchema = schema;
     }
@@ -164,17 +166,16 @@ public final class ColumnarVirtualTable {
             throw new IllegalArgumentException("RowID must either be dropped or remain at index 0");
         }
         var valueFactories = IntStream.of(columnIndices)//
-                .mapToObj(schema::getValueFactory)//
-                .toArray(ValueFactory<?, ?>[]::new);
+            .mapToObj(schema::getValueFactory)//
+            .toArray(ValueFactory<?, ?>[]::new);
         var originalSpec = schema.getSourceSpec();
         var specCreator = new DataTableSpecCreator(originalSpec);
         specCreator.dropAllColumns();
         var permutationStream = IntStream.of(columnIndices);
         if (hasRowID) {
             // The RowID is not part of the DataTableSpec.
-            permutationStream = permutationStream
-                    .filter(i -> i > 0) // skip if present
-                    .map(i -> i - 1); // translate "indices including RowID" to "indices without RowID"
+            permutationStream = permutationStream.filter(i -> i > 0) // skip if present
+                .map(i -> i - 1); // translate "indices including RowID" to "indices without RowID"
         }
         specCreator.addColumns(permutationStream.mapToObj(originalSpec::getColumnSpec).toArray(DataColumnSpec[]::new));
         return createColumnarValueSchema(valueFactories, specCreator.createSpec());
@@ -223,8 +224,8 @@ public final class ColumnarVirtualTable {
     }
 
     /**
-     * If the appended {@code tables} have RowID columns, these are dropped.
-     * Only the RowID of {@code this} table is kept (if present).
+     * If the appended {@code tables} have RowID columns, these are dropped. Only the RowID of {@code this} table is
+     * kept (if present).
      */
     ColumnarVirtualTable append(final List<ColumnarVirtualTable> tables) {
         var tablesWithoutRowIDs = tables.stream()//
@@ -245,8 +246,7 @@ public final class ColumnarVirtualTable {
 
     private static ColumnarValueSchema dropRowID(final ColumnarValueSchema schema) {
         if (ColumnarValueSchemaUtils.hasRowID(schema)) {
-            return ColumnarValueSchemaUtils.create(schema.getSourceSpec(),
-                IntStream.range(1, schema.numColumns())//
+            return ColumnarValueSchemaUtils.create(schema.getSourceSpec(), IntStream.range(1, schema.numColumns())//
                 .mapToObj(schema::getValueFactory)//
                 .toArray(ValueFactory<?, ?>[]::new));
         }
@@ -275,11 +275,21 @@ public final class ColumnarVirtualTable {
     }
 
     /**
-     * A {@link MapperWithRowIndexFactory} whose {@link #getOutputSchema()} method returns a {@link ColumnarValueSchema}.
+     * A {@link MapperWithRowIndexFactory} whose {@link #getOutputSchema()} method returns a
+     * {@link ColumnarValueSchema}.
      */
     public interface ColumnarMapperWithRowIndexFactory extends MapperWithRowIndexFactory {
         @Override
         ColumnarValueSchema getOutputSchema();
+    }
+
+    ColumnarVirtualTable mask(final ColumnarVirtualTable mask) {
+        var maskSchema = mask.getSchema();
+        CheckUtils.checkArgument(maskSchema.numColumns() == 2, "The mask table should have exactly two columns.");
+        CheckUtils.checkArgument(DataSpec.longSpec().equals(maskSchema.getSpec(1)),
+            "The second column of the mask table must be of type long.");
+        var transform = new TableTransform(collectTransforms(List.of(mask)), new MaskTransformSpec(1));
+        return new ColumnarVirtualTable(transform, m_valueSchema);
     }
 
     ColumnarVirtualTable concatenate(final List<ColumnarVirtualTable> tables) {
@@ -349,14 +359,11 @@ public final class ColumnarVirtualTable {
             .collect(Collectors.toList());
     }
 
-
-
     ColumnarVirtualTable materialize(final UUID sinkIdentifier) {
         final MaterializeTransformSpec transformSpec = new MaterializeTransformSpec(sinkIdentifier);
         var emptySchema = createColumnarValueSchema(new ValueFactory<?, ?>[0], new DataTableSpec());
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), emptySchema);
     }
-
 
     // TODO (TP) Implement RowIndex propagation.
     //      (*) MapperWithRowIndexFactory should probably get the actual row index from a Source node?
@@ -370,9 +377,9 @@ public final class ColumnarVirtualTable {
     //          }
     ColumnarVirtualTable map(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
         final TableTransformSpec transformSpec = new MapTransformSpec(columnIndices, mapperFactory);
-        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), mapperFactory.getOutputSchema());
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec),
+            mapperFactory.getOutputSchema());
     }
-
 
     // TODO (TP) Implement ProgressTransformSpec handling.
     //      As a workaround, we use a RowFilter that always evaluates to {@code
@@ -380,7 +387,8 @@ public final class ColumnarVirtualTable {
     //      optimizations, destroys lookahead capability for no reason, etc...
     // TODO (TP) rename to "observe()"? (ObserverFactory, ObserverWithRowIndexFactory, etc?)
     private ColumnarVirtualTable progress(final ProgressListenerFactory factory, final int... columnIndices) {
-        final TableTransformSpec transformSpec = new RowFilterTransformSpec(columnIndices, wrapAsRowFilterFactory(factory));
+        final TableTransformSpec transformSpec =
+            new RowFilterTransformSpec(columnIndices, wrapAsRowFilterFactory(factory));
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
 

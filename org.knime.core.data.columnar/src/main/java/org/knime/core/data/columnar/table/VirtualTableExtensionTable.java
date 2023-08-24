@@ -92,6 +92,7 @@ import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
+import org.knime.core.table.virtual.exec.LazyVirtualTableExecutor;
 import org.knime.core.table.virtual.exec.VirtualTableExecutor;
 import org.knime.core.table.virtual.spec.SourceTableProperties;
 import org.knime.core.table.virtual.spec.SourceTransformSpec;
@@ -468,7 +469,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     }
 
     private List<RowAccessible> runComputationGraph() {
-        final VirtualTableExecutor exec = new GraphVirtualTableExecutor(m_resolvedTableTransform);
+//        final VirtualTableExecutor exec = new GraphVirtualTableExecutor(m_resolvedTableTransform);
+        final VirtualTableExecutor exec = new LazyVirtualTableExecutor(m_resolvedTableTransform);
         final Map<UUID, RowAccessible> sources = collectSources();
         return exec.execute(sources);
     }
