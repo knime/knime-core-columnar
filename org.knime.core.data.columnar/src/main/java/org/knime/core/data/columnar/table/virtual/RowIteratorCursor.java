@@ -96,6 +96,8 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
     @Override
     public boolean forward() {
         if (m_iterator.hasNext()) {
+            // Note: all cells of a BufferedAccessRow need to be populated when advancing to a new row,
+            //       which we do here, so no need to call setMissing() on all cells first.
             m_rowWrite.setFrom(m_iterator.next());
             return true;
         } else {
