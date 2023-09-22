@@ -31,7 +31,7 @@ try {
 
     workflowTests.runTests(
         dependencies: [
-            repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep']
+            repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep', 'knime-ensembles', 'knime-xml', 'knime-distance']
         ]
     )
 
