@@ -66,7 +66,7 @@ import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.Weigher;
 
 /**
- * Cache for {@link ReadBatch ReadBatches} that can be cleared from the outside.
+ * Cache for {@link ReadBatch ReadBatches}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
@@ -89,16 +89,15 @@ public final class SharedReadBatchCache {
         m_cacheSizeInBytes = cacheSizeInBytes;
         var cacheSizeInKBytes = Math.max(cacheSizeInBytes / 1024, 1);
         m_cache = CacheBuilder.newBuilder()//
-                .removalListener(SharedReadBatchCache::evictBatch)//
-                .weigher(SharedReadBatchCache::weighBatch)//
-                .maximumWeight(cacheSizeInKBytes)//
-                .build();
+            .removalListener(SharedReadBatchCache::evictBatch)//
+            .weigher(SharedReadBatchCache::weighBatch)//
+            .maximumWeight(cacheSizeInKBytes)//
+            .build();
 
         ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(() -> {
             if (m_cache.size() > 1) {
                 LOGGER.debug("Received off-heap memory alert. Clearing cache.");
-                clear();
-                return true;
+                return tryClear();
             }
             LOGGER.debug("Received off-heap memory alert. Doing nothing because cache is empty.");
             return false;
@@ -133,17 +132,22 @@ public final class SharedReadBatchCache {
     }
 
     /**
-     * Releases all held batches and clears the cache.
+     * Releases all held batches and clears the cache if we are not reading right now.
+     *
+     * @return <code>true</code> if the cache was cleared
      */
-    public void clear() {
-        // we have to wait until all getRetained calls are finished in order to avoid race conditions between
-        // their retains and the releases of this call
-        m_readWriteLock.writeLock().lock();
-        try {
-            m_cache.invalidateAll();
-        } finally {
-            m_readWriteLock.writeLock().unlock();
+    boolean tryClear() {
+        // we should not clear while any getRetained call is running in order to avoid race conditions between their
+        // retains and the releases of this call
+        if (m_readWriteLock.writeLock().tryLock()) {
+            try {
+                m_cache.invalidateAll();
+                return true;
+            } finally {
+                m_readWriteLock.writeLock().unlock();
+            }
         }
+        return false;
     }
 
     /**

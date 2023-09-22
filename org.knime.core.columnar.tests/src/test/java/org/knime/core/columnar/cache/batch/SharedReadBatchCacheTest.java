@@ -153,7 +153,7 @@ final class SharedReadBatchCacheTest {
         m_cache.put(idWithOtherSource, m_batch);
         assertTrue(m_cache.getRetained(m_id).isPresent(), "Key not in cache.");
         assertTrue(m_cache.getRetained(idWithOtherSource).isPresent(), "Key not in cache.");
-        m_cache.clear();
+        m_cache.tryClear();
         assertTrue(m_cache.getRetained(m_id).isEmpty(), "Cache should have been cleared.");
         assertTrue(m_cache.getRetained(idWithOtherSource).isEmpty(), "Cache should have been cleared.");
     }
@@ -194,7 +194,7 @@ final class SharedReadBatchCacheTest {
         getRetainedThread.start();
 
         for (int i = 0; i < 1_000_000; i++) {
-            m_cache.clear();
+            m_cache.tryClear();
         }
         runRetains.set(false);
         getRetainedThread.join();

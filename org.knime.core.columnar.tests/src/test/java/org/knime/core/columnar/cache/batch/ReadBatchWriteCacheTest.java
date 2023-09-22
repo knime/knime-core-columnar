@@ -133,7 +133,7 @@ final class ReadBatchWriteCacheTest extends AbstractBatchCacheTest {
             var batch = reader.readRetained(0);
             assertEquals(m_batch, batch, "Expected the batch that was just written.");
             verify(m_reader, never()).readRetained(0);
-            m_sharedCache.clear();
+            m_sharedCache.tryClear();
             batch = reader.readRetained(0);
             assertEquals(m_batch, batch, "Expected the batch to be read from the underlying reader.");
             verify(m_reader).readRetained(0);
