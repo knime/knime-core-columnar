@@ -109,8 +109,12 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
             .enableDictEncoding(true); //
         if (!DISABLE_CACHES) {
             builder.useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache()) //
-                .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache())//
                 .useHeapCache(ColumnarPreferenceUtils.getHeapCache()); //
+
+            // NOTE:
+            // We do not use the ReadBatchCache for now because it can cause a deadlock on a memory alert.
+            // The cache will be useful when we have random-access rows but this is not the case yet.
+            // .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache())
         }
         return builder.build();
     }
