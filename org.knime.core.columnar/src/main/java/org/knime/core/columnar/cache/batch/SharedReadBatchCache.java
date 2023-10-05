@@ -68,6 +68,7 @@ import com.google.common.cache.Weigher;
 /**
  * Cache for {@link ReadBatch ReadBatches}.
  *
+ *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public final class SharedReadBatchCache {
@@ -136,6 +137,7 @@ public final class SharedReadBatchCache {
      *
      * @return <code>true</code> if the cache was cleared
      */
+    // FIXME The read-write-lock approach is too rigid and requires to tradeoff deadlocks for memory errors
     boolean tryClear() {
         // we should not clear while any getRetained call is running in order to avoid race conditions between their
         // retains and the releases of this call
