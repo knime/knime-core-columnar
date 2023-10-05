@@ -68,7 +68,6 @@ import javax.management.ReflectionException;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.knime.core.columnar.batch.BatchWritable;
-import org.knime.core.columnar.cache.batch.SharedReadBatchCache;
 import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.cache.object.shared.SoftReferencedObjectCache;
@@ -118,8 +117,6 @@ public final class ColumnarPreferenceUtils {
 
     // lazily initialized
     private static SharedReadDataCache columnDataCache;
-
-    private static SharedReadBatchCache batchCache;
 
     private static final AtomicLong PERSIST_THREAD_COUNT = new AtomicLong();
 
@@ -238,17 +235,6 @@ public final class ColumnarPreferenceUtils {
         return columnDataCache;
     }
 
-    /**
-     * @return the SharedReadBatchCache
-     */
-    public static synchronized SharedReadBatchCache getReadBatchCache() {
-        if (batchCache == null) {
-            var readBatchCacheSize = (long)(getOffHeapMemoryLimit() * 0.8); // 80% of off-heap limit
-            LOGGER.infoWithFormat("Read Batch Cache size is %d MB.", readBatchCacheSize >> 20);
-            batchCache = new SharedReadBatchCache(readBatchCacheSize);
-        }
-        return batchCache;
-    }
 
     /**
      * @return the executor for persisting data from memory to disk
