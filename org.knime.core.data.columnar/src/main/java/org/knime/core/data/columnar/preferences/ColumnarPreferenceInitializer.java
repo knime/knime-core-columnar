@@ -64,22 +64,51 @@ public final class ColumnarPreferenceInitializer extends AbstractPreferenceIniti
 
     static final int OFF_HEAP_MEM_LIMIT_DEF = computeDefaultOffHeapMemoryLimit();
 
+    /**
+     * The amount of physical memory reserved for the system. The default off-heap memory will leave at least this much
+     * memory available.
+     */
+    private static final int SYS_RESERVED_MEM_MB = 1024;
+
+    /**
+     * A factor that is multiplied with the configured heap and off-heap memory to get the expected memory usage of the
+     * application.
+     */
+    private static final double JVM_FACTOR = 1.1;
+
     @Override
     public void initializeDefaultPreferences() {
         COLUMNAR_STORE.setDefault(OFF_HEAP_MEM_LIMIT_KEY, OFF_HEAP_MEM_LIMIT_DEF);
     }
 
+    /**
+     * Compute the default off-heap memory. Uses whichever is less but at least {@link #OFF_HEAP_MEM_LIMIT_MIN}.
+     * <ul>
+     * <li>the amount of memory as used for the heap</li>
+     * <li>the amount of off-heap memory that fulfills the following formula
+     *
+     * <pre>
+     * (heapLimitMb + offHeapLimitMb) * {@link #JVM_FACTOR} + {@link #SYS_RESERVED_MEM_MB} = physicalMemoryMb
+     * </pre>
+     *
+     * </li>
+     * </ul>
+     */
     private static int computeDefaultOffHeapMemoryLimit() {
         var heapLimitMb = (int)(ColumnarPreferenceUtils.getMaxHeapSize() >> 20);
         var physicalMemoryMb = (int)(ColumnarPreferenceUtils.getTotalPhysicalMemorySize() >> 20);
-        var heapLimitOrRestOfPhysicalMemory = Math.min(heapLimitMb, physicalMemoryMb - heapLimitMb);
 
-        if (heapLimitOrRestOfPhysicalMemory < OFF_HEAP_MEM_LIMIT_MIN) {
+        var offHeapLimitMb = Math.min( //
+            heapLimitMb, //
+            (int)((physicalMemoryMb - SYS_RESERVED_MEM_MB) / JVM_FACTOR - heapLimitMb) //
+        );
+
+        if (offHeapLimitMb < OFF_HEAP_MEM_LIMIT_MIN) {
             NodeLogger.getLogger(ColumnarPreferenceInitializer.class).warn(
                 "Configured heap memory limit does not leave enough free memory for the columnar backend off-heap memory. "
                     + "Using " + OFF_HEAP_MEM_LIMIT_MIN + "Mb for the off-heap memory limit.");
             return OFF_HEAP_MEM_LIMIT_MIN;
         }
-        return heapLimitOrRestOfPhysicalMemory;
+        return offHeapLimitMb;
     }
 }
