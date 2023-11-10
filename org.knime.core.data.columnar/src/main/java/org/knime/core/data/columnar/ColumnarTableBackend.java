@@ -68,6 +68,7 @@ import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarConcatenater;
 import org.knime.core.data.columnar.table.virtual.ColumnarRearranger;
+import org.knime.core.data.columnar.table.virtual.ColumnarRowIndexPrepender;
 import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
@@ -323,6 +324,17 @@ public final class ColumnarTableBackend implements TableBackend {
         } catch (VirtualTableIncompatibleException ex) {//NOSONAR
             logFallback();
             return OLD_BACKEND.replaceSpec(exec, table, newSpec, tableIDSupplier);
+        }
+    }
+
+    @Override
+    public KnowsRowCountTable prependRowIndex(final ExecutionContext exec, final IntSupplier tableIdSupplier,
+        final BufferedDataTable table, final String columnName) {
+        try {
+            return new ColumnarRowIndexPrepender(tableIdSupplier).prependRowIndex(table, columnName);
+        } catch (VirtualTableIncompatibleException ex) {
+            logFallback();
+            return OLD_BACKEND.prependRowIndex(exec, tableIdSupplier, table, columnName);
         }
     }
 
