@@ -293,6 +293,25 @@ public final class TableTransformNodeSettingsPersistor {
                 (s, c) -> IdentityTransformSpec.INSTANCE, //
                 noop()),
             MAP(//
+                // TODO (TP) The solution below works, because currently there are only
+                //           ColumnarMapperWithRowIndexFactory implementations, not
+                //           ColumnarMapperFactory implementations.
+                //
+                //           From knime-core-table, MapTransformSpec always contains
+                //           MapperFactory, accessed via MapTransformSpec.getMapperFactory().
+                //           MapperWithRowIndexFactory does not extend MapperFactory.
+                //           Instead, it is wrapped in a MapperFactory.
+                //           If that is the case, it can be retrieved with
+                //           MapperFactory.getMapperWithRowIndexFactory().
+                //
+                //           The below code assumes, that the
+                //           MapTransformSpec.getMapperFactory() is always a wrapped
+                //           ColumnarMapperWithRowIndexFactory.
+                //
+                //           If MapTransformSpec is used in the future for mappers
+                //           that do not require row indices (ColumnarMapperFactory implementations),
+                //           the serialization needs to be revised!
+                //
                 MapTransformSpec.class, //
                 (s, c) -> {
                     var mapperFactoryClass = s.getString("mapper_factory_class");
@@ -305,7 +324,7 @@ public final class TableTransformNodeSettingsPersistor {
                 },
                 (t, s) -> {//NOSONAR
                     s.addIntArray("column_indices", t.getColumnSelection());
-                    var mapperFactory = t.getMapperFactory();
+                    var mapperFactory = t.getMapperFactory().getMapperWithRowIndexFactory();
                     var factoryClass = mapperFactory.getClass();
                     var persistor =
                             PersistenceRegistry.getPersistor(factoryClass)
