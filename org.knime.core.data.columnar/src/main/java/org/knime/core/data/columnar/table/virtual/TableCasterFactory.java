@@ -126,7 +126,7 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
 
 
     @Override
-    public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+    public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
         initOutputValueFactoriesForWriting();
         var casters = IntStream.range(0, m_casts.size())//
             .mapToObj(i -> m_casts.get(i).createCaster(inputs[i], outputs[i]))//

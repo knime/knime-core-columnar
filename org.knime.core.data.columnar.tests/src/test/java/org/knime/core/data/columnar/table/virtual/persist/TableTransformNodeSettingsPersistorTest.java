@@ -86,7 +86,6 @@ import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
-import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
@@ -310,7 +309,7 @@ final class TableTransformNodeSettingsPersistorTest {
         addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
         var transform = TableTransformNodeSettingsPersistor.load(settings, this::getDataRepository);
         checkMapTransform(transform,
-            s -> assertEquals(42, ((TestMapperFactory)s.getMapperFactory()).m_increment, "Unexpected increment."));
+            s -> assertEquals(42, ((TestMapperFactory)s.getMapperFactory().getMapperWithRowIndexFactory()).m_increment, "Unexpected increment."));
         checkSourceTransform(transform.getPrecedingTransforms().get(0), id);
     }
 
@@ -335,7 +334,7 @@ final class TableTransformNodeSettingsPersistorTest {
     }
 
     private static void checkMapSettings(final NodeSettingsRO settings,
-        final SettingsChecker mapperFactorySettingsChecker, final Class<? extends MapperFactory> mapperFactoryClass,
+        final SettingsChecker mapperFactorySettingsChecker, final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass,
         final int... columnIndices) throws InvalidSettingsException {
         checkTransformType(settings, "MAP");
         var internals = settings.getNodeSettings("internal");
@@ -346,7 +345,7 @@ final class TableTransformNodeSettingsPersistorTest {
     }
 
     private static void addMapSettings(final NodeSettingsWO settings, final Consumer<NodeSettingsWO> mapSettingsAdder,
-        final Class<? extends MapperFactory> mapperFactoryClass, final int... columnIndices) {
+        final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices) {
         addTransformType(settings, "MAP");
         var internals = settings.addNodeSettings("internal");
         internals.addIntArray("column_indices", columnIndices);
@@ -371,7 +370,7 @@ final class TableTransformNodeSettingsPersistorTest {
         }
 
         @Override
-        public MapperWithRowIndexFactory.Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        public MapperWithRowIndexFactory.Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var readAccess = (IntReadAccess)inputs[0];
             var writeAccess = (IntWriteAccess)outputs[0];
             return r -> writeAccess.setIntValue(readAccess.getIntValue() + m_increment);

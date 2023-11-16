@@ -70,7 +70,6 @@ import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.AppendMissingValuesTransformSpec;
@@ -80,11 +79,9 @@ import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
 import org.knime.core.table.virtual.spec.MaterializeTransformSpec;
-import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerFactory;
-import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerWithRowIndexFactory;
-import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerWithRowIndexFactory.ProgressListener;
-import org.knime.core.table.virtual.spec.RowFilterTransformSpec;
-import org.knime.core.table.virtual.spec.RowFilterTransformSpec.RowFilterFactory;
+import org.knime.core.table.virtual.spec.ObserverTransformSpec;
+import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverFactory;
+import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverWithRowIndexFactory;
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
 import org.knime.core.table.virtual.spec.SourceTableProperties;
@@ -357,71 +354,25 @@ public final class ColumnarVirtualTable {
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), emptySchema);
     }
 
-
-    // TODO (TP) Implement RowIndex propagation.
-    //      (*) MapperWithRowIndexFactory should probably get the actual row index from a Source node?
-    //      (*) How to handle sliced Sources? Should indices start at 0 or at slice.from?
-    //      (*) Add a signature
-    //          VirtualTable.map(int[], MapperWithRowIndexFactory, VirtualTable),
-    //          where the VirtualTable argument specifies which VirtualTable the row index should be taken from.
-    //          Then the method below would be equivalent to
-    //          VirtualTable.map(int[] c, MapperWithRowIndexFactory f) {
-    //              return map(c,f,this);
-    //          }
     ColumnarVirtualTable map(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
         final TableTransformSpec transformSpec = new MapTransformSpec(columnIndices, mapperFactory);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), mapperFactory.getOutputSchema());
     }
 
-
-    // TODO (TP) Implement ProgressTransformSpec handling.
-    //      As a workaround, we use a RowFilter that always evaluates to {@code
-    //      true} but this should be fixed, because it stands in the way of
-    //      optimizations, destroys lookahead capability for no reason, etc...
-    // TODO (TP) rename to "observe()"? (ObserverFactory, ObserverWithRowIndexFactory, etc?)
-    private ColumnarVirtualTable progress(final ProgressListenerFactory factory, final int... columnIndices) {
-        final TableTransformSpec transformSpec = new RowFilterTransformSpec(columnIndices, wrapAsRowFilterFactory(factory));
+    ColumnarVirtualTable observe(final ObserverFactory factory, final int... columnIndices ) {
+        final ObserverTransformSpec transformSpec = new ObserverTransformSpec(columnIndices, factory);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
 
-    private static RowFilterFactory wrapAsRowFilterFactory(final ProgressListenerFactory factory) {
-        return inputs -> {
-            Runnable progress = factory.createProgressListener(inputs);
-            return () -> {
-                progress.run();
-                return true;
-            };
-        };
-    }
-
     /**
-     * Adds a progress (observer) to the table.
+     * Adds a (progress) observer to the table.
      *
-     * @param factory for the progress listener
-     * @param columnIndices indices the progress listener observes
-     * @return table containing the progress listener
+     * @param factory for the observer
+     * @param columnIndices columns that will be passed to the observer
+     * @return table containing the observer
      */
-    ColumnarVirtualTable progress(final ProgressListenerWithRowIndexFactory factory, final int... columnIndices) {
-        return progress(wrapAsProgressListenerFactory(factory), columnIndices);
+    ColumnarVirtualTable observe(final ObserverWithRowIndexFactory factory, final int... columnIndices) {
+        final ObserverTransformSpec transformSpec = new ObserverTransformSpec(columnIndices, factory);
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
-
-    private static ProgressListenerFactory
-        wrapAsProgressListenerFactory(final ProgressListenerWithRowIndexFactory factory) {
-        return new ProgressListenerFactory() {
-            @Override
-            public Runnable createProgressListener(final ReadAccess[] inputs) {
-                ProgressListener progress = factory.createProgressListener(inputs);
-                return new Runnable() {
-                    private long m_rowIndex = 0;
-
-                    @Override
-                    public void run() {
-                        progress.update(m_rowIndex);
-                        m_rowIndex++;
-                    }
-                };
-            }
-        };
-    }
-
 }
