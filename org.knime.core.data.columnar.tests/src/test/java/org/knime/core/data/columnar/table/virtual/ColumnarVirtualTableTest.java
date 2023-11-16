@@ -202,7 +202,7 @@ final class ColumnarVirtualTableTest {
     private static final class TestMapperFactory implements ColumnarMapperWithRowIndexFactory {
 
         @Override
-        public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var intReadAccess = (IntReadAccess)inputs[0];
             var longWriteAccess = (LongWriteAccess)outputs[0];
             return r -> longWriteAccess.setLongValue(intReadAccess.getIntValue() + r);

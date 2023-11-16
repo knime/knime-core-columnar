@@ -107,7 +107,7 @@ import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.row.RowWriteAccessible;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
-import org.knime.core.table.virtual.spec.ProgressListenerTransformSpec.ProgressListenerWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverWithRowIndexFactory;
 
 /**
  * Handles the construction (and optimization) of virtual tables that are generated via the ExecutionContext in a node.
@@ -330,7 +330,7 @@ public final class ColumnarRearranger {
         final ColumnarVirtualTable sourceTable, final ColumnarVirtualTable appendedColumns)
         throws CanceledExecutionException, VirtualTableIncompatibleException {
 
-        ProgressListenerWithRowIndexFactory progressListenerFactory = inputs -> {
+        ObserverWithRowIndexFactory progressListenerFactory = inputs -> {
                 RowKeyValue rowKey = ((StringAccess.StringReadAccess)inputs[0])::getStringValue;
                 // use 1 based indexing
                 return rowIndex -> progress.update(rowIndex + 1, rowKey);
@@ -342,7 +342,7 @@ public final class ColumnarRearranger {
             // observe all created columns to ensure that the progress update happens after the map
             // because some CellFactories (e.g. in the Math Formula node) expect this call order
             // see also the implementation in RearrangeColumnsTable
-            .progress(progressListenerFactory,
+            .observe(progressListenerFactory,
                 IntStream.rangeClosed(0, appendedColumns.getSchema().numColumns()).toArray())
             .materialize(sinkUUID);
         var executor = new GraphVirtualTableExecutor(tableToMaterialize.getProducingTransform());
@@ -565,7 +565,7 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var inputAccess = inputs[0];
             var inputValue = new NullableReadValue(m_inputValueFactory.createReadValue(inputAccess), inputAccess);
             var outputAccess = outputs[0];
@@ -599,7 +599,7 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var rowKey = (RowKeyValue)m_readValueFactories[0].createReadValue(inputs[0]);
             var readValues = IntStream.range(1, inputs.length)//
                 .mapToObj(i -> new NullableReadValue(m_readValueFactories[i].createReadValue(inputs[i]), inputs[i]))

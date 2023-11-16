@@ -186,7 +186,7 @@ public final class ColumnarConcatenater {
     private static final class RowIDGenerator implements ColumnarMapperWithRowIndexFactory {
 
         @Override
-        public Mapper createMapperWithRowIndex(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var stringAccess = (StringWriteAccess) outputs[0];
             return i -> stringAccess.setStringValue("Row" + i);
         }
