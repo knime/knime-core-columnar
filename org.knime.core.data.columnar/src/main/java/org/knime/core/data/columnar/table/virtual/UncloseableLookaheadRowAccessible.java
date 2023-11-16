@@ -51,10 +51,10 @@ package org.knime.core.data.columnar.table.virtual;
 import java.io.IOException;
 
 import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * A decorator for {@link LookaheadRowAccessible} that prevents closing the decorated RowAccessible while delegating all

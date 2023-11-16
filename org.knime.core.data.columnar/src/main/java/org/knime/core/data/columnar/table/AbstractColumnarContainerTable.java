@@ -77,10 +77,10 @@ import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.WorkflowDataRepository;
 import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * Implementation of an {@link ExtensionTable}. This table is managed by the KNIME framework and allows to access data

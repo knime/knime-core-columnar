@@ -54,11 +54,11 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * A {@link RowAccessible} that is based on a {@link BufferedDataTable}.

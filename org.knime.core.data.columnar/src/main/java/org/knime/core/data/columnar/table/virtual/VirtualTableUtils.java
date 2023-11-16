@@ -63,13 +63,13 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.cursor.Cursors;
 import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.traits.DataTraits;
-import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * Provides utility functions for dealing with the conversion between the physical (accesses) and logical layer (values)
