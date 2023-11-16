@@ -61,9 +61,9 @@ import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
-import org.knime.core.table.virtual.LookaheadRowAccessible;
 
 /**
  * Standard implementation of a read-only table that understands KNIME's {@link ReadValue logical} data types and is
