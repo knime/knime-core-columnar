@@ -94,6 +94,7 @@ import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
 import org.knime.core.table.virtual.exec.VirtualTableExecutor;
 import org.knime.core.table.virtual.spec.SourceTableProperties;
+import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 import org.knime.core.table.virtual.spec.SourceTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
 
@@ -232,7 +233,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             var transformSpecs = reconstructSpecsFromStringArray(settings.getStringArray(CFG_TRANSFORMSPECS));
             var sourceSpecs = Stream.of(referenceTables)//
                     // all KNIME tables know their size and therefore are LookaheadRowAccessibles
-                    .map(t -> new SourceTransformSpec(t.getId(), new SourceTableProperties(t.getSchema(), true)))//
+                    .map(t -> new SourceTransformSpec(t.getId(), new SourceTableProperties(t.getSchema(), CursorType.LOOKAHEAD)))//
                     .map(TableTransform::new)//
                     .collect(toList());
             var transformSpecIter = transformSpecs.iterator();

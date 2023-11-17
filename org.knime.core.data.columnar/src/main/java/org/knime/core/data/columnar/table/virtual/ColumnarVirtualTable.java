@@ -70,6 +70,9 @@ import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.util.CheckUtils;
+import org.knime.core.table.cursor.Cursor;
+import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.cursor.RandomAccessCursor;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.AppendMissingValuesTransformSpec;
@@ -85,6 +88,7 @@ import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverWithRowIn
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
 import org.knime.core.table.virtual.spec.SourceTableProperties;
+import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 import org.knime.core.table.virtual.spec.SourceTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
 
@@ -111,8 +115,20 @@ public final class ColumnarVirtualTable {
      */
     public ColumnarVirtualTable(final UUID sourceIdentifier, final ColumnarValueSchema schema,
         final boolean lookahead) {
+        this(sourceIdentifier, schema, lookahead ? CursorType.LOOKAHEAD : CursorType.BASIC);
+    }
+
+    /**
+     * Constructs a ColumnarVirtualTable around a source table.
+     *
+     * @param sourceIdentifier ID of the source
+     * @param schema of the source
+     * @param cursorType which Cursor types the source provides ({@link Cursor}, {@link LookaheadCursor}, or {@link RandomAccessCursor})
+     */
+    public ColumnarVirtualTable(final UUID sourceIdentifier, final ColumnarValueSchema schema,
+        final CursorType cursorType) {
         m_transform =
-            new TableTransform(new SourceTransformSpec(sourceIdentifier, new SourceTableProperties(schema, lookahead)));
+            new TableTransform(new SourceTransformSpec(sourceIdentifier, new SourceTableProperties(schema, cursorType)));
         m_valueSchema = schema;
     }
 
