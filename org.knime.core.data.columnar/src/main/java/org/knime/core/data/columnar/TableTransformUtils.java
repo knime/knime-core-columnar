@@ -61,6 +61,7 @@ import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.virtual.VirtualTable;
+import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 
 /**
  * Utility class that contains various methods for dealing with TableTransforms in ColumnarTableBackend.
@@ -119,7 +120,7 @@ public final class TableTransformUtils {
     }
 
     private static VirtualTable asSource(final ReferenceTable table) {
-        return new VirtualTable(table.getId(), table.getSchema(), true);
+        return new VirtualTable(table.getId(), table.getSchema(), CursorType.LOOKAHEAD);
     }
 
     static void checkRowKeysMatch(final ExecutionMonitor exec, final BufferedDataTable... tables)
