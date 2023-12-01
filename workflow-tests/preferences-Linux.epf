@@ -7,3 +7,4 @@ file_export_version=3.0
 /instance/org.knime.python2/python3CondaEnvironmentDirectoryPath=/home/jenkins/miniconda3/envs/py3_knime43
 /instance/org.knime.python3.scripting.nodes/bundledCondaEnvPath=org_knime_pythonscripting
 /instance/org.knime.python3.scripting.nodes/pythonEnvironmentType=bundled
+/instance/org.knime.core.data.columnar/knime.core.data.columnar.off-heap-limit=1024
