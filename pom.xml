@@ -26,6 +26,7 @@
           org.knime.core.data.columnar/**/org/knime/core/data/columnar/*,
           org.knime.core.data.columnar/**/org/knime/core/data/columnar/preferences/*
         </sonar.coverage.exclusions>
+        <knime.sonar-env>Sonarcloud</knime.sonar-env>
 	</properties>
 
 	<modules>
