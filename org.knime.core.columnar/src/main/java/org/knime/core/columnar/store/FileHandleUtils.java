@@ -44,64 +44,59 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Nov 30, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   5 Feb 2024 (chaubold): created
  */
-package org.knime.core.data.columnar.table;
+package org.knime.core.columnar.store;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-
-import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.columnar.store.FileHandleUtils;
-import org.knime.core.data.container.DataContainer;
-import org.knime.core.node.workflow.NodeContext;
+import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
 
 /**
- * {@link FileHandle} that creates its file lazily when it is first needed.
+ * Utilities to work with {@link FileHandle}s
  *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-final class TempFileHandle implements FileHandle {
+public final class FileHandleUtils {
+    private FileHandleUtils() {
 
-    private File m_file = null;
-
-    private Path m_path = null;
-
-    private final NodeContext m_context = NodeContext.getContext();
-
-    @Override
-    public synchronized File asFile() {
-        init();
-        return m_file;
     }
 
-    @Override
-    public synchronized void delete() {
-        if (m_path != null) {
-            FileHandleUtils.deleteAndRetry(m_path, ColumnarRowWriteTable.LOGGER::debug,
-                ColumnarRowWriteTable.LOGGER::error);
+    /**
+     * Try to delete the file at the given path and if deletion failed (e.g. because there was still a file lock) try
+     * again one second later, while logging all errors to the given message consumers.
+     *
+     * @param path
+     * @param warningsConsumer
+     * @param errorConsumer
+     */
+    public static void deleteAndRetry(final Path path, final BiConsumer<String, Exception> warningsConsumer,
+        final BiConsumer<String, Exception> errorConsumer) {
+        final long FILE_DELETION_RETRY_DELAY_MS = 1000;
+
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ex) {
+            warningsConsumer.accept("Encountered exception while deleting file " + path + ". Retrying in "
+                + FILE_DELETION_RETRY_DELAY_MS + "ms.", ex);
+            // retry after some time on a separate thread
+            Executors.newCachedThreadPool()
+                .execute(() -> deleteDelayed(path, FILE_DELETION_RETRY_DELAY_MS, errorConsumer));
         }
     }
 
-    private synchronized void init() {
-        if (m_file == null) {
-            NodeContext.pushContext(m_context);
-            try {
-                m_file = DataContainer.createTempFile(".knable");
-                m_path = m_file.toPath();
-            } catch (IOException ex) {
-                throw new IllegalStateException(ex);
-            } finally {
-                NodeContext.removeLastContext();
-            }
+    private static void deleteDelayed(final Path path, final long delayMs,
+        final BiConsumer<String, Exception> errorConsumer) {
+        try {
+            Thread.sleep(delayMs);
+            Files.deleteIfExists(path);
+        } catch (IOException ex2) {
+            errorConsumer.accept("Exception while deleting file: " + path, ex2);
+        } catch (InterruptedException ex2) {
+            errorConsumer.accept("Interrupted while deleting file: " + path, ex2);
+            Thread.currentThread().interrupt();
         }
     }
-
-    @Override
-    public Path asPath() {
-        init();
-        return m_path;
-    }
-
 }

@@ -59,7 +59,7 @@ import java.nio.file.Path;
 public interface FileHandle {
 
     /**
-     * Deletes the file if it exists.
+     * Deletes the file if it exists. See {@link FileHandleUtils#deleteAndRetry} for utilities.
      */
     void delete();
 

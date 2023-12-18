@@ -49,11 +49,10 @@
 package org.knime.core.columnar.arrow;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.knime.core.columnar.store.FileHandle;
+import org.knime.core.columnar.store.FileHandleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,11 +83,7 @@ public final class PathBackedFileHandle implements FileHandle {
 
     @Override
     public void delete() {
-        try {
-            Files.deleteIfExists(m_path);
-        } catch (IOException ex) {
-            LOGGER.error("Exception while deleting file: " + m_path, ex);
-        }
+        FileHandleUtils.deleteAndRetry(m_path, LOGGER::debug, LOGGER::error);
     }
 
     @Override
