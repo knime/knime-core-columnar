@@ -70,6 +70,8 @@ final class TempFileHandle implements FileHandle {
 
     private final NodeContext m_context = NodeContext.getContext();
 
+    private static final long FILE_DELETION_RETRY_DELAY_MS = 1000;
+
     @Override
     public synchronized File asFile() {
         init();
@@ -82,7 +84,16 @@ final class TempFileHandle implements FileHandle {
             try {
                 Files.deleteIfExists(m_path);
             } catch (IOException ex) {
-                ColumnarRowWriteTable.LOGGER.debug("Exception while deleting temporary columnar output file.", ex);
+                // retry
+                try {
+                    Thread.sleep(FILE_DELETION_RETRY_DELAY_MS); // NOSONAR
+                    Files.deleteIfExists(m_path);
+                } catch (IOException ex2) {
+                    ColumnarRowWriteTable.LOGGER.error("Exception while deleting temporary columnar output file: " + m_path, ex2);
+                } catch (InterruptedException ex2) {
+                    ColumnarRowWriteTable.LOGGER.error("Interrupted while deleting temporary columnar output file: " + m_path, ex2);
+                    Thread.currentThread().interrupt();
+                }
             }
         }
     }

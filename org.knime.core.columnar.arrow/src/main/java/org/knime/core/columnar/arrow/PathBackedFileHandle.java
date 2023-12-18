@@ -66,6 +66,8 @@ public final class PathBackedFileHandle implements FileHandle {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PathBackedFileHandle.class);
 
+    private static final long FILE_DELETION_RETRY_DELAY_MS = 1000;
+
     private final Path m_path;
 
     /**
@@ -87,7 +89,16 @@ public final class PathBackedFileHandle implements FileHandle {
         try {
             Files.deleteIfExists(m_path);
         } catch (IOException ex) {
-            LOGGER.error("Exception while deleting file: " + m_path, ex);
+            // retry
+            try {
+                Thread.sleep(FILE_DELETION_RETRY_DELAY_MS);
+                Files.deleteIfExists(m_path);
+            } catch (IOException ex2) {
+                LOGGER.error("Exception while deleting file: " + m_path, ex2);
+            } catch (InterruptedException ex2) {
+                LOGGER.error("Interrupted while deleting file: " + m_path, ex2);
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
