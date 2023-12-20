@@ -104,7 +104,7 @@ public class HeapBadgerWriteCursorTest {
     @Test
     public void testWriteData2() throws IOException {
         ColumnarSchema columnarSchema = ColumnarSchema.of(INT, STRING);
-        Integer[] intData = new Integer[] {1,2, 3, 4};
+        Integer[] intData = new Integer[] {1, 2, 3, 4};
         String[] stringData = new String[] {"A", "B", "C", "D"};
         final int numRows = intData.length;
         final int numCols = columnarSchema.numColumns();
@@ -113,6 +113,7 @@ public class HeapBadgerWriteCursorTest {
             HeapBadger badger = new HeapBadger(batchStore);
             try(WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
                 for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+                    cursor.forward();
                     ((IntWriteAccess)cursor.access().getWriteAccess(0)).setIntValue(intData[rowIdx]);
                     ((StringWriteAccess)cursor.access().getWriteAccess(1)).setStringValue(stringData[rowIdx]);
                 }
