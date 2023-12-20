@@ -96,7 +96,6 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             for (int i = 0; i < m_factories.length; i++) {
                 final TestData testData = m_factories[i].createWriteData(capacity);
                 data[i] = testData;
-                m_tracker.add(testData);
             }
             return new DefaultWriteBatch(data);
         }
@@ -115,6 +114,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             for (int i = 0; i < data.length; i++) {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();
+                m_tracker.add(testData);
             }
             m_batches.add(data);
             m_batchLengths.add(batch.length());
