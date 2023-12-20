@@ -47,6 +47,8 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.table.access.LongAccess.LongWriteAccess;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -103,4 +105,8 @@ public final class TestLongData extends AbstractTestData implements LongWriteDat
         get()[index] = val;
     }
 
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((LongWriteAccess)access).setLongValue(getLong(index));
+    }
 }

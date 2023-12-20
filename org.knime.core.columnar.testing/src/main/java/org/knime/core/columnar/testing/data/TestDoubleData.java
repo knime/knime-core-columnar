@@ -47,6 +47,8 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.table.access.DoubleAccess.DoubleWriteAccess;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -104,4 +106,8 @@ public final class TestDoubleData extends AbstractTestData implements DoubleWrit
         get()[index] = val;
     }
 
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((DoubleWriteAccess)access).setDoubleValue(getDouble(index));
+    }
 }

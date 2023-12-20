@@ -42,71 +42,56 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   20 Dec 2023 (chaubold): created
  */
-package org.knime.core.columnar.testing.data;
+package org.knime.core.columnar.badger;
 
-import org.knime.core.columnar.data.StringData.StringReadData;
-import org.knime.core.columnar.data.StringData.StringWriteData;
-import org.knime.core.table.access.StringAccess.StringWriteAccess;
-import org.knime.core.table.access.WriteAccess;
+import java.util.List;
+import java.util.stream.IntStream;
+
+import org.knime.core.columnar.testing.data.TestData;
+import org.knime.core.table.access.BufferedAccesses;
+import org.knime.core.table.access.BufferedAccesses.BufferedAccess;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.row.ReadAccessRow;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * @author Marc Bux, KNIME GmbH, Berlin, Germany
+ *
+ * @author chaubold
  */
-@SuppressWarnings("javadoc")
-public final class TestStringData extends AbstractTestData implements StringWriteData, StringReadData {
+public class TestReadAccessRow implements ReadAccessRow {
+    private final BufferedAccess[] m_accesses;
 
-    public static final class TestStringDataFactory implements TestDataFactory {
+    /**
+     * @param columnData
+     * @param schema
+     * @param rowIdx
+     */
+    public TestReadAccessRow( //
+        final List<TestData> columnData, //
+        final ColumnarSchema schema, //
+        final int rowIdx //
+    ) {
+        var bufferedAccessRow = BufferedAccesses.createBufferedAccessRow(schema);
 
-        public static final TestStringDataFactory INSTANCE = new TestStringDataFactory();
+        columnData.stream().forEach(testData -> testData.writeToAccess(bufferedAccessRow.getAccess(rowIdx), rowIdx));
 
-        private TestStringDataFactory() {
-        }
-
-        @Override
-        public TestStringData createWriteData(final int capacity) {
-            return new TestStringData(capacity);
-        }
-
-        @Override
-        public TestStringData createReadData(final Object[] data) {
-            return createReadData(data, data.length);
-        }
-
-        @Override
-        public TestStringData createReadData(final Object[] data, final int length) {
-            return new TestStringData(data, length);
-        }
-
-    }
-
-    TestStringData(final int capacity) {
-        super(capacity);
-    }
-
-    TestStringData(final Object[] strings, final int length) {
-        super(strings);
-        close(length);
+        m_accesses = IntStream.range(0, columnData.size()).mapToObj(i -> bufferedAccessRow.getAccess(i))
+            .toArray(BufferedAccess[]::new);
     }
 
     @Override
-    public TestStringData close(final int length) {
-        closeInternal(length);
-        return this;
+    public int size() {
+        return m_accesses.length;
     }
 
     @Override
-    public synchronized String getString(final int index) {
-        return (String)get()[index];
-    }
-
-    @Override
-    public synchronized void setString(final int index, final String val) {
-        get()[index] = val;
-    }
-
-    @Override
-    public void writeToAccess(final WriteAccess access, final int index) {
-        ((StringWriteAccess)access).setStringValue(getString(index));
+    public <A extends ReadAccess> A getAccess(final int index) {
+        @SuppressWarnings("unchecked")
+        final A cast = (A)m_accesses[index];
+        return cast;
     }
 }

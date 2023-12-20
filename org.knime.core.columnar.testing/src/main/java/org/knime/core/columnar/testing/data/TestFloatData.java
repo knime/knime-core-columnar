@@ -47,6 +47,8 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.FloatData.FloatReadData;
 import org.knime.core.columnar.data.FloatData.FloatWriteData;
+import org.knime.core.table.access.FloatAccess.FloatWriteAccess;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -103,4 +105,8 @@ public final class TestFloatData extends AbstractTestData implements FloatWriteD
         get()[index] = val;
     }
 
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((FloatWriteAccess)access).setFloatValue(getFloat(index));
+    }
 }
