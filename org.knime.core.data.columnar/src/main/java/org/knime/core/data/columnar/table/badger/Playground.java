@@ -55,6 +55,8 @@ import java.util.stream.IntStream;
 
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
 import org.knime.core.columnar.access.ColumnarWriteAccess;
+import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.store.BatchStore;
@@ -69,19 +71,16 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 public class Playground {
 
-
-
     private final MyCursor m_writeCursor;
 
-    public Playground(final BatchStore store)
-    {
+    public Playground(final BatchStore store) {
         ColumnarSchema schema = store.getSchema();
 
         m_writeCursor = new MyCursor(schema, 1000);
 
-
     }
 
+    // TODO we should make this depend on the size of the data that we know about in advance
     /** max number of rows in one batch */
     private static final int MAX_BATCH_LENGTH = 500;
 
@@ -90,28 +89,34 @@ public class Playground {
 
     static class Badger {
 
+        private final BatchWriter m_writer;
+
         private final MyCursor m_writeCursor;
+
         private final BatchStore m_store;
 
-        Badger(final MyCursor cursor, final BatchStore store)
-        {
+        Badger(final MyCursor cursor, final BatchStore store) {
             m_writeCursor = cursor;
             m_store = store;
-            m_current_batch = m_store.getWriter().create(MAX_BATCH_LENGTH);
+            m_writer = m_store.getWriter();
+            m_current_batch = m_writer.create(MAX_BATCH_LENGTH);
         }
 
         private int m_previous_index = 0;
+
         private WriteBatch m_current_batch;
 
-        void tryAdvance()
-        {
+        void tryAdvance() {
             int numCols = m_current_batch.numData();
 
             // TODO the name is wrong because it is the first that is not yet written, right?
             int lastValidIndex = m_writeCursor.m_current;
+
+            // TODO if we do this in parallel, each write access needs its own current row (probably thread local)
             AtomicInteger currentRow = new AtomicInteger(m_previous_index);
 
             // Create accesses to be able to write into a WriteBatch
+            // TODO the accesses could be created in the constructor and re-used
             ColumnarSchema schema = m_store.getSchema();
             ColumnarWriteAccess[] accessesToTheCurrentBatch = IntStream.range(0, m_store.getSchema().numColumns())//
                 .mapToObj(j -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(j)))//
@@ -125,42 +130,47 @@ public class Playground {
 
             // Loop to the last row that was written before this method was called
             // and serialize them to the current write batch
-            while ( currentRow.get() < lastValidIndex )
-            {
+            while (currentRow.get() < lastValidIndex) {
                 // Set the data from the buffer
-                for( int col = 0; col < numCols; ++col ) {
+                for (int col = 0; col < numCols; ++col) {
                     accessesToTheCurrentBatch[col].setFrom(m_writeCursor.m_access.getAccess(col));
                 }
 
-                if (m_current_batch.sizeOf() > 5000) {
-                    switchToNextBatch();
-                }
-
-
-
                 currentRow.incrementAndGet();
+
+                // TODO use the size tracker by Adrian
+                if (m_current_batch.sizeOf() >= MAX_BATCH_SIZE) {
+                    try {
+                        switchToNextBatch();
+                        currentRow.set(0);
+                    } catch (IOException ex) {
+                        // TODO: handle exception
+                    }
+                }
             }
             m_previous_index = currentRow.get();
         }
 
-        void switchToNextBatch() {
-//            m_
+        void switchToNextBatch() throws IOException {
+            // TODO if we have written more data in some columns make sure we do not loose it
+            ReadBatch readBatch = m_current_batch.close(m_previous_index);
+            m_writer.write(readBatch);
+
+            m_current_batch = m_writer.create(MAX_BATCH_LENGTH);
+            m_previous_index = 0;
         }
     }
 
-
-    static class MyCursor implements ColumnarWriteCursor
-    {
+    static class MyCursor implements ColumnarWriteCursor {
         private final BufferedAccessRow[] m_buffers;
 
         private final BufferedAccessRow m_access;
 
         private final int m_bufferSize;
 
-        MyCursor( final ColumnarSchema schema, final int bufferSize)
-        {
+        MyCursor(final ColumnarSchema schema, final int bufferSize) {
             m_bufferSize = bufferSize;
-            m_buffers = new BufferedAccessRow[ bufferSize ];
+            m_buffers = new BufferedAccessRow[bufferSize];
             Arrays.setAll(m_buffers, i -> BufferedAccesses.createBufferedAccessRow(schema));
             m_access = BufferedAccesses.createBufferedAccessRow(schema);
         }
@@ -179,7 +189,7 @@ public class Playground {
             if (m_current >= 0) {
                 m_buffers[m_current].setFrom(m_access);
             }
-            if(++m_current == m_bufferSize) {
+            if (++m_current == m_bufferSize) {
                 m_current = 0;
                 m_offset += m_bufferSize;
             }
@@ -201,6 +211,5 @@ public class Playground {
             return m_offset + m_current;
         }
     }
-
 
 }
