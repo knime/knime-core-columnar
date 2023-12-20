@@ -50,14 +50,16 @@ package org.knime.core.data.columnar.table.badger;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
+import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
+import org.knime.core.columnar.access.ColumnarWriteAccess;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.table.access.BufferedAccesses;
 import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
-import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
 
@@ -80,6 +82,11 @@ public class Playground {
 
     }
 
+    /** max number of rows in one batch */
+    private static final int MAX_BATCH_LENGTH = 500;
+
+    /** max size of a batch */
+    private static final int MAX_BATCH_SIZE = 5000;
 
     static class Badger {
 
@@ -90,7 +97,7 @@ public class Playground {
         {
             m_writeCursor = cursor;
             m_store = store;
-            m_current_batch = m_store.getWriter().create(cursor.m_capacity);
+            m_current_batch = m_store.getWriter().create(MAX_BATCH_LENGTH);
         }
 
         private int m_previous_index = 0;
@@ -98,16 +105,46 @@ public class Playground {
 
         void tryAdvance()
         {
-            int index = m_writeCursor.m_current;
-            for ( int i = m_previous_index; i < index; ++i )
+            int numCols = m_current_batch.numData();
+
+            // TODO the name is wrong because it is the first that is not yet written, right?
+            int lastValidIndex = m_writeCursor.m_current;
+            AtomicInteger currentRow = new AtomicInteger(m_previous_index);
+
+            // Create accesses to be able to write into a WriteBatch
+            ColumnarSchema schema = m_store.getSchema();
+            ColumnarWriteAccess[] accessesToTheCurrentBatch = IntStream.range(0, m_store.getSchema().numColumns())//
+                .mapToObj(j -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(j)))//
+                .map(f -> f.createWriteAccess(() -> currentRow.get()))// TODO is this right? We have an index in the cursor and one in the batch and we kind of mix them here
+                .toArray(ColumnarWriteAccess[]::new);
+
+            // Connect the accesses with the current write batch
+            for (int col = 0; col < numCols; col++) {
+                accessesToTheCurrentBatch[col].setData(m_current_batch.get(col));
+            }
+
+            // Loop to the last row that was written before this method was called
+            // and serialize them to the current write batch
+            while ( currentRow.get() < lastValidIndex )
             {
-                int numCols = m_current_batch.numData();
+                // Set the data from the buffer
                 for( int col = 0; col < numCols; ++col ) {
-                    ReadAccess access = m_writeCursor.m_access.getAccess(col);
-                    NullableWriteData d = m_current_batch.get(col);
+                    accessesToTheCurrentBatch[col].setFrom(m_writeCursor.m_access.getAccess(col));
                 }
 
+                if (m_current_batch.sizeOf() > 5000) {
+                    switchToNextBatch();
+                }
+
+
+
+                currentRow.incrementAndGet();
             }
+            m_previous_index = currentRow.get();
+        }
+
+        void switchToNextBatch() {
+//            m_
         }
     }
 
@@ -118,12 +155,12 @@ public class Playground {
 
         private final BufferedAccessRow m_access;
 
-        private final int m_capacity;
+        private final int m_bufferSize;
 
-        MyCursor( final ColumnarSchema schema, final int capacity)
+        MyCursor( final ColumnarSchema schema, final int bufferSize)
         {
-            m_capacity = capacity;
-            m_buffers = new BufferedAccessRow[ capacity ];
+            m_bufferSize = bufferSize;
+            m_buffers = new BufferedAccessRow[ bufferSize ];
             Arrays.setAll(m_buffers, i -> BufferedAccesses.createBufferedAccessRow(schema));
             m_access = BufferedAccesses.createBufferedAccessRow(schema);
         }
@@ -142,9 +179,9 @@ public class Playground {
             if (m_current >= 0) {
                 m_buffers[m_current].setFrom(m_access);
             }
-            if(++m_current == m_capacity) {
+            if(++m_current == m_bufferSize) {
                 m_current = 0;
-                m_offset += m_capacity;
+                m_offset += m_bufferSize;
             }
             return true;
         }
