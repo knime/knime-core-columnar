@@ -47,6 +47,7 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -56,4 +57,6 @@ public interface TestData extends NullableWriteData, NullableReadData {
     Object[] get();
 
     int getRefs();
+
+    void writeToAccess(WriteAccess access, int index);
 }

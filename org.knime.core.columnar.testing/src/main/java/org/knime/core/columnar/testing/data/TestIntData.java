@@ -47,6 +47,8 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.table.access.IntAccess.IntWriteAccess;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -101,6 +103,11 @@ public final class TestIntData extends AbstractTestData implements IntWriteData,
     @Override
     public synchronized void setInt(final int index, final int val) {
         get()[index] = val;
+    }
+
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((IntWriteAccess)access).setIntValue(getInt(index));
     }
 
 }
