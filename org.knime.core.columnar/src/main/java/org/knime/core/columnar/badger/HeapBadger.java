@@ -56,7 +56,6 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
 import org.knime.core.columnar.access.ColumnarWriteAccess;
 import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.store.BatchStore;
@@ -112,6 +111,14 @@ public class HeapBadger {
 
         private WriteBatch m_current_batch;
 
+        void finish() throws IOException {
+            writeCurrentBatch();
+            m_writer.close();
+        }
+
+        /**
+         * Write buffered rows to the underlying store. Split batches when they become large enough.
+         */
         void tryAdvance() {
             int numCols = m_current_batch.numData();
 
@@ -147,6 +154,7 @@ public class HeapBadger {
                 // TODO use the size tracker by Adrian
                 if (m_current_batch.sizeOf() >= MAX_BATCH_SIZE) {
                     try {
+                        // TODO if we have written more data in some columns make sure we do not loose it
                         switchToNextBatch();
                         currentRow.set(0);
                     } catch (IOException ex) {
@@ -157,11 +165,14 @@ public class HeapBadger {
             m_previous_index = currentRow.get();
         }
 
-        void switchToNextBatch() throws IOException {
-            // TODO if we have written more data in some columns make sure we do not loose it
-            ReadBatch readBatch = m_current_batch.close(m_previous_index);
-            m_writer.write(readBatch);
+        private void writeCurrentBatch() throws IOException {
+            m_writer.write(m_current_batch.close(m_previous_index));
+        }
 
+        private void switchToNextBatch() throws IOException {
+            writeCurrentBatch();
+
+            // Create the next batch
             m_current_batch = m_writer.create(MAX_BATCH_LENGTH);
             m_previous_index = 0;
         }
@@ -195,10 +206,14 @@ public class HeapBadger {
             if (m_current >= 0) {
                 m_buffers[m_current].setFrom(m_access);
 
-                // synchonously write
-                m_badger.tryAdvance();
             }
-            if (++m_current == m_bufferSize) {
+            m_current++;
+
+            // synchonously write
+            m_badger.tryAdvance();
+
+            // Ring buffer
+            if (m_current == m_bufferSize) {
                 // TODO: when writing asynchronously, we have to make sure that we don't overwrite old
                 // buffers that haven't been serialized yet
                 m_current = 0;
@@ -218,7 +233,7 @@ public class HeapBadger {
         public void close() throws IOException {
             // TODO Auto-generated method stub
             m_badger.tryAdvance();
-            m_badger.switchToNextBatch();
+            m_badger.finish();
         }
 
         @Override
