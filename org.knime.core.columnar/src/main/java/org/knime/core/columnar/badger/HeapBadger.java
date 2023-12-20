@@ -56,6 +56,7 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
 import org.knime.core.columnar.access.ColumnarWriteAccess;
 import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.store.BatchStore;
@@ -166,7 +167,9 @@ public class HeapBadger {
         }
 
         private void writeCurrentBatch() throws IOException {
-            m_writer.write(m_current_batch.close(m_previous_index));
+            ReadBatch readBatch = m_current_batch.close(m_previous_index);
+            m_writer.write(readBatch);
+            readBatch.release();
         }
 
         private void switchToNextBatch() throws IOException {
@@ -205,7 +208,6 @@ public class HeapBadger {
         public boolean forward() {
             if (m_current >= 0) {
                 m_buffers[m_current].setFrom(m_access);
-
             }
             m_current++;
 
@@ -224,15 +226,13 @@ public class HeapBadger {
 
         @Override
         public void flush() throws IOException {
-            // TODO Auto-generated method stub
-            m_badger.tryAdvance();
+            forward();
             m_badger.switchToNextBatch();
         }
 
         @Override
         public void close() throws IOException {
-            // TODO Auto-generated method stub
-            m_badger.tryAdvance();
+            forward();
             m_badger.finish();
         }
 
