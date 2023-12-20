@@ -54,9 +54,11 @@ import static org.knime.core.table.schema.DataSpecs.INT;
 import static org.knime.core.table.schema.DataSpecs.STRING;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import org.junit.Test;
 import org.knime.core.columnar.testing.TestBatchStore;
+import org.knime.core.columnar.testing.data.TestData;
 import org.knime.core.table.access.IntAccess.IntWriteAccess;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
 import org.knime.core.table.cursor.WriteCursor;
@@ -70,48 +72,47 @@ import org.knime.core.table.schema.ColumnarSchema;
 @SuppressWarnings("javadoc")
 public class HeapBadgerWriteCursorTest {
 
-
-//    @Test
-//    public void testWriteData() {
-//        HeapBadger badger = new HeapBadger(m_batchStore);
-//        WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor();
-//
-//        var testData = getTestData();
-//
-//        for (int rowIdx = 0; rowIdx < testData.get(0).length(); rowIdx++) {
-//            var testReadAccessRow = new TestReadAccessRow(getTestData(), m_columnarSchema, rowIdx);
-//            cursor.access().setFrom(testReadAccessRow);
-//        }
-//
-//        cursor.close(); // ??
-//
-//        // Close to finish writing and to get the read cache?
-//        ObjectReadCache heapReadCache = badger.close();
-//
-//        // Check that all data that was written with the Cursor ended up in the store
-//        var writtenData = m_batchStore.getData();
-//        // compare testData to writtenData
-//        assertEquals(testData.size(), writtenData.size());
-//        for (int colIdx = 0; colIdx < testData.size(); colIdx++) {
-//            assertArrayEquals(testData.get(colIdx).get(), writtenData.get(colIdx).get());
-//        }
-//
-//        // TODO: check that everything is available in HeapCache
-//        //       by mocking the TestBatchStore so that we should not call it at all?
-//
-//    }
+    //    @Test
+    //    public void testWriteData() {
+    //        HeapBadger badger = new HeapBadger(m_batchStore);
+    //        WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor();
+    //
+    //        var testData = getTestData();
+    //
+    //        for (int rowIdx = 0; rowIdx < testData.get(0).length(); rowIdx++) {
+    //            var testReadAccessRow = new TestReadAccessRow(getTestData(), m_columnarSchema, rowIdx);
+    //            cursor.access().setFrom(testReadAccessRow);
+    //        }
+    //
+    //        cursor.close(); // ??
+    //
+    //        // Close to finish writing and to get the read cache?
+    //        ObjectReadCache heapReadCache = badger.close();
+    //
+    //        // Check that all data that was written with the Cursor ended up in the store
+    //        var writtenData = m_batchStore.getData();
+    //        // compare testData to writtenData
+    //        assertEquals(testData.size(), writtenData.size());
+    //        for (int colIdx = 0; colIdx < testData.size(); colIdx++) {
+    //            assertArrayEquals(testData.get(colIdx).get(), writtenData.get(colIdx).get());
+    //        }
+    //
+    //        // TODO: check that everything is available in HeapCache
+    //        //       by mocking the TestBatchStore so that we should not call it at all?
+    //
+    //    }
 
     @Test
     public void testWriteData2() throws IOException {
         ColumnarSchema columnarSchema = ColumnarSchema.of(INT, STRING);
-        Integer[] intData = new Integer[] {1, 2, 3, 4};
-        String[] stringData = new String[] {"A", "B", "C", "D"};
+        Integer[] intData = new Integer[]{1, 2, 3, 4};
+        String[] stringData = new String[]{"A", "B", "C", "D"};
         final int numRows = intData.length;
         final int numCols = columnarSchema.numColumns();
 
-        try(TestBatchStore batchStore = TestBatchStore.create(columnarSchema)) {
+        try (TestBatchStore batchStore = TestBatchStore.create(columnarSchema)) {
             HeapBadger badger = new HeapBadger(batchStore);
-            try(WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
+            try (WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
                 for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
                     cursor.forward();
                     ((IntWriteAccess)cursor.access().getWriteAccess(0)).setIntValue(intData[rowIdx]);
@@ -120,7 +121,7 @@ public class HeapBadgerWriteCursorTest {
             }
 
             // Close to finish writing and to get the read cache?
-    //        ObjectReadCache heapReadCache = badger.close();
+            //        ObjectReadCache heapReadCache = badger.close();
 
             // Check that all data that was written with the Cursor ended up in the store
             var writtenData = batchStore.getData();
@@ -128,12 +129,16 @@ public class HeapBadgerWriteCursorTest {
             // compare testData to writtenData
             assertEquals(numCols, writtenData.size());
 
-            assertArrayEquals(intData, writtenData.get(0).get());
-            assertArrayEquals(stringData, writtenData.get(1).get());
-
+            checkTestData(intData, writtenData.get(0));
+            checkTestData(stringData, writtenData.get(1));
 
             // TODO: check that everything is available in HeapCache
             //       by mocking the TestBatchStore so that we should not call it at all?
         }
+    }
+
+    private static void checkTestData(final Object[] expected, final TestData data) {
+        assertEquals(expected.length, data.length());
+        assertArrayEquals(expected, Arrays.copyOf(data.get(), expected.length));
     }
 }
