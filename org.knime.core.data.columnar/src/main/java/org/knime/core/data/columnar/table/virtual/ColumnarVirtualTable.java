@@ -61,15 +61,22 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
+import org.knime.core.data.DataType;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.container.ConcatenateTable;
+import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.util.CheckUtils;
+import org.knime.core.table.access.LongAccess;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.cursor.RandomAccessCursor;
@@ -80,11 +87,13 @@ import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
-import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
 import org.knime.core.table.virtual.spec.MaterializeTransformSpec;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverFactory;
-import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.ObserverTransformUtils;
+import org.knime.core.table.virtual.spec.ObserverTransformUtils.ObserverWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.RowIndexTransformSpec;
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
 import org.knime.core.table.virtual.spec.SourceTableProperties;
@@ -295,6 +304,51 @@ public final class ColumnarVirtualTable {
         ColumnarValueSchema getOutputSchema();
     }
 
+    /**
+     * A {@code ColumnarMapperFactory} implementation that wraps a {@code ColumnarMapperWithRowIndexFactory}.
+     * <p>
+     * Mappers created by this factory have one additional {@code LongReadAccess} input wrt mappers created by the
+     * wrapped {@code MapperWithRowIndexFactory}. This additional input represents the row index. When the mapper is
+     * {@code run()}, this input is stripped off and passed as the rowIndex argument to the wrapped
+     * {@link ColumnarMapperWithRowIndexFactory.Mapper#map(long)}.
+     */
+    public static class WrappedColumnarMapperWithRowIndexFactory implements ColumnarMapperFactory {
+
+        private final ColumnarMapperWithRowIndexFactory factory;
+
+        /**
+         * Wrap the given {@code MapperWithRowIndexFactory} as a simple {@code
+         * MapperFactory} with the row index appended as an additional input
+         * {@code LongReadAccess}.
+         */
+        public WrappedColumnarMapperWithRowIndexFactory(final ColumnarMapperWithRowIndexFactory factory) {
+            this.factory = factory;
+        }
+
+        @Override
+        public ColumnarValueSchema getOutputSchema() {
+            return factory.getOutputSchema();
+        }
+
+        @Override
+        public Runnable createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+
+            // the last input is the rowIndex
+            final LongAccess.LongReadAccess rowIndex = (LongAccess.LongReadAccess)inputs[inputs.length - 1];
+
+            // create a MapperWithRowIndex with the remaining inputs
+            final ReadAccess[] inputsWithoutRowIndex = Arrays.copyOf(inputs, inputs.length - 1);
+            final MapperWithRowIndexFactory.Mapper
+                    mapper = factory.createMapper(inputsWithoutRowIndex, outputs);
+
+            return () -> mapper.map(rowIndex.getLongValue());
+        }
+
+        public ColumnarMapperWithRowIndexFactory getMapperWithRowIndexFactory() {
+            return factory;
+        }
+    }
+
     ColumnarVirtualTable concatenate(final List<ColumnarVirtualTable> tables) {
         CheckUtils.checkArgument(tables.stream()//
             .map(ColumnarVirtualTable::getSchema)//
@@ -339,6 +393,21 @@ public final class ColumnarVirtualTable {
         return ColumnarValueSchemaUtils.create(spec, valueFactories);
     }
 
+    private static ColumnarValueSchema appendRowIndex(final ColumnarValueSchema schema) {
+        final DataType LONG = LongCell.TYPE;
+
+        final int numColumns = schema.numColumns();
+        var valueFactories = new ValueFactory<?, ?>[numColumns + 1];
+        var colSpecs = new DataColumnSpec[numColumns + 1];
+        for (int i = 0; i < numColumns; i++) {
+            valueFactories[ i ] = schema.getValueFactory(i);
+            colSpecs[ i ] = schema.getSourceSpec().getColumnSpec(i);
+        }
+        valueFactories[ numColumns ] = ValueFactoryUtils.getValueFactory(LONG, null);
+        colSpecs[ numColumns ] = new DataColumnSpecCreator("row index", LONG).createSpec();
+        return ColumnarValueSchemaUtils.create(new DataTableSpec(colSpecs), valueFactories);
+    }
+
     private List<TableTransform> collectTransforms(final List<ColumnarVirtualTable> tables) {
         final List<TableTransform> transforms = new ArrayList<>(1 + tables.size());
         transforms.add(m_transform);
@@ -364,19 +433,34 @@ public final class ColumnarVirtualTable {
 
 
 
-    ColumnarVirtualTable materialize(final UUID sinkIdentifier) {
+    public ColumnarVirtualTable materialize(final UUID sinkIdentifier) {
         final MaterializeTransformSpec transformSpec = new MaterializeTransformSpec(sinkIdentifier);
         var emptySchema = createColumnarValueSchema(new ValueFactory<?, ?>[0], new DataTableSpec());
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), emptySchema);
     }
 
-    ColumnarVirtualTable map(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
+    /**
+     * Append a LONG column that contains the current row index.
+     */
+    public ColumnarVirtualTable appendRowIndex() {
+        final RowIndexTransformSpec transformSpec = new RowIndexTransformSpec();
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), appendRowIndex(m_valueSchema));
+    }
+
+    public ColumnarVirtualTable map(final ColumnarMapperFactory mapperFactory, final int... columnIndices) {
         final TableTransformSpec transformSpec = new MapTransformSpec(columnIndices, mapperFactory);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), mapperFactory.getOutputSchema());
     }
 
-    ColumnarVirtualTable observe(final ObserverFactory factory, final int... columnIndices ) {
-        final ObserverTransformSpec transformSpec = new ObserverTransformSpec(columnIndices, factory);
+    public ColumnarVirtualTable map(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
+        final int[] columns = Arrays.copyOf(columnIndices, columnIndices.length + 1);
+        columns[columns.length - 1] = m_valueSchema.numColumns();
+        final ColumnarMapperFactory factory = new WrappedColumnarMapperWithRowIndexFactory(mapperFactory);
+        return appendRowIndex().map(factory, columns);
+    }
+
+    public ColumnarVirtualTable observe(final ObserverFactory observerFactory, final int... columnIndices ) {
+        final ObserverTransformSpec transformSpec = new ObserverTransformSpec(columnIndices, observerFactory);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
 
@@ -387,8 +471,13 @@ public final class ColumnarVirtualTable {
      * @param columnIndices columns that will be passed to the observer
      * @return table containing the observer
      */
-    ColumnarVirtualTable observe(final ObserverWithRowIndexFactory factory, final int... columnIndices) {
-        final ObserverTransformSpec transformSpec = new ObserverTransformSpec(columnIndices, factory);
-        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
+    public ColumnarVirtualTable observe(final ObserverWithRowIndexFactory observerFactory, final int... columnIndices) {
+        final int[] columns = Arrays.copyOf(columnIndices, columnIndices.length + 1);
+        final int rowIndexColumn = m_valueSchema.numColumns();
+        columns[columns.length - 1] = rowIndexColumn;
+        final ObserverFactory factory = new ObserverTransformUtils.WrappedObserverWithRowIndexFactory(observerFactory);
+        return appendRowIndex() //
+                .observe(factory, columns) //
+                .dropColumns(rowIndexColumn);
     }
 }

@@ -71,7 +71,9 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.WrappedColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.node.InvalidSettingsException;
@@ -84,8 +86,11 @@ import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.IdentityTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
+import org.knime.core.table.virtual.spec.RowIndexTransformSpec;
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
+import org.knime.core.table.virtual.spec.SourceTableProperties;
+import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 import org.knime.core.table.virtual.spec.SourceTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
 
@@ -267,7 +272,7 @@ public final class TableTransformNodeSettingsPersistor {
     enum TransformSpecPersistor {
             SOURCE(//
                 SourceTransformSpec.class, //
-                (s, c) -> new SourceTransformSpec(UUID.fromString(s.getString("identifier")), null),
+                (s, c) -> new SourceTransformSpec(UUID.fromString(s.getString("identifier")), new SourceTableProperties(null, CursorType.BASIC, -1)),
                 (t, s) -> s.addString("identifier", t.getSourceIdentifier().toString())),
             APPEND(//
                 AppendTransformSpec.class, //
@@ -288,43 +293,41 @@ public final class TableTransformNodeSettingsPersistor {
                     s.addLong("from", t.getRowRangeSelection().fromIndex());
                     s.addLong("to", t.getRowRangeSelection().toIndex());
                 }),
-        IDENTITY(//
+            IDENTITY(//
                 IdentityTransformSpec.class, //
                 (s, c) -> IdentityTransformSpec.INSTANCE, //
                 noop()),
+            ROWINDEX(//
+                RowIndexTransformSpec.class, //
+                (s, c) -> new RowIndexTransformSpec(s.getLong("offset")), //
+                (t, s) -> s.addLong("offset", t.getOffset())),
             MAP(//
-                // TODO (TP) The solution below works, because currently there are only
-                //           ColumnarMapperWithRowIndexFactory implementations, not
-                //           ColumnarMapperFactory implementations.
-                //
-                //           From knime-core-table, MapTransformSpec always contains
-                //           MapperFactory, accessed via MapTransformSpec.getMapperFactory().
-                //           MapperWithRowIndexFactory does not extend MapperFactory.
-                //           Instead, it is wrapped in a MapperFactory.
-                //           If that is the case, it can be retrieved with
-                //           MapperFactory.getMapperWithRowIndexFactory().
-                //
-                //           The below code assumes, that the
-                //           MapTransformSpec.getMapperFactory() is always a wrapped
-                //           ColumnarMapperWithRowIndexFactory.
-                //
-                //           If MapTransformSpec is used in the future for mappers
-                //           that do not require row indices (ColumnarMapperFactory implementations),
-                //           the serialization needs to be revised!
-                //
                 MapTransformSpec.class, //
                 (s, c) -> {
                     var mapperFactoryClass = s.getString("mapper_factory_class");
                     var persistor = PersistenceRegistry.getPersistor(mapperFactoryClass)
                         .orElseThrow(() -> new InvalidSettingsException(
                             "No persistor available for mapper factory %s.".formatted(mapperFactoryClass)));
-                    var mapperFactoryWithIndex = (ColumnarMapperWithRowIndexFactory)
+                    final Object factory =
                         persistor.load(s.getNodeSettings("mapper_factory_settings"), c::getDataRepository);
-                    return new MapTransformSpec(s.getIntArray("column_indices"), mapperFactoryWithIndex);
+                    final ColumnarMapperFactory mapperFactory;
+                    if (factory instanceof ColumnarMapperWithRowIndexFactory f) {
+                        mapperFactory = new WrappedColumnarMapperWithRowIndexFactory(f);
+                    } else { // if (factory instanceof ColumnarMapperFactory) {
+                        mapperFactory = (ColumnarMapperFactory)factory;
+                    }
+                    return new MapTransformSpec(s.getIntArray("column_indices"), mapperFactory);
                 },
                 (t, s) -> {//NOSONAR
                     s.addIntArray("column_indices", t.getColumnSelection());
-                    var mapperFactory = t.getMapperFactory().getMapperWithRowIndexFactory();
+                    final Object mapperFactory;
+                    if (t.getMapperFactory() instanceof WrappedColumnarMapperWithRowIndexFactory wrapper) {
+                        mapperFactory = wrapper.getMapperWithRowIndexFactory();
+                        // mapperFactory is a ColumnarMapperWithRowIndexFactory
+                    } else {
+                        mapperFactory = t.getMapperFactory();
+                        // mapperFactory is a ColumnarMapperFactory
+                    }
                     var factoryClass = mapperFactory.getClass();
                     var persistor =
                             PersistenceRegistry.getPersistor(factoryClass)
@@ -337,7 +340,7 @@ public final class TableTransformNodeSettingsPersistor {
             APPEND_MISSING(//
                 AppendMissingValuesTransformSpec.class, //
                 (s, c) -> {
-                    return new AppendMissingValuesTransformSpec(loadMissingColumnsSchema(s, c.getDataRepository()));
+                    return new AppendMissingValuesTransformSpec(loadColumnarValueSchema(s, c.getDataRepository()));
                 }, (t, s) -> {
                     var schema = t.getAppendedSchema();
                     if (schema instanceof ColumnarValueSchema valueSchema) {
@@ -384,6 +387,10 @@ public final class TableTransformNodeSettingsPersistor {
     private static void saveMissingColumnsSchema(final ColumnarValueSchema schema, final NodeSettingsWO settings) {
         CheckUtils.checkArgument(!ColumnarValueSchemaUtils.hasRowID(schema),
             "A schema used for appending missing values must not have a RowID column because RowIDs can't be missing.");
+        saveColumnarValueSchema(schema, settings);
+    }
+
+    private static void saveColumnarValueSchema(final ColumnarValueSchema schema, final NodeSettingsWO settings) {
         schema.getSourceSpec().save(settings.addNodeSettings("data_table_spec"));
         var valueFactorySettings = settings.addNodeSettings("value_factories");
         for (int i = 0; i < schema.numColumns(); i++) {
@@ -392,7 +399,7 @@ public final class TableTransformNodeSettingsPersistor {
         }
     }
 
-    private static ColumnarValueSchema loadMissingColumnsSchema(final NodeSettingsRO settings,
+    private static ColumnarValueSchema loadColumnarValueSchema(final NodeSettingsRO settings,
         final IDataRepository dataRepository) throws InvalidSettingsException {
         var tableSpec = DataTableSpec.load(settings.getNodeSettings("data_table_spec"));
         // the schema contains no RowID

@@ -59,7 +59,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
 import org.knime.core.data.columnar.table.virtual.NullableValues.NullableReadValue;
 import org.knime.core.data.columnar.table.virtual.NullableValues.NullableWriteValue;
 import org.knime.core.data.columnar.table.virtual.persist.Persistor;
@@ -74,14 +74,13 @@ import org.knime.core.node.workflow.NativeNodeContainer;
 import org.knime.core.node.workflow.NodeContext;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
-import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
 
 /**
  * Creates mappers that map from a sub-type ValueFactory to a ValueFactory of a super type.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
+final class TableCasterFactory implements ColumnarMapperFactory {
 
     private final List<ColumnCasterFactory> m_casts;
 
@@ -91,20 +90,20 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
         /**
          * Maps via DataValue and avoids materializing the DataCell.
          */
-        UPCAST((r, w) -> i -> w.setReadValue(r)),
+        UPCAST((r, w) -> () -> w.setReadValue(r)),
         /**
          * Maps by materializing the DataCell. Needed for downcasts.
          */
-        DOWNCAST((r, w) -> i -> w.setDataCell(r.getDataCell()));
+        DOWNCAST((r, w) -> () -> w.setDataCell(r.getDataCell()));
 
-        private final BiFunction<NullableReadValue, NullableWriteValue, MapperWithRowIndexFactory.Mapper> m_casterFactory;
+        private final BiFunction<NullableReadValue, NullableWriteValue, Runnable> m_casterFactory;
 
         private CastOperation(
-            final BiFunction<NullableReadValue, NullableWriteValue, MapperWithRowIndexFactory.Mapper> casterFactory) {
+            final BiFunction<NullableReadValue, NullableWriteValue, Runnable> casterFactory) {
             m_casterFactory = casterFactory;
         }
 
-        MapperWithRowIndexFactory.Mapper createCaster(final NullableReadValue readValue,
+        Runnable createCaster(final NullableReadValue readValue,
             final NullableWriteValue writeValue) {
             return m_casterFactory.apply(readValue, writeValue);
         }
@@ -112,7 +111,7 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
 
     record ColumnCasterFactory(DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
         UntypedValueFactory outputValueFactory, CastOperation castOperation) {
-        MapperWithRowIndexFactory.Mapper createCaster(final ReadAccess readAccess, final WriteAccess writeAccess) {
+        Runnable createCaster(final ReadAccess readAccess, final WriteAccess writeAccess) {
             var readValue = inputValueFactory.createNullableReadValue(readAccess);
             var writeValue = outputValueFactory.createNullableWriteValue(writeAccess);
             return castOperation.createCaster(readValue, writeValue);
@@ -126,12 +125,12 @@ final class TableCasterFactory implements ColumnarMapperWithRowIndexFactory {
 
 
     @Override
-    public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+    public Runnable createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
         initOutputValueFactoriesForWriting();
         var casters = IntStream.range(0, m_casts.size())//
             .mapToObj(i -> m_casts.get(i).createCaster(inputs[i], outputs[i]))//
             .toList();
-        return r -> casters.forEach(m -> m.map(r));
+        return () -> casters.forEach(Runnable::run);
     }
 
     private void initOutputValueFactoriesForWriting() {

@@ -175,7 +175,7 @@ public final class ColumnarConcatenater {
         var virtualTable = first.concatenate(preparedTables);
 
         if (m_generateNewRowIDs) {
-            var rowIDTable = virtualTable.map(new RowIDGenerator(), 0);
+            var rowIDTable = virtualTable.map(new RowIDGenerator());
             virtualTable = rowIDTable.append(virtualTable);
         }
 

@@ -106,8 +106,8 @@ import org.knime.core.table.access.StringAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.row.RowWriteAccessible;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
-import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
-import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.ObserverTransformUtils.ObserverWithRowIndexFactory;
 
 /**
  * Handles the construction (and optimization) of virtual tables that are generated via the ExecutionContext in a node.

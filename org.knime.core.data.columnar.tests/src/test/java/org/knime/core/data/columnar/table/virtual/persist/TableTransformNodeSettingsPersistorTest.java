@@ -63,13 +63,18 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataType;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.WrappedColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowDataRepository;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.value.DoubleValueFactory;
 import org.knime.core.data.v2.value.IntValueFactory;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettings;
@@ -81,14 +86,14 @@ import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.DefaultColumnarSchema.Builder;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
-import org.knime.core.table.virtual.spec.MapTransformSpec.MapperWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
+import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 import org.knime.core.table.virtual.spec.SourceTransformSpec;
 
 import com.google.common.collect.Iterables;
@@ -106,9 +111,8 @@ final class TableTransformNodeSettingsPersistorTest {
     @Test
     void testSaveSource() throws Exception {
         var id = UUID.randomUUID();
-        var virtualTable =
-            new VirtualTable(id, new DefaultColumnarSchema(List.of(stringSpec(), intSpec(), doubleSpec()),
-                List.of(DefaultDataTraits.EMPTY, DefaultDataTraits.EMPTY, DefaultDataTraits.EMPTY)));
+        var virtualTable = new VirtualTable(id,
+            schemaBuilder().addColumn(stringSpec()).addColumn(intSpec()).addColumn(doubleSpec()).build());
         var sourceTransform = virtualTable.getProducingTransform();
         var settings = rootSettings();
         TableTransformNodeSettingsPersistor.save(sourceTransform, settings);
@@ -283,17 +287,20 @@ final class TableTransformNodeSettingsPersistorTest {
     void testSaveMap() throws Exception {
         var id = UUID.randomUUID();
         var mapperFactory = new TestMapperFactory(3);
-        var table = new VirtualTable(id, schemaBuilder().addColumn(intSpec()).addColumn(doubleSpec()).build())
-            .map(new int[]{1}, mapperFactory);
+        var schema = ColumnarValueSchemaUtils.create(
+            new DataTableSpec(new String[] {"1", "2"}, new DataType[] {IntCell.TYPE, DoubleCell.TYPE}),
+            new ValueFactory<?, ?>[]{new IntValueFactory(), new DoubleValueFactory()});
+        var table = new ColumnarVirtualTable(id, schema, CursorType.BASIC)
+            .map(mapperFactory, 1);
         var settings = rootSettings();
         TableTransformNodeSettingsPersistor.save(table.getProducingTransform(), settings);
         var transformSettings = getTransformSettings(settings);
-        checkSize(transformSettings, 2);
+        checkSize(transformSettings, 3);
         checkSourceSettings(getSubSettings(transformSettings, 0), id);
-        checkMapSettings(getSubSettings(transformSettings, 1), mapperFactory::checkSettings, TestMapperFactory.class,
-            1);
+        checkMapSettings(getSubSettings(transformSettings, 2), mapperFactory::checkSettings, TestMapperFactory.class,
+            1, 2);
         var connectionSettings = getConnectionSettings(settings);
-        checkSize(connectionSettings, 1);
+        checkSize(connectionSettings, 2);
         checkConnection(getSubSettings(connectionSettings, 0), 0, 1, 0);
     }
 
@@ -309,7 +316,11 @@ final class TableTransformNodeSettingsPersistorTest {
         addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
         var transform = TableTransformNodeSettingsPersistor.load(settings, this::getDataRepository);
         checkMapTransform(transform,
-            s -> assertEquals(42, ((TestMapperFactory)s.getMapperFactory().getMapperWithRowIndexFactory()).m_increment, "Unexpected increment."));
+            s -> {
+                var wrappedMapperFactory = (WrappedColumnarMapperWithRowIndexFactory)s.getMapperFactory();
+                var testMapperFactory = (TestMapperFactory)wrappedMapperFactory.getMapperWithRowIndexFactory();
+                assertEquals(42, testMapperFactory.m_increment, "Unexpected increment.");
+            });
         checkSourceTransform(transform.getPrecedingTransforms().get(0), id);
     }
 
