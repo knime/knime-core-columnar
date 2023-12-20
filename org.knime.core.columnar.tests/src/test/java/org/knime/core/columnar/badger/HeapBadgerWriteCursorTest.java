@@ -105,8 +105,8 @@ public class HeapBadgerWriteCursorTest {
     @Test
     public void testWriteData2() throws IOException {
         ColumnarSchema columnarSchema = ColumnarSchema.of(INT, STRING);
-        Integer[] intData = new Integer[]{1, 2, 3, 4};
-        String[] stringData = new String[]{"A", "B", "C", "D"};
+        Integer[] intData = new Integer[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25};
+        String[] stringData = new String[]{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y"};
         final int numRows = intData.length;
         final int numCols = columnarSchema.numColumns();
 
@@ -118,6 +118,7 @@ public class HeapBadgerWriteCursorTest {
                     ((IntWriteAccess)cursor.access().getWriteAccess(0)).setIntValue(intData[rowIdx]);
                     ((StringWriteAccess)cursor.access().getWriteAccess(1)).setStringValue(stringData[rowIdx]);
                 }
+                cursor.flush();
             }
 
             // Close to finish writing and to get the read cache?
