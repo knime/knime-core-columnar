@@ -46,7 +46,7 @@
  * History
  *   20 Dec 2023 (pietzsch): created
  */
-package org.knime.core.data.columnar.table.badger;
+package org.knime.core.columnar.badger;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -69,15 +69,19 @@ import org.knime.core.table.schema.ColumnarSchema;
  *
  * @author pietzsch
  */
-public class Playground {
+public class HeapBadger {
 
     private final MyCursor m_writeCursor;
 
-    public Playground(final BatchStore store) {
+    public HeapBadger(final BatchStore store) {
         ColumnarSchema schema = store.getSchema();
 
         m_writeCursor = new MyCursor(schema, 1000);
 
+    }
+
+    public ColumnarWriteCursor getWriteCursor() {
+        return m_writeCursor;
     }
 
     // TODO we should make this depend on the size of the data that we know about in advance
