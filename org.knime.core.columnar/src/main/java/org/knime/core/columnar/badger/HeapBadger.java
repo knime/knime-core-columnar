@@ -50,9 +50,8 @@ package org.knime.core.columnar.badger;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
 
+import org.knime.core.columnar.access.ColumnarAccessFactory;
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
 import org.knime.core.columnar.access.ColumnarWriteAccess;
 import org.knime.core.columnar.batch.BatchWriter;
@@ -78,7 +77,7 @@ public class HeapBadger {
     public HeapBadger(final BatchStore store) {
         ColumnarSchema schema = store.getSchema();
 
-        m_writeCursor = new BadgerWriteCursor(schema, 1000);
+        m_writeCursor = new BadgerWriteCursor(schema, 20);
         m_badger = new Badger(m_writeCursor, store);
     }
 
@@ -105,79 +104,127 @@ public class HeapBadger {
             m_writeCursor = cursor;
             m_store = store;
             m_writer = m_store.getWriter();
-            m_current_batch = m_writer.create(MAX_BATCH_LENGTH);
+            m_current_batch = null;
+
+            final ColumnarSchema schema = m_store.getSchema();
+            final int numColumns = schema.numColumns();
+            m_accessesToTheCurrentBatchs = new ColumnarWriteAccess[numColumns];
+            for (int c = 0; c < numColumns; ++c) {
+                ColumnarAccessFactory factory = ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(c));
+                m_accessesToTheCurrentBatchs[c] = factory.createWriteAccess(() -> m_index_in_writebatch);
+            }
+
+            switchToNextBatch();
         }
 
-        private int m_previous_index = 0;
+        private final ColumnarWriteAccess[] m_accessesToTheCurrentBatchs;
+
+        private int m_index_in_writebatch = 0;
+
+        private int m_previous_head = 0;
 
         private WriteBatch m_current_batch;
 
-        void finish() throws IOException {
-            writeCurrentBatch();
-            m_writer.close();
+        private void writeBufferedRow(final int row) {
+            final BufferedAccessRow bufferedRow = m_writeCursor.m_buffers[row];
+
+            // Set the data from the buffer
+            for (int col = 0; col < m_accessesToTheCurrentBatchs.length; ++col) {
+                m_accessesToTheCurrentBatchs[col].setFrom(bufferedRow.getAccess(col));
+            }
+            ++m_index_in_writebatch;
+
+            // TODO use the size tracker by Adrian
+            if (m_current_batch.sizeOf() >= MAX_BATCH_SIZE) {
+                System.out.println("NEW BATCH!");
+                try {
+                    // TODO if we have written more data in some columns make sure we do not loose it
+                    writeCurrentBatch();
+                    switchToNextBatch();
+                } catch (IOException ex) {
+                    // TODO: handle exception
+                }
+            }
         }
 
         /**
          * Write buffered rows to the underlying store. Split batches when they become large enough.
+         *
+         * @return up to which index buffered data has been serialized.
          */
-        void tryAdvance() {
-            int numCols = m_current_batch.numData();
+        int tryAdvance() {
 
-            // TODO the name is wrong because it is the first that is not yet written, right?
-            int lastValidIndex = m_writeCursor.m_current;
+            final int head = m_writeCursor.m_current;
 
-            // TODO if we do this in parallel, each write access needs its own current row (probably thread local)
-            AtomicInteger currentRow = new AtomicInteger(m_previous_index);
+            System.out.println("tryAdvance()");
+            System.out.println(" head = " + head);
+            System.out.println(" m_previous_head = " + m_previous_head);
 
-            // Create accesses to be able to write into a WriteBatch
-            // TODO the accesses could be created in the constructor and re-used
-            ColumnarSchema schema = m_store.getSchema();
-            ColumnarWriteAccess[] accessesToTheCurrentBatch = IntStream.range(0, m_store.getSchema().numColumns())//
-                .mapToObj(j -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(j)))//
-                .map(f -> f.createWriteAccess(() -> currentRow.get()))// TODO is this right? We have an index in the cursor and one in the batch and we kind of mix them here
-                .toArray(ColumnarWriteAccess[]::new);
 
-            // Connect the accesses with the current write batch
-            for (int col = 0; col < numCols; col++) {
-                accessesToTheCurrentBatch[col].setData(m_current_batch.get(col));
-            }
+//          [0,1,2,3,4,5]
+//           |     ^
+//           0,1,2,
+//                 |
 
-            // Loop to the last row that was written before this method was called
-            // and serialize them to the current write batch
-            while (currentRow.get() < lastValidIndex) {
-                // Set the data from the buffer
-                for (int col = 0; col < numCols; ++col) {
-                    accessesToTheCurrentBatch[col].setFrom(m_writeCursor.m_access.getAccess(col));
+//            weil m_current > previous_head
+//            darf write_cursor bis zum ende schreiben, wrappen, und bis m_current-1 schreiben
+
+//          [0,1,2,3,4,5]
+//             ^     |
+//           0,      4,5
+//             |
+
+//          weil m_current < previous_head
+//          darf write_cursor nur bis m_current-1 schreiben
+
+
+            final int you_may_write_to = m_previous_head;
+
+            final boolean wrap = head < m_previous_head;
+            if (wrap) {
+                System.out.println(" wrap");
+                final int len = m_writeCursor.m_bufferSize;
+                for (int i = m_previous_head; i < len; ++i) {
+                    System.out.println( " writeBufferedRow("+i+")");
+                    writeBufferedRow(i);
                 }
-
-                currentRow.incrementAndGet();
-
-                // TODO use the size tracker by Adrian
-                if (m_current_batch.sizeOf() >= MAX_BATCH_SIZE) {
-                    try {
-                        // TODO if we have written more data in some columns make sure we do not loose it
-                        switchToNextBatch();
-                        currentRow.set(0);
-                    } catch (IOException ex) {
-                        // TODO: handle exception
-                    }
+                for (int i = 0; i < head; ++i) {
+                    System.out.println( " writeBufferedRow("+i+")");
+                    writeBufferedRow(i);
+                }
+            } else {
+                System.out.println(" !wrap");
+                for (int i = m_previous_head; i < head; ++i) {
+                    System.out.println( " writeBufferedRow("+i+")");
+                    writeBufferedRow(i);
                 }
             }
-            m_previous_index = currentRow.get();
+            m_previous_head = head;
+
+            return you_may_write_to - 1; // TODO -1? really?
+        }
+
+        void finish() throws IOException {
+            tryAdvance();
+            writeCurrentBatch();
         }
 
         private void writeCurrentBatch() throws IOException {
-            ReadBatch readBatch = m_current_batch.close(m_previous_index);
+            ReadBatch readBatch = m_current_batch.close(m_index_in_writebatch);
             m_writer.write(readBatch);
             readBatch.release();
         }
 
-        private void switchToNextBatch() throws IOException {
-            writeCurrentBatch();
-
+        private void switchToNextBatch() {
             // Create the next batch
             m_current_batch = m_writer.create(MAX_BATCH_LENGTH);
-            m_previous_index = 0;
+
+            // Connect the accesses with the current write batch
+            for (int col = 0; col < m_accessesToTheCurrentBatchs.length; col++) {
+                m_accessesToTheCurrentBatchs[col].setData(m_current_batch.get(col));
+            }
+
+            m_index_in_writebatch = 0;
         }
     }
 
@@ -202,17 +249,41 @@ public class HeapBadger {
 
         private int m_current = -1;
 
-        private long m_offset = 0;
+        private int m_bound = -1;
+
+        private long m_offset = 1;
 
         @Override
         public boolean forward() {
+            only_forward();
+
+            // synchonously write
+            if ( getNumForwards() % 7 == 0) {
+                m_bound = m_badger.tryAdvance();
+            }
+
+            return true;
+        }
+
+        private boolean only_forward() {
+            System.out.println("only_forward()");
+
             if (m_current >= 0) {
                 m_buffers[m_current].setFrom(m_access);
             }
             m_current++;
 
-            // synchonously write
-            m_badger.tryAdvance();
+//            if ( m_current == m_bound ) {
+//                // TODO: block until buffered data has been serialized
+//                while (m_current == m_bound) {
+//                    m_bound = m_badger.tryAdvance();
+//                }
+//            }
+//          weil m_current > previous_head
+//          darf write_cursor bis zum ende schreiben, wrappen, und bis m_current-1 schreiben
+//          weil m_current < previous_head
+//          darf write_cursor nur bis m_current-1 schreiben
+
 
             // Ring buffer
             if (m_current == m_bufferSize) {
@@ -220,20 +291,25 @@ public class HeapBadger {
                 // buffers that haven't been serialized yet
                 m_current = 0;
                 m_offset += m_bufferSize;
+                System.out.println(" wrapped!");
             }
+
+            System.out.println(" m_current = " + m_current);
+            System.out.println(" getNumForwards() = " + getNumForwards());
+
             return true;
         }
 
+        // TODO rename to finish() ???
         @Override
         public void flush() throws IOException {
-            forward();
-            m_badger.switchToNextBatch();
+            only_forward();
+            m_badger.finish();
         }
 
         @Override
         public void close() throws IOException {
-            forward();
-            m_badger.finish();
+            // TODO abort, release resources
         }
 
         @Override
