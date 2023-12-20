@@ -71,13 +71,15 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 public class HeapBadger {
 
-    private final MyCursor m_writeCursor;
+    private final BadgerWriteCursor m_writeCursor;
+
+    private final Badger m_badger;
 
     public HeapBadger(final BatchStore store) {
         ColumnarSchema schema = store.getSchema();
 
-        m_writeCursor = new MyCursor(schema, 1000);
-
+        m_writeCursor = new BadgerWriteCursor(schema, 1000);
+        m_badger = new Badger(m_writeCursor, store);
     }
 
     public ColumnarWriteCursor getWriteCursor() {
@@ -95,11 +97,11 @@ public class HeapBadger {
 
         private final BatchWriter m_writer;
 
-        private final MyCursor m_writeCursor;
+        private final BadgerWriteCursor m_writeCursor;
 
         private final BatchStore m_store;
 
-        Badger(final MyCursor cursor, final BatchStore store) {
+        Badger(final BadgerWriteCursor cursor, final BatchStore store) {
             m_writeCursor = cursor;
             m_store = store;
             m_writer = m_store.getWriter();
@@ -165,14 +167,14 @@ public class HeapBadger {
         }
     }
 
-    static class MyCursor implements ColumnarWriteCursor {
+    class BadgerWriteCursor implements ColumnarWriteCursor {
         private final BufferedAccessRow[] m_buffers;
 
         private final BufferedAccessRow m_access;
 
         private final int m_bufferSize;
 
-        MyCursor(final ColumnarSchema schema, final int bufferSize) {
+        BadgerWriteCursor(final ColumnarSchema schema, final int bufferSize) {
             m_bufferSize = bufferSize;
             m_buffers = new BufferedAccessRow[bufferSize];
             Arrays.setAll(m_buffers, i -> BufferedAccesses.createBufferedAccessRow(schema));
@@ -186,14 +188,19 @@ public class HeapBadger {
 
         private int m_current = -1;
 
-        private long m_offset = 1;
+        private long m_offset = 0;
 
         @Override
         public boolean forward() {
             if (m_current >= 0) {
                 m_buffers[m_current].setFrom(m_access);
+
+                // synchonously write
+                m_badger.tryAdvance();
             }
             if (++m_current == m_bufferSize) {
+                // TODO: when writing asynchronously, we have to make sure that we don't overwrite old
+                // buffers that haven't been serialized yet
                 m_current = 0;
                 m_offset += m_bufferSize;
             }
@@ -203,11 +210,15 @@ public class HeapBadger {
         @Override
         public void flush() throws IOException {
             // TODO Auto-generated method stub
+            m_badger.tryAdvance();
+            m_badger.switchToNextBatch();
         }
 
         @Override
         public void close() throws IOException {
             // TODO Auto-generated method stub
+            m_badger.tryAdvance();
+            m_badger.switchToNextBatch();
         }
 
         @Override
