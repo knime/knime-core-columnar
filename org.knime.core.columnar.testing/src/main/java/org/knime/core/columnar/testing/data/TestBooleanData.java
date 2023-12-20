@@ -47,6 +47,8 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
+import org.knime.core.table.access.BooleanAccess.BooleanWriteAccess;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -101,6 +103,11 @@ public final class TestBooleanData extends AbstractTestData implements BooleanWr
     @Override
     public synchronized void setBoolean(final int index, final boolean val) {
         get()[index] = val;
+    }
+
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((BooleanWriteAccess)access).setBooleanValue(getBoolean(index));
     }
 
 }

@@ -50,6 +50,7 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.VoidData.VoidReadData;
 import org.knime.core.columnar.data.VoidData.VoidWriteData;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -99,6 +100,11 @@ public final class TestVoidData extends AbstractTestData implements VoidWriteDat
     public TestVoidData close(final int length) {
         closeInternal(length);
         return this;
+    }
+
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        return; // NOOP
     }
 
 }
