@@ -72,6 +72,10 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 public final class ColumnarWriteCursorFactory {
 
+    // the maximum capacity (in number of held elements) of a single chunk
+    // subtract 750 since arrow rounds up to the next power of 2 anyways
+    static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
+
     private ColumnarWriteCursorFactory() {
         // static factory class
     }
@@ -118,10 +122,6 @@ public final class ColumnarWriteCursorFactory {
         private static final String CAPACITY_INIT_PROPERTY = "knime.columnar.capacity.initial";
 
         private static final int CAPACITY_INIT = Integer.getInteger(CAPACITY_INIT_PROPERTY, CAPACITY_INIT_DEF);
-
-        // the maximum capacity (in number of held elements) of a single chunk
-        // subtract 750 since arrow rounds up to the next power of 2 anyways
-        static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
 
         private static final String CAPACITY_MAX_PROPERTY = "knime.columnar.capacity.max";
 
