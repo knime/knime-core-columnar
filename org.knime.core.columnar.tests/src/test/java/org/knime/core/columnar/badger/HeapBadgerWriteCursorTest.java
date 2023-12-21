@@ -53,12 +53,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.knime.core.columnar.batch.RandomAccessBatchReadable;
+import org.knime.core.columnar.cache.ColumnDataUniqueId;
+import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -85,7 +92,7 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 class HeapBadgerWriteCursorTest {
 
     // Tests (always check that the heap cache is filled)
-    // - One batch that is not full
+    // - One batch that does not have max size (but is written)
     // - One batch that just enough - would switch to new batch with next data but should not
     // - Two batches - just switched to next data by one row because of max rows
     // - Two batches - just switched to next data by one row because of max size
@@ -102,6 +109,10 @@ class HeapBadgerWriteCursorTest {
             26, // max num rows per batch
             Integer.MAX_VALUE, // max batch size in bytes
             new int[]{25}, // expected num rows
+            new int[][]{
+                new int[]{}, //no ints cached
+                new int[]{0} //one string batch cached
+            }, // expected cache indices
             TestDataImpl.INT, TestDataImpl.STRING // test data
         );
     }
@@ -114,6 +125,10 @@ class HeapBadgerWriteCursorTest {
             24, // max num rows per batch
             Integer.MAX_VALUE, // max batch size in bytes
             new int[]{24, 1}, // expected num rows
+            new int[][]{
+                new int[]{}, //no ints cached
+                new int[]{0} //one string batch cached
+            }, // expected cache indices
             TestDataImpl.INT, TestDataImpl.STRING // test data
         );
     }
@@ -126,6 +141,30 @@ class HeapBadgerWriteCursorTest {
 
     // ====== TEST UTILITIES
 
+    static class MockSharedObjectCache implements SharedObjectCache {
+        private Map<ColumnDataUniqueId, Object> m_cache = new HashMap<>();
+
+        @Override
+        public Object computeIfAbsent(final ColumnDataUniqueId key,
+            final Function<ColumnDataUniqueId, Object> mappingFunction) {
+            return m_cache.computeIfAbsent(key, mappingFunction);
+        }
+
+        @Override
+        public void put(final ColumnDataUniqueId key, final Object value) {
+            m_cache.put(key, value);
+        }
+
+        @Override
+        public void removeAll(final Collection<ColumnDataUniqueId> keys) {
+            keys.stream().forEach(m_cache::remove);
+        }
+
+        Map<ColumnDataUniqueId, Object> getContents() {
+            return m_cache;
+        }
+    }
+
     private static void runFillAndCheckHeapBadgerTest( //
         final int numRows, //
         final int maxNumRowsPerBatch, //
@@ -133,12 +172,51 @@ class HeapBadgerWriteCursorTest {
         final int[] expectedNumRows, //
         final TestData... testData //
     ) throws IOException {
+        runFillAndCheckHeapBadgerTest(numRows, //
+            maxNumRowsPerBatch, //
+            maxBatchSizeInBytes, //
+            expectedNumRows, //
+            new int[0][], //
+            testData);
+    }
+
+    @SuppressWarnings("resource") // heap cache doesn't need to be closed by us
+    private static void runFillAndCheckHeapBadgerTest( //
+        final int numRows, //
+        final int maxNumRowsPerBatch, //
+        final int maxBatchSizeInBytes, //
+        final int[] expectedNumRows, //
+        final int[][] expectedCacheDataIndices, //
+        final TestData... testData //
+    ) throws IOException {
         try (TestBatchStore batchStore = createTestStore(testData)) {
-            var badger = new HeapBadger(batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes);
+            var cache = new MockSharedObjectCache();
+            var badger = new HeapBadger(batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes, cache);
             writeToHeapBadger(badger, testData, numRows);
 
-            // TODO assert the heap cache
             assertWrittenData(testData, expectedNumRows, batchStore);
+            if (expectedCacheDataIndices.length > 0) {
+                assertDataInCache(cache, badger.getHeapCache(), expectedCacheDataIndices);
+                assertWrittenData(testData, expectedNumRows, badger.getHeapCache(), batchStore.numBatches());
+            }
+        }
+    }
+
+    /**
+     * @param cache
+     * @param expectedCacheDataIndices
+     */
+    private static void assertDataInCache(final MockSharedObjectCache cache, final HeapCache heapCache, final int[][] expectedCacheDataIndices) {
+        for (int colIdx = 0; colIdx < expectedCacheDataIndices.length; colIdx++) {
+            if (expectedCacheDataIndices[colIdx] == null) {
+                continue;
+            }
+
+            for (int batchIdx : expectedCacheDataIndices[colIdx]) {
+                if (!cache.getContents().containsKey(new ColumnDataUniqueId(heapCache, colIdx, batchIdx))) {
+                    throw new AssertionError("Could not find column=" + colIdx + " batch=" + batchIdx + " in cache");
+                }
+            }
         }
     }
 
@@ -165,12 +243,17 @@ class HeapBadgerWriteCursorTest {
     /** Check the written data in the underlying store */
     private static void assertWrittenData(final TestData[] testData, final int[] numRowsPerBatch,
         final TestBatchStore batchStore) throws IOException {
-        var numBatches = batchStore.numBatches();
-        var numColumns = batchStore.getSchema().numColumns();
+        assertWrittenData(testData, numRowsPerBatch, batchStore, batchStore.numBatches());
+    }
+
+    /** Check the written data in the numBatche of the batch readable */
+    private static void assertWrittenData(final TestData[] testData, final int[] numRowsPerBatch,
+        final RandomAccessBatchReadable batchReadable, final int numBatches) throws IOException {
+        var numColumns = batchReadable.getSchema().numColumns();
 
         assertEquals(numRowsPerBatch.length, numBatches, "wrong number of batches");
 
-        try (var reader = batchStore.createRandomAccessReader()) {
+        try (var reader = batchReadable.createRandomAccessReader()) {
             var batchStartRow = 0L;
 
             // Loop over batches
