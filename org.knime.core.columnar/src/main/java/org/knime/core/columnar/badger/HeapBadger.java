@@ -70,38 +70,45 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 public class HeapBadger {
 
+    // TODO we should make this depend on the size of the data that we know about in advance
+    /** max number of rows in one batch */
+    private static final int DEFAULT_MAX_NUM_ROWS_PER_BATCH = 500;
+
+    /** max size of a batch */
+    private static final int DEFAULT_MAX_BATCH_SIZE_IN_BYTES = 5000;
+
     private final BadgerWriteCursor m_writeCursor;
 
     private final Badger m_badger;
 
-    public HeapBadger(final BatchStore store) {
+    private final int m_maxNumRowsPerBatch;
+
+    private final int m_maxBatchSizeInBytes;
+
+    public HeapBadger(final BatchStore store, final int maxNumRowsPerBatch, final int maxBatchSizeInBytes) {
         ColumnarSchema schema = store.getSchema();
+        m_maxNumRowsPerBatch = maxNumRowsPerBatch;
+        m_maxBatchSizeInBytes = maxBatchSizeInBytes;
 
         m_writeCursor = new BadgerWriteCursor(schema, 20);
-        m_badger = new Badger(m_writeCursor, store);
+        m_badger = new Badger(store);
+    }
+
+    public HeapBadger(final BatchStore store) {
+        this(store, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES);
     }
 
     public ColumnarWriteCursor getWriteCursor() {
         return m_writeCursor;
     }
 
-    // TODO we should make this depend on the size of the data that we know about in advance
-    /** max number of rows in one batch */
-    private static final int MAX_BATCH_LENGTH = 500;
-
-    /** max size of a batch */
-    private static final int MAX_BATCH_SIZE = 5000;
-
-    static class Badger {
+    class Badger {
 
         private final BatchWriter m_writer;
 
-        private final BadgerWriteCursor m_writeCursor;
-
         private final BatchStore m_store;
 
-        Badger(final BadgerWriteCursor cursor, final BatchStore store) {
-            m_writeCursor = cursor;
+        Badger(final BatchStore store) {
             m_store = store;
             m_writer = m_store.getWriter();
             m_current_batch = null;
@@ -135,7 +142,7 @@ public class HeapBadger {
             ++m_index_in_writebatch;
 
             // TODO use the size tracker by Adrian
-            if (m_current_batch.sizeOf() >= MAX_BATCH_SIZE) {
+            if (m_current_batch.sizeOf() >= m_maxBatchSizeInBytes) {
                 System.out.println("NEW BATCH!");
                 try {
                     // TODO if we have written more data in some columns make sure we do not loose it
@@ -217,7 +224,7 @@ public class HeapBadger {
 
         private void switchToNextBatch() {
             // Create the next batch
-            m_current_batch = m_writer.create(MAX_BATCH_LENGTH);
+            m_current_batch = m_writer.create(m_maxNumRowsPerBatch);
 
             // Connect the accesses with the current write batch
             for (int col = 0; col < m_accessesToTheCurrentBatchs.length; col++) {
