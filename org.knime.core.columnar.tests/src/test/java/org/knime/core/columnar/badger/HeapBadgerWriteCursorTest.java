@@ -48,25 +48,30 @@
  */
 package org.knime.core.columnar.badger;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.knime.core.table.schema.DataSpecs.INT;
-import static org.knime.core.table.schema.DataSpecs.STRING;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.table.access.IntAccess.IntWriteAccess;
+import org.knime.core.table.access.ListAccess.ListWriteAccess;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpecs;
 import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
 
 /**
@@ -88,43 +93,59 @@ class HeapBadgerWriteCursorTest {
     @Test
     @DisplayName("no batching - int|string")
     void testSingleBatchStringInt() throws IOException {
-        var testData = new GeneratedTestData[]{intData(), stringData()};
-        var numRows = 25;
-
-        try (TestBatchStore batchStore = createTestStore(testData)) {
-            var badger = new HeapBadger(batchStore);
-            writeToHeapBadger(badger, testData, numRows);
-
-            // TODO assert the heap cache
-            assertWrittenData(testData, new int[]{numRows}, batchStore);
-        }
+        runFillAndCheckHeapBadgerTest( //
+            25, // num rows
+            26, // max num rows per batch
+            Integer.MAX_VALUE, // max batch size in bytes
+            new int[]{25}, // expected num rows
+            TestDataImpl.INT, TestDataImpl.STRING // test data
+        );
     }
 
     @Test
     @DisplayName("batching by num rows - int|string")
     void testTwoBatchesStringInt() throws IOException {
-        var testData = new GeneratedTestData[]{intData(), stringData()};
-        var numRows = 25;
+        runFillAndCheckHeapBadgerTest( //
+            25, // num rows
+            24, // max num rows per batch
+            Integer.MAX_VALUE, // max batch size in bytes
+            new int[]{24, 1}, // expected num rows
+            TestDataImpl.INT, TestDataImpl.STRING // test data
+        );
+    }
 
-        try (TestBatchStore batchStore = createTestStore(testData)) {
-            var badger = new HeapBadger(batchStore, numRows - 1, Integer.MAX_VALUE);
-            writeToHeapBadger(badger, testData, numRows);
-
-            // TODO assert the heap cache
-            assertWrittenData(testData, new int[]{numRows - 1, 1}, batchStore);
-        }
+    @ParameterizedTest
+    @EnumSource(value = TestDataImpl.class)
+    void testOneBatchWithTypes(final TestData data) throws IOException {
+        runFillAndCheckHeapBadgerTest(10, 20, Integer.MAX_VALUE, new int[]{10}, data);
     }
 
     // ====== TEST UTILITIES
 
+    private static void runFillAndCheckHeapBadgerTest( //
+        final int numRows, //
+        final int maxNumRowsPerBatch, //
+        final int maxBatchSizeInBytes, //
+        final int[] expectedNumRows, //
+        final TestData... testData //
+    ) throws IOException {
+        try (TestBatchStore batchStore = createTestStore(testData)) {
+            var badger = new HeapBadger(batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes);
+            writeToHeapBadger(badger, testData, numRows);
+
+            // TODO assert the heap cache
+            assertWrittenData(testData, expectedNumRows, batchStore);
+        }
+    }
+
     /** Create a new batch store that can store the given test data */
-    private static TestBatchStore createTestStore(final GeneratedTestData[] data) {
+    private static TestBatchStore createTestStore(final TestData[] data) {
         var schema = ColumnarSchema.of(Arrays.stream(data).map(d -> d.getSpec()).toArray(DataSpecWithTraits[]::new));
         return TestBatchStore.create(schema);
     }
 
     /** Write some test data to the HeapBadger */
-    private static void writeToHeapBadger(final HeapBadger badger, final GeneratedTestData[] data, final long numRows)
+    private static void writeToHeapBadger(final HeapBadger badger, final TestData[] data, final long numRows)
         throws IOException {
         try (WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
             for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
@@ -138,7 +159,7 @@ class HeapBadgerWriteCursorTest {
     }
 
     /** Check the written data in the underlying store */
-    private static void assertWrittenData(final GeneratedTestData[] testData, final int[] numRowsPerBatch,
+    private static void assertWrittenData(final TestData[] testData, final int[] numRowsPerBatch,
         final TestBatchStore batchStore) throws IOException {
         var numBatches = batchStore.numBatches();
         var numColumns = batchStore.getSchema().numColumns();
@@ -172,53 +193,88 @@ class HeapBadgerWriteCursorTest {
 
     // ====== TEST DATA
 
-    private static abstract class GeneratedTestData {
+    interface TestDataWriter {
+        void writeTo(WriteAccess access, long rowIdx);
+    }
 
-        private final DataSpecWithTraits m_spec;
+    interface TestDataChecker {
+        void assertData(NullableReadData data, int dataIdx, long rowIdx);
+    }
 
-        public GeneratedTestData(final DataSpecWithTraits spec) {
+    interface TestData extends TestDataWriter, TestDataChecker {
+        DataSpecWithTraits getSpec();
+    }
+
+    private static int[] listForIdx(final long rowIdx) {
+        return IntStream.range(0, (int)(rowIdx % 10)).toArray();
+    }
+
+    enum TestDataImpl implements TestData {
+
+            INT(DataSpecs.INT, //
+                (access, rowIdx) -> {
+                    ((IntWriteAccess)access).setIntValue((int)rowIdx);
+                }, //
+                (data, dataIdx, rowIdx) -> {
+                    assertEquals((int)rowIdx, ((IntReadData)data).getInt(dataIdx),
+                        "wrong value at row " + rowIdx + ", data idx " + dataIdx);
+                } //
+            ),
+
+            STRING(DataSpecs.STRING, //
+                (access, rowIdx) -> {
+                    ((StringWriteAccess)access).setStringValue("str_" + rowIdx);
+                }, //
+                (data, dataIdx, rowIdx) -> {
+                    assertEquals("str_" + rowIdx, ((StringReadData)data).getString(dataIdx),
+                        "wrong value at row " + rowIdx + ", data idx " + dataIdx);
+                } //
+            ),
+
+            LIST_OF_INT(DataSpecs.LIST.of(DataSpecs.INT), //
+                (access, rowIdx) -> {
+                    var list = listForIdx(rowIdx);
+                    var listAccess = (ListWriteAccess)access;
+                    listAccess.create(list.length);
+                    for (int i = 0; i < list.length; i++) {
+                        listAccess.setWriteIndex(i);
+                        ((IntWriteAccess)listAccess.getWriteAccess()).setIntValue(list[i]);
+                    }
+                }, //
+                (data, dataIdx, rowIdx) -> {
+                    var listData = (IntReadData)((ListReadData)data).createReadData(dataIdx);
+                    var list = IntStream.range(0, listData.length()).map(i -> listData.getInt(i)).toArray();
+                    assertArrayEquals(listForIdx(rowIdx), list,
+                        "wrong value at row " + rowIdx + ", data idx " + dataIdx);
+
+                } //
+            );
+
+        DataSpecWithTraits m_spec;
+
+        private TestDataWriter m_writer;
+
+        private TestDataChecker m_checker;
+
+        TestDataImpl(final DataSpecWithTraits spec, final TestDataWriter writer, final TestDataChecker checker) {
             m_spec = spec;
-
+            m_writer = writer;
+            m_checker = checker;
         }
 
-        DataSpecWithTraits getSpec() {
+        @Override
+        public DataSpecWithTraits getSpec() {
             return m_spec;
         }
 
-        abstract void writeTo(final WriteAccess access, final long rowIdx);
+        @Override
+        public void writeTo(final WriteAccess access, final long rowIdx) {
+            m_writer.writeTo(access, rowIdx);
+        }
 
-        abstract void assertData(final NullableReadData data, final int dataIdx, final long rowIdx);
-    }
-
-    private static GeneratedTestData intData() {
-        return new GeneratedTestData(INT) {
-
-            @Override
-            void writeTo(final WriteAccess access, final long rowIdx) {
-                ((IntWriteAccess)access).setIntValue((int)rowIdx);
-            }
-
-            @Override
-            void assertData(final NullableReadData data, final int dataIdx, final long rowIdx) {
-                assertEquals((int)rowIdx, ((IntReadData)data).getInt(dataIdx),
-                    "wrong value at row " + rowIdx + ", data idx " + dataIdx);
-            }
-        };
-    }
-
-    private static GeneratedTestData stringData() {
-        return new GeneratedTestData(STRING) {
-
-            @Override
-            void writeTo(final WriteAccess access, final long rowIdx) {
-                ((StringWriteAccess)access).setStringValue("str_" + rowIdx);
-            }
-
-            @Override
-            void assertData(final NullableReadData data, final int dataIdx, final long rowIdx) {
-                assertEquals("str_" + rowIdx, ((StringReadData)data).getString(dataIdx),
-                    "wrong value at row " + rowIdx + ", data idx " + dataIdx);
-            }
-        };
+        @Override
+        public void assertData(final NullableReadData data, final int dataIdx, final long rowIdx) {
+            m_checker.assertData(data, dataIdx, rowIdx);
+        }
     }
 }
