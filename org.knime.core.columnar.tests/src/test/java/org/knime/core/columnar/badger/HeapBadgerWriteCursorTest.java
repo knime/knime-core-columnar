@@ -48,7 +48,6 @@
  */
 package org.knime.core.columnar.badger;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.knime.core.table.schema.DataSpecs.INT;
 import static org.knime.core.table.schema.DataSpecs.STRING;
@@ -56,90 +55,170 @@ import static org.knime.core.table.schema.DataSpecs.STRING;
 import java.io.IOException;
 import java.util.Arrays;
 
-import org.junit.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.testing.TestBatchStore;
-import org.knime.core.columnar.testing.data.TestData;
 import org.knime.core.table.access.IntAccess.IntWriteAccess;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
 
 /**
  *
  * @author chaubold
  */
-@SuppressWarnings("javadoc")
-public class HeapBadgerWriteCursorTest {
+class HeapBadgerWriteCursorTest {
 
-    //    @Test
-    //    public void testWriteData() {
-    //        HeapBadger badger = new HeapBadger(m_batchStore);
-    //        WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor();
-    //
-    //        var testData = getTestData();
-    //
-    //        for (int rowIdx = 0; rowIdx < testData.get(0).length(); rowIdx++) {
-    //            var testReadAccessRow = new TestReadAccessRow(getTestData(), m_columnarSchema, rowIdx);
-    //            cursor.access().setFrom(testReadAccessRow);
-    //        }
-    //
-    //        cursor.close(); // ??
-    //
-    //        // Close to finish writing and to get the read cache?
-    //        ObjectReadCache heapReadCache = badger.close();
-    //
-    //        // Check that all data that was written with the Cursor ended up in the store
-    //        var writtenData = m_batchStore.getData();
-    //        // compare testData to writtenData
-    //        assertEquals(testData.size(), writtenData.size());
-    //        for (int colIdx = 0; colIdx < testData.size(); colIdx++) {
-    //            assertArrayEquals(testData.get(colIdx).get(), writtenData.get(colIdx).get());
-    //        }
-    //
-    //        // TODO: check that everything is available in HeapCache
-    //        //       by mocking the TestBatchStore so that we should not call it at all?
-    //
-    //    }
+    // Tests (always check that the heap cache is filled)
+    // - One batch that is not full
+    // - One batch that just enough - would switch to new batch with next data but should not
+    // - Two batches - just switched to next data by one row because of max rows
+    // - Two batches - just switched to next data by one row because of max size
+    // - 4 batches
+    // - Data so big that one row already surpasses the max size
+    // - Settings such that one row of fixed data would surpass the max size
+    // TODO we should also test edge cases of the buffer configuration
 
     @Test
-    public void testWriteData2() throws IOException {
-        ColumnarSchema columnarSchema = ColumnarSchema.of(INT, STRING);
-        Integer[] intData = new Integer[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25};
-        String[] stringData = new String[]{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y"};
-        final int numRows = intData.length;
-        final int numCols = columnarSchema.numColumns();
+    @DisplayName("no batching - int|string")
+    void testSingleBatchStringInt() throws IOException {
+        var testData = new GeneratedTestData[]{intData(), stringData()};
+        var numRows = 25;
 
-        try (TestBatchStore batchStore = TestBatchStore.create(columnarSchema)) {
-            HeapBadger badger = new HeapBadger(batchStore);
-            try (WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
-                for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-                    cursor.forward();
-                    ((IntWriteAccess)cursor.access().getWriteAccess(0)).setIntValue(intData[rowIdx]);
-                    ((StringWriteAccess)cursor.access().getWriteAccess(1)).setStringValue(stringData[rowIdx]);
-                }
-                cursor.flush();
-            }
+        try (TestBatchStore batchStore = createTestStore(testData)) {
+            var badger = new HeapBadger(batchStore);
+            writeToHeapBadger(badger, testData, numRows);
 
-            // Close to finish writing and to get the read cache?
-            //        ObjectReadCache heapReadCache = badger.close();
-
-            // Check that all data that was written with the Cursor ended up in the store
-            var writtenData = batchStore.getData();
-
-            // compare testData to writtenData
-            assertEquals(numCols, writtenData.size());
-
-            checkTestData(intData, writtenData.get(0));
-            checkTestData(stringData, writtenData.get(1));
-
-            // TODO: check that everything is available in HeapCache
-            //       by mocking the TestBatchStore so that we should not call it at all?
+            // TODO assert the heap cache
+            assertWrittenData(testData, new int[]{numRows}, batchStore);
         }
     }
 
-    private static void checkTestData(final Object[] expected, final TestData data) {
-        assertEquals(expected.length, data.length());
-        assertArrayEquals(expected, Arrays.copyOf(data.get(), expected.length));
+    @Test
+    @DisplayName("batching by num rows - int|string")
+    void testTwoBatchesStringInt() throws IOException {
+        var testData = new GeneratedTestData[]{intData(), stringData()};
+        var numRows = 25;
+
+        try (TestBatchStore batchStore = createTestStore(testData)) {
+            var badger = new HeapBadger(batchStore, numRows - 1, Integer.MAX_VALUE);
+            writeToHeapBadger(badger, testData, numRows);
+
+            // TODO assert the heap cache
+            assertWrittenData(testData, new int[]{numRows - 1, 1}, batchStore);
+        }
+    }
+
+    // ====== TEST UTILITIES
+
+    /** Create a new batch store that can store the given test data */
+    private static TestBatchStore createTestStore(final GeneratedTestData[] data) {
+        var schema = ColumnarSchema.of(Arrays.stream(data).map(d -> d.getSpec()).toArray(DataSpecWithTraits[]::new));
+        return TestBatchStore.create(schema);
+    }
+
+    /** Write some test data to the HeapBadger */
+    private static void writeToHeapBadger(final HeapBadger badger, final GeneratedTestData[] data, final long numRows)
+        throws IOException {
+        try (WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
+            for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
+                cursor.forward();
+                for (int col = 0; col < data.length; col++) {
+                    data[col].writeTo(cursor.access().getWriteAccess(col), rowIdx);
+                }
+            }
+            cursor.flush();
+        }
+    }
+
+    /** Check the written data in the underlying store */
+    private static void assertWrittenData(final GeneratedTestData[] testData, final int[] numRowsPerBatch,
+        final TestBatchStore batchStore) throws IOException {
+        var numBatches = batchStore.numBatches();
+        var numColumns = batchStore.getSchema().numColumns();
+
+        assertEquals(numRowsPerBatch.length, numBatches, "wrong number of batches");
+
+        try (var reader = batchStore.createRandomAccessReader()) {
+            var batchStartRow = 0L;
+
+            // Loop over batches
+            for (int batchIdx = 0; batchIdx < numBatches; batchIdx++) {
+                var writtenBatch = reader.readRetained(batchIdx);
+                var currentBatchNumRows = writtenBatch.length();
+                assertEquals(numRowsPerBatch[batchIdx], currentBatchNumRows,
+                    "wrong number of rows in batch " + batchIdx);
+
+                // Loop over columns
+                for (int col = 0; col < numColumns; col++) {
+                    var writteData = writtenBatch.get(col);
+
+                    // Loop over rows of the batch
+                    for (int dataIdx = 0; dataIdx < currentBatchNumRows; dataIdx++) {
+                        testData[col].assertData(writteData, dataIdx, batchStartRow + dataIdx);
+                    }
+                }
+                batchStartRow += currentBatchNumRows;
+                writtenBatch.release();
+            }
+        }
+    }
+
+    // ====== TEST DATA
+
+    private static abstract class GeneratedTestData {
+
+        private final DataSpecWithTraits m_spec;
+
+        public GeneratedTestData(final DataSpecWithTraits spec) {
+            m_spec = spec;
+
+        }
+
+        DataSpecWithTraits getSpec() {
+            return m_spec;
+        }
+
+        abstract void writeTo(final WriteAccess access, final long rowIdx);
+
+        abstract void assertData(final NullableReadData data, final int dataIdx, final long rowIdx);
+    }
+
+    private static GeneratedTestData intData() {
+        return new GeneratedTestData(INT) {
+
+            @Override
+            void writeTo(final WriteAccess access, final long rowIdx) {
+                ((IntWriteAccess)access).setIntValue((int)rowIdx);
+            }
+
+            @Override
+            void assertData(final NullableReadData data, final int dataIdx, final long rowIdx) {
+                assertEquals((int)rowIdx, ((IntReadData)data).getInt(dataIdx),
+                    "wrong value at row " + rowIdx + ", data idx " + dataIdx);
+            }
+        };
+    }
+
+    private static GeneratedTestData stringData() {
+        return new GeneratedTestData(STRING) {
+
+            @Override
+            void writeTo(final WriteAccess access, final long rowIdx) {
+                ((StringWriteAccess)access).setStringValue("str_" + rowIdx);
+            }
+
+            @Override
+            void assertData(final NullableReadData data, final int dataIdx, final long rowIdx) {
+                assertEquals("str_" + rowIdx, ((StringReadData)data).getString(dataIdx),
+                    "wrong value at row " + rowIdx + ", data idx " + dataIdx);
+            }
+        };
     }
 }
