@@ -188,6 +188,7 @@ public class HeapBadger {
         void finish() throws IOException {
             tryAdvance();
             writeCurrentBatch();
+            m_writer.close();
         }
 
         private void writeCurrentBatch() throws IOException {
