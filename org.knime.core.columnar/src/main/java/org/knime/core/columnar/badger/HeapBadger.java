@@ -167,48 +167,22 @@ public class HeapBadger {
             System.out.println(" head = " + head);
             System.out.println(" m_previous_head = " + m_previous_head);
 
+            final int new_bound = m_previous_head;
+            System.out.println(" --> async new_bound = " + new_bound);
 
-//          [0,1,2,3,4,5]
-//           |     ^
-//           0,1,2,
-//                 |
-
-//            weil m_current > previous_head
-//            darf write_cursor bis zum ende schreiben, wrappen, und bis m_current-1 schreiben
-
-//          [0,1,2,3,4,5]
-//             ^     |
-//           0,      4,5
-//             |
-
-//          weil m_current < previous_head
-//          darf write_cursor nur bis m_current-1 schreiben
-
-
-            final int you_may_write_to = m_previous_head;
-
-            final boolean wrap = head < m_previous_head;
-            if (wrap) {
-                System.out.println(" wrap");
-                final int len = m_writeCursor.m_bufferSize;
-                for (int i = m_previous_head; i < len; ++i) {
-                    System.out.println( " writeBufferedRow("+i+")");
-                    writeBufferedRow(i);
-                }
-                for (int i = 0; i < head; ++i) {
-                    System.out.println( " writeBufferedRow("+i+")");
-                    writeBufferedRow(i);
-                }
-            } else {
-                System.out.println(" !wrap");
-                for (int i = m_previous_head; i < head; ++i) {
-                    System.out.println( " writeBufferedRow("+i+")");
-                    writeBufferedRow(i);
-                }
+            int from = m_previous_head;
+            int to = head;
+            if (to < from) {
+                from -= m_writeCursor.m_bufferSize;
+                to += m_writeCursor.m_bufferSize;
             }
-            m_previous_head = head;
+            for (int i = from; i < to; ++i) {
+                System.out.println( " writeBufferedRow("+ (i % m_writeCursor.m_bufferSize) +")  ... i="+i);
+                writeBufferedRow(i % m_writeCursor.m_bufferSize);
+            }
 
-            return you_may_write_to - 1; // TODO -1? really?
+            m_previous_head = head;
+            return new_bound;
         }
 
         void finish() throws IOException {
@@ -247,6 +221,49 @@ public class HeapBadger {
             m_buffers = new BufferedAccessRow[bufferSize];
             Arrays.setAll(m_buffers, i -> BufferedAccesses.createBufferedAccessRow(schema));
             m_access = BufferedAccesses.createBufferedAccessRow(schema);
+
+            // initialize indices:
+
+            m_current = -1;
+            // The access() returned by the most recent forward() modifies m_buffers[m_current].
+            // The first forward() increments m_current to 0, so access() modifies m_buffers[0] after the initial forward().
+            // After forward(), everything up to m_buffers[m_current-1] is ready to be serialized.
+            // So after the second forward(), m_current=1, and m_buffers[0] is valid. m_buffers[1] is now modified.
+            //
+            // When the serializer thread reads head:=m_current, it knows everything up to m_buffers[head-1] can be serialized.
+            // The first index to be serialized is serializer.m_previous_head.
+            // After the serializer is done serializing up to m_buffers[head-1], it sets m_previous_head:=head,
+            //   because m_buffers[head] is the first to be serialized in the next round.
+
+            m_bound = m_bufferSize;
+            // forward() increments m_current, and blocks if m_current==m_bound afterwards.
+            // Otherwise, the access() returned after forward() would write into the range that is currently serializing.
+            //
+            // If the first serialization has not finished (maybe it was not even triggered yet) when m_buffers is filled,
+            //   m_current==m_bufferSize, that is access() would return the invalid m_buffers[m_bufferSize].
+            // Technically, m_current should wrap around to 0 then, before the forward() returns.
+            // However, from the perspective of the serializer, it would be indistinguishable whether nothing has been
+            //   written since the last round, or everything.
+            //
+            // We disambiguate this by only wrapping to m_current=0 at 2*m_bufferSize,
+            //   and taking indices modulo m_bufferSize for reading and writing.
+            // That is:
+            //   * access() modifies m_buffers[m_current % m_bufferSize].
+            //   * serializer takes buffers from m_previous_head % m_bufferSize to (head-1) % m_bufferSize.
+            //
+
+            m_offset = 1;
+            // m_offset is used to calculate getNumForwards() as m_offset + m_current.
+            // Initially, we should have getNumForwards()==0, and because m_current==-1 we set m_offset:=1.
+            // When wrapping at 2*m_bufferSize, m_offset is incremented by 2*m_bufferSize.
+
+            // m_previous_head = 0
+            // The first serialization round should start at index 0.
+            // If nothing is ready to be serialized head:=m_current==0, and nothing will be serialized.
+            // As a special case, m_current==-1 before the initial forward() is treated as m_current==0.
+            //
+            // Otherwise, if m_current < m_previous_head, we know that the writer has wrapped around.
+            // We handle that accordingly: ... TODO ...
         }
 
         @Override
@@ -254,17 +271,17 @@ public class HeapBadger {
             return m_access;
         }
 
-        private int m_current = -1;
+        private int m_current;
 
-        private int m_bound = -1;
+        private int m_bound;
 
-        private long m_offset = 1;
+        private long m_offset;
 
         @Override
         public boolean forward() {
             only_forward();
 
-            // synchonously write
+            // synchronously write
             if ( getNumForwards() % 7 == 0) {
                 m_bound = m_badger.tryAdvance();
             }
@@ -273,10 +290,8 @@ public class HeapBadger {
         }
 
         private boolean only_forward() {
-            System.out.println("only_forward()");
-
             if (m_current >= 0) {
-                m_buffers[m_current].setFrom(m_access);
+                m_buffers[m_current % m_bufferSize].setFrom(m_access);
             }
             m_current++;
 
@@ -286,23 +301,19 @@ public class HeapBadger {
 //                    m_bound = m_badger.tryAdvance();
 //                }
 //            }
-//          weil m_current > previous_head
-//          darf write_cursor bis zum ende schreiben, wrappen, und bis m_current-1 schreiben
-//          weil m_current < previous_head
-//          darf write_cursor nur bis m_current-1 schreiben
-
 
             // Ring buffer
-            if (m_current == m_bufferSize) {
+            boolean DEBUG_wrapped = false;
+            if (m_current == 2 * m_bufferSize) {
                 // TODO: when writing asynchronously, we have to make sure that we don't overwrite old
                 // buffers that haven't been serialized yet
                 m_current = 0;
-                m_offset += m_bufferSize;
-                System.out.println(" wrapped!");
+                m_offset += 2 * m_bufferSize;
+                DEBUG_wrapped = true;
             }
 
-            System.out.println(" m_current = " + m_current);
-            System.out.println(" getNumForwards() = " + getNumForwards());
+            System.out.println("only_forward(): m_current=" + m_current + ", numForwards=" + getNumForwards()
+                + (DEBUG_wrapped ? " WRAPPED" : ""));
 
             return true;
         }
