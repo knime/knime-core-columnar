@@ -50,6 +50,8 @@ package org.knime.core.columnar.badger;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.knime.core.columnar.access.ColumnarAccessFactory;
 import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
@@ -81,18 +83,23 @@ public class HeapBadger {
 
     private final Badger m_badger;
 
-    private final int m_maxNumRowsPerBatch;
-
-    private final int m_maxBatchSizeInBytes;
-
     public HeapBadger(final BatchStore store, final int maxNumRowsPerBatch, final int maxBatchSizeInBytes) {
         ColumnarSchema schema = store.getSchema();
-        m_maxNumRowsPerBatch = maxNumRowsPerBatch;
-        m_maxBatchSizeInBytes = maxBatchSizeInBytes;
 
-        m_writeCursor = new BadgerWriteCursor(schema, 20);
-        m_badger = new Badger(store);
+        int bufferSize = 20;
+        final Async async = new Async(bufferSize);
+        m_writeCursor = new BadgerWriteCursor(schema, async);
+        m_badger = new Badger(store, m_writeCursor.m_buffers, maxNumRowsPerBatch, maxBatchSizeInBytes);
+
+        new Thread(() -> {
+            try {
+                async.serializeLoop(m_badger);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e); // TODO exception handling
+            }
+        }).start();
     }
+
 
     public HeapBadger(final BatchStore store) {
         this(store, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES);
@@ -102,132 +109,48 @@ public class HeapBadger {
         return m_writeCursor;
     }
 
-    class Badger {
 
-        private final BatchWriter m_writer;
+    // --------------------------------------------------------------------
+    //
+    //   Async
+    //
 
-        private final BatchStore m_store;
-
-        Badger(final BatchStore store) {
-            m_store = store;
-            m_writer = m_store.getWriter();
-            m_current_batch = null;
-
-            final ColumnarSchema schema = m_store.getSchema();
-            final int numColumns = schema.numColumns();
-            m_accessesToTheCurrentBatchs = new ColumnarWriteAccess[numColumns];
-            for (int c = 0; c < numColumns; ++c) {
-                ColumnarAccessFactory factory = ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(c));
-                m_accessesToTheCurrentBatchs[c] = factory.createWriteAccess(() -> m_index_in_writebatch);
-            }
-
-            switchToNextBatch();
-        }
-
-        private final ColumnarWriteAccess[] m_accessesToTheCurrentBatchs;
-
-        private int m_index_in_writebatch = 0;
-
-        private int m_previous_head = 0;
-
-        private WriteBatch m_current_batch;
-
-        private void writeBufferedRow(final int row) {
-            final BufferedAccessRow bufferedRow = m_writeCursor.m_buffers[row];
-
-            // Set the data from the buffer
-            for (int col = 0; col < m_accessesToTheCurrentBatchs.length; ++col) {
-                m_accessesToTheCurrentBatchs[col].setFrom(bufferedRow.getAccess(col));
-            }
-            ++m_index_in_writebatch;
-
-            // TODO use the size tracker by Adrian
-            if (m_current_batch.sizeOf() >= m_maxBatchSizeInBytes) {
-                System.out.println("NEW BATCH!");
-                try {
-                    // TODO if we have written more data in some columns make sure we do not loose it
-                    writeCurrentBatch();
-                    switchToNextBatch();
-                } catch (IOException ex) {
-                    // TODO: handle exception
-                }
-            }
-        }
-
-        /**
-         * Write buffered rows to the underlying store. Split batches when they become large enough.
-         *
-         * @return up to which index buffered data has been serialized.
-         */
-        int tryAdvance() {
-
-            final int head = m_writeCursor.m_current;
-
-            System.out.println("tryAdvance()");
-            System.out.println(" head = " + head);
-            System.out.println(" m_previous_head = " + m_previous_head);
-
-            final int new_bound = m_previous_head;
-            System.out.println(" --> async new_bound = " + new_bound);
-
-            int from = m_previous_head;
-            int to = head;
-            if (to < from) {
-                from -= m_writeCursor.m_bufferSize;
-                to += m_writeCursor.m_bufferSize;
-            }
-            for (int i = from; i < to; ++i) {
-                System.out.println( " writeBufferedRow("+ (i % m_writeCursor.m_bufferSize) +")  ... i="+i);
-                writeBufferedRow(i % m_writeCursor.m_bufferSize);
-            }
-
-            m_previous_head = head;
-            return new_bound;
-        }
-
-        void finish() throws IOException {
-            tryAdvance();
-            writeCurrentBatch();
-            m_writer.close();
-        }
-
-        private void writeCurrentBatch() throws IOException {
-            ReadBatch readBatch = m_current_batch.close(m_index_in_writebatch);
-            m_writer.write(readBatch);
-            readBatch.release();
-        }
-
-        private void switchToNextBatch() {
-            // Create the next batch
-            m_current_batch = m_writer.create(m_maxNumRowsPerBatch);
-
-            // Connect the accesses with the current write batch
-            for (int col = 0; col < m_accessesToTheCurrentBatchs.length; col++) {
-                m_accessesToTheCurrentBatchs[col].setData(m_current_batch.get(col));
-            }
-
-            m_index_in_writebatch = 0;
-        }
-    }
-
-    class BadgerWriteCursor implements ColumnarWriteCursor {
-        private final BufferedAccessRow[] m_buffers;
-
-        private final BufferedAccessRow m_access;
+    static class Async {
 
         private final int m_bufferSize;
 
-        BadgerWriteCursor(final ColumnarSchema schema, final int bufferSize) {
+        private final ReentrantLock m_lock;
+        private final Condition m_notEmpty;
+        private final Condition m_notFull;
+        private final Condition m_finished;
+        private boolean m_finishing;
+
+
+        private final int m_wrap_at;
+        private int m_current;
+        private int m_bound;
+
+        private long m_offset;
+
+        Async(final int bufferSize) {
             m_bufferSize = bufferSize;
-            m_buffers = new BufferedAccessRow[bufferSize];
-            Arrays.setAll(m_buffers, i -> BufferedAccesses.createBufferedAccessRow(schema));
-            m_access = BufferedAccesses.createBufferedAccessRow(schema);
+            m_wrap_at = 2 * bufferSize;
+
+            m_lock = new ReentrantLock();
+            m_notEmpty = m_lock.newCondition();
+            m_notFull = m_lock.newCondition();
+            m_finished = m_lock.newCondition();
+
 
             // initialize indices:
 
-            m_current = -1;
-            // The access() returned by the most recent forward() modifies m_buffers[m_current].
-            // The first forward() increments m_current to 0, so access() modifies m_buffers[0] after the initial forward().
+            m_current = 0;
+            // After the most recent forward(), the cursor modifies buffers[m_current].
+            // Initially, before the first forward(), m_current = 0, so the cursor modifies m_buffers[0].
+            //
+            // Via the Cursor contract, cursor.forward() needs to be called once, before modifying the first row.
+            // So the Cursor running on top of Async needs to "swallow" the first cursor.forward().
+            //
             // After forward(), everything up to m_buffers[m_current-1] is ready to be serialized.
             // So after the second forward(), m_current=1, and m_buffers[0] is valid. m_buffers[1] is now modified.
             //
@@ -251,20 +174,257 @@ public class HeapBadger {
             // That is:
             //   * access() modifies m_buffers[m_current % m_bufferSize].
             //   * serializer takes buffers from m_previous_head % m_bufferSize to (head-1) % m_bufferSize.
-            //
 
-            m_offset = 1;
+            m_offset = 0;
             // m_offset is used to calculate getNumForwards() as m_offset + m_current.
-            // Initially, we should have getNumForwards()==0, and because m_current==-1 we set m_offset:=1.
-            // When wrapping at 2*m_bufferSize, m_offset is incremented by 2*m_bufferSize.
+            // When wrapping at m_wrap_at, m_offset is incremented by m_wrap_at.
+        }
 
-            // m_previous_head = 0
-            // The first serialization round should start at index 0.
-            // If nothing is ready to be serialized head:=m_current==0, and nothing will be serialized.
-            // As a special case, m_current==-1 before the initial forward() is treated as m_current==0.
-            //
-            // Otherwise, if m_current < m_previous_head, we know that the writer has wrapped around.
-            // We handle that accordingly: ... TODO ...
+        /**
+         * @return index of buffer to modify
+         * @throws InterruptedException if interrupted while waiting
+         */
+        int forward() throws InterruptedException {
+
+            // TODO: throw Exception if finishing==true?
+            //       @throws IllegalStateException if called after {@link #finish}
+
+            // TODO: this needs to happen in WriteCursor: (swallow first forward())
+            //    if (m_current >= 0) {
+            //        m_buffers[m_current % m_bufferSize].setFrom(m_access);
+            //    }
+
+            final ReentrantLock lock = this.m_lock;
+            lock.lock();
+            try
+            {
+                if (++m_current == m_wrap_at) {
+                    m_current = 0;
+                    m_offset += m_wrap_at;
+                }
+                while (m_current == m_bound) {
+                    m_notFull.await();
+                }
+                m_notEmpty.signal();
+            }
+            finally
+            {
+                lock.unlock();
+            }
+
+            return m_current % m_bufferSize;
+        }
+
+        /**
+         * Get the number of times {@link #forward()} has been called.
+         *
+         * @return number of calls to {@link #forward()}
+         */
+        long numForwards() {
+            return m_offset + m_current;
+        }
+
+        /**
+         * @throws InterruptedException if interrupted while waiting
+         */
+        void finish() throws InterruptedException {
+            final ReentrantLock lock = this.m_lock;
+            lock.lock();
+            try
+            {
+                m_finishing = true;
+                m_notEmpty.signal();
+                m_finished.await();
+            }
+            finally
+            {
+                lock.unlock();
+            }
+        }
+
+        interface Serializer {
+            void serialize(int previous_head, int head) throws IOException;
+            void finish() throws IOException;
+        }
+
+        void serializeLoop(final Serializer serializer) throws InterruptedException {
+
+            final ReentrantLock lock = this.m_lock;
+            int previous_head = 0;
+            int head;
+            boolean doFinish;
+            while (true) {
+                lock.lock();
+                try {
+                    head = m_current;
+                    doFinish = m_finishing;
+                    while (head == previous_head && !doFinish) {
+                        m_notEmpty.await();
+                        head = m_current;
+                        doFinish = m_finishing;
+                    }
+                } finally {
+                    lock.unlock();
+                }
+
+                // Note that m_previous_head..head maybe empty in case we are finishing
+                try {
+                    serializer.serialize(previous_head, head);
+                    if (doFinish) {
+                        serializer.finish();
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e); // TODO: how to handle IOException ???
+                }
+
+                lock.lock();
+                try {
+                    m_bound = head;
+                    m_notFull.signal();
+                    if (doFinish) {
+                        m_finished.signal();
+                        return;
+                    }
+                } finally {
+                    lock.unlock();
+                }
+
+                previous_head = head;
+            }
+        }
+    }
+
+
+    // --------------------------------------------------------------------
+    //
+    //   Badger
+    //
+
+    static class Badger implements Async.Serializer {
+
+        private final BufferedAccessRow[] m_buffers;
+
+        private final int m_bufferSize;
+
+        private final int m_maxNumRowsPerBatch;
+
+        private final int m_maxBatchSizeInBytes;
+
+        private final BatchWriter m_writer;
+
+        private WriteBatch m_current_batch;
+
+        private final ColumnarWriteAccess[] m_accessesToTheCurrentBatchs;
+
+        private int m_index_in_writebatch;
+
+        Badger(
+                final BatchStore store,
+                final BufferedAccessRow[] buffers,
+                final int maxNumRowsPerBatch,
+                final int maxBatchSizeInBytes) {
+            m_buffers = buffers;
+            m_bufferSize = buffers.length;
+
+            m_maxNumRowsPerBatch = maxNumRowsPerBatch;
+            m_maxBatchSizeInBytes = maxBatchSizeInBytes;
+
+            m_writer = store.getWriter();
+            m_current_batch = null;
+
+            final ColumnarSchema schema = store.getSchema();
+            final int numColumns = schema.numColumns();
+            m_accessesToTheCurrentBatchs = new ColumnarWriteAccess[numColumns];
+            for (int c = 0; c < numColumns; ++c) {
+                ColumnarAccessFactory factory = ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(c));
+                m_accessesToTheCurrentBatchs[c] = factory.createWriteAccess(() -> m_index_in_writebatch);
+            }
+
+            switchToNextBatch();
+        }
+
+        private void writeBufferedRow(final int row) throws IOException {
+            System.out.println("[b] Badger.writeBufferedRow( row=" + row + " )");
+            final BufferedAccessRow bufferedRow = m_buffers[row];
+
+            // Set the data from the buffer
+            for (int col = 0; col < m_accessesToTheCurrentBatchs.length; ++col) {
+                m_accessesToTheCurrentBatchs[col].setFrom(bufferedRow.getAccess(col));
+            }
+            ++m_index_in_writebatch;
+
+            // TODO use the size tracker by Adrian
+            if (m_current_batch.sizeOf() >= m_maxBatchSizeInBytes) {
+                System.out.println("[b]   switch to new batch");
+                // TODO if we have written more data in some columns make sure we do not loose it
+                writeCurrentBatch();
+                switchToNextBatch();
+            }
+        }
+
+        private void writeCurrentBatch() throws IOException {
+            System.out.println("[b] Badger.writeCurrentBatch");
+            ReadBatch readBatch = m_current_batch.close(m_index_in_writebatch);
+            m_writer.write(readBatch);
+            readBatch.release();
+        }
+
+        private void switchToNextBatch() {
+            System.out.println("[b] Badger.switchToNextBatch");
+            // Create the next batch
+            m_current_batch = m_writer.create(m_maxNumRowsPerBatch);
+
+            // Connect the accesses with the current write batch
+            for (int col = 0; col < m_accessesToTheCurrentBatchs.length; col++) {
+                m_accessesToTheCurrentBatchs[col].setData(m_current_batch.get(col));
+            }
+
+            m_index_in_writebatch = 0;
+        }
+
+        /**
+         * Write buffered rows to the underlying store. Split batches when they become large enough.
+         */
+        @Override
+        public void serialize(final int previous_head, final int head) throws IOException {
+            System.out.println("[b] Badger.serialize( previous_head=" + previous_head + ", head=" + head + " )");
+            int from = previous_head;
+            int to = head;
+            if (to < from) {
+                from -= m_bufferSize;
+                to += m_bufferSize;
+            }
+            for (int i = from; i < to; ++i) {
+                System.out.println( "[b]   writeBufferedRow("+ (i % m_bufferSize) +")  ... i="+i);
+                writeBufferedRow(i % m_bufferSize);
+            }
+        }
+
+        @Override
+        public void finish() throws IOException {
+            writeCurrentBatch();
+            m_writer.close();
+        }
+    }
+
+
+    // --------------------------------------------------------------------
+    //
+    //   BadgerWriteCursor
+    //
+
+    static class BadgerWriteCursor implements ColumnarWriteCursor {
+        private final BufferedAccessRow[] m_buffers;
+
+        private final BufferedAccessRow m_access;
+
+        private final Async m_queue;
+
+        BadgerWriteCursor(final ColumnarSchema schema, final Async queue) {
+            m_queue = queue;
+            m_buffers = new BufferedAccessRow[queue.m_bufferSize]; // TODO Async::getBufferSize() instead of field access
+            Arrays.setAll(m_buffers, i -> BufferedAccesses.createBufferedAccessRow(schema));
+            m_access = BufferedAccesses.createBufferedAccessRow(schema);
         }
 
         @Override
@@ -272,58 +432,36 @@ public class HeapBadger {
             return m_access;
         }
 
-        private int m_current;
-
-        private int m_bound;
-
-        private long m_offset;
+        private int m_current = -1;
 
         @Override
         public boolean forward() {
-            only_forward();
-
-            // synchronously write
-            if ( getNumForwards() % 7 == 0) {
-                m_bound = m_badger.tryAdvance();
-            }
-
-            return true;
-        }
-
-        private boolean only_forward() {
+            System.out.println("[c] BadgerWriteCursor.forward");
             if (m_current >= 0) {
-                m_buffers[m_current % m_bufferSize].setFrom(m_access);
+                m_buffers[m_current].setFrom(m_access);
             }
-            m_current++;
-
-//            if ( m_current == m_bound ) {
-//                // TODO: block until buffered data has been serialized
-//                while (m_current == m_bound) {
-//                    m_bound = m_badger.tryAdvance();
-//                }
-//            }
-
-            // Ring buffer
-            boolean DEBUG_wrapped = false;
-            if (m_current == 2 * m_bufferSize) {
-                // TODO: when writing asynchronously, we have to make sure that we don't overwrite old
-                // buffers that haven't been serialized yet
-                m_current = 0;
-                m_offset += 2 * m_bufferSize;
-                DEBUG_wrapped = true;
+            try {
+                System.out.println("[c]   -> m_queue.forward()");
+                m_current = m_queue.forward();
+                System.out.println("[c]   <- m_queue.forward()");
+                System.out.println("[c]   m_current = " + m_current);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e); // TODO: how to handle InterruptedException ???
             }
-
-            System.out.println("only_forward(): m_current=" + m_current + ", numForwards=" + getNumForwards()
-                + (DEBUG_wrapped ? " WRAPPED" : ""));
-
             return true;
         }
 
         // TODO rename to finish() ???
         @Override
         public void flush() throws IOException {
-            only_forward();
-            m_badger.finish();
+            System.out.println("[c] BadgerWriteCursor.flush");
+            try {
+                System.out.println("[c]   -> m_queue.finish()");
+                m_queue.finish();
+                System.out.println("[c]   <- m_queue.finish()");
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e); // TODO: how to handle InterruptedException ???
+            }
         }
 
         @Override
@@ -333,7 +471,7 @@ public class HeapBadger {
 
         @Override
         public long getNumForwards() {
-            return m_offset + m_current;
+            return (m_current < 0) ? 0 : m_queue.numForwards();
         }
     }
 
