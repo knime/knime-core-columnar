@@ -198,14 +198,22 @@ public class HeapBadger {
             lock.lock();
             try
             {
+                System.out.println("[c]  Q m_current = " + m_current);
+                System.out.println("[c]  Q m_bound = " + m_bound);
+                System.out.println("[c]  Q m_offset = " + m_offset);
                 if (++m_current == m_wrap_at) {
                     m_current = 0;
                     m_offset += m_wrap_at;
                 }
                 while (m_current == m_bound) {
+                    System.out.println("[c]  Q -> m_notFull.await();");
                     m_notFull.await();
+                    System.out.println("[c]  Q <- m_notFull.await();");
                 }
                 m_notEmpty.signal();
+                System.out.println("[c]  Q m_current = " + m_current);
+                System.out.println("[c]  Q m_bound = " + m_bound);
+                System.out.println("[c]  Q m_offset = " + m_offset);
             }
             finally
             {
@@ -254,19 +262,29 @@ public class HeapBadger {
             int head;
             boolean doFinish;
             while (true) {
+                System.out.println("[b] - 0 -");
+                System.out.println("[b] - previous_head = " + previous_head);
                 lock.lock();
                 try {
                     head = m_current;
                     doFinish = m_finishing;
+                    System.out.println("[b] - 1 -");
+                    System.out.println("[b] - head = " + head);
+                    System.out.println("[b] - doFinish = " + doFinish);
                     while (head == previous_head && !doFinish) {
+                        System.out.println("[b] - -> m_notEmpty.await();");
                         m_notEmpty.await();
+                        System.out.println("[b] - <- m_notEmpty.await();");
                         head = m_current;
                         doFinish = m_finishing;
+                        System.out.println("[b] - head = " + head);
+                        System.out.println("[b] - doFinish = " + doFinish);
                     }
                 } finally {
                     lock.unlock();
                 }
 
+                System.out.println("[b] - 2 -");
                 // Note that m_previous_head..head maybe empty in case we are finishing
                 try {
                     serializer.serialize(previous_head, head);
@@ -277,9 +295,10 @@ public class HeapBadger {
                     throw new RuntimeException(e); // TODO: how to handle IOException ???
                 }
 
+                System.out.println("[b] - 3 -");
                 lock.lock();
                 try {
-                    m_bound = head;
+                    m_bound = ( head + m_bufferSize ) % m_wrap_at;
                     m_notFull.signal();
                     if (doFinish) {
                         m_finished.signal();
@@ -288,6 +307,7 @@ public class HeapBadger {
                 } finally {
                     lock.unlock();
                 }
+                System.out.println("[b] - 4 -");
 
                 previous_head = head;
             }
@@ -437,9 +457,12 @@ public class HeapBadger {
         @Override
         public boolean forward() {
             System.out.println("[c] BadgerWriteCursor.forward");
-            if (m_current >= 0) {
-                m_buffers[m_current].setFrom(m_access);
+            if ( m_current < 0 ) {
+                m_current = 0;
+                return true;
             }
+
+            m_buffers[m_current].setFrom(m_access);
             try {
                 System.out.println("[c]   -> m_queue.forward()");
                 m_current = m_queue.forward();
@@ -455,6 +478,7 @@ public class HeapBadger {
         @Override
         public void flush() throws IOException {
             System.out.println("[c] BadgerWriteCursor.flush");
+            forward();
             try {
                 System.out.println("[c]   -> m_queue.finish()");
                 m_queue.finish();
