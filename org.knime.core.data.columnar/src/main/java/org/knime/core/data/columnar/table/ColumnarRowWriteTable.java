@@ -202,6 +202,9 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
             } else {
                 schema = m_schema;
             }
+
+            // Convert to RowReadTable directly, no additional caches needed because we have all of the caches in
+            // the hierarchy of wrapped stores already.
             m_nullableFinishedTable = new ColumnarRowReadTable(schema, m_storeFactory, m_store, m_writeCursor.size());
         }
         return m_nullableFinishedTable;

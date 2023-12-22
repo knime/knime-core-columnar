@@ -93,6 +93,8 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
     private final CursorTracker<RowCursor> m_rowCursorTracker = CursorTracker.createRowCursorTracker();
 
     /**
+     * Note: Used when loading a {@link ColumnarRowReadTable} from disk
+     *
      * @param schema The schema of the table.
      * @param storeFactory The factory which created the table's underlying store.
      * @param store The table's underlying store.
