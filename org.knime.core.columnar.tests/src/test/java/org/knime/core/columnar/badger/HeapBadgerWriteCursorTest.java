@@ -63,16 +63,20 @@ import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.table.access.IntAccess.IntWriteAccess;
 import org.knime.core.table.access.ListAccess.ListWriteAccess;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
+import org.knime.core.table.access.VarBinaryAccess.VarBinaryWriteAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
 import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
+import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 /**
  *
@@ -209,27 +213,50 @@ class HeapBadgerWriteCursorTest {
         return IntStream.range(0, (int)(rowIdx % 10)).toArray();
     }
 
+    private static final class ObjectData {
+
+        private static final ObjectSerializer<ObjectData> SERIALIZER = //
+            (output, object) -> output.writeLong(object.m_val);
+
+        private static final ObjectDeserializer<ObjectData> DESERIALIZER = //
+            (input) -> new ObjectData(input.readLong());
+
+        private long m_val;
+
+        public ObjectData(final long val) {
+            m_val = val;
+        }
+
+        @Override
+        public int hashCode() {
+            return Long.hashCode(m_val);
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (obj instanceof ObjectData o) {
+                return o.m_val == this.m_val;
+            }
+            return false;
+        }
+
+        @Override
+        public String toString() {
+            return "ObjectData{" + m_val + "}";
+        }
+    }
+
     enum TestDataImpl implements TestData {
 
             INT(DataSpecs.INT, //
-                (access, rowIdx) -> {
-                    ((IntWriteAccess)access).setIntValue((int)rowIdx);
-                }, //
-                (data, dataIdx, rowIdx) -> {
-                    assertEquals((int)rowIdx, ((IntReadData)data).getInt(dataIdx),
-                        "wrong value at row " + rowIdx + ", data idx " + dataIdx);
-                } //
-            ),
+                (access, rowIdx) -> ((IntWriteAccess)access).setIntValue((int)rowIdx),
+                (data, dataIdx, rowIdx) -> assertEquals((int)rowIdx, ((IntReadData)data).getInt(dataIdx),
+                    wrongValueMessage(dataIdx, rowIdx))),
 
             STRING(DataSpecs.STRING, //
-                (access, rowIdx) -> {
-                    ((StringWriteAccess)access).setStringValue("str_" + rowIdx);
-                }, //
-                (data, dataIdx, rowIdx) -> {
-                    assertEquals("str_" + rowIdx, ((StringReadData)data).getString(dataIdx),
-                        "wrong value at row " + rowIdx + ", data idx " + dataIdx);
-                } //
-            ),
+                (access, rowIdx) -> ((StringWriteAccess)access).setStringValue("str_" + rowIdx),
+                (data, dataIdx, rowIdx) -> assertEquals("str_" + rowIdx, ((StringReadData)data).getString(dataIdx),
+                    wrongValueMessage(dataIdx, rowIdx))),
 
             LIST_OF_INT(DataSpecs.LIST.of(DataSpecs.INT), //
                 (access, rowIdx) -> {
@@ -244,11 +271,17 @@ class HeapBadgerWriteCursorTest {
                 (data, dataIdx, rowIdx) -> {
                     var listData = (IntReadData)((ListReadData)data).createReadData(dataIdx);
                     var list = IntStream.range(0, listData.length()).map(i -> listData.getInt(i)).toArray();
-                    assertArrayEquals(listForIdx(rowIdx), list,
-                        "wrong value at row " + rowIdx + ", data idx " + dataIdx);
+                    assertArrayEquals(listForIdx(rowIdx), list, wrongValueMessage(dataIdx, rowIdx));
 
                 } //
-            );
+            ),
+
+            OBJECT(DataSpecs.VARBINARY, //
+                (access, rowIdx) -> ((VarBinaryWriteAccess)access).setObject(new ObjectData(rowIdx),
+                    ObjectData.SERIALIZER),
+                (data, dataIdx, rowIdx) -> assertEquals(new ObjectData(rowIdx),
+                    ((VarBinaryReadData)data).getObject(dataIdx, ObjectData.DESERIALIZER),
+                    wrongValueMessage(dataIdx, rowIdx)));
 
         DataSpecWithTraits m_spec;
 
@@ -275,6 +308,10 @@ class HeapBadgerWriteCursorTest {
         @Override
         public void assertData(final NullableReadData data, final int dataIdx, final long rowIdx) {
             m_checker.assertData(data, dataIdx, rowIdx);
+        }
+
+        private static String wrongValueMessage(final int dataIdx, final long rowIdx) {
+            return "wrong value at row " + rowIdx + ", data idx " + dataIdx;
         }
     }
 }
