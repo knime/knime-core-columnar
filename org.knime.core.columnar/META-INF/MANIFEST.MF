@@ -12,6 +12,7 @@ Require-Bundle:
  org.slf4j.api;bundle-version="[1.7.2,2.0.0)"
 Export-Package: org.knime.core.columnar,
  org.knime.core.columnar.access,
+ org.knime.core.columnar.badger,
  org.knime.core.columnar.batch,
  org.knime.core.columnar.cache,
  org.knime.core.columnar.cache.data,

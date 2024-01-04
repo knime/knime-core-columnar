@@ -1,0 +1,7 @@
+Copyright (c) 2019 by KNIME AG, Switzerland and others.
+You may use this software for internal usage only.
+You may make copies of the software for internal installation and backup
+purposes only.
+All other rights are reserved by the respective copyright holders.
+You must not under no circumstances distribute any part of this software to
+any third party for any purpose.
