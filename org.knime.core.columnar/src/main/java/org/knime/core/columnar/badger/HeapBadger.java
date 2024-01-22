@@ -411,7 +411,8 @@ public class HeapBadger {
             ++m_batchLocalRowIndex;
 
             // TODO use the size tracker by Adrian
-            if (m_current_batch.sizeOf() >= m_maxBatchSizeInBytes) {
+            if (m_batchLocalRowIndex >= m_maxNumRowsPerBatch
+                    || m_current_batch.sizeOf() >= m_maxBatchSizeInBytes) {
                 System.out.println("[b]   switch to new batch");
                 // TODO if we have written more data in some columns make sure we do not loose it
                 writeCurrentBatch();
