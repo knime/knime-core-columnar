@@ -61,6 +61,7 @@ import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -146,6 +147,15 @@ class HeapBadgerWriteCursorTest {
             }, // expected cache indices
             TestDataImpl.INT, TestDataImpl.STRING // test data
         );
+    }
+
+    @Test
+    @DisplayName("error handling - failing serializer")
+    @Timeout(1)
+    void testFailingSerializer() throws IOException {
+        // TODO assert that the correct error was thrown
+        runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25},
+            new FailingSerializeObjectData());
     }
 
     @ParameterizedTest
