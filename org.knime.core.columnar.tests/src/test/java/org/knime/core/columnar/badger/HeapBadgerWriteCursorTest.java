@@ -99,6 +99,7 @@ class HeapBadgerWriteCursorTest {
     // - 4 batches
     // - Data so big that one row already surpasses the max size
     // - Settings such that one row of fixed data would surpass the max size
+    // - Test exception during serialization
     // TODO we should also test edge cases of the buffer configuration
 
     @Test
@@ -109,8 +110,7 @@ class HeapBadgerWriteCursorTest {
             26, // max num rows per batch
             Integer.MAX_VALUE, // max batch size in bytes
             new int[]{25}, // expected num rows
-            new int[][]{
-                new int[]{}, //no ints cached
+            new int[][]{new int[]{}, //no ints cached
                 new int[]{0} //one string batch cached
             }, // expected cache indices
             TestDataImpl.INT, TestDataImpl.STRING // test data
@@ -125,8 +125,23 @@ class HeapBadgerWriteCursorTest {
             24, // max num rows per batch
             Integer.MAX_VALUE, // max batch size in bytes
             new int[]{24, 1}, // expected num rows
-            new int[][]{
-                new int[]{}, //no ints cached
+            new int[][]{new int[]{}, //no ints cached
+                new int[]{0} //one string batch cached
+            }, // expected cache indices
+            TestDataImpl.INT, TestDataImpl.STRING // test data
+        );
+    }
+
+    @Test
+    @DisplayName("batching by size - int|string")
+    void testTwoBatchesBySizeStringInt() throws IOException {
+        // NB: The size of the test data is just the length
+        runFillAndCheckHeapBadgerTest( //
+            25, // num rows
+            1000, // max num rows per batch
+            48, // max batch size in bytes
+            new int[]{24, 1}, // expected num rows
+            new int[][]{new int[]{}, //no ints cached
                 new int[]{0} //one string batch cached
             }, // expected cache indices
             TestDataImpl.INT, TestDataImpl.STRING // test data
@@ -206,7 +221,8 @@ class HeapBadgerWriteCursorTest {
      * @param cache
      * @param expectedCacheDataIndices
      */
-    private static void assertDataInCache(final MockSharedObjectCache cache, final HeapCache heapCache, final int[][] expectedCacheDataIndices) {
+    private static void assertDataInCache(final MockSharedObjectCache cache, final HeapCache heapCache,
+        final int[][] expectedCacheDataIndices) {
         for (int colIdx = 0; colIdx < expectedCacheDataIndices.length; colIdx++) {
             if (expectedCacheDataIndices[colIdx] == null) {
                 continue;
@@ -395,6 +411,31 @@ class HeapBadgerWriteCursorTest {
 
         private static String wrongValueMessage(final int dataIdx, final long rowIdx) {
             return "wrong value at row " + rowIdx + ", data idx " + dataIdx;
+        }
+    }
+
+    class FailingSerializeObjectData implements TestData {
+
+        private static final ObjectSerializer<ObjectData> SERIALIZER = (output, object) -> {
+            if (object.m_val >= 10) {
+                throw new RuntimeException("This serializer is buggy");
+            }
+            output.writeLong(object.m_val);
+        };
+
+        @Override
+        public void writeTo(final WriteAccess access, final long rowIdx) {
+            ((VarBinaryWriteAccess)access).setObject(new ObjectData(rowIdx), FailingSerializeObjectData.SERIALIZER);
+        }
+
+        @Override
+        public void assertData(final NullableReadData data, final int dataIdx, final long rowIdx) {
+            throw new AssertionError("this method should not be called");
+        }
+
+        @Override
+        public DataSpecWithTraits getSpec() {
+            return DataSpecs.VARBINARY;
         }
     }
 }
