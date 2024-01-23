@@ -79,4 +79,15 @@ public interface WriteData extends ReferencedData {
      */
     ReadData close(int length);
 
+    /**
+     * The memory footprint used by the first <code>numElements</code> elements. Closing the data ({@link #close(int)})
+     * with the same length will result in an {@link ReadData} object with the same memory footprint (e.g.
+     * {@link ReadData#sizeOf()}).
+     *
+     * TODO - Is this true???
+     *
+     * @param numElements
+     * @return the memory footprint in bytes
+     */
+    long usedSizeFor(int numElements);
 }

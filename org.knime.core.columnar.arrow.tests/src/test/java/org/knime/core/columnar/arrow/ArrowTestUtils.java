@@ -461,6 +461,12 @@ public final class ArrowTestUtils {
         }
 
         @Override
+        public long usedSizeFor(final int numElements) {
+            // Does not matter for this test data
+            return 100;
+        }
+
+        @Override
         public int capacity() {
             return m_vector.getValueCapacity();
         }
@@ -555,6 +561,12 @@ public final class ArrowTestUtils {
 
         @Override
         public long sizeOf() {
+            // Does not matter for this test data
+            return 100;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
             // Does not matter for this test data
             return 100;
         }
@@ -738,6 +750,12 @@ public final class ArrowTestUtils {
 
         @Override
         public long sizeOf() {
+            // Does not matter for this test data
+            return 100;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
             // Does not matter for this test data
             return 100;
         }

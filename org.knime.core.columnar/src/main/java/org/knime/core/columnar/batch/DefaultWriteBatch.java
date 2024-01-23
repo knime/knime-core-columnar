@@ -95,4 +95,12 @@ public final class DefaultWriteBatch extends AbstractBatch<NullableWriteData> im
         return new DefaultReadBatch(datas);
     }
 
+    @Override
+    public long usedSizeFor(final int numElements) {
+        var totalSize = 0L;
+        for (var d: m_data) {
+            totalSize += d.usedSizeFor(numElements);
+        }
+        return totalSize;
+    }
 }

@@ -230,6 +230,10 @@ public final class DecoratingData {
             return m_delegate.sizeOf();
         }
 
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return m_delegate.usedSizeFor(numElements);
+        }
     }
 
 }
