@@ -357,7 +357,7 @@ public class HeapBadger {
 
         private WriteBatch m_current_batch;
 
-        private final ColumnarWriteAccess[] m_accessesToTheCurrentBatchs;
+        private final ColumnarWriteAccess[] m_accessesToTheCurrentBatch;
 
         private int m_batchLocalRowIndex;
 
@@ -381,12 +381,11 @@ public class HeapBadger {
 
             final ColumnarSchema schema = store.getSchema();
             final int numColumns = schema.numColumns();
-            m_accessesToTheCurrentBatchs = new ColumnarWriteAccess[numColumns];
+            m_accessesToTheCurrentBatch = new ColumnarWriteAccess[numColumns];
             m_heapCacheBuffers = HeapCacheBuffers.createHeapCacheBuffers(schema);
             for (int c = 0; c < numColumns; ++c) {
                 ColumnarAccessFactory factory = ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(c));
-                m_accessesToTheCurrentBatchs[c] = factory.createWriteAccess(() -> m_batchLocalRowIndex);
-                m_heapCacheBuffers[c].init(m_maxNumRowsPerBatch);
+                m_accessesToTheCurrentBatch[c] = factory.createWriteAccess(() -> m_batchLocalRowIndex);
             }
 
             switchToNextBatch();
@@ -397,7 +396,7 @@ public class HeapBadger {
             final BufferedAccessRow bufferedRow = m_buffers[row];
 
             // Set the data from the buffer
-            for (int col = 0; col < m_accessesToTheCurrentBatchs.length; ++col) {
+            for (int col = 0; col < m_accessesToTheCurrentBatch.length; ++col) {
                 var access = bufferedRow.getAccess(col);
 
                 // Put all string and var binary data into a heap list/array to be added to the cache later.
@@ -406,13 +405,16 @@ public class HeapBadger {
                 m_heapCacheBuffers[col].getAccess(m_batchLocalRowIndex).setFrom(access);
 
                 // Write to batch
-                m_accessesToTheCurrentBatchs[col].setFrom(access);
+                m_accessesToTheCurrentBatch[col].setFrom(access);
             }
             ++m_batchLocalRowIndex;
 
-            // TODO use the size tracker by Adrian
+            System.out.println("[b]       localRowIdx:        " + m_batchLocalRowIndex);
+            System.out.println("[b]       maxNumRowsPerBatch: " + m_maxNumRowsPerBatch);
+            System.out.println("[b]       sizeof batch:       " + m_current_batch.usedSizeFor(m_batchLocalRowIndex));
+            System.out.println("[b]       max batch sizeof:   " + m_maxBatchSizeInBytes);
             if (m_batchLocalRowIndex >= m_maxNumRowsPerBatch
-                    || m_current_batch.sizeOf() >= m_maxBatchSizeInBytes) {
+                    || m_current_batch.usedSizeFor(m_batchLocalRowIndex) > m_maxBatchSizeInBytes) {
                 System.out.println("[b]   switch to new batch");
                 // TODO if we have written more data in some columns make sure we do not loose it
                 writeCurrentBatch();
@@ -442,8 +444,8 @@ public class HeapBadger {
             m_current_batch = m_writer.create(m_maxNumRowsPerBatch);
 
             // Connect the accesses with the current write batch
-            for (int col = 0; col < m_accessesToTheCurrentBatchs.length; col++) {
-                m_accessesToTheCurrentBatchs[col].setData(m_current_batch.get(col));
+            for (int col = 0; col < m_accessesToTheCurrentBatch.length; col++) {
+                m_accessesToTheCurrentBatch[col].setData(m_current_batch.get(col));
                 m_heapCacheBuffers[col].init(m_maxNumRowsPerBatch);
             }
 

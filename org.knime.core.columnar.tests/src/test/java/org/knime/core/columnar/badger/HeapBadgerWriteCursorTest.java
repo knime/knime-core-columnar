@@ -138,10 +138,10 @@ class HeapBadgerWriteCursorTest {
     void testTwoBatchesBySizeStringInt() throws IOException {
         // NB: The size of the test data is just the length
         runFillAndCheckHeapBadgerTest( //
-            25, // num rows
+            26, // num rows
             1000, // max num rows per batch
             48, // max batch size in bytes
-            new int[]{24, 1}, // expected num rows
+            new int[]{25, 1}, // expected num rows
             new int[][]{new int[]{}, //no ints cached
                 new int[]{0} //one string batch cached
             }, // expected cache indices
