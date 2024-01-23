@@ -52,6 +52,8 @@ package org.knime.core.columnar;
  */
 public interface WriteData extends ReferencedData {
 
+    // TODO do we still need expand and capacity?
+
     /**
      * Expand the data, potentially increasing capacity. Note that the capacity to which the data will be expanded might
      * be larger than the provided minimum capacity.
