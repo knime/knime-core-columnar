@@ -63,17 +63,15 @@ import org.knime.core.columnar.arrow.ArrowBatchStore;
 import org.knime.core.columnar.arrow.ArrowColumnStoreFactory;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
-import org.knime.core.table.access.IntAccess.IntWriteAccess;
+import org.knime.core.table.access.StringAccess.StringWriteAccess;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpecs;
 import org.knime.core.table.schema.DataSpecs.DataSpecWithTraits;
 
 /*
- * Benchmark Ideas:
- * - with one column to serialize and many not to serialize
- * - with many columns to serialize
+ * TODO this contains copied code from IntDataBenchmark - we should do a proper benchmark setup
  */
-final class IntDataBenchmark {
+final class ShortStringDataBenchmark {
 
     private static final int NUM_TRIALS = 10;
 
@@ -113,8 +111,8 @@ final class IntDataBenchmark {
     // TODO setup before each trail
     void setup() throws IOException {
         var schema = ColumnarSchema
-            .of(IntStream.range(0, m_numCols).mapToObj(i -> DataSpecs.INT).toArray(DataSpecWithTraits[]::new));
-        var testFile = createFileHandle("benchIntColumns");
+            .of(IntStream.range(0, m_numCols).mapToObj(i -> DataSpecs.STRING).toArray(DataSpecWithTraits[]::new));
+        var testFile = createFileHandle("benchShortStringColumns");
         m_store = m_storeFactory.createStore(schema, testFile);
         m_objectCache = new WritableObjectCacheTestStore(m_store);
     }
@@ -125,6 +123,8 @@ final class IntDataBenchmark {
         m_store.close();
         m_store.getFileHandle().delete();
     }
+
+    private static final String[] VALUES = {"A", "B", "C", "D", "E", "F", "G", "H"};
 
     // TODO This is the benchmark method
     // @Benchmark
@@ -139,13 +139,13 @@ final class IntDataBenchmark {
 
                 // Loop over columns
                 for (int colIdx = 0; colIdx < m_numCols; colIdx++) {
-                    var intAccess = (IntWriteAccess)rowAccess.getWriteAccess(colIdx);
-                    var val = (int)(rowIdx + colIdx);
+                    var stringAccess = (StringWriteAccess)rowAccess.getWriteAccess(colIdx);
+                    var val = VALUES[((int)rowIdx + colIdx) % VALUES.length];
                     if (m_missingValues == MissingValues.ALL_
-                        || (m_missingValues == MissingValues.SOME && val % 10 == 0)) {
-                        intAccess.setMissing();
+                        || (m_missingValues == MissingValues.SOME && rowIdx % 10 == 0)) {
+                        stringAccess.setMissing();
                     } else {
-                        intAccess.setIntValue(val);
+                        stringAccess.setStringValue(val);
                     }
                 }
             }
@@ -165,13 +165,13 @@ final class IntDataBenchmark {
 
                 // Loop over columns
                 for (int colIdx = 0; colIdx < m_numCols; colIdx++) {
-                    var intAccess = (IntWriteAccess)rowAccess.getWriteAccess(colIdx);
-                    var val = (int)(rowIdx + colIdx);
+                    var stringAccess = (StringWriteAccess)rowAccess.getWriteAccess(colIdx);
+                    var val = VALUES[((int)rowIdx + colIdx) % VALUES.length];
                     if (m_missingValues == MissingValues.ALL_
-                        || (m_missingValues == MissingValues.SOME && val % 10 == 0)) {
-                        intAccess.setMissing();
+                        || (m_missingValues == MissingValues.SOME && rowIdx % 10 == 0)) {
+                        stringAccess.setMissing();
                     } else {
-                        intAccess.setIntValue(val);
+                        stringAccess.setStringValue(val);
                     }
                 }
             }
@@ -184,7 +184,7 @@ final class IntDataBenchmark {
     @Test
     void runBenchmarksHeapBadger() throws IOException {
         System.out.println("--------------------------------");
-        System.out.println("IntData - HeapBadger implementation");
+        System.out.println("ShortStringData - HeapBadger implementation");
         runBenchmarks(() -> benchHeapBadger());
         System.out.println("--------------------------------");
     }
@@ -192,7 +192,7 @@ final class IntDataBenchmark {
     @Test
     void runBenchmarksOldImpl() throws IOException {
         System.out.println("--------------------------------");
-        System.out.println("IntData - Old implementation");
+        System.out.println("ShortStringData - Old implementation");
         runBenchmarks(() -> benchOldImpl());
         System.out.println("--------------------------------");
     }
@@ -202,7 +202,6 @@ final class IntDataBenchmark {
     }
 
     void runBenchmarks(final BenchmarkFn benchmarkFn) throws IOException {
-
         for (var numRows : NUM_ROWS_OPTIONS) {
             m_numRows = numRows;
             for (var numCols : NUM_COLS_OPTIONS) {
