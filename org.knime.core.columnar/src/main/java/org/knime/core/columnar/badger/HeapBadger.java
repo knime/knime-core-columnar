@@ -78,10 +78,10 @@ public class HeapBadger {
 
     // TODO we should make this depend on the size of the data that we know about in advance
     /** max number of rows in one batch */
-    private static final int DEFAULT_MAX_NUM_ROWS_PER_BATCH = 500;
+    private static final int DEFAULT_MAX_NUM_ROWS_PER_BATCH = (1 << 15) - 750;
 
     /** max size of a batch */
-    private static final int DEFAULT_MAX_BATCH_SIZE_IN_BYTES = 5000;
+    private static final int DEFAULT_MAX_BATCH_SIZE_IN_BYTES = 1 << 26;
 
     private final BadgerWriteCursor m_writeCursor;
 
