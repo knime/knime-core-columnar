@@ -103,11 +103,7 @@ public class HeapBadger {
         m_store = store;
 
         new Thread(() -> {
-            try {
-                async.serializeLoop(m_badger);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e); // TODO exception handling
-            }
+            async.serializeLoop(m_badger);
         }).start();
     }
 
@@ -143,14 +139,21 @@ public class HeapBadger {
         private final int m_bufferSize;
 
         private final ReentrantLock m_lock;
+
         private final Condition m_notEmpty;
+
         private final Condition m_notFull;
+
         private final Condition m_finished;
+
+        private Throwable m_exception = null; // only filled if an exception occurred, needs to be re-thrown at the next call of the serializer
+
         private boolean m_finishing;
 
-
         private final int m_wrap_at;
+
         private int m_current;
+
         private int m_bound;
 
         private long m_offset;
@@ -163,7 +166,6 @@ public class HeapBadger {
             m_notEmpty = m_lock.newCondition();
             m_notFull = m_lock.newCondition();
             m_finished = m_lock.newCondition();
-
 
             // initialize indices:
 
@@ -207,7 +209,7 @@ public class HeapBadger {
          * @return index of buffer to modify
          * @throws InterruptedException if interrupted while waiting
          */
-        int forward() throws InterruptedException {
+        int forward() throws InterruptedException, IOException {
 
             // TODO: throw Exception if finishing==true?
             //       @throws IllegalStateException if called after {@link #finish}
@@ -217,10 +219,13 @@ public class HeapBadger {
             //        m_buffers[m_current % m_bufferSize].setFrom(m_access);
             //    }
 
+            rethrowExceptionInErrorCase();
+
             final ReentrantLock lock = this.m_lock;
+            System.out.println("[c] ACQUIRING LOCK IN FORWARD");
             lock.lock();
-            try
-            {
+            System.out.println("[c] LOCKED IN FORWARD");
+            try {
                 System.out.println("[c]  Q m_current = " + m_current);
                 System.out.println("[c]  Q m_bound = " + m_bound);
                 System.out.println("[c]  Q m_offset = " + m_offset);
@@ -228,7 +233,7 @@ public class HeapBadger {
                     m_current = 0;
                     m_offset += m_wrap_at;
                 }
-                while (m_current == m_bound) {
+                while (m_current == m_bound && m_exception == null) {
                     System.out.println("[c]  Q -> m_notFull.await();");
                     m_notFull.await();
                     System.out.println("[c]  Q <- m_notFull.await();");
@@ -237,11 +242,12 @@ public class HeapBadger {
                 System.out.println("[c]  Q m_current = " + m_current);
                 System.out.println("[c]  Q m_bound = " + m_bound);
                 System.out.println("[c]  Q m_offset = " + m_offset);
-            }
-            finally
-            {
+            } finally {
+                System.out.println("[c] UNLOCKING IN FORWARD");
                 lock.unlock();
             }
+
+            rethrowExceptionInErrorCase();
 
             return m_current % m_bufferSize;
         }
@@ -258,28 +264,43 @@ public class HeapBadger {
         /**
          * @throws InterruptedException if interrupted while waiting
          */
-        void finish() throws InterruptedException {
+        void finish() throws InterruptedException, IOException {
             final ReentrantLock lock = this.m_lock;
             lock.lock();
-            try
-            {
+            try {
                 m_finishing = true;
                 m_notEmpty.signal();
-                m_finished.await();
-            }
-            finally
-            {
+                m_finished.await(); // is reached definitely if errors occurred
+            } finally {
                 lock.unlock();
+            }
+
+            rethrowExceptionInErrorCase();
+        }
+
+        private void rethrowExceptionInErrorCase() throws InterruptedException, IOException {
+            if (m_exception != null) {
+                if (m_exception instanceof InterruptedException interruptedException) {
+                    throw interruptedException;
+                } else if (m_exception instanceof IOException ioException) {
+                    throw ioException;
+                }
+                throw new IOException(m_exception);
             }
         }
 
         interface Serializer {
             void serialize(int previous_head, int head) throws IOException;
+
             void finish() throws IOException;
         }
 
-        void serializeLoop(final Serializer serializer) throws InterruptedException {
-
+        /**
+         * This worker method runs in a separate thread and serializes entries when they become available.
+         *
+         * @param serializer
+         */
+        void serializeLoop(final Serializer serializer) {
             final ReentrantLock lock = this.m_lock;
             int previous_head = 0;
             int head;
@@ -287,7 +308,9 @@ public class HeapBadger {
             while (true) {
                 System.out.println("[b] - 0 -");
                 System.out.println("[b] - previous_head = " + previous_head);
+                System.out.println("[b] ACQUIRING LOCK IN LOOP");
                 lock.lock();
+                System.out.println("[b] LOCKED IN LOOP");
                 try {
                     head = m_current;
                     doFinish = m_finishing;
@@ -296,7 +319,19 @@ public class HeapBadger {
                     System.out.println("[b] - doFinish = " + doFinish);
                     while (head == previous_head && !doFinish) {
                         System.out.println("[b] - -> m_notEmpty.await();");
-                        m_notEmpty.await();
+                        try {
+                            m_notEmpty.await();
+                        } catch (InterruptedException ex) {
+                            // in case of an exception, we remember it and quit the serialization loop
+                            m_exception = ex;
+                            // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
+                            m_notFull.signal();
+                            if (doFinish) {
+                                m_finished.signal();
+                            }
+                            System.out.println("[b] ERROR EXIT a) because of " + ex.getMessage());
+                            return;
+                        }
                         System.out.println("[b] - <- m_notEmpty.await();");
                         head = m_current;
                         doFinish = m_finishing;
@@ -304,6 +339,7 @@ public class HeapBadger {
                         System.out.println("[b] - doFinish = " + doFinish);
                     }
                 } finally {
+                    System.out.println("[b] UNLOCKING IN LOOP");
                     lock.unlock();
                 }
 
@@ -315,19 +351,32 @@ public class HeapBadger {
                         serializer.finish();
                     }
                 } catch (IOException e) {
-                    throw new RuntimeException(e); // TODO: how to handle IOException ???
+                    // in case of an exception, we remember it and quit the serialization loop
+                    m_exception = e;
+                    lock.lock();
+                    // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
+                    m_notFull.signal();
+                    if (doFinish) {
+                        m_finished.signal();
+                    }
+                    lock.unlock();
+                    System.out.println("[b] ERROR EXIT b) because of " + e.getMessage());
+                    return;
                 }
 
                 System.out.println("[b] - 3 -");
+                System.out.println("[b] ACQUIRING LOCK AT END OF ITERATION");
                 lock.lock();
+                System.out.println("[b] LOCKED AT END OF ITERATION");
                 try {
-                    m_bound = ( head + m_bufferSize ) % m_wrap_at;
+                    m_bound = (head + m_bufferSize) % m_wrap_at;
                     m_notFull.signal();
                     if (doFinish) {
                         m_finished.signal();
                         return;
                     }
                 } finally {
+                    System.out.println("[b] UNLOCKING AT END OF ITERATION");
                     lock.unlock();
                 }
                 System.out.println("[b] - 4 -");
@@ -336,7 +385,6 @@ public class HeapBadger {
             }
         }
     }
-
 
     // --------------------------------------------------------------------
     //
@@ -405,7 +453,11 @@ public class HeapBadger {
                 m_heapCacheBuffers[col].getAccess(m_batchLocalRowIndex).setFrom(access);
 
                 // Write to batch
-                m_accessesToTheCurrentBatch[col].setFrom(access);
+                try {
+                    m_accessesToTheCurrentBatch[col].setFrom(access);
+                } catch (Exception e) { // NOSONAR: we really want to catch ALL extensions that might be thrown by serializer
+                    throw new IOException("Error during serialization: " + e.getMessage(), e);
+                }
             }
             ++m_batchLocalRowIndex;
 
@@ -512,19 +564,22 @@ public class HeapBadger {
                 return true;
             }
 
-            m_buffers[m_current].setFrom(m_access);
             try {
+                m_buffers[m_current].setFrom(m_access);
                 System.out.println("[c]   -> m_queue.forward()");
                 m_current = m_queue.forward();
-                System.out.println("[c]   <- m_queue.forward()");
-                System.out.println("[c]   m_current = " + m_current);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e); // TODO: how to handle InterruptedException ???
+            } catch (IOException | InterruptedException ex) {
+                // can throw IOException if serialization of any previous row has failed
+                // can throw InterruptedException if the cursor had to wait for free buffers to write to and got interrupted
+                throw new RuntimeException(ex);
             }
+            System.out.println("[c]   <- m_queue.forward()");
+            System.out.println("[c]   m_current = " + m_current);
             return true;
         }
 
         // TODO rename to finish() ???
+        //      or allow writing after calling flush() once
         @Override
         public void flush() throws IOException {
             System.out.println("[c] BadgerWriteCursor.flush");
@@ -534,13 +589,13 @@ public class HeapBadger {
                 m_queue.finish();
                 System.out.println("[c]   <- m_queue.finish()");
             } catch (InterruptedException e) {
-                throw new RuntimeException(e); // TODO: how to handle InterruptedException ???
+                throw new RuntimeException(e); // let's pretend it is a RuntimeException?
             }
         }
 
         @Override
         public void close() throws IOException {
-            // TODO abort, release resources
+            // TODO abort, release resources, ignore exceptions that might have occurred while serializing in m_queue
         }
 
         @Override
