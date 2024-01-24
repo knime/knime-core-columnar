@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.badger;
 
+import static org.junit.Assert.fail;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -153,9 +154,29 @@ class HeapBadgerWriteCursorTest {
     @DisplayName("error handling - failing serializer")
     @Timeout(1)
     void testFailingSerializer() throws IOException {
-        // TODO assert that the correct error was thrown
-        runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25},
-            new FailingSerializeObjectData());
+       try {
+            runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25},
+                new FailingSerializeObjectData());
+       } catch (RuntimeException e) {
+           assertEquals("java.io.IOException: Error during serialization: This serializer is buggy", e.getMessage());
+           return;
+       }
+       fail("Expected an exception to be thrown");
+    }
+
+    @Test
+    @DisplayName("error handling - interrupted serializer")
+    @Timeout(1)
+    void testInterruptedSerializer() throws IOException {
+        try {
+            Thread.currentThread().interrupt(); // to cause InterruptExceptions on await
+            runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25},
+                TestDataImpl.INT);
+        } catch (RuntimeException e) {
+            assertEquals("java.lang.InterruptedException", e.getMessage());
+            return;
+        }
+        fail("Expected an exception to be thrown");
     }
 
     @ParameterizedTest
