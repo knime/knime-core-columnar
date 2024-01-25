@@ -10,7 +10,9 @@ Bundle-ActivationPolicy: lazy
 Export-Package: org.knime.core.data.columnar,
  org.knime.core.data.columnar.domain,
  org.knime.core.data.columnar.schema,
- org.knime.core.data.columnar.table
+ org.knime.core.data.columnar.table,
+ org.knime.core.data.columnar.table.virtual;x-internal:=true,
+ org.knime.core.data.columnar.table.virtual.reference;x-internal:=true
 Bundle-ClassPath: .
 Require-Bundle: org.knime.core.columnar;bundle-version="[5.3.0,6.0.0)",
  org.knime.core;bundle-version="[5.3.0,6.0.0)",

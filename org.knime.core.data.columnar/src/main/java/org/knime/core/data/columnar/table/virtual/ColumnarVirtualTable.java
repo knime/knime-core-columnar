@@ -467,6 +467,19 @@ public final class ColumnarVirtualTable {
     }
 
     /**
+     * Creates a single-column {@link ColumnarVirtualTable} that holds the result of executing the given expression on
+     * the current table
+     *
+     * @param expression The expression to evaluate
+     * @param newColumnName The desired name of the resulting column
+     * @return A table holding a single column with the expression results
+     */
+    public ColumnarVirtualTable map(final String expression, final String newColumnName) {
+        var expressionMapper = new ExpressionMapperFactory(expression, m_valueSchema, newColumnName);
+        return map(expressionMapper, expressionMapper.getInputColumnIndices());
+    }
+
+    /**
      * Adds a (progress) observer to the table.
      *
      * @param factory for the observer

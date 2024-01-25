@@ -36,12 +36,16 @@
    <extension
          point="org.knime.core.data.columnar.Persistence">
       <persistence
+            persistable="org.knime.core.data.columnar.table.virtual.ColumnarConcatenater$RowIDGenerator"
+            persistor="org.knime.core.data.columnar.table.virtual.ColumnarConcatenater$RowIDGenerator$RowIDGeneratorPersistor">
+      </persistence>
+      <persistence
             persistable="org.knime.core.data.columnar.table.virtual.TableCasterFactory"
             persistor="org.knime.core.data.columnar.table.virtual.TableCasterFactory$TableCasterFactoryPersistor">
       </persistence>
       <persistence
-            persistable="org.knime.core.data.columnar.table.virtual.ColumnarConcatenater$RowIDGenerator"
-            persistor="org.knime.core.data.columnar.table.virtual.ColumnarConcatenater$RowIDGenerator$RowIDGeneratorPersistor">
+            persistable="org.knime.core.data.columnar.table.virtual.ExpressionMapperFactory"
+            persistor="org.knime.core.data.columnar.table.virtual.ExpressionMapperFactory$ExpressionMapperFactoryPersistor">
       </persistence>
    </extension>
 </plugin>
