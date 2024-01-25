@@ -64,7 +64,6 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
-import org.knime.core.data.DataType;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
@@ -394,17 +393,20 @@ public final class ColumnarVirtualTable {
     }
 
     private static ColumnarValueSchema appendRowIndex(final ColumnarValueSchema schema) {
-        final DataType LONG = LongCell.TYPE;
-
         final int numColumns = schema.numColumns();
         var valueFactories = new ValueFactory<?, ?>[numColumns + 1];
-        var colSpecs = new DataColumnSpec[numColumns + 1];
         for (int i = 0; i < numColumns; i++) {
             valueFactories[ i ] = schema.getValueFactory(i);
+        }
+        valueFactories[ numColumns ] = ValueFactoryUtils.getValueFactory(LongCell.TYPE, null);
+
+        final int numSpecColumns = schema.getSourceSpec().getNumColumns();
+        var colSpecs = new DataColumnSpec[numSpecColumns + 1];
+        for (int i = 0; i < numSpecColumns; i++) {
             colSpecs[ i ] = schema.getSourceSpec().getColumnSpec(i);
         }
-        valueFactories[ numColumns ] = ValueFactoryUtils.getValueFactory(LONG, null);
-        colSpecs[ numColumns ] = new DataColumnSpecCreator("row index", LONG).createSpec();
+        colSpecs[ numSpecColumns ] = new DataColumnSpecCreator("row index", LongCell.TYPE).createSpec();
+
         return ColumnarValueSchemaUtils.create(new DataTableSpec(colSpecs), valueFactories);
     }
 
