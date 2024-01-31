@@ -72,11 +72,13 @@ import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.table.access.IntAccess.IntWriteAccess;
 import org.knime.core.table.access.ListAccess.ListWriteAccess;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
+import org.knime.core.table.access.StructAccess.StructWriteAccess;
 import org.knime.core.table.access.VarBinaryAccess.VarBinaryWriteAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.cursor.WriteCursor;
@@ -154,14 +156,13 @@ class HeapBadgerWriteCursorTest {
     @DisplayName("error handling - failing serializer")
     @Timeout(1)
     void testFailingSerializer() throws IOException {
-       try {
-            runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25},
-                new FailingSerializeObjectData());
-       } catch (RuntimeException e) {
-           assertEquals("java.io.IOException: Error during serialization: This serializer is buggy", e.getMessage());
-           return;
-       }
-       fail("Expected an exception to be thrown");
+        try {
+            runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25}, new FailingSerializeObjectData());
+        } catch (RuntimeException e) {
+            assertEquals("java.io.IOException: Error during serialization: This serializer is buggy", e.getMessage());
+            return;
+        }
+        fail("Expected an exception to be thrown");
     }
 
     @Test
@@ -170,8 +171,7 @@ class HeapBadgerWriteCursorTest {
     void testInterruptedSerializer() throws IOException {
         try {
             Thread.currentThread().interrupt(); // to cause InterruptExceptions on await
-            runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25},
-                TestDataImpl.INT);
+            runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25}, TestDataImpl.INT);
         } catch (RuntimeException e) {
             assertEquals("java.lang.InterruptedException", e.getMessage());
             return;
@@ -403,6 +403,18 @@ class HeapBadgerWriteCursorTest {
                     var list = IntStream.range(0, listData.length()).map(i -> listData.getInt(i)).toArray();
                     assertArrayEquals(listForIdx(rowIdx), list, wrongValueMessage(dataIdx, rowIdx));
 
+                } //
+            ), STRUCT_OF_STRING(DataSpecs.STRUCT.of(DataSpecs.STRING, DataSpecs.STRING), //
+                (access, rowIdx) -> {
+                    var structAccess = (StructWriteAccess)access;
+                    ((StringWriteAccess)structAccess.getWriteAccess(0)).setStringValue("A" + rowIdx);
+                    ((StringWriteAccess)structAccess.getWriteAccess(1)).setStringValue("B" + rowIdx);
+                }, //
+                (data, dataIdx, rowIdx) -> {
+                    var accessA = (StringReadData)((StructReadData)data).getReadDataAt(0);
+                    var accessB = (StringReadData)((StructReadData)data).getReadDataAt(1);
+                    assertEquals("A" + rowIdx, accessA.getString(dataIdx), wrongValueMessage(dataIdx, rowIdx));
+                    assertEquals("B" + rowIdx, accessB.getString(dataIdx), wrongValueMessage(dataIdx, rowIdx));
                 } //
             ),
 

@@ -55,6 +55,7 @@ import org.knime.core.columnar.cache.DataIndex;
 import org.knime.core.columnar.cache.object.CachedDataFactoryBuilder;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.StringAccess.StringReadAccess;
+import org.knime.core.table.access.StructAccess.StructReadAccess;
 import org.knime.core.table.access.VarBinaryAccess.VarBinaryReadAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -275,12 +276,33 @@ public final class HeapCacheBuffers {
 
         @Override
         public WriteAccess getAccess(final int index) {
-            throw new UnsupportedOperationException("Struct Access not implemented yet");
+            return new StructHeapCacheBufferWriteAccess(index);
         }
 
         @Override
         public Object[] getArray() {
             return Arrays.stream(m_innerFactories).map(f -> f.getArray()).toArray();
+        }
+
+        private class StructHeapCacheBufferWriteAccess implements WriteAccess {
+            private int m_index;
+
+            private StructHeapCacheBufferWriteAccess(final int index) {
+                m_index = index;
+            }
+
+            @Override
+            public void setMissing() {
+                // NOOP
+            }
+
+            @Override
+            public void setFrom(final ReadAccess access) {
+                final StructReadAccess structAccess = (StructReadAccess)access;
+                for (int i = 0; i < m_innerFactories.length; i++) {
+                    m_innerFactories[i].getAccess(m_index).setFrom(structAccess.getAccess(i));
+                }
+            }
         }
     }
 }
