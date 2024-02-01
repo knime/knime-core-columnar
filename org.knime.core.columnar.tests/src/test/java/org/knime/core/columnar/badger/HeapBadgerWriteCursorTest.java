@@ -237,7 +237,7 @@ class HeapBadgerWriteCursorTest {
     ) throws IOException {
         try (TestBatchStore batchStore = createTestStore(testData)) {
             var cache = new MockSharedObjectCache();
-            var badger = new HeapBadger(batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes, cache);
+            var badger = new HeapBadger(batchStore, batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes, cache);
             writeToHeapBadger(badger, testData, numRows);
 
             assertWrittenData(testData, expectedNumRows, batchStore);

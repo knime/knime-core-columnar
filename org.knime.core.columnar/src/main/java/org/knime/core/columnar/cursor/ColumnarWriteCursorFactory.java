@@ -54,6 +54,7 @@ import java.io.IOException;
 
 import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.access.ColumnarWriteAccess;
+import org.knime.core.columnar.badger.BatchingWritable;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -89,7 +90,11 @@ public final class ColumnarWriteCursorFactory {
      * @return the {@link WriteCursor}
      */
     public static ColumnarWriteCursor createWriteCursor(final BatchStore store) {
-        return new ColumnarWriteCursorImpl(store);
+        if (store instanceof BatchingWritable batchingStore) {
+            return batchingStore.getBatchingWriteCursor();
+        } else {
+            return new ColumnarWriteCursorImpl(store);
+        }
     }
 
     /**
@@ -112,8 +117,7 @@ public final class ColumnarWriteCursorFactory {
      * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
      * @author Marc Bux, KNIME GmbH, Berlin, Germany
      */
-    private static final class ColumnarWriteCursorImpl
-        implements ColumnarWriteCursor, ColumnDataIndex, WriteAccessRow {
+    private static final class ColumnarWriteCursorImpl implements ColumnarWriteCursor, ColumnDataIndex, WriteAccessRow {
 
         // the initial capacity (in number of held elements) of a single chunk
         // arrow has a minimum capacity of 2
@@ -172,7 +176,6 @@ public final class ColumnarWriteCursorFactory {
         public long getNumForwards() {
             return m_numForwards;
         }
-
 
         @Override
         public int size() {
