@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import static java.util.stream.Collectors.toList;
+import static org.knime.core.data.columnar.table.virtual.persist.TableTransformNodeSettingsPersistor.TransformLoadContext.createTransformLoadContext;
 
 import java.io.Closeable;
 import java.io.File;
@@ -139,7 +140,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     /**
      * Fragment of the workflow's VirtualTable that corresponds to this VirtualTableExtensionTable. Contains all
-     * transformations, that are saved as part of this VirtualTableExtensionTable.
+     * transformations, that are saved as part of this VirtualTableExtensionTable. Source transforms refer to one of the
+     * reference tables and have the most basic properties (CursorType.BASIC, unknown size).
      */
     private final TableTransform m_tableTransformFragment;
 
@@ -221,16 +223,18 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         final ReferenceTable[] referenceTables, final LoadContext ctx)
         throws JsonProcessingException, InvalidSettingsException {
         var objectMapper = new ObjectMapper();
+        var referenceTableMap = Stream.of(referenceTables).collect(Collectors.toMap(ReferenceTable::getId, r -> r));
         if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT)) {
             return TableTransformNodeSettingsPersistor.load(settings.getNodeSettings(CFG_VIRTUAL_TABLE_FRAGMENT),
-                ctx::getDataRepository);
+                createTransformLoadContext(ctx.getDataRepository(), referenceTableMap));
         } else if (settings.containsKey(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)) {
             // before 5.1 we stored the transform as JSON
             return TableTransformSerializer
-                .load(objectMapper.readTree(settings.getString(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)));
+                .load(objectMapper.readTree(settings.getString(CFG_VIRTUAL_TABLE_FRAGMENT_PRE_5_1)), referenceTableMap);
         } else {
             // in 4.5 we stored a list of TableTransformSpecs as opposed to a complete TableTransform or VirtualTable
-            var transformSpecs = reconstructSpecsFromStringArray(settings.getStringArray(CFG_TRANSFORMSPECS));
+            var transformSpecs =
+                reconstructSpecsFromStringArray(settings.getStringArray(CFG_TRANSFORMSPECS), referenceTableMap);
             var sourceSpecs = Stream.of(referenceTables)//
                     // all KNIME tables know their size and therefore are LookaheadRowAccessibles
                     .map(t -> new SourceTransformSpec(t.getId(), new SourceTableProperties(t.getSchema(), CursorType.LOOKAHEAD)))//
@@ -247,17 +251,17 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         }
     }
 
-    private static List<TableTransformSpec> reconstructSpecsFromStringArray(final String[] serializedSpecs)
-            throws JsonProcessingException {
-            final List<TableTransformSpec> specs = new ArrayList<>(serializedSpecs.length);
-            var objectMapper = new ObjectMapper();
-            for (String serializedSpec : serializedSpecs) {
-                TableTransformSpec spec =
-                    TableTransformSerializer.deserializeTransformSpec(objectMapper.readTree(serializedSpec));
-                specs.add(spec);
-            }
-            return specs;
+    private static List<TableTransformSpec> reconstructSpecsFromStringArray(final String[] serializedSpecs,
+        final Map<UUID, ReferenceTable> referenceTableMap) throws JsonProcessingException {
+        final List<TableTransformSpec> specs = new ArrayList<>(serializedSpecs.length);
+        var objectMapper = new ObjectMapper();
+        for (String serializedSpec : serializedSpecs) {
+            TableTransformSpec spec = TableTransformSerializer
+                .deserializeTransformSpec(objectMapper.readTree(serializedSpec), referenceTableMap);
+            specs.add(spec);
         }
+        return specs;
+    }
 
     /**
      * Constructor.

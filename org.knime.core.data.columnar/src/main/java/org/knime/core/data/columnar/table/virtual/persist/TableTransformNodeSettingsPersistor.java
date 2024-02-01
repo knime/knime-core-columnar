@@ -63,7 +63,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -74,6 +73,8 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.WrappedColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.columnar.table.virtual.persist.Persistor.LoadContext;
+import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.node.InvalidSettingsException;
@@ -125,7 +126,6 @@ public final class TableTransformNodeSettingsPersistor {
         while (!transformsToTraverse.isEmpty()) {
             final TableTransform transform = transformsToTraverse.pop();
 
-
             if (transformIds.containsKey(transform)) {
                 continue;
             }
@@ -161,33 +161,76 @@ public final class TableTransformNodeSettingsPersistor {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    public interface LoadContext {
+    public interface TransformLoadContext extends LoadContext {
 
         /**
-         * @return the data repository to use for reading filestores
+         * Maps a given identifier to the according {@link ReferenceTable}.
+         *
+         * @param id the identifier of the source reference table
+         * @return the {@link ReferenceTable}
+         * @throws IllegalArgumentException if there is no source with the given identifier
          */
-        IDataRepository getDataRepository();
+        ReferenceTable getReferenceTable(UUID id) throws IllegalArgumentException;
+
+        /**
+         * Helper to create a load context.
+         *
+         * @param dataRepository the data repository
+         * @param sourceMap a map from source ids to the reference tables
+         * @return a {@link TransformLoadContext}
+         */
+        static TransformLoadContext createTransformLoadContext(final IDataRepository dataRepository,
+            final Map<UUID, ReferenceTable> sourceMap) {
+            return new TransformLoadContext() {
+
+                @Override
+                public IDataRepository getDataRepository() {
+                    return dataRepository;
+                }
+
+                @Override
+                public ReferenceTable getReferenceTable(final UUID id) {
+                    if (sourceMap.containsKey(id)) {
+                        return sourceMap.get(id);
+                    } else {
+                        throw new IllegalArgumentException(
+                            "Deserialization of virtual table failed. The source with the id '" + id
+                                + "' does not exist.");
+                    }
+                }
+            };
+        }
     }
 
     /**
+     * Load the {@link TableTransform} from the settings.
+     *
+     * Note: Source transforms are initialized with the most basic properties (CursorType.BASIC, unknown size). Make
+     * sure to re-source the transform with the appropriate properties.
+     *
      * @param settings to load from
      * @param ctx the context of the table that is loaded
      * @return the loaded transform
      * @throws InvalidSettingsException if the settings are invalid
      */
-    public static TableTransform load(final NodeSettingsRO settings, final LoadContext ctx)
+    public static TableTransform load(final NodeSettingsRO settings, final TransformLoadContext ctx)
         throws InvalidSettingsException {
 
         var transformSettings = settings.getNodeSettings("transforms");
         var connectionSettings = settings.getNodeSettings("connections");
+
+        // Load the transform specs
 
         var transformSpecs = new ArrayList<TableTransformSpec>();
         for (var key : transformSettings) {
             transformSpecs.add(loadSpec(transformSettings.getNodeSettings(key), ctx));
         }
 
+        // Load the connections
+
+        // leafTransform is initialized with all possible indices -- the loop removes all non-leaf indices
         final Set<Integer> leafTransforms =
-            new LinkedHashSet<>(IntStream.range(0, transformSpecs.size()).boxed().collect(Collectors.toList()));
+            new LinkedHashSet<>(IntStream.range(0, transformSpecs.size()).boxed().toList());
         final Map<Integer, Map<Integer, Integer>> parentTransforms = new HashMap<>();
         for (final var key : connectionSettings) {
             var connection = connectionSettings.getNodeSettings(key);
@@ -199,22 +242,29 @@ public final class TableTransformNodeSettingsPersistor {
             parentTransforms.computeIfAbsent(toTransform, k -> new HashMap<>()).put(toPort, fromTransform);
         }
 
+        // Build the TableTransform graph
+
         final Map<Integer, TableTransform> transforms = new HashMap<>();
         for (int i = 0; i < transformSpecs.size(); i++) {//NOSONAR
             resolveTransformsTree(i, transformSpecs, parentTransforms, transforms);
         }
 
+        // The final table transform is the one that has no connections going to another transform
         return transforms.get(leafTransforms.iterator().next());
 
     }
 
-    private static TableTransformSpec loadSpec(final NodeSettingsRO specSettings, final LoadContext ctx)
+    private static TableTransformSpec loadSpec(final NodeSettingsRO specSettings, final TransformLoadContext ctx)
         throws InvalidSettingsException {
         var type = specSettings.getString("type");
         var persistor = TransformSpecPersistor.valueOf(type);
         return persistor.load(specSettings.getNodeSettings("internal"), ctx);
     }
 
+    /**
+     * Resolve the TableTransform for the node with the given index. Calls this method recursively to resolve the parent
+     * transforms.
+     */
     private static void resolveTransformsTree(final int specIndex, final List<TableTransformSpec> transformSpecs,
         final Map<Integer, Map<Integer, Integer>> parentTransforms, final Map<Integer, TableTransform> transforms) {
         if (transforms.containsKey(specIndex)) {
@@ -261,7 +311,7 @@ public final class TableTransformNodeSettingsPersistor {
 
     @FunctionalInterface
     interface TransformSpecLoader<T extends TableTransformSpec> {
-        T load(NodeSettingsRO settings, LoadContext ctx) throws InvalidSettingsException;
+        T load(NodeSettingsRO settings, TransformLoadContext ctx) throws InvalidSettingsException;
     }
 
     private static <T extends TableTransformSpec> TransformSpecSaver<T> noop() {
@@ -272,8 +322,15 @@ public final class TableTransformNodeSettingsPersistor {
     enum TransformSpecPersistor {
             SOURCE(//
                 SourceTransformSpec.class, //
-                (s, c) -> new SourceTransformSpec(UUID.fromString(s.getString("identifier")), new SourceTableProperties(null, CursorType.BASIC, -1)),
-                (t, s) -> s.addString("identifier", t.getSourceIdentifier().toString())),
+                (s, c) -> {
+                    var id = UUID.fromString(s.getString("identifier"));
+                    // NB: We use the most basic source properties because we do not know which kind of
+                    // RowAccessible will be provided by the reference table (this could be added when we need it)
+                    // The caller should re-source the transform with additional information
+                    var sourceProps =
+                        new SourceTableProperties(c.getReferenceTable(id).getSchema(), CursorType.BASIC, -1);
+                    return new SourceTransformSpec(id, sourceProps);
+                }, (t, s) -> s.addString("identifier", t.getSourceIdentifier().toString())),
             APPEND(//
                 AppendTransformSpec.class, //
                 (s, c) -> new AppendTransformSpec(), //
@@ -317,8 +374,7 @@ public final class TableTransformNodeSettingsPersistor {
                         mapperFactory = (ColumnarMapperFactory)factory;
                     }
                     return new MapTransformSpec(s.getIntArray("column_indices"), mapperFactory);
-                },
-                (t, s) -> {//NOSONAR
+                }, (t, s) -> {//NOSONAR
                     s.addIntArray("column_indices", t.getColumnSelection());
                     final Object mapperFactory;
                     if (t.getMapperFactory() instanceof WrappedColumnarMapperWithRowIndexFactory wrapper) {
@@ -329,14 +385,11 @@ public final class TableTransformNodeSettingsPersistor {
                         // mapperFactory is a ColumnarMapperFactory
                     }
                     var factoryClass = mapperFactory.getClass();
-                    var persistor =
-                            PersistenceRegistry.getPersistor(factoryClass)
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                "No persistor for %s registered.".formatted(factoryClass)));
+                    var persistor = PersistenceRegistry.getPersistor(factoryClass).orElseThrow(
+                        () -> new IllegalArgumentException("No persistor for %s registered.".formatted(factoryClass)));
                     s.addString("mapper_factory_class", factoryClass.getName());
                     persistor.save(mapperFactory, s.addNodeSettings("mapper_factory_settings"));
-                }
-                ),
+                }),
             APPEND_MISSING(//
                 AppendMissingValuesTransformSpec.class, //
                 (s, c) -> {
@@ -374,7 +427,8 @@ public final class TableTransformNodeSettingsPersistor {
             saver.save((T)transformSpec, settings);
         }
 
-        TableTransformSpec load(final NodeSettingsRO settings, final LoadContext ctx) throws InvalidSettingsException {
+        TableTransformSpec load(final NodeSettingsRO settings, final TransformLoadContext ctx)
+            throws InvalidSettingsException {
             return m_loader.load(settings, ctx);
         }
 

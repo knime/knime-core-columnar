@@ -56,16 +56,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.IdentityTransformSpec;
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
+import org.knime.core.table.virtual.spec.SourceTableProperties;
+import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 import org.knime.core.table.virtual.spec.SourceTransformSpec;
 import org.knime.core.table.virtual.spec.TableTransformSpec;
 
@@ -81,34 +83,51 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 @Deprecated
 public final class TableTransformSerializer {
 
-    private TableTransformSerializer() {}
-
-    public static TableTransform load(final JsonNode config) {
-        return new TableTransformInDeserialization(config).load();
+    private TableTransformSerializer() {
     }
 
-    public static TableTransformSpec deserializeTransformSpec(final JsonNode transformSpecConfig) {
+    /**
+     * Note: Source transforms are initialized with the most basic properties (CursorType.BASIC, unknown size). Make
+     * sure to re-source the transform with the appropriate properties.
+     */
+    public static TableTransform load(final JsonNode config, final Map<UUID, ReferenceTable> referenceTableMap) {
+        return new TableTransformInDeserialization(config, referenceTableMap).load();
+    }
+
+    public static TableTransformSpec deserializeTransformSpec(final JsonNode transformSpecConfig,
+        final Map<UUID, ReferenceTable> referenceTableMap) {
         final String type = transformSpecConfig.get("type").textValue();
         var loader = getLoader(type);
-        return loader.apply(transformSpecConfig.get("config"));
+        return loader.load(transformSpecConfig.get("config"), referenceTableMap);
     }
 
-    private static Function<JsonNode, TableTransformSpec> getLoader(final String transformSpecType) {//NOSONAR
+    private interface SpecLoader {
+        TableTransformSpec load(JsonNode config, Map<UUID, ReferenceTable> referenceTableMap);
+    }
+
+    private static SpecLoader getLoader(final String transformSpecType) {//NOSONAR
         switch (transformSpecType) {
             case "append":
-                return c -> new AppendTransformSpec();
+                return (c, r) -> new AppendTransformSpec();
             case "permute":
-                return TableTransformSerializer::loadPermuteBackwardsCompatible;
+                return (c, r) -> loadPermuteBackwardsCompatible(c);
             case "column_filter", "select_columns":
-                return TableTransformSerializer::loadSelect;
+                return (c, r) -> loadSelect(c);
             case "concatenate":
-                return c -> new ConcatenateTransformSpec();
+                return (c, r) -> new ConcatenateTransformSpec();
             case "slice":
-                return c -> new SliceTransformSpec(c.get("from").longValue(), c.get("to").longValue());
+                return (c, r) -> new SliceTransformSpec(c.get("from").longValue(), c.get("to").longValue());
             case "source":
-                return c -> new SourceTransformSpec(UUID.fromString(c.get("identifier").textValue()), null);
+                return (c, r) -> {
+                    var id = UUID.fromString(c.get("identifier").textValue());
+                    // NB: We use the most basic source properties because we do not know which kind of
+                    // RowAccessible will be provided by the reference table
+                    // The caller should re-source the transform with additional information
+                    var sourceProps = new SourceTableProperties(r.get(id).getSchema(), CursorType.BASIC, -1);
+                    return new SourceTransformSpec(id, sourceProps);
+                };
             case "identity":
-                return c -> IdentityTransformSpec.INSTANCE;
+                return (c, r) -> IdentityTransformSpec.INSTANCE;
             default:
                 throw new UnsupportedOperationException("Unkown transformation: " + transformSpecType);
         }
@@ -124,12 +143,15 @@ public final class TableTransformSerializer {
         return new SelectColumnsTransformSpec(columnIndices);
     }
 
-
     private static final class TableTransformInDeserialization {
 
         private final ObjectNode m_configRoot;
 
-        public TableTransformInDeserialization(final JsonNode input) {
+        private final Map<UUID, ReferenceTable> m_referenceTableMap;
+
+        public TableTransformInDeserialization(final JsonNode input,
+            final Map<UUID, ReferenceTable> referenceTableMap) {
+            m_referenceTableMap = referenceTableMap;
             m_configRoot = (ObjectNode)input;
         }
 
@@ -139,7 +161,7 @@ public final class TableTransformSerializer {
 
             final List<TableTransformSpec> transformSpecs = new ArrayList<>(transformsConfig.size());
             for (final JsonNode transformConfig : transformsConfig) {
-                transformSpecs.add(deserializeTransformSpec(transformConfig));
+                transformSpecs.add(deserializeTransformSpec(transformConfig, m_referenceTableMap));
             }
 
             final Set<Integer> leafTransforms =

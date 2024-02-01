@@ -57,8 +57,11 @@ import static org.knime.core.table.schema.DataSpec.intSpec;
 import static org.knime.core.table.schema.DataSpec.stringSpec;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import org.knime.core.data.DataColumnSpecCreator;
@@ -70,12 +73,15 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.WrappedColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.columnar.table.virtual.persist.TableTransformNodeSettingsPersistor.TransformLoadContext;
+import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowDataRepository;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.value.DoubleValueFactory;
 import org.knime.core.data.v2.value.IntValueFactory;
+import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettings;
 import org.knime.core.node.NodeSettingsRO;
@@ -84,6 +90,7 @@ import org.knime.core.table.access.IntAccess.IntReadAccess;
 import org.knime.core.table.access.IntAccess.IntWriteAccess;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
+import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.DefaultColumnarSchema.Builder;
 import org.knime.core.table.virtual.TableTransform;
@@ -106,7 +113,7 @@ import com.google.common.collect.Iterables;
 @SuppressWarnings("static-method")
 final class TableTransformNodeSettingsPersistorTest {
 
-    private final IDataRepository m_dataRepo = NotInWorkflowDataRepository.newInstance();
+    private static final IDataRepository DATA_REPO = NotInWorkflowDataRepository.newInstance();
 
     @Test
     void testSaveSource() throws Exception {
@@ -133,7 +140,7 @@ final class TableTransformNodeSettingsPersistorTest {
         addSourceTransform(id, addTransformSettings(settings).addNodeSettings("0"));
         addConnectionSettings(settings);
 
-        var sourceTransform = TableTransformNodeSettingsPersistor.load(settings, this::getDataRepository);
+        var sourceTransform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
         var sourceSpec = (SourceTransformSpec)sourceTransform.getSpec();
         assertEquals(id, sourceSpec.getSourceIdentifier());
     }
@@ -173,7 +180,7 @@ final class TableTransformNodeSettingsPersistorTest {
         var connectionSettings = addConnectionSettings(settings);
         addConnection(0, 2, 0, connectionSettings.addNodeSettings("0"));
         addConnection(1, 2, 1, connectionSettings.addNodeSettings("1"));
-        var transform = TableTransformNodeSettingsPersistor.load(settings, this::getDataRepository);
+        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(firstId, secondId));
         assertEquals(firstId,
             ((SourceTransformSpec)transform.getPrecedingTransforms().get(0).getSpec()).getSourceIdentifier(),
             "Wrong source order.");
@@ -210,7 +217,7 @@ final class TableTransformNodeSettingsPersistorTest {
         addSourceTransform(id, transformSettings.addNodeSettings("0"));
         addColumnFilterTransform(transformSettings.addNodeSettings("1"), 1, 2);
         addConnection(0, 1, 0, addConnectionSettings(settings).addNodeSettings("0"));
-        var transform = TableTransformNodeSettingsPersistor.load(settings, this::getDataRepository);
+        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
         assertArrayEquals(new int[]{1, 2}, ((SelectColumnsTransformSpec)transform.getSpec()).getColumnSelection());
         assertEquals(id,
             ((SourceTransformSpec)transform.getPrecedingTransforms().get(0).getSpec()).getSourceIdentifier());
@@ -247,7 +254,7 @@ final class TableTransformNodeSettingsPersistorTest {
         var connections = addConnectionSettings(settings);
         addConnection(0, 2, 0, connections.addNodeSettings("0"));
         addConnection(1, 2, 1, connections.addNodeSettings("1"));
-        var transform = TableTransformNodeSettingsPersistor.load(settings, this::getDataRepository);
+        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(firstID, secondID));
         assertInstanceOf(ConcatenateTransformSpec.class, transform.getSpec());
         checkSourceTransform(transform.getPrecedingTransforms().get(0), firstID);
         checkSourceTransform(transform.getPrecedingTransforms().get(1), secondID);
@@ -278,7 +285,7 @@ final class TableTransformNodeSettingsPersistorTest {
         addSourceTransform(id, transformSettings.addNodeSettings("0"));
         addSliceSettings(transformSettings.addNodeSettings("1"), 13, 42);
         addConnection(0, 1, 0, addSubSettings(addConnectionSettings(settings), 0));
-        var transform = TableTransformNodeSettingsPersistor.load(settings, this::getDataRepository);
+        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
         checkSliceTransform(transform, 13, 42);
         checkSourceTransform(transform.getPrecedingTransforms().get(0), id);
     }
@@ -288,17 +295,16 @@ final class TableTransformNodeSettingsPersistorTest {
         var id = UUID.randomUUID();
         var mapperFactory = new TestMapperFactory(3);
         var schema = ColumnarValueSchemaUtils.create(
-            new DataTableSpec(new String[] {"1", "2"}, new DataType[] {IntCell.TYPE, DoubleCell.TYPE}),
+            new DataTableSpec(new String[]{"1", "2"}, new DataType[]{IntCell.TYPE, DoubleCell.TYPE}),
             new ValueFactory<?, ?>[]{new IntValueFactory(), new DoubleValueFactory()});
-        var table = new ColumnarVirtualTable(id, schema, CursorType.BASIC)
-            .map(mapperFactory, 1);
+        var table = new ColumnarVirtualTable(id, schema, CursorType.BASIC).map(mapperFactory, 1);
         var settings = rootSettings();
         TableTransformNodeSettingsPersistor.save(table.getProducingTransform(), settings);
         var transformSettings = getTransformSettings(settings);
         checkSize(transformSettings, 3);
         checkSourceSettings(getSubSettings(transformSettings, 0), id);
-        checkMapSettings(getSubSettings(transformSettings, 2), mapperFactory::checkSettings, TestMapperFactory.class,
-            1, 2);
+        checkMapSettings(getSubSettings(transformSettings, 2), mapperFactory::checkSettings, TestMapperFactory.class, 1,
+            2);
         var connectionSettings = getConnectionSettings(settings);
         checkSize(connectionSettings, 2);
         checkConnection(getSubSettings(connectionSettings, 0), 0, 1, 0);
@@ -314,13 +320,12 @@ final class TableTransformNodeSettingsPersistorTest {
             1);
         var connectionSettings = addConnectionSettings(settings);
         addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
-        var transform = TableTransformNodeSettingsPersistor.load(settings, this::getDataRepository);
-        checkMapTransform(transform,
-            s -> {
-                var wrappedMapperFactory = (WrappedColumnarMapperWithRowIndexFactory)s.getMapperFactory();
-                var testMapperFactory = (TestMapperFactory)wrappedMapperFactory.getMapperWithRowIndexFactory();
-                assertEquals(42, testMapperFactory.m_increment, "Unexpected increment.");
-            });
+        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
+        checkMapTransform(transform, s -> {
+            var wrappedMapperFactory = (WrappedColumnarMapperWithRowIndexFactory)s.getMapperFactory();
+            var testMapperFactory = (TestMapperFactory)wrappedMapperFactory.getMapperWithRowIndexFactory();
+            assertEquals(42, testMapperFactory.m_increment, "Unexpected increment.");
+        });
         checkSourceTransform(transform.getPrecedingTransforms().get(0), id);
     }
 
@@ -345,8 +350,9 @@ final class TableTransformNodeSettingsPersistorTest {
     }
 
     private static void checkMapSettings(final NodeSettingsRO settings,
-        final SettingsChecker mapperFactorySettingsChecker, final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass,
-        final int... columnIndices) throws InvalidSettingsException {
+        final SettingsChecker mapperFactorySettingsChecker,
+        final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices)
+        throws InvalidSettingsException {
         checkTransformType(settings, "MAP");
         var internals = settings.getNodeSettings("internal");
         assertArrayEquals(columnIndices, internals.getIntArray("column_indices"), "Unexpected column indices.");
@@ -363,7 +369,6 @@ final class TableTransformNodeSettingsPersistorTest {
         internals.addString("mapper_factory_class", mapperFactoryClass.getName());
         mapSettingsAdder.accept(internals.addNodeSettings("mapper_factory_settings"));
     }
-
 
     private static final class TestMapperFactory implements ColumnarMapperWithRowIndexFactory {
 
@@ -393,8 +398,7 @@ final class TableTransformNodeSettingsPersistorTest {
 
         // it is registered at the corresponding extension point and used to persist TestMapperFactory
         @SuppressWarnings("unused")
-        public static final class TestMapperFactoryPersistor
-            implements Persistor<TestMapperFactory> {
+        public static final class TestMapperFactoryPersistor implements Persistor<TestMapperFactory> {
 
             @Override
             public TestMapperFactory load(final NodeSettingsRO settings, final LoadContext ctx)
@@ -523,8 +527,62 @@ final class TableTransformNodeSettingsPersistorTest {
         return DefaultColumnarSchema.builder();
     }
 
-    private IDataRepository getDataRepository() {
-        return m_dataRepo;
+    private TransformLoadContext createLoadContext(final UUID... sourceIds) {
+        var sourceIdsSet = Stream.of(sourceIds).collect(Collectors.toSet());
+        return new TransformLoadContext() {
+
+            @Override
+            public IDataRepository getDataRepository() {
+                return DATA_REPO;
+            }
+
+            @Override
+            public ReferenceTable getReferenceTable(final UUID id) throws IllegalArgumentException {
+                if (sourceIdsSet.contains(id)) {
+                    return new DummyReferenceTable(id);
+                } else {
+                    throw new AssertionError("Tried to access unexpected reference table with id " + id);
+                }
+            }
+        };
     }
 
+    private static final class DummyReferenceTable implements ReferenceTable {
+
+        private final UUID m_id;
+
+        public DummyReferenceTable(final UUID id) {
+            m_id = id;
+        }
+
+        @Override
+        public UUID getId() {
+            return m_id;
+        }
+
+        @Override
+        public ColumnarValueSchema getSchema() {
+            return null;
+        }
+
+        @Override
+        public ColumnarVirtualTable getVirtualTable() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Map<UUID, RowAccessible> getSources() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public BufferedDataTable getBufferedTable() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void clearIfNecessary() {
+            throw new UnsupportedOperationException();
+        }
+    }
 }
