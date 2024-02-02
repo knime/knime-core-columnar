@@ -66,7 +66,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
@@ -392,7 +391,7 @@ public final class ColumnarVirtualTable {
         return ColumnarValueSchemaUtils.create(spec, valueFactories);
     }
 
-    private static ColumnarValueSchema appendRowIndex(final ColumnarValueSchema schema) {
+    private static ColumnarValueSchema appendRowIndex(final ColumnarValueSchema schema, final String columnName) {
         final int numColumns = schema.numColumns();
         var valueFactories = new ValueFactory<?, ?>[numColumns + 1];
         for (int i = 0; i < numColumns; i++) {
@@ -405,9 +404,13 @@ public final class ColumnarVirtualTable {
         for (int i = 0; i < numSpecColumns; i++) {
             colSpecs[ i ] = schema.getSourceSpec().getColumnSpec(i);
         }
-        colSpecs[ numSpecColumns ] = new DataColumnSpecCreator("row index", LongCell.TYPE).createSpec();
+        colSpecs[ numSpecColumns ] = new DataColumnSpecCreator(columnName, LongCell.TYPE).createSpec();
 
         return ColumnarValueSchemaUtils.create(new DataTableSpec(colSpecs), valueFactories);
+    }
+
+    private static String tmpUniqueRowIndexColumnName() {
+        return "row_idx-" + UUID.randomUUID().toString();
     }
 
     private List<TableTransform> collectTransforms(final List<ColumnarVirtualTable> tables) {
@@ -443,10 +446,13 @@ public final class ColumnarVirtualTable {
 
     /**
      * Append a LONG column that contains the current row index.
+     *
+     * @param columnName the name of the row index column
      */
-    public ColumnarVirtualTable appendRowIndex() {
+    public ColumnarVirtualTable appendRowIndex(final String columnName) {
         final RowIndexTransformSpec transformSpec = new RowIndexTransformSpec();
-        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), appendRowIndex(m_valueSchema));
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec),
+            appendRowIndex(m_valueSchema, columnName));
     }
 
     public ColumnarVirtualTable map(final ColumnarMapperFactory mapperFactory, final int... columnIndices) {
@@ -458,7 +464,7 @@ public final class ColumnarVirtualTable {
         final int[] columns = Arrays.copyOf(columnIndices, columnIndices.length + 1);
         columns[columns.length - 1] = m_valueSchema.numColumns();
         final ColumnarMapperFactory factory = new WrappedColumnarMapperWithRowIndexFactory(mapperFactory);
-        return appendRowIndex().map(factory, columns);
+        return appendRowIndex(tmpUniqueRowIndexColumnName()).map(factory, columns);
     }
 
     public ColumnarVirtualTable observe(final ObserverFactory observerFactory, final int... columnIndices ) {
@@ -491,8 +497,8 @@ public final class ColumnarVirtualTable {
         final int rowIndexColumn = m_valueSchema.numColumns();
         columns[columns.length - 1] = rowIndexColumn;
         final ObserverFactory factory = new ObserverTransformUtils.WrappedObserverWithRowIndexFactory(observerFactory);
-        return appendRowIndex() //
-                .observe(factory, columns) //
-                .dropColumns(rowIndexColumn);
+        return appendRowIndex(tmpUniqueRowIndexColumnName()) //
+            .observe(factory, columns) //
+            .dropColumns(rowIndexColumn);
     }
 }
