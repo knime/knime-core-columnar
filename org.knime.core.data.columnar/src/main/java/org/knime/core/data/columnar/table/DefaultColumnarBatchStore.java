@@ -53,6 +53,7 @@ import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.badger.BatchingWritable;
 import org.knime.core.columnar.badger.HeapBadger;
+import org.knime.core.columnar.badger.HeapBadgerBatchStore;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -244,7 +245,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     private DomainWritable m_domainWritable = null;
 
-    private final WrappedBatchStore m_wrappedStore;
+    private final BatchStore m_wrappedStore;
 
     private final BatchReadStore m_readStore;
 
@@ -279,7 +280,13 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         // work on batches at the moment. This might not be optimal, but is the quickest way to put everything together right now.
         initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
 
-        m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getFileHandle());
+        if (m_heapBadger != null) {
+            // TODO: Do not build a WrappedBatchStore if we use the HeapBadger. The WrappedBatchStore expects a BatchWriter
+            //      (and also reads the numBatches from there). But we don't write Batches, we write row-wise and let the badger do the splitting...
+            m_wrappedStore = new HeapBadgerBatchStore(m_heapBadger, m_readStore.getFileHandle());
+        } else {
+            m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getFileHandle());
+        }
     }
 
     private void initHeapCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
@@ -359,7 +366,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     @Override
     public void close() throws IOException {
-        if (m_heapCache != null || m_heapBadger != null) {
+        if (m_heapCache != null) {
             MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
         }
 
@@ -367,7 +374,6 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         m_wrappedStore.close();
     }
 
-    @SuppressWarnings("resource") // HeapBadger's HeapCache is closed with HeapBadger
     @Override
     public void flushObjects() throws IOException {
         if (m_heapCache != null) {

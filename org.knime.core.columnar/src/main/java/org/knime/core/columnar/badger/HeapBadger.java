@@ -143,6 +143,14 @@ public class HeapBadger {
         return m_heapCache;
     }
 
+    public ColumnarSchema getSchema() {
+        return m_writeDelegate.getSchema();
+    }
+
+    public int numBatches() {
+        return m_badger.getNumBatchesWritten();
+    }
+
     // --------------------------------------------------------------------
     //
     //   Async
@@ -448,6 +456,11 @@ public class HeapBadger {
             switchToNextBatch();
         }
 
+        synchronized int getNumBatchesWritten() {
+            // synchronized so that getNumBatchesWritten and writeCurrentBatch cannot be called at the same time
+            return m_numBatchesWritten;
+        }
+
         private void writeBufferedRow(final int row) throws IOException {
             debug("[b] Badger.writeBufferedRow( row=" + row + " )");
             final BufferedAccessRow bufferedRow = m_buffers[row];
@@ -483,7 +496,8 @@ public class HeapBadger {
             }
         }
 
-        private void writeCurrentBatch() throws IOException {
+        private synchronized void writeCurrentBatch() throws IOException {
+            // synchronized so that getNumBatchesWritten and writeCurrentBatch cannot be called at the same time
             debug("[b] Badger.writeCurrentBatch");
             ReadBatch readBatch = m_current_batch.close(m_batchLocalRowIndex);
             m_writer.write(readBatch);

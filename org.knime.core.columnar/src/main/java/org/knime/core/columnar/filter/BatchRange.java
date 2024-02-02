@@ -106,7 +106,7 @@ public interface BatchRange {
 
                 if (toRowIndex >= batchBoundaries[batchBoundaries.length - 1]) {
                     throw new IllegalStateException("Selection extends past the end of the ReadStore (selected to "
-                        + toRowIndex + ", but only " + batchBoundaries[batchBoundaries.length] + " rows available).");
+                        + toRowIndex + ", but only " + batchBoundaries[batchBoundaries.length - 1] + " rows available).");
                 }
 
                 int firstBatchIndex = 0;
@@ -116,7 +116,7 @@ public interface BatchRange {
                 int firstIndexInFirstBatch =
                     (int)(fromRowIndex - (firstBatchIndex == 0 ? 0 : batchBoundaries[firstBatchIndex - 1]));
 
-                while (lastBatchIndex > 0 && toRowIndex < batchBoundaries[lastBatchIndex - 2]) {
+                while (lastBatchIndex > 0 && toRowIndex < batchBoundaries[lastBatchIndex - 1]) {
                     lastBatchIndex--;
                 }
                 int lastIndexInLastBatch =
