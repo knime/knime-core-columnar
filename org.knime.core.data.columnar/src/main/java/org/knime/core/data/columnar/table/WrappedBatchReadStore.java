@@ -138,17 +138,13 @@ final class WrappedBatchReadStore implements BatchReadStore {
 
     private final int m_numBatches;
 
-    private final int m_batchLength;
-
     private final FileHandle m_fileHandle;
 
     private final AtomicBoolean m_closed = new AtomicBoolean();
 
-    WrappedBatchReadStore(final RandomAccessBatchReadable readable, final int numBatches, final int batchLength,
-        final FileHandle path) {
+    WrappedBatchReadStore(final RandomAccessBatchReadable readable, final int numBatches, final FileHandle path) {
         m_readable = readable;
         m_numBatches = numBatches;
-        m_batchLength = batchLength;
         m_fileHandle = path;
     }
 
@@ -169,11 +165,6 @@ final class WrappedBatchReadStore implements BatchReadStore {
     @Override
     public int numBatches() {
         return m_numBatches;
-    }
-
-    @Override
-    public int batchLength() {
-        return m_batchLength;
     }
 
     @Override

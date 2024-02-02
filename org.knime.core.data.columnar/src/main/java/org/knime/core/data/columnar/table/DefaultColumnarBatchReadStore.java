@@ -156,8 +156,7 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
         initHeapCache(builder.m_heapCache);
 
-        m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(),
-            builder.m_readStore.batchLength(), builder.m_readStore.getFileHandle());
+        m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(), builder.m_readStore.getFileHandle());
     }
 
 
@@ -195,11 +194,6 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
     @Override
     public int numBatches() {
         return m_wrappedStore.numBatches();
-    }
-
-    @Override
-    public int batchLength() {
-        return m_wrappedStore.batchLength();
     }
 
     @Override

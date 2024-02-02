@@ -106,14 +106,6 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
         return m_numBatches.get();
     }
 
-    @Override
-    public int batchLength() {
-        if (m_maxLength == null) {
-            initMetadata();
-        }
-        return m_maxLength.get();
-    }
-
     /**
      * @return Whether the store's data was persisted using the deprecated
      *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.

@@ -186,7 +186,6 @@ public class ArrowColumnStoreTest {
         try (final RootAllocator allocator = new RootAllocator();
                 final BatchStore store = new ArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
             assertEquals(0, store.numBatches());
-            assertThrows(IllegalStateException.class, store::batchLength);
 
             @SuppressWarnings("resource")
             final BatchWriter writer = store.getWriter();
@@ -197,7 +196,6 @@ public class ArrowColumnStoreTest {
             writer.write(batch);
             batch.release();
             assertEquals(1, store.numBatches());
-            assertEquals(chunkSize, store.batchLength());
 
             // Write batch 1
             batch = fillBatch(writer.create(chunkSize), chunkSize, 1);
@@ -253,7 +251,6 @@ public class ArrowColumnStoreTest {
             reader.close();
 
             assertEquals(5, store.numBatches());
-            assertEquals(chunkSize, store.batchLength());
         }
     }
 
@@ -353,7 +350,6 @@ public class ArrowColumnStoreTest {
             final var writeStore = factory.createStore(schema, writePath);
 
             assertEquals(0, writeStore.numBatches());
-            assertThrows(IllegalStateException.class, writeStore::batchLength);
 
             @SuppressWarnings("resource")
             final BatchWriter writer = writeStore.getWriter();
@@ -364,7 +360,6 @@ public class ArrowColumnStoreTest {
             writer.write(batch);
             batch.release();
             assertEquals(1, writeStore.numBatches());
-            assertEquals(chunkSize, writeStore.batchLength());
 
             // Write batch 1
             batch = fillBatch(writer.create(chunkSize), chunkSize, 1);
@@ -424,7 +419,6 @@ public class ArrowColumnStoreTest {
             reader.close();
 
             assertEquals(5, writeStore.numBatches());
-            assertEquals(chunkSize, writeStore.batchLength());
 
             writeStore.close();
             readable.close();
@@ -472,7 +466,6 @@ public class ArrowColumnStoreTest {
         try (final BatchReadStore readStore = factory.createReadStore(readPath.asPath())) {
             assertEquals(schema, readStore.getSchema());
             assertEquals(1, readStore.numBatches());
-            assertEquals(chunkSize, readStore.batchLength());
 
             // Read the batch
             final ReadBatch readBatch;
@@ -491,7 +484,6 @@ public class ArrowColumnStoreTest {
             readBatch.release();
 
             assertEquals(1, readStore.numBatches());
-            assertEquals(chunkSize, readStore.batchLength());
         }
 
         // Assert that the file for reading exists

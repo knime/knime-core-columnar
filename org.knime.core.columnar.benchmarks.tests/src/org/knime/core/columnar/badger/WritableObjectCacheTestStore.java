@@ -100,11 +100,6 @@ final class WritableObjectCacheTestStore implements BatchStore {
     }
 
     @Override
-    public int batchLength() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public FileHandle getFileHandle() {
         throw new UnsupportedOperationException();
     }

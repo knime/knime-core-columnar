@@ -280,11 +280,6 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     }
 
     @Override
-    public int batchLength() {
-        return m_batchLengths.stream().mapToInt(Integer::intValue).max().orElse(-1);
-    }
-
-    @Override
     public FileHandle getFileHandle() {
         return m_fileHandle;
     }
