@@ -401,10 +401,13 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         return m_wrappedStore.numBatches();
     }
 
-    @Override
-    public int batchLength() {
-        return m_wrappedStore.batchLength();
-    }
+//    @Override
+//    public int batchLength() {
+//        if (m_heapBadger != null) {
+//            throw new IllegalStateException("The batchLength should not be used when batches have variable size");
+//        }
+//        return m_wrappedStore.batchLength();
+//    }
 
     @Override
     public FileHandle getFileHandle() {

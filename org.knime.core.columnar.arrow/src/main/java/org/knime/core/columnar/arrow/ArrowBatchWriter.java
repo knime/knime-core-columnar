@@ -233,17 +233,6 @@ class ArrowBatchWriter implements BatchWriter {
         return m_numBatches.get();
     }
 
-    /**
-     * @return the length of the batches (recorded by observing the length of the first batch written)
-     */
-    int batchLength() {
-        final int bl = m_chunkSize.get();
-        if (bl == -1) {
-            throw new IllegalStateException("The batch length is not yet know. No batch has been written.");
-        }
-        return bl;
-    }
-
     @Override
     public synchronized void close() throws IOException {
         if (!m_closed) {

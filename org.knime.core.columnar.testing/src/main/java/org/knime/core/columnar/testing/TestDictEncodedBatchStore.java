@@ -85,11 +85,6 @@ public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable 
     }
 
     @Override
-    public int batchLength() {
-        return m_testDelegate.batchLength();
-    }
-
-    @Override
     public FileHandle getFileHandle() {
         return m_testDelegate.getFileHandle();
     }
