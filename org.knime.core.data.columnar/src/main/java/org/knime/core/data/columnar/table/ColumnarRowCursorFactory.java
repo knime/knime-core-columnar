@@ -150,7 +150,6 @@ final class ColumnarRowCursorFactory {
     static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size, // NOSONAR
         final TableFilter filter) {
         if (size < 1) {
-            System.out.println("bla");
             return new EmptyRowCursor(schema);
         }
 
