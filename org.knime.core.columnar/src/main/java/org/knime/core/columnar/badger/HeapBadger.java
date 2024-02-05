@@ -102,7 +102,8 @@ public class HeapBadger {
         ColumnarSchema schema = writable.getSchema();
 
         int bufferSize = 20;
-        final Async async = new Async(bufferSize);
+        final SerializationQueue async = new AsyncQueue(bufferSize);
+        //        final SerializationQueue async = new SyncQueue();
         m_writeCursor = new BadgerWriteCursor(schema, async);
         m_badger = new Badger(writable, m_writeCursor.m_buffers, maxNumRowsPerBatch, maxBatchSizeInBytes);
         m_heapCache = new HeapCache(readable, cache);
@@ -155,7 +156,46 @@ public class HeapBadger {
     //
     //   Async
     //
-    static class Async {
+    interface SerializationQueue {
+        interface Serializer {
+            void serialize(int previous_head, int head) throws IOException;
+
+            void finish() throws IOException;
+        }
+
+        /**
+         * This worker method runs in a separate thread and serializes entries when they become available.
+         *
+         * @param serializer
+         */
+        void serializeLoop(Serializer serializer);
+
+        /**
+         * @return index of buffer to modify
+         * @throws InterruptedException if interrupted while waiting
+         * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
+         */
+        int forward() throws InterruptedException, IOException;
+
+        /**
+         * Waits for all queued serializations to finish
+         *
+         * @throws InterruptedException if interrupted while waiting
+         * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
+         */
+        void finish() throws InterruptedException, IOException;
+
+        int getBufferSize();
+
+        /**
+         * Get the number of times {@link #forward()} has been called.
+         *
+         * @return number of calls to {@link #forward()}
+         */
+        long numForwards();
+    }
+
+    static class AsyncQueue implements SerializationQueue {
         private final int m_bufferSize;
 
         private final ReentrantLock m_lock;
@@ -178,7 +218,7 @@ public class HeapBadger {
 
         private long m_offset;
 
-        Async(final int bufferSize) {
+        AsyncQueue(final int bufferSize) {
             m_bufferSize = bufferSize;
             m_wrap_at = 2 * bufferSize;
 
@@ -225,11 +265,13 @@ public class HeapBadger {
             // When wrapping at m_wrap_at, m_offset is incremented by m_wrap_at.
         }
 
-        /**
-         * @return index of buffer to modify
-         * @throws InterruptedException if interrupted while waiting
-         */
-        int forward() throws InterruptedException, IOException {
+        @Override
+        public int getBufferSize() {
+            return m_bufferSize;
+        }
+
+        @Override
+        public int forward() throws InterruptedException, IOException {
 
             // TODO: throw Exception if finishing==true?
             //       @throws IllegalStateException if called after {@link #finish}
@@ -272,19 +314,22 @@ public class HeapBadger {
             return m_current % m_bufferSize;
         }
 
-        /**
-         * Get the number of times {@link #forward()} has been called.
-         *
-         * @return number of calls to {@link #forward()}
-         */
-        long numForwards() {
-            return m_offset + m_current;
+        @Override
+        public long numForwards() {
+            final ReentrantLock lock = this.m_lock;
+            lock.lock();
+            try {
+                if (!m_finishing) {
+                    throw new IllegalStateException("Accessed size of table before closing cursor");
+                }
+                return m_offset + m_current;
+            } finally {
+                lock.unlock();
+            }
         }
 
-        /**
-         * @throws InterruptedException if interrupted while waiting
-         */
-        void finish() throws InterruptedException, IOException {
+        @Override
+        public void finish() throws InterruptedException, IOException {
             final ReentrantLock lock = this.m_lock;
             lock.lock();
             try {
@@ -309,18 +354,8 @@ public class HeapBadger {
             }
         }
 
-        interface Serializer {
-            void serialize(int previous_head, int head) throws IOException;
-
-            void finish() throws IOException;
-        }
-
-        /**
-         * This worker method runs in a separate thread and serializes entries when they become available.
-         *
-         * @param serializer
-         */
-        void serializeLoop(final Serializer serializer) {
+        @Override
+        public void serializeLoop(final Serializer serializer) {
             final ReentrantLock lock = this.m_lock;
             int previous_head = 0;
             int head;
@@ -406,12 +441,57 @@ public class HeapBadger {
         }
     }
 
+    /**
+     * Synchronous serialization queue implementation that is supposed to be useful for debugging.
+     * NOTE: not tested very well yet, might have bugs.
+     */
+    static class SyncQueue implements SerializationQueue {
+        private int m_current = -1;
+
+        private Serializer m_serializer;
+
+        private boolean m_finished;
+
+        @Override
+        public synchronized int forward() throws InterruptedException, IOException {
+            if (m_serializer != null) {
+                m_serializer.serialize(0, 1);
+                m_current++;
+            }
+            return 0;
+        }
+
+        @Override
+        public synchronized long numForwards() {
+            if (!m_finished) {
+                throw new IllegalStateException("queried the size of the table before closing the cursor");
+            }
+            return m_current;
+        }
+
+        @Override
+        public synchronized void finish() throws InterruptedException, IOException {
+            // NO OP
+            m_finished = true;
+        }
+
+        @Override
+        public synchronized void serializeLoop(final SerializationQueue.Serializer serializer) {
+            m_serializer = serializer;
+        }
+
+        @Override
+        public int getBufferSize() {
+            return 1;
+        }
+    }
+
     // --------------------------------------------------------------------
     //
     //   Badger
     //
 
-    class Badger implements Async.Serializer {
+    class Badger implements SerializationQueue.Serializer {
 
         private final BufferedAccessRow[] m_buffers;
 
@@ -563,11 +643,11 @@ public class HeapBadger {
 
         private final BufferedAccessRow m_access;
 
-        private final Async m_queue;
+        private final SerializationQueue m_queue;
 
-        BadgerWriteCursor(final ColumnarSchema schema, final Async queue) {
+        BadgerWriteCursor(final ColumnarSchema schema, final SerializationQueue queue) {
             m_queue = queue;
-            m_buffers = new BufferedAccessRow[queue.m_bufferSize]; // TODO Async::getBufferSize() instead of field access
+            m_buffers = new BufferedAccessRow[queue.getBufferSize()]; // TODO Async::getBufferSize() instead of field access
             Arrays.setAll(m_buffers, i -> BufferedAccesses.createBufferedAccessRow(schema));
             m_access = BufferedAccesses.createBufferedAccessRow(schema);
         }
@@ -623,7 +703,7 @@ public class HeapBadger {
 
         @Override
         public long getNumForwards() {
-            return (m_current < 0) ? 0 : m_queue.numForwards();
+            return (m_current < 0) ? 0 : (m_queue.numForwards());
         }
     }
 }
