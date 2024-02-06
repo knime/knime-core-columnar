@@ -379,6 +379,10 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         if (m_heapCache != null) {
             m_heapCache.flush();
         }
+
+        if (m_heapBadger != null) {
+            m_heapBadger.getWriteCursor().flush();
+        }
     }
 
     @Override

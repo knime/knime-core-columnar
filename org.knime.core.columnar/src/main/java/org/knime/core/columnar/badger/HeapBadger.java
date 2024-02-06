@@ -333,6 +333,9 @@ public class HeapBadger {
             final ReentrantLock lock = this.m_lock;
             lock.lock();
             try {
+                if (m_finishing) {
+                    return; // TODO: actually wait for the other finishing calls to finish, too
+                }
                 m_finishing = true;
                 m_notEmpty.signal();
                 m_finished.await(); // is reached definitely if errors occurred
@@ -645,6 +648,8 @@ public class HeapBadger {
 
         private final SerializationQueue m_queue;
 
+        private boolean m_closed;
+
         BadgerWriteCursor(final ColumnarSchema schema, final SerializationQueue queue) {
             m_queue = queue;
             m_buffers = new BufferedAccessRow[queue.getBufferSize()]; // TODO Async::getBufferSize() instead of field access
@@ -661,7 +666,11 @@ public class HeapBadger {
 
         @Override
         public boolean forward() {
-            debug("[c] BadgerWriteCursor.forward");
+            debug("[c:" + this + "] BadgerWriteCursor.forward");
+            if (m_closed) {
+                throw new IllegalStateException("Cannot forward a closed write cursor");
+            }
+
             if (m_current < 0) {
                 m_current = 0;
                 return true;
@@ -669,15 +678,15 @@ public class HeapBadger {
 
             try {
                 m_buffers[m_current].setFrom(m_access);
-                debug("[c]   -> m_queue.forward()");
+                debug("[c:" + this + "]   -> m_queue.forward()");
                 m_current = m_queue.forward();
             } catch (IOException | InterruptedException ex) {
                 // can throw IOException if serialization of any previous row has failed
                 // can throw InterruptedException if the cursor had to wait for free buffers to write to and got interrupted
                 throw new RuntimeException(ex);
             }
-            debug("[c]   <- m_queue.forward()");
-            debug("[c]   m_current = " + m_current);
+            debug("[c:" + this + "]   <- m_queue.forward()");
+            debug("[c:" + this + "]   m_current = " + m_current);
             return true;
         }
 
@@ -685,12 +694,17 @@ public class HeapBadger {
         //      or allow writing after calling flush() once
         @Override
         public void flush() throws IOException {
-            debug("[c] BadgerWriteCursor.flush");
+            debug("[c:" + this + "] BadgerWriteCursor.flush");
+            if (m_closed) {
+                debug("[c:" + this + "] !! already flushed, ignoring call !!");
+                return;
+            }
             forward();
             try {
-                debug("[c]   -> m_queue.finish()");
+                debug("[c:" + this + "]   -> m_queue.finish()");
                 m_queue.finish();
-                debug("[c]   <- m_queue.finish()");
+                m_closed = true;
+                debug("[c:" + this + "]   <- m_queue.finish()");
             } catch (InterruptedException e) {
                 throw new RuntimeException(e); // let's pretend it is a RuntimeException?
             }
@@ -699,6 +713,7 @@ public class HeapBadger {
         @Override
         public void close() throws IOException {
             // TODO abort, release resources, ignore exceptions that might have occurred while serializing in m_queue
+            m_closed = true;
         }
 
         @Override
