@@ -79,7 +79,7 @@ import org.knime.core.table.schema.ColumnarSchema;
 public class HeapBadger {
 
     private static final void debug(final String message) {
-        System.out.println(message);
+        //        System.out.println(message);
     }
 
     // TODO we should make this depend on the size of the data that we know about in advance
