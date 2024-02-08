@@ -79,7 +79,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
-public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAccessible {
+public final class ColumnarRowWriteTable implements RowWriteAccessible {
 
     static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteTable.class);
 
@@ -124,10 +124,15 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
             builder //
                 .useColumnDataCache( //
                     ColumnarPreferenceUtils.getColumnDataCache(), ColumnarPreferenceUtils.getPersistExecutor())
-                .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
-                .useHeapCache( //
+                .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache());
+
+            if (ColumnarRowWriteTableSettings.useHeapBadger()) {
+                builder.useHeapBadger(ColumnarPreferenceUtils.getHeapCache());
+            } else {
+                builder.useHeapCache( //
                     ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
                     ColumnarPreferenceUtils.getSerializeExecutor());//
+            }
 
             // NOTE:
             // We do not use the ReadBatchCache for now because it can cause a deadlock on a memory alert.

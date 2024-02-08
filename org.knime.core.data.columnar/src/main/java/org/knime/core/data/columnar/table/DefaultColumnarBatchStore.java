@@ -73,11 +73,13 @@ import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.domain.DomainWritableConfig;
 import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
+import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.util.DuplicateChecker;
+import org.knime.core.util.ThreadUtils;
 
 /**
  * Enhances a {@link BatchStore} with additional features like caching, dictionary encoding, domain calculation and
@@ -112,6 +114,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         private ExecutorService m_columnDataCacheExecutor = null;
 
         private boolean m_dictEncodingEnabled = false;
+
+        private boolean m_useHeapBadger = false;
 
         private ExecutorService m_duplicateCheckExecutor = null;
 
@@ -153,6 +157,18 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             m_heapCache = cache;
             m_heapCachePersistExecutor = persistExec;
             m_heapCacheSerializeExecutor = serializeExec;
+            return this;
+        }
+
+        /**
+         * Use the heap badger for heap caching instead of the (old) heap cache
+         *
+         * @param cache The heap cache to use for storing the data, or pass null to disable the heap cache
+         * @return This {@link ColumnarBatchStoreBuilder} to continue configuring it.
+         */
+        public ColumnarBatchStoreBuilder useHeapBadger(final SharedObjectCache cache) {
+            m_heapCache = cache;
+            m_useHeapBadger = true;
             return this;
         }
 
@@ -265,28 +281,47 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             m_writable = dictEncoded;
         }
 
-        if (builder.m_duplicateCheckExecutor != null) {
-            m_writable =
-                new DuplicateCheckWritable(m_writable, new DuplicateChecker(), builder.m_duplicateCheckExecutor);
-        }
-
-        if (builder.m_domainCalculationConfig != null) {
-            m_domainWritable =
-                new DomainWritable(m_writable, builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
-            m_writable = m_domainWritable;
-        }
-
-        // In case of the heap badger, we put the duplicate check and domain calculation below, because they are designed to
-        // work on batches at the moment. This might not be optimal, but is the quickest way to put everything together right now.
-        initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
-
-        if (m_heapBadger != null) {
-            // TODO: Do not build a WrappedBatchStore if we use the HeapBadger. The WrappedBatchStore expects a BatchWriter
-            //      (and also reads the numBatches from there). But we don't write Batches, we write row-wise and let the badger do the splitting...
+        if (builder.m_useHeapBadger) {
+            // In case of the heap badger, we put the duplicate check and domain calculation below, because they are designed to
+            // work on batches at the moment. This might not be optimal, but is the quickest way to put everything together right now.
+            initDuplicateCheck(builder.m_duplicateCheckExecutor);
+            initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
+            initHeapBadger(builder.m_heapCache);
             m_wrappedStore = new HeapBadgerBatchStore(m_heapBadger, m_readStore.getFileHandle());
         } else {
+            initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor,
+                builder.m_heapCacheSerializeExecutor);
+            initDuplicateCheck(builder.m_duplicateCheckExecutor);
+            initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
             m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getFileHandle());
         }
+    }
+
+    private void initDuplicateCheck(final ExecutorService duplicateCheckExecutor) {
+        if (duplicateCheckExecutor != null) {
+            m_writable = new DuplicateCheckWritable(m_writable, new DuplicateChecker(), duplicateCheckExecutor);
+        }
+    }
+
+    private void initDomainCalculation(final DomainWritableConfig config, final ExecutorService domainCalcExecutor) {
+        if (config != null) {
+            m_domainWritable = new DomainWritable(m_writable, config, domainCalcExecutor);
+            m_writable = m_domainWritable;
+        }
+    }
+
+    private void initHeapBadger(final SharedObjectCache heapCache) {
+        if (heapCache == null) {
+            return;
+        }
+
+        m_heapBadger = new HeapBadger(m_writable, m_readable, heapCache);
+
+        m_readable = m_heapBadger.getHeapCache();
+        m_writable = null; // FIXME
+
+        // No need for another MemoryAlertListener. The HeapBadger only keeps a small number of rows in the buffer. We could maybe implement flush instead of finish...
+        // The SharedObjectCache is flushed/invalidated outside anyways
     }
 
     private void initHeapCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
@@ -295,29 +330,25 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             return;
         }
 
-        //        m_heapCache = new ObjectCache(m_writable, m_readable, heapCache, persistExec, serializeExec);
-        m_heapBadger = new HeapBadger(m_writable, m_readable, heapCache);
+        m_heapCache = new ObjectCache(m_writable, m_readable, heapCache, persistExec, serializeExec);
 
-        m_readable = m_heapBadger.getHeapCache();
-        m_writable = null; // FIXME
+        m_readable = m_heapCache;
+        m_writable = m_heapCache;
 
-        // No need for another MemoryAlertListener. The HeapBadger only keeps a small number of rows in the buffer. We could maybe implement flush instead of finish...
-        // The SharedObjectCache is flushed/invalidated outside anyways
-
-        //        m_memListener = new MemoryAlertListener() {
-        //            @Override
-        //            protected boolean memoryAlert(final MemoryAlert alert) {
-        //                new Thread(ThreadUtils.runnableWithContext(() -> {
-        //                    try {
-        //                        m_heapCache.flush();
-        //                    } catch (IOException ex) {
-        //                        LOGGER.error("Error during enforced premature serialization of object data.", ex);
-        //                    }
-        //                })).start();
-        //                return false;
-        //            }
-        //        };
-        //        MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
+        m_memListener = new MemoryAlertListener() {
+            @Override
+            protected boolean memoryAlert(final MemoryAlert alert) {
+                new Thread(ThreadUtils.runnableWithContext(() -> {
+                    try {
+                        m_heapCache.flush();
+                    } catch (IOException ex) {
+                        LOGGER.error("Error during enforced premature serialization of object data.", ex);
+                    }
+                })).start();
+                return false;
+            }
+        };
+        MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
     }
 
     private void initSmallTableCache(final SharedBatchWritableCache cache) {
@@ -374,6 +405,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         m_wrappedStore.close();
     }
 
+    @SuppressWarnings("resource") // The heap badger write cursor is closed separately
     @Override
     public void flushObjects() throws IOException {
         if (m_heapCache != null) {
@@ -410,14 +442,6 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
     public int numBatches() {
         return m_wrappedStore.numBatches();
     }
-
-//    @Override
-//    public int batchLength() {
-//        if (m_heapBadger != null) {
-//            throw new IllegalStateException("The batchLength should not be used when batches have variable size");
-//        }
-//        return m_wrappedStore.batchLength();
-//    }
 
     @Override
     public FileHandle getFileHandle() {
