@@ -115,7 +115,10 @@ public class HeapBadgerBatchStore implements BatchStore, BatchingWritable {
 
     @Override
     public void close() throws IOException {
+        // close the writer
         m_heapBadger.getWriteCursor().close();
+        // close the reader
+        m_heapBadger.getHeapCache().close();
     }
 
     @Override
