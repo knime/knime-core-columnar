@@ -129,5 +129,6 @@ public class HeapCache implements RandomAccessBatchReadable {
     @Override
     public void close() throws IOException {
         m_cacheManager.close();
+        m_delegate.close();
     }
 }
