@@ -49,6 +49,7 @@
 package org.knime.core.data.columnar.table;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.knime.core.data.columnar.TestDataBatchStoreUtils.createSpec;
 
 import java.io.IOException;
@@ -147,6 +148,18 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
     }
 
     @Test
+    public void testHeapBadger() throws IOException {
+        try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
+            final var cache = new SoftReferencedObjectCache();
+            final var builder = new ColumnarBatchStoreBuilder(delegate).useHeapBadger(cache);
+            try (final var wrappedStore = builder.build(); //
+                    var writeCursor = wrappedStore.getBatchingWriteCursor()) {
+                assertNotNull(writeCursor);
+            }
+        }
+    }
+
+    @Test
     public void testColumnDataCache() throws IOException {
         final var exec = Executors.newSingleThreadExecutor();
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
@@ -190,7 +203,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
             final var heapCache = new SoftReferencedObjectCache();
             final var smallTableCache = new SharedBatchWritableCache(200, 1000, 2);
             final var builder = new ColumnarBatchStoreBuilder(delegate).useHeapCache(heapCache, exec, exec)
-                    .useSmallTableCache(smallTableCache);
+                .useSmallTableCache(smallTableCache);
             try (final var wrappedStore = builder.build()) {
                 assertEquals(ObjectCache.class, wrappedStore.getWritableDelegate().getClass());
             }
@@ -226,8 +239,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
     public void testDomainCalculationAfterDuplicateCheck() throws IOException {
         final var exec = Executors.newSingleThreadExecutor();
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
-            final var builder =
-                new ColumnarBatchStoreBuilder(delegate).useDuplicateChecking(exec)
+            final var builder = new ColumnarBatchStoreBuilder(delegate).useDuplicateChecking(exec)
                 .useDomainCalculation(new DefaultDomainWritableConfig(SCHEMA, 5, false), exec);
             try (final var wrappedStore = builder.build()) {
                 assertEquals(DomainWritable.class, wrappedStore.getWritableDelegate().getClass());
