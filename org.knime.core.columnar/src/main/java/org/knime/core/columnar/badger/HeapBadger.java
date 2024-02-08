@@ -348,7 +348,9 @@ public class HeapBadger {
 
         private void rethrowExceptionInErrorCase() throws InterruptedException, IOException {
             if (m_exception != null) {
-                if (m_exception instanceof InterruptedException interruptedException) {
+                if (m_exception instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                } else if (m_exception instanceof InterruptedException interruptedException) {
                     throw interruptedException;
                 } else if (m_exception instanceof IOException ioException) {
                     throw ioException;
@@ -408,7 +410,7 @@ public class HeapBadger {
                     if (doFinish) {
                         serializer.finish();
                     }
-                } catch (IOException e) {
+                } catch (Exception e) {
                     // in case of an exception, we remember it and quit the serialization loop
                     m_exception = e;
                     lock.lock();
@@ -445,8 +447,8 @@ public class HeapBadger {
     }
 
     /**
-     * Synchronous serialization queue implementation that is supposed to be useful for debugging.
-     * NOTE: not tested very well yet, might have bugs.
+     * Synchronous serialization queue implementation that is supposed to be useful for debugging. NOTE: not tested very
+     * well yet, might have bugs.
      */
     static class SyncQueue implements SerializationQueue {
         private int m_current = -1;
