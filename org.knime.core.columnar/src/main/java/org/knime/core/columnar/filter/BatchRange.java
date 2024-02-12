@@ -94,7 +94,7 @@ public interface BatchRange {
             return new DefaultBatchRange(0, 0, store.numBatches() - 1, lastIndexInLastBatch);
         } else {
             try {
-                var batchBoundaries = findBatchBoundaries(store);
+                var batchBoundaries = store.findBatchBoundaries();
                 int lastBatchIndex = batchBoundaries.length - 1;
 
                 if (lastBatchIndex < 0) {
@@ -127,30 +127,6 @@ public interface BatchRange {
             } catch (IOException ex) {
                 throw new IllegalStateException("Couldn't find batch boundaries in store.", ex);
             }
-        }
-    }
-
-    /**
-     * Find the boundaries of (variably sized) batches in the store.
-     *
-     * NOTE: not optimal as it loads each batch!
-     *
-     * @param store
-     * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
-     *         the second value indicates the end of the second batch etc
-     * @throws IOException
-     */
-    private static long[] findBatchBoundaries(final BatchReadStore store) throws IOException {
-        // TODO: don't read all batches for this, read batch boundaries from footer
-        int numBatches = store.numBatches();
-        long[] batchBoundaries = new long[numBatches];
-        try (var batchReadable = store.createRandomAccessReader()) {
-            for (int i = 0; i < numBatches; i++) {
-                var batch = batchReadable.readRetained(i);
-                batchBoundaries[i] = batch.length() + (i == 0 ? 0 : batchBoundaries[i - 1]);
-                batch.release();
-            }
-            return batchBoundaries;
         }
     }
 }
