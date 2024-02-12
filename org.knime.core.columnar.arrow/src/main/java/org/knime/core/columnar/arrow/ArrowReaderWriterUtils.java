@@ -52,6 +52,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -84,8 +85,20 @@ public final class ArrowReaderWriterUtils {
     /** The length of the Arrow magic number */
     static final int ARROW_MAGIC_LENGTH = ARROW_MAGIC_BYTES.length;
 
-    /** Key for the metadata element holding the chunk size */
+    /**
+     * Key for the metadata element holding the chunk size
+     *
+     * @deprecated since 5.3
+     * */
+    @Deprecated
     static final String ARROW_CHUNK_SIZE_KEY = "KNIME:basic:chunkSize";
+
+    /**
+     * Key for footer metadata containing the indices of batch lengths
+     *
+     * @since 5.3
+     */
+    static final String ARROW_BATCH_BOUNDARIES_KEY = "KNIME:basic:batchBoundaries";
 
     /** Key for the metadata element holding the factory versions */
     static final String ARROW_FACTORY_VERSIONS_KEY = "KNIME:basic:factoryVersions";
@@ -161,6 +174,27 @@ public final class ArrowReaderWriterUtils {
         return decompressedBuffers;
     }
 
+    public static String longArrayToString(final long[] longs) {
+        StringBuilder sb = new StringBuilder();
+        var first = true;
+        for (var l : longs) {
+            if (first) {
+                first = false;
+            } else {
+                sb.append(",");
+            }
+            sb.append(l);
+        }
+        return sb.toString();
+    }
+
+    public static long[] stringToLongArray(final String serializedLongs) {
+        if (serializedLongs == null) {
+            return new long[0];
+        }
+        return Arrays.stream(serializedLongs.split(",")).mapToLong(Long::valueOf).toArray();
+    }
+
     /** A dictionary provider only holding one single dictionary */
     public static final class SingletonDictionaryProvider implements DictionaryProvider {
 
@@ -229,7 +263,7 @@ public final class ArrowReaderWriterUtils {
         }
     }
 
-    /** A provider of offsets of record batches and dictionary batches in an Arrow file. */
+    /** A provider of byte offsets of record batches and dictionary batches in an Arrow file. */
     public interface OffsetProvider {
 
         /**

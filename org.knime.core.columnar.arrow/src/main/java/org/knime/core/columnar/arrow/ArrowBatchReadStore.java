@@ -65,19 +65,17 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
 
     private AtomicInteger m_numBatches;
 
-    private AtomicInteger m_maxLength;
+    private long[] m_batchBoundaries;
 
     private Boolean m_useLZ4BlockCompression;
 
     ArrowBatchReadStore(final Path path, final BufferAllocator allocator) {
-        this(path, allocator, null, null);
+        this(path, allocator, null);
     }
 
-    ArrowBatchReadStore(final Path path, final BufferAllocator allocator,
-        final AtomicInteger numBatches, final AtomicInteger maxLength) {
+    ArrowBatchReadStore(final Path path, final BufferAllocator allocator, final AtomicInteger numBatches) {
         super(ArrowSchemaUtils.readSchema(path), new PathBackedFileHandle(path), allocator);
         m_numBatches = numBatches;
-        m_maxLength = maxLength;
     }
 
     @Override
@@ -90,9 +88,10 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
         try (final ArrowBatchReader reader =
             createRandomAccessReader(new DefaultColumnSelection(m_schema.numColumns()))) {
             m_numBatches = new AtomicInteger(reader.numBatches());
-            m_maxLength = new AtomicInteger(reader.maxLength());
             m_useLZ4BlockCompression =
                 reader.getMetadata().containsKey(ArrowReaderWriterUtils.ARROW_LZ4_BLOCK_FEATURE_KEY);
+            m_batchBoundaries = ArrowReaderWriterUtils
+                .stringToLongArray(reader.getMetadata().get(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY));
         } catch (final IOException e) {
             throw new IllegalStateException("Error when reading footer.", e);
         }
@@ -115,6 +114,14 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
             initMetadata();
         }
         return m_useLZ4BlockCompression;
+    }
+
+    @Override
+    public long[] getBatchBoundaries() throws IOException {
+        if (m_batchBoundaries == null) {
+            initMetadata();
+        }
+        return m_batchBoundaries;
     }
 
 }
