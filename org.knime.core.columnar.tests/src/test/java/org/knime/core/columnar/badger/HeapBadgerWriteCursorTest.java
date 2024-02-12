@@ -57,6 +57,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -153,6 +154,29 @@ class HeapBadgerWriteCursorTest {
     }
 
     @Test
+    @DisplayName("write - flush - write")
+    void testWriteAfterFlush() throws IOException {
+        runFillAndCheckHeapBadgerTest( //
+            25, // num rows
+            24, // max num rows per batch
+            Integer.MAX_VALUE, // max batch size in bytes
+            new int[]{24, 1}, // expected num rows
+            new int[][]{new int[]{}, //no ints cached
+                new int[]{0} //one string batch cached
+            }, // expected cache indices
+            (row, cursor) -> {
+                if (row == 10) {
+                    try {
+                        cursor.flush();
+                    } catch (IOException ex) {
+                        fail("Flushing should not fail");
+                    }
+                }
+            }, TestDataImpl.INT, TestDataImpl.STRING // test data
+        );
+    }
+
+    @Test
     @DisplayName("error handling - failing serializer")
     @Timeout(1)
     void testFailingSerializer() throws IOException {
@@ -226,7 +250,6 @@ class HeapBadgerWriteCursorTest {
             testData);
     }
 
-    @SuppressWarnings("resource") // heap cache doesn't need to be closed by us
     private static void runFillAndCheckHeapBadgerTest( //
         final int numRows, //
         final int maxNumRowsPerBatch, //
@@ -235,10 +258,25 @@ class HeapBadgerWriteCursorTest {
         final int[][] expectedCacheDataIndices, //
         final TestData... testData //
     ) throws IOException {
+        runFillAndCheckHeapBadgerTest(numRows, maxNumRowsPerBatch, maxBatchSizeInBytes, expectedNumRows,
+            expectedCacheDataIndices, (a, b) -> {
+            }, testData);
+    }
+
+    @SuppressWarnings("resource") // heap cache doesn't need to be closed by us
+    private static void runFillAndCheckHeapBadgerTest( //
+        final int numRows, //
+        final int maxNumRowsPerBatch, //
+        final int maxBatchSizeInBytes, //
+        final int[] expectedNumRows, //
+        final int[][] expectedCacheDataIndices, //
+        final BiConsumer<Long, WriteCursor<WriteAccessRow>> rowCallback, // is called after writing each row
+        final TestData... testData //
+    ) throws IOException {
         try (TestBatchStore batchStore = createTestStore(testData)) {
             var cache = new MockSharedObjectCache();
             var badger = new HeapBadger(batchStore, batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes, cache);
-            writeToHeapBadger(badger, testData, numRows);
+            writeToHeapBadger(badger, testData, numRows, rowCallback);
 
             assertWrittenData(testData, expectedNumRows, batchStore);
             if (expectedCacheDataIndices.length > 0) {
@@ -274,14 +312,15 @@ class HeapBadgerWriteCursorTest {
     }
 
     /** Write some test data to the HeapBadger */
-    private static void writeToHeapBadger(final HeapBadger badger, final TestData[] data, final long numRows)
-        throws IOException {
+    private static void writeToHeapBadger(final HeapBadger badger, final TestData[] data, final long numRows,
+        final BiConsumer<Long, WriteCursor<WriteAccessRow>> rowCallback) throws IOException {
         try (WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
             for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
                 cursor.forward();
                 for (int col = 0; col < data.length; col++) {
                     data[col].writeTo(cursor.access().getWriteAccess(col), rowIdx);
                 }
+                rowCallback.accept(rowIdx, cursor);
             }
             cursor.flush();
         }
