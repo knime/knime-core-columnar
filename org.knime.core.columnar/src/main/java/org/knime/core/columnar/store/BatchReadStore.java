@@ -45,6 +45,8 @@
  */
 package org.knime.core.columnar.store;
 
+import java.io.IOException;
+
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 
 /**
@@ -64,12 +66,33 @@ public interface BatchReadStore extends RandomAccessBatchReadable {
     int numBatches();
 
     /**
-     * Obtain the {@link ReadBatch#length()} of batches in this store. Note that the length of the last batch might be
-     * smaller than the reported value.
+     * Find the boundaries of (variably sized) batches in the store.
      *
-     * @return the length of batches
+     * NOTE: not optimal as it loads each batch!
+     *
+     * TODO: for new arrow files we should store these boundaries in the metadata
+     *       * ReadStore should provide these batchBoundaries
+     *       * "old" files still have the same size for all (but the last) batch -> we can fake the info without having to touch each batch
+     *       * PUSH DOWN TO ARROW!
+     *
+     * @param store
+     * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
+     *         the second value indicates the end of the second batch etc
+     * @throws IOException
      */
-//    int batchLength();
+    default long[] findBatchBoundaries() throws IOException {
+        // TODO: don't read all batches for this, read batch boundaries from footer
+        int numBatches = numBatches();
+        long[] batchBoundaries = new long[numBatches];
+        try (var batchReadable = createRandomAccessReader()) {
+            for (int i = 0; i < numBatches; i++) {
+                var batch = batchReadable.readRetained(i);
+                batchBoundaries[i] = batch.length() + (i == 0 ? 0 : batchBoundaries[i - 1]);
+                batch.release();
+            }
+            return batchBoundaries;
+        }
+    }
 
     /**
      * @return The designated physical location of the store. Note that the store may not (fully) be existent at this
