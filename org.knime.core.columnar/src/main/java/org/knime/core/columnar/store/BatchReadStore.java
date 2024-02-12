@@ -66,21 +66,14 @@ public interface BatchReadStore extends RandomAccessBatchReadable {
     int numBatches();
 
     /**
-     * Find the boundaries of (variably sized) batches in the store.
-     *
-     * NOTE: not optimal as it loads each batch!
-     *
-     * TODO: for new arrow files we should store these boundaries in the metadata
-     *       * ReadStore should provide these batchBoundaries
-     *       * "old" files still have the same size for all (but the last) batch -> we can fake the info without having to touch each batch
-     *       * PUSH DOWN TO ARROW!
+     * Return the boundaries of (variably sized) batches in the store.
      *
      * @param store
      * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
      *         the second value indicates the end of the second batch etc
      * @throws IOException
      */
-    default long[] findBatchBoundaries() throws IOException {
+    default long[] getBatchBoundaries() throws IOException {
         // TODO: don't read all batches for this, read batch boundaries from footer
         int numBatches = numBatches();
         long[] batchBoundaries = new long[numBatches];

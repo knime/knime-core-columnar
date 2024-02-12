@@ -94,7 +94,7 @@ public interface BatchRange {
             return new DefaultBatchRange(0, 0, store.numBatches() - 1, lastIndexInLastBatch);
         } else {
             try {
-                var batchBoundaries = store.findBatchBoundaries();
+                var batchBoundaries = store.getBatchBoundaries();
                 int lastBatchIndex = batchBoundaries.length - 1;
 
                 if (lastBatchIndex < 0) {

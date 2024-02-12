@@ -45,7 +45,6 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY;
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_BYTES;
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_LENGTH;
 
@@ -226,13 +225,6 @@ abstract class AbstractArrowBatchReader implements RandomAccessBatchReader {
                 b.close();
             }
         }
-    }
-
-    int maxLength() throws IOException {
-        if (m_reader == null) {
-            initializeReader();
-        }
-        return Integer.parseInt(m_metadata.get(ARROW_CHUNK_SIZE_KEY));
     }
 
     @Override
