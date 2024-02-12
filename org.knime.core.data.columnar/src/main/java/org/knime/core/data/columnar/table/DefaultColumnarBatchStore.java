@@ -284,6 +284,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         if (builder.m_useHeapBadger) {
             // In case of the heap badger, we put the duplicate check and domain calculation below, because they are designed to
             // work on batches at the moment. This might not be optimal, but is the quickest way to put everything together right now.
+            // TODO: move duplicate check and domain calc before the HeapBadger by making them batch-unaware (again).
             initDuplicateCheck(builder.m_duplicateCheckExecutor);
             initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
             initHeapBadger(builder.m_heapCache);
