@@ -138,7 +138,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     //            The warning "Finishing writing failed ..." seems to indicate that.
     //            Should also close() this cursor !?
     @SuppressWarnings("javadoc")
-    public void flush() {
+    public void finish() {
         try {
             m_accessCursor.finish();
         } catch (IOException ex) {
