@@ -762,6 +762,7 @@ public class HeapBadger {
             }
             try {
                 debug("[c:" + this + "]   -> m_queue.finish()");
+                forward();
                 m_queue.finish();
                 m_closed = true;
                 debug("[c:" + this + "]   <- m_queue.finish()");
