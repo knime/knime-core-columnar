@@ -140,6 +140,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     @SuppressWarnings("javadoc")
     public void finish() {
         try {
+            m_accessCursor.forward();
             m_accessCursor.finish();
         } catch (IOException ex) {
             // This exception is usually not critical, similar to #close()
