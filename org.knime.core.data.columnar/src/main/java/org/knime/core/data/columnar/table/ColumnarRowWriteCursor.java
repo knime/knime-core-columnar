@@ -96,6 +96,10 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
 
     @Override
     public final RowWrite forward() {
+        if ( !m_accessCursor.forward() ) {
+            return null;
+        }
+
         if (m_flushOnForward != null) {
             try {
                 m_flushOnForward.flush();
@@ -103,7 +107,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
                 LOGGER.error("Could not flush cursor during forward", ex);
             }
         }
-        return m_accessCursor.forward() ? m_rowWrite : null;
+        return m_rowWrite;
     }
 
     @Override
