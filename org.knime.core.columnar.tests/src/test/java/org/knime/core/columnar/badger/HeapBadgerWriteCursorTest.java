@@ -315,13 +315,12 @@ class HeapBadgerWriteCursorTest {
     private static void writeToHeapBadger(final HeapBadger badger, final TestData[] data, final long numRows,
         final BiConsumer<Long, WriteCursor<WriteAccessRow>> rowCallback) throws IOException {
         try (WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
-            cursor.forward(); // TODO (TP): using commit() would avoid this, but is it worth the trouble
             for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
+                cursor.forward();
                 for (int col = 0; col < data.length; col++) {
                     data[col].writeTo(cursor.access().getWriteAccess(col), rowIdx);
                 }
                 rowCallback.accept(rowIdx, cursor);
-                cursor.forward();
             }
             cursor.finish();
         }
