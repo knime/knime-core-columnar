@@ -178,7 +178,19 @@ public class HeapBadger {
         int forward() throws InterruptedException, IOException;
 
         /**
-         * Waits for all queued serializations to finish
+         * Blocks until all queued entries have been processed by the {@link Serializer}.
+         * <p>
+         * When {@code flush()} returns, {@link Serializer#serialize} has run on all entries and the queue is now empty. It does not necessarily mean that everything is written to files, etc.
+         *
+         * @throws InterruptedException if interrupted while waiting
+         * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
+         */
+        void flush() throws InterruptedException, IOException;
+
+        /**
+         * Waits for all queued serializations to finish.
+         * <p>
+         * When {@code finish()} returns {@link Serializer#serialize} has run on all entries, and @link {@link Serializer#finish} has been called. No further entries are accepted after {@code finish()}.
          *
          * @throws InterruptedException if interrupted while waiting
          * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
@@ -329,12 +341,34 @@ public class HeapBadger {
         }
 
         @Override
+        public void flush() throws InterruptedException, IOException {
+            final ReentrantLock lock = this.m_lock;
+            lock.lock();
+            try {
+                while (!isQueueEmpty() && m_exception == null) {
+                    m_notFull.await();
+                }
+            } finally {
+                lock.unlock();
+            }
+
+            rethrowExceptionInErrorCase();
+        }
+
+        private boolean isQueueEmpty() {
+            return m_bound == (m_current + m_bufferSize) % m_wrap_at;
+        }
+
+        @Override
         public void finish() throws InterruptedException, IOException {
             final ReentrantLock lock = this.m_lock;
             lock.lock();
             try {
                 if (m_finishing) {
                     return; // TODO: actually wait for the other finishing calls to finish, too
+                    // TODO (TP): Is this still relevant? What are "the other finishing calls"?
+                    //            In general: Should SerializationQueue do any IllegalState checking,
+                    //            or should this rather all be done at the WriteCursor level?
                 }
                 m_finishing = true;
                 m_notEmpty.signal();
@@ -472,6 +506,11 @@ public class HeapBadger {
                 throw new IllegalStateException("queried the size of the table before closing the cursor");
             }
             return m_current;
+        }
+
+        @Override
+        public void flush() throws InterruptedException, IOException {
+            // NO OP
         }
 
         @Override
@@ -692,16 +731,35 @@ public class HeapBadger {
             return true;
         }
 
-        // TODO rename to finish() ???
-        //      or allow writing after calling flush() once
         @Override
         public void flush() throws IOException {
             debug("[c:" + this + "] BadgerWriteCursor.flush");
             if (m_closed) {
-                debug("[c:" + this + "] !! already flushed, ignoring call !!");
+                // TODO (TP): should we rather
+                //              throw new IllegalStateException("Cannot flush a closed write cursor");
+                //            ???
+                debug("[c:" + this + "] !! already closed, ignoring call !!");
                 return;
             }
-            forward();
+            try {
+                debug("[c:" + this + "]   -> m_queue.flush()");
+                m_queue.flush();
+                debug("[c:" + this + "]   <- m_queue.flush()");
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e); // let's pretend it is a RuntimeException?
+            }
+        }
+
+        @Override
+        public void finish() throws IOException {
+            debug("[c:" + this + "] BadgerWriteCursor.finish");
+            if (m_closed) {
+                // TODO (TP): should we rather
+                //              throw new IllegalStateException("Cannot finish a closed write cursor");
+                //            ???
+                debug("[c:" + this + "] !! already closed, ignoring call !!");
+                return;
+            }
             try {
                 debug("[c:" + this + "]   -> m_queue.finish()");
                 m_queue.finish();

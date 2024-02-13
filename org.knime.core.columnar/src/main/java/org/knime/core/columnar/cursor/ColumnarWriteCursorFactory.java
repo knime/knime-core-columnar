@@ -198,6 +198,14 @@ public final class ColumnarWriteCursorFactory {
 
         @Override
         public void flush() throws IOException {
+            throw new UnsupportedOperationException("TODO: ColumnarWriteCursorImpl.flush() should probably not be called?");
+            // TODO (TP): This was implemented before as
+            //   writeCurrentBatch(m_currentIndex + 1);
+            //
+        }
+
+        @Override
+        public void finish() throws IOException {
             writeCurrentBatch(m_currentIndex + 1);
         }
 
