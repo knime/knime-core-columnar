@@ -206,7 +206,7 @@ public final class ColumnarWriteCursorFactory {
 
         @Override
         public void finish() throws IOException {
-            writeCurrentBatch(m_currentIndex + 1);
+            writeCurrentBatch(m_currentIndex);
         }
 
         private void writeCurrentBatch(final int numValues) {

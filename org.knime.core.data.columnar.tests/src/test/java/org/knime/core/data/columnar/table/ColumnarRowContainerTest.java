@@ -98,7 +98,7 @@ public class ColumnarRowContainerTest extends ColumnarTest {
             cursor.forward().setRowKey("1");
             // since heap badger we need to flush before close to run into the duplicate key error.
             // But that would've made sense before too
-            cursor.flush();
+            cursor.finish();
         }
     }
 
