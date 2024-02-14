@@ -163,19 +163,11 @@ public final class ColumnarWriteCursorFactory {
             final ColumnarSchema schema = store.getSchema();
             m_accesses = createWriteAccesses(schema.specStream(), this);
             switchToNextData();
-            // TODO (TP): When forward is removed, m_currentIndex should be initialized m_currentIndex = 0
-            m_currentIndex = -1;
-            // TODO (TP): When forward is removed, m_numRows should be initialized m_numRows = 0
-            m_numRows = -1;
         }
 
         @Override
         public final boolean initialForward() {
-            m_numRows++;
-            m_currentIndex++;
-            if (m_currentIndex > m_currentMaxIndex) {
-                switchToNextData();
-            }
+            // noop
             return true;
         }
 
@@ -217,7 +209,7 @@ public final class ColumnarWriteCursorFactory {
             throw new UnsupportedOperationException("TODO: ColumnarWriteCursorImpl.flush() should probably not be called?");
             // TODO (TP): This was implemented before as
             //   writeCurrentBatch(m_currentIndex + 1);
-            //
+            //   But we don't want to close the batch here?
         }
 
         @Override
