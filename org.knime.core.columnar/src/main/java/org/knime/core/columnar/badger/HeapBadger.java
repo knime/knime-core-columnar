@@ -846,7 +846,7 @@ public class HeapBadger {
         }
 
         @Override
-        public long getNumForwards() {
+        public long numRows() {
             return (m_current < 0) ? 0 : (m_queue.numForwards());
         }
     }
