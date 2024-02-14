@@ -106,9 +106,13 @@ public final class ColumnarWriteCursorFactory {
     public interface ColumnarWriteCursor extends WriteCursor<WriteAccessRow> {
 
         /**
-         * @return the number of times {@link #forward()} has been called successfully on this cursor
+         * Get the number of rows that have been written to this cursor.
+         * <p>
+         * This may only be called after {@link #finish()}. TODO (TP): Do we really want that??? Why???
+         *
+         * @return the number of rows written
          */
-        long getNumForwards();
+        long numRows();
     }
 
     /**
@@ -150,7 +154,7 @@ public final class ColumnarWriteCursorFactory {
 
         private boolean m_adjusting;
 
-        private long m_numForwards;
+        private long m_numRows;
 
         ColumnarWriteCursorImpl(final BatchWritable store) {
             m_writer = store.getWriter();
@@ -164,7 +168,7 @@ public final class ColumnarWriteCursorFactory {
 
         @Override
         public final boolean forward() {
-            m_numForwards++;
+            m_numRows++;
             m_currentIndex++;
             if (m_currentIndex > m_currentMaxIndex) {
                 switchToNextData();
@@ -173,8 +177,9 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public long getNumForwards() {
-            return m_numForwards > 0 ? m_numForwards - 1 : 0;
+        public long numRows() {
+            return m_numRows;
+//          TODO (TP): merging ... had this check on heap-badger branch: return m_numForwards > 0 ? m_numForwards - 1 : 0;
         }
 
         @Override

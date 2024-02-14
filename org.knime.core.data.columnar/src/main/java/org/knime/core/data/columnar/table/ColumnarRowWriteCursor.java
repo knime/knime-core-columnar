@@ -127,7 +127,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     }
 
     long size() {
-        return m_accessCursor.getNumForwards();
+        return m_accessCursor.numRows();
     }
 
     /**
