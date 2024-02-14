@@ -801,7 +801,7 @@ public class HeapBadger {
         }
 
         @Override
-        public boolean forward() {
+        public boolean initialForward() {
             debug("[c:" + this + "] BadgerWriteCursor.forward");
             if (m_closed) {
                 throw new IllegalStateException("Cannot forward a closed write cursor");
