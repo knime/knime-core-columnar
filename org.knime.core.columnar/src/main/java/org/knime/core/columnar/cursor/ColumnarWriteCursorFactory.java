@@ -170,7 +170,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public final boolean forward() {
+        public final boolean initialForward() {
             m_numRows++;
             m_currentIndex++;
             if (m_currentIndex > m_currentMaxIndex) {
