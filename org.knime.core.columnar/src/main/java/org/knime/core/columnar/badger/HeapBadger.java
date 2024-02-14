@@ -778,8 +778,7 @@ public class HeapBadger {
             return m_access;
         }
 
-        // TODO (TP): When forward is removed, m_current should be initialized m_current = 0
-        private int m_current = -1;
+        private int m_current = 0;
 
         @Override
         public void commit() throws IOException {
@@ -802,27 +801,7 @@ public class HeapBadger {
 
         @Override
         public boolean initialForward() {
-            debug("[c:" + this + "] BadgerWriteCursor.forward");
-            if (m_closed) {
-                throw new IllegalStateException("Cannot forward a closed write cursor");
-            }
-
-            if (m_current < 0) {
-                m_current = 0;
-                return true;
-            }
-
-            try {
-                m_buffers[m_current].setFrom(m_access);
-                debug("[c:" + this + "]   -> m_queue.forward()");
-                m_current = m_queue.forward();
-            } catch (IOException | InterruptedException ex) {
-                // can throw IOException if serialization of any previous row has failed
-                // can throw InterruptedException if the cursor had to wait for free buffers to write to and got interrupted
-                throw new RuntimeException(ex);
-            }
-            debug("[c:" + this + "]   <- m_queue.forward()");
-            debug("[c:" + this + "]   m_current = " + m_current);
+            // noop
             return true;
         }
 
@@ -880,7 +859,7 @@ public class HeapBadger {
 
         @Override
         public long numRows() {
-            return (m_current < 0) ? 0 : (m_queue.numForwards());
+            return m_queue.numForwards();
         }
     }
 }
