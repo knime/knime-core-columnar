@@ -64,6 +64,7 @@ import org.knime.core.data.DataRow;
 import org.knime.core.data.MissingCell;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.RowKeyValue;
+import org.knime.core.data.container.DataRowRead;
 import org.knime.core.data.def.BooleanCell.BooleanCellFactory;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell.DoubleCellFactory;
@@ -123,7 +124,7 @@ public class WriteAccessRowWriteTest {
     @Test
     public void testSetNoMissingValues() {
         final DataRow testRow = createRow("test", true, 4, 1.3);
-        m_testInstance.setFrom(testRow);
+        m_testInstance.setFrom(new DataRowRead().setDelegate(testRow));
         verify(m_rowKeyAccess).setStringValue("test");
         verify(m_booleanAccess).setBooleanValue(true);
         verify(m_intAccess).setIntValue(4);
@@ -147,7 +148,7 @@ public class WriteAccessRowWriteTest {
     @Test
     public void testWithMissingValues() {
         final DataRow testRow = createRow("test", null, 4, null);
-        m_testInstance.setFrom(testRow);
+        m_testInstance.setFrom(new DataRowRead().setDelegate(testRow));
         verify(m_rowKeyAccess).setStringValue("test");
         verify(m_booleanAccess).setMissing();
         verify(m_intAccess).setIntValue(4);
