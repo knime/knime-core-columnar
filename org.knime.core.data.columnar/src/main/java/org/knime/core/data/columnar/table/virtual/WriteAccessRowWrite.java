@@ -50,9 +50,6 @@ package org.knime.core.data.columnar.table.virtual;
 
 import java.util.stream.IntStream;
 
-import org.knime.core.data.DataCell;
-import org.knime.core.data.DataRow;
-import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.RowRead;
@@ -63,8 +60,7 @@ import org.knime.core.table.row.Selection.ColumnSelection;
 import org.knime.core.table.row.WriteAccessRow;
 
 /**
- * Implements a {@link RowWrite} based on a {@link WriteAccessRow}. Also allows to directly {@link DataRow DataRows} in
- * order to avoid the overhead of wrapping the {@link DataRow} into a {@link RowRead} first.
+ * Implements a {@link RowWrite} based on a {@link WriteAccessRow}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
@@ -106,7 +102,6 @@ public final class WriteAccessRowWrite implements RowWrite {
         this(schema, writeAccess, ColumnSelection.all());
     }
 
-
     @Override
     public void setFrom(final RowRead values) {
         assert values.getNumColumns() == getNumColumns();
@@ -121,32 +116,6 @@ public final class WriteAccessRowWrite implements RowWrite {
                 }
             }
         }
-    }
-
-    /**
-     * Copy all values as well as the row key from the provided row.
-     *
-     * @param row to read from
-     */
-    public void setFrom(final DataRow row) {
-        assert row.getNumCells() == getNumColumns();
-        setRowKey(row.getKey());
-        for (var i = 0; i < row.getNumCells(); i++) {
-            final DataCell cell = row.getCell(i);
-            if (cell.isMissing()) {
-                setMissing(i);
-            } else {
-                var writeValue = m_values[i + 1];
-                if (writeValue != null) {
-                    setValue(writeValue, cell);
-                }
-            }
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <V extends DataValue> void setValue(final WriteValue<V> writeValue, final DataValue value) {
-        writeValue.setValue((V)value);
     }
 
     @SuppressWarnings("unchecked")

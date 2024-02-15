@@ -51,6 +51,7 @@ package org.knime.core.data.columnar.table.virtual;
 import java.io.IOException;
 
 import org.knime.core.data.container.CloseableRowIterator;
+import org.knime.core.data.container.DataRowRead;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.access.BufferedAccesses;
 import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
@@ -68,6 +69,8 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
 
     private final BufferedAccessRow m_accessRow;
 
+    private final DataRowRead m_rowRead;
+
     private final WriteAccessRowWrite m_rowWrite;
 
     private final CloseableRowIterator m_iterator;
@@ -75,6 +78,7 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
     RowIteratorCursor(final ValueSchema schema, final CloseableRowIterator iterator,
         final ColumnSelection selection) {
         m_accessRow = BufferedAccesses.createBufferedAccessRow(schema, selection);
+        m_rowRead = new DataRowRead();
         m_rowWrite = new WriteAccessRowWrite(schema, m_accessRow, selection);
         m_iterator = iterator;
     }
@@ -98,9 +102,10 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
         if (m_iterator.hasNext()) {
             // Note: all cells of a BufferedAccessRow need to be populated when advancing to a new row,
             //       which we do here, so no need to call setMissing() on all cells first.
-            m_rowWrite.setFrom(m_iterator.next());
+            m_rowWrite.setFrom(m_rowRead.setDelegate(m_iterator.next()));
             return true;
         } else {
+            m_rowRead.setDelegate(null);
             return false;
         }
     }
