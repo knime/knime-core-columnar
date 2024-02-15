@@ -100,7 +100,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     {
         try {
             if (m_isFirstRow) {
-                m_accessCursor.initialForward();
                 m_isFirstRow = false;
             } else {
                 m_accessCursor.commit();

@@ -166,12 +166,6 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public final boolean initialForward() {
-            // noop
-            return true;
-        }
-
-        @Override
         public void commit() throws IOException {
             m_numRows++;
             m_currentIndex++;
