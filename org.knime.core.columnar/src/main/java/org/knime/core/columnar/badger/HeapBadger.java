@@ -800,12 +800,6 @@ public class HeapBadger {
         }
 
         @Override
-        public boolean initialForward() {
-            // noop
-            return true;
-        }
-
-        @Override
         public void flush() throws IOException {
             debug("[c:" + this + "] BadgerWriteCursor.flush");
             if (m_closed) {
