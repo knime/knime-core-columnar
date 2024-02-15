@@ -123,11 +123,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     }
 
     @Override
-    public boolean canForward() {
-        return true;
-    }
-
-    @Override
     public final void close() {
         try {
             m_accessCursor.close();
