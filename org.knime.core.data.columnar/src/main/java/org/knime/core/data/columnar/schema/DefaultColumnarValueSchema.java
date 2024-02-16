@@ -94,18 +94,26 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
         return m_source;
     }
 
-    @Override
-    public DataSpec getSpec(final int index) {
+    private int boundsCheckedColumnIndex(final int index)
+    {
         if (index < 0) {
             throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
         }
         if (index >= numColumns()) {
             throw new IndexOutOfBoundsException(
-                String.format("Column index %d greater or equal to the reader's largest column index (%d).", index,
-                    numColumns() - 1));
+                String.format("Column index %d greater than largest column index (%d).", index, numColumns() - 1));
         }
+        return index;
+    }
 
-        return m_specs.get(index);
+    @Override
+    public DataSpec getSpec(final int index) {
+        return m_specs.get(boundsCheckedColumnIndex(index));
+    }
+
+    @Override
+    public DataTraits getTraits(final int index) {
+        return m_traits.get(boundsCheckedColumnIndex(index));
     }
 
     @Override
@@ -143,20 +151,6 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
             return false;
         }
         return Iterators.elementsEqual(iterator(), other.iterator());
-    }
-
-    @Override
-    public DataTraits getTraits(final int index) {
-        if (index < 0) {
-            throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
-        }
-        if (index >= numColumns()) {
-            throw new IndexOutOfBoundsException(
-                String.format("Column index %d greater or equal to the reader's largest column index (%d).", index,
-                    numColumns() - 1));
-        }
-
-        return m_traits.get(index);
     }
 
     @Override
