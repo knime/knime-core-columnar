@@ -48,9 +48,9 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import java.text.ParseException;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
@@ -74,6 +74,10 @@ import org.knime.core.data.v2.value.DoubleValueFactory;
 import org.knime.core.data.v2.value.IntValueFactory;
 import org.knime.core.data.v2.value.LongValueFactory;
 import org.knime.core.data.v2.value.StringValueFactory;
+import org.knime.core.expressions.Ast;
+import org.knime.core.expressions.AstType;
+import org.knime.core.expressions.Expressions;
+import org.knime.core.expressions.Expressions.ExpressionError;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -87,16 +91,9 @@ import org.knime.core.table.schema.DoubleDataSpec;
 import org.knime.core.table.schema.IntDataSpec;
 import org.knime.core.table.schema.LongDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
-import org.knime.core.table.virtual.expression.Ast;
-import org.knime.core.table.virtual.expression.AstType;
 import org.knime.core.table.virtual.expression.Exec;
 import org.knime.core.table.virtual.expression.Exec.Computer;
-import org.knime.core.table.virtual.expression.ExpressionGrammar;
-import org.knime.core.table.virtual.expression.ExpressionGrammar.Expr;
-import org.knime.core.table.virtual.expression.Typing;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
-import org.rekex.parser.ParseResult;
-import org.rekex.parser.PegParser;
 
 /**
  * The {@link ExpressionMapperFactory} parses the expression and applies it to each row of the given data.
@@ -124,13 +121,19 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
         m_newColumnName = newColumnName;
 
         try {
-            final IntFunction<AstType> columnIndexToAstType = i -> inputTableSchema.getSpec(i).accept(Typing.toAstType);
-            final var ast = parseExpression(expression, columnIndexToAstType);
+            Function<String, OptionalInt> colNameToIdx = colName -> {
+                var colIdx = inputTableSchema.getSourceSpec().findColumnIndex(colName);
+                return colIdx == -1 ? OptionalInt.empty() : OptionalInt.of(colIdx + 1);
+            };
+            Function<Ast.ColumnAccess, Optional<AstType>> colNameToType =
+                colAccess -> colNameToIdx.apply(colAccess.name()).stream().mapToObj(inputTableSchema::getSpec)
+                    .map(s -> s.accept(Exec.DATA_SPEC_TO_AST_TYPE_MAPPER)).findFirst();
+            var ast = Expressions.parse(expression);
+            Expressions.resolveColumnIndices(ast, colNameToIdx);
+            var outputType = Expressions.inferTypes(ast, colNameToType);
+            var outputSpec = Exec.toDataSpec(outputType);
 
-            var outputType = ast.inferredType();
-            var outputSpec = Typing.toDataSpec(outputType);
-
-            final var columns = getRequiredColumns(ast);
+            final var columns = Exec.getRequiredColumns(ast);
             m_columnIndices = columns.columnIndices();
 
             final IntFunction<Function<ReadAccess[], ? extends Computer>> columnIndexToComputerFactory =
@@ -143,7 +146,7 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
 
             m_mapperFactory = Exec.createMapperFactory(ast, columnIndexToComputerFactory, outputSpec);
 
-        } catch (ParseException ex) {
+        } catch (ExpressionError ex) {
             throw new IllegalArgumentException(ex);
         }
     }
@@ -167,35 +170,6 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
 
     int[] getInputColumnIndices() {
         return m_columnIndices;
-    }
-
-    /**
-     * Parses the given expression and builds an abstract syntax tree representing it
-     *
-     * @param expression
-     * @param columnIndexToAstType
-     * @return The root node of the AST
-     * @throws ParseException
-     */
-    @SuppressWarnings("restriction")
-    public static Ast.Node parseExpression(final String expression, final IntFunction<AstType> columnIndexToAstType)
-        throws ParseException {
-        final PegParser<Expr> parser = ExpressionGrammar.parser();
-        final ParseResult<Expr> result = parser.parse(expression);
-        if (result instanceof ParseResult.Full<Expr> full) {
-            final Ast.Node ast = full.value().ast();
-            final List<Ast.Node> postorder = Ast.postorder(ast);
-            Typing.inferTypes(postorder, columnIndexToAstType);
-            return ast;
-        } else {
-            throw new ParseException("Could not parse expression, error: " + result, 0);
-        }
-    }
-
-    @SuppressWarnings("restriction")
-    private static Ast.RequiredColumns getRequiredColumns(final Ast.Node ast) {
-        final List<Ast.Node> postorder = Ast.postorder(ast);
-        return Ast.getRequiredColumns(postorder);
     }
 
     private static ValueFactory<?, ?> primitiveDataSpecToValueFactory(final DataSpec spec) {
