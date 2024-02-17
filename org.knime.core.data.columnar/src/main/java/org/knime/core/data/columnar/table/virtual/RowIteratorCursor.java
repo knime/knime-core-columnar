@@ -49,14 +49,13 @@
 package org.knime.core.data.columnar.table.virtual;
 
 import java.io.IOException;
-import java.util.stream.IntStream;
+import java.util.Arrays;
 
-import org.knime.core.data.RowKeyValue;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DataRow;
+import org.knime.core.data.DataValue;
 import org.knime.core.data.container.CloseableRowIterator;
-import org.knime.core.data.container.DataRowRead;
 import org.knime.core.data.v2.RowKeyWriteValue;
-import org.knime.core.data.v2.RowRead;
-import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.access.BufferedAccesses;
@@ -74,9 +73,7 @@ import org.knime.core.table.row.WriteAccessRow;
  */
 final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
 
-    private final BufferedAccessRow m_accessRow;
-
-    private final DataRowRead m_rowRead;
+    private final BufferedAccessRow m_accesses;
 
     private final WriteAccessRowWrite m_rowWrite;
 
@@ -84,16 +81,15 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
 
     RowIteratorCursor(final ValueSchema schema, final CloseableRowIterator iterator,
         final ColumnSelection selection) {
-        m_accessRow = BufferedAccesses.createBufferedAccessRow(schema, selection);
-        m_rowRead = new DataRowRead();
-        m_rowWrite = new WriteAccessRowWrite(schema, m_accessRow, selection);
+        if (!selection.isSelected(0)) {
+            throw new IllegalArgumentException("ColumnSelection must contain RowKey");
+        }
+        m_accesses = BufferedAccesses.createBufferedAccessRow(schema, selection);
+        m_rowWrite = new WriteAccessRowWrite(schema, selection, m_accesses);
         m_iterator = iterator;
     }
 
-
-    private static class WriteAccessRowWrite implements RowWrite {
-
-        // TODO with a bit of refactoring this could also be used in BufferedRowContainer
+    private static class WriteAccessRowWrite {
 
         private final WriteAccessRow m_accesses;
 
@@ -108,73 +104,35 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
          * @param writeAccess to write to
          * @param selection the selected columns
          */
-        public WriteAccessRowWrite(final ColumnarValueSchema schema, final WriteAccessRow writeAccess,
-            final ColumnSelection selection) {
-            m_accesses = writeAccess;
-            final var numColumns = schema.numColumns();
-            m_values = new WriteValue<?>[numColumns];
-            var selected = selection.allSelected() ? IntStream.range(0, numColumns)
-                : IntStream.of(selection.getSelected(0, numColumns));
-            selected.forEach(i -> m_values[i] = schema.getValueFactory(i).createWriteValue(m_accesses.getWriteAccess(i)));
+        public WriteAccessRowWrite(final ValueSchema schema, final ColumnSelection selection,
+            final WriteAccessRow accesses) {
+            m_accesses = accesses;
+            m_values = new WriteValue<?>[schema.numColumns()];
+            Arrays.setAll(m_values, i -> selection.isSelected(i) //
+                ? schema.getValueFactory(i).createWriteValue(m_accesses.getWriteAccess(i)) //
+                : null);
             m_rowKeyValue = (RowKeyWriteValue)m_values[0];
         }
 
-        /**
-         * Constructor.
-         *
-         * @param schema of the table
-         * @param writeAccess to write to
-         */
-        public WriteAccessRowWrite(final ColumnarValueSchema schema, final WriteAccessRow writeAccess) {
-            this(schema, writeAccess, ColumnSelection.all());
-        }
-
-        @Override
-        public void setFrom(final RowRead values) {
-            assert values.getNumColumns() == getNumColumns();
-            setRowKey(values.getRowKey());
-            for (var i = 0; i < values.getNumColumns(); i++) {
-                if (values.isMissing(i)) {
-                    setMissing(i);
-                } else {
-                    final var writeValue = m_values[i + 1];
-                    if (writeValue != null) {
-                        writeValue.setValue(values.getValue(i));
+        public void setFrom(final DataRow row) {
+            assert row.getNumCells() == m_values.length - 1;
+            m_rowKeyValue.setRowKey(row.getKey());
+            for (int i = 0; i < m_values.length - 1; i++) {
+                WriteValue<?> writeValue = m_values[i + 1];
+                if (writeValue != null) {
+                    final DataCell cell = row.getCell(i);
+                    if (cell.isMissing()) {
+                        m_accesses.getWriteAccess(i + 1).setMissing();
+                    } else {
+                        set(writeValue, cell);
                     }
                 }
             }
         }
 
         @SuppressWarnings("unchecked")
-        @Override
-        public <W extends WriteValue<?>> W getWriteValue(final int index) {
-            return (W)m_values[index + 1];
-        }
-
-        @Override
-        public int getNumColumns() {
-            return m_values.length - 1;
-        }
-
-        @Override
-        public void setMissing(final int index) {
-            if (m_values[index + 1] != null) {
-                m_accesses.getWriteAccess(index + 1).setMissing();
-            }
-        }
-
-        @Override
-        public void setRowKey(final String rowKey) {
-            if (m_rowKeyValue != null) {
-                m_rowKeyValue.setRowKey(rowKey);
-            }
-        }
-
-        @Override
-        public void setRowKey(final RowKeyValue rowKey) {
-            if (m_rowKeyValue != null) {
-                m_rowKeyValue.setRowKey(rowKey);
-            }
+        private static <D extends DataValue> void set(final WriteValue<D> writeValue, final DataCell cell) {
+            writeValue.setValue((D)cell);
         }
     }
 
@@ -189,7 +147,7 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
 
     @Override
     public ReadAccessRow access() {
-        return m_accessRow;
+        return m_accesses;
     }
 
     @Override
@@ -197,10 +155,9 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
         if (m_iterator.hasNext()) {
             // Note: all cells of a BufferedAccessRow need to be populated when advancing to a new row,
             //       which we do here, so no need to call setMissing() on all cells first.
-            m_rowWrite.setFrom(m_rowRead.setDelegate(m_iterator.next()));
+            m_rowWrite.setFrom(m_iterator.next());
             return true;
         } else {
-            m_rowRead.setDelegate(null);
             return false;
         }
     }
@@ -209,5 +166,4 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
     public boolean canForward() {
         return m_iterator.hasNext();
     }
-
 }
