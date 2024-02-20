@@ -63,6 +63,7 @@ import org.knime.core.table.row.WriteAccessRow;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
+// TODO (TP) replace with BufferedRowWrite
 public final class WriteAccessRowWrite implements RowWrite {
 
     // TODO with a bit of refactoring this could also be used in BufferedRowContainer
@@ -81,13 +82,18 @@ public final class WriteAccessRowWrite implements RowWrite {
      */
     public WriteAccessRowWrite(final ValueSchema schema, final WriteAccessRow writeAccess) {
         m_accesses = writeAccess;
-        m_values = new WriteValue<?>[schema.numColumns()];
+        m_values = new WriteValue<?>[schema.numFactories()];
         Arrays.setAll(m_values, i -> schema.getValueFactory(i).createWriteValue(m_accesses.getWriteAccess(i)));
         m_rowKeyValue = (RowKeyWriteValue)m_values[0];
     }
 
     @Override
     public void setFrom(final RowRead values) {
+
+        // TODO (TP) We could check instanceof (Dense)ColumnarRowWrite here and directly
+        //           set our WriteAccessRow from their ReadAccessRow
+        //           Would that improve performance in any way?
+
         assert values.getNumColumns() == getNumColumns();
         setRowKey(values.getRowKey());
         for (int i = 0; i < getNumColumns(); i++) {
