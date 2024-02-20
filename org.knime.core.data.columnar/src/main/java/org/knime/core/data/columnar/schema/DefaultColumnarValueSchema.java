@@ -132,6 +132,11 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
+    public int numFactories() {
+        return m_source.numFactories();
+    }
+
+    @Override
     public Iterator<DataSpec> iterator() {
         return m_specs.iterator();
     }

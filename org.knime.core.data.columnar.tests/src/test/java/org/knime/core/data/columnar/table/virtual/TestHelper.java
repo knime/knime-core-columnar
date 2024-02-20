@@ -191,6 +191,11 @@ public class TestHelper {
         }
 
         @Override
+        public int numFactories() {
+            return m_valueFactories.length;
+        }
+
+        @Override
         public DataSpec getSpec(final int index) {
             return m_dataSpecs[index];
         }

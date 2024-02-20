@@ -85,6 +85,11 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
+    public int numFactories() {
+        return m_delegate.numFactories();
+    }
+
+    @Override
     public DataSpec getSpec(final int index) {
         return m_delegate.getSpec(index);
     }
@@ -128,5 +133,4 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     public Stream<DataSpec> specStream() {
         return m_delegate.specStream();
     }
-
 }

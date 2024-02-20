@@ -59,11 +59,12 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public interface ColumnarValueSchema extends ColumnarSchema {
+public interface ColumnarValueSchema extends ValueSchema, ColumnarSchema {
 
     /**
      * @return the spec used to create this schema
      */
+    @Override
     DataTableSpec getSourceSpec();
 
     /**
@@ -72,6 +73,7 @@ public interface ColumnarValueSchema extends ColumnarSchema {
      * @param index of the column (including the row key column)
      * @return the {@link ValueFactory} for the provided column index
      */
+    @Override
     <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(int index);
 
     /**

@@ -97,6 +97,7 @@ public final class ColumnarValueSchemaUtils {
     /**
      * @return an empty {@link ColumnarValueSchema}
      */
+    // TODO (TP) remove
     public static ColumnarValueSchema empty() {
         return EmptyColumnarValueSchema.INSTANCE;
     }
@@ -224,6 +225,7 @@ public final class ColumnarValueSchemaUtils {
         return new UpdatedColumnarValueSchema(spec, schema);
     }
 
+    // TODO (TP) remove
     private enum EmptyColumnarValueSchema implements ColumnarValueSchema {
 
         INSTANCE;
@@ -232,6 +234,11 @@ public final class ColumnarValueSchemaUtils {
 
         @Override
         public int numColumns() {
+            return 0;
+        }
+
+        @Override
+        public int numFactories() {
             return 0;
         }
 
