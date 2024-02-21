@@ -144,7 +144,7 @@ final class ColumnarTableTestUtils {
         try (final ColumnarRowContainer container = createColumnarRowContainer(nCols, type, exec);
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
             for (int i = 0; i < nRows; i++) {
-                final RowWrite row = cursor.forward();
+                final RowWrite row = cursor.row();
                 row.setRowKey(Integer.toString(i));
                 for (int j = 0; j < nCols; j++) {
                     if (i % 2 == 0) { // NOSONAR
@@ -153,6 +153,7 @@ final class ColumnarTableTestUtils {
                         setter.accept(row, j, i);
                     }
                 }
+                cursor.commit();
             }
             return (UnsavedColumnarContainerTable)container.finishInternal();
         } catch (Exception e) {

@@ -277,7 +277,11 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
      * @param row the row to be written
      */
     private void writeRowIntoCursor(final DataRow row) {
-        final RowWrite rowWrite = m_delegateCursor.forward();
+        final RowWrite rowWrite = m_delegateCursor.row();
+
+        // TODO (TP): Replace with ~ m_delegateCursor.commit(DataRowRead(row))
+        //            Or ColumnarRowWriteCursor could support commit(DataRow) directly?
+        //            That is, not through the RowWriteCursor interface, but directly.
         rowWrite.setRowKey(row.getKey());
         for (int i = 0; i < m_numColumns; i++) {
             final DataCell cell = row.getCell(i);
@@ -287,6 +291,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
                 rowWrite.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
             }
         }
+        m_delegateCursor.commit();
     }
 
     /**
