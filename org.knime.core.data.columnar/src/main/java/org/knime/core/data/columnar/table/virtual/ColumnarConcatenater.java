@@ -264,7 +264,10 @@ public final class ColumnarConcatenater {
                     var writeCursor = rowContainer.createCursor(); //
             ) {
                 progress.setMessage("Uniquify RowIDs");
-                consumeRowIDs(table, rowID -> writeCursor.forward().setRowKey(uniquifyRowID(rowID)), progress);
+                consumeRowIDs(table, rowID -> {
+                    writeCursor.row().setRowKey(uniquifyRowID(rowID));
+                    writeCursor.commit();
+                }, progress);
                 return rowContainer.finish();
             } catch (Exception ex) {
                 throw new IllegalStateException(ex);

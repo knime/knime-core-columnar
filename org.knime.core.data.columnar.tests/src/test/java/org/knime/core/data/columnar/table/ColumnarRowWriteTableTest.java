@@ -169,15 +169,17 @@ public final class ColumnarRowWriteTableTest {
     }
 
     private static void writeTestData(final ColumnarRowWriteCursor cursor) {
-        final RowWrite row0 = cursor.forward();
+        final RowWrite row0 = cursor.row();
         row0.setRowKey(RowKey.createRowKey(0l));
         row0.<IntWriteValue> getWriteValue(0).setIntValue(-234);
         row0.<StringWriteValue> getWriteValue(1).setStringValue("My third string");
+        cursor.commit();
 
-        final RowWrite row1 = cursor.forward();
+        final RowWrite row1 = cursor.row();
         row1.setRowKey(RowKey.createRowKey(1l));
         row1.<IntWriteValue> getWriteValue(0).setIntValue(21);
         row1.<StringWriteValue> getWriteValue(1).setStringValue("My fourth string");
+        cursor.commit();
     }
 
     private static void checkDomains(final int intColExpectedLowerBound, final int intColExpectedUpperBound,

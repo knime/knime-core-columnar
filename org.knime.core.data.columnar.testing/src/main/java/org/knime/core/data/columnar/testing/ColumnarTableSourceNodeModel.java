@@ -81,11 +81,12 @@ public class ColumnarTableSourceNodeModel extends NodeModel {
             try (final RowContainer container = exec.createRowContainer(m_spec);
                     final RowWriteCursor cursor = container.createCursor()) {
                 for (long i = 0; i < nrRows; i++) {
-                    final RowWrite row = cursor.forward();
+                    final RowWrite row = cursor.row();
                     row.setRowKey("Row" + i);
                     for (int j = 0; j < nrCols; j++) {
                         row.<DoubleWriteValue> getWriteValue(j).setDoubleValue(r.nextDouble());
                     }
+                    cursor.commit();
                 }
                 bdt = container.finish();
             }

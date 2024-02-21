@@ -76,9 +76,10 @@ public class ColumnarContainerTableTest extends ColumnarTest {
             ColumnarRowContainer.create(null, tableId, createSchema(1), TestColumnStoreFactory.INSTANCE, settings);
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
             for (int i = 0; i < nRows; i++) {
-                final RowWrite row = cursor.forward();
+                final RowWrite row = cursor.row();
                 row.setRowKey(Integer.toString(i));
                 row.<IntWriteValue> getWriteValue(0).setIntValue(i);
+                cursor.commit();
             }
             try (@SuppressWarnings("resource")
             final AbstractColumnarContainerTable table = (AbstractColumnarContainerTable)container.finishInternal()) {
