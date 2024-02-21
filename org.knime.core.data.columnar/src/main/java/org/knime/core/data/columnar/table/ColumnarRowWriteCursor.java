@@ -125,34 +125,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
         commit();
     }
 
-    // TODO (TP): get rid of this workaround:
-    boolean m_isFirstRow = true;
-    private void commitPreviousRow()
-    {
-        try {
-            if (m_isFirstRow) {
-                m_isFirstRow = false;
-            } else {
-                m_accessCursor.commit();
-            }
-        } catch (IOException ex) {
-            LOGGER.error("Could not commit row", ex);
-        }
-    }
-
-    @Override
-    public final RowWrite forward() {
-        commitPreviousRow();
-        if (m_flushOnForward != null) {
-            try {
-                m_flushOnForward.flush();
-            } catch (IOException ex) {
-                LOGGER.error("Could not flush cursor during forward", ex);
-            }
-        }
-        return m_rowWrite;
-    }
-
     @Override
     public final void close() {
         try {
@@ -178,7 +150,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     @SuppressWarnings("javadoc")
     public void finish() {
         try {
-            commitPreviousRow();
             m_accessCursor.finish();
         } catch (IOException ex) {
             // This exception is usually not critical, similar to #close()
