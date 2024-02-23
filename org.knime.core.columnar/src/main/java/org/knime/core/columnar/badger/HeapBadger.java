@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.badger;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.locks.Condition;
@@ -79,7 +80,7 @@ import org.knime.core.table.schema.ColumnarSchema;
 public class HeapBadger {
 
     private static final void debug(final String message) {
-        //        System.out.println(message);
+        //                System.out.println(message);
     }
 
     // TODO we should make this depend on the size of the data that we know about in advance
@@ -97,6 +98,8 @@ public class HeapBadger {
 
     private final BatchWritable m_writeDelegate;
 
+    private final Thread m_serializationThread;
+
     public HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable,
         final int maxNumRowsPerBatch, final int maxBatchSizeInBytes, final SharedObjectCache cache) {
         ColumnarSchema schema = writable.getSchema();
@@ -109,9 +112,10 @@ public class HeapBadger {
         m_heapCache = new HeapCache(readable, cache);
         m_writeDelegate = writable;
 
-        new Thread(() -> {
+        m_serializationThread = new Thread(() -> {
             async.serializeLoop(m_badger);
-        }).start();
+        }, "HeapBadger-SerializationLoop");
+        m_serializationThread.start();
     }
 
     public HeapBadger(final BatchStore store) {
@@ -156,11 +160,13 @@ public class HeapBadger {
     //
     //   Async
     //
-    interface SerializationQueue {
+    interface SerializationQueue extends Closeable {
         interface Serializer {
-            void serialize(int previous_head, int head) throws IOException;
+            void serialize(int previous_head, int head) throws IOException, InterruptedException;
 
             void finish() throws IOException;
+
+            void close() throws IOException;
         }
 
         /**
@@ -180,7 +186,8 @@ public class HeapBadger {
         /**
          * Blocks until all queued entries have been processed by the {@link Serializer}.
          * <p>
-         * When {@code flush()} returns, {@link Serializer#serialize} has run on all entries and the queue is now empty. It does not necessarily mean that everything is written to files, etc.
+         * When {@code flush()} returns, {@link Serializer#serialize} has run on all entries and the queue is now empty.
+         * It does not necessarily mean that everything is written to files, etc.
          *
          * @throws InterruptedException if interrupted while waiting
          * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
@@ -190,7 +197,8 @@ public class HeapBadger {
         /**
          * Waits for all queued serializations to finish.
          * <p>
-         * When {@code finish()} returns {@link Serializer#serialize} has run on all entries, and @link {@link Serializer#finish} has been called. No further entries are accepted after {@code finish()}.
+         * When {@code finish()} returns {@link Serializer#serialize} has run on all entries, and @link
+         * {@link Serializer#finish} has been called. No further entries are accepted after {@code finish()}.
          *
          * @throws InterruptedException if interrupted while waiting
          * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
@@ -218,9 +226,13 @@ public class HeapBadger {
 
         private final Condition m_finished;
 
+        private final Condition m_closed;
+
         private Throwable m_exception = null; // only filled if an exception occurred, needs to be re-thrown at the next call of the serializer
 
         private boolean m_finishing;
+
+        private boolean m_closing;
 
         private final int m_wrap_at;
 
@@ -230,6 +242,8 @@ public class HeapBadger {
 
         private long m_offset;
 
+        private SerializationQueue.Serializer m_serializer;
+
         AsyncQueue(final int bufferSize) {
             m_bufferSize = bufferSize;
             m_wrap_at = 2 * bufferSize;
@@ -238,6 +252,7 @@ public class HeapBadger {
             m_notEmpty = m_lock.newCondition();
             m_notFull = m_lock.newCondition();
             m_finished = m_lock.newCondition();
+            m_closed = m_lock.newCondition();
 
             // initialize indices:
 
@@ -395,9 +410,11 @@ public class HeapBadger {
 
         @Override
         public void serializeLoop(final Serializer serializer) {
+            m_serializer = serializer;
             final ReentrantLock lock = this.m_lock;
             int previous_head = 0;
             int head;
+            boolean doClose;
             boolean doFinish;
             while (true) {
                 debug("[b] - 0 -");
@@ -407,11 +424,12 @@ public class HeapBadger {
                 debug("[b] LOCKED IN LOOP");
                 try {
                     head = m_current;
+                    doClose = m_closing;
                     doFinish = m_finishing;
                     debug("[b] - 1 -");
                     debug("[b] - head = " + head);
                     debug("[b] - doFinish = " + doFinish);
-                    while (head == previous_head && !doFinish) {
+                    while (head == previous_head && !doFinish && !doClose) {
                         debug("[b] - -> m_notEmpty.await();");
                         try {
                             m_notEmpty.await();
@@ -420,14 +438,14 @@ public class HeapBadger {
                             m_exception = ex;
                             // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
                             m_notFull.signal();
-                            if (doFinish) {
-                                m_finished.signal();
-                            }
+                            m_closed.signal();
+                            m_finished.signal();
                             debug("[b] ERROR EXIT a) because of " + ex.getMessage());
                             return;
                         }
                         debug("[b] - <- m_notEmpty.await();");
                         head = m_current;
+                        doClose = m_closing;
                         doFinish = m_finishing;
                         debug("[b] - head = " + head);
                         debug("[b] - doFinish = " + doFinish);
@@ -450,9 +468,8 @@ public class HeapBadger {
                     lock.lock();
                     // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
                     m_notFull.signal();
-                    if (doFinish) {
-                        m_finished.signal();
-                    }
+                    m_closed.signal();
+                    m_finished.signal();
                     lock.unlock();
                     debug("[b] ERROR EXIT b) because of " + e.getMessage());
                     return;
@@ -469,6 +486,10 @@ public class HeapBadger {
                         m_finished.signal();
                         return;
                     }
+                    if (doClose) {
+                        m_closed.signal();
+                        return;
+                    }
                 } finally {
                     debug("[b] UNLOCKING AT END OF ITERATION");
                     lock.unlock();
@@ -476,6 +497,29 @@ public class HeapBadger {
                 debug("[b] - 4 -");
 
                 previous_head = head;
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            final ReentrantLock lock = this.m_lock;
+            lock.lock();
+            try {
+                if (m_closing) {
+                    return; // multiple threads could call close
+                }
+
+                if (!m_finishing) {
+                    m_closing = true;
+                    m_closed.await();
+                }
+
+                debug("[b]  close AsyncQueue");
+            } catch (InterruptedException ex) {
+                throw new IOException(ex);
+            } finally {
+                m_serializer.close();
+                lock.unlock();
             }
         }
     }
@@ -527,6 +571,11 @@ public class HeapBadger {
         @Override
         public int getBufferSize() {
             return 1;
+        }
+
+        @Override
+        public void close() throws IOException {
+            // NO OP
         }
     }
 
@@ -635,6 +684,7 @@ public class HeapBadger {
                 }
             }
             readBatch.release();
+            m_current_batch = null;
             m_numBatchesWritten++;
         }
 
@@ -656,7 +706,7 @@ public class HeapBadger {
          * Write buffered rows to the underlying store. Split batches when they become large enough.
          */
         @Override
-        public void serialize(final int previous_head, final int head) throws IOException {
+        public void serialize(final int previous_head, final int head) throws IOException, InterruptedException {
             debug("[b] Badger.serialize( previous_head=" + previous_head + ", head=" + head + " )");
             int from = previous_head;
             int to = head;
@@ -665,6 +715,9 @@ public class HeapBadger {
                 to += m_bufferSize;
             }
             for (int i = from; i < to; ++i) {
+                if (Thread.interrupted()) {
+                    throw new InterruptedException("Serialization interrupted");
+                }
                 debug("[b]   writeBufferedRow(" + (i % m_bufferSize) + ")  ... i=" + i);
                 writeBufferedRow(i % m_bufferSize);
             }
@@ -675,6 +728,15 @@ public class HeapBadger {
             writeCurrentBatch();
             m_writer.close();
         }
+
+        @Override
+        public void close() throws IOException {
+            debug("[b]  close Badger");
+            if (m_current_batch != null) {
+                m_current_batch.release();
+            }
+            m_writer.close();
+        }
     }
 
     // --------------------------------------------------------------------
@@ -682,7 +744,7 @@ public class HeapBadger {
     //   BadgerWriteCursor
     //
 
-    static class BadgerWriteCursor implements ColumnarWriteCursor {
+    class BadgerWriteCursor implements ColumnarWriteCursor {
         private final BufferedAccessRow[] m_buffers;
 
         private final BufferedAccessRow m_access;
@@ -773,7 +835,14 @@ public class HeapBadger {
         @Override
         public void close() throws IOException {
             // TODO abort, release resources, ignore exceptions that might have occurred while serializing in m_queue
+            if (m_closed) {
+                return;
+            }
+
             m_closed = true;
+            m_serializationThread.interrupt();
+            m_queue.close();
+            debug("[c:" + this + "] --- Closing the Badger Write Cursor ");
         }
 
         @Override
