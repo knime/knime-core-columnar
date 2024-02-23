@@ -104,12 +104,6 @@ public class HeapBadgerBatchStore implements BatchStore, BatchingWritable {
     @SuppressWarnings("resource") // the heap cache will be closed with the badger, not here
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-//        try {
-//            m_heapBadger.getWriteCursor().flush();
-//            m_heapBadger.getWriteCursor().close();
-//        } catch (IOException ex) {
-//            throw new IllegalStateException("Could not close the write cursor before reading.", ex);
-//        }
         return m_heapBadger.getHeapCache().createRandomAccessReader(selection);
     }
 
