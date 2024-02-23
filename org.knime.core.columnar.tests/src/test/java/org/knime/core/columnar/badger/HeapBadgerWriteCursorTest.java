@@ -57,7 +57,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -172,6 +171,33 @@ class HeapBadgerWriteCursorTest {
                         fail("Flushing should not fail");
                     }
                 }
+                return true;
+            }, TestDataImpl.INT, TestDataImpl.STRING // test data
+        );
+    }
+
+    @Test
+    @DisplayName("close without flush or finish")
+    void testCloseWithoutFlush() throws IOException {
+        // TODO: try to make me fail :D
+        runFillAndCheckHeapBadgerTest( //
+            25, // num rows
+            24, // max num rows per batch
+            Integer.MAX_VALUE, // max batch size in bytes
+            new int[]{24, 1}, // expected num rows
+            new int[][]{new int[]{}, //no ints cached
+                new int[]{0} //one string batch cached
+            }, // expected cache indices
+            (row, cursor) -> {
+                if (row == 10) {
+                    try {
+                        cursor.close();
+                        return false;
+                    } catch (IOException ex) {
+                        fail("Closing should not fail");
+                    }
+                }
+                return true;
             }, TestDataImpl.INT, TestDataImpl.STRING // test data
         );
     }
@@ -210,6 +236,10 @@ class HeapBadgerWriteCursorTest {
     }
 
     // ====== TEST UTILITIES
+
+    interface RowCallback {
+        boolean keepGoing(Long rowIdx, WriteCursor<WriteAccessRow> cursor);
+    }
 
     static class MockSharedObjectCache implements SharedObjectCache {
         private Map<ColumnDataUniqueId, Object> m_cache = new HashMap<>();
@@ -260,6 +290,7 @@ class HeapBadgerWriteCursorTest {
     ) throws IOException {
         runFillAndCheckHeapBadgerTest(numRows, maxNumRowsPerBatch, maxBatchSizeInBytes, expectedNumRows,
             expectedCacheDataIndices, (a, b) -> {
+                return true;
             }, testData);
     }
 
@@ -270,13 +301,15 @@ class HeapBadgerWriteCursorTest {
         final int maxBatchSizeInBytes, //
         final int[] expectedNumRows, //
         final int[][] expectedCacheDataIndices, //
-        final BiConsumer<Long, WriteCursor<WriteAccessRow>> rowCallback, // is called after writing each row
+        final RowCallback rowCallback, // is called after writing each row
         final TestData... testData //
     ) throws IOException {
         try (TestBatchStore batchStore = createTestStore(testData)) {
             var cache = new MockSharedObjectCache();
             var badger = new HeapBadger(batchStore, batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes, cache);
-            writeToHeapBadger(badger, testData, numRows, rowCallback);
+            if (!writeToHeapBadger(badger, testData, numRows, rowCallback)) {
+                return;
+            }
 
             assertWrittenData(testData, expectedNumRows, batchStore);
             if (expectedCacheDataIndices.length > 0) {
@@ -312,19 +345,22 @@ class HeapBadgerWriteCursorTest {
     }
 
     /** Write some test data to the HeapBadger */
-    private static void writeToHeapBadger(final HeapBadger badger, final TestData[] data, final long numRows,
-        final BiConsumer<Long, WriteCursor<WriteAccessRow>> rowCallback) throws IOException {
+    private static boolean writeToHeapBadger(final HeapBadger badger, final TestData[] data, final long numRows,
+        final RowCallback rowCallback) throws IOException {
         try (WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
             cursor.forward();
             for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
                 for (int col = 0; col < data.length; col++) {
                     data[col].writeTo(cursor.access().getWriteAccess(col), rowIdx);
                 }
-                rowCallback.accept(rowIdx, cursor);
+                if (!rowCallback.keepGoing(rowIdx, cursor)) {
+                    return false;
+                }
                 cursor.forward();
             }
             cursor.finish();
         }
+        return true;
     }
 
     /** Check the written data in the underlying store */

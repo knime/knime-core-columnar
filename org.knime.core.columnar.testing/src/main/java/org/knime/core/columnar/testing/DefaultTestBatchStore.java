@@ -97,6 +97,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
                 final TestData testData = m_factories[i].createWriteData(capacity);
                 data[i] = testData;
             }
+            // TODO: track open write batches too??
             return new DefaultWriteBatch(data);
         }
 
