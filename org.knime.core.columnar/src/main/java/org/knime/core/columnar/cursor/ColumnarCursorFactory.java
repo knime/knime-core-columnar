@@ -48,8 +48,6 @@
  */
 package org.knime.core.columnar.cursor;
 
-import org.knime.core.columnar.filter.BatchRange;
-import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.cursor.RandomAccessCursor;
@@ -92,18 +90,5 @@ public final class ColumnarCursorFactory {
      */
     public static RandomAccessCursor<ReadAccessRow> create(final BatchReadStore store, final Selection selection) {
         return new DefaultColumnarCursor(store, selection);
-    }
-
-    /**
-     * Creates a {@link RandomAccessCursor} that reads from the provided {@link BatchReadStore}.
-     *
-     * @param store to read from
-     * @param selection the columns to read
-     * @param batchRange the range of batches and rows to read
-     * @return a {@link RandomAccessCursor} that reads from {@link BatchReadStore store}
-     */
-    public static RandomAccessCursor<ReadAccessRow> create(final BatchReadStore store, final ColumnSelection selection,
-        final BatchRange batchRange) {
-        throw new IllegalStateException("BatchRange will be removed");
     }
 }

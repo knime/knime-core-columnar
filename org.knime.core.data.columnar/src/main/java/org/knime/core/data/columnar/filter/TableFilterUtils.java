@@ -55,6 +55,7 @@ import java.util.stream.IntStream;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.data.container.filter.TableFilter;
+import org.knime.core.table.row.Selection;
 
 /**
  * Utility class for dealing with the {@link TableFilter} API.
@@ -152,6 +153,29 @@ public final class TableFilterUtils {
         return filter.getMaterializeColumnIndices()//
             .map(TableFilterUtils::toSortedIntArrayWithRowKey)//
             .map(i -> new FilteredColumnSelection(numColumns, i));
+    }
+
+    /**
+     * Create a {@link Selection} based on the provided {@link TableFilter}.
+     *
+     * @param filter to extract the {@link Selection} from
+     * @param numColumns number of columns in the table the filter is applied to
+     * @param numRows number of rows in the table that is filtered
+     * @return the Selection equivalent to the {@link TableFilter}
+     */
+    public static Selection createSelection(final TableFilter filter, final int numColumns, final long numRows) {
+        // Columns
+        final var columns = definesColumnFilter(filter)
+            ? Selection.ColumnSelection.all().retain(extractPhysicalColumnIndices(filter, numColumns))
+            : Selection.ColumnSelection.all();
+
+        // Rows
+        final var rows = Selection.RowRangeSelection.all().retain( //
+            /* from */ extractFromIndex(filter), //
+            /* to   */ extractToIndex(filter, numRows) + 1 //
+        );
+
+        return Selection.all().retainColumns(columns).retainRows(rows);
     }
 
     private TableFilterUtils() {

@@ -46,14 +46,9 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
-import org.knime.core.columnar.filter.BatchRange;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.DefaultBatchRange;
-import org.knime.core.columnar.filter.DefaultColumnSelection;
-import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
@@ -64,6 +59,7 @@ import org.knime.core.data.v2.RowRead;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
+import org.knime.core.table.row.Selection;
 
 /**
  * Columnar implementations of {@link RowCursor} for reading data from columnar table backend.
@@ -162,43 +158,10 @@ final class ColumnarRowCursorFactory {
                 String.format("Length of table is %d, but maximum batch length is %d.", size, maxLength));
         }
 
-        final var batchRange = createBatchRange(filter, size, maxLength);
-        final int numBatches = store.numBatches();
-        if (batchRange.getLastBatch() >= numBatches) {
-            throw new IllegalStateException(String.format("Last batch index is %d, but maximum batch index is %d.",
-                batchRange.getLastBatch(), numBatches - 1));
-        }
-
-        final var selection = createColumnSelection(filter, schema.numColumns());
-
-        return new DefaultRowCursor(ColumnarCursorFactory.create(store, selection, batchRange), schema, selection);
-    }
-
-    private static BatchRange createBatchRange(final TableFilter filter, final long size, final int batchLength) {
-        final long maxRowIndex = size - 1;
-        // filter.getFromRowIndex() is guaranteed to return a value >= 0
-        final long fromRowIndex = filter != null ? TableFilterUtils.extractFromIndex(filter) : 0L;
-        // filter.getToRowIndex() is guaranteed to return a value >= fromRowIndex >= 0
-        final long toRowIndex = filter != null ? TableFilterUtils.extractToIndex(filter, size) : maxRowIndex;
-
-        final int firstBatchIndex = (int)(fromRowIndex / batchLength);
-        final int lastBatchIndex = (int)(toRowIndex / batchLength);
-        final int firstIndexInFirstBatch = (int)(fromRowIndex % batchLength);
-        final int lastIndexInLastBatch = (int)(toRowIndex % batchLength);
-        return new DefaultBatchRange(firstBatchIndex, firstIndexInFirstBatch, lastBatchIndex, lastIndexInLastBatch);
-    }
-
-    private static ColumnSelection createColumnSelection(final TableFilter filter, final int numColumns) {
-        if (filter == null) {
-            return new DefaultColumnSelection(numColumns);
-        } else {
-            if (TableFilterUtils.definesColumnFilter(filter)) {
-                return new FilteredColumnSelection(numColumns,
-                    TableFilterUtils.extractPhysicalColumnIndices(filter, numColumns));
-            } else {
-                return new DefaultColumnSelection(numColumns);
-            }
-        }
+        var numColumns = schema.numColumns();
+        var selection = filter == null ? Selection.all() : TableFilterUtils.createSelection(filter, numColumns, size);
+        var columnSelection = ColumnSelection.fromSelection(selection, numColumns);
+        return new DefaultRowCursor(ColumnarCursorFactory.create(store, selection), schema, columnSelection);
     }
 
     private ColumnarRowCursorFactory() {
