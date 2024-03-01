@@ -73,21 +73,20 @@ import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * Tests for the {@link ColumnarCursorFactory}.
+ * Tests for the {@link DefaultColumnarCursor}.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class ColumnarCursorFactoryTest extends ColumnarTest {
+public class DefaultColumnarCursorTest extends ColumnarTest {
 
     @Test
     public void testSameAccessInstance() throws IOException {
         var batches = new int[]{2, 2, 1};
-        var numRows = numRows(batches);
 
         try ( //
                 var store = createData(batches); //
-                var cursor = ColumnarCursorFactory.create(store, numRows) //
+                var cursor = new DefaultColumnarCursor(store, Selection.all()) //
         ) {
             var access = cursor.access();
             var intAccess = access.getAccess(0);
@@ -108,7 +107,7 @@ public class ColumnarCursorFactoryTest extends ColumnarTest {
 
         try ( //
                 var store = createData(batches); //
-                var cursor = ColumnarCursorFactory.create(store, numRows) //
+                var cursor = new DefaultColumnarCursor(store, Selection.all()) //
         ) {
             var access = cursor.access();
             assertEquals("size of the ReadAccessRow should be number of columns", 2, access.size());
@@ -135,7 +134,7 @@ public class ColumnarCursorFactoryTest extends ColumnarTest {
 
         try ( //
                 var store = createData(batches); //
-                var cursor = ColumnarCursorFactory.create(store, selection) //
+                var cursor = new DefaultColumnarCursor(store, selection) //
         ) {
             var access = cursor.access();
             assertEquals("size of the ReadAccessRow should be number of columns", 2, access.size());
@@ -164,7 +163,7 @@ public class ColumnarCursorFactoryTest extends ColumnarTest {
 
         try ( //
                 var store = createData(batches); //
-                var cursor = ColumnarCursorFactory.create(store, selection) //
+                var cursor = new DefaultColumnarCursor(store, selection) //
         ) {
             var access = cursor.access();
             var intAccess = access.getAccess(0);
@@ -183,16 +182,83 @@ public class ColumnarCursorFactoryTest extends ColumnarTest {
     }
 
     @Test
-    public void testEmptyCursor() throws IOException {
+    public void testRandomAccessAll() throws IOException {
+        var batches = new int[]{2, 2, 1};
+        var rowsToTest = new int[]{4, 2, 3, 0, 4};
+
         try ( //
-                var store = createData(0); //
-                var cursor = ColumnarCursorFactory.create(store, 0) //
+                var store = createData(batches); //
+                var cursor = new DefaultColumnarCursor(store, Selection.all()) //
         ) {
             var access = cursor.access();
             assertEquals("size of the ReadAccessRow should be number of columns", 2, access.size());
-            assertFalse("canForward should be false", cursor.canForward());
-            assertFalse("forward should return false", cursor.forward());
-            assertThrows("moveTo should throw", IndexOutOfBoundsException.class, () -> cursor.moveTo(0));
+            var intAccess = access.getAccess(0);
+            var stringAccess = access.getAccess(1);
+
+            for (var rowIdx : rowsToTest) {
+                cursor.moveTo(rowIdx);
+                checkIntValue(rowIdx, intAccess);
+                checkStringValue(rowIdx, stringAccess);
+            }
+            cursor.close();
+        }
+    }
+
+    @Test
+    public void testRandomAccessColumnSelection() throws IOException {
+        var batches = new int[]{2, 2, 1};
+        var selection = Selection.all().retainColumns(1);
+        var rowsToTest = new int[]{4, 2, 3, 0, 4};
+
+        try ( //
+                var store = createData(batches); //
+                var cursor = new DefaultColumnarCursor(store, selection) //
+        ) {
+            var access = cursor.access();
+            assertEquals("size of the ReadAccessRow should be number of columns", 2, access.size());
+            var intAccess = access.getAccess(0);
+            var stringAccess = access.getAccess(1);
+
+            for (var rowIdx : rowsToTest) {
+                cursor.moveTo(rowIdx);
+                assertThrows("should not be able to access column 0", Exception.class,
+                    () -> ((IntReadAccess)intAccess).getIntValue());
+                checkStringValue(rowIdx, stringAccess);
+            }
+            cursor.close();
+        }
+    }
+
+    @Test
+    public void testRandomAccessRowSelection() throws IOException {
+        var batches = new int[]{4, 4, 4, 2};
+        var startRow = 5;
+        var endRow = 11;
+        var selection = Selection.all().retainRows(startRow, endRow);
+
+        try ( //
+                var store = createData(batches); //
+                var cursor = new DefaultColumnarCursor(store, selection) //
+        ) {
+            var access = cursor.access();
+            assertEquals("size of the ReadAccessRow should be number of columns", 2, access.size());
+            var intAccess = access.getAccess(0);
+            var stringAccess = access.getAccess(1);
+
+            var rowIdx = 1;
+            cursor.moveTo(rowIdx);
+            checkIntValue(rowIdx + startRow, intAccess);
+            checkStringValue(rowIdx + startRow, stringAccess);
+
+            assertThrows("should throw outside of selection", IndexOutOfBoundsException.class, () -> cursor.moveTo(10));
+            assertThrows("should throw outside of selection", IndexOutOfBoundsException.class,
+                () -> cursor.moveTo(endRow - startRow));
+
+            rowIdx = endRow - startRow - 1;
+            cursor.moveTo(rowIdx);
+            checkIntValue(rowIdx + startRow, intAccess);
+            checkStringValue(rowIdx + startRow, stringAccess);
+
             cursor.close();
         }
     }
@@ -201,7 +267,7 @@ public class ColumnarCursorFactoryTest extends ColumnarTest {
     public void testEmptyBatches() throws IOException {
         try ( //
                 var store = createData(0, 0); //
-                var cursor = ColumnarCursorFactory.create(store, Selection.all()) //
+                var cursor = new DefaultColumnarCursor(store, Selection.all()) //
         ) {
             var access = cursor.access();
             assertEquals("size of the ReadAccessRow should be number of columns", 2, access.size());

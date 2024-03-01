@@ -48,29 +48,13 @@
  */
 package org.knime.core.columnar.cursor;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.Arrays;
-import java.util.stream.IntStream;
-
-import org.knime.core.columnar.access.ColumnDataIndex;
-import org.knime.core.columnar.access.ColumnarAccessFactory;
-import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
-import org.knime.core.columnar.access.ColumnarReadAccess;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.BatchRange;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.DefaultBatchRange;
-import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
-import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.cursor.Cursor;
-import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.cursor.RandomAccessCursor;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
-import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.virtual.EmptyCursor;
 
 /**
@@ -81,187 +65,45 @@ import org.knime.core.table.virtual.EmptyCursor;
  */
 public final class ColumnarCursorFactory {
 
+    private ColumnarCursorFactory() {
+    }
+
     /**
-     * Creates a {@link LookaheadCursor} that reads from the provided {@link BatchReadStore}.
+     * Creates a {@link RandomAccessCursor} that reads from the provided {@link BatchReadStore}.
      *
      * @param readStore the store
      * @param size the number of rows in the readStore
-     * @return LookaheadCursor reading all entries in the store
+     * @return {@link RandomAccessCursor} reading all entries in the store
      */
-    public static LookaheadCursor<ReadAccessRow> create(final BatchReadStore readStore, final long size) {
+    public static RandomAccessCursor<ReadAccessRow> create(final BatchReadStore readStore, final long size) {
         if (size == 0) {
             return new EmptyCursor(readStore.getSchema());
         } else {
-//          TODO: replace by this?:
-//          return create(readStore, Selection.all().retainRows(0, size));
-            final int lastIndexInLastBatch = (int)((size - 1) % readStore.batchLength());
-            return create(readStore, new DefaultColumnSelection(readStore.getSchema().numColumns()),
-                new DefaultBatchRange(0, 0, readStore.numBatches() - 1, lastIndexInLastBatch));
+            return create(readStore, Selection.all().retainRows(0, size));
         }
     }
 
     /**
-     * Creates a {@link LookaheadCursor} that reads from the provided {@link BatchReadStore}.
+     * Creates a {@link RandomAccessCursor} that reads from the provided {@link BatchReadStore}.
      *
      * @param store to read from
      * @param selection the columns and row range to read
-     * @return a {@link LookaheadCursor} that reads from {@link BatchReadStore store}
+     * @return a {@link RandomAccessCursor} that reads from {@link BatchReadStore store}
      */
-    public static LookaheadCursor<ReadAccessRow> create(final BatchReadStore store, final Selection selection) {
-        final ColumnSelection columnSelection = ColumnSelection.fromSelection(selection, store.getSchema().numColumns());
-        final BatchRange batchRange = BatchRange.fromSelection(selection, store);
-        return create(store, columnSelection, batchRange);
+    public static RandomAccessCursor<ReadAccessRow> create(final BatchReadStore store, final Selection selection) {
+        return new DefaultColumnarCursor(store, selection);
     }
 
     /**
-     * Creates a {@link LookaheadCursor} that reads from the provided {@link BatchReadStore}.
+     * Creates a {@link RandomAccessCursor} that reads from the provided {@link BatchReadStore}.
      *
      * @param store to read from
      * @param selection the columns to read
      * @param batchRange the range of batches and rows to read
-     * @return a {@link LookaheadCursor} that reads from {@link BatchReadStore store}
+     * @return a {@link RandomAccessCursor} that reads from {@link BatchReadStore store}
      */
-    public static LookaheadCursor<ReadAccessRow> create(final BatchReadStore store, final ColumnSelection selection,
+    public static RandomAccessCursor<ReadAccessRow> create(final BatchReadStore store, final ColumnSelection selection,
         final BatchRange batchRange) {
-
-        final ColumnarSchema schema = store.getSchema();
-        final ColumnarAccessFactory[] accessFactories = IntStream.range(0, schema.numColumns())//
-            .mapToObj(i -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(i)))//
-            .toArray(ColumnarAccessFactory[]::new);
-
-        return new DefaultColumnarCursor(store, selection, accessFactories, batchRange);
-    }
-
-    private ColumnarCursorFactory() {}
-
-    private static final class DefaultColumnarCursor
-        implements LookaheadCursor<ReadAccessRow>, ReadAccessRow, ColumnDataIndex {
-
-        private final int m_numColumns;
-
-        private final ColumnSelection m_selection;
-
-        private final ColumnarReadAccess[] m_accesses;
-
-        private final RandomAccessBatchReader m_reader;
-
-        private final int m_firstBatchIndex;
-
-        private final int m_firstIndexInFirstBatch;
-
-        private final int m_lastBatchIndex;
-
-        private final int m_lastIndexInLastBatch;
-
-        private int m_currentBatchIndex = -1;
-
-        private ReadBatch m_currentBatch;
-
-        private int m_lastIndexInCurrentBatch = -1;
-
-        private int m_currentIndexInCurrentBatch;
-
-        private DefaultColumnarCursor(final BatchReadStore store, final ColumnSelection selection,
-            final ColumnarAccessFactory[] accessFactories, final BatchRange batchSelection) {
-            m_numColumns = store.getSchema().numColumns();
-            m_selection = selection;
-            m_accesses = Arrays.stream(accessFactories) //
-                .map(f -> f.createReadAccess(this)) //
-                .toArray(ColumnarReadAccess[]::new);
-
-            @SuppressWarnings("resource") // The batch reader is closed when this instance is closed.
-            final RandomAccessBatchReader reader = selection == null //
-                ? store.createRandomAccessReader() //
-                : store.createRandomAccessReader(selection);
-            m_reader = reader;
-
-            m_firstBatchIndex = batchSelection.getFirstBatch();
-            m_firstIndexInFirstBatch = batchSelection.getFirstRowInFirstBatch();
-            // Special case for stores that contain only empty batches: don't even bother trying to iterate over them,
-            // this would only complicate the index-handling logic in the methods below.
-            m_lastBatchIndex = store.batchLength() > 0 ? batchSelection.getLastBatch() : -1;
-            m_lastIndexInLastBatch = batchSelection.getLastRowInLastBatch();
-
-            m_currentBatchIndex = m_firstBatchIndex - 1;
-            m_currentIndexInCurrentBatch = m_firstIndexInFirstBatch - 1;
-        }
-
-        @Override
-        public ReadAccessRow access() {
-            return this;
-        }
-
-        @Override
-        public boolean canForward() {
-            return m_currentIndexInCurrentBatch < m_lastIndexInCurrentBatch || m_currentBatchIndex < m_lastBatchIndex;
-        }
-
-        @Override
-        public boolean forward() {
-            if (m_currentIndexInCurrentBatch >= m_lastIndexInCurrentBatch) {
-                if (m_currentBatchIndex >= m_lastBatchIndex) {
-                    return false;
-                }
-                if (m_currentBatch != null) {
-                    m_currentBatch.release();
-                }
-                m_currentBatchIndex++;
-                readCurrentBatch();
-                m_currentIndexInCurrentBatch = m_currentBatchIndex == m_firstBatchIndex //
-                    ? m_firstIndexInFirstBatch //
-                    : 0;
-            } else {
-                m_currentIndexInCurrentBatch++;
-            }
-            return true;
-        }
-
-        private void readCurrentBatch() {
-            try {
-                m_currentBatch = m_reader.readRetained(m_currentBatchIndex);
-            } catch (final IOException ex) {
-                throw new UncheckedIOException(ex);
-            }
-            final NullableReadData[] currentData = m_currentBatch.getUnsafe();
-            for (int i = 0; i < m_numColumns; i++) {
-                if (m_selection == null || m_selection.isSelected(i)) {
-                    m_accesses[i].setData(currentData[i]);
-                }
-            }
-            if (m_currentBatchIndex != m_lastBatchIndex
-            // Indicates that the last batch should be read fully.
-                || m_lastIndexInLastBatch == -1) {
-                m_lastIndexInCurrentBatch = m_currentBatch.length() - 1;
-            } else {
-                m_lastIndexInCurrentBatch = m_lastIndexInLastBatch;
-            }
-        }
-
-        @Override
-        public int getIndex() {
-            return m_currentIndexInCurrentBatch;
-        }
-
-        @Override
-        public int size() {
-            return m_numColumns;
-        }
-
-        @Override
-        public <A extends ReadAccess> A getAccess(final int index) {
-            @SuppressWarnings("unchecked")
-            final A cast = (A)m_accesses[index];
-            return cast;
-        }
-
-        @Override
-        public void close() throws IOException {
-            if (m_currentBatch != null) {
-                m_currentBatch.release();
-                m_currentBatch = null;
-            }
-            m_reader.close();
-        }
-
+        throw new IllegalStateException("BatchRange will be removed");
     }
 }
