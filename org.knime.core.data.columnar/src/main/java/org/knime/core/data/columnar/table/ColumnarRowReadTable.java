@@ -60,8 +60,8 @@ import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.Columnar
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.table.cursor.LookaheadCursor;
-import org.knime.core.table.row.LookaheadRowAccessible;
+import org.knime.core.table.cursor.RandomAccessCursor;
+import org.knime.core.table.row.RandomRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
 
@@ -74,7 +74,7 @@ import org.knime.core.table.row.Selection;
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
-public final class ColumnarRowReadTable implements LookaheadRowAccessible {
+public final class ColumnarRowReadTable implements RandomRowAccessible {
 
     /** a system property to disable all caches in a read table for testing */
     private static final boolean DISABLE_CACHES = Boolean.getBoolean("knime.columnar.disablecaches.readtable");
@@ -87,8 +87,8 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
 
     private final long m_size;
 
-    private final CursorTracker<LookaheadCursor<ReadAccessRow>> m_cursorTracker =
-        CursorTracker.createLookaheadCursorTracker();
+    private final CursorTracker<RandomAccessCursor<ReadAccessRow>> m_cursorTracker =
+        CursorTracker.createRandomAccessCursorTracker();
 
     private final CursorTracker<RowCursor> m_rowCursorTracker = CursorTracker.createRowCursorTracker();
 
@@ -164,13 +164,13 @@ public final class ColumnarRowReadTable implements LookaheadRowAccessible {
     }
 
     @Override
-    public LookaheadCursor<ReadAccessRow> createCursor() {
+    public RandomAccessCursor<ReadAccessRow> createCursor() {
         // we track the cursors, so that we can close them before closing m_store
         return m_cursorTracker.createTrackedCursor(() -> ColumnarCursorFactory.create(m_store, m_size));
     }
 
     @Override
-    public LookaheadCursor<ReadAccessRow> createCursor(final Selection selection) {
+    public RandomAccessCursor<ReadAccessRow> createCursor(final Selection selection) {
         // we track the cursors, so that we can close them before closing m_store
         return m_cursorTracker.createTrackedCursor(() -> ColumnarCursorFactory.create(m_store, selection));
     }

@@ -76,8 +76,8 @@ import org.knime.core.node.NodeLogger;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.WorkflowDataRepository;
-import org.knime.core.table.cursor.LookaheadCursor;
-import org.knime.core.table.row.LookaheadRowAccessible;
+import org.knime.core.table.cursor.RandomAccessCursor;
+import org.knime.core.table.row.RandomRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.Selection;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -116,7 +116,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
     private final ColumnarRowReadTable m_columnarTable;
 
-    private final ColumnarContainerRowAccessible m_rowAccessibleView = new ColumnarContainerRowAccessible();
+    private final RandomRowAccessible m_rowAccessibleView = new ColumnarContainerRowAccessible();
 
     // effectively final. This is a safety net for the case that a table gets GC'ed without being cleared by the AP
     private Finalizer m_tableCloser;
@@ -266,13 +266,13 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
     }
 
     /**
-     * @return a view of this table as {@link LookaheadRowAccessible}
+     * @return a view of this table as {@link RandomRowAccessible}
      */
-    public LookaheadRowAccessible asRowAccessible() {
+    public RandomRowAccessible asRowAccessible() {
         return m_rowAccessibleView;
     }
 
-    private final class ColumnarContainerRowAccessible implements LookaheadRowAccessible {
+    private final class ColumnarContainerRowAccessible implements RandomRowAccessible {
 
         @Override
         public void close() throws IOException {
@@ -290,12 +290,12 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         }
 
         @Override
-        public LookaheadCursor<ReadAccessRow> createCursor() {
+        public RandomAccessCursor<ReadAccessRow> createCursor() {
             return m_columnarTable.createCursor();
         }
 
         @Override
-        public LookaheadCursor<ReadAccessRow> createCursor(final Selection selection) {
+        public RandomAccessCursor<ReadAccessRow> createCursor(final Selection selection) {
             return m_columnarTable.createCursor(selection);
         }
     }

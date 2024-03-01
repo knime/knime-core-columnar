@@ -60,15 +60,15 @@ import java.util.function.UnaryOperator;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.table.cursor.Cursor;
-import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.cursor.RandomAccessCursor;
 
 import com.google.common.cache.CacheBuilder;
 
 /**
  * Tracks {@link Closeable} cursors emitted by tables and makes sure that their resources are properly released if
  * <ul>
- * <li> They are no longer referenced but haven't been closed, yet.
- * <li> The emitting table is closed before the cursors released their resources.
+ * <li>They are no longer referenced but haven't been closed, yet.
+ * <li>The emitting table is closed before the cursors released their resources.
  * </ul>
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
@@ -96,9 +96,10 @@ final class CursorTracker<C extends Closeable> implements Closeable {
         return new CursorTracker<>(c -> CursorsWithFinalizer.cursor(c, openFinalizers::add), openFinalizers);
     }
 
-    static <A> CursorTracker<LookaheadCursor<A>> createLookaheadCursorTracker() {
+    static <A> CursorTracker<RandomAccessCursor<A>> createRandomAccessCursorTracker() {
         Set<Finalizer> openFinalizers = finalizerSet();
-        return new CursorTracker<>(c -> CursorsWithFinalizer.lookaheadCursor(c, openFinalizers::add), openFinalizers);
+        return new CursorTracker<>(c -> CursorsWithFinalizer.randomAccessCursor(c, openFinalizers::add),
+            openFinalizers);
     }
 
     static CursorTracker<RowCursor> createRowCursorTracker() {

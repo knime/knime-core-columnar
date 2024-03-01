@@ -55,7 +55,7 @@ import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.table.cursor.Cursor;
-import org.knime.core.table.cursor.LookaheadCursor;
+import org.knime.core.table.cursor.RandomAccessCursor;
 
 /**
  * Utility class providing decorators for various interfaces whose instance might be resource sensitive and need to be
@@ -65,16 +65,16 @@ import org.knime.core.table.cursor.LookaheadCursor;
  */
 final class CursorsWithFinalizer {
 
-    static <A> LookaheadCursor<A> lookaheadCursor(final LookaheadCursor<A> cursor,
+    static <A> RandomAccessCursor<A> randomAccessCursor(final RandomAccessCursor<A> cursor,
         final Consumer<Finalizer> finalizerRegistry) {
-        var cursorWithFinalizer = new LookaheadCursorWithFinalizer<>(cursor);
+        var cursorWithFinalizer = new RandomAccessCursorWithFinalizer<>(cursor);
         finalizerRegistry.accept(cursorWithFinalizer.m_finalizer);
         return cursorWithFinalizer;
     }
 
     static <A> Cursor<A> cursor(final Cursor<A> cursor, final Consumer<Finalizer> finalizerRegistry) {
-        if (cursor instanceof LookaheadCursor) {
-            return lookaheadCursor((LookaheadCursor<A>)cursor, finalizerRegistry);
+        if (cursor instanceof RandomAccessCursor) {
+            return randomAccessCursor((RandomAccessCursor<A>)cursor, finalizerRegistry);
         } else {
             var cursorWithFinalizer = new CursorWithFinalizer<>(cursor);
             finalizerRegistry.accept(cursorWithFinalizer.m_finalizer);
@@ -117,15 +117,20 @@ final class CursorsWithFinalizer {
 
     }
 
-    private static final class LookaheadCursorWithFinalizer<A> implements LookaheadCursor<A> {
+    private static final class RandomAccessCursorWithFinalizer<A> implements RandomAccessCursor<A> {
 
-        private final LookaheadCursor<A> m_delegate;
+        private final RandomAccessCursor<A> m_delegate;
 
         private final Finalizer m_finalizer;
 
-        LookaheadCursorWithFinalizer(final LookaheadCursor<A> delegate) {
+        RandomAccessCursorWithFinalizer(final RandomAccessCursor<A> delegate) {
             m_delegate = delegate;
             m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, delegate);
+        }
+
+        @Override
+        public void moveTo(final long row) {
+            m_delegate.moveTo(row);
         }
 
         @Override
@@ -148,7 +153,6 @@ final class CursorsWithFinalizer {
             m_delegate.close();
             m_finalizer.close();
         }
-
     }
 
     private static final class RowCursorWithFinalizer implements RowCursor {
