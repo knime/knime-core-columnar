@@ -116,21 +116,15 @@ public final class DefaultTestBatchStore implements TestBatchStore {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();
             }
-            if (m_batches.isEmpty()) {
-                m_maxDataLength = batch.length();
-            }
             m_batches.add(data);
+            m_batchLengths.add(batch.length());
         }
 
         @Override
         public void close() {
             if (!m_batches.isEmpty()) {
-                for (int b = 0; b < m_batches.size()-1; b++) {
-                    assertEquals(m_maxDataLength, m_batches.get(b)[0].length);
-                }
-
-                if (m_batches.size() > 1) {
-                    assertTrue(m_batches.get(m_batches.size() - 1)[0].length <= m_maxDataLength);
+                for (int b = 0; b < m_batches.size() - 1; b++) {
+                    assertTrue(m_batchLengths.get(b) <= m_batches.get(b)[0].length);
                 }
             }
 
@@ -162,7 +156,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             waitForLatch();
             final Object[][] data = m_batches.get(chunkIndex);
             return m_selection.createBatch(i -> {
-                final TestData testData = m_factories[i].createReadData(data[i], m_maxDataLength);
+                final TestData testData = m_factories[i].createReadData(data[i], m_batchLengths.get(chunkIndex));
                 m_tracker.add(testData);
                 return testData;
             });
@@ -188,13 +182,13 @@ public final class DefaultTestBatchStore implements TestBatchStore {
 
     private final List<TestData> m_tracker = new ArrayList<>();
 
+    private final List<Integer> m_batchLengths = new ArrayList<>();
+
     // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
     private volatile boolean m_writerClosed;
 
     // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
     private volatile boolean m_storeClosed;
-
-    private int m_maxDataLength = -1;
 
     private CountDownLatch m_latch;
 
@@ -212,7 +206,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     private DefaultTestBatchStore(final ColumnarSchema schema, final FileHandle fileHandle) {
         m_schema = schema;
         m_factories = IntStream.range(0, schema.numColumns()) //
-            .mapToObj(i -> schema.getSpec(i).accept(TestSchemaMapper.INSTANCE, schema.getTraits(i)) )//
+            .mapToObj(i -> schema.getSpec(i).accept(TestSchemaMapper.INSTANCE, schema.getTraits(i)))//
             .toArray(TestDataFactory[]::new);
         m_fileHandle = fileHandle;
     }
@@ -287,7 +281,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
 
     @Override
     public int batchLength() {
-        return m_maxDataLength;
+        return m_batchLengths.stream().mapToInt(Integer::intValue).max().orElse(-1);
     }
 
     @Override
