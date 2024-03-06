@@ -49,6 +49,7 @@
 package org.knime.core.columnar.access;
 
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 import org.knime.core.table.schema.BooleanDataSpec;
 import org.knime.core.table.schema.ByteDataSpec;
@@ -84,6 +85,34 @@ public final class ColumnarAccessFactoryMapper implements DataSpec.Mapper<Column
      */
     public static ColumnarAccessFactory createAccessFactory(final DataSpec dataSpec) {
         return dataSpec.accept(INSTANCE);
+    }
+
+    /**
+     * Create an array of {@link ColumnarReadAccess} from the given specs.
+     *
+     * @param specs a stream of {@link DataSpec}
+     * @param index the index given to {@link ColumnarAccessFactory#createReadAccess(ColumnDataIndex)}
+     * @return an array of {@link ColumnarReadAccess}
+     */
+    public static ColumnarReadAccess[] createReadAccesses(final Stream<DataSpec> specs, final ColumnDataIndex index) {
+        return specs //
+            .map(ColumnarAccessFactoryMapper::createAccessFactory) //
+            .map(f -> f.createReadAccess(index)) //
+            .toArray(ColumnarReadAccess[]::new);
+    }
+
+    /**
+     * Create an array of {@link ColumnarWriteAccess} from the given specs.
+     *
+     * @param specs a stream of {@link DataSpec}
+     * @param index the index given to {@link ColumnarAccessFactory#createWriteAccess(ColumnDataIndex)}
+     * @return an array of {@link ColumnarWriteAccess}
+     */
+    public static ColumnarWriteAccess[] createWriteAccesses(final Stream<DataSpec> specs, final ColumnDataIndex index) {
+        return specs //
+            .map(ColumnarAccessFactoryMapper::createAccessFactory) //
+            .map(f -> f.createWriteAccess(index)) //
+            .toArray(ColumnarWriteAccess[]::new);
     }
 
     @Override

@@ -48,12 +48,12 @@
  */
 package org.knime.core.columnar.cursor;
 
+import static org.knime.core.columnar.access.ColumnarAccessFactoryMapper.createReadAccesses;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Objects;
-import java.util.stream.IntStream;
 
-import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
 import org.knime.core.columnar.access.ColumnarReadAccess;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -110,10 +110,7 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
         m_selection = Objects.requireNonNull(selection);
 
         // Initialize accesses
-        m_accesses = IntStream.range(0, schema.numColumns())//
-            .mapToObj(i -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(i)))//
-            .map(f -> f.createReadAccess(() -> m_indexInBatch)) //
-            .toArray(ColumnarReadAccess[]::new);
+        m_accesses = createReadAccesses(schema.specStream(), () -> m_indexInBatch);
 
         // Initialize reader
         m_numBatches = store.numBatches();

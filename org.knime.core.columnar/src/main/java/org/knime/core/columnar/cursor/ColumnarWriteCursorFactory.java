@@ -48,11 +48,11 @@
  */
 package org.knime.core.columnar.cursor;
 
+import static org.knime.core.columnar.access.ColumnarAccessFactoryMapper.createWriteAccesses;
+
 import java.io.IOException;
-import java.util.stream.IntStream;
 
 import org.knime.core.columnar.access.ColumnDataIndex;
-import org.knime.core.columnar.access.ColumnarAccessFactoryMapper;
 import org.knime.core.columnar.access.ColumnarWriteAccess;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
@@ -153,10 +153,7 @@ public final class ColumnarWriteCursorFactory {
             m_adjusting = true;
 
             final ColumnarSchema schema = store.getSchema();
-            m_accesses = IntStream.range(0, schema.numColumns())//
-                .mapToObj(i -> ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(i)))//
-                .map(f -> f.createWriteAccess(this))//
-                .toArray(ColumnarWriteAccess[]::new);
+            m_accesses = createWriteAccesses(schema.specStream(), this);
             switchToNextData();
             m_currentIndex = -1;
         }
