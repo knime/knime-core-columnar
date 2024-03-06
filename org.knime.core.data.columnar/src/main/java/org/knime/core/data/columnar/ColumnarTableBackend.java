@@ -63,6 +63,7 @@ import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
+import org.knime.core.data.columnar.table.ColumnarTableSorter;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
@@ -72,6 +73,7 @@ import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.BufferedTableBackend;
+import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerSettings;
@@ -79,6 +81,8 @@ import org.knime.core.data.container.ILocalDataRepository;
 import org.knime.core.data.container.WrappedTable;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
+import org.knime.core.data.sort.BufferedDataTableSorter;
+import org.knime.core.data.sort.RowComparator;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.schema.ValueSchema;
@@ -185,8 +189,8 @@ public final class ColumnarTableBackend implements TableBackend {
                     progressMonitor);
         } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
             logFallback();
-            return OLD_BACKEND.concatenate(exec, progressMonitor, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck,
-                tables);
+            return OLD_BACKEND.concatenate(exec, progressMonitor, tableIdSupplier, rowKeyDuplicateSuffix,
+                duplicatesPreCheck, tables);
         }
     }
 
@@ -216,10 +220,10 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             switch (config.getRowIDMode()) {
                 case FROM_TABLE:
-                        var table = appendWithRowIDFromTable(tableIdSupplier, config.getRowIDTableIndex(),
-                            new BufferedDataTable[]{preprocessedLeft, preprocessedRight});
-                        exec.setProgress(1);
-                        return table;
+                    var table = appendWithRowIDFromTable(tableIdSupplier, config.getRowIDTableIndex(),
+                        new BufferedDataTable[]{preprocessedLeft, preprocessedRight});
+                    exec.setProgress(1);
+                    return table;
                 case MATCHING:
                     return append(exec, exec, tableIdSupplier, preprocessedLeft, preprocessedRight);
                 default:
@@ -282,7 +286,7 @@ public final class ColumnarTableBackend implements TableBackend {
             var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
             var cols = slice.columns();
             var rearranger = new ColumnRearranger(spec);
-            if (!cols.allSelected()){
+            if (!cols.allSelected()) {
                 var colIndices = cols.getSelected();
                 virtualTable = virtualTable.filterColumns(//
                     IntStream.concat(//
@@ -347,6 +351,7 @@ public final class ColumnarTableBackend implements TableBackend {
             return rewriteTable(table, exec);
         }
     }
+
     private static boolean isColumnarCompatible(final BufferedDataTable table) {
         return getSchemaIfColumnar(table).filter(not(ColumnarValueSchemaUtils::storesDataCellSerializersSeparately))
             .isPresent();
@@ -361,16 +366,16 @@ public final class ColumnarTableBackend implements TableBackend {
         }
         return Optional.empty();
     }
-    private static KnowsRowCountTable unwrap(final BufferedDataTable table) {
+
+    public static KnowsRowCountTable unwrap(final BufferedDataTable table) {
         var delegate = Node.invokeGetDelegate(table);
-        if (delegate instanceof WrappedTable) {
-            return unwrap(delegate.getReferenceTables()[0]);
-        } else {
-            return delegate;
+        while (delegate instanceof WrappedTable wrapped) {
+            delegate = Node.invokeGetDelegate(wrapped.getReferenceTables()[0]);
         }
+        return delegate;
     }
 
-    private static BufferedDataTable rewriteTable(final BufferedDataTable table, final ExecutionContext exec) {
+    public static BufferedDataTable rewriteTable(final BufferedDataTable table, final ExecutionContext exec) {
         try (var rowContainer = exec.createRowContainer(table.getDataTableSpec(), true);
                 var writeCursor = rowContainer.createCursor();
                 var readCursor = table.cursor()) {
@@ -383,4 +388,17 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
 
+    @Override
+    public BufferedDataTable sort(final ExecutionContext exec, final BufferedDataTable table,
+            final RowComparator rowComparator) throws CanceledExecutionException {
+        final var columnarTable = makeColumnar(table, exec);
+        final var schema = getSchemaIfColumnar(columnarTable).orElseThrow();
+        return ColumnarTableSorter.sort(this, exec, schema, columnarTable, rowComparator);
+    }
+
+    @Override
+    public CloseableRowIterator sortedIterator(final ExecutionContext exec, final BufferedDataTable table,
+            final RowComparator rowComparator) throws CanceledExecutionException {
+        return new BufferedDataTableSorter(table, rowComparator).sortedIterator(exec);
+    }
 }
