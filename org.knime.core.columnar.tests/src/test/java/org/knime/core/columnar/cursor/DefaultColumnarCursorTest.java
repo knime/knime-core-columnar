@@ -96,7 +96,6 @@ public class DefaultColumnarCursorTest extends ColumnarTest {
                 assertSame("must always be the same access instance", intAccess, access.getAccess(0));
                 assertSame("must always be the same access instance", stringAccess, access.getAccess(1));
             }
-            cursor.close();
         }
     }
 
@@ -122,7 +121,6 @@ public class DefaultColumnarCursorTest extends ColumnarTest {
                 assertEquals("should canForward", rowIdx != numRows, cursor.canForward());
             }
             assertEquals("should read num rows", numRows, rowIdx);
-            cursor.close();
         }
     }
 
@@ -150,7 +148,6 @@ public class DefaultColumnarCursorTest extends ColumnarTest {
                 assertEquals("should canForward", rowIdx != numRows, cursor.canForward());
             }
             assertEquals("should read num rows", numRows, rowIdx);
-            cursor.close();
         }
     }
 
@@ -177,7 +174,6 @@ public class DefaultColumnarCursorTest extends ColumnarTest {
                 assertEquals("should canForward", rowIdx != endRow, cursor.canForward());
             }
             assertEquals("should read num rows", endRow, rowIdx);
-            cursor.close();
         }
     }
 
@@ -200,7 +196,6 @@ public class DefaultColumnarCursorTest extends ColumnarTest {
                 checkIntValue(rowIdx, intAccess);
                 checkStringValue(rowIdx, stringAccess);
             }
-            cursor.close();
         }
     }
 
@@ -225,7 +220,6 @@ public class DefaultColumnarCursorTest extends ColumnarTest {
                     () -> ((IntReadAccess)intAccess).getIntValue());
                 checkStringValue(rowIdx, stringAccess);
             }
-            cursor.close();
         }
     }
 
@@ -258,8 +252,6 @@ public class DefaultColumnarCursorTest extends ColumnarTest {
             cursor.moveTo(rowIdx);
             checkIntValue(rowIdx + startRow, intAccess);
             checkStringValue(rowIdx + startRow, stringAccess);
-
-            cursor.close();
         }
     }
 
@@ -274,7 +266,6 @@ public class DefaultColumnarCursorTest extends ColumnarTest {
             assertFalse("canForward should be false", cursor.canForward());
             assertFalse("forward should return false", cursor.forward());
             assertThrows("moveTo should throw", IndexOutOfBoundsException.class, () -> cursor.moveTo(0));
-            cursor.close();
         }
     }
 
