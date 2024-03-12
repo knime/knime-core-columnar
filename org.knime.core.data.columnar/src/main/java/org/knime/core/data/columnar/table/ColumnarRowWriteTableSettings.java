@@ -62,8 +62,8 @@ public final class ColumnarRowWriteTableSettings {
     /** a system property to disable all caches in a write table for testing */
     private static final boolean DISABLE_CACHES = Boolean.getBoolean("knime.columnar.disablecaches.writetable");
 
-    /** a system property to enforce using the old heap cache as the heap badger is used by default now */
-    private static final boolean USE_OLD_HEAP_CACHE = Boolean.getBoolean("knime.columnar.heapbadger.disable");
+    /** a system property to enforce using the heap badger as it is not the default yet */
+    private static final boolean USE_HEAP_BADGER = Boolean.getBoolean("knime.columnar.heapbadger.enable");
 
     private final boolean m_initializeDomains;
 
@@ -169,7 +169,7 @@ public final class ColumnarRowWriteTableSettings {
     }
 
     static boolean useHeapBadger() {
-        return !USE_OLD_HEAP_CACHE;
+        return USE_HEAP_BADGER;
     }
 
     /**

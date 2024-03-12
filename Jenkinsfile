@@ -20,6 +20,11 @@ properties([
                 description: "Run knime-base workflow tests with the columnar backend",
                 name: "KNIME_BASE_WORKFLOW_TESTS",
             ),
+            booleanParam(
+                defaultValue: false,
+                description: "Use the HeapBadger instead of the Object Cache",
+                name: "USE_HEAP_BADGER",
+            )
         ],
     ),
     buildDiscarder(logRotator(numToKeepStr: '5')),
@@ -36,6 +41,9 @@ try {
     )
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
+        if (params["USE_HEAP_BADGER"]) {
+            // TODO: run shell command to add property to workflow-tests? does that work?
+        }
         withEnv(["MALLOC_ARENA_MAX=1"]) {
             def testflowsDir = "Testflows (${baseBranch})/knime-base"
             def excludedTestflows = [
