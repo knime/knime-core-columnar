@@ -73,23 +73,13 @@ import org.knime.core.table.row.Selection;
  */
 final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, ReadAccessRow {
 
-    /*
-     * TODO(heap-badger) Currently, we initialize m_numRows with -1 if we do not know the total number of rows. We only
-     * set it to the real value after reading the last batch. This won't be necessary anymore with the heap-badger
-     * changes because the BatchReadStore will have API to get the total number of rows without reading the last batch.
-     *
-     * See TODO(numRows)
-     */
-
     private final Selection m_selection;
 
     private final ColumnarReadAccess[] m_accesses;
 
     private final RandomAccessBatchReader m_reader;
 
-    private final int m_numBatches;
-
-    private final int m_batchLength;
+    private final long[] m_batchBoundaries;
 
     private ReadBatch m_currentBatch;
 
@@ -97,7 +87,7 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
     private long m_nextRow;
 
     /** Number of rows of the selection */
-    private long m_numRows;
+    private final long m_numRows;
 
     private int m_indexInBatch;
 
@@ -113,15 +103,17 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
         m_accesses = createReadAccesses(schema.specStream(), () -> m_indexInBatch);
 
         // Initialize reader
-        m_numBatches = store.numBatches();
-        m_batchLength = store.batchLength();
+        try {
+            m_batchBoundaries = store.getBatchBoundaries();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not extract batch sizes from store", ex);
+        }
         m_reader = store.createRandomAccessReader(ColumnSelection.fromSelection(selection, schema.numColumns()));
 
         // Initialize the iteration indices
         m_nextRow = 0;
         m_firstRowInStore = Math.max(selection.rows().fromIndex(), 0);
-        // TODO(numRows) set the real value of numRows and make final
-        m_numRows = m_batchLength == 0 ? 0 : (selection.rows().toIndex() - m_firstRowInStore);
+        m_numRows = m_batchBoundaries.length == 0 ? 0 : (selection.rows().toIndex() - m_firstRowInStore);
 
         m_currentBatchIdx = -1;
         m_indexInBatch = -1;
@@ -150,20 +142,27 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
     }
 
     private int getBatchIdx(final long storeRow) {
-        // TODO(numRows) - adapt to variable batch sizes
-        return (int)(storeRow / m_batchLength);
+        for (int batchIdx = 0; batchIdx < m_batchBoundaries.length; batchIdx++) {
+            if (m_batchBoundaries[batchIdx] > storeRow) {
+                return batchIdx;
+            }
+        }
+        var numStoreRows = m_batchBoundaries.length == 0 ? 0 : m_batchBoundaries[m_batchBoundaries.length - 1];
+
+        throw new IndexOutOfBoundsException(
+            "The requested row " + storeRow + " is not present in store with size " + numStoreRows);
     }
 
     @Override
     public void moveTo(final long row) {
-        // TODO(numRows) remove the m_numRows >= 0 check
-        if (row < 0 || (m_numRows >= 0 && row >= m_numRows)) {
+        if (row < 0 || row >= m_numRows) {
             throw new IndexOutOfBoundsException(row);
         }
 
         var storeRow = row + m_firstRowInStore;
-        switchToBatch(getBatchIdx(storeRow));
-        m_indexInBatch = (int)(storeRow % m_batchLength);
+        var newBatchIdx = getBatchIdx(storeRow);
+        switchToBatch(newBatchIdx);
+        m_indexInBatch = newBatchIdx == 0 ? (int)storeRow : (int)(storeRow - m_batchBoundaries[newBatchIdx]);
     }
 
     /** Switch to the given batch if it is not the current batch */
@@ -184,12 +183,6 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
             m_currentBatch = m_reader.readRetained(m_currentBatchIdx);
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
-        }
-
-        // HACK: Set the numRows if this is the last batch
-        // TODO(numRows) remove the hack
-        if (m_numRows < 0 && m_currentBatchIdx == m_numBatches - 1) {
-            m_numRows = (m_numBatches - 1) * (long)m_batchLength + m_currentBatch.length();
         }
 
         // Update the accesses
