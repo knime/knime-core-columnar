@@ -89,6 +89,7 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
         m_iterator = iterator;
     }
 
+    // Helper to set BufferedAccessRow m_accesses from a DataRow
     private static class WriteAccessRowWrite {
 
         private final WriteAccessRow m_accesses;
