@@ -87,9 +87,8 @@ import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.workflow.WorkflowDataRepository;
-import org.knime.core.table.cursor.Cursor;
-import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
+import org.knime.core.table.row.Selection;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
@@ -488,38 +487,9 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public RowCursor cursor(final TableFilter filter) {
-        if (TableFilterUtils.hasFilter(filter)) {
-            return m_openCursors.createTrackedCursor(() -> createdFilteredRowCursor(filter));
-        } else {
-            // cursor() already does the tracking for us
-            return cursor();
-        }
-    }
-
-    @SuppressWarnings("resource") // we track both the accessibles and the cursor using CloseableTracker
-    private RowCursor createdFilteredRowCursor(final TableFilter filter) {
-        var table = createFilteredVirtualTable(filter);
-        final VirtualTableExecutor exec = new GraphVirtualTableExecutor(table.getProducingTransform());
-        final List<RowAccessible> accessibles = exec.execute(collectSources());
-        final Cursor<ReadAccessRow> physicalCursor = accessibles.get(0).createCursor();
-        var cursor = TableFilterUtils.createColumnSelection(filter, m_schema.numColumns())//
-            .map(s -> VirtualTableUtils.createTableFilterRowCursor(m_schema, physicalCursor, s))//
-            .orElseGet(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, physicalCursor));
-        return new SourceClosingRowCursor(cursor, accessibles.toArray(Closeable[]::new));
-    }
-
-    private ColumnarVirtualTable createFilteredVirtualTable(final TableFilter filter) {
-        var table = getVirtualTable();
-
-        if (TableFilterUtils.definesRowRange(filter)) {
-            table = table.slice(TableFilterUtils.extractFromIndex(filter),
-                TableFilterUtils.extractToIndex(filter, m_size) + 1);
-        }
-
-        if (TableFilterUtils.definesColumnFilter(filter)) {
-            table = table.selectColumns(TableFilterUtils.extractPhysicalColumnIndices(filter, m_schema.numColumns()));
-        }
-        return table;
+        final Selection selection = TableFilterUtils.toSelection(filter, m_size);
+        return m_openCursors.createTrackedCursor(
+            () -> VirtualTableUtils.createColumnarRowCursor(m_schema, getOutput().createCursor(selection)));
     }
 
     public ColumnarVirtualTable getVirtualTable() {
