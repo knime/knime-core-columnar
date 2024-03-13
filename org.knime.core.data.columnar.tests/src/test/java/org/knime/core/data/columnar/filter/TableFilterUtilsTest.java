@@ -48,12 +48,6 @@
  */
 package org.knime.core.data.columnar.filter;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import org.junit.Test;
-import org.knime.core.data.container.filter.TableFilter;
-
 /**
  * Contains unit tests for {@link TableFilterUtils}.
  *
@@ -62,19 +56,5 @@ import org.knime.core.data.container.filter.TableFilter;
 @SuppressWarnings("javadoc")
 public class TableFilterUtilsTest {
 
-    private static final TableFilter EMPTY = new TableFilter.Builder().build();
-
-    @Test
-    public void testHasFilter() {
-        TableFilter onlyCols = TableFilter.materializeCols(1, 2, 3);
-        assertTrue(TableFilterUtils.hasFilter(onlyCols));
-        TableFilter onlyFromIndex = TableFilter.filterRowsFromIndex(3);
-        assertTrue(TableFilterUtils.hasFilter(onlyFromIndex));
-        TableFilter onlyToIndex = TableFilter.filterRowsToIndex(7);
-        assertTrue(TableFilterUtils.hasFilter(onlyToIndex));
-        TableFilter fromAndToIndex = TableFilter.filterRangeOfRows(3, 7);
-        assertTrue(TableFilterUtils.hasFilter(fromAndToIndex));
-        TableFilter noFilter = new TableFilter.Builder().build();
-        assertFalse(TableFilterUtils.hasFilter(noFilter));
-    }
+    // TODO (TP) add test for TableFilterUtils.toSelection()
 }

@@ -438,15 +438,12 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     @SuppressWarnings("resource")
     @Override
     public CloseableRowIterator iteratorWithFilter(final TableFilter filter) {
-
-
-        if (TableFilterUtils.hasFilter(filter)) {
-            var filteredCursor = cursor(filter);
-            return filter.getMaterializeColumnIndices()
-                .map(m -> FilteredColumnarRowIteratorFactory.create(filteredCursor, m)) // TODO (TP): dig deeper here.
-                .orElseGet(() -> new ColumnarRowIterator(filteredCursor));
+        final Selection selection = TableFilterUtils.toSelection(filter, m_size);
+        final RowCursor cursor = cursor(selection);
+        if (selection.rows().allSelected()) {
+            return new ColumnarRowIterator(cursor);
         } else {
-            return iterator();
+            return FilteredColumnarRowIteratorFactory.create(cursor, selection);
         }
     }
 
@@ -457,12 +454,16 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public RowCursor cursor() {
-        return m_openCursors.createTrackedCursor(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, getOutput().createCursor()));
+        return cursor(Selection.all());
     }
 
     @Override
     public RowCursor cursor(final TableFilter filter) {
         final Selection selection = TableFilterUtils.toSelection(filter, m_size);
+        return cursor(selection);
+    }
+
+    private RowCursor cursor(final Selection selection) {
         return m_openCursors.createTrackedCursor(() -> VirtualTableUtils.createColumnarRowCursor(m_schema, getOutput().createCursor(selection)));
     }
 

@@ -63,17 +63,6 @@ import org.knime.core.table.row.Selection;
 public final class TableFilterUtils {
 
     /**
-     * Checks if the provided {@link TableFilter} actually filters any columns or rows.
-     *
-     * @param filter to check
-     * @return {@code true} if either columns or rows are filtered
-     */
-    public static boolean hasFilter(final TableFilter filter) {
-        return filter.getMaterializeColumnIndices().isPresent() || filter.getFromRowIndex().isPresent()
-            || filter.getToRowIndex().isPresent();
-    }
-
-    /**
      * Get the {@link Selection} corresponding to the given {@link TableFilter}.
      * <p>
      * {@code TableFilter} are used in the {@code BufferedDataTable} API, where the row key column is always present and

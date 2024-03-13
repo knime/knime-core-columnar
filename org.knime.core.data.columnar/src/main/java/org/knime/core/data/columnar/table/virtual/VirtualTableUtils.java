@@ -48,11 +48,7 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import java.util.stream.IntStream;
-
-import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.util.CheckUtils;
@@ -80,16 +76,9 @@ public final class VirtualTableUtils {
     public static RowCursor createColumnarRowCursor(final ValueSchema schema,
         final Cursor<ReadAccessRow> cursor) {
         final var lookaheadCursor = Cursors.toLookahead(schema, cursor);
-        final var accessRow = createRowRead(schema, lookaheadCursor.access());
+        final var accessRow = new ReadAccessRowRead(schema, lookaheadCursor.access());
         return new ColumnarRowCursor(accessRow, lookaheadCursor);
     }
-
-    private static RowRead createRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow) {
-        return new DenseColumnarRowRead(schema, accessRow);
-    }
-
-
-
 
     /**
      * Creates a {@link RowAccessible} that is backed by a {@link BufferedDataTable}.
@@ -103,31 +92,6 @@ public final class VirtualTableUtils {
             "The schema must match the table.");
         return new BufferedDataTableRowAccessible(table, schema);
     }
-
-    /**
-     * Creates a {@link RowRead} that wraps the provided {@link ReadAccessRow} and respects the provided
-     * {@link ColumnSelection}.
-     *
-     * @param schema of the table
-     * @param accessRow to wrap
-     * @param columnSelection specifies which columns are included
-     * @return a {@link RowRead} that is backed by the provided {@link ReadAccessRow}
-     */
-    public static RowRead createRowRead(final ValueSchema schema, final ReadAccessRow accessRow,
-        final ColumnSelection columnSelection) {
-        if (isSparse(columnSelection)) {
-            return new SparseColumnarRowRead(schema, accessRow, columnSelection);
-        } else {
-            return new DenseColumnarRowRead(schema, accessRow);
-        }
-    }
-
-    private static boolean isSparse(final ColumnSelection columnSelection) {
-        return columnSelection != null && IntStream.range(0, columnSelection.numColumns())//
-            .anyMatch(i -> !columnSelection.isSelected(i));
-    }
-
-
 
     private VirtualTableUtils() {
         // static utility class
