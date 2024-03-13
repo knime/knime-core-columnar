@@ -154,7 +154,7 @@ final class ColumnarRowCursorFactory {
         }
 
         var numColumns = schema.numColumns();
-        var selection = filter == null ? Selection.all() : TableFilterUtils.createSelection(filter, numColumns, size);
+        var selection = filter == null ? Selection.all() : TableFilterUtils.toSelection(filter, size);
         var columnSelection = ColumnSelection.fromSelection(selection, numColumns);
         return new DefaultRowCursor(ColumnarCursorFactory.create(store, selection), schema, columnSelection);
     }

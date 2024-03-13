@@ -48,13 +48,9 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import static java.util.stream.Collectors.toList;
-
-import java.util.List;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.schema.ValueSchema;
@@ -62,14 +58,8 @@ import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.cursor.Cursor;
 import org.knime.core.table.cursor.Cursors;
-import org.knime.core.table.cursor.LookaheadCursor;
-import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
 import org.knime.core.table.row.RowAccessible;
-import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.DefaultColumnarSchema;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Provides utility functions for dealing with the conversion between the physical (accesses) and logical layer (values)
@@ -78,23 +68,6 @@ import org.knime.core.table.schema.traits.DataTraits;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public final class VirtualTableUtils {
-
-    /**
-     * Creates a RowCursor that has been filtered by a {@link TableFilter}.
-     *
-     * @param unfilteredSchema {@link ColumnarValueSchema} containing all columns (including unselected ones)
-     * @param filteredCursor {@link Cursor} that contains only the selected columns and rows
-     * @param columnSelection corresponding to the applied {@link TableFilter}
-     * @return a {@link RowCursor} with the unfiltered schema that only contains values for the selected columns
-     */
-    @SuppressWarnings("resource") // the lookaheadCursor is managed by the returned RowCursor
-    public static RowCursor createTableFilterRowCursor(final ValueSchema unfilteredSchema,
-        final Cursor<ReadAccessRow> filteredCursor, final ColumnSelection columnSelection) {
-        final ColumnarSchema filteredSchema = filter(unfilteredSchema, columnSelection);
-        final LookaheadCursor<ReadAccessRow> lookaheadCursor = Cursors.toLookahead(filteredSchema, filteredCursor);
-        final var rowRead = new FilteredRowRead(unfilteredSchema, lookaheadCursor.access(), columnSelection);
-        return new ColumnarRowCursor(rowRead, lookaheadCursor);
-    }
 
     /**
      * Creates a {@link RowCursor} that is backed by the provided {@link Cursor}.
@@ -111,20 +84,12 @@ public final class VirtualTableUtils {
         return new ColumnarRowCursor(accessRow, lookaheadCursor);
     }
 
-    private static ColumnarSchema filter(final ColumnarSchema unfiltered, final ColumnSelection selection) {
-        final List<DataSpec> specs = getSelectedIndexStream(selection)
-            .mapToObj(unfiltered::getSpec)//
-            .collect(toList());
-        final List<DataTraits> traits = getSelectedIndexStream(selection)
-                .mapToObj(unfiltered::getTraits)//
-                .collect(toList());
-        return new DefaultColumnarSchema(specs, traits);
+    private static RowRead createRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow) {
+        return new DenseColumnarRowRead(schema, accessRow);
     }
 
-    private static IntStream getSelectedIndexStream(final ColumnSelection selection) {
-        return IntStream.range(0, selection.numColumns())//
-                .filter(selection::isSelected);
-    }
+
+
 
     /**
      * Creates a {@link RowAccessible} that is backed by a {@link BufferedDataTable}.
@@ -137,10 +102,6 @@ public final class VirtualTableUtils {
         CheckUtils.checkArgument(schema.getSourceSpec().equals(table.getDataTableSpec()),
             "The schema must match the table.");
         return new BufferedDataTableRowAccessible(table, schema);
-    }
-
-    private static RowRead createRowRead(final ValueSchema schema, final ReadAccessRow accessRow) {
-        return new DenseColumnarRowRead(schema, accessRow);
     }
 
     /**
@@ -166,27 +127,9 @@ public final class VirtualTableUtils {
             .anyMatch(i -> !columnSelection.isSelected(i));
     }
 
-    /**
-     * Decorates the provided {@link RowAccessible} to be unclosable.
-     * <p>
-     * The lookahead capability of the decorated {@code RowAccessible} is preserved. That is, if the given
-     * {@code rowAccessible} implements {@link LookaheadRowAccessible}, then the returned {@code RowAccessible} also
-     * implements {@code LookaheadRowAccessible}.
-     *
-     * @param rowAccessible to make uncloseable
-     * @return a {@link RowAccessible} that delegates everything to the provided rowAccessible except for the close
-     *         method
-     */
-    public static RowAccessible uncloseable(final RowAccessible rowAccessible) {
-        if (rowAccessible instanceof LookaheadRowAccessible) {
-            return new UncloseableLookaheadRowAccessible((LookaheadRowAccessible)rowAccessible);
-        } else {
-            return new UncloseableRowAccessible(rowAccessible);
-        }
-    }
+
 
     private VirtualTableUtils() {
-
+        // static utility class
     }
-
 }
