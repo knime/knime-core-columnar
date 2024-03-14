@@ -117,7 +117,7 @@ public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implem
     }
 
     @Override
-    public long[] getBatchBoundaries() throws IOException {
+    public long[] getBatchBoundaries() {
         if (m_batchBoundaries == null) {
             initMetadata();
         }

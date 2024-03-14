@@ -68,12 +68,10 @@ public interface BatchReadStore extends RandomAccessBatchReadable {
     /**
      * Return the boundaries of (variably sized) batches in the store.
      *
-     * @param store
      * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
      *         the second value indicates the end of the second batch etc
-     * @throws IOException
      */
-    default long[] getBatchBoundaries() throws IOException {
+    default long[] getBatchBoundaries() {
         // TODO: don't read all batches for this, read batch boundaries from footer
         int numBatches = numBatches();
         long[] batchBoundaries = new long[numBatches];
@@ -84,6 +82,8 @@ public interface BatchReadStore extends RandomAccessBatchReadable {
                 batch.release();
             }
             return batchBoundaries;
+        } catch (final IOException e) {
+            throw new IllegalStateException("Error when reading batch boundaries.", e);
         }
     }
 
