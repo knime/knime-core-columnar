@@ -93,6 +93,16 @@ public final class ArrowBatchStore extends AbstractArrowBatchReadable implements
         return m_writer.numBatches();
     }
 
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_writer.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_writer.numRows();
+    }
+
     /**
      * @return an object that can provide the offsets of record batches and dictionary batches in an Arrow IPC file. If
      *         new batches are written to the file after this method was called, the object will also provide offsets to
