@@ -137,11 +137,7 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
         m_accesses = createReadAccesses(schema.specStream(), () -> m_indexInBatch);
 
         // Initialize reader
-        try {
-            m_batchBoundaries = store.getBatchBoundaries();
-        } catch (IOException ex) {
-            throw new IllegalStateException("Could not extract batch sizes from store", ex);
-        }
+        m_batchBoundaries = store.getBatchBoundaries();
         m_reader = store.createRandomAccessReader(ColumnSelection.fromSelection(selection, schema.numColumns()));
 
         /**
