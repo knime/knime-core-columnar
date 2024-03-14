@@ -145,35 +145,30 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
     private DefaultColumnarBatchReadStore(final ColumnarBatchReadStoreBuilder builder) {
         m_readStore = builder.m_readStore;
+
         m_readable = builder.m_readStore;
-
-        initColumnDataCache(builder.m_columnDataCache);
-
-        if (builder.m_dictEncodingEnabled) {
-            final var dictEncoded = new DictEncodedBatchReadable(m_readable);
-            m_readable = dictEncoded;
-        }
-
-        initHeapCache(builder.m_heapCache);
+        m_readable = initColumnDataCache(m_readable, builder.m_columnDataCache);
+        m_readable = initDictEncoding(m_readable, builder.m_dictEncodingEnabled);
+        m_readable = initHeapCache(m_readable, builder.m_heapCache);
 
         m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(), builder.m_readStore.getFileHandle());
     }
 
 
-    private void initHeapCache(final SharedObjectCache heapCache) {
-        if (heapCache == null) {
-            return;
-        }
-
-        m_readable = new ObjectReadCache(m_readable, heapCache);
+    private static RandomAccessBatchReadable initHeapCache(final RandomAccessBatchReadable readable,
+        final SharedObjectCache heapCache) {
+        return (heapCache == null) ? readable : new ObjectReadCache(readable, heapCache);
     }
 
-    private void initColumnDataCache(final SharedReadDataCache cache) {
-        if (cache == null || cache.getMaxSizeInBytes() == 0) {
-            return;
-        }
+    private static RandomAccessBatchReadable initColumnDataCache(final RandomAccessBatchReadable readable,
+        final SharedReadDataCache cache) {
+        return (cache == null || cache.getMaxSizeInBytes() == 0) ? readable : new ReadDataReadCache(readable, cache);
+    }
 
-        m_readable = new ReadDataReadCache(m_readable, cache);
+    @SuppressWarnings("resource")
+    private static RandomAccessBatchReadable initDictEncoding(final RandomAccessBatchReadable readable,
+        final boolean dictEncodingEnabled) {
+        return dictEncodingEnabled ? new DictEncodedBatchReadable(readable) : readable;
     }
 
     @Override
