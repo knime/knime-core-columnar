@@ -59,9 +59,9 @@ import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.data.columnar.table.WrappedBatchReadStore.WrappedRandomAccessBatchReader;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -72,6 +72,70 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @noreference This class is not intended to be referenced by clients
  */
 public final class WrappedBatchStore implements BatchStore {
+
+    private static final class WrappedRandomAccessBatchReader implements RandomAccessBatchReader {
+
+        private final RandomAccessBatchReadable m_delegateReadable;
+
+        private final ColumnSelection m_selection;
+
+        private final AtomicBoolean m_storeClosed;
+
+        private final int m_numBatches;
+
+        private final AtomicBoolean m_readerClosed;
+
+        private RandomAccessBatchReader m_delegateReader;
+
+        /**
+         * @param store a delegating store from which to obtain the delegate reader
+         * @param selection see {@link BatchReadStore#createRandomAccessReader(ColumnSelection)}
+         */
+        WrappedRandomAccessBatchReader(final RandomAccessBatchReadable wrappedDelegateReadable,
+            final ColumnSelection selection, final AtomicBoolean storeClosed, final int numBatches) {
+            m_delegateReadable = wrappedDelegateReadable;
+            m_selection = selection;
+            m_storeClosed = storeClosed;
+            m_numBatches = numBatches;
+            m_readerClosed = new AtomicBoolean();
+        }
+
+        @SuppressWarnings("resource")
+        @Override
+        public final ReadBatch readRetained(final int index) throws IOException {
+            if (m_readerClosed.get()) {
+                throw new IllegalStateException(ERROR_MESSAGE_READER_CLOSED);
+            }
+            if (m_storeClosed.get()) {
+                throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
+            }
+            if (index < 0) {
+                throw new IndexOutOfBoundsException(String.format("Batch index %d smaller than 0.", index));
+            }
+            if (index >= m_numBatches) {
+                throw new IndexOutOfBoundsException(
+                    String.format("Batch index %d greater or equal to the reader's largest batch index (%d).", index,
+                        m_numBatches - 1));
+            }
+
+            return initAndGetDelegate().readRetained(index);
+        }
+
+        @Override
+        public final void close() throws IOException {
+            if (!m_readerClosed.getAndSet(true) && m_delegateReader != null) {
+                m_delegateReader.close();
+            }
+        }
+
+        private final RandomAccessBatchReader initAndGetDelegate() {
+            if (m_delegateReader == null) {
+                m_delegateReader = m_delegateReadable.createRandomAccessReader(m_selection);
+            }
+            return m_delegateReader;
+        }
+
+    }
 
     private static final class WrappedBatchWriter implements BatchWriter {
 
@@ -144,6 +208,8 @@ public final class WrappedBatchStore implements BatchStore {
     private static final String ERROR_MESSAGE_WRITER_CLOSED = "Column store writer has already been closed.";
 
     private static final String ERROR_MESSAGE_WRITER_NOT_CLOSED = "Column store writer has not been closed.";
+
+    private static final String ERROR_MESSAGE_READER_CLOSED = "Column store reader has already been closed.";
 
     private final BatchWritable m_writable;
 

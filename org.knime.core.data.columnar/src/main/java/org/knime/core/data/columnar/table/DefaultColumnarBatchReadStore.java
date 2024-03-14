@@ -137,23 +137,20 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
         }
     }
 
-    private RandomAccessBatchReadable m_readable;
+    private final RandomAccessBatchReadable m_readable;
 
-    private final WrappedBatchReadStore m_wrappedStore;
+    private final BatchReadStore m_delegateBatchReadStore;
 
-    private final BatchReadStore m_readStore;
-
+    @SuppressWarnings("resource")
     private DefaultColumnarBatchReadStore(final ColumnarBatchReadStoreBuilder builder) {
-        m_readStore = builder.m_readStore;
+        m_delegateBatchReadStore = builder.m_readStore;
 
-        m_readable = builder.m_readStore;
-        m_readable = initColumnDataCache(m_readable, builder.m_columnDataCache);
-        m_readable = initDictEncoding(m_readable, builder.m_dictEncodingEnabled);
-        m_readable = initHeapCache(m_readable, builder.m_heapCache);
-
-        m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore);
+        RandomAccessBatchReadable readable = builder.m_readStore;
+        readable = initColumnDataCache(readable, builder.m_columnDataCache);
+        readable = initDictEncoding(readable, builder.m_dictEncodingEnabled);
+        readable = initHeapCache(readable, builder.m_heapCache);
+        m_readable = readable;
     }
-
 
     private static RandomAccessBatchReadable initHeapCache(final RandomAccessBatchReadable readable,
         final SharedObjectCache heapCache) {
@@ -178,22 +175,22 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return m_wrappedStore.createRandomAccessReader(selection);
+        return m_readable.createRandomAccessReader(selection);
     }
 
     @Override
     public void close() throws IOException {
-        m_wrappedStore.close();
+        m_readable.close();
     }
 
     @Override
     public int numBatches() {
-        return m_wrappedStore.numBatches();
+        return m_delegateBatchReadStore.numBatches();
     }
 
     @Override
     public FileHandle getFileHandle() {
-        return m_wrappedStore.getFileHandle();
+        return m_delegateBatchReadStore.getFileHandle();
     }
 
     /**
@@ -206,6 +203,6 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
     @Override
     public BatchReadStore getDelegateBatchReadStore() {
-        return m_readStore;
+        return m_delegateBatchReadStore;
     }
 }
