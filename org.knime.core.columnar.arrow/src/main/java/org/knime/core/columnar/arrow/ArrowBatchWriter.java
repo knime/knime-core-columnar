@@ -235,6 +235,25 @@ class ArrowBatchWriter implements BatchWriter {
         return m_numBatches.get();
     }
 
+    /**
+     * Return the boundaries of (variably sized) batches in the store.
+     *
+     * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
+     *         the second value indicates the end of the second batch etc
+     */
+    synchronized long[] getBatchBoundaries() {
+        // TODO (TP): Probably we should just make m_batchBoundaries a long[] array and implement effectively a CopyOnWrite list
+        return m_batchBoundaries.stream().mapToLong(i -> i).toArray();
+    }
+
+    /**
+     * @return the number of rows of complete batches that are already written
+     */
+    synchronized long numRows() {
+        return m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
+    }
+
+
     @Override
     public synchronized void close() throws IOException {
         if (!m_closed) {
