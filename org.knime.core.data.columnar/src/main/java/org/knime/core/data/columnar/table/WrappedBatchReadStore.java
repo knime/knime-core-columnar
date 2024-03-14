@@ -54,6 +54,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.cache.object.ObjectCache;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.FileHandle;
@@ -61,6 +62,10 @@ import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * A {@link BatchReadStore} that delegates operations to a {@link RandomAccessBatchReadable}.
+ * <p>
+ * The purpose is to wrap a {@link BatchReadStore} that has been decorated by layers of caching etc. The caches (e.g.,
+ * {@link ObjectCache}) implement {@code RandomAccessBatchReadable}. This wrapper adds back the missing additional
+ * {@link BatchReadStore} API methods by delegating to the underlying un-decorated {@code BatchReadStore}.
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
@@ -136,16 +141,21 @@ final class WrappedBatchReadStore implements BatchReadStore {
 
     private final RandomAccessBatchReadable m_readable;
 
-    private final int m_numBatches;
-
-    private final FileHandle m_fileHandle;
-
     private final AtomicBoolean m_closed = new AtomicBoolean();
 
-    WrappedBatchReadStore(final RandomAccessBatchReadable readable, final int numBatches, final FileHandle path) {
-        m_readable = readable;
-        m_numBatches = numBatches;
-        m_fileHandle = path;
+    private BatchReadStore m_underlyingStore;
+
+    /**
+     * Wrap a {@link BatchReadStore} that has been decorated by layers of caching etc. The caches (e.g.,
+     * {@link ObjectCache}) implement {@code RandomAccessBatchReadable}. This wrapper adds back the missing additional
+     * {@link BatchReadStore} API methods by delegating to the underlying un-decorated {@code BatchReadStore}.
+     *
+     * @param decoratedStore the decorated {@code store} wrapped into layers of caching.
+     * @param store the underlying store
+     */
+    WrappedBatchReadStore(final RandomAccessBatchReadable decoratedStore, final BatchReadStore store) {
+        m_readable = decoratedStore;
+        m_underlyingStore = store;
     }
 
     @Override
@@ -164,12 +174,22 @@ final class WrappedBatchReadStore implements BatchReadStore {
 
     @Override
     public int numBatches() {
-        return m_numBatches;
+        return m_underlyingStore.numBatches();
+    }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_underlyingStore.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_underlyingStore.numRows();
     }
 
     @Override
     public FileHandle getFileHandle() {
-        return m_fileHandle;
+        return m_underlyingStore.getFileHandle();
     }
 
     @Override
