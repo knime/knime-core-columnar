@@ -45,7 +45,6 @@
  */
 package org.knime.core.data.columnar.domain;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -69,7 +68,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class DomainWritable implements BatchWritable, Closeable {
+public final class DomainWritable implements BatchWritable {
 
     private final class DomainBatchWriter implements BatchWriter {
 
@@ -230,11 +229,4 @@ public final class DomainWritable implements BatchWritable, Closeable {
         }
         m_config = m_config.withMaxPossibleNominalDomainValues(maxPossibleValues);
     }
-
-    @Override
-    public void close() throws IOException {
-        m_domainCalculators = null;
-        m_metadataCalculators = null;
-    }
-
 }
