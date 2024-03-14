@@ -189,6 +189,16 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
     }
 
     @Override
+    public long[] getBatchBoundaries() {
+        return m_delegateBatchReadStore.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_delegateBatchReadStore.numRows();
+    }
+
+    @Override
     public FileHandle getFileHandle() {
         return m_delegateBatchReadStore.getFileHandle();
     }
