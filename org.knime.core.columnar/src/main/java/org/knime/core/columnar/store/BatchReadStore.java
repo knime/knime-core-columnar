@@ -88,6 +88,16 @@ public interface BatchReadStore extends RandomAccessBatchReadable {
     }
 
     /**
+     * Obtain the number of rows in this store.
+     *
+     * @return number of rows in this store.
+     */
+    default long numRows() {
+        final long[] b = getBatchBoundaries();
+        return b.length == 0 ? 0 : b[b.length - 1];
+    }
+
+    /**
      * @return The designated physical location of the store. Note that the store may not (fully) be existent at this
      *         location depending on its state. E.g. it could be cached in memory and only later be persisted to its
      *         location.
