@@ -46,6 +46,8 @@ try {
         if (params["USE_HEAP_BADGER"]) {
             vmArgs = '-Dknime.columnar.heapbadger.enable=true'
         }
+        println("Using VM Args:" + vmArgs)
+        
         withEnv(["MALLOC_ARENA_MAX=1"]) {
             def testflowsDir = "Testflows (${baseBranch})/knime-base"
             def excludedTestflows = [
