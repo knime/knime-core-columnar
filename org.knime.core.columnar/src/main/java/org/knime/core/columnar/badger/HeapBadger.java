@@ -80,7 +80,7 @@ import org.knime.core.table.schema.ColumnarSchema;
 public class HeapBadger {
 
     private static final void debug(final String message) {
-        //                System.out.println(message);
+//        System.out.println(message);
     }
 
     // TODO we should make this depend on the size of the data that we know about in advance
@@ -465,11 +465,14 @@ public class HeapBadger {
                 } catch (Exception e) {
                     // in case of an exception, we remember it and quit the serialization loop
                     m_exception = e;
+                    debug("[b] LOOP ERROR EXIT -- acquiring LOCK");
                     lock.lock();
+                    debug("[b] LOOP ERROR EXIT -- LOCKING");
                     // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
                     m_notFull.signal();
                     m_closed.signal();
                     m_finished.signal();
+                    debug("[b] LOOP ERROR EXIT -- UNLOCKING");
                     lock.unlock();
                     debug("[b] ERROR EXIT b) because of " + e.getMessage());
                     return;
@@ -503,13 +506,20 @@ public class HeapBadger {
         @Override
         public void close() throws IOException {
             final ReentrantLock lock = this.m_lock;
+            debug("[b] Close -- acquiring LOCK");
             lock.lock();
+            debug("[b] Close -- LOCKING");
             try {
+                if (m_exception != null) {
+                    return;
+                }
+
                 if (m_closing) {
                     return; // multiple threads could call close
                 }
 
                 if (!m_finishing) {
+                    debug("[b] Close -- waiting for closed signal");
                     m_closing = true;
                     m_closed.await();
                 }
@@ -520,6 +530,7 @@ public class HeapBadger {
             } finally {
                 m_serializer.close();
                 lock.unlock();
+                debug("[b] Close -- UNLOCKING");
             }
         }
     }
