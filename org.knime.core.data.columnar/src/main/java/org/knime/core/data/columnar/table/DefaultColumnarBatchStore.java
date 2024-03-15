@@ -453,6 +453,16 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
     }
 
     @Override
+    public long[] getBatchBoundaries() {
+        return m_readStore.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_readStore.numRows();
+    }
+
+    @Override
     public FileHandle getFileHandle() {
         return m_readStore.getFileHandle();
     }
