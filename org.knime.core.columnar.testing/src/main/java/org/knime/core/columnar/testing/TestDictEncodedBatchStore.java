@@ -85,6 +85,16 @@ public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable 
     }
 
     @Override
+    public long[] getBatchBoundaries() {
+        return m_testDelegate.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_testDelegate.numRows();
+    }
+
+    @Override
     public FileHandle getFileHandle() {
         return m_testDelegate.getFileHandle();
     }
