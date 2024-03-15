@@ -61,7 +61,6 @@ try {
                 testflowsDir: testflowsDir,
                 testflowsRegex: testflowsRegex,
                 additionalVmArgs: vmArgs,
-                withAssertions: true,
                 dependencies: [
                     repositories:  [
                         "knime-aws",
