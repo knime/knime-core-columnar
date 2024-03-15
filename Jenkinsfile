@@ -1,7 +1,8 @@
 #!groovy
 def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRANCH_NAME : 'releases/2024-06'
 
-library "knime-pipeline@$BN"
+// library "knime-pipeline@$BN"
+library "knime-pipeline@heap-badger"
 
 def baseBranch = (BN == KNIMEConstants.NEXT_RELEASE_BRANCH ? "master" : BN.replace("releases/",""))
 
@@ -41,8 +42,9 @@ try {
     )
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
+        vmArgs = ''
         if (params["USE_HEAP_BADGER"]) {
-            // TODO: run shell command to add property to workflow-tests? does that work?
+            vmArgs = '-Dknime.columnar.heapbadger.enable=true'
         }
         withEnv(["MALLOC_ARENA_MAX=1"]) {
             def testflowsDir = "Testflows (${baseBranch})/knime-base"
@@ -58,6 +60,8 @@ try {
             workflowTests.runTests(
                 testflowsDir: testflowsDir,
                 testflowsRegex: testflowsRegex,
+                additionalVmArgs: vmArgs,
+                withAssertions: true,
                 dependencies: [
                     repositories:  [
                         "knime-aws",
@@ -110,7 +114,7 @@ try {
                         "knime-wide-data",
                         "knime-xml",
                     ],
-                    ius: ["org.knime.features.chem.types.feature.group"]
+                    ius: ["org.knime.features.chem.types.feature.group"],
                 ],
                 sidecarContainers: [
                     [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
