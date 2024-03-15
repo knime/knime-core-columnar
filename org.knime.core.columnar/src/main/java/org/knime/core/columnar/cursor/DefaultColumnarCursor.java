@@ -147,7 +147,7 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
         long m_toRow;
         if (selection.rows().allSelected()) {
             m_fromRow = 0;
-            m_toRow = m_batchBoundaries[m_batchBoundaries.length - 1];
+            m_toRow = store.numRows();
         } else {
             m_fromRow = selection.rows().fromIndex();
             m_toRow = selection.rows().toIndex();
