@@ -153,45 +153,10 @@ final class ColumnarRowCursorFactory {
             return new EmptyRowCursor(schema);
         }
 
-        try {
-        var batchBoundaries = findBatchBoundaries(store);
-            final long maxLength = batchBoundaries.length > 0 ? batchBoundaries[batchBoundaries.length - 1] : 0;
-            if (maxLength < 1) {
-                throw new IllegalStateException(
-                    String.format("Length of table is %d, but maximum batch length is %d.", size, maxLength));
-            }
-        } catch (IOException ex) {
-            // no checks possible...
-        }
-
         var numColumns = schema.numColumns();
         var selection = filter == null ? Selection.all() : TableFilterUtils.createSelection(filter, numColumns, size);
         var columnSelection = ColumnSelection.fromSelection(selection, numColumns);
         return new DefaultRowCursor(ColumnarCursorFactory.create(store, selection), schema, columnSelection);
-    }
-
-    /**
-     * Find the boundaries of (variably sized) batches in the store.
-     *
-     * NOTE: not optimal as it loads each batch!
-     *
-     * @param store
-     * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
-     *         the second value indicates the end of the second batch etc
-     * @throws IOException
-     */
-    private static long[] findBatchBoundaries(final BatchReadStore store) throws IOException {
-        // TODO: don't read all batches for this, read batch boundaries from footer
-        int numBatches = store.numBatches();
-        long[] batchBoundaries = new long[numBatches];
-        try (var batchReadable = store.createRandomAccessReader()) {
-            for (int i = 0; i < numBatches; i++) {
-                var batch = batchReadable.readRetained(i);
-                batchBoundaries[i] = batch.length() + (i == 0 ? 0 : batchBoundaries[i - 1]);
-                batch.release();
-            }
-            return batchBoundaries;
-        }
     }
 
     private ColumnarRowCursorFactory() {
