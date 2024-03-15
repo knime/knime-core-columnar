@@ -89,7 +89,7 @@ public final class ColumnarWriteCursorFactory {
      * @param store the underlying storage
      * @return the {@link WriteCursor}
      */
-    public static ColumnarWriteCursor createWriteCursor(final BatchStore store) {
+    public static ColumnarWriteCursor createWriteCursor(final BatchWritable store) {
         if (store instanceof BatchingWritable batchingStore) {
             return batchingStore.getBatchingWriteCursor();
         } else {
@@ -152,7 +152,7 @@ public final class ColumnarWriteCursorFactory {
 
         private long m_numForwards;
 
-        ColumnarWriteCursorImpl(final BatchStore store) {
+        ColumnarWriteCursorImpl(final BatchWritable store) {
             m_writer = store.getWriter();
             m_adjusting = true;
 
