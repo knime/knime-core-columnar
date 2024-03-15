@@ -53,7 +53,6 @@ import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.badger.BatchingWritable;
 import org.knime.core.columnar.badger.HeapBadger;
-import org.knime.core.columnar.badger.HeapBadgerBatchStore;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -64,6 +63,7 @@ import org.knime.core.columnar.cache.object.ObjectCache;
 import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.cache.writable.BatchWritableCache;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
+import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadable;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -261,9 +261,9 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     private DomainWritable m_domainWritable = null;
 
-    private final BatchStore m_wrappedStore;
-
     private final BatchReadStore m_readStore;
+
+    private final ColumnarWriteCursor m_writeCursor;
 
     private DefaultColumnarBatchStore(final ColumnarBatchStoreBuilder builder) {
         m_readStore = builder.m_readDelegate;
@@ -288,13 +288,13 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             initDuplicateCheck(builder.m_duplicateCheckExecutor);
             initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
             initHeapBadger(builder.m_heapCache);
-            m_wrappedStore = new HeapBadgerBatchStore(m_heapBadger, m_readStore.getFileHandle());
+            m_writeCursor = m_heapBadger.getWriteCursor();
         } else {
             initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor,
                 builder.m_heapCacheSerializeExecutor);
             initDuplicateCheck(builder.m_duplicateCheckExecutor);
             initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
-            m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getFileHandle());
+            m_writeCursor = ColumnarWriteCursorFactory.createWriteCursor(m_writable);
         }
     }
 
@@ -374,16 +374,16 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     @Override
     public BatchWriter getWriter() {
-        return m_wrappedStore.getWriter();
+        if ( m_writable == null ) {
+            throw new IllegalStateException(
+                    "No writer available for the HeapBadger. Use the batching write cursor instead");
+        }
+        return m_writable.getWriter();
     }
 
     @Override
     public ColumnarWriteCursor getBatchingWriteCursor() {
-        if (m_heapBadger != null) {
-            return m_heapBadger.getWriteCursor();
-        } else {
-            return null;
-        }
+        return m_writeCursor;
     }
 
     @Override
@@ -393,7 +393,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return m_wrappedStore.createRandomAccessReader(selection);
+        return m_readable.createRandomAccessReader(selection);
     }
 
     @Override
@@ -402,8 +402,16 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
         }
 
-        // this also closes the delegates and all caches
-        m_wrappedStore.close();
+        if (m_heapBadger != null) {
+            // close the writer
+            m_heapBadger.getWriteCursor().close();
+            // close the reader
+            m_heapBadger.getHeapCache().close();
+        } else {
+            // this also closes the delegates and all caches
+            m_writable.getWriter().close();
+            m_readable.close();
+        }
     }
 
     @SuppressWarnings("resource") // The heap badger write cursor is closed separately
@@ -441,12 +449,12 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     @Override
     public int numBatches() {
-        return m_wrappedStore.numBatches();
+        return m_readStore.numBatches();
     }
 
     @Override
     public FileHandle getFileHandle() {
-        return m_wrappedStore.getFileHandle();
+        return m_readStore.getFileHandle();
     }
 
     /**
