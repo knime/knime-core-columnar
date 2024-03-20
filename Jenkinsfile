@@ -35,92 +35,95 @@ properties([
 try {
     knimetools.defaultTychoBuild('org.knime.update.core.columnar')
 
-    workflowTests.runTests(
-        dependencies: [
-            repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep', 'knime-ensembles', 'knime-xml', 'knime-distance']
-        ]
-    )
+    stage("knime-core-columnar workflow tests") {
+        workflowTests.runTests(
+            dependencies: [
+                repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep', 'knime-ensembles', 'knime-xml', 'knime-distance']
+            ]
+        )
+    }
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
         vmArgs = ''
         if (params["USE_HEAP_BADGER"]) {
             vmArgs = '-Dknime.columnar.heapbadger.enable=true'
         }
-        println("Using VM Args:" + vmArgs)
 
-        withEnv(["MALLOC_ARENA_MAX=1"]) {
-            def testflowsDir = "Testflows (${baseBranch})/knime-base"
-            def excludedTestflows = [
-                "\\\\QDate&Time/test_AP-6112_DateTimeDifference\\\\E",
-                "\\\\QDate&Time/test_AP-6963_StringToDurationPeriod\\\\E",
-                "\\\\QTransformation/test_CollectionCreator3\\\\E",
-                "\\\\QFlow Control/test_endModelCase\\\\E", // TODO AP-20719 - fix this test
-            ].join('|')
-            def testflowsRegex =
-            "/\\\\Q${testflowsDir}\\\\E/(?:(?!OS|\\\\QFile Handling v2\\\\E|Staging|${excludedTestflows})|OS/__KNIME_OS__/|\\\\QStaging/${BRANCH_NAME}\\\\E).+"
+        stage("knime-base workflow tests (${vmArgs})") {
+            withEnv(["MALLOC_ARENA_MAX=1"]) {
+                def testflowsDir = "Testflows (${baseBranch})/knime-base"
+                def excludedTestflows = [
+                    "\\\\QDate&Time/test_AP-6112_DateTimeDifference\\\\E",
+                    "\\\\QDate&Time/test_AP-6963_StringToDurationPeriod\\\\E",
+                    "\\\\QTransformation/test_CollectionCreator3\\\\E",
+                    "\\\\QFlow Control/test_endModelCase\\\\E", // TODO AP-20719 - fix this test
+                ].join('|')
+                def testflowsRegex =
+                "/\\\\Q${testflowsDir}\\\\E/(?:(?!OS|\\\\QFile Handling v2\\\\E|Staging|${excludedTestflows})|OS/__KNIME_OS__/|\\\\QStaging/${BRANCH_NAME}\\\\E).+"
 
-            workflowTests.runTests(
-                testflowsDir: testflowsDir,
-                testflowsRegex: testflowsRegex,
-                additionalVmArguments: vmArgs,
-                dependencies: [
-                    repositories:  [
-                        "knime-aws",
-                        "knime-base",
-                        "knime-bigdata",
-                        "knime-bigdata-externals",
-                        "knime-birt",
-                        "knime-chemistry",
-                        "knime-cloud",
-                        "knime-conda",
-                        "knime-core",
-                        "knime-core-ui",
-                        "knime-credentials-base",
-                        "knime-database",
-                        "knime-database-proprietary",
-                        "knime-datageneration",
-                        "knime-distance",
-                        "knime-ensembles",
-                        "knime-excel",
-                        "knime-expressions",
-                        "knime-exttool",
-                        "knime-filehandling",
-                        "knime-gateway",
-                        "knime-h2o",
-                        "knime-jep",
-                        "knime-jfreechart",
-                        "knime-js-base",
-                        "knime-js-core",
-                        "knime-js-labs",
-                        "knime-kerberos",
-                        "knime-office365",
-                        "knime-optimization",
-                        "knime-parquet",
-                        "knime-pmml",
-                        "knime-pmml-compilation",
-                        "knime-pmml-translation",
-                        "knime-python",
-                        "knime-python",
-                        "knime-python-legacy",
-                        "knime-r",
-                        "knime-scripting-editor",
-                        "knime-stats",
-                        "knime-streaming",
-                        "knime-svg",
-                        "knime-svm",
-                        "knime-testing-internal",
-                        "knime-textprocessing",
-                        "knime-timeseries",
-                        "knime-weka",
-                        "knime-wide-data",
-                        "knime-xml",
+                workflowTests.runTests(
+                    testflowsDir: testflowsDir,
+                    testflowsRegex: testflowsRegex,
+                    additionalVmArguments: vmArgs,
+                    dependencies: [
+                        repositories:  [
+                            "knime-aws",
+                            "knime-base",
+                            "knime-bigdata",
+                            "knime-bigdata-externals",
+                            "knime-birt",
+                            "knime-chemistry",
+                            "knime-cloud",
+                            "knime-conda",
+                            "knime-core",
+                            "knime-core-ui",
+                            "knime-credentials-base",
+                            "knime-database",
+                            "knime-database-proprietary",
+                            "knime-datageneration",
+                            "knime-distance",
+                            "knime-ensembles",
+                            "knime-excel",
+                            "knime-expressions",
+                            "knime-exttool",
+                            "knime-filehandling",
+                            "knime-gateway",
+                            "knime-h2o",
+                            "knime-jep",
+                            "knime-jfreechart",
+                            "knime-js-base",
+                            "knime-js-core",
+                            "knime-js-labs",
+                            "knime-kerberos",
+                            "knime-office365",
+                            "knime-optimization",
+                            "knime-parquet",
+                            "knime-pmml",
+                            "knime-pmml-compilation",
+                            "knime-pmml-translation",
+                            "knime-python",
+                            "knime-python",
+                            "knime-python-legacy",
+                            "knime-r",
+                            "knime-scripting-editor",
+                            "knime-stats",
+                            "knime-streaming",
+                            "knime-svg",
+                            "knime-svm",
+                            "knime-testing-internal",
+                            "knime-textprocessing",
+                            "knime-timeseries",
+                            "knime-weka",
+                            "knime-wide-data",
+                            "knime-xml",
+                        ],
+                        ius: ["org.knime.features.chem.types.feature.group"],
                     ],
-                    ius: ["org.knime.features.chem.types.feature.group"],
-                ],
-                sidecarContainers: [
-                    [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
-                ]
-            )
+                    sidecarContainers: [
+                        [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
+                    ]
+                )
+            }
         }
     }
 
