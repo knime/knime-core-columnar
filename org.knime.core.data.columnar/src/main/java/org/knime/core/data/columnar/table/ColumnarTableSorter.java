@@ -49,193 +49,268 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.Iterator;
+import java.util.Deque;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.function.IntSupplier;
 import java.util.stream.IntStream;
 
+import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataType;
+import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKey;
+import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
 import org.knime.core.data.columnar.ColumnarTableBackend;
-import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
+import org.knime.core.data.container.CloseableRowIterator;
+import org.knime.core.data.def.DefaultRow;
+import org.knime.core.data.sort.KWayMergeCursor;
 import org.knime.core.data.sort.RowComparator;
-import org.knime.core.data.sort.RowComparator.SortKeyColumns;
+import org.knime.core.data.sort.RowReadComparator;
+import org.knime.core.data.sort.RowReadComparator.SortKeyColumns;
+import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.node.BufferedDataTable;
+import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.ExecutionContext;
+import org.knime.core.node.NodeLogger;
+import org.knime.core.table.cursor.RandomAccessCursor;
 import org.knime.core.table.row.LookaheadRowAccessible;
 import org.knime.core.table.row.RandomRowAccessible;
+import org.knime.core.table.row.ReadAccessRow;
 
 /**
  *
  * @author leonard.woerteler
  */
 public final class ColumnarTableSorter {
+    private static final int MAX_SIZE = 1_000_000; // TODO num rows for now but should be bytes
+    private static final int K = 10;
 
-    /**
-     * @return a {@link LookaheadRowAccessible} for the given columnarTable
-     * @throws IllegalArgumentException if the table is not columnar
-     */
-    private static RandomRowAccessible getRowAccessible(final ColumnarTableBackend backend,
-        final BufferedDataTable columnarTable, final ExecutionContext exec) {
-        var delegate = ColumnarTableBackend.unwrap(columnarTable);
-        if (delegate instanceof AbstractColumnarContainerTable containerTable) {
-            return containerTable.asRowAccessible();
-        } else if (delegate instanceof VirtualTableExtensionTable) {
-            // TODO we do not always need to re-write
-            // we could get a cursor that computes the virtual table output on demand
-            return getRowAccessible(backend, ColumnarTableBackend.rewriteTable(columnarTable, exec), exec);
-        } else {
-            throw new IllegalArgumentException("the table is not columnar");
-        }
-    }
+    private final ExecutionContext m_execContext;
+    private final BufferedDataTable m_inputTable;
+    private final ColumnarValueSchema m_schema;
+    private final ColumnStoreFactory m_columnStoreFactory;
 
-    public static BufferedDataTable sort(final ColumnarTableBackend backend, final ExecutionContext exec,
-        final ColumnarValueSchema schema, final BufferedDataTable columnarTable,
-        final RowComparator rowComparator) {
-
-        var MAX_SIZE = 10_000; // TODO num rows for now but should be bytes
-
-        final var initialRuns = phase0(backend, columnarTable, schema, exec, rowComparator, MAX_SIZE);
-
-
-
-        // Next:
-        // - On the readTable we can create a cursor again (on access level)
-        // var sortedReadCursor = sortedTable.createCursor();
-        // - We can wrap the access of the cursor as RowRead:
-        // var rowRead = VirtualTableUtils.createRowRead(schema, sortedReadCursor.access(), keySelection);
-        // - We can do this on k tables for the merge phase and merge them (writing like above)
-        // - For the last merge we might need to use a "ColumnarRowContainer".
-        //   It just wraps a ColumnarRowWriteTable but finish will do the wrapping to "BufferedDataTable"
-
-        return null;
-    }
-
-    @SuppressWarnings("resource")
-    private static List<ColumnarRowReadTable> phase0(final ColumnarTableBackend backend,
-        final BufferedDataTable columnarTable, final ColumnarValueSchema schema, final ExecutionContext exec,
-        final RowComparator rowComparator, final int maxSize) {
-
-        ColumnStoreFactory storeFactory = getColumnsStoreFactory();
-        final var keySpec = rowComparator.getSortKeyColumns();
-        final var lut = computeLookupTable(keySpec);
-
-        final var runs = new ArrayList<ColumnarRowReadTable>();
-
-        // NB: No selection to the key column because we use the cursor later for copying the data
-        try (final var rowAccessible = getRowAccessible(backend, columnarTable, exec);
-                var readCursor = rowAccessible.createCursor()) {
-            var keySelection = new DefaultColumnSelection(schema.numColumns()); // TODO select only the sort key columns
-            final var rowRead = VirtualTableUtils.createRowRead(schema, readCursor.access(), keySelection);
-
-            var currRow = 0;
-            boolean hasNext = readCursor.forward();
-            while (hasNext) {
-                final var offset = currRow;
-
-                final var sortKeys = new ArrayList<Object[]>();
-                var outputSize = 0L;
-                while (outputSize < maxSize) {
-                    sortKeys.add(getSortKey(rowRead, keySpec, lut));
-                    hasNext = readCursor.forward();
-                    currRow++;
-                    outputSize += sizeOf(rowRead);
-                }
-
-                final var sortedIndices = getSortedIndices(sortKeys, rowComparator, lut, offset);
-
-                FileHandle fileHandle = null; // TODO create a temp file or use TempFileHandle
-                final var underlyingStore = storeFactory.createStore(schema, fileHandle);
-                final var enhancedStore = new DefaultColumnarBatchStore.ColumnarBatchStoreBuilder(underlyingStore) //
-                    //.enableDictEncoding(true) // TODO???
-                    .useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache(),
-                        ColumnarPreferenceUtils.getPersistExecutor()) //
-                    .build();
-
-                try (var batchWriter = enhancedStore.getWriter();) {
-                    var writeBatch = batchWriter.create(sortedIndices.length);
-                    for (var i = 0; i < sortedIndices.length; i++) {
-                        // TODO for each column
-                        // TODO set to the value which we get from the input table
-                        writeBatch.get(0);
-                    }
-                }
-
-                try (var writeTable = new ColumnarRowWriteTable(schema, storeFactory,
-                    new ColumnarRowWriteTableSettings(true, false, 0, false, true, false, 100, 1));
-                        var writeCursor = writeTable.getWriteCursor()) {
-
-                    for (var i : sortedIndices) {
-                        readCursor.moveTo(i);
-                        writeCursor.forward();
-                        writeCursor.access().setFrom(readCursor.access());
-                    }
-
-                    // NB: This might be incorrect. The API is quite unclear. It will change in AP-21999.
-                    writeCursor.flush();
-
-                    runs.add(writeTable.finish());
-                }
-                readCursor.moveTo(currRow - 1);
-            }
-        } catch (IOException ex) {
-            // TODO Handle correctly
-            throw new IllegalStateException(ex);
-        }
-        return runs;
-    }
-
-    /**
-     * @param rowRead
-     */
-    private static long sizeOf(final RowRead rowRead) {
-        return 1L;
-    }
-
-    private static ColumnStoreFactory getColumnsStoreFactory() {
+    public ColumnarTableSorter(final ExecutionContext exec, final ColumnarValueSchema schema,
+            final BufferedDataTable inputTable) {
+        m_execContext = exec;
+        m_inputTable = inputTable;
+        m_schema = schema;
         try {
-            return ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
+            m_columnStoreFactory = ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton();
         } catch (Exception ex) {
             throw ex instanceof RuntimeException rte ? rte : new IllegalStateException(ex.getMessage(), ex);
         }
     }
 
+    public KnowsRowCountTable sortIntoTable(final IntSupplier tableIDSupplier, final RowComparator rowComparator)
+            throws IOException {
+        final var keySpec = rowComparator.getSortKeyColumns();
+        final var columnIndexLookup = computeLookupTable(keySpec);
+        final var rowReadComparator = rowComparator.toRowReadComparator();
+        final var filteredKeySelection = createSortColumnSelection(keySpec);
+
+        final var initialRuns = phase0(keySpec, filteredKeySelection, columnIndexLookup, rowReadComparator, MAX_SIZE);
+        return mergePhase(tableIDSupplier, initialRuns, filteredKeySelection, rowReadComparator, K);
+    }
+
+    public RowCursor sortIntoCursor(final RowComparator rowComparator) throws IOException {
+        final var keySpec = rowComparator.getSortKeyColumns();
+        final var columnIndexLookup = computeLookupTable(keySpec);
+        final var rowReadComparator = rowComparator.toRowReadComparator();
+        final var filteredKeySelection = createSortColumnSelection(keySpec);
+
+        final var initialRuns = phase0(keySpec, filteredKeySelection, columnIndexLookup, rowReadComparator, MAX_SIZE);
+        return mergePhaseToCursor(initialRuns, filteredKeySelection, rowReadComparator, K);
+    }
+
+    @SuppressWarnings("resource")
+    public CloseableRowIterator sortIntoIterator(final RowComparator rowComparator) throws IOException {
+        final var sortedCursor = sortIntoCursor(rowComparator);
+        return new CursorToIteratorAdapter(sortedCursor);
+    }
+
+    @SuppressWarnings("resource")
+    private List<ColumnarRowReadTable> phase0(final SortKeyColumns keySpec, final FilteredColumnSelection keyFilter,
+            final int[] columnIndexLookup, final RowReadComparator rowReadComparator, final int maxSize)
+            throws IOException {
+
+        final var runs = new ArrayList<ColumnarRowReadTable>();
+
+        // NB: No selection to the key column because we use the cursor later for copying the data
+        try (final var rowAccessible = getRowAccessible(m_inputTable);
+                final var readCursor = rowAccessible.createCursor()) {
+            final var rowRead = VirtualTableUtils.createRowRead(m_schema, readCursor.access(), keyFilter);
+
+            var runStart = 0L;
+            boolean hasNext = readCursor.forward();
+            while (hasNext) {
+
+                final var sortKeys = new ArrayList<Object[]>();
+                var outputSize = 0L;
+                while (hasNext && outputSize < maxSize) {
+                    sortKeys.add(getSortKey(rowRead, keySpec, columnIndexLookup));
+                    hasNext = readCursor.forward();
+                    outputSize += sizeOf(readCursor);
+                }
+
+                final var sortedIndices = getSortedIndices(sortKeys, rowReadComparator, columnIndexLookup);
+
+                try (var writeTable = new ColumnarRowWriteTable(m_schema, m_columnStoreFactory,
+                    new ColumnarRowWriteTableSettings(true, false, 0, false, true, false, 100, 1));
+                        var writeCursor = writeTable.getWriteCursor()) {
+
+                    final var outAccess = writeCursor.access();
+                    final var inAccess = readCursor.access();
+                    for (var i : sortedIndices) {
+                        readCursor.moveTo(runStart + i);
+                        writeCursor.forward();
+                        outAccess.setFrom(inAccess);
+                    }
+
+                    runs.add(writeTable.finish());
+                }
+                runStart += sortKeys.size();
+                readCursor.moveTo(runStart - 1);
+            }
+        }
+        return runs;
+    }
+
+    @SuppressWarnings("resource")
+    private KnowsRowCountTable mergePhase(final IntSupplier tableIDSupplier,
+            final List<ColumnarRowReadTable> initialRuns, final FilteredColumnSelection keyColumnFilter,
+            final RowReadComparator rowReadComparator, final int maxK) throws IOException {
+        final var mergeQueue = new ArrayDeque<>(initialRuns);
+        initialRuns.clear();
+
+        while (mergeQueue.size() > 1) {
+            mergeIteration(mergeQueue, keyColumnFilter, rowReadComparator, maxK);
+        }
+        return UnsavedColumnarContainerTable.create(tableIDSupplier.getAsInt(), mergeQueue.removeFirst(), () -> {});
+    }
+
+    @SuppressWarnings("resource")
+    private RowCursor mergePhaseToCursor(final List<ColumnarRowReadTable> initialRuns,
+            final FilteredColumnSelection keyColumnFilter, final Comparator<RowRead> rowReadComparator, final int k)
+            throws IOException {
+        final var mergeQueue = new ArrayDeque<>(initialRuns);
+        initialRuns.clear();
+
+        while (mergeQueue.size() > k) {
+            mergeIteration(mergeQueue, keyColumnFilter, rowReadComparator, k);
+        }
+
+        if (mergeQueue.size() == 1) {
+            final var resultTable = initialRuns.get(0);
+            return new DeletingRowCursor(resultTable, new DefaultColumnSelection(m_schema.numColumns()));
+        }
+
+        final var rowCursors = mergeQueue.stream() //
+                .map(run -> new DeletingRowCursor(run, keyColumnFilter)) //
+                .toArray(RowCursor[]::new);
+        return new KWayMergeCursor(rowReadComparator, rowCursors, m_schema.numColumns());
+    }
+
+    @SuppressWarnings("resource")
+    private void mergeIteration(final Deque<ColumnarRowReadTable> runs, final FilteredColumnSelection keyFilter,
+            final Comparator<RowRead> rowReadComparator, final int maxK) throws IOException {
+        final var numInputRuns = runs.size();
+        final var numMerges = (numInputRuns + maxK - 1) / maxK;
+        final var minNumInputs = numInputRuns / numMerges;
+        final var numAdditionalRuns = numInputRuns % numMerges;
+
+        final int len = numAdditionalRuns != 0 ? (minNumInputs + 1) : minNumInputs;
+        final var rowCursors = new DeletingRowCursor[len];
+
+        for (var i = 0; i < numMerges; i++) {
+            final var k = i < numAdditionalRuns ? (minNumInputs + 1) : minNumInputs;
+            for (var j = 0; j < k; j++) {
+                final ColumnarRowReadTable run = runs.removeFirst();
+                rowCursors[j] = new DeletingRowCursor(run, keyFilter);
+            }
+            runs.add(merge(rowReadComparator, rowCursors));
+            Arrays.fill(rowCursors, null);
+        }
+    }
+
+    private ColumnarRowReadTable merge(final Comparator<RowRead> comparator, final DeletingRowCursor[] inputs)
+            throws IOException {
+        try (final var mergeCursor = new KWayMergeCursor(comparator, inputs, m_schema.numColumns());
+                var writeTable = new ColumnarRowWriteTable(m_schema, m_columnStoreFactory,
+                    new ColumnarRowWriteTableSettings(true, false, 0, false, true, false, 100, 1));
+                        var writeCursor = writeTable.getWriteCursor()) {
+            while (mergeCursor.canForward()) {
+                mergeCursor.forward();
+                writeCursor.forward();
+                writeCursor.access().setFrom(inputs[mergeCursor.currentInput()].access());
+            }
+
+            // NB: This might be incorrect. The API is quite unclear. It will change in AP-21999.
+            writeCursor.flush();
+
+            return writeTable.finish();
+        }
+    }
+
     /**
-     * @param sortKeys
-     * @return
+     * @return a {@link LookaheadRowAccessible} for the given columnarTable
+     * @throws IllegalArgumentException if the table is not columnar
      */
-    private static int[] getSortedIndices(final List<Object[]> sortKeys, final RowComparator comp, final int[] lut,
-            final int offset) {
+    private RandomRowAccessible getRowAccessible(final BufferedDataTable table) {
+        var delegate = ColumnarTableBackend.unwrap(table);
+        if (delegate instanceof AbstractColumnarContainerTable containerTable) {
+            return containerTable.asRowAccessible();
+        } else if (delegate instanceof VirtualTableExtensionTable) {
+            // TODO we do not always need to re-write
+            // we could get a cursor that computes the virtual table output on demand
+            return getRowAccessible(ColumnarTableBackend.rewriteTable(table, m_execContext));
+        } else {
+            throw new IllegalArgumentException("the table is not columnar");
+        }
+    }
+
+    private static long sizeOf(@SuppressWarnings("unused") final RandomAccessCursor<ReadAccessRow> cursor) {
+        return 1L; // NOSONAR
+    }
+
+    private FilteredColumnSelection createSortColumnSelection(final SortKeyColumns keySpec) {
+        return new FilteredColumnSelection(m_schema.numColumns(),
+            IntStream.concat(IntStream.of(0).filter(i -> keySpec.comparesRowKey()),
+                keySpec.columnIndexes().stream().map(i -> i + 1)).toArray());
+    }
+
+    private static int[] getSortedIndices(final List<Object[]> sortKeys, final Comparator<RowRead> comp,
+            final int[] lut) {
         final Integer[] indexes = IntStream.range(0, sortKeys.size()).boxed().toArray(Integer[]::new);
-        final var rowL = new DummyRow(lut);
-        final var rowR = new DummyRow(lut);
+        final var rowL = new DummyRowRead(lut);
+        final var rowR = new DummyRowRead(lut);
         final Comparator<Integer> rowComp =
                 (a, b) -> comp.compare(rowL.withSortKey(sortKeys.get(a)), rowR.withSortKey(sortKeys.get(b)));
         Arrays.sort(indexes, rowComp);
-        return Arrays.stream(indexes).mapToInt(idx -> idx + offset).toArray();
+        return Arrays.stream(indexes).mapToInt(Integer::intValue).toArray();
     }
 
-    private static int[] computeLookupTable(final SortKeyColumns keySpec) {
+    private int[] computeLookupTable(final SortKeyColumns keySpec) {
         final var columnIndexes = keySpec.columnIndexes();
-        final var numColumns = columnIndexes.cardinality();
-        final var columnLookup = new int[numColumns];
+        final var columnLookup = new int[m_schema.numColumns()];
         Arrays.fill(columnLookup, -1);
 
-        int colIdx = -1;
-        for (var i = 0; i < numColumns; i++) {
-            colIdx = columnIndexes.nextSetBit(colIdx + 1);
-            columnLookup[colIdx] = 1;
+        for (int offset = 0, colIdx = columnIndexes.nextSetBit(0); colIdx >= 0;
+                offset++, colIdx = columnIndexes.nextSetBit(colIdx + 1)) {
+            columnLookup[colIdx] = offset;
         }
 
         return columnLookup;
@@ -246,8 +321,7 @@ public final class ColumnarTableSorter {
         final var row = new Object[keySpec.comparesRowKey() ? (colOffsets.length + 1) : colOffsets.length];
         final var cols = keySpec.columnIndexes();
         for (int colIdx = cols.nextSetBit(0), out = 0; colIdx >= 0; colIdx = cols.nextSetBit(colIdx + 1), out++) {
-            row[out] = rowRead.isMissing(colIdx) ? DataType.getMissingCell()
-                : rowRead.getValue(colIdx).materializeDataCell();
+            row[out] = getAsDataCell(rowRead, colIdx);
         }
         if (keySpec.comparesRowKey()) {
             row[row.length - 1] = new RowKey(rowRead.getRowKey().getString());
@@ -255,40 +329,130 @@ public final class ColumnarTableSorter {
         return row;
     }
 
+    private static DataCell getAsDataCell(final RowRead rowRead, final int colIdx) {
+        return rowRead.isMissing(colIdx) ? DataType.getMissingCell() : rowRead.getValue(colIdx).materializeDataCell();
+    }
 
-    private static final class DummyRow implements DataRow {
+    private static final class CursorToIteratorAdapter extends CloseableRowIterator {
+
+        private final RowCursor m_cursor;
+
+        CursorToIteratorAdapter(final RowCursor cursor) {
+            m_cursor = cursor;
+        }
+
+        @Override
+        public DataRow next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            final var read = m_cursor.forward();
+            final var cells = IntStream.range(0, read.getNumColumns()) //
+                .mapToObj(idx -> ColumnarTableSorter.getAsDataCell(read, idx)) //
+                .toArray(DataCell[]::new);
+            return new DefaultRow(read.getRowKey().getString(), cells);
+        }
+
+        @Override
+        public boolean hasNext() {
+            return m_cursor.canForward();
+        }
+
+        @Override
+        public void close() {
+            m_cursor.close();
+        }
+    }
+
+    private static final class DeletingRowCursor implements RowCursor {
+
+        private ColumnarRowReadTable m_run;
+        private RandomAccessCursor<ReadAccessRow> m_delegate;
+        private RowRead m_rowRead;
+
+
+        DeletingRowCursor(final ColumnarRowReadTable run, final ColumnSelection keyColumnFilter) {
+            m_run = run;
+            m_delegate = run.createCursor();
+            m_rowRead = VirtualTableUtils.createRowRead(run.getSchema(), m_delegate.access(), keyColumnFilter);
+        }
+
+        public ReadAccessRow access() {
+            return m_delegate.access();
+        }
+
+        @Override
+        public RowRead forward() {
+            return m_delegate.forward() ? m_rowRead : null;
+        }
+
+        @Override
+        public boolean canForward() {
+            return m_delegate.canForward();
+        }
+
+        @Override
+        public int getNumColumns() {
+            return m_rowRead.getNumColumns();
+        }
+
+        @SuppressWarnings("resource")
+        @Override
+        public void close() {
+            if (m_run != null) {
+                try {
+                    m_rowRead = null;
+                    m_delegate.close();
+                    m_delegate = null;
+                    m_run.close();
+                } catch (IOException ex) {
+                    NodeLogger.getLogger(ColumnarTableSorter.class).error(ex);
+                } finally {
+                    m_run.getStore().getFileHandle().delete();
+                    m_run = null;
+                }
+            }
+        }
+    }
+
+    private static final class DummyRowRead implements RowRead {
 
         private final int[] m_colOffsets;
 
         private Object[] m_sortKey;
 
-        private DummyRow(final int[] colOffsets) {
+        DummyRowRead(final int[] colOffsets) {
             m_colOffsets = colOffsets;
         }
 
-        DummyRow withSortKey(final Object[] sortKey) {
+        RowRead withSortKey(final Object[] sortKey) {
             m_sortKey = sortKey;
             return this;
         }
 
-        @Override
-        public Iterator<DataCell> iterator() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int getNumCells() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public RowKey getKey() {
-            return (RowKey)m_sortKey[m_sortKey.length - 1];
-        }
-
-        @Override
-        public DataCell getCell(final int index) {
+        private DataCell getCell(final int index) {
             return (DataCell)m_sortKey[m_colOffsets[index]];
+        }
+
+        @Override
+        public int getNumColumns() {
+            return m_colOffsets.length;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <D extends DataValue> D getValue(final int index) {
+            return (D)getCell(index);
+        }
+
+        @Override
+        public boolean isMissing(final int index) {
+            return getCell(index).isMissing();
+        }
+
+        @Override
+        public RowKeyValue getRowKey() {
+            return (RowKeyValue)m_sortKey[m_sortKey.length - 1];
         }
     }
 }

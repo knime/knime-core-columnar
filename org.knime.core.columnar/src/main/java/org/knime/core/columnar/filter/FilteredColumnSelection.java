@@ -149,14 +149,14 @@ public final class FilteredColumnSelection implements ColumnSelection {
                 return data;
             }
             if (index < 0) {
-                throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
+                throw new IndexOutOfBoundsException("Column index %d smaller than 0.".formatted(index));
             }
             if (index >= m_numColumns) {
-                throw new IndexOutOfBoundsException(String
-                    .format("Column index %d larger then the batch's's number of columns (%d).", index, m_numColumns - 1));
+                throw new IndexOutOfBoundsException("Column index %d larger than the batch's number of columns (%d)." //
+                    .formatted(index, m_numColumns - 1));
             }
-            throw new NoSuchElementException(
-                String.format("Data at index %d is not available in this filtered batch.", index));
+            throw new NoSuchElementException("Data at index %d is not available in this filtered batch." //
+                .formatted(index));
         }
 
         @Override

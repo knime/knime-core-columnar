@@ -116,10 +116,10 @@ public final class ColumnarValueSchemaUtils {
     }
 
     private static ValueSchema getValueSchema(final ColumnarValueSchema schema) {
-        if (schema instanceof DefaultColumnarValueSchema) {
-            return ((DefaultColumnarValueSchema)schema).getSource();
-        } else if (schema instanceof UpdatedColumnarValueSchema) {
-            return getValueSchema(((UpdatedColumnarValueSchema)schema).getDelegate());
+        if (schema instanceof DefaultColumnarValueSchema defaultSchema) {
+            return defaultSchema.getSource();
+        } else if (schema instanceof UpdatedColumnarValueSchema updatedSchema) {
+            return getValueSchema(updatedSchema.getDelegate());
         } else {
             throw new IllegalArgumentException("Unsupported ColumnarValueSchema type: " + schema.getClass());
         }
@@ -133,7 +133,7 @@ public final class ColumnarValueSchemaUtils {
      *
      * @return a new {@link ColumnarValueSchema}.
      */
-    public static final ColumnarValueSchema create(final ValueSchema source) {
+    public static ColumnarValueSchema create(final ValueSchema source) {
         return new DefaultColumnarValueSchema(source);
     }
 
@@ -144,7 +144,7 @@ public final class ColumnarValueSchemaUtils {
      * @param valueFactories for the columns including the RowID
      * @return a new {@link ColumnarValueSchema}
      */
-    public static final ColumnarValueSchema create(final DataTableSpec spec, final ValueFactory<?, ?>[] valueFactories) {
+    public static ColumnarValueSchema create(final DataTableSpec spec, final ValueFactory<?, ?>[] valueFactories) {
         return create(ValueSchemaUtils.create(spec, valueFactories));
     }
 
@@ -156,12 +156,14 @@ public final class ColumnarValueSchemaUtils {
      * @param fsHandler FileStoreHandler used by some ValueFactories
      * @return a new schema corresponding to spec
      */
-    public static final ColumnarValueSchema create(final DataTableSpec spec, final RowKeyType rowIDType,
+    public static ColumnarValueSchema create(final DataTableSpec spec, final RowKeyType rowIDType,
         final IWriteFileStoreHandler fsHandler) {
-        var valueFactories = Stream.concat(Stream.of(ValueFactoryUtils.getRowKeyValueFactory(rowIDType)), spec.stream()//
-            .map(DataColumnSpec::getType)//
-            .map(t -> ValueFactoryUtils.getValueFactory(t, fsHandler))).toArray(ValueFactory<?, ?>[]::new);
-        return create(spec, valueFactories);
+        final var rowKeyFactory = ValueFactoryUtils.getRowKeyValueFactory(rowIDType);
+        final var columnValueFactories = spec.stream() //
+                .map(DataColumnSpec::getType) //
+                .map(t -> ValueFactoryUtils.getValueFactory(t, fsHandler));
+        return create(spec, Stream.concat(Stream.of(rowKeyFactory), columnValueFactories) //
+            .toArray(ValueFactory<?, ?>[]::new));
     }
 
     /**
@@ -170,7 +172,7 @@ public final class ColumnarValueSchemaUtils {
      * @param schema to check
      * @return true if the schema has a RowID column
      */
-    public static final boolean hasRowID(final ColumnarValueSchema schema) {
+    public static boolean hasRowID(final ColumnarValueSchema schema) {
         return schema.numColumns() > 0 && schema.getValueFactory(0) instanceof RowKeyValueFactory;
     }
 
@@ -184,7 +186,7 @@ public final class ColumnarValueSchemaUtils {
      *
      * @return the updated {@link ColumnarValueSchema}
      */
-    public static final ColumnarValueSchema updateSource(final ColumnarValueSchema source,
+    public static ColumnarValueSchema updateSource(final ColumnarValueSchema source,
         final Map<Integer, DataColumnDomain> domainMap, final Map<Integer, DataColumnMetaData[]> metadataMap) {
         final var result = new DataColumnSpec[source.numColumns() - 1];
         for (int i = 0; i < result.length; i++) {//NOSONAR
@@ -219,7 +221,7 @@ public final class ColumnarValueSchemaUtils {
      * @return the schema with the updated spec
      * @throws IllegalArgumentException if the types in schema and spec don't match
      */
-    public static final ColumnarValueSchema updateDataTableSpec(final ColumnarValueSchema schema,
+    public static ColumnarValueSchema updateDataTableSpec(final ColumnarValueSchema schema,
         final DataTableSpec spec) {
         return new UpdatedColumnarValueSchema(spec, schema);
     }

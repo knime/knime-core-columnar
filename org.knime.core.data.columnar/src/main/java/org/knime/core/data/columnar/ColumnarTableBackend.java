@@ -49,6 +49,7 @@ package org.knime.core.data.columnar;
 import static java.util.function.Predicate.not;
 import static org.knime.core.data.columnar.table.virtual.reference.ReferenceTables.createReferenceTables;
 
+import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.IntSupplier;
@@ -81,9 +82,9 @@ import org.knime.core.data.container.ILocalDataRepository;
 import org.knime.core.data.container.WrappedTable;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
-import org.knime.core.data.sort.BufferedDataTableSorter;
 import org.knime.core.data.sort.RowComparator;
 import org.knime.core.data.v2.RowContainer;
+import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
@@ -141,7 +142,8 @@ public final class ColumnarTableBackend implements TableBackend {
                 ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
             final ColumnarRowWriteTableSettings containerSettings =
                 new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
+                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(),
+                    maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(context, repository.generateNewID(),
                 ColumnarValueSchemaUtils.create(schema), containerSettings);
         } catch (Exception e) {
@@ -389,16 +391,27 @@ public final class ColumnarTableBackend implements TableBackend {
     }
 
     @Override
-    public BufferedDataTable sort(final ExecutionContext exec, final BufferedDataTable table,
-            final RowComparator rowComparator) throws CanceledExecutionException {
+    public KnowsRowCountTable sortIntoTable(final ExecutionContext exec, final IntSupplier tableIDSupplier,
+            final BufferedDataTable table, final RowComparator rowComparator)
+            throws CanceledExecutionException, IOException {
         final var columnarTable = makeColumnar(table, exec);
         final var schema = getSchemaIfColumnar(columnarTable).orElseThrow();
-        return ColumnarTableSorter.sort(this, exec, schema, columnarTable, rowComparator);
+        return new ColumnarTableSorter(exec, schema, columnarTable).sortIntoTable(tableIDSupplier, rowComparator);
     }
 
     @Override
-    public CloseableRowIterator sortedIterator(final ExecutionContext exec, final BufferedDataTable table,
-            final RowComparator rowComparator) throws CanceledExecutionException {
-        return new BufferedDataTableSorter(table, rowComparator).sortedIterator(exec);
+    public RowCursor sortIntoCursor(final ExecutionContext exec, final BufferedDataTable table,
+            final RowComparator rowComparator) throws CanceledExecutionException, IOException {
+        final var columnarTable = makeColumnar(table, exec);
+        final var schema = getSchemaIfColumnar(columnarTable).orElseThrow();
+        return new ColumnarTableSorter(exec, schema, columnarTable).sortIntoCursor(rowComparator);
+    }
+
+    @Override
+    public CloseableRowIterator sortIntoIterator(final ExecutionContext exec, final BufferedDataTable table,
+            final RowComparator rowComparator) throws CanceledExecutionException, IOException {
+        final var columnarTable = makeColumnar(table, exec);
+        final var schema = getSchemaIfColumnar(columnarTable).orElseThrow();
+        return new ColumnarTableSorter(exec, schema, columnarTable).sortIntoIterator(rowComparator);
     }
 }
