@@ -261,6 +261,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     private DomainWritable m_domainWritable = null;
 
+    private BatchSizeRecorder m_batchSizeRecorder = null;
+
     private final BatchReadStore m_readStore;
 
     private final ColumnarWriteCursor m_writeCursor;
@@ -287,9 +289,11 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             // TODO: move duplicate check and domain calc before the HeapBadger by making them batch-unaware (again).
             initDuplicateCheck(builder.m_duplicateCheckExecutor);
             initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
+            m_writable = initBatchSizeRecorder(m_writable);
             initHeapBadger(builder.m_heapCache);
             m_writeCursor = m_heapBadger.getWriteCursor();
         } else {
+            m_writable = initBatchSizeRecorder(m_writable);
             initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor,
                 builder.m_heapCacheSerializeExecutor);
             initDuplicateCheck(builder.m_duplicateCheckExecutor);
@@ -309,6 +313,11 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             m_domainWritable = new DomainWritable(m_writable, config, domainCalcExecutor);
             m_writable = m_domainWritable;
         }
+    }
+
+    private BatchWritable initBatchSizeRecorder(final BatchWritable writable) {
+        m_batchSizeRecorder = new BatchSizeRecorder();
+        return m_batchSizeRecorder.wrap(writable);
     }
 
     private void initHeapBadger(final SharedObjectCache heapCache) {
@@ -449,16 +458,25 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     @Override
     public int numBatches() {
+        if (m_batchSizeRecorder != null) {
+            return m_batchSizeRecorder.numBatches();
+        }
         return m_readStore.numBatches();
     }
 
     @Override
     public long[] getBatchBoundaries() {
+        if (m_batchSizeRecorder != null) {
+            return m_batchSizeRecorder.getBatchBoundaries();
+        }
         return m_readStore.getBatchBoundaries();
     }
 
     @Override
     public long numRows() {
+        if (m_batchSizeRecorder != null) {
+            return m_batchSizeRecorder.numRows();
+        }
         return m_readStore.numRows();
     }
 
