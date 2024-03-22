@@ -45,8 +45,6 @@
  */
 package org.knime.core.columnar.store;
 
-import java.io.IOException;
-
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 
 /**
@@ -57,45 +55,6 @@ import org.knime.core.columnar.batch.RandomAccessBatchReadable;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
 public interface BatchReadStore extends RandomAccessBatchReadable {
-
-    /**
-     * Obtain the number of batches in this store, i.e., the number of valid indices for readers provided by this store.
-     *
-     * @return the number of valid indices for reading
-     */
-    int numBatches();
-
-    /**
-     * Return the boundaries of (variably sized) batches in the store.
-     *
-     * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
-     *         the second value indicates the end of the second batch etc
-     */
-    default long[] getBatchBoundaries() {
-        // TODO: don't read all batches for this, read batch boundaries from footer
-        int numBatches = numBatches();
-        long[] batchBoundaries = new long[numBatches];
-        try (var batchReadable = createRandomAccessReader()) {
-            for (int i = 0; i < numBatches; i++) {
-                var batch = batchReadable.readRetained(i);
-                batchBoundaries[i] = batch.length() + (i == 0 ? 0 : batchBoundaries[i - 1]);
-                batch.release();
-            }
-            return batchBoundaries;
-        } catch (final IOException e) {
-            throw new IllegalStateException("Error when reading batch boundaries.", e);
-        }
-    }
-
-    /**
-     * Obtain the number of rows in this store.
-     *
-     * @return number of rows in this store.
-     */
-    default long numRows() {
-        final long[] b = getBatchBoundaries();
-        return b.length == 0 ? 0 : b[b.length - 1];
-    }
 
     /**
      * @return The designated physical location of the store. Note that the store may not (fully) be existent at this
