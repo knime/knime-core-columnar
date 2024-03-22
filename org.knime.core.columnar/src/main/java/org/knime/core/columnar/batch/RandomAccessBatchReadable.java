@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.batch;
 
+import java.io.IOException;
+
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
@@ -91,4 +93,44 @@ public interface RandomAccessBatchReadable extends BatchReadable {
         return createRandomAccessReader(new DefaultColumnSelection(getSchema().numColumns()));
     }
 
+    /**
+     * Obtain the number of batches in this store, i.e., the number of valid indices for readers provided by this store.
+     *
+     * @return the number of valid indices for reading
+     */
+    default int numBatches() {
+        return getBatchBoundaries().length;
+    }
+
+    /**
+     * Return the boundaries of (variably sized) batches in the store.
+     *
+     * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
+     *         the second value indicates the end of the second batch etc
+     */
+    default long[] getBatchBoundaries() {
+        // TODO: don't read all batches for this, read batch boundaries from footer
+        int numBatches = numBatches();
+        long[] batchBoundaries = new long[numBatches];
+        try (var batchReadable = createRandomAccessReader()) {
+            for (int i = 0; i < numBatches; i++) {
+                var batch = batchReadable.readRetained(i);
+                batchBoundaries[i] = batch.length() + (i == 0 ? 0 : batchBoundaries[i - 1]);
+                batch.release();
+            }
+            return batchBoundaries;
+        } catch (final IOException e) {
+            throw new IllegalStateException("Error when reading batch boundaries.", e);
+        }
+    }
+
+    /**
+     * Obtain the number of rows in this store.
+     *
+     * @return number of rows in this store.
+     */
+    default long numRows() {
+        final long[] b = getBatchBoundaries();
+        return b.length == 0 ? 0 : b[b.length - 1];
+    }
 }

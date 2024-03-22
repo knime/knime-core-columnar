@@ -92,4 +92,9 @@ public class DictEncodedBatchReadable implements RandomAccessBatchReadable {
     public void close() throws IOException {
         m_delegate.close();
     }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_delegate.getBatchBoundaries();
+    }
 }
