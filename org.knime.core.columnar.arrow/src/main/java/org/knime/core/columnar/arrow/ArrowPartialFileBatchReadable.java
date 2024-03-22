@@ -76,4 +76,10 @@ public class ArrowPartialFileBatchReadable extends AbstractArrowBatchReadable im
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
         return new ArrowPartialFileBatchReader(m_fileHandle.asFile(), m_allocator, factories, selection, m_offsetProvider);
     }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        // TODO: implement me!
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
 }

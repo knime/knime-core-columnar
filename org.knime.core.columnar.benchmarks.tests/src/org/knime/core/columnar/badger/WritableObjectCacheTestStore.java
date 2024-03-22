@@ -120,4 +120,9 @@ final class WritableObjectCacheTestStore implements BatchStore {
         m_serializeExecutor.shutdownNow();
         m_heapCache.invalidate();
     }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_objectCache.getBatchBoundaries();
+    }
 }
