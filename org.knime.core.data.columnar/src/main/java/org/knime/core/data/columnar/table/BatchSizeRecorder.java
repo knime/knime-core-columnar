@@ -54,8 +54,11 @@ import java.util.List;
 
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReadable;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
+import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -69,21 +72,17 @@ class BatchSizeRecorder {
         m_batchBoundaries.add(numRowsInBatch + numRows());
     }
 
-    long[] getBatchBoundaries() {
-        return m_batchBoundaries.stream().mapToLong(l -> l).toArray();
-    }
-
-    long numRows() {
-        return m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
-    }
-
-    int numBatches() {
-        return m_batchBoundaries.size();
-    }
-
     BatchWritable wrap(final BatchWritable writable) {
         // TODO: this only makes sense if it is only called once
         return new BatchSizeRecordingWritable(writable);
+    }
+
+    RandomAccessBatchReadable augment(final RandomAccessBatchReadable readable) {
+        return new BatchSizeAugmentedReadable(readable);
+    }
+
+    private long numRows() {
+        return m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
     }
 
     private class BatchSizeRecordingWritable implements BatchWritable {
@@ -131,5 +130,33 @@ class BatchSizeRecorder {
             m_delegateWriter.write(batch);
         }
 
+    }
+
+    private class BatchSizeAugmentedReadable implements RandomAccessBatchReadable {
+        private final RandomAccessBatchReadable m_delegate;
+
+        private BatchSizeAugmentedReadable(final RandomAccessBatchReadable delegate) {
+            m_delegate = delegate;
+        }
+
+        @Override
+        public ColumnarSchema getSchema() {
+            return m_delegate.getSchema();
+        }
+
+        @Override
+        public void close() throws IOException {
+            m_delegate.close();
+        }
+
+        @Override
+        public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+            return m_delegate.createRandomAccessReader(selection);
+        }
+
+        @Override
+        public long[] getBatchBoundaries() {
+            return m_batchBoundaries.stream().mapToLong(l -> l).toArray();
+        }
     }
 }
