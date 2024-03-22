@@ -105,4 +105,9 @@ public class TestDictEncodedBatchBuffer implements TestBatchBuffer {
     public void close() throws IOException {
         m_delegate.close();
     }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_delegate.getBatchBoundaries();
+    }
 }

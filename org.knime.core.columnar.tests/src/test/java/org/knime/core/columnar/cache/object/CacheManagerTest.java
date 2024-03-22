@@ -179,6 +179,11 @@ public class CacheManagerTest {
             return null;
         }
 
+        @Override
+        public long[] getBatchBoundaries() {
+            return new long[0];
+        }
+
     }
 
 }
