@@ -300,6 +300,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
             m_writeCursor = ColumnarWriteCursorFactory.createWriteCursor(m_writable);
         }
+
+        m_readable = m_batchSizeRecorder.augment(m_readable);
     }
 
     private void initDuplicateCheck(final ExecutorService duplicateCheckExecutor) {
@@ -457,27 +459,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
     }
 
     @Override
-    public int numBatches() {
-        if (m_batchSizeRecorder != null) {
-            return m_batchSizeRecorder.numBatches();
-        }
-        return m_readStore.numBatches();
-    }
-
-    @Override
     public long[] getBatchBoundaries() {
-        if (m_batchSizeRecorder != null) {
-            return m_batchSizeRecorder.getBatchBoundaries();
-        }
-        return m_readStore.getBatchBoundaries();
-    }
-
-    @Override
-    public long numRows() {
-        if (m_batchSizeRecorder != null) {
-            return m_batchSizeRecorder.numRows();
-        }
-        return m_readStore.numRows();
+        return m_readable.getBatchBoundaries();
     }
 
     @Override
