@@ -174,7 +174,7 @@ public final class ColumnarWriteCursorFactory {
 
         @Override
         public long getNumForwards() {
-            return m_numForwards;
+            return m_numForwards > 0 ? m_numForwards - 1 : 0;
         }
 
         @Override
