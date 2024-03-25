@@ -85,7 +85,8 @@ class BatchSizeRecorder {
         return m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
     }
 
-    private class BatchSizeRecordingWritable implements BatchWritable {
+    /** package private so it is visible in tests */
+    class BatchSizeRecordingWritable implements BatchWritable {
         private final BatchWritable m_delegate;
 
         private final BatchWriter m_writer;
@@ -104,6 +105,11 @@ class BatchSizeRecorder {
         @Override
         public ColumnarSchema getSchema() {
             return m_delegate.getSchema();
+        }
+
+        /** for tests */
+        BatchWritable getDelegate() {
+            return m_delegate;
         }
     }
 
