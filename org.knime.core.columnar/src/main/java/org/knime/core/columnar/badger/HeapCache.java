@@ -131,4 +131,9 @@ public class HeapCache implements RandomAccessBatchReadable {
         m_cacheManager.close();
         m_delegate.close();
     }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        throw new IllegalStateException("The batch boundaries should be tracked outside of the cache");
+    }
 }
