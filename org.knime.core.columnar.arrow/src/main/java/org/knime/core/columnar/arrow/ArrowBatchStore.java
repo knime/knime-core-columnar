@@ -84,8 +84,7 @@ public final class ArrowBatchStore extends AbstractArrowBatchReadable implements
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
-        return new ArrowPartialFileBatchReader(getFileHandle().asFile(), m_allocator, m_factories, config,
-            m_writer.getOffsetProvider());
+        return new ArrowBatchReader(getFileHandle().asFile(), m_allocator, m_factories, config);
     }
 
     @Override
