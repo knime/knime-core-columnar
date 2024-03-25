@@ -92,7 +92,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractArrowBatchReader implements RandomAccessBatchReader {
+abstract class AbstractArrowBatchReader {
 
     private final BufferAllocator m_allocator;
 
@@ -145,8 +145,7 @@ abstract class AbstractArrowBatchReader implements RandomAccessBatchReader {
         return m_reader.getSchema().getCustomMetadata();
     }
 
-    @Override
-    public ReadBatch readRetained(final int index) throws IOException {
+    protected ReadBatch readRetained(final int index) throws IOException {
         // Initialize the reader when reading the first batch
         if (m_reader == null) {
             initializeReader();
@@ -227,7 +226,6 @@ abstract class AbstractArrowBatchReader implements RandomAccessBatchReader {
         }
     }
 
-    @Override
     public synchronized void close() throws IOException {
         if (m_reader != null && !m_closed) {
             m_reader.close();

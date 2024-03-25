@@ -66,6 +66,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializer;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
@@ -75,7 +76,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-class ArrowBatchReader extends AbstractArrowBatchReader {
+class ArrowBatchReader extends AbstractArrowBatchReader implements RandomAccessBatchReader {
 
     private final File m_file;
 
@@ -83,6 +84,11 @@ class ArrowBatchReader extends AbstractArrowBatchReader {
         final ColumnSelection columnSelection) {
         super(allocator, factories, columnSelection);
         m_file = file;
+    }
+
+    @Override
+    public ReadBatch readRetained(final int index) throws IOException {
+        return super.readRetained(index);
     }
 
     @Override
