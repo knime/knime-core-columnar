@@ -75,9 +75,10 @@ import org.knime.core.data.v2.value.IntValueFactory;
 import org.knime.core.data.v2.value.LongValueFactory;
 import org.knime.core.data.v2.value.StringValueFactory;
 import org.knime.core.expressions.Ast;
-import org.knime.core.expressions.AstType;
+import org.knime.core.expressions.Computer;
 import org.knime.core.expressions.Expressions;
 import org.knime.core.expressions.Expressions.ExpressionError;
+import org.knime.core.expressions.ValueType;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -92,7 +93,6 @@ import org.knime.core.table.schema.IntDataSpec;
 import org.knime.core.table.schema.LongDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.virtual.expression.Exec;
-import org.knime.core.table.virtual.expression.Exec.Computer;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 
 /**
@@ -125,7 +125,7 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
                 var colIdx = inputTableSchema.getSourceSpec().findColumnIndex(colName);
                 return colIdx == -1 ? OptionalInt.empty() : OptionalInt.of(colIdx + 1);
             };
-            Function<Ast.ColumnAccess, Optional<AstType>> colNameToType =
+            Function<Ast.ColumnAccess, Optional<ValueType>> colNameToType =
                 colAccess -> colNameToIdx.apply(colAccess.name()).stream().mapToObj(inputTableSchema::getSpec)
                     .map(s -> s.accept(Exec.DATA_SPEC_TO_AST_TYPE_MAPPER)).findFirst();
             var ast = Expressions.parse(expression);
