@@ -64,20 +64,19 @@ import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarM
 import org.knime.core.data.columnar.table.virtual.persist.Persistor;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
-import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.value.BooleanValueFactory;
 import org.knime.core.data.v2.value.DoubleValueFactory;
-import org.knime.core.data.v2.value.IntValueFactory;
 import org.knime.core.data.v2.value.LongValueFactory;
 import org.knime.core.data.v2.value.StringValueFactory;
 import org.knime.core.expressions.Ast;
-import org.knime.core.expressions.AstType;
+import org.knime.core.expressions.Computer;
 import org.knime.core.expressions.Expressions;
 import org.knime.core.expressions.Expressions.ExpressionError;
+import org.knime.core.expressions.ValueType;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -85,14 +84,11 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.BooleanDataSpec;
-import org.knime.core.table.schema.ByteDataSpec;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DoubleDataSpec;
-import org.knime.core.table.schema.IntDataSpec;
 import org.knime.core.table.schema.LongDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
 import org.knime.core.table.virtual.expression.Exec;
-import org.knime.core.table.virtual.expression.Exec.Computer;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 
 /**
@@ -101,6 +97,7 @@ import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  * @since 5.3
  */
+@SuppressWarnings("restriction") // Expressions API is not yet public
 public class ExpressionMapperFactory implements ColumnarMapperFactory {
 
     final String m_expression;
@@ -113,7 +110,6 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
 
     final String m_newColumnName;
 
-    @SuppressWarnings("restriction")
     public ExpressionMapperFactory(final String expression, final ColumnarValueSchema inputTableSchema,
         final String newColumnName) {
         m_expression = expression;
@@ -125,26 +121,25 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
                 var colIdx = inputTableSchema.getSourceSpec().findColumnIndex(colName);
                 return colIdx == -1 ? OptionalInt.empty() : OptionalInt.of(colIdx + 1);
             };
-            Function<Ast.ColumnAccess, Optional<AstType>> colNameToType =
+            Function<Ast.ColumnAccess, Optional<ValueType>> colNameToType =
                 colAccess -> colNameToIdx.apply(colAccess.name()).stream().mapToObj(inputTableSchema::getSpec)
-                    .map(s -> s.accept(Exec.DATA_SPEC_TO_AST_TYPE_MAPPER)).findFirst();
+                    .map(s -> s.accept(Exec.DATA_SPEC_TO_EXPRESSION_TYPE)).findFirst();
             var ast = Expressions.parse(expression);
             Expressions.resolveColumnIndices(ast, colNameToIdx);
-            var outputType = Expressions.inferTypes(ast, colNameToType);
-            var outputSpec = Exec.toDataSpec(outputType);
+            Expressions.inferTypes(ast, colNameToType);
 
-            final var columns = Exec.getRequiredColumns(ast);
+            final var columns = Exec.RequiredColumns.of(ast);
             m_columnIndices = columns.columnIndices();
 
             final IntFunction<Function<ReadAccess[], ? extends Computer>> columnIndexToComputerFactory =
                 columnIndex -> {
                     int inputIndex = columns.getInputIndex(columnIndex);
                     Function<ReadAccess, ? extends Computer> createComputer =
-                        inputTableSchema.getSpec(columnIndex).accept(Exec.toReaderFactory);
+                        inputTableSchema.getSpec(columnIndex).accept(Exec.DATA_SPEC_TO_READER_FACTORY);
                     return readAccesses -> createComputer.apply(readAccesses[inputIndex]);
                 };
 
-            m_mapperFactory = Exec.createMapperFactory(ast, columnIndexToComputerFactory, outputSpec);
+            m_mapperFactory = Exec.createMapperFactory(ast, columnIndexToComputerFactory);
 
         } catch (ExpressionError ex) {
             throw new IllegalArgumentException(ex);
@@ -173,10 +168,9 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
     }
 
     private static ValueFactory<?, ?> primitiveDataSpecToValueFactory(final DataSpec spec) {
+        // NB: These are all output types supported by expressions
         if (spec instanceof BooleanDataSpec) {
             return BooleanValueFactory.INSTANCE;
-        } else if (spec instanceof ByteDataSpec || spec instanceof IntDataSpec) {
-            return IntValueFactory.INSTANCE;
         } else if (spec instanceof LongDataSpec) {
             return LongValueFactory.INSTANCE;
         } else if (spec instanceof DoubleDataSpec) {
@@ -184,10 +178,7 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
         } else if (spec instanceof StringDataSpec) {
             return StringValueFactory.INSTANCE;
         }
-
-        // FIXME: support more types, see https://knime-com.atlassian.net/browse/AP-21933
-
-        throw new UnsupportedOperationException("Cannot convert " + spec + " to ValueFactory");
+        throw new IllegalArgumentException("Cannot convert " + spec + " to ValueFactory");
     }
 
     /**
@@ -198,11 +189,10 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
      * @return The corresponding DataColumnSpec
      */
     public static DataColumnSpec primitiveDataSpecToDataColumnSpec(final DataSpec spec, final String newColumnName) {
-        DataType type = null;
+        // NB: These are all output types supported by expressions
+        final DataType type;
         if (spec instanceof BooleanDataSpec) {
             type = BooleanCell.TYPE;
-        } else if (spec instanceof ByteDataSpec || spec instanceof IntDataSpec) {
-            type = IntCell.TYPE;
         } else if (spec instanceof LongDataSpec) {
             type = LongCell.TYPE;
         } else if (spec instanceof DoubleDataSpec) {
@@ -210,11 +200,8 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
         } else if (spec instanceof StringDataSpec) {
             type = StringCell.TYPE;
         } else {
-            throw new UnsupportedOperationException("Cannot convert " + spec + " to DataColumnSpec");
+            throw new IllegalArgumentException("Cannot convert " + spec + " to DataColumnSpec");
         }
-
-        // FIXME: support more types, see https://knime-com.atlassian.net/browse/AP-21933
-
         return new DataColumnSpecCreator(newColumnName, type).createSpec();
     }
 
