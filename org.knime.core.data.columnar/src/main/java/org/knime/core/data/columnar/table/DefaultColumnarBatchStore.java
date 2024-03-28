@@ -413,6 +413,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
         }
 
+        m_writeCursor.close();
+
         if (m_heapBadger != null) {
             // close the writer
             m_heapBadger.getWriteCursor().close();
