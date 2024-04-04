@@ -52,6 +52,7 @@ import static org.knime.core.columnar.access.ColumnarAccessFactoryMapper.createR
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Arrays;
 import java.util.Objects;
 
 import org.knime.core.columnar.access.ColumnarReadAccess;
@@ -73,37 +74,60 @@ import org.knime.core.table.row.Selection;
  */
 final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, ReadAccessRow {
 
-    /*
-     * TODO(heap-badger) Currently, we initialize m_numRows with -1 if we do not know the total number of rows. We only
-     * set it to the real value after reading the last batch. This won't be necessary anymore with the heap-badger
-     * changes because the BatchReadStore will have API to get the total number of rows without reading the last batch.
-     *
-     * See TODO(numRows)
-     */
-
     private final Selection m_selection;
 
     private final ColumnarReadAccess[] m_accesses;
 
     private final RandomAccessBatchReader m_reader;
 
-    private final int m_numBatches;
+    private final long[] m_batchBoundaries;
 
-    private final int m_batchLength;
+    // index bounds for binary search on m_batchBoundaries.
+    // (no need to look at batches outside the selection).
+    private final int m_searchFrom;
+    private final int m_searchTo;
 
+    /**
+     * The start (inclusive) row of the selection.
+     * Row {@code i} returned by this cursor, is row {@code (i+m_fromRow)} in the BatchReadStore.
+     */
+    private final long m_fromRow;
+
+    /**
+     * Number of rows of the selection
+     */
+    private final long m_numRows;
+
+    /**
+     * Current row relative to the selection.
+     */
+    private long m_currentRow;
+
+    /**
+     * The batch containing the current row.
+     */
     private ReadBatch m_currentBatch;
 
-    /** Row inside the selection */
-    private long m_nextRow;
-
-    /** Number of rows of the selection */
-    private long m_numRows;
-
+    /**
+     * Index of the current row in the current batch.
+     */
     private int m_indexInBatch;
 
-    private long m_firstRowInStore;
+    /**
+     * The start (inclusive) row of the current batch, relative to the selection.
+     */
+    private long m_currentBatchFrom;
 
-    private int m_currentBatchIdx;
+    /**
+     * The end (exclusive) row of the current batch, relative to the selection.
+     */
+    private long m_currentBatchTo;
+
+    /**
+     * The offset between a row index of this cursor (i.e., relative to the selection)
+     * and a row index in the current batch.
+     */
+    private long m_currentBatchOffset;
 
     public DefaultColumnarCursor(final BatchReadStore store, final Selection selection) {
         var schema = store.getSchema();
@@ -113,17 +137,27 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
         m_accesses = createReadAccesses(schema.specStream(), () -> m_indexInBatch);
 
         // Initialize reader
-        m_numBatches = store.numBatches();
-        m_batchLength = store.batchLength();
+        m_batchBoundaries = store.getBatchBoundaries();
         m_reader = store.createRandomAccessReader(ColumnSelection.fromSelection(selection, schema.numColumns()));
 
-        // Initialize the iteration indices
-        m_nextRow = 0;
-        m_firstRowInStore = Math.max(selection.rows().fromIndex(), 0);
-        // TODO(numRows) set the real value of numRows and make final
-        m_numRows = m_batchLength == 0 ? 0 : (selection.rows().toIndex() - m_firstRowInStore);
+        /**
+         * The end (inclusive) row of the selection.
+         * Row {@code i} returned by this cursor, is row {@code (i+m_fromRow)} in the BatchReadStore.
+         */
+        long m_toRow;
+        if (selection.rows().allSelected()) {
+            m_fromRow = 0;
+            m_toRow = store.numRows();
+        } else {
+            m_fromRow = selection.rows().fromIndex();
+            m_toRow = selection.rows().toIndex();
+        }
+        m_numRows = m_toRow - m_fromRow;
 
-        m_currentBatchIdx = -1;
+        m_searchFrom = findRange(m_batchBoundaries, m_fromRow, 0, m_batchBoundaries.length);
+        m_searchTo = findRange(m_batchBoundaries, m_toRow - 1, m_searchFrom, m_batchBoundaries.length) + 1;
+
+        m_currentRow = -1;
         m_indexInBatch = -1;
     }
 
@@ -132,64 +166,63 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
         return this;
     }
 
-    // TODO abstract implementation of RandomAccessCursor for forward and canForward based on moveTo
     @Override
     public boolean canForward() {
-        // TODO(numRows) remove the < 0 check
-        return m_numRows < 0 || m_nextRow < m_numRows;
+        return m_currentRow < m_numRows - 1;
     }
 
     @Override
     public boolean forward() {
         if (canForward()) {
-            moveTo(m_nextRow);
-            m_nextRow++;
+            moveTo(++m_currentRow);
             return true;
         }
         return false;
     }
 
-    private int getBatchIdx(final long storeRow) {
-        // TODO(numRows) - adapt to variable batch sizes
-        return (int)(storeRow / m_batchLength);
-    }
-
     @Override
     public void moveTo(final long row) {
-        // TODO(numRows) remove the m_numRows >= 0 check
-        if (row < 0 || (m_numRows >= 0 && row >= m_numRows)) {
-            throw new IndexOutOfBoundsException(row);
-        }
+        // check whether row is still in current batch
+        if (row < m_currentBatchFrom || row >= m_currentBatchTo) {
+            // if not: check whether row is out-of-bounds
+            if (row < 0 || row >= m_numRows) {
+                throw new IndexOutOfBoundsException(row);
+            }
 
-        var storeRow = row + m_firstRowInStore;
-        switchToBatch(getBatchIdx(storeRow));
-        m_indexInBatch = (int)(storeRow % m_batchLength);
+            // switch to new batch
+            final long row_store = row + m_fromRow;
+            final int batchIndex = findRange(m_batchBoundaries, row_store, m_searchFrom, m_searchTo);
+            switchToBatch(batchIndex);
+        }
+        m_currentRow = row;
+        m_indexInBatch = (int)(row + m_currentBatchOffset);
     }
 
-    /** Switch to the given batch if it is not the current batch */
+    /**
+     * Switch to the given batch
+     */
     private void switchToBatch(final int idx) {
-        if (m_currentBatchIdx == idx) {
-            // We are already there
-            return;
-        }
-
         // Release the old batch
         if (m_currentBatch != null) {
             m_currentBatch.release();
         }
 
+        // start (inclusive) and end (exclusive) row of the current batch, relative to the BatchReadStore.
+        final long batchFrom_store = idx == 0 ? 0 : m_batchBoundaries[idx - 1];
+        final long batchTo_store = m_batchBoundaries[idx];
+
+        // start (inclusive) and end (exclusive) row of the current batch, relative to the selection.
+        m_currentBatchFrom = Math.max(batchFrom_store - m_fromRow, 0);
+        m_currentBatchTo = Math.min(batchTo_store - m_fromRow, m_numRows);
+
+        // offset between a row index (relative to the selection), and a row index in the current batch.
+        m_currentBatchOffset = m_fromRow - batchFrom_store;
+
         // Read the new batch
-        m_currentBatchIdx = idx;
         try {
-            m_currentBatch = m_reader.readRetained(m_currentBatchIdx);
+            m_currentBatch = m_reader.readRetained(idx);
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
-        }
-
-        // HACK: Set the numRows if this is the last batch
-        // TODO(numRows) remove the hack
-        if (m_numRows < 0 && m_currentBatchIdx == m_numBatches - 1) {
-            m_numRows = (m_numBatches - 1) * (long)m_batchLength + m_currentBatch.length();
         }
 
         // Update the accesses
@@ -199,6 +232,14 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
                 m_accesses[i].setData(currentData[i]);
             }
         }
+    }
+
+    /**
+     * Returns the largest index {@code i} such that {@code values[i] < value}.
+     */
+    private static int findRange(final long[] values, final long value, final int fromIndex, final int toIndex) {
+        final int i = Arrays.binarySearch(values, fromIndex, toIndex, value);
+        return i < 0 ? -(i + 1) : (i + 1);
     }
 
     @Override

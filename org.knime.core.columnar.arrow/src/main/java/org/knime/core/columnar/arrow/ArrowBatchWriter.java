@@ -45,7 +45,6 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY;
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_FACTORY_VERSIONS_KEY;
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_BYTES;
 
@@ -105,7 +104,7 @@ import org.slf4j.LoggerFactory;
  */
 class ArrowBatchWriter implements BatchWriter {
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(ArrowBatchWriter.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ArrowBatchWriter.class);
 
     private final FileHandle m_fileHandle;
 
@@ -120,9 +119,9 @@ class ArrowBatchWriter implements BatchWriter {
 
     private boolean m_closed;
 
-    final AtomicInteger m_chunkSize = new AtomicInteger(-1);
-
     final AtomicInteger m_numBatches = new AtomicInteger(0);
+
+    private final List<Long> m_batchBoundaries = new ArrayList<>();
 
     // Initialized on first #write
     private ArrowWriter m_writer;
@@ -135,8 +134,8 @@ class ArrowBatchWriter implements BatchWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    ArrowBatchWriter(final FileHandle file, final ArrowColumnDataFactory[] factories, final ArrowCompression compression,
-        final BufferAllocator allocator) {
+    ArrowBatchWriter(final FileHandle file, final ArrowColumnDataFactory[] factories,
+        final ArrowCompression compression, final BufferAllocator allocator) {
         m_fileHandle = file;
         m_factories = factories;
         m_compression = compression;
@@ -156,6 +155,10 @@ class ArrowBatchWriter implements BatchWriter {
 
     @Override
     public synchronized void write(final ReadBatch batch) throws IOException {
+        if (m_closed) {
+            throw new IllegalStateException("Cannot write batch after closing the writer.");
+        }
+
         final List<Field> fields = new ArrayList<>(m_factories.length);
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
@@ -183,7 +186,6 @@ class ArrowBatchWriter implements BatchWriter {
 
         // If this is the first call we need to create the writer and write the schema to the file
         if (m_firstWrite) {
-            m_chunkSize.set(batch.length());
             m_firstWrite = false;
             final Schema schema = new Schema(fields, getMetadata());
 
@@ -195,6 +197,10 @@ class ArrowBatchWriter implements BatchWriter {
 
         // Write the vectors
         writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
+
+        // Remember batch boundary for footer
+        var previousBatchEnd = m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
+        m_batchBoundaries.add(previousBatchEnd + Long.valueOf(batch.length()));
 
         m_numBatches.incrementAndGet();
     }
@@ -234,21 +240,29 @@ class ArrowBatchWriter implements BatchWriter {
     }
 
     /**
-     * @return the length of the batches (recorded by observing the length of the first batch written)
+     * Return the boundaries of (variably sized) batches in the store.
+     *
+     * @return an array of offsets for the start of the next batch, so the first value = num rows of the first batch,
+     *         the second value indicates the end of the second batch etc
      */
-    int batchLength() {
-        final int bl = m_chunkSize.get();
-        if (bl == -1) {
-            throw new IllegalStateException("The batch length is not yet know. No batch has been written.");
-        }
-        return bl;
+    synchronized long[] getBatchBoundaries() {
+        // TODO (TP): Probably we should just make m_batchBoundaries a long[] array and implement effectively a CopyOnWrite list
+        return m_batchBoundaries.stream().mapToLong(i -> i).toArray();
     }
+
+    /**
+     * @return the number of rows of complete batches that are already written
+     */
+    synchronized long numRows() {
+        return m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
+    }
+
 
     @Override
     public synchronized void close() throws IOException {
         if (!m_closed) {
             if (!m_firstWrite) {
-                m_writer.writeFooter();
+                m_writer.writeFooter(m_batchBoundaries.stream().mapToLong(i -> i).toArray());
                 m_writer.close();
                 if (LOGGER.isDebugEnabled()) {
                     logToDebug();
@@ -262,8 +276,7 @@ class ArrowBatchWriter implements BatchWriter {
         var path = m_fileHandle.asPath();
         var absPath = path.toAbsolutePath().toString();
         if (Files.exists(path)) {
-            LOGGER.debug("Closing file {} ({})", absPath,
-                FileUtils.byteCountToDisplaySize(Files.size(path)));//NOSONAR we only end up here if we actually log
+            LOGGER.debug("Closing file {} ({})", absPath, FileUtils.byteCountToDisplaySize(Files.size(path)));//NOSONAR we only end up here if we actually log
         } else {
             // the file may already have been deleted by e.g. the WorkflowManager
             // if the writer is closed by the MemoryLeakDetector long after its workflow has been closed
@@ -274,9 +287,6 @@ class ArrowBatchWriter implements BatchWriter {
     /** Create and return the metadata for this writer */
     private Map<String, String> getMetadata() {
         final Map<String, String> metadata = new HashMap<>();
-
-        // Max chunk size
-        metadata.put(ARROW_CHUNK_SIZE_KEY, Integer.toString(m_chunkSize.get()));
 
         // Factory versions
         final String factoryVersions = Arrays.stream(m_factories) //
@@ -482,7 +492,7 @@ class ArrowBatchWriter implements BatchWriter {
         }
 
         /** Write the arrow file footer. Call before close to create a valid arrow file */
-        private void writeFooter() throws IOException {
+        private void writeFooter(final long[] batchBoundaries) throws IOException {
             // Write EOS
             m_out.writeIntLittleEndian(MessageSerializer.IPC_CONTINUATION_TOKEN);
             m_out.writeIntLittleEndian(0);
@@ -490,8 +500,11 @@ class ArrowBatchWriter implements BatchWriter {
             // Write the footer
             final List<ArrowBlock> dictBlocks =
                 m_dictionaryBlocks.stream().flatMap(Arrays::stream).collect(Collectors.toList());
+            final Map<String, String> metadata = new HashMap<>();
+            metadata.put(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY,
+                ArrowReaderWriterUtils.longArrayToString(batchBoundaries));
             final ArrowFooter footer =
-                new ArrowFooter(m_schema, dictBlocks, m_recordBlocks, Collections.emptyMap(), m_option.metadataVersion);
+                new ArrowFooter(m_schema, dictBlocks, m_recordBlocks, metadata, m_option.metadataVersion);
             final long footerStart = m_out.getCurrentPosition();
             m_out.write(footer, false);
 

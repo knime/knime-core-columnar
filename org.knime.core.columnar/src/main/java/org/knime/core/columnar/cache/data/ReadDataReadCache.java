@@ -179,4 +179,9 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
         }
     }
 
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_readableDelegate.getBatchBoundaries();
+    }
+
 }

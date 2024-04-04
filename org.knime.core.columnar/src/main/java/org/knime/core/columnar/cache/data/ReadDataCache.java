@@ -422,4 +422,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             return batch;
         }
     }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_readableDelegate.getBatchBoundaries();
+    }
 }

@@ -49,6 +49,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.IntStream;
@@ -96,8 +97,8 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             for (int i = 0; i < m_factories.length; i++) {
                 final TestData testData = m_factories[i].createWriteData(capacity);
                 data[i] = testData;
-                m_tracker.add(testData);
             }
+            // TODO: track open write batches too??
             return new DefaultWriteBatch(data);
         }
 
@@ -115,9 +116,18 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             for (int i = 0; i < data.length; i++) {
                 final TestData testData = (TestData)batch.get(i);
                 data[i] = testData.get();
+                m_tracker.add(testData);
             }
             m_batches.add(data);
             m_batchLengths.add(batch.length());
+            appendBatchBoundary(batch.length());
+        }
+
+        private void appendBatchBoundary(final int batchLength) {
+            final long newBoundary = numRows() + batchLength;
+            final int newLength = m_batchBoundaries.length + 1;
+            m_batchBoundaries = Arrays.copyOf(m_batchBoundaries, newLength);
+            m_batchBoundaries[newLength - 1] = newBoundary;
         }
 
         @Override
@@ -183,6 +193,8 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     private final List<TestData> m_tracker = new ArrayList<>();
 
     private final List<Integer> m_batchLengths = new ArrayList<>();
+
+    private long[] m_batchBoundaries = new long[ 0 ];
 
     // this flag is volatile so that data written by the writer in some thread is visible to a reader in another thread
     private volatile boolean m_writerClosed;
@@ -280,8 +292,13 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     }
 
     @Override
-    public int batchLength() {
-        return m_batchLengths.stream().mapToInt(Integer::intValue).max().orElse(-1);
+    public long[] getBatchBoundaries() {
+        return m_batchBoundaries;
+    }
+
+    @Override
+    public long numRows() {
+        return m_batchBoundaries.length == 0 ? 0 : m_batchBoundaries[m_batchBoundaries.length - 1];
     }
 
     @Override

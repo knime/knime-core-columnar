@@ -50,7 +50,9 @@ import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_L
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import org.apache.arrow.flatbuf.Footer;
 import org.apache.arrow.memory.BufferAllocator;
@@ -64,6 +66,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializer;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
@@ -73,7 +76,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-class ArrowBatchReader extends AbstractArrowBatchReader {
+class ArrowBatchReader extends AbstractArrowBatchReader implements RandomAccessBatchReader {
 
     private final File m_file;
 
@@ -84,6 +87,11 @@ class ArrowBatchReader extends AbstractArrowBatchReader {
     }
 
     @Override
+    public ReadBatch readRetained(final int index) throws IOException {
+        return super.readRetained(index);
+    }
+
+    @Override
     protected ArrowReader createReader() throws IOException {
         return new ArrowFileReader(m_file);
     }
@@ -91,12 +99,55 @@ class ArrowBatchReader extends AbstractArrowBatchReader {
     // Override getMetadata to handle legacy files
     @Override
     protected Map<String, String> getMetadata() {
-        final Map<String, String> metadata = super.getMetadata();
+        var metadata = super.getMetadata();
+        var footerMetadata = ((ArrowFileReader)m_reader).getFooter().getMetaData();
+
+        var metadataToReturn = metadata;
+
         if (metadata.isEmpty()) {
             // Legacy: For <4.4 the metadata was saved in the footer
-            return ((ArrowFileReader)m_reader).getFooter().getMetaData();
+            metadataToReturn = footerMetadata;
         }
-        return metadata;
+
+        // Before 5.3 we stored the chunk size as all batches (but the last) had the same size,
+        // so we can construct the batch boundaries
+        if (!metadata.containsKey(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY)) {
+            metadataToReturn = new HashMap<>(metadata);
+            if (footerMetadata.containsKey(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY))
+            {
+                // Copy batch boundaries from footer to metadata. They are stored in the footer because
+                // we only know them once all batches have been written.
+                metadataToReturn.put(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY,
+                    footerMetadata.get(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY));
+            } else {
+                // Construct from old batchLength info
+                int batchLength = readChunkSize(metadata, footerMetadata);
+
+                var numBatches = ((ArrowFileReader)m_reader).getNumberOfBatches();
+                var boundaries = new long[numBatches];
+                IntStream.range(0, numBatches - 1).forEach(i -> boundaries[i] = (i + 1) * batchLength);
+                try (var lastBatch = ((ArrowFileReader)m_reader).readRecordBatch(numBatches - 1)) {
+                    var lastBatchNumRows = lastBatch.getLength();
+                    boundaries[numBatches - 1] = (numBatches - 1) * batchLength + lastBatchNumRows;
+                    metadataToReturn.put(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY, ArrowReaderWriterUtils.longArrayToString(boundaries));
+                } catch (IOException ex) {
+                    throw new IllegalStateException("Could not determine batch boundaries", ex);
+                }
+            }
+        }
+
+        return metadataToReturn;
+    }
+
+    @SuppressWarnings("deprecation")
+    private static int readChunkSize(final Map<String, String> metadata, final Map<String, String> footerMetadata) {
+        if (metadata.containsKey(ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY)) {
+            return Integer.parseInt(metadata.get(ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY));
+        } else if (footerMetadata.containsKey(ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY)) {
+            return Integer.parseInt(footerMetadata.get(ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY));
+        } else {
+            throw new IllegalStateException("Could not find batch length");
+        }
     }
 
     int numBatches() throws IOException {
@@ -206,7 +257,7 @@ class ArrowBatchReader extends AbstractArrowBatchReader {
             final int numBatches = footer.getRecordBatches().size();
             final int numDictionaries = footer.getDictionaries().size();
             if (numBatches == 0) {
-            	// pyarrow doesn't write any batches if a table is empty
+                // pyarrow doesn't write any batches if a table is empty
                 if (numDictionaries != 0) {
                     throw new IOException("Arrow file invalid: There are no batches but there are dictionaries.");
                 }

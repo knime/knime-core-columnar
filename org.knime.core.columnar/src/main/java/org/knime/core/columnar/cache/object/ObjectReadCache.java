@@ -70,7 +70,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 public final class ObjectReadCache implements RandomAccessBatchReadable {
 
-    private final RandomAccessBatchReadable m_reabableDelegate;
+    private final RandomAccessBatchReadable m_readableDelegate;
 
     private final CachedDataFactory[] m_cachedDataFactories;
 
@@ -83,7 +83,7 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
      * @param cache the delegate from which to read object data in case of a cache miss
      */
     public ObjectReadCache(final RandomAccessBatchReadable delegate, final SharedObjectCache cache) {
-        m_reabableDelegate = delegate;
+        m_readableDelegate = delegate;
         m_cacheManager = new CacheManager(cache);
         m_cachedDataFactories =
             CachedDataFactoryBuilder.createForReading(m_cacheManager).build(delegate.getSchema());
@@ -96,7 +96,7 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
 
     @Override
     public ColumnarSchema getSchema() {
-        return m_reabableDelegate.getSchema();
+        return m_readableDelegate.getSchema();
     }
 
     @Override
@@ -105,7 +105,7 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
             return; // already closed!
         }
         m_cacheManager.close();
-        m_reabableDelegate.close();
+        m_readableDelegate.close();
     }
 
     private ColumnDataUniqueId createId(final int columnIndex, final int batchIndex) {
@@ -117,7 +117,7 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
         private final RandomAccessBatchReader m_readerDelegate;
 
         private ObjectReadCacheReader(final ColumnSelection selection) {
-            m_readerDelegate = m_reabableDelegate.createRandomAccessReader(selection);
+            m_readerDelegate = m_readableDelegate.createRandomAccessReader(selection);
         }
 
         @Override
@@ -133,4 +133,8 @@ public final class ObjectReadCache implements RandomAccessBatchReadable {
 
     }
 
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_readableDelegate.getBatchBoundaries();
+    }
 }

@@ -338,4 +338,9 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
         }
 
     }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_readableDelegate.getBatchBoundaries();
+    }
 }

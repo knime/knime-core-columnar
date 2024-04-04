@@ -292,4 +292,10 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
         m_readableDelegate.close();
     }
 
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_readableDelegate.getBatchBoundaries();
+    }
+
 }

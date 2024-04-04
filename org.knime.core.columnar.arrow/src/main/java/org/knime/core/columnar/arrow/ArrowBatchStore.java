@@ -94,8 +94,13 @@ public final class ArrowBatchStore extends AbstractArrowBatchReadable implements
     }
 
     @Override
-    public int batchLength() {
-        return m_writer.batchLength();
+    public long[] getBatchBoundaries() {
+        return m_writer.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_writer.numRows();
     }
 
     /**

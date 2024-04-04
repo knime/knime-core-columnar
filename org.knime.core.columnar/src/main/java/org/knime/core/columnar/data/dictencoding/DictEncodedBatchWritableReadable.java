@@ -108,4 +108,8 @@ public class DictEncodedBatchWritableReadable
         m_readDelegate.close();
     }
 
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_readDelegate.getBatchBoundaries();
+    }
 }
