@@ -50,6 +50,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
@@ -131,6 +132,12 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
     @Override
     public int hashCode() {
         return m_specs.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "Columns (" + m_specs.size() + ") "
+            + StringUtils.join(m_specs.stream().map(Object::toString).iterator(), ",");
     }
 
     @Override

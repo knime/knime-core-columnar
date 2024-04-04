@@ -152,11 +152,6 @@ final class ColumnarRowCursorFactory {
         if (size < 1) {
             return new EmptyRowCursor(schema);
         }
-        final int maxLength = store.batchLength();
-        if (maxLength < 1) {
-            throw new IllegalStateException(
-                String.format("Length of table is %d, but maximum batch length is %d.", size, maxLength));
-        }
 
         var numColumns = schema.numColumns();
         var selection = filter == null ? Selection.all() : TableFilterUtils.createSelection(filter, numColumns, size);
