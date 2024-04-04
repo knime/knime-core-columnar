@@ -1,0 +1,4 @@
+<factorypath>
+    <factorypathentry kind="WKSPJAR" id="/org.knime.ext.benchmarks.libs/libs/jmh-core-1.21.jar" enabled="true" runInBatchMode="false"/>
+    <factorypathentry kind="WKSPJAR" id="/org.knime.ext.benchmarks.libs/libs/jmh-generator-annprocess-1.21.jar" enabled="true" runInBatchMode="false"/>
+</factorypath>
