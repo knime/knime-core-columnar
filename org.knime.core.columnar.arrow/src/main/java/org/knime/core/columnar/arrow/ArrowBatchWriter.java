@@ -155,6 +155,10 @@ class ArrowBatchWriter implements BatchWriter {
 
     @Override
     public synchronized void write(final ReadBatch batch) throws IOException {
+        if (m_closed) {
+            throw new IllegalStateException("Cannot write batch after closing the writer.");
+        }
+
         final List<Field> fields = new ArrayList<>(m_factories.length);
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
