@@ -51,6 +51,7 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStri
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory;
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 
 /**
@@ -147,5 +148,10 @@ public final class TestDictEncodedStringData<K> extends AbstractTestDictEncodedD
         // In the tests we expect that a value of null means missing, however that is not necessarily true in KNIME,
         // so we replicate the required test behavior here
         return m_delegate.isMissing(index) || getString(index) == null;
+    }
+
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        throw new UnsupportedOperationException("Writing to Access not implemented for DictEncoded String åin test");
     }
 }

@@ -53,6 +53,7 @@ import java.io.IOException;
 
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.io.ReadableDataInput;
 import org.knime.core.table.io.ReadableDataInputStream;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
@@ -136,4 +137,10 @@ public final class TestVarBinaryData extends AbstractTestData implements VarBina
         setBytes(index, bs.toByteArray());
     }
 
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        // TODO: are getBytes and getObject equivalent here?
+//        ((VarBinaryWriteAccess)access).setByteArray(getBytes(index));
+        throw new UnsupportedOperationException("Var binaries are too complicated for now");
+    }
 }

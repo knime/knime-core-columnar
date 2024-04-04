@@ -47,6 +47,8 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.table.access.StringAccess.StringWriteAccess;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -78,8 +80,11 @@ public final class TestStringData extends AbstractTestData implements StringWrit
 
     }
 
+    private int m_numWritten;
+
     TestStringData(final int capacity) {
         super(capacity);
+        m_numWritten = 0;
     }
 
     TestStringData(final Object[] strings, final int length) {
@@ -89,6 +94,7 @@ public final class TestStringData extends AbstractTestData implements StringWrit
 
     @Override
     public TestStringData close(final int length) {
+        m_numWritten = length;
         closeInternal(length);
         return this;
     }
@@ -101,6 +107,16 @@ public final class TestStringData extends AbstractTestData implements StringWrit
     @Override
     public synchronized void setString(final int index, final String val) {
         get()[index] = val;
+        m_numWritten++;
     }
 
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((StringWriteAccess)access).setStringValue(getString(index));
+    }
+
+    @Override
+    public long sizeOf() {
+        return m_numWritten;
+    }
 }

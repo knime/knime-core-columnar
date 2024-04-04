@@ -52,6 +52,7 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
 import org.knime.core.columnar.data.StructData.StructWriteData;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -128,6 +129,11 @@ public final class TestStructData extends AbstractTestData implements StructWrit
     @Override
     public <C extends NullableWriteData> C getWriteDataAt(final int index) {
         return (C)get()[index];
+    }
+
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        throw new UnsupportedOperationException("Writing to Access not implemented for Structs in test");
     }
 
 }

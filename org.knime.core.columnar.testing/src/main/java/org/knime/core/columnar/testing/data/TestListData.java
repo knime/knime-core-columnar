@@ -52,6 +52,7 @@ import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -119,4 +120,8 @@ public final class TestListData extends AbstractTestData implements ListWriteDat
         return data;
     }
 
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        throw new UnsupportedOperationException("Writing to Access not implemented for Lists in test");
+    }
 }

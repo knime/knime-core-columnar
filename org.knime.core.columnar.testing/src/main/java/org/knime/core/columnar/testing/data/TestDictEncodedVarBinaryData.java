@@ -59,6 +59,7 @@ import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarB
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryWriteData;
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
 import org.knime.core.columnar.testing.data.TestVarBinaryData.TestVarBinaryDataFactory;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.io.ReadableDataInputStream;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
@@ -174,5 +175,10 @@ public final class TestDictEncodedVarBinaryData<K> extends AbstractTestDictEncod
 
         return (byte[])m_dictKeyToVal.computeIfAbsent(dictKey,
             k -> ((VarBinaryReadData)m_delegate.getReadDataAt(1)).getBytes(index));
+    }
+
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        throw new UnsupportedOperationException("Writing to Access not implemented for Dict Encoded VarBinary in test");
     }
 }

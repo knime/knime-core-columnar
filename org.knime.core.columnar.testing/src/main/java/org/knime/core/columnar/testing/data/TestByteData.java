@@ -47,6 +47,8 @@ package org.knime.core.columnar.testing.data;
 
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
+import org.knime.core.table.access.ByteAccess.ByteWriteAccess;
+import org.knime.core.table.access.WriteAccess;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -103,4 +105,8 @@ public final class TestByteData extends AbstractTestData implements ByteWriteDat
         get()[index] = val;
     }
 
+    @Override
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((ByteWriteAccess)access).setByteValue(getByte(index));
+    }
 }
