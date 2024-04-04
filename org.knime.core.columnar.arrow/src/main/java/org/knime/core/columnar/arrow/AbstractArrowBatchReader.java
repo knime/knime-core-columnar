@@ -45,7 +45,6 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_CHUNK_SIZE_KEY;
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_BYTES;
 import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_LENGTH;
 
@@ -93,7 +92,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractArrowBatchReader implements RandomAccessBatchReader {
+abstract class AbstractArrowBatchReader {
 
     private final BufferAllocator m_allocator;
 
@@ -146,8 +145,7 @@ abstract class AbstractArrowBatchReader implements RandomAccessBatchReader {
         return m_reader.getSchema().getCustomMetadata();
     }
 
-    @Override
-    public ReadBatch readRetained(final int index) throws IOException {
+    protected ReadBatch readRetained(final int index) throws IOException {
         // Initialize the reader when reading the first batch
         if (m_reader == null) {
             initializeReader();
@@ -228,14 +226,6 @@ abstract class AbstractArrowBatchReader implements RandomAccessBatchReader {
         }
     }
 
-    int maxLength() throws IOException {
-        if (m_reader == null) {
-            initializeReader();
-        }
-        return Integer.parseInt(m_metadata.get(ARROW_CHUNK_SIZE_KEY));
-    }
-
-    @Override
     public synchronized void close() throws IOException {
         if (m_reader != null && !m_closed) {
             m_reader.close();

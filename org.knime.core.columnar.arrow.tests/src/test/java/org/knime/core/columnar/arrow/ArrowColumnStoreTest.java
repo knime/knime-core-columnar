@@ -74,6 +74,7 @@ import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.SequentialBatchReader;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
@@ -173,12 +174,12 @@ public class ArrowColumnStoreTest {
     }
 
     /**
-     * Test reading from an Arrow file before it is completely written.
+     * Test reading batches out of order from an Arrow file after it is completely written.
      *
      * @throws IOException
      */
     @Test
-    public void testReadBeforeFullyWritten() throws IOException {
+    public void testRandomAccessReadAfterWrite() throws IOException {
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
 
@@ -186,7 +187,6 @@ public class ArrowColumnStoreTest {
         try (final RootAllocator allocator = new RootAllocator();
                 final BatchStore store = new ArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
             assertEquals(0, store.numBatches());
-            assertThrows(IllegalStateException.class, store::batchLength);
 
             @SuppressWarnings("resource")
             final BatchWriter writer = store.getWriter();
@@ -197,21 +197,12 @@ public class ArrowColumnStoreTest {
             writer.write(batch);
             batch.release();
             assertEquals(1, store.numBatches());
-            assertEquals(chunkSize, store.batchLength());
 
             // Write batch 1
             batch = fillBatch(writer.create(chunkSize), chunkSize, 1);
             writer.write(batch);
             batch.release();
             assertEquals(2, store.numBatches());
-
-            @SuppressWarnings("resource")
-            final RandomAccessBatchReader reader = store.createRandomAccessReader(); // NOSONAR
-
-            // Read back batch 1 already
-            batch = reader.readRetained(1);
-            assertBatchData(batch, chunkSize, 1);
-            batch.release();
 
             // Write batch 2
             batch = fillBatch(writer.create(chunkSize), chunkSize, 2);
@@ -225,6 +216,28 @@ public class ArrowColumnStoreTest {
             batch.release();
             assertEquals(4, store.numBatches());
 
+            // Write batch 4
+            batch = fillBatch(writer.create(chunkSize), chunkSize, 4);
+            writer.write(batch);
+            batch.release();
+            assertEquals(5, store.numBatches());
+
+            // Close the writer
+            writer.close();
+
+            @SuppressWarnings("resource")
+            final RandomAccessBatchReader reader = store.createRandomAccessReader(); // NOSONAR
+
+            // Read back batch 1 already
+            batch = reader.readRetained(1);
+            assertBatchData(batch, chunkSize, 1);
+            batch.release();
+
+            // Read back batch 4
+            batch = reader.readRetained(3);
+            assertBatchData(batch, chunkSize, 3);
+            batch.release();
+
             // Read back batch 0
             batch = reader.readRetained(0);
             assertBatchData(batch, chunkSize, 0);
@@ -235,25 +248,48 @@ public class ArrowColumnStoreTest {
             assertBatchData(batch, chunkSize, 3);
             batch.release();
 
-            // Write batch 4
-            batch = fillBatch(writer.create(chunkSize), chunkSize, 4);
-            writer.write(batch);
-            batch.release();
-            assertEquals(5, store.numBatches());
-
-            // Close the writer
-            writer.close();
-
-            // Read back batch 4
-            batch = reader.readRetained(3);
-            assertBatchData(batch, chunkSize, 3);
-            batch.release();
-
             // Close the reader
             reader.close();
 
             assertEquals(5, store.numBatches());
-            assertEquals(chunkSize, store.batchLength());
+        }
+    }
+
+    /**
+     * Test that reading from an Arrow file before it is completely written using the
+     * RandomAccess reader will fail.
+     *
+     * @throws IOException
+     */
+    @SuppressWarnings("resource")
+    @Test(expected = IOException.class)
+    public void testRandomAccessReadBeforeCloseThrows() throws IOException {
+        final int chunkSize = 64;
+        final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
+
+        // Use the write store to write some data
+        try (final RootAllocator allocator = new RootAllocator();
+                final BatchStore store = new ArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
+            assertEquals(0, store.numBatches());
+
+            final BatchWriter writer = store.getWriter();
+            ReadBatch batch;
+
+            // Write batch 0
+            batch = fillBatch(writer.create(chunkSize), chunkSize, 0);
+            writer.write(batch);
+            batch.release();
+            assertEquals(1, store.numBatches());
+
+            // Write batch 1
+            batch = fillBatch(writer.create(chunkSize), chunkSize, 1);
+            writer.write(batch);
+            batch.release();
+            assertEquals(2, store.numBatches());
+
+            // This should throw because the writer is not closed
+            var reader = store.createRandomAccessReader(); // NOSONAR
+            reader.readRetained(0);
         }
     }
 
@@ -288,11 +324,16 @@ public class ArrowColumnStoreTest {
             batch.release();
 
             @SuppressWarnings("resource")
-            final RandomAccessBatchReader reader = new ArrowPartialFileBatchReader(writePath.asFile(), allocator,
+            final SequentialBatchReader reader = new ArrowPartialFileBatchReader(writePath.asFile(), allocator,
                 factories, new DefaultColumnSelection(1), writer.getOffsetProvider());
 
-            // Read back batch 1 already
-            batch = reader.readRetained(1);
+            // Read back batch 0
+            batch = reader.forward();
+            assertBatchDataDict(batch, chunkSize, 0);
+            batch.release();
+
+            // Read back batch 1
+            batch = reader.forward();
             assertBatchDataDict(batch, chunkSize, 1);
             batch.release();
 
@@ -306,13 +347,11 @@ public class ArrowColumnStoreTest {
             writer.write(batch);
             batch.release();
 
-            // Read back batch 0
-            batch = reader.readRetained(0);
-            assertBatchDataDict(batch, chunkSize, 0);
-            batch.release();
+            // Ignore batch 2
+            reader.forward();
 
             // Read back batch 3
-            batch = reader.readRetained(3);
+            batch = reader.forward();
             assertBatchDataDict(batch, chunkSize, 3);
             batch.release();
 
@@ -325,8 +364,8 @@ public class ArrowColumnStoreTest {
             writer.close();
 
             // Read back batch 4
-            batch = reader.readRetained(3);
-            assertBatchDataDict(batch, chunkSize, 3);
+            batch = reader.forward();
+            assertBatchDataDict(batch, chunkSize, 4);
             batch.release();
 
             // Close the reader
@@ -335,7 +374,7 @@ public class ArrowColumnStoreTest {
     }
 
     /**
-     * Test reading from an Arrow file before it is completely written (including dictionaries).
+     * Test reading from an Arrow file before it is completely written (no dictionaries).
      *
      * @throws IOException
      */
@@ -353,7 +392,6 @@ public class ArrowColumnStoreTest {
             final var writeStore = factory.createStore(schema, writePath);
 
             assertEquals(0, writeStore.numBatches());
-            assertThrows(IllegalStateException.class, writeStore::batchLength);
 
             @SuppressWarnings("resource")
             final BatchWriter writer = writeStore.getWriter();
@@ -364,7 +402,6 @@ public class ArrowColumnStoreTest {
             writer.write(batch);
             batch.release();
             assertEquals(1, writeStore.numBatches());
-            assertEquals(chunkSize, writeStore.batchLength());
 
             // Write batch 1
             batch = fillBatch(writer.create(chunkSize), chunkSize, 1);
@@ -377,10 +414,15 @@ public class ArrowColumnStoreTest {
             final ArrowPartialFileBatchReadable readable =
                 factory.createPartialFileReadable(writePath.asPath(), writeStore.getOffsetProvider());
             @SuppressWarnings("resource")
-            final RandomAccessBatchReader reader = readable.createRandomAccessReader();
+            final SequentialBatchReader reader = readable.createSequentialReader();
 
-            // Read back batch 1 already
-            batch = reader.readRetained(1);
+            // Read back batch 0
+            batch = reader.forward();
+            assertBatchData(batch, chunkSize, 0);
+            batch.release();
+
+            // Read back batch 1
+            batch = reader.forward();
             assertBatchData(batch, chunkSize, 1);
             batch.release();
 
@@ -388,21 +430,17 @@ public class ArrowColumnStoreTest {
             batch = fillBatch(writer.create(chunkSize), chunkSize, 2);
             writer.write(batch);
             batch.release();
-            assertEquals(3, writeStore.numBatches());
 
             // Write batch 3
             batch = fillBatch(writer.create(chunkSize), chunkSize, 3);
             writer.write(batch);
             batch.release();
-            assertEquals(4, writeStore.numBatches());
 
-            // Read back batch 0
-            batch = reader.readRetained(0);
-            assertBatchData(batch, chunkSize, 0);
-            batch.release();
+            // Ignore batch 2
+            reader.forward();
 
             // Read back batch 3
-            batch = reader.readRetained(3);
+            batch = reader.forward();
             assertBatchData(batch, chunkSize, 3);
             batch.release();
 
@@ -410,21 +448,16 @@ public class ArrowColumnStoreTest {
             batch = fillBatch(writer.create(chunkSize), chunkSize, 4);
             writer.write(batch);
             batch.release();
-            assertEquals(5, writeStore.numBatches());
 
             // Close the writer
             writer.close();
 
             // Read back batch 4
-            batch = reader.readRetained(3);
-            assertBatchData(batch, chunkSize, 3);
+            batch = reader.forward();
+            assertBatchData(batch, chunkSize, 4);
             batch.release();
 
-            // Close the reader
-            reader.close();
-
             assertEquals(5, writeStore.numBatches());
-            assertEquals(chunkSize, writeStore.batchLength());
 
             writeStore.close();
             readable.close();
@@ -472,7 +505,6 @@ public class ArrowColumnStoreTest {
         try (final BatchReadStore readStore = factory.createReadStore(readPath.asPath())) {
             assertEquals(schema, readStore.getSchema());
             assertEquals(1, readStore.numBatches());
-            assertEquals(chunkSize, readStore.batchLength());
 
             // Read the batch
             final ReadBatch readBatch;
@@ -491,7 +523,6 @@ public class ArrowColumnStoreTest {
             readBatch.release();
 
             assertEquals(1, readStore.numBatches());
-            assertEquals(chunkSize, readStore.batchLength());
         }
 
         // Assert that the file for reading exists

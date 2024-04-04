@@ -57,6 +57,8 @@ import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializer;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.SequentialBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
@@ -65,11 +67,13 @@ import org.knime.core.columnar.filter.ColumnSelection;
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-class ArrowPartialFileBatchReader extends AbstractArrowBatchReader {
+class ArrowPartialFileBatchReader extends AbstractArrowBatchReader implements SequentialBatchReader {
 
     private final File m_file;
 
     private final OffsetProvider m_offsetProvider;
+
+    private int m_currentBatchIndex = -1;
 
     ArrowPartialFileBatchReader(final File file, final BufferAllocator allocator,
         final ArrowColumnDataFactory[] factories, final ColumnSelection columnSelection,
@@ -150,5 +154,11 @@ class ArrowPartialFileBatchReader extends AbstractArrowBatchReader {
             in.setPosition(8);
             return MessageSerializer.deserializeSchema(in);
         }
+    }
+
+    @Override
+    public ReadBatch forward() throws IOException {
+        m_currentBatchIndex++;
+        return readRetained(m_currentBatchIndex);
     }
 }

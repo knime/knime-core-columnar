@@ -53,7 +53,8 @@ import java.nio.file.Path;
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.batch.SequentialBatchReadable;
+import org.knime.core.columnar.batch.SequentialBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
@@ -61,7 +62,7 @@ import org.knime.core.columnar.filter.ColumnSelection;
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowPartialFileBatchReadable extends AbstractArrowBatchReadable implements RandomAccessBatchReadable {
+public class ArrowPartialFileBatchReadable extends AbstractArrowBatchReadable implements SequentialBatchReadable {
 
     private final OffsetProvider m_offsetProvider;
 
@@ -72,7 +73,7 @@ public class ArrowPartialFileBatchReadable extends AbstractArrowBatchReadable im
     }
 
     @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+    public SequentialBatchReader createSequentialReader(final ColumnSelection selection) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
         return new ArrowPartialFileBatchReader(m_fileHandle.asFile(), m_allocator, factories, selection, m_offsetProvider);
     }
