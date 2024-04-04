@@ -207,6 +207,8 @@ public final class ColumnarWriteCursorFactory {
         @Override
         public void finish() throws IOException {
             writeCurrentBatch(m_currentIndex);
+            // TODO: As per contract, this should block until the data is written to disk.
+            // But right now we don't do this.
         }
 
         private void writeCurrentBatch(final int numValues) {

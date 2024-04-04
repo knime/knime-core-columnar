@@ -194,6 +194,11 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
             m_finalizer.close();
             m_writeCursor.finish();
             m_writeCursor.close(); // TODO (TP) ColumnarRowWriteCursor.finish() should simultaneously close() !?
+            try {
+                m_store.flush(); // NEW: make sure this actually writes the data underneath.
+            } catch (IOException ex) {
+                System.out.println("Couldn't finish writing???");
+            }
             final ColumnarValueSchema schema;
             if (m_nullableDomainWritable != null) {
                 final Map<Integer, DataColumnDomain> domains = new HashMap<>();
