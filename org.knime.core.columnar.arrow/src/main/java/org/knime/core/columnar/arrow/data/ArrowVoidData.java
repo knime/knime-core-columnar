@@ -101,6 +101,11 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
     }
 
     @Override
+    public long usedSizeFor(final int numElements) {
+        return 0;
+    }
+
+    @Override
     public void expand(final int minimumCapacity) {
         m_capacity = minimumCapacity;
     }

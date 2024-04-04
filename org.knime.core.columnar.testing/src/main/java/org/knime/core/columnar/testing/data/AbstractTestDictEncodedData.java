@@ -118,6 +118,11 @@ public abstract class AbstractTestDictEncodedData<T, K>
     }
 
     @Override
+    public long usedSizeFor(final int numElements) {
+        return m_delegate.usedSizeFor(numElements);
+    }
+
+    @Override
     public boolean isMissing(final int index) {
         return m_delegate.isMissing(index);
     }

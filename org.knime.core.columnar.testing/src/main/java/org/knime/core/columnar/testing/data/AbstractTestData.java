@@ -107,6 +107,11 @@ public abstract class AbstractTestData implements TestData {
     }
 
     @Override
+    public long usedSizeFor(final int numElements) {
+        return numElements;
+    }
+
+    @Override
     public final int capacity() {
         return m_size;
     }

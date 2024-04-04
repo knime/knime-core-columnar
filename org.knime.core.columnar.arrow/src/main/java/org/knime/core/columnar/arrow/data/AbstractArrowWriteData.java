@@ -123,8 +123,8 @@ abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractRef
     /**
      * {@inheritDoc}
      *
-     * This method is not thread-safe. Do not call it concurrently from multiple threads,
-     * and do not call it concurrently with set operations or size queries.
+     * This method is not thread-safe. Do not call it concurrently from multiple threads, and do not call it
+     * concurrently with set operations or size queries.
      */
     @Override
     public void expand(final int minimumCapacity) {
@@ -148,5 +148,10 @@ abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractRef
     @Override
     public String toString() {
         return ValueVectorUtility.getToString(m_vector, m_offset, m_vector.getValueCount());
+    }
+
+    @Override
+    public long usedSizeFor(final int numElements) {
+        return m_vector.getBufferSizeFor(numElements);
     }
 }

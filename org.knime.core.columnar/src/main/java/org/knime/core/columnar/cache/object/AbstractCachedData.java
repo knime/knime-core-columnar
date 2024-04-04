@@ -144,6 +144,12 @@ final class AbstractCachedData {
             return m_delegate.sizeOf();
         }
 
+        @Override
+        public long usedSizeFor(final int numElements) {
+            flush();
+            return m_delegate.usedSizeFor(numElements);
+        }
+
         abstract class AbstractCachedReadData implements CachedReadData {
 
             private final int m_length;

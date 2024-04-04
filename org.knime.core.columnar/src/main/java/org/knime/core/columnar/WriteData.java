@@ -52,6 +52,8 @@ package org.knime.core.columnar;
  */
 public interface WriteData extends ReferencedData {
 
+    // TODO do we still need expand and capacity?
+
     /**
      * Expand the data, potentially increasing capacity. Note that the capacity to which the data will be expanded might
      * be larger than the provided minimum capacity.
@@ -79,4 +81,15 @@ public interface WriteData extends ReferencedData {
      */
     ReadData close(int length);
 
+    /**
+     * The memory footprint used by the first <code>numElements</code> elements. Closing the data ({@link #close(int)})
+     * with the same length will result in an {@link ReadData} object with the same memory footprint (e.g.
+     * {@link ReadData#sizeOf()}).
+     *
+     * TODO - Is this true???
+     *
+     * @param numElements
+     * @return the memory footprint in bytes
+     */
+    long usedSizeFor(int numElements);
 }

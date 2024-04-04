@@ -162,6 +162,11 @@ public final class AbstractArrowDictEncodedData {
         }
 
         @Override
+        public long usedSizeFor(final int numElements) {
+            return m_delegate.usedSizeFor(numElements);
+        }
+
+        @Override
         public String toString() {
             return "[" + "references=" + m_delegate.getWriteDataAt(DICT_KEY_DATA_INDEX).toString()
                 + ", dictionaryEntries=" + m_delegate.getWriteDataAt(DICT_ENTRY_DATA_INDEX).toString() + "]";
