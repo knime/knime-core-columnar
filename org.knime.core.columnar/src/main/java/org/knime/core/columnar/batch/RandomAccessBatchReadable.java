@@ -107,21 +107,6 @@ public interface RandomAccessBatchReadable extends BatchReadable {
      *         the second value indicates the end of the second batch etc
      */
     long[] getBatchBoundaries();
-//    default long[] getBatchBoundaries() {
-//        // TODO: don't read all batches for this, read batch boundaries from footer
-//        int numBatches = numBatches();
-//        long[] batchBoundaries = new long[numBatches];
-//        try (var batchReadable = createRandomAccessReader()) {
-//            for (int i = 0; i < numBatches; i++) {
-//                var batch = batchReadable.readRetained(i);
-//                batchBoundaries[i] = batch.length() + (i == 0 ? 0 : batchBoundaries[i - 1]);
-//                batch.release();
-//            }
-//            return batchBoundaries;
-//        } catch (final IOException e) {
-//            throw new IllegalStateException("Error when reading batch boundaries.", e);
-//        }
-//    }
 
     /**
      * Obtain the number of rows in this store.
