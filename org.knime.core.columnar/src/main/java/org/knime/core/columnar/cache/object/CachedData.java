@@ -60,7 +60,7 @@ import org.knime.core.columnar.data.NullableWriteData;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class CachedData {
+public final class CachedData {
 
     CachedData() {
     }
@@ -70,7 +70,7 @@ final class CachedData {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    interface CachedDataFactory {
+    public interface CachedDataFactory {
 
         /**
          * Creates either a {@link CachedWriteData} if the column is cached or returns {@link NullableWriteData data} if

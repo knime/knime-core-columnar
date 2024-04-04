@@ -60,22 +60,22 @@ import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class CacheManager implements AutoCloseable {
+public final class CacheManager implements AutoCloseable {
 
     private final SharedObjectCache m_cache;
 
     private final Set<ColumnDataUniqueId> m_cachedData = ConcurrentHashMap.newKeySet();
 
-    CacheManager(final SharedObjectCache cache) {
+    public CacheManager(final SharedObjectCache cache) {
         m_cache = cache;
     }
 
-    void cacheData(final Object data, final ColumnDataUniqueId id) {
+    public void cacheData(final Object data, final ColumnDataUniqueId id) {
         m_cache.put(id, data);
         m_cachedData.add(id);
     }
 
-    Object getOrCreate(final ColumnDataUniqueId id, final Supplier<Object> supplier) {
+    public Object getOrCreate(final ColumnDataUniqueId id, final Supplier<Object> supplier) {
         return m_cache.computeIfAbsent(id, k -> {
             m_cachedData.add(k);
             return supplier.get();

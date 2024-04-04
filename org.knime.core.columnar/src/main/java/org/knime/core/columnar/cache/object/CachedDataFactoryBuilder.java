@@ -79,7 +79,7 @@ import org.knime.core.table.schema.traits.StructDataTraits;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class CachedDataFactoryBuilder {
+public final class CachedDataFactoryBuilder {
 
     private final ExecutorService m_persistExecutor;
 
@@ -95,14 +95,14 @@ final class CachedDataFactoryBuilder {
         ColumnDataUniqueId create(final DataIndex dataIndex, int batchIndex);
     }
 
-    static CachedDataFactoryBuilder createForWriting(final ExecutorService persistExecutor,
+    public static CachedDataFactoryBuilder createForWriting(final ExecutorService persistExecutor,
         final Set<CachedWriteData> unclosedData, final CacheManager cacheManager,
         final CountUpDownLatch serializationLatch, final ExecutorService serializationExecutor) {
         return new CachedDataFactoryBuilder(persistExecutor, unclosedData, cacheManager, serializationLatch,
             serializationExecutor);
     }
 
-    static CachedDataFactoryBuilder createForReading(final CacheManager cacheManager) {
+    public static CachedDataFactoryBuilder createForReading(final CacheManager cacheManager) {
         return new CachedDataFactoryBuilder(null, null, cacheManager, null, null);
     }
 
@@ -116,7 +116,7 @@ final class CachedDataFactoryBuilder {
         m_serializationExecutor = serializationExecutor;
     }
 
-    CachedDataFactory[] build(final ColumnarSchema schema) {
+    public CachedDataFactory[] build(final ColumnarSchema schema) {
         return createCachedDataFactories(schema);
     }
 
