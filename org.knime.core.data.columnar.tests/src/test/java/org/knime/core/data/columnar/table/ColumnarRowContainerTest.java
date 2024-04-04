@@ -88,7 +88,7 @@ public class ColumnarRowContainerTest extends ColumnarTest {
         }
     }
 
-    @Test(expected = DuplicateKeyException.class)
+    @Test(expected = DuplicateKeyException.class, timeout = 500)
     public void testDuplicateKeyExceptionOnClose() {
         try (final ColumnarRowContainer container = createColumnarRowContainer();
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
@@ -96,6 +96,9 @@ public class ColumnarRowContainerTest extends ColumnarTest {
                 cursor.forward().setRowKey("1");
             }
             cursor.forward().setRowKey("1");
+            // since heap badger we need to flush before close to run into the duplicate key error.
+            // But that would've made sense before too
+            cursor.finish();
         }
     }
 

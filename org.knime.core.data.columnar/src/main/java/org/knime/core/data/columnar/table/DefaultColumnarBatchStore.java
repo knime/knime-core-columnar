@@ -51,6 +51,8 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
+import org.knime.core.columnar.badger.BatchingWritable;
+import org.knime.core.columnar.badger.HeapBadger;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -61,6 +63,8 @@ import org.knime.core.columnar.cache.object.ObjectCache;
 import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.cache.writable.BatchWritableCache;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
+import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
+import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadable;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
@@ -83,7 +87,7 @@ import org.knime.core.util.ThreadUtils;
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
+public final class DefaultColumnarBatchStore implements ColumnarBatchStore, BatchingWritable {
     /**
      * Builder pattern to wrap a plain {@link BatchWritable} and {@link RandomAccessBatchReader} in cache, dictionary
      * encoding and domain calculation layers.
@@ -110,6 +114,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         private ExecutorService m_columnDataCacheExecutor = null;
 
         private boolean m_dictEncodingEnabled = false;
+
+        private boolean m_useHeapBadger = false;
 
         private ExecutorService m_duplicateCheckExecutor = null;
 
@@ -151,6 +157,18 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             m_heapCache = cache;
             m_heapCachePersistExecutor = persistExec;
             m_heapCacheSerializeExecutor = serializeExec;
+            return this;
+        }
+
+        /**
+         * Use the heap badger for heap caching instead of the (old) heap cache
+         *
+         * @param cache The heap cache to use for storing the data, or pass null to disable the heap cache
+         * @return This {@link ColumnarBatchStoreBuilder} to continue configuring it.
+         */
+        public ColumnarBatchStoreBuilder useHeapBadger(final SharedObjectCache cache) {
+            m_heapCache = cache;
+            m_useHeapBadger = true;
             return this;
         }
 
@@ -237,13 +255,17 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
     private ObjectCache m_heapCache = null;
 
+    private HeapBadger m_heapBadger = null;
+
     private MemoryAlertListener m_memListener = null;
 
     private DomainWritable m_domainWritable = null;
 
-    private final WrappedBatchStore m_wrappedStore;
+    private BatchSizeRecorder m_batchSizeRecorder = null;
 
     private final BatchReadStore m_readStore;
+
+    private final ColumnarWriteCursor m_writeCursor;
 
     private DefaultColumnarBatchStore(final ColumnarBatchStoreBuilder builder) {
         m_readStore = builder.m_readDelegate;
@@ -261,23 +283,57 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             m_writable = dictEncoded;
         }
 
-        initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor, builder.m_heapCacheSerializeExecutor);
-
-
-        if (builder.m_duplicateCheckExecutor != null) {
-            m_writable =
-                new DuplicateCheckWritable(m_writable, new DuplicateChecker(), builder.m_duplicateCheckExecutor);
+        if (builder.m_useHeapBadger) {
+            // In case of the heap badger, we put the duplicate check and domain calculation below, because they are designed to
+            // work on batches at the moment. This might not be optimal, but is the quickest way to put everything together right now.
+            // TODO: move duplicate check and domain calc before the HeapBadger by making them batch-unaware (again).
+            initDuplicateCheck(builder.m_duplicateCheckExecutor);
+            initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
+            m_writable = initBatchSizeRecorder(m_writable);
+            initHeapBadger(builder.m_heapCache);
+            m_writeCursor = m_heapBadger.getWriteCursor();
+        } else {
+            m_writable = initBatchSizeRecorder(m_writable);
+            initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor,
+                builder.m_heapCacheSerializeExecutor);
+            initDuplicateCheck(builder.m_duplicateCheckExecutor);
+            initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
+            m_writeCursor = ColumnarWriteCursorFactory.createWriteCursor(m_writable);
         }
 
-        if (builder.m_domainCalculationConfig != null) {
-            m_domainWritable =
-                new DomainWritable(m_writable, builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
+        m_readable = m_batchSizeRecorder.augment(m_readable);
+    }
+
+    private void initDuplicateCheck(final ExecutorService duplicateCheckExecutor) {
+        if (duplicateCheckExecutor != null) {
+            m_writable = new DuplicateCheckWritable(m_writable, new DuplicateChecker(), duplicateCheckExecutor);
+        }
+    }
+
+    private void initDomainCalculation(final DomainWritableConfig config, final ExecutorService domainCalcExecutor) {
+        if (config != null) {
+            m_domainWritable = new DomainWritable(m_writable, config, domainCalcExecutor);
             m_writable = m_domainWritable;
         }
+    }
 
+    private BatchWritable initBatchSizeRecorder(final BatchWritable writable) {
+        m_batchSizeRecorder = new BatchSizeRecorder();
+        return m_batchSizeRecorder.wrap(writable);
+    }
 
+    private void initHeapBadger(final SharedObjectCache heapCache) {
+        if (heapCache == null) {
+            return;
+        }
 
-        m_wrappedStore = new WrappedBatchStore(m_writable, m_readable, m_readStore.getFileHandle());
+        m_heapBadger = new HeapBadger(m_writable, m_readable, heapCache);
+
+        m_readable = m_heapBadger.getHeapCache();
+        m_writable = null; // FIXME
+
+        // No need for another MemoryAlertListener. The HeapBadger only keeps a small number of rows in the buffer. We could maybe implement flush instead of finish...
+        // The SharedObjectCache is flushed/invalidated outside anyways
     }
 
     private void initHeapCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
@@ -287,6 +343,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
         }
 
         m_heapCache = new ObjectCache(m_writable, m_readable, heapCache, persistExec, serializeExec);
+
         m_readable = m_heapCache;
         m_writable = m_heapCache;
 
@@ -328,7 +385,16 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
     @Override
     public BatchWriter getWriter() {
-        return m_wrappedStore.getWriter();
+        if ( m_writable == null ) {
+            throw new IllegalStateException(
+                    "No writer available for the HeapBadger. Use the batching write cursor instead");
+        }
+        return m_writable.getWriter();
+    }
+
+    @Override
+    public ColumnarWriteCursor getBatchingWriteCursor() {
+        return m_writeCursor;
     }
 
     @Override
@@ -338,7 +404,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return m_wrappedStore.createRandomAccessReader(selection);
+        return m_readable.createRandomAccessReader(selection);
     }
 
     @Override
@@ -347,14 +413,29 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
             MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
         }
 
-        // this also closes the delegates and all caches
-        m_wrappedStore.close();
+        m_writeCursor.close();
+
+        if (m_heapBadger != null) {
+            // close the writer
+            m_heapBadger.getWriteCursor().close();
+            // close the reader
+            m_heapBadger.getHeapCache().close();
+        } else {
+            // this also closes the delegates and all caches
+            m_writable.getWriter().close();
+            m_readable.close();
+        }
     }
 
+    @SuppressWarnings("resource") // The heap badger write cursor is closed separately
     @Override
     public void flushObjects() throws IOException {
         if (m_heapCache != null) {
             m_heapCache.flush();
+        }
+
+        if (m_heapBadger != null) {
+            m_heapBadger.getWriteCursor().flush();
         }
     }
 
@@ -380,18 +461,13 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore {
     }
 
     @Override
-    public int numBatches() {
-        return m_wrappedStore.numBatches();
-    }
-
-    @Override
-    public int batchLength() {
-        return m_wrappedStore.batchLength();
+    public long[] getBatchBoundaries() {
+        return m_readable.getBatchBoundaries();
     }
 
     @Override
     public FileHandle getFileHandle() {
-        return m_wrappedStore.getFileHandle();
+        return m_readStore.getFileHandle();
     }
 
     /**

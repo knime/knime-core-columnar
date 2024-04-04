@@ -96,6 +96,10 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
 
     @Override
     public final RowWrite forward() {
+        if ( !m_accessCursor.forward() ) {
+            return null;
+        }
+
         if (m_flushOnForward != null) {
             try {
                 m_flushOnForward.flush();
@@ -103,7 +107,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
                 LOGGER.error("Could not flush cursor during forward", ex);
             }
         }
-        return m_accessCursor.forward() ? m_rowWrite : null;
+        return m_rowWrite;
     }
 
     @Override
@@ -130,10 +134,12 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
      * Make sure the current contents of this {@link ColumnarRowWriteCursor} have been
      * written to disk. Blocks until this is true. Does not close this cursor.
      */
+    // TODO (TP): Should also close() this cursor !?
     @SuppressWarnings("javadoc")
-    public void flush() {
+    public void finish() {
         try {
-            m_accessCursor.flush();
+            m_accessCursor.forward();
+            m_accessCursor.finish();
         } catch (IOException ex) {
             // This exception is usually not critical, similar to #close()
             LOGGER.warn("Finishing writing failed because flushing the write access cursor failed.", ex);

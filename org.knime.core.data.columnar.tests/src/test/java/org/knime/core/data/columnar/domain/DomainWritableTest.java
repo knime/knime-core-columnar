@@ -111,8 +111,8 @@ public class DomainWritableTest extends ColumnarTest {
 
     @Test()
     public void testDomains() throws IOException {
-        try (final BatchStore delegate = TestBatchStore.create(SCHEMA);
-                final DomainWritable store = generateDomainStore(delegate)) {
+        try (final BatchStore delegate = TestBatchStore.create(SCHEMA)) {
+            final DomainWritable store = generateDomainStore(delegate);
             final WriteBatch[] batches = createBatches(store, 4, 4);
             writeRowKeys(batches, "1", "2", "3", "4");
             writeIntegers(batches, 3, 1, 3, 4);
@@ -135,8 +135,8 @@ public class DomainWritableTest extends ColumnarTest {
 
     @Test()
     public void testSetMaxPossibleValues() throws IOException {
-        try (final BatchStore delegate = TestBatchStore.create(SCHEMA);
-                final DomainWritable store = generateDomainStore(delegate)) {
+        try (final BatchStore delegate = TestBatchStore.create(SCHEMA)) {
+            final DomainWritable store = generateDomainStore(delegate);
             final WriteBatch[] batches = createBatches(store, 2, 2);
             writeRowKeys(batches, "1", "2");
             writeStrings(batches, "1", "2");
@@ -150,8 +150,8 @@ public class DomainWritableTest extends ColumnarTest {
 
     @Test(expected = IllegalStateException.class)
     public void testSetMaxPossibleValuesIllegalStateException() throws IOException {
-        try (final BatchStore delegate = TestBatchStore.create(SCHEMA);
-                final DomainWritable store = generateDomainStore(delegate)) {
+        try (final BatchStore delegate = TestBatchStore.create(SCHEMA)) {
+            final DomainWritable store = generateDomainStore(delegate);
             final WriteBatch[] batches = createBatches(store, 2, 2);
             writeRowKeys(batches, "1", "2");
             writeStrings(batches, "1", "2");
@@ -162,8 +162,8 @@ public class DomainWritableTest extends ColumnarTest {
 
     @Test
     public void testWriteRead() throws IOException {
-        try (final BatchStore delegate = TestBatchStore.create(SCHEMA);
-                final DomainWritable store = generateDomainStore(delegate)) {
+        try (final BatchStore delegate = TestBatchStore.create(SCHEMA)) {
+            final DomainWritable store = generateDomainStore(delegate);
             writeDefaultTable(store);
             readDefaultTable(delegate);
             readDefaultTable(delegate);
@@ -172,11 +172,12 @@ public class DomainWritableTest extends ColumnarTest {
 
     @Test
     public void testWriterSingleton() throws IOException {
-        try (final BatchStore delegate = TestBatchStore.create(SCHEMA);
-                final DomainWritable store = generateDomainStore(delegate);
-                final BatchWriter writer1 = store.getWriter();
-                final BatchWriter writer2 = store.getWriter()) {
-            assertEquals(writer1, writer2);
+        try (final BatchStore delegate = TestBatchStore.create(SCHEMA)) {
+            final DomainWritable store = generateDomainStore(delegate);
+            try (final BatchWriter writer1 = store.getWriter();
+                 final BatchWriter writer2 = store.getWriter()) {
+                assertEquals(writer1, writer2);
+            }
         }
     }
 

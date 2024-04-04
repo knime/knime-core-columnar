@@ -137,44 +137,35 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
         }
     }
 
-    private RandomAccessBatchReadable m_readable;
+    private final RandomAccessBatchReadable m_readable;
 
-    private final WrappedBatchReadStore m_wrappedStore;
+    private final BatchReadStore m_delegateBatchReadStore;
 
-    private final BatchReadStore m_readStore;
-
+    @SuppressWarnings("resource")
     private DefaultColumnarBatchReadStore(final ColumnarBatchReadStoreBuilder builder) {
-        m_readStore = builder.m_readStore;
-        m_readable = builder.m_readStore;
+        m_delegateBatchReadStore = builder.m_readStore;
 
-        initColumnDataCache(builder.m_columnDataCache);
-
-        if (builder.m_dictEncodingEnabled) {
-            final var dictEncoded = new DictEncodedBatchReadable(m_readable);
-            m_readable = dictEncoded;
-        }
-
-        initHeapCache(builder.m_heapCache);
-
-        m_wrappedStore = new WrappedBatchReadStore(m_readable, builder.m_readStore.numBatches(),
-            builder.m_readStore.batchLength(), builder.m_readStore.getFileHandle());
+        RandomAccessBatchReadable readable = builder.m_readStore;
+        readable = initColumnDataCache(readable, builder.m_columnDataCache);
+        readable = initDictEncoding(readable, builder.m_dictEncodingEnabled);
+        readable = initHeapCache(readable, builder.m_heapCache);
+        m_readable = readable;
     }
 
-
-    private void initHeapCache(final SharedObjectCache heapCache) {
-        if (heapCache == null) {
-            return;
-        }
-
-        m_readable = new ObjectReadCache(m_readable, heapCache);
+    private static RandomAccessBatchReadable initHeapCache(final RandomAccessBatchReadable readable,
+        final SharedObjectCache heapCache) {
+        return (heapCache == null) ? readable : new ObjectReadCache(readable, heapCache);
     }
 
-    private void initColumnDataCache(final SharedReadDataCache cache) {
-        if (cache == null || cache.getMaxSizeInBytes() == 0) {
-            return;
-        }
+    private static RandomAccessBatchReadable initColumnDataCache(final RandomAccessBatchReadable readable,
+        final SharedReadDataCache cache) {
+        return (cache == null || cache.getMaxSizeInBytes() == 0) ? readable : new ReadDataReadCache(readable, cache);
+    }
 
-        m_readable = new ReadDataReadCache(m_readable, cache);
+    @SuppressWarnings("resource")
+    private static RandomAccessBatchReadable initDictEncoding(final RandomAccessBatchReadable readable,
+        final boolean dictEncodingEnabled) {
+        return dictEncodingEnabled ? new DictEncodedBatchReadable(readable) : readable;
     }
 
     @Override
@@ -184,27 +175,32 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
     @Override
     public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return m_wrappedStore.createRandomAccessReader(selection);
+        return m_readable.createRandomAccessReader(selection);
     }
 
     @Override
     public void close() throws IOException {
-        m_wrappedStore.close();
+        m_readable.close();
     }
 
     @Override
     public int numBatches() {
-        return m_wrappedStore.numBatches();
+        return m_delegateBatchReadStore.numBatches();
     }
 
     @Override
-    public int batchLength() {
-        return m_wrappedStore.batchLength();
+    public long[] getBatchBoundaries() {
+        return m_delegateBatchReadStore.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_delegateBatchReadStore.numRows();
     }
 
     @Override
     public FileHandle getFileHandle() {
-        return m_wrappedStore.getFileHandle();
+        return m_delegateBatchReadStore.getFileHandle();
     }
 
     /**
@@ -217,6 +213,6 @@ public final class DefaultColumnarBatchReadStore implements ColumnarBatchReadSto
 
     @Override
     public BatchReadStore getDelegateBatchReadStore() {
-        return m_readStore;
+        return m_delegateBatchReadStore;
     }
 }

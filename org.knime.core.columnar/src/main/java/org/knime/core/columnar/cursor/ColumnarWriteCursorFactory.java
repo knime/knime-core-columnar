@@ -54,6 +54,7 @@ import java.io.IOException;
 
 import org.knime.core.columnar.access.ColumnDataIndex;
 import org.knime.core.columnar.access.ColumnarWriteAccess;
+import org.knime.core.columnar.badger.BatchingWritable;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -72,6 +73,10 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 public final class ColumnarWriteCursorFactory {
 
+    // the maximum capacity (in number of held elements) of a single chunk
+    // subtract 750 since arrow rounds up to the next power of 2 anyways
+    static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
+
     private ColumnarWriteCursorFactory() {
         // static factory class
     }
@@ -84,8 +89,12 @@ public final class ColumnarWriteCursorFactory {
      * @param store the underlying storage
      * @return the {@link WriteCursor}
      */
-    public static ColumnarWriteCursor createWriteCursor(final BatchStore store) {
-        return new ColumnarWriteCursorImpl(store);
+    public static ColumnarWriteCursor createWriteCursor(final BatchWritable store) {
+        if (store instanceof BatchingWritable batchingStore) {
+            return batchingStore.getBatchingWriteCursor();
+        } else {
+            return new ColumnarWriteCursorImpl(store);
+        }
     }
 
     /**
@@ -108,8 +117,7 @@ public final class ColumnarWriteCursorFactory {
      * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
      * @author Marc Bux, KNIME GmbH, Berlin, Germany
      */
-    private static final class ColumnarWriteCursorImpl
-        implements ColumnarWriteCursor, ColumnDataIndex, WriteAccessRow {
+    private static final class ColumnarWriteCursorImpl implements ColumnarWriteCursor, ColumnDataIndex, WriteAccessRow {
 
         // the initial capacity (in number of held elements) of a single chunk
         // arrow has a minimum capacity of 2
@@ -118,10 +126,6 @@ public final class ColumnarWriteCursorFactory {
         private static final String CAPACITY_INIT_PROPERTY = "knime.columnar.capacity.initial";
 
         private static final int CAPACITY_INIT = Integer.getInteger(CAPACITY_INIT_PROPERTY, CAPACITY_INIT_DEF);
-
-        // the maximum capacity (in number of held elements) of a single chunk
-        // subtract 750 since arrow rounds up to the next power of 2 anyways
-        static final int CAPACITY_MAX_DEF = (1 << 15) - 750; // 32,018
 
         private static final String CAPACITY_MAX_PROPERTY = "knime.columnar.capacity.max";
 
@@ -148,7 +152,7 @@ public final class ColumnarWriteCursorFactory {
 
         private long m_numForwards;
 
-        ColumnarWriteCursorImpl(final BatchStore store) {
+        ColumnarWriteCursorImpl(final BatchWritable store) {
             m_writer = store.getWriter();
             m_adjusting = true;
 
@@ -170,9 +174,8 @@ public final class ColumnarWriteCursorFactory {
 
         @Override
         public long getNumForwards() {
-            return m_numForwards;
+            return m_numForwards - 1;
         }
-
 
         @Override
         public int size() {
@@ -195,7 +198,17 @@ public final class ColumnarWriteCursorFactory {
 
         @Override
         public void flush() throws IOException {
-            writeCurrentBatch(m_currentIndex + 1);
+            throw new UnsupportedOperationException("TODO: ColumnarWriteCursorImpl.flush() should probably not be called?");
+            // TODO (TP): This was implemented before as
+            //   writeCurrentBatch(m_currentIndex + 1);
+            //
+        }
+
+        @Override
+        public void finish() throws IOException {
+            writeCurrentBatch(m_currentIndex);
+            // TODO: As per contract, this should block until the data is written to disk.
+            // But right now we don't do this.
         }
 
         private void writeCurrentBatch(final int numValues) {

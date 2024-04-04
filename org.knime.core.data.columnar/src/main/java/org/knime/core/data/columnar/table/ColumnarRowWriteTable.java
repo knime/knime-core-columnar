@@ -79,7 +79,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  *
  * @author Marcel Wiedenmann, KNIME GmbH, Konstanz, Germany
  */
-public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAccessible {
+public final class ColumnarRowWriteTable implements RowWriteAccessible {
 
     static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteTable.class);
 
@@ -124,10 +124,15 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
             builder //
                 .useColumnDataCache( //
                     ColumnarPreferenceUtils.getColumnDataCache(), ColumnarPreferenceUtils.getPersistExecutor())
-                .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache()) //
-                .useHeapCache( //
+                .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache());
+
+            if (ColumnarRowWriteTableSettings.useHeapBadger()) {
+                builder.useHeapBadger(ColumnarPreferenceUtils.getHeapCache());
+            } else {
+                builder.useHeapCache( //
                     ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
                     ColumnarPreferenceUtils.getSerializeExecutor());//
+            }
 
             // NOTE:
             // We do not use the ReadBatchCache for now because it can cause a deadlock on a memory alert.
@@ -187,8 +192,16 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
     public ColumnarRowReadTable finish() {
         if (m_nullableFinishedTable == null) {
             m_finalizer.close();
-            m_writeCursor.flush();
-            m_writeCursor.close();
+            m_writeCursor.finish();
+            m_writeCursor.close(); // TODO (TP) ColumnarRowWriteCursor.finish() should simultaneously close() !?
+            try {
+                // Make sure this actually writes the data underneath. This is needed for the test
+                // testDeduplicateRowIDsWithSuffix and would cause a "writing after closing writer" error.
+                m_store.flush();
+            } catch (IOException ex) {
+                LOGGER.error("Exception while flushing store.", ex);
+                throw new IllegalStateException("Table could not be written to disk.", ex);
+            }
             final ColumnarValueSchema schema;
             if (m_nullableDomainWritable != null) {
                 final Map<Integer, DataColumnDomain> domains = new HashMap<>();
@@ -202,6 +215,9 @@ public final class ColumnarRowWriteTable implements AutoCloseable, RowWriteAcces
             } else {
                 schema = m_schema;
             }
+
+            // Convert to RowReadTable directly, no additional caches needed because we have all of the caches in
+            // the hierarchy of wrapped stores already.
             m_nullableFinishedTable = new ColumnarRowReadTable(schema, m_storeFactory, m_store, m_writeCursor.size());
         }
         return m_nullableFinishedTable;

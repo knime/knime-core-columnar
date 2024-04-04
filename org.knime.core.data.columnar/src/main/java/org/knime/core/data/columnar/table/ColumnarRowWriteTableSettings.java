@@ -62,6 +62,9 @@ public final class ColumnarRowWriteTableSettings {
     /** a system property to disable all caches in a write table for testing */
     private static final boolean DISABLE_CACHES = Boolean.getBoolean("knime.columnar.disablecaches.writetable");
 
+    /** a system property to enforce using the heap badger as it is not the default yet */
+    private static final boolean USE_HEAP_BADGER = Boolean.getBoolean("knime.columnar.heapbadger.enable");
+
     private final boolean m_initializeDomains;
 
     private final boolean m_calculateDomains;
@@ -80,8 +83,9 @@ public final class ColumnarRowWriteTableSettings {
     private final int m_rowBatchSize;
 
     /**
-     * The maximum number of batches to queue for processing before adding further rows is blocked.
-     * Together with {@link #m_rowBatchSize}, this determines the maximum number of rows that are held by a container before they are processed.
+     * The maximum number of batches to queue for processing before adding further rows is blocked. Together with
+     * {@link #m_rowBatchSize}, this determines the maximum number of rows that are held by a container before they are
+     * processed.
      */
     private final int m_maxPendingBatches;
 
@@ -94,10 +98,13 @@ public final class ColumnarRowWriteTableSettings {
      *            have been persisted.
      * @param rowBatchSize number of rows to be processed by a single thread when not forced to handle rows
      *            sequentially.
+     * @param maxPendingBatches maximum number of batches to queue for processing before adding further rows is blocked.
      */
     public ColumnarRowWriteTableSettings(final boolean initializeDomains, final int maxPossibleNominalDomainValues,
-        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO, final int rowBatchSize, final int maxPendingBatches) {
-        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO, rowBatchSize, maxPendingBatches);
+        final boolean checkDuplicateRowKeys, final boolean forceSynchronousIO, final int rowBatchSize,
+        final int maxPendingBatches) {
+        this(initializeDomains, true, maxPossibleNominalDomainValues, checkDuplicateRowKeys, true, forceSynchronousIO,
+            rowBatchSize, maxPendingBatches);
     }
 
     /**
@@ -159,6 +166,10 @@ public final class ColumnarRowWriteTableSettings {
 
     boolean isForceSynchronousIO() {
         return m_forceSynchronousIO;
+    }
+
+    static boolean useHeapBadger() {
+        return USE_HEAP_BADGER;
     }
 
     /**
