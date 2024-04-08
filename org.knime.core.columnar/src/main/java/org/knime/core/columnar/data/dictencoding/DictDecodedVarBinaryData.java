@@ -98,6 +98,11 @@ public final class DictDecodedVarBinaryData {
         }
 
         @Override
+        public void copyFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
+            setBytes(toIndex, readData.getBytes(fromIndex));
+        }
+
+        @Override
         public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
             m_delegate.setObject(index, value, serializer);
         }
@@ -105,7 +110,8 @@ public final class DictDecodedVarBinaryData {
         @SuppressWarnings("unchecked")
         @Override
         public VarBinaryReadData close(final int length) {
-            return new DictDecodedVarBinaryReadData<K>((DictEncodedVarBinaryReadData<K>)m_delegate.close(length), m_cache);
+            final var delegate = (DictEncodedVarBinaryReadData<K>)m_delegate.close(length);
+            return new DictDecodedVarBinaryReadData<K>(delegate, m_cache);
         }
     }
 

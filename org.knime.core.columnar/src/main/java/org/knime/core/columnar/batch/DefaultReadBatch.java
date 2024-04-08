@@ -104,7 +104,7 @@ public final class DefaultReadBatch extends AbstractBatch<NullableReadData> impl
     }
 
     @Override
-    public final long sizeOf() {
+    public long sizeOf() {
         return m_size.updateAndGet(s -> s == -1 ? super.sizeOf() : s);
     }
 

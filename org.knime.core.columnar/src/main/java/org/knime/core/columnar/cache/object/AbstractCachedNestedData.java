@@ -68,105 +68,104 @@ final class AbstractCachedNestedData {
     }
 
     /**
-    *
-    * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-    */
-   abstract static class AbstractNestedCachedWriteData<W extends NullableWriteData, R extends NullableReadData>
-       extends AbstractCachedWriteData<W, R> {
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    abstract static class AbstractNestedCachedWriteData<W extends NullableWriteData, R extends NullableReadData>
+        extends AbstractCachedWriteData<W, R> {
 
-       protected CachedWriteData[] m_children;
+        protected CachedWriteData[] m_children;
 
-       protected AbstractNestedCachedWriteData(final W delegate, final CachedWriteData[] elements) {
-           super(delegate);
-           m_children = elements;
-       }
+        protected AbstractNestedCachedWriteData(final W delegate, final CachedWriteData[] elements) {
+            super(delegate);
+            m_children = elements;
+        }
 
-       @Override
-       public void expandCache() {
-           delegateToChildren(CachedWriteData::expandCache);
-       }
+        @Override
+        public void expandCache() {
+            delegateToChildren(CachedWriteData::expandCache);
+        }
 
-       @Override
-       public void cancel() {
-           delegateToChildren(CachedWriteData::cancel);
-       }
+        @Override
+        public void cancel() {
+            delegateToChildren(CachedWriteData::cancel);
+        }
 
-       @Override
-       public void lockWriting() {
-           delegateToChildren(CachedWriteData::lockWriting);
-       }
+        @Override
+        public void lockWriting() {
+            delegateToChildren(CachedWriteData::lockWriting);
+        }
 
-       @Override
-       public void unlockWriting() {
-           delegateToChildren(CachedWriteData::unlockWriting);
-       }
+        @Override
+        public void unlockWriting() {
+            delegateToChildren(CachedWriteData::unlockWriting);
+        }
 
-       @Override
-       public void waitForAndGetFuture() {
-           delegateToChildren(CachedWriteData::waitForAndGetFuture);
-       }
+        @Override
+        public void waitForAndGetFuture() {
+            delegateToChildren(CachedWriteData::waitForAndGetFuture);
+        }
 
-       @Override
-       public void flush() {
-           delegateToChildren(CachedWriteData::flush);
-       }
+        @Override
+        public void flush() {
+            delegateToChildren(CachedWriteData::flush);
+        }
 
-       private void delegateToChildren(final Consumer<CachedWriteData> method) {
-           for (var child : m_children) {
-               if (child != null) {
-                   method.accept(child);
-               }
-           }
-       }
+        private void delegateToChildren(final Consumer<CachedWriteData> method) {
+            for (var child : m_children) {
+                if (child != null) {
+                    method.accept(child);
+                }
+            }
+        }
 
-       @Override
-       public void expand(final int minimumCapacity) {
-           waitForAndGetFuture();
-           lockWriting();
-           try {
-               m_delegate.expand(minimumCapacity);
-               expandCache();
-           } finally {
-               unlockWriting();
-           }
-       }
+        @Override
+        public void expand(final int minimumCapacity) {
+            waitForAndGetFuture();
+            lockWriting();
+            try {
+                m_delegate.expand(minimumCapacity);
+                expandCache();
+            } finally {
+                unlockWriting();
+            }
+        }
 
-   }
+    }
 
-   /**
-    * Abstract implementation for nested CachedLoadingReadData.
-    * Handles the delegation of the CachedLoadingReadData specific methods to the nested children.
-    *
-    * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-    */
-   abstract static class AbstractCachedLoadingNestedReadData<R extends NullableReadData>
-       extends AbstractCachedLoadingReadData<R> {
+    /**
+     * Abstract implementation for nested CachedLoadingReadData. Handles the delegation of the CachedLoadingReadData
+     * specific methods to the nested children.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    abstract static class AbstractCachedLoadingNestedReadData<R extends NullableReadData>
+        extends AbstractCachedLoadingReadData<R> {
 
-       protected final CachedLoadingReadData[] m_children;
+        protected final CachedLoadingReadData[] m_children;
 
-       AbstractCachedLoadingNestedReadData(final R delegate, final CachedLoadingReadData[] children) {
-           super(delegate);
-           m_children = children;
-       }
+        AbstractCachedLoadingNestedReadData(final R delegate, final CachedLoadingReadData[] children) {
+            super(delegate);
+            m_children = children;
+        }
 
-       @Override
-       public void retainCache() {
-           delegateMethod(CachedLoadingReadData::retainCache);
-       }
+        @Override
+        public void retainCache() {
+            delegateMethod(CachedLoadingReadData::retainCache);
+        }
 
-       @Override
-       public void releaseCache() {
-           delegateMethod(CachedLoadingReadData::releaseCache);
-       }
+        @Override
+        public void releaseCache() {
+            delegateMethod(CachedLoadingReadData::releaseCache);
+        }
 
-       private void delegateMethod(final Consumer<CachedLoadingReadData> method) {
-           for (var child : m_children) {
-               if (child != null) {
-                   method.accept(child);
-               }
-           }
-       }
-
-   }
+        private void delegateMethod(final Consumer<CachedLoadingReadData> method) {
+            for (var child : m_children) {
+                if (child != null) {
+                    method.accept(child);
+                }
+            }
+        }
+    }
 
 }

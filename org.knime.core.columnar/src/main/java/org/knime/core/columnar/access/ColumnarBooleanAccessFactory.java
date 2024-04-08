@@ -103,7 +103,12 @@ final class ColumnarBooleanAccessFactory implements ColumnarAccessFactory {
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            m_data.setBoolean(m_index.getIndex(), ((BooleanReadAccess)access).getBooleanValue());
+            if (access.getClass() == ColumnarBooleanReadAccess.class) {
+                final var columnar = (ColumnarBooleanReadAccess)access;
+                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+            } else {
+                m_data.setBoolean(m_index.getIndex(), ((BooleanReadAccess)access).getBooleanValue());
+            }
         }
 
     }

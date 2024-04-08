@@ -109,4 +109,9 @@ public final class TestFloatData extends AbstractTestData implements FloatWriteD
     public void writeToAccess(final WriteAccess access, final int index) {
         ((FloatWriteAccess)access).setFloatValue(getFloat(index));
     }
+
+    @Override
+    public void copyFrom(final FloatReadData readData, final int fromIndex, final int toIndex) {
+        setFloat(toIndex, readData.getFloat(fromIndex));
+    }
 }

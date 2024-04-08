@@ -102,6 +102,15 @@ public final class ArrowStringData {
         }
 
         @Override
+        public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowStringReadData arrow) {
+                m_vector.copyFromSafe(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+            } else {
+                setString(toIndex, readData.getString(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowStringWriteData(m_vector, m_offset + start);
         }

@@ -89,6 +89,15 @@ public final class ArrowBooleanData {
         }
 
         @Override
+        public void copyFrom(final BooleanReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowBooleanReadData arrow) {
+                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+            } else {
+                setBoolean(toIndex, readData.getBoolean(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowBooleanWriteData(m_vector, m_offset + start);
         }

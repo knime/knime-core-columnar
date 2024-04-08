@@ -109,4 +109,9 @@ public final class TestLongData extends AbstractTestData implements LongWriteDat
     public void writeToAccess(final WriteAccess access, final int index) {
         ((LongWriteAccess)access).setLongValue(getLong(index));
     }
+
+    @Override
+    public void copyFrom(final LongReadData readData, final int fromIndex, final int toIndex) {
+        setLong(toIndex, readData.getLong(fromIndex));
+    }
 }

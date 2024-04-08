@@ -90,22 +90,26 @@ public final class TestDictEncodedStringData<K> extends AbstractTestDictEncodedD
 
         private TestDictEncodedStringDataFactory(final KeyType keyType) {
             m_keyType = keyType;
-            m_delegate = new TestStructDataFactory(AbstractTestData.createKeyDataFactory(keyType), TestStringDataFactory.INSTANCE);
+            m_delegate = new TestStructDataFactory(AbstractTestData.createKeyDataFactory(keyType),
+                TestStringDataFactory.INSTANCE);
         }
 
         @Override
         public TestData createWriteData(final int capacity) {
-            return new TestDictEncodedStringData<>(m_delegate.createWriteData(capacity), AbstractTestData.createKeyInstance(m_keyType));
+            return new TestDictEncodedStringData<>(m_delegate.createWriteData(capacity),
+                AbstractTestData.createKeyInstance(m_keyType));
         }
 
         @Override
         public TestData createReadData(final Object[] data) {
-            return new TestDictEncodedStringData<>(m_delegate.createReadData(data), AbstractTestData.createKeyInstance(m_keyType));
+            return new TestDictEncodedStringData<>(m_delegate.createReadData(data),
+                AbstractTestData.createKeyInstance(m_keyType));
         }
 
         @Override
         public TestData createReadData(final Object[] data, final int length) {
-            return new TestDictEncodedStringData<>(m_delegate.createReadData(data, length), AbstractTestData.createKeyInstance(m_keyType));
+            return new TestDictEncodedStringData<>(m_delegate.createReadData(data, length),
+                AbstractTestData.createKeyInstance(m_keyType));
         }
 
     }
@@ -128,6 +132,11 @@ public final class TestDictEncodedStringData<K> extends AbstractTestDictEncodedD
         });
 
         setDictKey(index, dictKey);
+    }
+
+    @Override
+    public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+        setString(toIndex, readData.getString(fromIndex));
     }
 
     @Override

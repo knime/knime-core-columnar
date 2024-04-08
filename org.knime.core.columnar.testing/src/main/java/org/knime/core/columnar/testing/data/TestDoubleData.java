@@ -110,4 +110,9 @@ public final class TestDoubleData extends AbstractTestData implements DoubleWrit
     public void writeToAccess(final WriteAccess access, final int index) {
         ((DoubleWriteAccess)access).setDoubleValue(getDouble(index));
     }
+
+    @Override
+    public void copyFrom(final DoubleReadData readData, final int fromIndex, final int toIndex) {
+        setDouble(toIndex, readData.getDouble(fromIndex));
+    }
 }

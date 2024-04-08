@@ -110,4 +110,8 @@ public final class TestBooleanData extends AbstractTestData implements BooleanWr
         ((BooleanWriteAccess)access).setBooleanValue(getBoolean(index));
     }
 
+    @Override
+    public void copyFrom(final BooleanReadData readData, final int fromIndex, final int toIndex) {
+        setBoolean(toIndex, readData.getBoolean(fromIndex));
+    }
 }

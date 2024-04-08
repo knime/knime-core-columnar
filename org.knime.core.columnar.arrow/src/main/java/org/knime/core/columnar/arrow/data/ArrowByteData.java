@@ -89,6 +89,15 @@ public final class ArrowByteData {
         }
 
         @Override
+        public void copyFrom(final ByteReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowByteReadData arrow) {
+                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+            } else {
+                setByte(toIndex, readData.getByte(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowByteWriteData(m_vector, m_offset + start);
         }
