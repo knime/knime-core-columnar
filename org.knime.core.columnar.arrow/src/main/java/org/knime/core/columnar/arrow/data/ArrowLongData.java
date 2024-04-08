@@ -90,6 +90,15 @@ public final class ArrowLongData {
         }
 
         @Override
+        public void copyFrom(final LongReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowLongReadData arrow) {
+                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+            } else {
+                setLong(toIndex, readData.getLong(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowLongWriteData(m_vector, m_offset + start);
         }
@@ -241,13 +250,12 @@ public final class ArrowLongData {
 
             final var missingValues = MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount());
             if (V0.equals(version)) {
-                if (vector instanceof DurationVector) {
-                    return new ArrowDurationLongReadData((DurationVector)vector, missingValues);
-                } else if (vector instanceof TimeNanoVector) {
-                    return new ArrowTimeNanoLongReadData((TimeNanoVector)vector, missingValues);
+                if (vector instanceof DurationVector durationVector) {
+                    return new ArrowDurationLongReadData(durationVector, missingValues);
+                } else if (vector instanceof TimeNanoVector timeNanoVector) {
+                    return new ArrowTimeNanoLongReadData(timeNanoVector, missingValues);
                 } else {
-                    return new ArrowLongReadData((BigIntVector)vector,
-                        missingValues);
+                    return new ArrowLongReadData((BigIntVector)vector, missingValues);
                 }
             } else if (m_version.equals(version)) {
                 return new ArrowLongReadData((BigIntVector)vector, missingValues);

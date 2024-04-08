@@ -76,7 +76,8 @@ public final class DictDecodedStringData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static class DictDecodedStringWriteData<K> extends AbstractDictDecodedWriteData<K, DictEncodedStringWriteData<K>>
+    public static class DictDecodedStringWriteData<K>
+        extends AbstractDictDecodedWriteData<K, DictEncodedStringWriteData<K>>
         implements StringWriteData {
 
         /**
@@ -103,6 +104,11 @@ public final class DictDecodedStringData {
         @Override
         public void setString(final int index, final String val) {
             m_delegate.setString(index, val);
+        }
+
+        @Override
+        public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+            setString(toIndex, readData.getString(fromIndex));
         }
 
         @SuppressWarnings("unchecked")

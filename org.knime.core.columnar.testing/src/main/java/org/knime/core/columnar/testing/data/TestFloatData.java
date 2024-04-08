@@ -103,4 +103,8 @@ public final class TestFloatData extends AbstractTestData implements FloatWriteD
         get()[index] = val;
     }
 
+    @Override
+    public void copyFrom(final FloatReadData readData, final int fromIndex, final int toIndex) {
+        setFloat(toIndex, readData.getFloat(fromIndex));
+    }
 }

@@ -104,7 +104,12 @@ final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            m_data.setDouble(m_index.getIndex(), ((DoubleReadAccess)access).getDoubleValue());
+            if (access.getClass() == ColumnarDoubleReadAccess.class) {
+                final var columnar = (ColumnarDoubleReadAccess)access;
+                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+            } else {
+                m_data.setDouble(m_index.getIndex(), ((DoubleReadAccess)access).getDoubleValue());
+            }
         }
     }
 }

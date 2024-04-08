@@ -67,7 +67,7 @@ public final class DoubleData {
     /**
      * {@link NullableWriteData} holding double elements.
      */
-    public static interface DoubleWriteData extends NullableWriteData {
+    public interface DoubleWriteData extends NullableWriteData {
 
         /**
          * Assigns a double value to the element at the given index (row). The contract is that values are only ever set
@@ -79,6 +79,16 @@ public final class DoubleData {
          */
         void setDouble(int index, double val);
 
+        /**
+         * Copies an entry from the given {@link DoubleReadData} as if by calling
+         * {@code setDouble(toIndex, readData.getDouble(fromIndex))}, but may be implemented more efficiently.
+         *
+         * @param readData read data to extract a (non-missing) value from
+         * @param fromIndex index in {@code readData}
+         * @param toIndex index to write the extracted value to
+         */
+        void copyFrom(DoubleReadData readData, int fromIndex, int toIndex);
+
         @Override
         DoubleReadData close(int length);
 
@@ -87,7 +97,7 @@ public final class DoubleData {
     /**
      * {@link NullableReadData} holding double elements.
      */
-    public static interface DoubleReadData extends NullableReadData {
+    public interface DoubleReadData extends NullableReadData {
 
         /**
          * Obtains the double value at the given index (row). It is the responsibility of the client calling this method

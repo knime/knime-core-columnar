@@ -103,4 +103,8 @@ public final class TestStringData extends AbstractTestData implements StringWrit
         get()[index] = val;
     }
 
+    @Override
+    public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+        setString(toIndex, readData.getString(fromIndex));
+    }
 }

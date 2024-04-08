@@ -103,4 +103,8 @@ public final class TestLongData extends AbstractTestData implements LongWriteDat
         get()[index] = val;
     }
 
+    @Override
+    public void copyFrom(final LongReadData readData, final int fromIndex, final int toIndex) {
+        setLong(toIndex, readData.getLong(fromIndex));
+    }
 }

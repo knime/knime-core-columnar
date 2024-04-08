@@ -104,7 +104,12 @@ final class ColumnarLongAccessFactory implements ColumnarAccessFactory {
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            m_data.setLong(m_index.getIndex(), ((LongReadAccess)access).getLongValue());
+            if (access.getClass() == ColumnarLongReadAccess.class) {
+                final var columnar = (ColumnarLongReadAccess)access;
+                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+            } else {
+                m_data.setLong(m_index.getIndex(), ((LongReadAccess)access).getLongValue());
+            }
         }
 
     }

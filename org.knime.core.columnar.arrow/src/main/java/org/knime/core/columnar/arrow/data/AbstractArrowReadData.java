@@ -156,14 +156,11 @@ abstract class AbstractArrowReadData<F extends FieldVector> extends AbstractRefe
 
     @Override
     public final boolean isMissing(final int index) {
-        switch (m_missingValues) {
-            case NO_MISSING:
-                return false;
-            case ALL_MISSING:
-                return true;
-            default:
-                return m_vector.isNull(m_offset + index);
-        }
+        return switch (m_missingValues) {
+            case NO_MISSING  -> false;
+            case ALL_MISSING -> true;
+            default          -> m_vector.isNull(m_offset + index);
+        };
     }
 
     @Override

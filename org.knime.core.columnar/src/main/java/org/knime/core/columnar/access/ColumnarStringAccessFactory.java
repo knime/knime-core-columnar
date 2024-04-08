@@ -61,12 +61,12 @@ final class ColumnarStringAccessFactory
     }
 
     @Override
-    public final ColumnarStringReadAccess createReadAccess(final ColumnDataIndex index) {
+    public ColumnarStringReadAccess createReadAccess(final ColumnDataIndex index) {
         return new ColumnarStringReadAccess(index);
     }
 
     @Override
-    public final ColumnarStringWriteAccess createWriteAccess(final ColumnDataIndex index) {
+    public ColumnarStringWriteAccess createWriteAccess(final ColumnDataIndex index) {
         return new ColumnarStringWriteAccess(index);
     }
 
@@ -83,7 +83,8 @@ final class ColumnarStringAccessFactory
 
     }
 
-    static final class ColumnarStringWriteAccess extends AbstractWriteAccess<StringWriteData> implements StringWriteAccess {
+    static final class ColumnarStringWriteAccess extends AbstractWriteAccess<StringWriteData>
+    implements StringWriteAccess {
 
         ColumnarStringWriteAccess(final ColumnDataIndex index) {
             super(index);
@@ -96,7 +97,12 @@ final class ColumnarStringAccessFactory
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            m_data.setString(m_index.getIndex(), ((StringReadAccess)access).getStringValue());
+            if (access.getClass() == ColumnarStringReadAccess.class) {
+                final var columnar = (ColumnarStringReadAccess)access;
+                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+            } else {
+                m_data.setString(m_index.getIndex(), ((StringReadAccess)access).getStringValue());
+            }
         }
 
     }

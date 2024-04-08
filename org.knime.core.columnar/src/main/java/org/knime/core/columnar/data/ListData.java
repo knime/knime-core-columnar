@@ -67,7 +67,7 @@ public final class ListData {
     /**
      * A {@link NullableWriteData} holding list elements.
      */
-    public static interface ListWriteData extends NullableWriteData {
+    public interface ListWriteData extends NullableWriteData {
 
         /**
          * Creates a {@link NullableWriteData} of type C that represents a list with a certain fixed size at the given
@@ -91,7 +91,7 @@ public final class ListData {
     /**
      * A {@link NullableReadData} holding list elements.
      */
-    public static interface ListReadData extends NullableReadData {
+    public interface ListReadData extends NullableReadData {
 
         /**
          * Obtains a {@link NullableReadData} of type C that represents the list at the given index (row), which can

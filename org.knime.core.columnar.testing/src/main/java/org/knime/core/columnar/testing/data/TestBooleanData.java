@@ -103,4 +103,8 @@ public final class TestBooleanData extends AbstractTestData implements BooleanWr
         get()[index] = val;
     }
 
+    @Override
+    public void copyFrom(final BooleanReadData readData, final int fromIndex, final int toIndex) {
+        setBoolean(toIndex, readData.getBoolean(fromIndex));
+    }
 }

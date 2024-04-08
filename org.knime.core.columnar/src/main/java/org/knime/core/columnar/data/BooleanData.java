@@ -64,7 +64,7 @@ public final class BooleanData {
     /**
      * {@link NullableWriteData} holding boolean elements.
      */
-    public static interface BooleanWriteData extends NullableWriteData {
+    public interface BooleanWriteData extends NullableWriteData {
 
         /**
          * Assigns a boolean value to the element at the given index (row). The contract is that values are only ever
@@ -76,6 +76,16 @@ public final class BooleanData {
          */
         void setBoolean(int index, boolean val);
 
+        /**
+         * Copies an entry from the given {@link BooleanReadData} as if by calling
+         * {@code setBoolean(toIndex, readData.getBoolean(fromIndex))}, but may be implemented more efficiently.
+         *
+         * @param readData read data to extract a (non-missing) value from
+         * @param fromIndex index in {@code readData}
+         * @param toIndex index to write the extracted value to
+         */
+        void copyFrom(BooleanReadData readData, int fromIndex, int toIndex);
+
         @Override
         BooleanReadData close(int length);
 
@@ -84,7 +94,7 @@ public final class BooleanData {
     /**
      * {@link NullableReadData} holding boolean elements.
      */
-    public static interface BooleanReadData extends NullableReadData {
+    public interface BooleanReadData extends NullableReadData {
 
         /**
          * Obtains the boolean value at the given index (row). It is the responsibility of the client calling this

@@ -67,7 +67,7 @@ public final class FloatData {
     /**
      * {@link NullableWriteData} holding float elements.
      */
-    public static interface FloatWriteData extends NullableWriteData {
+    public interface FloatWriteData extends NullableWriteData {
 
         /**
          * Assigns a float value to the element at the given index (row). The contract is that values are only ever set
@@ -79,6 +79,16 @@ public final class FloatData {
          */
         void setFloat(int index, float val);
 
+        /**
+         * Copies an entry from the given {@link FloatReadData} as if by calling
+         * {@code setFloat(toIndex, readData.getFloat(fromIndex))}, but may be implemented more efficiently.
+         *
+         * @param readData read data to extract a (non-missing) value from
+         * @param fromIndex index in {@code readData}
+         * @param toIndex index to write the extracted value to
+         */
+        void copyFrom(FloatReadData readData, int fromIndex, int toIndex);
+
         @Override
         FloatReadData close(int length);
 
@@ -87,7 +97,7 @@ public final class FloatData {
     /**
      * {@link NullableReadData} holding float elements.
      */
-    public static interface FloatReadData extends NullableReadData {
+    public interface FloatReadData extends NullableReadData {
 
         /**
          * Obtains the float value at the given index (row). It is the responsibility of the client calling this method

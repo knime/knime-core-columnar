@@ -99,7 +99,7 @@ public final class DictEncodedData {
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
      */
-    public static interface DictEncodedWriteData<K> extends NullableWriteData {
+    public interface DictEncodedWriteData<K> extends NullableWriteData {
 
         /**
          * Set the key of the dictionary element that is referenced at the given data index
@@ -133,7 +133,7 @@ public final class DictEncodedData {
      *
      * @param <K> key type, should be Byte, Long or Integer
      */
-    public static interface DictEncodedStringReadData<K> extends DictEncodedReadData<K>, StringReadData {
+    public interface DictEncodedStringReadData<K> extends DictEncodedReadData<K>, StringReadData {
 
     }
 
@@ -142,7 +142,7 @@ public final class DictEncodedData {
      *
      * @param <K> key type, should be Byte, Long or Integer
      */
-    public static interface DictEncodedStringWriteData<K> extends DictEncodedWriteData<K>, StringWriteData {
+    public interface DictEncodedStringWriteData<K> extends DictEncodedWriteData<K>, StringWriteData {
 
     }
 
@@ -152,7 +152,7 @@ public final class DictEncodedData {
      *
      * @param <K> key type, should be Byte, Long or Integer
      */
-    public static interface DictEncodedVarBinaryReadData<K> extends DictEncodedReadData<K>, VarBinaryReadData {
+    public interface DictEncodedVarBinaryReadData<K> extends DictEncodedReadData<K>, VarBinaryReadData {
     }
 
     /**
@@ -160,6 +160,6 @@ public final class DictEncodedData {
      *
      * @param <K> key type, should be Byte, Long or Integer
      */
-    public static interface DictEncodedVarBinaryWriteData<K> extends DictEncodedWriteData<K>, VarBinaryWriteData {
+    public interface DictEncodedVarBinaryWriteData<K> extends DictEncodedWriteData<K>, VarBinaryWriteData {
     }
 }

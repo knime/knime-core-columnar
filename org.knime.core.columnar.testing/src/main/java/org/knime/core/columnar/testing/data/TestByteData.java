@@ -103,4 +103,8 @@ public final class TestByteData extends AbstractTestData implements ByteWriteDat
         get()[index] = val;
     }
 
+    @Override
+    public void copyFrom(final ByteReadData readData, final int fromIndex, final int toIndex) {
+        setByte(toIndex, readData.getByte(fromIndex));
+    }
 }

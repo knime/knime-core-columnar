@@ -169,6 +169,11 @@ public final class TestDictEncodedVarBinaryData<K> extends AbstractTestDictEncod
     }
 
     @Override
+    public void copyFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
+        setBytes(toIndex, readData.getBytes(fromIndex));
+    }
+
+    @Override
     public byte[] getBytes(final int index) {
         K dictKey = getDictKey(index);
 

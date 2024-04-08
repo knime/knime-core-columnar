@@ -65,7 +65,7 @@ public final class VoidData {
     /**
      * {@link NullableWriteData} holding no elements.
      */
-    public static interface VoidWriteData extends NullableWriteData {
+    public interface VoidWriteData extends NullableWriteData {
 
         @Override
         VoidReadData close(int length);
@@ -79,7 +79,7 @@ public final class VoidData {
     /**
      * {@link NullableReadData} holding no elements.
      */
-    public static interface VoidReadData extends NullableReadData {
+    public interface VoidReadData extends NullableReadData {
 
         @Override
         default boolean isMissing(final int index) {

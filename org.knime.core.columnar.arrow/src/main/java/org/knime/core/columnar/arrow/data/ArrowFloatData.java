@@ -89,6 +89,15 @@ public final class ArrowFloatData {
         }
 
         @Override
+        public void copyFrom(final FloatReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowFloatReadData arrow) {
+                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+            } else {
+                setFloat(toIndex, readData.getFloat(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowFloatWriteData(m_vector, m_offset + start);
         }

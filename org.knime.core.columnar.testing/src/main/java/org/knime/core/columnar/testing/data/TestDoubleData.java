@@ -104,4 +104,8 @@ public final class TestDoubleData extends AbstractTestData implements DoubleWrit
         get()[index] = val;
     }
 
+    @Override
+    public void copyFrom(final DoubleReadData readData, final int fromIndex, final int toIndex) {
+        setDouble(toIndex, readData.getDouble(fromIndex));
+    }
 }

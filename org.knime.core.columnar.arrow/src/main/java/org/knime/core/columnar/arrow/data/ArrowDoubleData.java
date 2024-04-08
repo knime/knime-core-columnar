@@ -89,6 +89,15 @@ public final class ArrowDoubleData {
         }
 
         @Override
+        public void copyFrom(final DoubleReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowDoubleReadData arrow) {
+                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+            } else {
+                setDouble(toIndex, readData.getDouble(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowDoubleWriteData(m_vector, m_offset + start);
         }

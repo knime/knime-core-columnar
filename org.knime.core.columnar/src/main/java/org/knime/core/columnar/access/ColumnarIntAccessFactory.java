@@ -68,12 +68,12 @@ final class ColumnarIntAccessFactory
     }
 
     @Override
-    public final ColumnarIntReadAccess createReadAccess(final ColumnDataIndex index) {
+    public ColumnarIntReadAccess createReadAccess(final ColumnDataIndex index) {
         return new ColumnarIntReadAccess(index);
     }
 
     @Override
-    public final ColumnarIntWriteAccess createWriteAccess(final ColumnDataIndex index) {
+    public ColumnarIntWriteAccess createWriteAccess(final ColumnDataIndex index) {
         return new ColumnarIntWriteAccess(index);
     }
 
@@ -103,7 +103,12 @@ final class ColumnarIntAccessFactory
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            m_data.setInt(m_index.getIndex(), ((IntReadAccess)access).getIntValue());
+            if (access.getClass() == ColumnarIntReadAccess.class) {
+                final var columnar = (ColumnarIntReadAccess)access;
+                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+            } else {
+                m_data.setInt(m_index.getIndex(), ((IntReadAccess)access).getIntValue());
+            }
         }
 
     }
