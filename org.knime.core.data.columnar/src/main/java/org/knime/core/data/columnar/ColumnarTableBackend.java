@@ -49,7 +49,9 @@ package org.knime.core.data.columnar;
 import static java.util.function.Predicate.not;
 import static org.knime.core.data.columnar.table.virtual.reference.ReferenceTables.createReferenceTables;
 
+import java.io.IOException;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.function.IntSupplier;
 import java.util.stream.IntStream;
@@ -61,6 +63,7 @@ import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
+import org.knime.core.data.columnar.table.ColumnarExternalSorter;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
@@ -79,7 +82,10 @@ import org.knime.core.data.container.ILocalDataRepository;
 import org.knime.core.data.container.WrappedTable;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
+import org.knime.core.data.sort.RowReadComparator;
+import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.data.v2.RowContainer;
+import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
@@ -122,7 +128,8 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final ColumnarRowWriteTableSettings cursorSettings =
                 new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
+                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(),
+                    maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", e);
@@ -137,7 +144,8 @@ public final class ColumnarTableBackend implements TableBackend {
                 ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
             final ColumnarRowWriteTableSettings containerSettings =
                 new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
+                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(),
+                    maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(context, repository.generateNewID(),
                 ColumnarValueSchemaUtils.create(schema), containerSettings);
         } catch (Exception e) {
@@ -185,8 +193,8 @@ public final class ColumnarTableBackend implements TableBackend {
                     progressMonitor);
         } catch (VirtualTableIncompatibleException ex) {//NOSONAR don't spam the log
             logFallback();
-            return OLD_BACKEND.concatenate(exec, progressMonitor, tableIdSupplier, rowKeyDuplicateSuffix, duplicatesPreCheck,
-                tables);
+            return OLD_BACKEND.concatenate(exec, progressMonitor, tableIdSupplier, rowKeyDuplicateSuffix,
+                duplicatesPreCheck, tables);
         }
     }
 
@@ -216,10 +224,10 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             switch (config.getRowIDMode()) {
                 case FROM_TABLE:
-                        var table = appendWithRowIDFromTable(tableIdSupplier, config.getRowIDTableIndex(),
-                            new BufferedDataTable[]{preprocessedLeft, preprocessedRight});
-                        exec.setProgress(1);
-                        return table;
+                    var table = appendWithRowIDFromTable(tableIdSupplier, config.getRowIDTableIndex(),
+                        new BufferedDataTable[]{preprocessedLeft, preprocessedRight});
+                    exec.setProgress(1);
+                    return table;
                 case MATCHING:
                     return append(exec, exec, tableIdSupplier, preprocessedLeft, preprocessedRight);
                 default:
@@ -282,7 +290,7 @@ public final class ColumnarTableBackend implements TableBackend {
             var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
             var cols = slice.columns();
             var rearranger = new ColumnRearranger(spec);
-            if (!cols.allSelected()){
+            if (!cols.allSelected()) {
                 var colIndices = cols.getSelected();
                 virtualTable = virtualTable.filterColumns(//
                     IntStream.concat(//
@@ -347,6 +355,7 @@ public final class ColumnarTableBackend implements TableBackend {
             return rewriteTable(table, exec);
         }
     }
+
     private static boolean isColumnarCompatible(final BufferedDataTable table) {
         return getSchemaIfColumnar(table).filter(not(ColumnarValueSchemaUtils::storesDataCellSerializersSeparately))
             .isPresent();
@@ -361,13 +370,13 @@ public final class ColumnarTableBackend implements TableBackend {
         }
         return Optional.empty();
     }
+
     private static KnowsRowCountTable unwrap(final BufferedDataTable table) {
         var delegate = Node.invokeGetDelegate(table);
-        if (delegate instanceof WrappedTable) {
-            return unwrap(delegate.getReferenceTables()[0]);
-        } else {
-            return delegate;
+        while (delegate instanceof WrappedTable wrapped) {
+            delegate = Node.invokeGetDelegate(wrapped.getReferenceTables()[0]);
         }
+        return delegate;
     }
 
     private static BufferedDataTable rewriteTable(final BufferedDataTable table, final ExecutionContext exec) {
@@ -383,4 +392,74 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
 
+    private static ColumnarValueSchema toColumnarValueSchema(final IDataRepository repository,
+        final IWriteFileStoreHandler handler, final DataTableSpec spec) {
+        return ColumnarValueSchemaUtils.create(
+            ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository)));
+    }
+
+    @Override
+    public KnowsRowCountTable sortedTable(final ExecutionContext exec, final IDataRepository repository,
+            final IWriteFileStoreHandler handler, final IntSupplier tableIDSupplier,
+            final BufferedDataTable table, final RowReadComparator rowReadComparator)
+            throws CanceledExecutionException, IOException {
+
+        if (ColumnarTableBackend.unwrap(table) instanceof AbstractColumnarContainerTable containerTable) {
+            final var memService = MemoryAlertSystem.getInstance();
+            final var outputSchema = toColumnarValueSchema(repository, handler, table.getDataTableSpec());
+            final var sorted = new ColumnarExternalSorter(memService, tableIDSupplier, outputSchema, rowReadComparator)
+                .sortedTable(exec, containerTable, OptionalLong.of(table.size()));
+
+            return sorted.isEmpty() ? new WrappedTable(table) : sorted.get();
+        }
+
+        // row-based or virtual table, needs buffering
+        try (final var rowCursor = table.cursor()) {
+            return sortedTable(exec, repository, handler, tableIDSupplier, table.getDataTableSpec(),
+                rowCursor, rowReadComparator);
+        }
+    }
+
+    @Override
+    public RowCursor sortedCursor(final ExecutionContext exec, final IDataRepository repository,
+            final IWriteFileStoreHandler handler, final IntSupplier tableIDSupplier, final BufferedDataTable table,
+            final RowReadComparator rowReadComparator) throws CanceledExecutionException, IOException {
+
+        if (ColumnarTableBackend.unwrap(table) instanceof AbstractColumnarContainerTable containerTable) {
+            final var memService = MemoryAlertSystem.getInstance();
+            final var outputSchema = toColumnarValueSchema(repository, handler, table.getDataTableSpec());
+            return new ColumnarExternalSorter(memService, tableIDSupplier, outputSchema, rowReadComparator) //
+                .sortedCursor(exec, containerTable, OptionalLong.of(table.size())).orElseGet(table::cursor);
+        }
+
+        // row-based or virtual table, needs buffering
+        try (final var rowCursor = table.cursor()) {
+            return sortedCursor(exec, repository, handler, tableIDSupplier, table.getDataTableSpec(),
+                rowCursor, rowReadComparator);
+        }
+    }
+
+    @Override
+    public RowCursor sortedCursor(final ExecutionContext exec, final IDataRepository repository,
+            final IWriteFileStoreHandler handler, final IntSupplier tableIDSupplier, final DataTableSpec spec,
+            final RowCursor rowCursor, final RowReadComparator rowReadComparator)
+            throws CanceledExecutionException, IOException {
+
+        final var memService = MemoryAlertSystem.getInstance();
+        final var outputSchema = toColumnarValueSchema(repository, handler, spec);
+        return new ColumnarExternalSorter(memService, tableIDSupplier, outputSchema, rowReadComparator) //
+            .sortedCursor(exec, rowCursor, OptionalLong.empty()).orElseThrow();
+    }
+
+    @Override
+    public KnowsRowCountTable sortedTable(final ExecutionContext exec, final IDataRepository repository,
+            final IWriteFileStoreHandler handler, final IntSupplier tableIDSupplier,
+            final DataTableSpec spec, final RowCursor rowCursor, final RowReadComparator rowReadComparator)
+            throws CanceledExecutionException, IOException {
+
+        final var memService = MemoryAlertSystem.getInstance();
+        final var outputSchema = toColumnarValueSchema(repository, handler, spec);
+        return new ColumnarExternalSorter(memService, tableIDSupplier, outputSchema, rowReadComparator) //
+            .sortedTable(exec, rowCursor, OptionalLong.empty()).orElseThrow();
+    }
 }
