@@ -155,7 +155,8 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
         m_numRows = m_toRow - m_fromRow;
 
         m_searchFrom = findRange(m_batchBoundaries, m_fromRow, 0, m_batchBoundaries.length);
-        m_searchTo = findRange(m_batchBoundaries, m_toRow - 1, m_searchFrom, m_batchBoundaries.length) + 1;
+        m_searchTo = Math.min(m_batchBoundaries.length,
+            findRange(m_batchBoundaries, m_toRow - 1, m_searchFrom, m_batchBoundaries.length) + 1);
 
         m_currentRow = -1;
         m_indexInBatch = -1;
