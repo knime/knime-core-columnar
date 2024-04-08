@@ -124,6 +124,15 @@ final class CachedStringData {
         }
 
         @Override
+        public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof CachedStringLoadingReadData columnar) {
+                m_delegate.copyFrom(columnar.m_delegate, fromIndex, toIndex);
+            } else {
+                setString(toIndex, readData.getString(fromIndex));
+            }
+        }
+
+        @Override
         void serializeAt(final int index) {
             m_delegate.setString(index, m_data[index]);
         }

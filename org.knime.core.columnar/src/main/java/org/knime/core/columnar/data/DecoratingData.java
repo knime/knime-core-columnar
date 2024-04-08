@@ -64,8 +64,8 @@ public final class DecoratingData {
      * @return the inner most delegate (which can be data itself if data is not a DecoratingNullableReadData)
      */
     public static NullableReadData unpack(NullableReadData data) {
-        while (data instanceof DecoratingNullableReadData) {
-            data = ((DecoratingNullableReadData)data).getReadDelegate();
+        while (data instanceof DecoratingNullableReadData decoratingData) {
+            data = decoratingData.getReadDelegate();
         }
         return data;
     }
@@ -79,8 +79,8 @@ public final class DecoratingData {
      * @return the inner most delegate (which can be data itself if data is not a DecoratingNullableWriteData)
      */
     public static NullableWriteData unpack(NullableWriteData data) {
-        while (data instanceof DecoratingNullableWriteData) {
-            data = ((DecoratingNullableWriteData)data).getWriteDelegate();
+        while (data instanceof DecoratingNullableWriteData decoratingData) {
+            data = decoratingData.getWriteDelegate();
         }
         return data;
     }
@@ -163,7 +163,6 @@ public final class DecoratingData {
         public long sizeOf() {
             return m_delegate.sizeOf();
         }
-
     }
 
     /**

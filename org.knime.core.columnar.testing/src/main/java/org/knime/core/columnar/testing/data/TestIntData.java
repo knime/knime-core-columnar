@@ -110,4 +110,8 @@ public final class TestIntData extends AbstractTestData implements IntWriteData,
         ((IntWriteAccess)access).setIntValue(getInt(index));
     }
 
+    @Override
+    public void copyFrom(final IntReadData readData, final int fromIndex, final int toIndex) {
+        setInt(toIndex, readData.getInt(fromIndex));
+    }
 }

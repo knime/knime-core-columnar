@@ -66,7 +66,7 @@ public final class IntData {
     /**
      * {@link NullableWriteData} holding int elements.
      */
-    public static interface IntWriteData extends NullableWriteData {
+    public interface IntWriteData extends NullableWriteData {
 
         /**
          * Assigns a int value to the element at the given index (row). The contract is that values are only ever set
@@ -78,6 +78,16 @@ public final class IntData {
          */
         void setInt(int index, int val);
 
+        /**
+         * Copies an entry from the given {@link IntReadData} as if by calling
+         * {@code setInt(toIndex, readData.getInt(fromIndex))}, but may be implemented more efficiently.
+         *
+         * @param readData read data to extract a (non-missing) value from
+         * @param fromIndex index in {@code readData}
+         * @param toIndex index to write the extracted value to
+         */
+        void copyFrom(IntReadData readData, int fromIndex, int toIndex);
+
         @Override
         IntReadData close(int length);
 
@@ -86,7 +96,7 @@ public final class IntData {
     /**
      * {@link NullableReadData} holding int elements.
      */
-    public static interface IntReadData extends NullableReadData {
+    public interface IntReadData extends NullableReadData {
 
         /**
          * Obtains the int value at the given index (row). It is the responsibility of the client calling this method to

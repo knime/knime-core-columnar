@@ -66,7 +66,7 @@ public final class VarBinaryData {
     /**
      * {@link NullableWriteData} holding byte array elements.
      */
-    public static interface VarBinaryWriteData extends NullableWriteData {
+    public interface VarBinaryWriteData extends NullableWriteData {
 
         /**
          * Assigns a byte array value to the element at the given index (row). The contract is that values are only ever
@@ -77,6 +77,16 @@ public final class VarBinaryData {
          * @param val the byte array value to set
          */
         void setBytes(int index, byte[] val);
+
+        /**
+         * Copies an entry from the given {@link VarBinaryReadData} as if by calling
+         * {@code setBytes(toIndex, readData.getBytes(fromIndex))}, but may be implemented more efficiently.
+         *
+         * @param readData read data to extract a (non-missing) value from
+         * @param fromIndex index in {@code readData}
+         * @param toIndex index to write the extracted value to
+         */
+        void copyFrom(VarBinaryReadData readData, int fromIndex, int toIndex);
 
         /**
          * Assigns an object to the element at the given index (row). The contract is that values are only ever set for
@@ -98,7 +108,7 @@ public final class VarBinaryData {
     /**
      * {@link NullableReadData} holding byte array elements.
      */
-    public static interface VarBinaryReadData extends NullableReadData {
+    public interface VarBinaryReadData extends NullableReadData {
 
         /**
          * Obtains the byte array value at the given index (row). It is the responsibility of the client calling this

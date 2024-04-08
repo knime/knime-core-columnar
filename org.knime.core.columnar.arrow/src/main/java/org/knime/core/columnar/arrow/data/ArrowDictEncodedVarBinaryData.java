@@ -113,6 +113,11 @@ public final class ArrowDictEncodedVarBinaryData {
         }
 
         @Override
+        public void copyFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
+            setBytes(toIndex, readData.getBytes(fromIndex));
+        }
+
+        @Override
         public ArrowDictEncodedVarBinaryWriteData<K> slice(final int start) {
             return new ArrowDictEncodedVarBinaryWriteData<>(m_delegate, m_keyType, start + m_offset, m_dict,
                 m_keyGenerator);

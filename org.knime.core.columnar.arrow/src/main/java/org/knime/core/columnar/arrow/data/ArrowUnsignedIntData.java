@@ -98,6 +98,15 @@ final class ArrowUnsignedIntData {
         }
 
         @Override
+        public void copyFrom(final IntReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowUnsignedIntReadData arrow) {
+                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+            } else {
+                setInt(toIndex, readData.getInt(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowUnsignedIntWriteData(m_vector, m_offset + start);
         }

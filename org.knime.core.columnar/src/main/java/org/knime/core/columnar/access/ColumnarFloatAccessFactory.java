@@ -100,7 +100,12 @@ final class ColumnarFloatAccessFactory implements ColumnarAccessFactory {
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            m_data.setFloat(m_index.getIndex(), ((FloatReadAccess)access).getFloatValue());
+            if (access.getClass() == ColumnarFloatReadAccess.class) {
+                final var columnar = (ColumnarFloatReadAccess)access;
+                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+            } else {
+                m_data.setFloat(m_index.getIndex(), ((FloatReadAccess)access).getFloatValue());
+            }
         }
 
     }

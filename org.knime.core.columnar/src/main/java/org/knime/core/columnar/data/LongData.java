@@ -66,7 +66,7 @@ public final class LongData {
     /**
      * {@link NullableWriteData} holding long elements.
      */
-    public static interface LongWriteData extends NullableWriteData {
+    public interface LongWriteData extends NullableWriteData {
 
         /**
          * Assigns a long value to the element at the given index (row). The contract is that values are only ever set
@@ -78,6 +78,16 @@ public final class LongData {
          */
         void setLong(int index, long val);
 
+        /**
+         * Copies an entry from the given {@link LongReadData} as if by calling
+         * {@code setLong(toIndex, readData.getLong(fromIndex))}, but may be implemented more efficiently.
+         *
+         * @param readData read data to extract a (non-missing) value from
+         * @param fromIndex index in {@code readData}
+         * @param toIndex index to write the extracted value to
+         */
+        void copyFrom(LongReadData readData, int fromIndex, int toIndex);
+
         @Override
         LongReadData close(int length);
 
@@ -86,7 +96,7 @@ public final class LongData {
     /**
      * {@link NullableReadData} holding long elements.
      */
-    public static interface LongReadData extends NullableReadData {
+    public interface LongReadData extends NullableReadData {
 
         /**
          * Obtains the long value at the given index (row). It is the responsibility of the client calling this method
