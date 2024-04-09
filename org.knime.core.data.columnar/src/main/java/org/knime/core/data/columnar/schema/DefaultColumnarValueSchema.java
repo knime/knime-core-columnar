@@ -45,25 +45,19 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
-import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.traits.DataTraits;
-
-import com.google.common.collect.Iterators;
 
 /**
  * Default implementation of a {@link ColumnarValueSchema}.
@@ -73,65 +67,68 @@ import com.google.common.collect.Iterators;
  */
 final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
-    private final ValueSchema m_source;
+    private final ValueSchema m_delegate;
 
-    private final List<DataSpec> m_specs;
-
-    private final List<DataTraits> m_traits;
-
-    DefaultColumnarValueSchema(final ValueSchema source) {
-        m_source = source;
-        final int numFactories = source.numFactories();
-        m_specs = new ArrayList<>(numFactories);
-        m_traits = new ArrayList<>(numFactories);
-        for (int i = 0; i < numFactories; i++) {//NOSONAR
-            final var factory = source.getValueFactory(i);
-            m_specs.add(factory.getSpec());
-            m_traits.add(ValueFactoryUtils.getTraits(factory));
-        }
+    DefaultColumnarValueSchema(final ValueSchema delegate) {
+        m_delegate = delegate;
     }
 
     ValueSchema getSource() {
-        return m_source;
-    }
-
-    @Override
-    public DataSpec getSpec(final int index) {
-        if (index < 0) {
-            throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
-        }
-        if (index >= numColumns()) {
-            throw new IndexOutOfBoundsException(
-                String.format("Column index %d greater or equal to the reader's largest column index (%d).", index,
-                    numColumns() - 1));
-        }
-
-        return m_specs.get(index);
-    }
-
-    @Override
-    public DataTableSpec getSourceSpec() {
-        return m_source.getSourceSpec();
+        return m_delegate;
     }
 
     @Override
     public void save(final NodeSettingsWO settings) {
-        ValueSchemaUtils.save(m_source, settings);
+        ValueSchemaUtils.save(m_delegate, settings);
+    }
+
+    // -------- ValueSchema --------
+
+    @Override
+    public DataTableSpec getSourceSpec() {
+        return m_delegate.getSourceSpec();
+    }
+
+    @Override
+    public int numFactories() {
+        return m_delegate.numFactories();
+    }
+
+    @Override
+    public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
+        return m_delegate.getValueFactory(index);
+    }
+
+    // -------- ColumnarSchema --------
+
+    @Override
+    public DataSpec getSpec(final int index) {
+        return m_delegate.getSpec(index);
+    }
+
+    @Override
+    public DataTraits getTraits(final int index) {
+        return m_delegate.getTraits(index);
     }
 
     @Override
     public int numColumns() {
-        return m_specs.size();
+        return m_delegate.numColumns();
     }
 
     @Override
     public Iterator<DataSpec> iterator() {
-        return m_specs.iterator();
+        return m_delegate.iterator();
     }
 
     @Override
     public int hashCode() {
-        return m_specs.hashCode();
+        return m_delegate.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return m_delegate.toString();
     }
 
     @Override
@@ -142,38 +139,11 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     @Override
     public boolean equals(final Object obj) {
-        if (!(obj instanceof ColumnarSchema)) { // NOSONAR
-            return false;
-        }
-        final ColumnarSchema other = (ColumnarSchema)obj;
-        if (numColumns() != other.numColumns()) {
-            return false;
-        }
-        return Iterators.elementsEqual(iterator(), other.iterator());
-    }
-
-    @Override
-    public DataTraits getTraits(final int index) {
-        if (index < 0) {
-            throw new IndexOutOfBoundsException(String.format("Column index %d smaller than 0.", index));
-        }
-        if (index >= numColumns()) {
-            throw new IndexOutOfBoundsException(
-                String.format("Column index %d greater or equal to the reader's largest column index (%d).", index,
-                    numColumns() - 1));
-        }
-
-        return m_traits.get(index);
-    }
-
-    @Override
-    public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
-        return m_source.getValueFactory(index);
+        return m_delegate.equals(obj);
     }
 
     @Override
     public Stream<DataSpec> specStream() {
-        return m_specs.stream();
+        return m_delegate.specStream();
     }
-
 }
