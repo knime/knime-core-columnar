@@ -64,9 +64,11 @@ import org.knime.core.table.row.WriteAccessRow;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 // TODO (TP) replace with BufferedRowWrite
+//           --> I think this TODO is outdated now?
 public final class WriteAccessRowWrite implements RowWrite {
 
     // TODO with a bit of refactoring this could also be used in BufferedRowContainer
+    // TODO (TP) --> I think this TODO is outdated now?
 
     private final WriteAccessRow m_accesses;
 
@@ -90,7 +92,7 @@ public final class WriteAccessRowWrite implements RowWrite {
     @Override
     public void setFrom(final RowRead values) {
 
-        // TODO (TP) We could check instanceof (Dense)ColumnarRowWrite here and directly
+        // TODO (TP) We could check instanceof ReadAccessRowRead here and directly
         //           set our WriteAccessRow from their ReadAccessRow
         //           Would that improve performance in any way?
 

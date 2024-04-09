@@ -91,17 +91,20 @@ public class ReadAccessRowRead implements RowRead {
 
     @Override
     public int getNumColumns() {
+        // the row key is not a column in KNIME AP
         return m_values.length - 1;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <D extends DataValue> D getValue(final int index) {
+        // the row key is not a column in KNIME AP
         return (D)m_values[index + 1];
     }
 
     @Override
     public boolean isMissing(final int index) {
+        // the row key is not a column in KNIME AP
         return m_accesses.getAccess(index + 1).isMissing();
     }
 

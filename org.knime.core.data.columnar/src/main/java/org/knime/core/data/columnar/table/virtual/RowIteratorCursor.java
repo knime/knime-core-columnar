@@ -90,6 +90,9 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
     }
 
     // Helper to set BufferedAccessRow m_accesses from a DataRow
+    // TODO (TP) It is confusing that this is named the same as
+    //           org.knime.core.data.columnar.table.virtual.WriteAccessRowWrite
+    //           It does not implement RowWrite either, so probably should be renamed or inlined into outer class
     private static class WriteAccessRowWrite {
 
         private final WriteAccessRow m_accesses;
