@@ -48,8 +48,6 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import java.util.stream.IntStream;
-
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataValue;
@@ -59,6 +57,7 @@ import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.row.Selection.ColumnSelection;
 import org.knime.core.table.row.WriteAccessRow;
 
@@ -73,6 +72,8 @@ public final class WriteAccessRowWrite implements RowWrite {
     // TODO with a bit of refactoring this could also be used in BufferedRowContainer
 
     private final WriteAccessRow m_accesses;
+
+    private final WriteAccess[] m_writeAccesses;
 
     private final WriteValue<?>[] m_values;
 
@@ -89,10 +90,14 @@ public final class WriteAccessRowWrite implements RowWrite {
         final ColumnSelection selection) {
         m_accesses = writeAccess;
         final var numColumns = schema.numColumns();
+        m_writeAccesses = new WriteAccess[numColumns];
         m_values = new WriteValue<?>[numColumns];
-        var selected = selection.allSelected() ? IntStream.range(0, numColumns)
-            : IntStream.of(selection.getSelected(0, numColumns));
-        selected.forEach(i -> m_values[i] = schema.getValueFactory(i).createWriteValue(m_accesses.getWriteAccess(i)));
+        for (var i = 0; i < numColumns; i++) {
+            if (selection.isSelected(i)) {
+                m_writeAccesses[i] = m_accesses.getWriteAccess(i);
+                m_values[i] = schema.getValueFactory(i).createWriteValue(m_writeAccesses[i]);
+            }
+        }
         m_rowKeyValue = (RowKeyWriteValue)m_values[0];
     }
 
@@ -110,6 +115,12 @@ public final class WriteAccessRowWrite implements RowWrite {
     @Override
     public void setFrom(final RowRead values) {
         assert values.getNumColumns() == getNumColumns();
+
+        if (values instanceof ColumnarRowRead columnarRead) {
+            columnarRead.writeTo(m_writeAccesses);
+            return;
+        }
+
         setRowKey(values.getRowKey());
         for (var i = 0; i < values.getNumColumns(); i++) {
             if (values.isMissing(i)) {

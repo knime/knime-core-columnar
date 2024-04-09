@@ -55,6 +55,7 @@ import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.row.ReadAccessRow;
 
 /**
@@ -62,7 +63,7 @@ import org.knime.core.table.row.ReadAccessRow;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-final class DenseColumnarRowRead implements RowRead {
+final class DenseColumnarRowRead implements ColumnarRowRead {
 
     private final ReadAccess[] m_accesses;
 
@@ -103,6 +104,13 @@ final class DenseColumnarRowRead implements RowRead {
     @Override
     public RowKeyValue getRowKey() {
         return m_rowKeyValue;
+    }
+
+    @Override
+    public void writeTo(final WriteAccess[] columns) {
+        for (var i = 0; i < columns.length; i++) {
+            columns[i].setFrom(m_accesses[i]);
+        }
     }
 
 }
