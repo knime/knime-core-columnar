@@ -44,85 +44,28 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jul 22, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Apr 9, 2024 (leonard.woerteler): created
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.data.DataValue;
-import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.v2.ReadValue;
-import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
-import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
-import org.knime.core.table.row.ReadAccessRow;
-
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
 
 /**
- * A sparse implementation of a {@link ReadAccessRow} based {@link RowRead}.
+ * A {@link RowRead} which can write its values into {@link WriteAccess}es representing an output row.
  *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+ * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
+ *
+ * @noreference This interface is not intended to be referenced by clients.
  */
-// TODO discuss if we want this class i.e. sparse physical accesses in case of table filter
-final class SparseColumnarRowRead implements ColumnarRowRead {
+sealed interface ColumnarRowRead extends RowRead permits SparseColumnarRowRead, DenseColumnarRowRead {
 
-    private final TIntObjectMap<ReadAccess> m_accesses;
-
-    private final TIntObjectMap<ReadValue> m_values;
-
-    private final RowKeyReadValue m_rowKeyValue;
-
-    private final int m_numColumns;
-
-    SparseColumnarRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow,
-        final ColumnSelection selection) {
-        final var numColumns = schema.numColumns();
-        // the row key is not a column in KNIME
-        m_numColumns = numColumns - 1;
-        m_accesses = new TIntObjectHashMap<>();
-        m_values = new TIntObjectHashMap<>();
-        for (var i = 0; i < numColumns; i++) {
-            if (selection.isSelected(i)) {
-                final var access = accessRow.getAccess(i);
-                m_accesses.put(i, access);
-                m_values.put(i, schema.getValueFactory(i).createReadValue(access));
-            }
-        }
-        m_rowKeyValue = (RowKeyReadValue)m_values.get(0);
-    }
-
-    @Override
-    public int getNumColumns() {
-        return m_numColumns;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <D extends DataValue> D getValue(final int index) {
-        // TODO what if column is not selected?
-        return (D)m_values.get(index + 1);
-    }
-
-    @Override
-    public void writeTo(final WriteAccess[] columns) {
-        for (var i = 0; i < columns.length; i++) {
-            columns[i].setFrom(m_accesses.get(i));
-        }
-    }
-
-    @Override
-    public boolean isMissing(final int index) {
-        // TODO what if column is not selected?
-        return m_accesses.get(index + 1).isMissing();
-    }
-
-    @Override
-    public RowKeyValue getRowKey() {
-        return m_rowKeyValue;
-    }
-
+    /**
+     * Writes the contents of this row into the given write accesses by invoking
+     * {@link WriteAccess#setFrom(org.knime.core.table.access.ReadAccess)} for each column.
+     *
+     * @param accesses write accesses of the output row, must have length {@code numColumns() + 1} with the first
+     *     write access designated for the row key
+     */
+    void writeTo(WriteAccess[] accesses);
 }
