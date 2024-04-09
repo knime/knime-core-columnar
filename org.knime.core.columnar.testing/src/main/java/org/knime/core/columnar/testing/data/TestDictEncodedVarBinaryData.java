@@ -77,23 +77,23 @@ public final class TestDictEncodedVarBinaryData<K> extends AbstractTestDictEncod
         public static final TestDictEncodedVarBinaryDataFactory BYTE_INSTANCE =
                 new TestDictEncodedVarBinaryDataFactory(KeyType.BYTE_KEY);
 
-            public static final TestDictEncodedVarBinaryDataFactory INT_INSTANCE =
-                new TestDictEncodedVarBinaryDataFactory(KeyType.INT_KEY);
+        public static final TestDictEncodedVarBinaryDataFactory INT_INSTANCE =
+            new TestDictEncodedVarBinaryDataFactory(KeyType.INT_KEY);
 
-            public static final TestDictEncodedVarBinaryDataFactory LONG_INSTANCE =
-                new TestDictEncodedVarBinaryDataFactory(KeyType.LONG_KEY);
+        public static final TestDictEncodedVarBinaryDataFactory LONG_INSTANCE =
+            new TestDictEncodedVarBinaryDataFactory(KeyType.LONG_KEY);
 
-            public static TestDictEncodedVarBinaryDataFactory factoryForKeyType(final KeyType keyType) {
-                if (keyType == KeyType.BYTE_KEY) {
-                    return BYTE_INSTANCE;
-                } else if (keyType == KeyType.INT_KEY) {
-                    return INT_INSTANCE;
-                } else if (keyType == KeyType.LONG_KEY) {
-                    return LONG_INSTANCE;
-                } else {
-                    throw new IllegalArgumentException("Invalid key type " + keyType);
-                }
+        public static TestDictEncodedVarBinaryDataFactory factoryForKeyType(final KeyType keyType) {
+            if (keyType == KeyType.BYTE_KEY) {
+                return BYTE_INSTANCE;
+            } else if (keyType == KeyType.INT_KEY) {
+                return INT_INSTANCE;
+            } else if (keyType == KeyType.LONG_KEY) {
+                return LONG_INSTANCE;
+            } else {
+                throw new IllegalArgumentException("Invalid key type " + keyType);
             }
+        }
 
         private final TestStructDataFactory m_delegate;
 
@@ -107,17 +107,20 @@ public final class TestDictEncodedVarBinaryData<K> extends AbstractTestDictEncod
 
         @Override
         public TestData createWriteData(final int capacity) {
-            return new TestDictEncodedVarBinaryData<>(m_delegate.createWriteData(capacity), AbstractTestData.createKeyInstance(m_keyType));
+            return new TestDictEncodedVarBinaryData<>(m_delegate.createWriteData(capacity),
+                    AbstractTestData.createKeyInstance(m_keyType));
         }
 
         @Override
         public TestData createReadData(final Object[] data) {
-            return new TestDictEncodedVarBinaryData<>(m_delegate.createReadData(data), AbstractTestData.createKeyInstance(m_keyType));
+            return new TestDictEncodedVarBinaryData<>(m_delegate.createReadData(data),
+                    AbstractTestData.createKeyInstance(m_keyType));
         }
 
         @Override
         public TestData createReadData(final Object[] data, final int length) {
-            return new TestDictEncodedVarBinaryData<>(m_delegate.createReadData(data, length), AbstractTestData.createKeyInstance(m_keyType));
+            return new TestDictEncodedVarBinaryData<>(m_delegate.createReadData(data, length),
+                    AbstractTestData.createKeyInstance(m_keyType));
         }
 
     }
@@ -167,11 +170,6 @@ public final class TestDictEncodedVarBinaryData<K> extends AbstractTestDictEncod
         });
 
         setDictKey(index, dictKey);
-    }
-
-    @Override
-    public void copyFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
-        setBytes(toIndex, readData.getBytes(fromIndex));
     }
 
     @Override

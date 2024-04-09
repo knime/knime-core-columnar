@@ -146,11 +146,6 @@ final class CachedVarBinaryData {
         }
 
         @Override
-        public void copyFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
-            setBytes(toIndex, readData.getBytes(fromIndex));
-        }
-
-        @Override
         void serializeAt(final int index) {
             final ObjectSerializer<?> serializer = m_serializers[index];
             if (serializer != null) {
