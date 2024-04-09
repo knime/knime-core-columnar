@@ -112,11 +112,6 @@ public final class ArrowDictEncodedStringData {
         }
 
         @Override
-        public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
-            setString(toIndex, readData.getString(fromIndex));
-        }
-
-        @Override
         public ArrowDictEncodedStringWriteData<K> slice(final int start) {
             return new ArrowDictEncodedStringWriteData<>(m_delegate, m_keyType, start + m_offset, m_dict,
                 m_keyGenerator);

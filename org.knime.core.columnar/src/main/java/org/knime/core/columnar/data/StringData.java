@@ -81,16 +81,6 @@ public final class StringData {
          */
         void setString(int index, String val);
 
-        /**
-         * Copies an entry from the given {@link StringReadData} as if by calling
-         * {@code setString(toIndex, readData.getString(fromIndex))}, but may be implemented more efficiently.
-         *
-         * @param readData read data to extract a (non-missing) value from
-         * @param fromIndex index in {@code readData}
-         * @param toIndex index to write the extracted value to
-         */
-        void copyFrom(StringReadData readData, int fromIndex, int toIndex);
-
         @Override
         StringReadData close(int length);
 

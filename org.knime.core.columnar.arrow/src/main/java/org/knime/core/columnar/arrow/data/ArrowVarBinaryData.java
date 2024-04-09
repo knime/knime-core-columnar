@@ -101,15 +101,6 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
-        public void copyFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
-            if (readData instanceof ArrowVarBinaryReadData arrow) {
-                m_vector.copyFromSafe(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
-            } else {
-                setBytes(toIndex, readData.getBytes(fromIndex));
-            }
-        }
-
-        @Override
         public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
             ArrowBufIO.serialize(m_offset + index, value, m_vector, serializer);
         }

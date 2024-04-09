@@ -79,16 +79,6 @@ public final class VarBinaryData {
         void setBytes(int index, byte[] val);
 
         /**
-         * Copies an entry from the given {@link VarBinaryReadData} as if by calling
-         * {@code setBytes(toIndex, readData.getBytes(fromIndex))}, but may be implemented more efficiently.
-         *
-         * @param readData read data to extract a (non-missing) value from
-         * @param fromIndex index in {@code readData}
-         * @param toIndex index to write the extracted value to
-         */
-        void copyFrom(VarBinaryReadData readData, int fromIndex, int toIndex);
-
-        /**
          * Assigns an object to the element at the given index (row). The contract is that values are only ever set for
          * ascending indices. It is the responsibility of the client calling this method to make sure that the provied
          * index is non-negative and smaller than the capacity of this {@link WriteData}.

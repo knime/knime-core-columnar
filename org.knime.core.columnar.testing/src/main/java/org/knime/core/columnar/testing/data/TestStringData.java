@@ -102,9 +102,4 @@ public final class TestStringData extends AbstractTestData implements StringWrit
     public synchronized void setString(final int index, final String val) {
         get()[index] = val;
     }
-
-    @Override
-    public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
-        setString(toIndex, readData.getString(fromIndex));
-    }
 }

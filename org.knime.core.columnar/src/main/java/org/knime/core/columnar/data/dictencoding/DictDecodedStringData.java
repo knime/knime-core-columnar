@@ -106,11 +106,6 @@ public final class DictDecodedStringData {
             m_delegate.setString(index, val);
         }
 
-        @Override
-        public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
-            setString(toIndex, readData.getString(fromIndex));
-        }
-
         @SuppressWarnings("unchecked")
         @Override
         public StringReadData close(final int length) {
