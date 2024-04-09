@@ -45,13 +45,8 @@
  */
 package org.knime.core.data.columnar.schema;
 
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.NodeSettingsWO;
-import org.knime.core.table.access.ReadAccess;
-import org.knime.core.table.access.WriteAccess;
-import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * Columnar wrapper around a {@link ValueSchema}.
@@ -59,20 +54,7 @@ import org.knime.core.table.schema.ColumnarSchema;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public interface ColumnarValueSchema extends ColumnarSchema {
-
-    /**
-     * @return the spec used to create this schema
-     */
-    DataTableSpec getSourceSpec();
-
-    /**
-     * @param <R> the type of {@link ReadAccess}
-     * @param <W> the type of {@link WriteAccess}
-     * @param index of the column (including the row key column)
-     * @return the {@link ValueFactory} for the provided column index
-     */
-    <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(int index);
+public interface ColumnarValueSchema extends ValueSchema {
 
     /**
     * Saves the wrapped {@link ValueSchema} to the provided settings.

@@ -80,14 +80,11 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public int numColumns() {
-        return m_delegate.numColumns();
+    public void save(final NodeSettingsWO settings) {
+        m_delegate.save(settings);
     }
 
-    @Override
-    public DataSpec getSpec(final int index) {
-        return m_delegate.getSpec(index);
-    }
+    // -------- ValueSchema --------
 
     @Override
     public DataTableSpec getSourceSpec() {
@@ -95,8 +92,30 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
-    public void save(final NodeSettingsWO settings) {
-        m_delegate.save(settings);
+    public int numFactories() {
+        return m_delegate.numFactories();
+    }
+
+    @Override
+    public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
+        return m_delegate.getValueFactory(index);
+    }
+
+    // -------- ColumnarSchema --------
+
+    @Override
+    public DataSpec getSpec(final int index) {
+        return m_delegate.getSpec(index);
+    }
+
+    @Override
+    public DataTraits getTraits(final int index) {
+        return m_delegate.getTraits(index);
+    }
+
+    @Override
+    public int numColumns() {
+        return m_delegate.numColumns();
     }
 
     @Override
@@ -110,23 +129,17 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
     }
 
     @Override
+    public String toString() {
+        return m_delegate.toString();
+    }
+
+    @Override
     public boolean equals(final Object obj) {
         return m_delegate.equals(obj);
-    }
-
-    @Override
-    public DataTraits getTraits(final int index) {
-        return m_delegate.getTraits(index);
-    }
-
-    @Override
-    public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
-        return m_delegate.getValueFactory(index);
     }
 
     @Override
     public Stream<DataSpec> specStream() {
         return m_delegate.specStream();
     }
-
 }

@@ -225,6 +225,11 @@ public class TestHelper {
             return Arrays.stream(m_dataSpecs);
         }
 
+        @Override
+        public int numFactories() {
+            return m_valueFactories.length;
+        }
+
     }
 
 }
