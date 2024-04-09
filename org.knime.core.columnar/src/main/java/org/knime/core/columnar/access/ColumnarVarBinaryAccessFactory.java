@@ -127,9 +127,6 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
             var binaryAccess = (VarBinaryReadAccess)access;
             if (binaryAccess.hasObjectAndSerializer()) {
                 m_data.setObject(m_index.getIndex(), binaryAccess.getObject(), binaryAccess.getSerializer());
-            } else if (access.getClass() == ColumnarVarBinaryReadAccess.class) {
-                final var columnar = (ColumnarVarBinaryReadAccess)access;
-                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
             } else {
                 m_data.setBytes(m_index.getIndex(), binaryAccess.getByteArray());
             }

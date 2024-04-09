@@ -135,11 +135,6 @@ public final class TestDictEncodedStringData<K> extends AbstractTestDictEncodedD
     }
 
     @Override
-    public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
-        setString(toIndex, readData.getString(fromIndex));
-    }
-
-    @Override
     public String getString(final int index) {
         K dictKey = getDictKey(index);
 

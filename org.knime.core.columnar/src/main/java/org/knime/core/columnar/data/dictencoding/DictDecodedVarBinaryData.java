@@ -98,11 +98,6 @@ public final class DictDecodedVarBinaryData {
         }
 
         @Override
-        public void copyFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
-            setBytes(toIndex, readData.getBytes(fromIndex));
-        }
-
-        @Override
         public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
             m_delegate.setObject(index, value, serializer);
         }

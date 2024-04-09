@@ -115,11 +115,6 @@ public final class TestVarBinaryData extends AbstractTestData implements VarBina
     }
 
     @Override
-    public void copyFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
-        setBytes(toIndex, readData.getBytes(fromIndex));
-    }
-
-    @Override
     public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
         final ReadableDataInput input = new ReadableDataInputStream(new ByteArrayInputStream(getBytes(index)));
         try {

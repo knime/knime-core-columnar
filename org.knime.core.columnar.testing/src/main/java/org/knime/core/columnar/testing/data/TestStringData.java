@@ -116,11 +116,6 @@ public final class TestStringData extends AbstractTestData implements StringWrit
     }
 
     @Override
-    public void copyFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
-        setString(toIndex, readData.getString(fromIndex));
-    }
-
-    @Override
     public long sizeOf() {
         return m_numWritten;
     }
