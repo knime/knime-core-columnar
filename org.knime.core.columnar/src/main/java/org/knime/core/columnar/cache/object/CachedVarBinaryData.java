@@ -48,7 +48,9 @@
  */
 package org.knime.core.columnar.cache.object;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
@@ -65,6 +67,7 @@ import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.VarBinaryData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
+import org.knime.core.table.io.ReadableDataInput;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
@@ -207,9 +210,30 @@ final class CachedVarBinaryData {
                 return outStream.toByteArray();
             }
 
-            @SuppressWarnings("unchecked")
+            private static class ByteArrayInput extends DataInputStream implements ReadableDataInput {
+                private final byte[] m_content;
+                ByteArrayInput(final byte[] content) {
+                    super(new ByteArrayInputStream(content));
+                    m_content = content;
+                }
+                @Override
+                public byte[] readBytes() throws IOException {
+                    return m_content;
+                }
+            }
+
+            @SuppressWarnings({"unchecked", "resource"})
             @Override
             public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
+                final var data = m_data[index];
+                // we assume that the deserializer will not produce byte[] again...
+                if (data instanceof byte[] bytes) {
+                    try {
+                        return deserializer.deserialize(new ByteArrayInput(bytes));
+                    } catch (final IOException ex) {
+                        throw new IllegalStateException("Error while deserializing bytes", ex);
+                    }
+                }
                 return (T)m_data[index];
             }
 
