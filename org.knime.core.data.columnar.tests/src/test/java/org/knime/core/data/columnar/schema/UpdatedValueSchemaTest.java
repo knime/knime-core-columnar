@@ -70,22 +70,22 @@ import org.knime.core.data.v2.schema.ValueSchema;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class UpdatedColumnarValueSchemaTest {
+public class UpdatedValueSchemaTest {
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testGetSpecIndexOutOfBoundsLower() {
-        new UpdatedColumnarValueSchema(createSpec(0), createDefaultValueSchema(createSpec(0))).getSpec(-1);
+        new UpdatedValueSchema(createSpec(0), createDefaultValueSchema(createSpec(0))).getSpec(-1);
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testGetSpecIndexOutOfBoundsUpper() {
-        new UpdatedColumnarValueSchema(createSpec(0), createDefaultValueSchema(createSpec(0))).getSpec(1);
+        new UpdatedValueSchema(createSpec(0), createDefaultValueSchema(createSpec(0))).getSpec(1);
     }
 
     @Test
     public void testGetSpec() {
         final ValueSchema delegate = createDefaultValueSchema(createSpec(1));
-        final UpdatedColumnarValueSchema updated = new UpdatedColumnarValueSchema(createSpec(1), delegate);
+        final UpdatedValueSchema updated = new UpdatedValueSchema(createSpec(1), delegate);
         assertEquals(delegate.getSpec(0), updated.getSpec(0));
         assertEquals(delegate.getSpec(1), updated.getSpec(1));
     }
@@ -95,7 +95,7 @@ public class UpdatedColumnarValueSchemaTest {
         final DataTableSpec delegateSpec = createSpec(1);
         final DataTableSpec updatedSpec = createSpec(1);
         final ValueSchema delegate = createDefaultValueSchema(delegateSpec);
-        final UpdatedColumnarValueSchema updated = new UpdatedColumnarValueSchema(updatedSpec, delegate);
+        final UpdatedValueSchema updated = new UpdatedValueSchema(updatedSpec, delegate);
         assertEquals(delegateSpec, delegate.getSourceSpec());
         assertEquals(updatedSpec, updated.getSourceSpec());
     }
