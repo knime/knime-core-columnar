@@ -60,7 +60,6 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.append.AppendedRowsTable;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.ColumnRearrangerUtils;
 import org.knime.core.data.container.ConcatenateTable;
@@ -232,7 +231,7 @@ public final class VirtualTableSchemaUtils {
     public static ValueSchema extractSchema(final BufferedDataTable table) throws VirtualTableIncompatibleException {
         var delegateTable = Node.invokeGetDelegate(table);
         var schema = extractSchema(delegateTable);
-        if (ColumnarValueSchemaUtils.storesDataCellSerializersSeparately(schema)) {
+        if (ValueSchemaUtils.storesDataCellSerializersSeparately(schema)) {
             throw new VirtualTableIncompatibleException(
                 "Tables created before KNIME Analytics Platform 4.5.0 are not compatible with virtual tables.");
         }

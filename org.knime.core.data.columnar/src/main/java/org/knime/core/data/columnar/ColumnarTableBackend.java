@@ -58,7 +58,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
@@ -364,7 +363,7 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
     private static boolean isColumnarCompatible(final BufferedDataTable table) {
-        return getSchemaIfColumnar(table).filter(not(ColumnarValueSchemaUtils::storesDataCellSerializersSeparately))
+        return getSchemaIfColumnar(table).filter(not(ValueSchemaUtils::storesDataCellSerializersSeparately))
             .isPresent();
     }
     private static Optional<ValueSchema> getSchemaIfColumnar(final BufferedDataTable table) {

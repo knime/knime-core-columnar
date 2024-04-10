@@ -65,7 +65,6 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
@@ -398,7 +397,7 @@ public final class ColumnarVirtualTable {
                 .map(ValueSchema::getSourceSpec)//
                 .toArray(DataTableSpec[]::new)//
         );
-        return ColumnarValueSchemaUtils.updateDataTableSpec(m_valueSchema, mergedSpec);
+        return ValueSchemaUtils.updateDataTableSpec(m_valueSchema, mergedSpec);
     }
 
     private boolean isConcatenateCompatible(final ValueSchema schema) {
