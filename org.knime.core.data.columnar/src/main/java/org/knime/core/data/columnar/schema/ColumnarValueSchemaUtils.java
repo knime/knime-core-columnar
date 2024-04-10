@@ -88,7 +88,7 @@ public final class ColumnarValueSchemaUtils {
     // TODO (TP) WIP: Try to remove ColumnarValueSchema.
     public static void save(final ValueSchema schema, final NodeSettingsWO settings)
     {
-        if (schema instanceof UpdatedColumnarValueSchema wrapper) {
+        if (schema instanceof UpdatedValueSchema wrapper) {
             save(wrapper.getDelegate(), settings);
         } else {
             ValueSchemaUtils.save(schema, settings);
@@ -112,7 +112,7 @@ public final class ColumnarValueSchemaUtils {
      *         Platform 4.5.0
      */
     public static boolean storesDataCellSerializersSeparately(final ValueSchema schema) {
-        if (schema instanceof UpdatedColumnarValueSchema s) {
+        if (schema instanceof UpdatedValueSchema s) {
             return storesDataCellSerializersSeparately(s.getDelegate());
         } else {
             return ValueSchemaUtils.storesDataCellSerializersSeparately(schema);
@@ -220,7 +220,7 @@ public final class ColumnarValueSchemaUtils {
             }
         }
         final var sourceName = source.getSourceSpec().getName();
-        return new UpdatedColumnarValueSchema(new DataTableSpec(sourceName, result), source);
+        return new UpdatedValueSchema(new DataTableSpec(sourceName, result), source);
     }
 
     /**
@@ -233,6 +233,6 @@ public final class ColumnarValueSchemaUtils {
      */
     public static final ValueSchema updateDataTableSpec(final ValueSchema schema,
         final DataTableSpec spec) {
-        return new UpdatedColumnarValueSchema(spec, schema);
+        return new UpdatedValueSchema(spec, schema);
     }
 }

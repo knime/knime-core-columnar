@@ -64,13 +64,13 @@ import org.knime.core.table.schema.traits.DataTraits;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class UpdatedColumnarValueSchema implements ValueSchema {
+final class UpdatedValueSchema implements ValueSchema {
 
     private final DataTableSpec m_updatedSpec;
 
     private final ValueSchema m_delegate;
 
-    UpdatedColumnarValueSchema(final DataTableSpec spec, final ValueSchema delegate) {
+    UpdatedValueSchema(final DataTableSpec spec, final ValueSchema delegate) {
         m_updatedSpec = spec;
         m_delegate = delegate;
     }
