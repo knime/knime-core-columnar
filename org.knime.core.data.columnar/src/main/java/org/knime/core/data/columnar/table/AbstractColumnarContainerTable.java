@@ -162,7 +162,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         throws IOException, CanceledExecutionException {
         settings.addLong(CFG_TABLE_SIZE, m_columnarTable.size());
         settings.addString(CFG_FACTORY_TYPE, m_columnarTable.getStoreFactory().getClass().getName());
-        m_columnarTable.getSchema().save(settings);
+        ColumnarValueSchemaUtils.save(m_columnarTable.getSchema(), settings);
         @SuppressWarnings("resource") // Store's life cycle is handled by super class.
         final var store = getStore();
         hardLinkOrCopy(store.getFileHandle().asPath(), f.toPath());

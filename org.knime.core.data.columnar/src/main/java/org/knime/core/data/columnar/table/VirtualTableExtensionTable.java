@@ -342,7 +342,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     @Override
     protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
         throws IOException, CanceledExecutionException {
-        m_schema.save(settings.addNodeSettings(CFG_SCHEMA));
+        ColumnarValueSchemaUtils.save(m_schema, settings.addNodeSettings(CFG_SCHEMA));
         settings.addIntArray(CFG_REF_TABLES, //
             Stream.of(m_refTables)//
                 .mapToInt(BufferedDataTable::getBufferedTableId)//

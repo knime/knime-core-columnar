@@ -67,6 +67,7 @@ import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaLoadContext;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
@@ -78,6 +79,33 @@ public final class ColumnarValueSchemaUtils {
 
     private ColumnarValueSchemaUtils() {
     }
+
+
+
+
+
+    /**
+     * Saves the wrapped {@link ValueSchema} to the provided settings.
+     *
+     * @param settings the settings to save the ValueSchema to
+     */
+    // TODO (TP) WIP: Try to remove ColumnarValueSchema.
+    public static void save(final ColumnarValueSchema schema, final NodeSettingsWO settings)
+    {
+        if (schema instanceof UpdatedColumnarValueSchema wrapper) {
+            save(wrapper.getDelegate(), settings);
+        } else {
+            ValueSchemaUtils.save(schema, settings);
+        }
+    }
+
+
+
+
+
+
+
+
 
     /**
      * Indicates that this schema does not store the cell serializer identifiers with the data, but separately. This was

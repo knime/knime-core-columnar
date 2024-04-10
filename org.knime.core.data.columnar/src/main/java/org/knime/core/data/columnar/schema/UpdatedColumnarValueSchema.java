@@ -53,7 +53,6 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.DataSpec;
@@ -77,11 +76,6 @@ final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
 
     ColumnarValueSchema getDelegate() {
         return m_delegate;
-    }
-
-    @Override
-    public void save(final NodeSettingsWO settings) {
-        m_delegate.save(settings);
     }
 
     // -------- ValueSchema --------
