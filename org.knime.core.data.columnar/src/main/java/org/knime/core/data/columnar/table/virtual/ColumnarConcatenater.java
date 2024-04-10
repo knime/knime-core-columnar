@@ -68,7 +68,6 @@ import org.knime.core.data.DataColumnSpecCreator.MergeOptions;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.columnar.ColumnarTableBackend;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
@@ -193,7 +192,7 @@ public final class ColumnarConcatenater {
 
         @Override
         public ValueSchema getOutputSchema() {
-            return ColumnarValueSchemaUtils.create(
+            return ValueSchemaUtils.create(
                 new DataTableSpec(), new ValueFactory<?, ?>[] {DefaultRowKeyValueFactory.INSTANCE});
         }
 
@@ -387,7 +386,7 @@ public final class ColumnarConcatenater {
                 }
             }
             if (!missingColumnSpecs.isEmpty()) {
-                var missingSchema = ColumnarValueSchemaUtils.create(
+                var missingSchema = ValueSchemaUtils.create(
                     new DataTableSpec(missingColumnSpecs.toArray(DataColumnSpec[]::new)),
                     Stream.concat(Stream.of(VoidRowKeyFactory.INSTANCE), missingValueFactories.stream())
                         .toArray(ValueFactory[]::new));

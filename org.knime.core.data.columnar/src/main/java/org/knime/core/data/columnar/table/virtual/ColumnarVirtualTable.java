@@ -65,6 +65,7 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
@@ -296,7 +297,7 @@ public final class ColumnarVirtualTable {
 
     private static ValueSchema dropRowID(final ValueSchema schema) {
         if (ColumnarValueSchemaUtils.hasRowID(schema)) {
-            return ColumnarValueSchemaUtils.create(schema.getSourceSpec(), IntStream.range(1, schema.numColumns())//
+            return ValueSchemaUtils.create(schema.getSourceSpec(), IntStream.range(1, schema.numColumns())//
                 .mapToObj(schema::getValueFactory)//
                 .toArray(ValueFactory<?, ?>[]::new));
         }
@@ -421,7 +422,7 @@ public final class ColumnarVirtualTable {
                 .flatMap(DataTableSpec::stream)//
                 .toArray(DataColumnSpec[]::new)//
         );
-        return ColumnarValueSchemaUtils.create(spec, valueFactories);
+        return ValueSchemaUtils.create(spec, valueFactories);
     }
 
     private static ValueSchema appendRowIndex(final ValueSchema schema, final String columnName) {
@@ -439,7 +440,7 @@ public final class ColumnarVirtualTable {
         }
         colSpecs[numSpecColumns] = new DataColumnSpecCreator(columnName, LongCell.TYPE).createSpec();
 
-        return ColumnarValueSchemaUtils.create(new DataTableSpec(colSpecs), valueFactories);
+        return ValueSchemaUtils.create(new DataTableSpec(colSpecs), valueFactories);
     }
 
     private static String tmpUniqueRowIndexColumnName() {

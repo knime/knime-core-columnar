@@ -477,7 +477,7 @@ public final class ColumnarRearranger {
             final UntypedValueFactory outputValueFactory, final DataColumnSpec convertedSpec) {
             m_inputValueFactory = inputValueFactory;
             m_outputValueFactory = outputValueFactory;
-            m_outputSchema = ColumnarValueSchemaUtils.create(new DataTableSpec(convertedSpec),
+            m_outputSchema = ValueSchemaUtils.create(new DataTableSpec(convertedSpec),
                 new ValueFactory<?, ?>[]{outputValueFactory.getValueFactory()});
             m_converter = converter;
         }

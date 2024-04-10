@@ -58,7 +58,6 @@ import java.util.function.IntSupplier;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.virtual.TableCasterFactory.CastOperation;
@@ -68,6 +67,7 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.Node;
@@ -112,7 +112,7 @@ public final class ColumnarSpecReplacer {
             "Table specs have different lengths: %s vs. %s", inputSpec.getNumColumns(), outputSpec.getNumColumns());
         var referenceTable = ReferenceTables.createReferenceTable(table);
 
-        var outputSchema = ColumnarValueSchemaUtils.create(outputSpec, RowKeyType.CUSTOM, m_fsHandler);
+        var outputSchema = ValueSchemaUtils.create(outputSpec, RowKeyType.CUSTOM, m_fsHandler);
 
         var inputSchema = referenceTable.getSchema();
         var casts = determineCasts(inputSchema, outputSchema);

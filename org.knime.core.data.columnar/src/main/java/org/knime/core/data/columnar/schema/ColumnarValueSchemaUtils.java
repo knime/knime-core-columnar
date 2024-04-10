@@ -50,25 +50,16 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.columnar.table.virtual.persist.Persistor.LoadContext;
-import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.meta.DataColumnMetaData;
-import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.RowKeyValueFactory;
-import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.data.v2.schema.ValueSchemaLoadContext;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
-import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsWO;
-import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * Utility class to work with {@link ColumnarValueSchema}s.
@@ -80,10 +71,6 @@ public final class ColumnarValueSchemaUtils {
     private ColumnarValueSchemaUtils() {
     }
 
-
-
-
-
     /**
      * Saves the wrapped {@link ValueSchema} to the provided settings.
      *
@@ -92,20 +79,12 @@ public final class ColumnarValueSchemaUtils {
     // TODO (TP) WIP: Try to remove ColumnarValueSchema.
     public static void save(final ValueSchema schema, final NodeSettingsWO settings)
     {
-        if (schema instanceof UpdatedValueSchema wrapper) {
-            save(wrapper.getDelegate(), settings);
+        if (schema instanceof UpdatedValueSchema s) {
+            save(s.getDelegate(), settings);
         } else {
             ValueSchemaUtils.save(schema, settings);
         }
     }
-
-
-
-
-
-
-
-
 
     /**
      * Indicates that this schema does not store the cell serializer identifiers with the data, but separately. This was
@@ -121,63 +100,6 @@ public final class ColumnarValueSchemaUtils {
         } else {
             return ValueSchemaUtils.storesDataCellSerializersSeparately(schema);
         }
-    }
-
-    /**
-     * Loads a {@link ColumnarValueSchema} by combining the provided {@link ColumnarSchema} with the information stored
-     * in the {@link LoadContext}.
-     *
-     * @param schema of the underlying store
-     * @param context contains the DataTableSpec as well as the DataRepository and potential additional settings
-     * @return the loaded {@link ColumnarValueSchema}
-     * @throws InvalidSettingsException if the settings in the LoadContext were invalid
-     */
-    public static ValueSchema load(final ColumnarSchema schema, final ValueSchemaLoadContext context)
-        throws InvalidSettingsException {
-        return create(ValueSchemaUtils.load(schema, context));
-    }
-
-    /**
-     * Create a new {@link ColumnarValueSchema} based on the provided {@link ValueSchema}.
-     *
-     * @param source the underlying {@link ValueSchema}.
-     *
-     * @return a new {@link ColumnarValueSchema}.
-     */
-    // TODO (TP) remove?
-    @Deprecated
-    public static final ValueSchema create(final ValueSchema source) {
-        return source;
-    }
-
-    /**
-     * Create a new {@link ColumnarValueSchema} based on a {@link DataTableSpec} and {@link ValueFactory
-     * ValueFactories}.
-     *
-     * @param spec of the table
-     * @param valueFactories for the columns including the RowID
-     * @return a new {@link ColumnarValueSchema}
-     */
-    // TODO (TP) remove?
-    @Deprecated
-    public static final ValueSchema create(final DataTableSpec spec, final ValueFactory<?, ?>[] valueFactories) {
-        return ValueSchemaUtils.create(spec, valueFactories);
-    }
-
-    /**
-     * Creates a ColumnarValueSchema for the provided parameters.
-     *
-     * @param spec to create the value schema for
-     * @param rowIDType the type of RowID to use
-     * @param fsHandler FileStoreHandler used by some ValueFactories
-     * @return a new schema corresponding to spec
-     */
-    public static final ValueSchema create(final DataTableSpec spec, final RowKeyType rowIDType,
-        final IWriteFileStoreHandler fsHandler) {
-        var valueFactories = Stream.concat(Stream.of(ValueFactoryUtils.getRowKeyValueFactory(rowIDType)), spec.stream()//
-            .map(DataColumnSpec::getType)//
-            .map(t -> ValueFactoryUtils.getValueFactory(t, fsHandler))).toArray(ValueFactory<?, ?>[]::new);
-        return create(spec, valueFactories);
     }
 
     /**

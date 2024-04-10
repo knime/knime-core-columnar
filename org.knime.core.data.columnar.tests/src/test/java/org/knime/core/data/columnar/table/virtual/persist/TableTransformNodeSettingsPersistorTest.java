@@ -68,7 +68,6 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.IDataRepository;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.WrappedColumnarMapperWithRowIndexFactory;
@@ -79,6 +78,7 @@ import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowDataRepository;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DoubleValueFactory;
 import org.knime.core.data.v2.value.IntValueFactory;
 import org.knime.core.node.BufferedDataTable;
@@ -295,7 +295,7 @@ final class TableTransformNodeSettingsPersistorTest {
     void testSaveMap() throws Exception {
         var id = UUID.randomUUID();
         var mapperFactory = new TestMapperFactory(3);
-        var schema = ColumnarValueSchemaUtils.create(
+        var schema = ValueSchemaUtils.create(
             new DataTableSpec(new String[]{"1", "2"}, new DataType[]{IntCell.TYPE, DoubleCell.TYPE}),
             new ValueFactory<?, ?>[]{new IntValueFactory(), new DoubleValueFactory()});
         var table = new ColumnarVirtualTable(id, schema, CursorType.BASIC).map(mapperFactory, 1);
@@ -412,7 +412,7 @@ final class TableTransformNodeSettingsPersistorTest {
 
         @Override
         public ValueSchema getOutputSchema() {
-            return ColumnarValueSchemaUtils.create(
+            return ValueSchemaUtils.create(
                 new DataTableSpec(new DataColumnSpecCreator("foo", IntCell.TYPE).createSpec()),
                 new ValueFactory<?, ?>[]{new IntValueFactory()});
         }

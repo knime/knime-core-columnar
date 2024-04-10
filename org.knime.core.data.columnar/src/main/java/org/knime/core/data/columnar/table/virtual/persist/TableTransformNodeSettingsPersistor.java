@@ -77,6 +77,7 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -510,7 +511,7 @@ public final class TableTransformNodeSettingsPersistor {
             valueFactories[i] = ValueFactoryUtils
                 .loadValueFactory(valueFactorySettings.getNodeSettings(Integer.toString(i)), dataRepository);
         }
-        return ColumnarValueSchemaUtils.create(tableSpec, valueFactories);
+        return ValueSchemaUtils.create(tableSpec, valueFactories);
     }
 
 }
