@@ -48,8 +48,6 @@ package org.knime.core.data.columnar.schema;
 import java.util.Map;
 
 import org.knime.core.data.DataColumnDomain;
-import org.knime.core.data.DataColumnSpec;
-import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowKeyValueFactory;
@@ -72,14 +70,10 @@ public final class ColumnarValueSchemaUtils {
      *
      * @param settings the settings to save the ValueSchema to
      */
-    // TODO (TP) WIP: Try to remove ColumnarValueSchema.
-    public static void save(final ValueSchema schema, final NodeSettingsWO settings)
-    {
-        if (schema instanceof UpdatedValueSchema s) {
-            save(s.getDelegate(), settings);
-        } else {
-            ValueSchemaUtils.save(schema, settings);
-        }
+    // TODO (TP) Remove
+    @Deprecated
+    public static void save(final ValueSchema schema, final NodeSettingsWO settings) {
+        ValueSchemaUtils.save(schema, settings);
     }
 
     /**
@@ -90,12 +84,10 @@ public final class ColumnarValueSchemaUtils {
      * @return true if schema was stores the cell serializers separately, meaning it was created before KNIME Analytics
      *         Platform 4.5.0
      */
+    // TODO (TP) Remove
+    @Deprecated
     public static boolean storesDataCellSerializersSeparately(final ValueSchema schema) {
-        if (schema instanceof UpdatedValueSchema s) {
-            return storesDataCellSerializersSeparately(s.getDelegate());
-        } else {
-            return ValueSchemaUtils.storesDataCellSerializersSeparately(schema);
-        }
+        return ValueSchemaUtils.storesDataCellSerializersSeparately(schema);
     }
 
     /**
@@ -104,7 +96,7 @@ public final class ColumnarValueSchemaUtils {
      * @param schema to check
      * @return true if the schema has a RowID column
      */
-    // TPDP (TP) move to ValueSchemaUtils
+    // TODP (TP) move to ValueSchemaUtils
     public static final boolean hasRowID(final ValueSchema schema) {
         return schema.numColumns() > 0 && schema.getValueFactory(0) instanceof RowKeyValueFactory;
     }
@@ -119,31 +111,11 @@ public final class ColumnarValueSchemaUtils {
      *
      * @return the updated {@link ColumnarValueSchema}
      */
+    // TODO (TP) Remove
+    @Deprecated
     public static final ValueSchema updateSource(final ValueSchema source,
         final Map<Integer, DataColumnDomain> domainMap, final Map<Integer, DataColumnMetaData[]> metadataMap) {
-        final var result = new DataColumnSpec[source.numColumns() - 1];
-        for (int i = 0; i < result.length; i++) {//NOSONAR
-            final DataColumnSpec colSpec = source.getSourceSpec().getColumnSpec(i);
-            final DataColumnDomain domain = domainMap.get(i + 1);
-            final DataColumnMetaData[] metadata = metadataMap.get(i + 1);
-
-            if (domain == null && metadata == null) {
-                result[i] = colSpec;
-            } else {
-                final var creator = new DataColumnSpecCreator(colSpec);
-                if (domain != null) {
-                    creator.setDomain(domain);
-                }
-
-                for (final DataColumnMetaData element : metadata) {
-                    creator.addMetaData(element, true);
-                }
-
-                result[i] = creator.createSpec();
-            }
-        }
-        final var sourceName = source.getSourceSpec().getName();
-        return new UpdatedValueSchema(new DataTableSpec(sourceName, result), source);
+        return ValueSchemaUtils.updateDataTableSpec(source, domainMap, metadataMap);
     }
 
     /**
@@ -154,8 +126,10 @@ public final class ColumnarValueSchemaUtils {
      * @return the schema with the updated spec
      * @throws IllegalArgumentException if the types in schema and spec don't match
      */
+    // TODO (TP) Remove
+    @Deprecated
     public static final ValueSchema updateDataTableSpec(final ValueSchema schema,
         final DataTableSpec spec) {
-        return new UpdatedValueSchema(spec, schema);
+        return ValueSchemaUtils.updateDataTableSpec(schema, spec);
     }
 }
