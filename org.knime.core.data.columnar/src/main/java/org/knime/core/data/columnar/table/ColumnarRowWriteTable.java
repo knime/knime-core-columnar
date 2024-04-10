@@ -58,12 +58,12 @@ import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.RowWriteAccessible;
@@ -211,7 +211,7 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
                     domains.put(i, m_nullableDomainWritable.getDomain(i));
                     metadata.put(i, m_nullableDomainWritable.getMetadata(i));
                 }
-                schema = ColumnarValueSchemaUtils.updateSource(m_schema, domains, metadata);
+                schema = ValueSchemaUtils.updateDataTableSpec(m_schema, domains, metadata);
             } else {
                 schema = m_schema;
             }

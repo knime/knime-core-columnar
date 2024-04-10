@@ -59,7 +59,6 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.container.CloseableRowIterator;
@@ -163,7 +162,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         throws IOException, CanceledExecutionException {
         settings.addLong(CFG_TABLE_SIZE, m_columnarTable.size());
         settings.addString(CFG_FACTORY_TYPE, m_columnarTable.getStoreFactory().getClass().getName());
-        ColumnarValueSchemaUtils.save(m_columnarTable.getSchema(), settings);
+        ValueSchemaUtils.save(m_columnarTable.getSchema(), settings);
         @SuppressWarnings("resource") // Store's life cycle is handled by super class.
         final var store = getStore();
         hardLinkOrCopy(store.getFileHandle().asPath(), f.toPath());

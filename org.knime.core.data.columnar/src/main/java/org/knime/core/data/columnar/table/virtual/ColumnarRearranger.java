@@ -187,7 +187,7 @@ public final class ColumnarRearranger {
         var rearrangedSpec = rearrangedSchema.getSourceSpec();
         var columns = rearrangedSpec.stream().toArray(DataColumnSpec[]::new);
         return rearrangedTable
-            .replaceSchema(ColumnarValueSchemaUtils.updateDataTableSpec(rearrangedSchema, new DataTableSpec(columns)));
+            .replaceSchema(ValueSchemaUtils.updateDataTableSpec(rearrangedSchema, new DataTableSpec(columns)));
     }
 
     private static ColumnarVirtualTable rearrange(final List<RearrangedColumn> newColumns,

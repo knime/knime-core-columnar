@@ -46,18 +46,15 @@
 package org.knime.core.data.columnar.schema;
 
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.UUID;
 
-import org.knime.core.data.DataColumnDomain;
+import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowKeyValueFactory;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
-import org.knime.core.node.NodeSettingsWO;
 
 /**
  * Utility class to work with {@link ColumnarValueSchema}s.
@@ -70,70 +67,14 @@ public final class ColumnarValueSchemaUtils {
     }
 
     /**
-     * Saves the wrapped {@link ValueSchema} to the provided settings.
-     *
-     * @param settings the settings to save the ValueSchema to
-     */
-    // TODO (TP) Remove
-    @Deprecated
-    public static void save(final ValueSchema schema, final NodeSettingsWO settings) {
-        ValueSchemaUtils.save(schema, settings);
-    }
-
-    /**
-     * Indicates that this schema does not store the cell serializer identifiers with the data, but separately. This was
-     * the case prior to KNIME Analytics Platform 4.5.0.
-     *
-     * @param schema to check
-     * @return true if schema was stores the cell serializers separately, meaning it was created before KNIME Analytics
-     *         Platform 4.5.0
-     */
-    // TODO (TP) Remove
-    @Deprecated
-    public static boolean storesDataCellSerializersSeparately(final ValueSchema schema) {
-        return ValueSchemaUtils.storesDataCellSerializersSeparately(schema);
-    }
-
-    /**
      * Checks if a schema includes a RowID column.
      *
      * @param schema to check
      * @return true if the schema has a RowID column
      */
-    // TODP (TP) move to ValueSchemaUtils
+    // TODP (TP) move to ValueSchemaUtils?
     public static final boolean hasRowID(final ValueSchema schema) {
         return schema.numColumns() > 0 && schema.getValueFactory(0) instanceof RowKeyValueFactory;
-    }
-
-    /**
-     * Updates the {@link DataTableSpec} of the passed source scheme with a new {@link DataTableSpec}, including the
-     * domains provided in the {@link Map}.
-     *
-     * @param source the source {@link DataTableSpec}
-     * @param domainMap the domains used for update.
-     * @param metadataMap the columnar metadata used to update
-     *
-     * @return the updated {@link ColumnarValueSchema}
-     */
-    // TODO (TP) Remove
-    @Deprecated
-    public static final ValueSchema updateSource(final ValueSchema source,
-        final Map<Integer, DataColumnDomain> domainMap, final Map<Integer, DataColumnMetaData[]> metadataMap) {
-        return ValueSchemaUtils.updateDataTableSpec(source, domainMap, metadataMap);
-    }
-
-    /**
-     * Changes the DataTableSpec in the schema.
-     *
-     * @param schema to updated
-     * @param spec to update the schema with (may have e.g. a different domains or different column names)
-     * @return the schema with the updated spec
-     * @throws IllegalArgumentException if the types in schema and spec don't match
-     */
-    // TODO (TP) Remove
-    @Deprecated
-    public static ValueSchema updateDataTableSpec(final ValueSchema schema, final DataTableSpec spec) {
-        return ValueSchemaUtils.updateDataTableSpec(schema, spec);
     }
 
     /**

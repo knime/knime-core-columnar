@@ -64,7 +64,6 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.filter.TableFilterUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.columnar.table.virtual.persist.TableTransformNodeSettingsPersistor;
@@ -343,7 +342,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     @Override
     protected void saveToFileOverwrite(final File f, final NodeSettingsWO settings, final ExecutionMonitor exec)
         throws IOException, CanceledExecutionException {
-        ColumnarValueSchemaUtils.save(m_schema, settings.addNodeSettings(CFG_SCHEMA));
+        ValueSchemaUtils.save(m_schema, settings.addNodeSettings(CFG_SCHEMA));
         settings.addIntArray(CFG_REF_TABLES, //
             Stream.of(m_refTables)//
                 .mapToInt(BufferedDataTable::getBufferedTableId)//
