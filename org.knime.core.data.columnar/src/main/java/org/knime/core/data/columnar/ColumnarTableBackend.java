@@ -136,8 +136,7 @@ public final class ColumnarTableBackend implements TableBackend {
             final ColumnarRowWriteTableSettings containerSettings =
                 new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
                     settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
-            return ColumnarRowContainerUtils.create(context, repository.generateNewID(),
-                ColumnarValueSchemaUtils.create(schema), containerSettings);
+            return ColumnarRowContainerUtils.create(context, repository.generateNewID(), schema, containerSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Exception while creating ColumnarRowWriteCursor.", e);
         }
