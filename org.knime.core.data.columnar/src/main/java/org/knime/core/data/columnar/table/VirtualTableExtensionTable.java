@@ -76,6 +76,7 @@ import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -194,7 +195,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
         @SuppressWarnings("resource") // will be closed in the close method
         var columnarSchema = getOutput().getSchema();
-        m_schema = ColumnarValueSchemaUtils.load(columnarSchema, context);
+        m_schema = ValueSchemaUtils.load(columnarSchema, context);
     }
 
     private static ReferenceTable[] createReferenceTables(final NodeSettingsRO settings, final BufferedDataTable[] refTables)

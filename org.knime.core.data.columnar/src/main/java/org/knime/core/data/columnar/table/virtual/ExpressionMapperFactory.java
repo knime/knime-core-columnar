@@ -58,7 +58,6 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
 import org.knime.core.data.columnar.table.virtual.persist.Persistor;
 import org.knime.core.data.def.BooleanCell;
@@ -251,9 +250,8 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
                 valueFactories.add(valueFactory);
             }
 
-            var columnarValueSchema =
-                ColumnarValueSchemaUtils.create(inputSpec, valueFactories.toArray(ValueFactory<?, ?>[]::new));
-            return new ExpressionMapperFactory(settings.getString(CFG_EXPRESSION), columnarValueSchema,
+            var valueSchema = ValueSchemaUtils.create(inputSpec, valueFactories.toArray(ValueFactory<?, ?>[]::new));
+            return new ExpressionMapperFactory(settings.getString(CFG_EXPRESSION), valueSchema,
                 settings.getString(CFG_COLUMN_NAME));
         }
 

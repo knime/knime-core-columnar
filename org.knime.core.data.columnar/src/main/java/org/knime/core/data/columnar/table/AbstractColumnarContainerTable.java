@@ -66,6 +66,7 @@ import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -143,7 +144,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         }
 
         final BatchReadStore readStore = factory.createReadStore(tempDataPath);
-        var schema = ColumnarValueSchemaUtils.load(readStore.getSchema(), context);
+        var schema = ValueSchemaUtils.load(readStore.getSchema(), context);
         m_columnarTable = new ColumnarRowReadTable(schema, factory, readStore, size);
     }
 
