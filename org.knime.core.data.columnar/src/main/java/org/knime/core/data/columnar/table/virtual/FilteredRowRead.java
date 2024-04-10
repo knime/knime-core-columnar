@@ -51,10 +51,10 @@ package org.knime.core.data.columnar.table.virtual;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.row.ReadAccessRow;
 
@@ -63,7 +63,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 
 final class FilteredRowRead implements RowRead {
 
-    private final ColumnarValueSchema m_schema;
+    private final ValueSchema m_schema;
 
     private final TIntObjectMap<ReadValue> m_values;
 
@@ -71,7 +71,7 @@ final class FilteredRowRead implements RowRead {
 
     private final RowKeyReadValue m_rowKey;
 
-    FilteredRowRead(final ColumnarValueSchema unfilteredSchema, final ReadAccessRow filteredReadAccessRow,
+    FilteredRowRead(final ValueSchema unfilteredSchema, final ReadAccessRow filteredReadAccessRow,
         final ColumnSelection selectedColumns) {
         m_schema = unfilteredSchema;
         m_values = new TIntObjectHashMap<>();

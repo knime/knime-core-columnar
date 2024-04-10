@@ -60,7 +60,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.NominalValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
@@ -69,6 +68,7 @@ import org.knime.core.data.def.StringCell;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.meta.DataColumnMetaDataCreator;
 import org.knime.core.data.meta.DataColumnMetaDataRegistry;
+import org.knime.core.data.v2.schema.ValueSchema;
 
 /**
  * Default Configuration for {@link DomainWritable}.
@@ -98,7 +98,7 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
         NATIVE_DOMAIN_CALCULATORS.put(BooleanCell.TYPE, n -> new ColumnarBooleanDomainCalculator());
     }
 
-    private final ColumnarValueSchema m_schema;
+    private final ValueSchema m_schema;
 
     private final int m_maxNumValues;
 
@@ -115,7 +115,7 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
      * @param maxPossibleNominalDomainValues the maximum number of values for nominal domains
      * @param initializeDomains <source>true</source> if incoming domains/metadata should be used for initialization
      */
-    public DefaultDomainWritableConfig(final ColumnarValueSchema schema, final int maxPossibleNominalDomainValues,
+    public DefaultDomainWritableConfig(final ValueSchema schema, final int maxPossibleNominalDomainValues,
         final boolean initializeDomains) {
         m_schema = schema;
         m_readValueFactories = IntStream.range(0, schema.numColumns())//

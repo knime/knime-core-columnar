@@ -74,7 +74,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
@@ -95,6 +94,8 @@ import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyValueFactory;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.VoidRowKeyFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -458,7 +459,7 @@ public final class ColumnarRearranger {
         Map<RearrangedColumn, ColumnarVirtualTable> convertedColumns) {
     }
 
-    private RowContainer createAppendContainer(final ColumnarValueSchema schema, final int tableId) throws Exception {
+    private RowContainer createAppendContainer(final ValueSchema schema, final int tableId) throws Exception {
         var schemaWithRowID = prependRowID(VoidRowKeyFactory.INSTANCE, schema);
         var dataContainerSettings = DataContainerSettings.getDefault();
         var columnarContainerSettings =
@@ -466,14 +467,14 @@ public final class ColumnarRearranger {
         return ColumnarRowContainerUtils.create(m_context, tableId, schemaWithRowID, columnarContainerSettings);
     }
 
-    private static ColumnarValueSchema prependRowID(final RowKeyValueFactory<?, ?> rowIDValueFactory,
-        final ColumnarValueSchema schema) {
+    private static ValueSchema prependRowID(final RowKeyValueFactory<?, ?> rowIDValueFactory,
+        final ValueSchema schema) {
         assert !ColumnarValueSchemaUtils.hasRowID(schema) : "The ColumnarValueSchema already has a RowID";
         var valueFactories = Stream.concat(//
             Stream.of(rowIDValueFactory), //
             IntStream.range(0, schema.numColumns()).mapToObj(schema::getValueFactory)//
         ).toArray(ValueFactory<?, ?>[]::new);
-        return ColumnarValueSchemaUtils.create(schema.getSourceSpec(), valueFactories);
+        return ValueSchemaUtils.create(schema.getSourceSpec(), valueFactories);
     }
 
     /**
@@ -544,7 +545,7 @@ public final class ColumnarRearranger {
     private static final class ConverterFactory implements ColumnarMapperWithRowIndexFactory {
         private final DataCellTypeConverter m_converter;
 
-        private final ColumnarValueSchema m_outputSchema;
+        private final ValueSchema m_outputSchema;
 
         private final UntypedValueFactory m_inputValueFactory;
 
@@ -560,7 +561,7 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public ColumnarValueSchema getOutputSchema() {
+        public ValueSchema getOutputSchema() {
             return m_outputSchema;
         }
 
@@ -583,14 +584,14 @@ public final class ColumnarRearranger {
 
         private final CellFactory m_cellFactory;
 
-        private ColumnarValueSchema m_schema;
+        private final ValueSchema m_schema;
 
         CellFactoryMap(final UntypedValueFactory[] inputValueFactories,
             final UntypedValueFactory[] outputValueFactories, final CellFactory cellFactory) {
             m_readValueFactories = inputValueFactories;
             m_writeValueFactories = outputValueFactories;
             m_cellFactory = cellFactory;
-            m_schema = ColumnarValueSchemaUtils.create(//
+            m_schema = ValueSchemaUtils.create(//
                 new DataTableSpec(cellFactory.getColumnSpecs()), //
                 Stream.of(outputValueFactories)//
                     .map(UntypedValueFactory::getValueFactory)//
@@ -611,7 +612,7 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public ColumnarValueSchema getOutputSchema() {
+        public ValueSchema getOutputSchema() {
             return m_schema;
         }
 

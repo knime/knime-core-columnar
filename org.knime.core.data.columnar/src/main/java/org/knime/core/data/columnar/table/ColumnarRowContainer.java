@@ -51,8 +51,8 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.v2.RowContainer;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
@@ -68,7 +68,7 @@ import org.knime.core.table.schema.ColumnarSchema;
 final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
 
     @SuppressWarnings("resource") // Columnar table will be closed along with row container.
-    static ColumnarRowContainer create(final ExecutionContext context, final int id, final ColumnarValueSchema schema,
+    static ColumnarRowContainer create(final ExecutionContext context, final int id, final ValueSchema schema,
         final ColumnStoreFactory storeFactory, final ColumnarRowWriteTableSettings settings) throws IOException {
         // TODO: turn this into a constructor?
         return new ColumnarRowContainer(context, id, new ColumnarRowWriteTable(schema, storeFactory, settings));

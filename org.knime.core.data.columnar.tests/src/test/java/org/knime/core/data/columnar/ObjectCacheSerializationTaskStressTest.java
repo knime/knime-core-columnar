@@ -33,8 +33,6 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
@@ -120,12 +118,11 @@ public class ObjectCacheSerializationTaskStressTest {
         return new DefaultColumnarSchema(types, traits);
     }
 
-    private static ColumnarValueSchema createColumnarValueSchema(final int numDataColumnsOfChunks) {
+    private static ValueSchema createColumnarValueSchema(final int numDataColumnsOfChunks) {
         final DataTableSpec dataTableSpec = createSpec(numDataColumnsOfChunks);
         final ValueSchema valueSchema =
             ValueSchemaUtils.create(dataTableSpec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
-        final ColumnarValueSchema schema = ColumnarValueSchemaUtils.create(valueSchema);
-        return schema;
+        return valueSchema;
     }
 
     private static DataTableSpec createSpec(final int numColumns) {

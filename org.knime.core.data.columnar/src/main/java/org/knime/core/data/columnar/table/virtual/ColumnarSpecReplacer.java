@@ -58,7 +58,6 @@ import java.util.function.IntSupplier;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
@@ -68,6 +67,7 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.Node;
@@ -183,8 +183,8 @@ public final class ColumnarSpecReplacer {
     record IndexFilters(int[] castedColumns, int[] unCastedColumns, int[] mergePermutation) {
     }
 
-    private static List<ColumnCast> determineCasts(final ColumnarValueSchema inputSchema,
-        final ColumnarValueSchema outputSchema) {
+    private static List<ColumnCast> determineCasts(final ValueSchema inputSchema,
+        final ValueSchema outputSchema) {
         var casts = new ArrayList<ColumnCast>();
         CheckUtils.checkArgument(areEqual(inputSchema.getValueFactory(0), outputSchema.getValueFactory(0)),
             "The RowID ValueFactories must match.");

@@ -59,8 +59,6 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.schema.ValueSchema;
@@ -72,11 +70,11 @@ import org.knime.core.data.v2.schema.ValueSchemaUtils;
 @SuppressWarnings("javadoc")
 public class WrappedBatchStoreTest extends ColumnarTest {
 
-    private static ColumnarValueSchema generateDefaultSchema() {
+    private static ValueSchema generateDefaultSchema() {
         final DataTableSpec spec = createSpec();
         final ValueSchema valueSchema =
             ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
-        return ColumnarValueSchemaUtils.create(valueSchema);
+        return valueSchema;
     }
 
     @SuppressWarnings("resource")
@@ -85,7 +83,7 @@ public class WrappedBatchStoreTest extends ColumnarTest {
         return new WrappedBatchStore(delegate, delegate, delegate.getFileHandle());
     }
 
-    static final ColumnarValueSchema SCHEMA = generateDefaultSchema();
+    static final ValueSchema SCHEMA = generateDefaultSchema();
 
     @Test
     public void testWriteRead() throws IOException {

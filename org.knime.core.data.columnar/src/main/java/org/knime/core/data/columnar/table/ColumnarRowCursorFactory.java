@@ -51,11 +51,11 @@ import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.columnar.filter.TableFilterUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.ReadAccessRow;
@@ -73,9 +73,9 @@ final class ColumnarRowCursorFactory {
 
     private static final class EmptyRowCursor implements RowCursor {
 
-        private final ColumnarValueSchema m_schema;
+        private final ValueSchema m_schema;
 
-        private EmptyRowCursor(final ColumnarValueSchema schema) {
+        private EmptyRowCursor(final ValueSchema schema) {
             m_schema = schema;
         }
 
@@ -107,7 +107,7 @@ final class ColumnarRowCursorFactory {
 
         private final RowRead m_rowRead;
 
-        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate, final ColumnarValueSchema schema,
+        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate, final ValueSchema schema,
             final ColumnSelection selection) {
             m_delegate = delegate;
             ReadAccessRow access = delegate.access();
@@ -142,12 +142,12 @@ final class ColumnarRowCursorFactory {
 
     }
 
-    static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size) {
+    static RowCursor create(final BatchReadStore store, final ValueSchema schema, final long size) {
         return create(store, schema, size, null);
     }
 
     @SuppressWarnings("resource") // the returned cursor has to be closed by the caller
-    static RowCursor create(final BatchReadStore store, final ColumnarValueSchema schema, final long size, // NOSONAR
+    static RowCursor create(final BatchReadStore store, final ValueSchema schema, final long size, // NOSONAR
         final TableFilter filter) {
         if (size < 1) {
             return new EmptyRowCursor(schema);

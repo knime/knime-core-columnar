@@ -50,8 +50,8 @@ package org.knime.core.data.columnar.schema;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
-import static org.knime.core.data.columnar.schema.DefaultColumnarValueSchemaTest.createDefaultColumnarValueSchema;
-import static org.knime.core.data.columnar.schema.DefaultColumnarValueSchemaTest.createSpec;
+import static org.knime.core.data.columnar.schema.DefaultValueSchemaTest.createDefaultValueSchema;
+import static org.knime.core.data.columnar.schema.DefaultValueSchemaTest.createSpec;
 
 import java.util.AbstractMap;
 import java.util.Collections;
@@ -64,6 +64,7 @@ import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.probability.nominal.NominalDistributionValueMetaData;
+import org.knime.core.data.v2.schema.ValueSchema;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -73,17 +74,17 @@ public class UpdatedColumnarValueSchemaTest {
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testGetSpecIndexOutOfBoundsLower() {
-        new UpdatedColumnarValueSchema(createSpec(0), createDefaultColumnarValueSchema(createSpec(0))).getSpec(-1);
+        new UpdatedColumnarValueSchema(createSpec(0), createDefaultValueSchema(createSpec(0))).getSpec(-1);
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testGetSpecIndexOutOfBoundsUpper() {
-        new UpdatedColumnarValueSchema(createSpec(0), createDefaultColumnarValueSchema(createSpec(0))).getSpec(1);
+        new UpdatedColumnarValueSchema(createSpec(0), createDefaultValueSchema(createSpec(0))).getSpec(1);
     }
 
     @Test
     public void testGetSpec() {
-        final ColumnarValueSchema delegate = createDefaultColumnarValueSchema(createSpec(1));
+        final ValueSchema delegate = createDefaultValueSchema(createSpec(1));
         final UpdatedColumnarValueSchema updated = new UpdatedColumnarValueSchema(createSpec(1), delegate);
         assertEquals(delegate.getSpec(0), updated.getSpec(0));
         assertEquals(delegate.getSpec(1), updated.getSpec(1));
@@ -93,7 +94,7 @@ public class UpdatedColumnarValueSchemaTest {
     public void testSourceSpec() {
         final DataTableSpec delegateSpec = createSpec(1);
         final DataTableSpec updatedSpec = createSpec(1);
-        final ColumnarValueSchema delegate = createDefaultColumnarValueSchema(delegateSpec);
+        final ValueSchema delegate = createDefaultValueSchema(delegateSpec);
         final UpdatedColumnarValueSchema updated = new UpdatedColumnarValueSchema(updatedSpec, delegate);
         assertEquals(delegateSpec, delegate.getSourceSpec());
         assertEquals(updatedSpec, updated.getSourceSpec());
@@ -101,21 +102,21 @@ public class UpdatedColumnarValueSchemaTest {
 
     @Test
     public void testUpdateSource() {
-        final ColumnarValueSchema source = createDefaultColumnarValueSchema(createSpec(1));
-        final ColumnarValueSchema updated =
+        final ValueSchema source = createDefaultValueSchema(createSpec(1));
+        final ValueSchema updated =
             ColumnarValueSchemaUtils.updateSource(source, Collections.emptyMap(), Collections.emptyMap());
         assertEquals(source.getSourceSpec(), updated.getSourceSpec());
     }
 
     @Test
     public void testUpdateSourceWithMetadata() {
-        final ColumnarValueSchema source = createDefaultColumnarValueSchema(createSpec(1));
+        final ValueSchema source = createDefaultValueSchema(createSpec(1));
         final Map<Integer, DataColumnDomain> domainMap = Collections.emptyMap();
         final Map<Integer, DataColumnMetaData[]> metadataMap = Stream
             .of(new AbstractMap.SimpleImmutableEntry<>(Integer.valueOf(1),
                 new DataColumnMetaData[]{new NominalDistributionValueMetaData(new String[]{"test"})}))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        final ColumnarValueSchema updated = ColumnarValueSchemaUtils.updateSource(source, domainMap, metadataMap);
+        final ValueSchema updated = ColumnarValueSchemaUtils.updateSource(source, domainMap, metadataMap);
         assertNotEquals(source.getSourceSpec(), updated.getSourceSpec());
     }
 

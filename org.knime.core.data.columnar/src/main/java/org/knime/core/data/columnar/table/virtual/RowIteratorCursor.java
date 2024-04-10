@@ -50,8 +50,8 @@ package org.knime.core.data.columnar.table.virtual;
 
 import java.io.IOException;
 
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.container.CloseableRowIterator;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.access.BufferedAccesses;
 import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
 import org.knime.core.table.cursor.Cursor;
@@ -72,14 +72,14 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
 
     private final CloseableRowIterator m_iterator;
 
-    RowIteratorCursor(final ColumnarValueSchema schema, final CloseableRowIterator iterator,
+    RowIteratorCursor(final ValueSchema schema, final CloseableRowIterator iterator,
         final ColumnSelection selection) {
         m_accessRow = BufferedAccesses.createBufferedAccessRow(schema, selection);
         m_rowWrite = new WriteAccessRowWrite(schema, m_accessRow, selection);
         m_iterator = iterator;
     }
 
-    RowIteratorCursor(final ColumnarValueSchema schema, final CloseableRowIterator iterator) {
+    RowIteratorCursor(final ValueSchema schema, final CloseableRowIterator iterator) {
         this(schema, iterator, ColumnSelection.all());
     }
 

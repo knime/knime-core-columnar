@@ -51,9 +51,9 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.v2.RowContainer;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.ExecutionContext;
 
 /**
@@ -77,7 +77,7 @@ public final class ColumnarRowContainerUtils {
      * @throws Exception when instantiation of the column store factory initially failed
      */
     public static RowContainer create(final ExecutionContext context, final int tableId,
-        final ColumnarValueSchema schema, final ColumnarRowWriteTableSettings settings) throws Exception {
+        final ValueSchema schema, final ColumnarRowWriteTableSettings settings) throws Exception {
         return createInternal(context, tableId, schema, settings);
     }
 
@@ -92,14 +92,14 @@ public final class ColumnarRowContainerUtils {
      * @throws Exception when instantiation of the column store factory initially failed
      */
     @SuppressWarnings("resource")
-    public static DataContainerDelegate create(final int tableId, final ColumnarValueSchema schema,
+    public static DataContainerDelegate create(final int tableId, final ValueSchema schema,
         final ColumnarRowWriteTableSettings settings) throws Exception {
         return new ColumnarDataContainerDelegate(schema.getSourceSpec(),
             createInternal(null, tableId, schema, settings), settings);
     }
 
     private static ColumnarRowContainer createInternal(final ExecutionContext context, final int tableId,
-        final ColumnarValueSchema schema, final ColumnarRowWriteTableSettings settings) throws Exception {
+        final ValueSchema schema, final ColumnarRowWriteTableSettings settings) throws Exception {
         return ColumnarRowContainer.create(context, tableId, schema,
             ColumnStoreFactoryRegistry.getOrCreateInstance().getFactorySingleton(), settings);
     }
