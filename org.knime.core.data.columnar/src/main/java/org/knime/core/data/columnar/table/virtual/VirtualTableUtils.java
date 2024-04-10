@@ -54,10 +54,10 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.cursor.Cursor;
@@ -88,7 +88,7 @@ public final class VirtualTableUtils {
      * @return a {@link RowCursor} with the unfiltered schema that only contains values for the selected columns
      */
     @SuppressWarnings("resource") // the lookaheadCursor is managed by the returned RowCursor
-    public static RowCursor createTableFilterRowCursor(final ColumnarValueSchema unfilteredSchema,
+    public static RowCursor createTableFilterRowCursor(final ValueSchema unfilteredSchema,
         final Cursor<ReadAccessRow> filteredCursor, final ColumnSelection columnSelection) {
         final ColumnarSchema filteredSchema = filter(unfilteredSchema, columnSelection);
         final LookaheadCursor<ReadAccessRow> lookaheadCursor = Cursors.toLookahead(filteredSchema, filteredCursor);
@@ -104,7 +104,7 @@ public final class VirtualTableUtils {
      * @return {@link RowCursor} that is backed by the provided {@link Cursor}
      */
     @SuppressWarnings("resource") // the lookaheadCursor is managed by the returned RowCursor
-    public static RowCursor createColumnarRowCursor(final ColumnarValueSchema schema,
+    public static RowCursor createColumnarRowCursor(final ValueSchema schema,
         final Cursor<ReadAccessRow> cursor) {
         final var lookaheadCursor = Cursors.toLookahead(schema, cursor);
         final var accessRow = createRowRead(schema, lookaheadCursor.access());
@@ -133,13 +133,13 @@ public final class VirtualTableUtils {
      * @param table
      * @return a {@link RowAccessible} that is backed by the provided table
      */
-    public static RowAccessible createRowAccessible(final ColumnarValueSchema schema, final BufferedDataTable table) {
+    public static RowAccessible createRowAccessible(final ValueSchema schema, final BufferedDataTable table) {
         CheckUtils.checkArgument(schema.getSourceSpec().equals(table.getDataTableSpec()),
             "The schema must match the table.");
         return new BufferedDataTableRowAccessible(table, schema);
     }
 
-    private static RowRead createRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow) {
+    private static RowRead createRowRead(final ValueSchema schema, final ReadAccessRow accessRow) {
         return new DenseColumnarRowRead(schema, accessRow);
     }
 
@@ -152,7 +152,7 @@ public final class VirtualTableUtils {
      * @param columnSelection specifies which columns are included
      * @return a {@link RowRead} that is backed by the provided {@link ReadAccessRow}
      */
-    public static RowRead createRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow,
+    public static RowRead createRowRead(final ValueSchema schema, final ReadAccessRow accessRow,
         final ColumnSelection columnSelection) {
         if (isSparse(columnSelection)) {
             return new SparseColumnarRowRead(schema, accessRow, columnSelection);

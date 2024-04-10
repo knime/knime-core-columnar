@@ -69,8 +69,6 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestBatchStore;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.schema.ValueSchema;
@@ -86,12 +84,12 @@ public class DuplicateCheckWritableTest extends ColumnarTest {
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
 
-    private static final ColumnarValueSchema SCHEMA;
+    private static final ValueSchema SCHEMA;
     static {
         final DataTableSpec spec = createSpec();
         final ValueSchema valueSchema =
             ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
-        SCHEMA = ColumnarValueSchemaUtils.create(valueSchema);
+        SCHEMA = valueSchema;
     }
 
     @AfterClass

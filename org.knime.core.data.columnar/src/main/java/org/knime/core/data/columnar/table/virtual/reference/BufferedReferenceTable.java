@@ -51,11 +51,11 @@ package org.knime.core.data.columnar.table.virtual.reference;
 import java.util.Map;
 import java.util.UUID;
 
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.row.RowAccessible;
 
@@ -65,7 +65,7 @@ final class BufferedReferenceTable extends AbstractReferenceTable {
 
     BufferedReferenceTable(final BufferedDataTable table, final UUID id) throws VirtualTableIncompatibleException {
         super(table, id);
-        ColumnarValueSchema schema = VirtualTableSchemaUtils.extractSchema(table);
+        ValueSchema schema = VirtualTableSchemaUtils.extractSchema(table);
         m_virtualTable = new ColumnarVirtualTable(id, schema, true);
     }
 

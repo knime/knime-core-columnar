@@ -61,8 +61,6 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
@@ -70,6 +68,8 @@ import org.knime.core.data.def.LongCell;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.table.access.IntAccess.IntReadAccess;
 import org.knime.core.table.access.LongAccess.LongWriteAccess;
@@ -209,13 +209,13 @@ final class ColumnarVirtualTableTest {
         }
 
         @Override
-        public ColumnarValueSchema getOutputSchema() {
+        public ValueSchema getOutputSchema() {
             return builder(false).withColumn("bar", LONG).build();
         }
 
     }
 
-    private static ColumnarVirtualTable createTable(final ColumnarValueSchema schema) {
+    private static ColumnarVirtualTable createTable(final ValueSchema schema) {
         return new ColumnarVirtualTable(UUID.randomUUID(), schema, true);
     }
 
@@ -223,7 +223,7 @@ final class ColumnarVirtualTableTest {
         return createTable(createSchema(hasRowID, columns));
     }
 
-    private static ColumnarValueSchema createSchema(final boolean hasRowID, final Column... columns) {
+    private static ValueSchema createSchema(final boolean hasRowID, final Column... columns) {
         var schemaBuilder = builder(hasRowID);
         Stream.of(columns).forEach(schemaBuilder::withColumn);
         return schemaBuilder.build();
@@ -255,14 +255,14 @@ final class ColumnarVirtualTableTest {
             return withColumn(column.name, column.type);
         }
 
-        ColumnarValueSchema build() {
+        ValueSchema build() {
             var valueFactories = Stream
                 .concat(m_hasRowID ? Stream.of(DefaultRowKeyValueFactory.INSTANCE) : Stream.empty(),
                     // null is save here because we are not using any FileStoreAwareValueFactories
                     m_columns.stream().map(c -> ValueFactoryUtils.getValueFactory(c.getType(), null)))//
                 .toArray(ValueFactory<?, ?>[]::new);
             var spec = new DataTableSpec(m_columns.toArray(DataColumnSpec[]::new));
-            return ColumnarValueSchemaUtils.create(spec, valueFactories);
+            return ValueSchemaUtils.create(spec, valueFactories);
         }
     }
 }

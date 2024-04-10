@@ -51,9 +51,9 @@ package org.knime.core.data.columnar.table.virtual.reference;
 import java.util.Map;
 import java.util.UUID;
 
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.virtual.VirtualTable;
@@ -80,7 +80,7 @@ public interface ReferenceTable {
      */
     void clearIfNecessary();
 
-    default ColumnarValueSchema getSchema() {
+    default ValueSchema getSchema() {
         return getVirtualTable().getSchema();
     }
 }

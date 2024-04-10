@@ -58,12 +58,12 @@ import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.RowWriteAccessible;
@@ -83,7 +83,7 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
 
     static final NodeLogger LOGGER = NodeLogger.getLogger(ColumnarRowWriteTable.class);
 
-    private final ColumnarValueSchema m_schema;
+    private final ValueSchema m_schema;
 
     private final ColumnStoreFactory m_storeFactory;
 
@@ -114,7 +114,7 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
      * @param settings Settings further governing this table's behavior.
      * @throws IOException If creating the underlying temporary file where the table will be stored failed.
      */
-    public ColumnarRowWriteTable(final ColumnarValueSchema schema, final ColumnStoreFactory storeFactory,
+    public ColumnarRowWriteTable(final ValueSchema schema, final ColumnStoreFactory storeFactory,
         final ColumnarRowWriteTableSettings settings) throws IOException {
         m_schema = schema;
         m_storeFactory = storeFactory;
@@ -202,7 +202,7 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
                 LOGGER.error("Exception while flushing store.", ex);
                 throw new IllegalStateException("Table could not be written to disk.", ex);
             }
-            final ColumnarValueSchema schema;
+            final ValueSchema schema;
             if (m_nullableDomainWritable != null) {
                 final Map<Integer, DataColumnDomain> domains = new HashMap<>();
                 final Map<Integer, DataColumnMetaData[]> metadata = new HashMap<>();

@@ -55,11 +55,11 @@ import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.cursor.RandomAccessCursor;
 import org.knime.core.table.row.RandomRowAccessible;
 import org.knime.core.table.row.ReadAccessRow;
@@ -79,7 +79,7 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
     /** a system property to disable all caches in a read table for testing */
     private static final boolean DISABLE_CACHES = Boolean.getBoolean("knime.columnar.disablecaches.readtable");
 
-    private final ColumnarValueSchema m_schema;
+    private final ValueSchema m_schema;
 
     private final ColumnStoreFactory m_storeFactory;
 
@@ -101,7 +101,7 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
      * @param size The number of rows contained in the table.
      */
     @SuppressWarnings("resource") // Wrapped store will be closed along with its wrapper, i.e. along with this table.
-    public ColumnarRowReadTable(final ColumnarValueSchema schema, final ColumnStoreFactory storeFactory,
+    public ColumnarRowReadTable(final ValueSchema schema, final ColumnStoreFactory storeFactory,
         final BatchReadStore store, final long size) {
         this(schema, storeFactory, wrapInColumnarStore(store), size);
     }
@@ -127,7 +127,7 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
      * @param store The table's underlying store.
      * @param size The number of rows contained in the table.
      */
-    public ColumnarRowReadTable(final ColumnarValueSchema schema, final ColumnStoreFactory storeFactory,
+    public ColumnarRowReadTable(final ValueSchema schema, final ColumnStoreFactory storeFactory,
         final ColumnarBatchReadStore store, final long size) {
         m_schema = schema;
         m_storeFactory = storeFactory;
@@ -139,7 +139,7 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
      * @return This table's schema.
      */
     @Override
-    public ColumnarValueSchema getSchema() {
+    public ValueSchema getSchema() {
         return m_schema;
     }
 

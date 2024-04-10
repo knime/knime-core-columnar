@@ -50,10 +50,10 @@ package org.knime.core.data.columnar.table.virtual;
 
 import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.row.ReadAccessRow;
 
@@ -70,7 +70,7 @@ final class DenseColumnarRowRead implements RowRead {
 
     private final RowKeyReadValue m_rowKeyValue;
 
-    DenseColumnarRowRead(final ColumnarValueSchema schema, final ReadAccessRow readAccessRow) {
+    DenseColumnarRowRead(final ValueSchema schema, final ReadAccessRow readAccessRow) {
         final var numColumns = schema.numColumns();
         m_values = new ReadValue[numColumns];
         m_accesses = new ReadAccess[numColumns];

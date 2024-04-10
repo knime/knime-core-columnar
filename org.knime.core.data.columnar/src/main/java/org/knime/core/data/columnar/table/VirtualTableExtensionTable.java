@@ -64,7 +64,6 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.filter.TableFilterUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
@@ -76,6 +75,7 @@ import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -130,7 +130,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private final DataTableSpec m_dataTableSpec;
 
-    private final ColumnarValueSchema m_schema;
+    private final ValueSchema m_schema;
 
     private final BufferedDataTable[] m_refTables;
 
@@ -275,7 +275,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
      */
     public VirtualTableExtensionTable(final ReferenceTable[] refs, //
         final VirtualTable virtualTableFragment, //
-        final ColumnarValueSchema transformedSchema, //
+        final ValueSchema transformedSchema, //
         final long size, //
         final int tableId) {
         this(refs, virtualTableFragment.getProducingTransform(), transformedSchema, size, tableId);
@@ -299,7 +299,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private VirtualTableExtensionTable(final ReferenceTable[] refs, //
         final TableTransform fragmentTableTransform, //
-        final ColumnarValueSchema transformedSchema, //
+        final ValueSchema transformedSchema, //
         final long size, //
         final int tableId) {
         m_tableId = tableId;
@@ -335,7 +335,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     /**
      * @return the schema of the table
      */
-    public ColumnarValueSchema getSchema() {
+    public ValueSchema getSchema() {
         return m_schema;
     }
 

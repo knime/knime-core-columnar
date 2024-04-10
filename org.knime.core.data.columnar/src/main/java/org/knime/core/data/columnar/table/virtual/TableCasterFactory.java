@@ -57,8 +57,6 @@ import java.util.stream.Stream;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
 import org.knime.core.data.columnar.table.virtual.NullableValues.NullableReadValue;
 import org.knime.core.data.columnar.table.virtual.NullableValues.NullableWriteValue;
@@ -67,6 +65,8 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -141,7 +141,7 @@ final class TableCasterFactory implements ColumnarMapperFactory {
     }
 
     @Override
-    public ColumnarValueSchema getOutputSchema() {
+    public ValueSchema getOutputSchema() {
         var spec = new DataTableSpec(//
             m_casts.stream()//
                 .map(ColumnCasterFactory::outputSpec)//
@@ -151,7 +151,7 @@ final class TableCasterFactory implements ColumnarMapperFactory {
             .map(ColumnCasterFactory::outputValueFactory)//
             .map(UntypedValueFactory::getValueFactory)//
             .toArray(ValueFactory<?, ?>[]::new);
-        return ColumnarValueSchemaUtils.create(spec, valueFactories);
+        return ValueSchemaUtils.create(spec, valueFactories);
     }
 
     /**

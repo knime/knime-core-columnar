@@ -53,7 +53,7 @@ import java.io.Flushable;
 import java.io.IOException;
 
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeSettingsWO;
@@ -100,7 +100,7 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      */
     @SuppressWarnings("resource") // Columnar table will be closed along with the container table.
     public static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
-        final ColumnarValueSchema schema, final ColumnarBatchReadStore store, final Flushable storeFlusher,
+        final ValueSchema schema, final ColumnarBatchReadStore store, final Flushable storeFlusher,
         final long size) {
         final var table = new UnsavedColumnarContainerTable(tableId,
             new ColumnarRowReadTable(schema, factory, store, size), storeFlusher);

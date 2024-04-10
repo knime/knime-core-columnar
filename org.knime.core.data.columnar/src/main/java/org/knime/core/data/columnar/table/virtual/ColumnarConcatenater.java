@@ -68,7 +68,6 @@ import org.knime.core.data.DataColumnSpecCreator.MergeOptions;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.columnar.ColumnarTableBackend;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
@@ -86,6 +85,7 @@ import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.data.v2.value.VoidRowKeyFactory;
@@ -192,7 +192,7 @@ public final class ColumnarConcatenater {
         }
 
         @Override
-        public ColumnarValueSchema getOutputSchema() {
+        public ValueSchema getOutputSchema() {
             return ColumnarValueSchemaUtils.create(
                 new DataTableSpec(), new ValueFactory<?, ?>[] {DefaultRowKeyValueFactory.INSTANCE});
         }
@@ -215,7 +215,7 @@ public final class ColumnarConcatenater {
 
     }
 
-    private ColumnarValueSchema concatenate(final ColumnarValueSchema[] schemas) {
+    private ValueSchema concatenate(final ValueSchema[] schemas) {
         final var tableSpecs = VirtualTableSchemaUtils.extractSpecs(schemas);
         var unionSchemaCreators = new LinkedHashMap<String, ColCreator>();
         for (int t = 0; t < schemas.length; t++) {
@@ -235,7 +235,7 @@ public final class ColumnarConcatenater {
         var valueFactories = Stream.concat(//
             Stream.of(schemas[0].getValueFactory(0)), // Assumes that all tables use the same value factory for RowIDs
             unionSchemaCreators.values().stream().map(ColCreator::getValueFactory)).toArray(ValueFactory[]::new);
-        return ColumnarValueSchemaUtils.create(ValueSchemaUtils.create(unionTableSpec, valueFactories));
+        return ValueSchemaUtils.create(unionTableSpec, valueFactories);
     }
 
     private final class RowIDUniquifier {
@@ -301,7 +301,7 @@ public final class ColumnarConcatenater {
 
         private final List<ReferenceTable> m_referenceTables = new ArrayList<>();
 
-        TablePrepper(final ColumnarValueSchema concatenatedSchema) {
+        TablePrepper(final ValueSchema concatenatedSchema) {
             m_concatenatedSpec = concatenatedSchema.getSourceSpec();
             m_valueFactoriesPerColumn = new HashMap<>();
             for (int c = 0; c < m_concatenatedSpec.getNumColumns(); c++) {

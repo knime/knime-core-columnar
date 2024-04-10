@@ -59,13 +59,13 @@ import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.ColumnStoreFactoryRegistry;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.Finalizer;
 import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelease;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -174,7 +174,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
     }
 
     @Override
-    public ColumnarValueSchema getSchema() {
+    public ValueSchema getSchema() {
         return m_columnarTable.getSchema();
     }
 

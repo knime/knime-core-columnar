@@ -73,7 +73,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
@@ -90,6 +89,8 @@ import org.knime.core.data.container.ColumnRearrangerUtils.RearrangedColumn;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionContext;
@@ -466,7 +467,7 @@ public final class ColumnarRearranger {
     private static final class ConverterFactory implements ColumnarMapperWithRowIndexFactory {
         private final DataCellTypeConverter m_converter;
 
-        private final ColumnarValueSchema m_outputSchema;
+        private final ValueSchema m_outputSchema;
 
         private final UntypedValueFactory m_inputValueFactory;
 
@@ -482,7 +483,7 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public ColumnarValueSchema getOutputSchema() {
+        public ValueSchema getOutputSchema() {
             return m_outputSchema;
         }
 
@@ -505,14 +506,14 @@ public final class ColumnarRearranger {
 
         private final CellFactory m_cellFactory;
 
-        private ColumnarValueSchema m_schema;
+        private final ValueSchema m_schema;
 
         CellFactoryMap(final UntypedValueFactory[] inputValueFactories,
             final UntypedValueFactory[] outputValueFactories, final CellFactory cellFactory) {
             m_readValueFactories = inputValueFactories;
             m_writeValueFactories = outputValueFactories;
             m_cellFactory = cellFactory;
-            m_schema = ColumnarValueSchemaUtils.create(//
+            m_schema = ValueSchemaUtils.create(//
                 new DataTableSpec(cellFactory.getColumnSpecs()), //
                 Stream.of(outputValueFactories)//
                     .map(UntypedValueFactory::getValueFactory)//
@@ -533,7 +534,7 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public ColumnarValueSchema getOutputSchema() {
+        public ValueSchema getOutputSchema() {
             return m_schema;
         }
 

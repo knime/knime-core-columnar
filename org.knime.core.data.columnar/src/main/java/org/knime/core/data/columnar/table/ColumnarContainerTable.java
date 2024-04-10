@@ -48,7 +48,7 @@
  */
 package org.knime.core.data.columnar.table;
 
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
 
 /**
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
@@ -64,5 +64,5 @@ public interface ColumnarContainerTable {
     /**
      * @return the table's schema
      */
-    ColumnarValueSchema getSchema();
+    ValueSchema getSchema();
 }

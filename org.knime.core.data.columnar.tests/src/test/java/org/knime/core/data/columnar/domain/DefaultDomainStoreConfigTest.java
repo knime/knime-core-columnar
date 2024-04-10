@@ -68,8 +68,6 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.NominalValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
@@ -116,11 +114,11 @@ public class DefaultDomainStoreConfigTest {
     private static class NoDomainCell extends DefaultDomainStoreConfigTestCell {
     }
 
-    private static ColumnarValueSchema createSchema(final DataColumnSpec... specs) {
+    private static ValueSchema createSchema(final DataColumnSpec... specs) {
         final DataTableSpec spec = new DataTableSpec(specs);
         final ValueSchema valueSchema =
             ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
-        return ColumnarValueSchemaUtils.create(valueSchema);
+        return valueSchema;
     }
 
     private static final DataColumnSpec INT = new DataColumnSpecCreator("int", IntCell.TYPE).createSpec();

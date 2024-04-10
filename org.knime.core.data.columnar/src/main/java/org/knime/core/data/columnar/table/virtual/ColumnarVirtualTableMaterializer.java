@@ -57,7 +57,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
@@ -67,6 +66,8 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.data.v2.value.VoidRowKeyFactory;
 import org.knime.core.node.CanceledExecutionException;
@@ -168,7 +169,7 @@ public final class ColumnarVirtualTableMaterializer {
         }
     }
 
-    private ColumnarValueSchema createContainerSchema(final ColumnarValueSchema virtualTableSchema) {
+    private ValueSchema createContainerSchema(final ValueSchema virtualTableSchema) {
         var rowIDValueFactory = m_materializeRowKey ? DefaultRowKeyValueFactory.INSTANCE : VoidRowKeyFactory.INSTANCE;
 
         assert ColumnarValueSchemaUtils.hasRowID(virtualTableSchema) : "The ColumnarValueSchema should have a RowID";
@@ -176,11 +177,11 @@ public final class ColumnarVirtualTableMaterializer {
             Stream.of(rowIDValueFactory), //
             IntStream.range(1, virtualTableSchema.numColumns()).mapToObj(virtualTableSchema::getValueFactory) //
         ).toArray(ValueFactory<?, ?>[]::new);
-        return ColumnarValueSchemaUtils.create(virtualTableSchema.getSourceSpec(), valueFactories);
+        return ValueSchemaUtils.create(virtualTableSchema.getSourceSpec(), valueFactories);
 
     }
 
-    private RowContainer createContainer(final ColumnarValueSchema schema) throws Exception {
+    private RowContainer createContainer(final ValueSchema schema) throws Exception {
         assert ColumnarValueSchemaUtils.hasRowID(schema) : "The ColumnarValueSchema should have a RowID";
         var dataContainerSettings = DataContainerSettings.getDefault();
         var columnarContainerSettings =

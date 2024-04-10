@@ -58,7 +58,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
@@ -118,13 +117,12 @@ public final class ColumnarTableBackend implements TableBackend {
         final boolean isEnableRowKeys = settings.isEnableRowKeys();
         final ValueSchema schema = ValueSchemaUtils.create(spec, isEnableRowKeys ? RowKeyType.CUSTOM : RowKeyType.NOKEY,
             initFileStoreHandler(fileStoreHandler, repository));
-        final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
             final ColumnarRowWriteTableSettings cursorSettings =
                 new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.isEnableDomainUpdate(),
                     settings.getMaxDomainValues(), isEnableRowKeys && settings.isCheckDuplicateRowKeys(), true,
                     settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
-            return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
+            return ColumnarRowContainerUtils.create(repository.generateNewID(), schema, cursorSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", e);
         }
@@ -370,7 +368,7 @@ public final class ColumnarTableBackend implements TableBackend {
         return getSchemaIfColumnar(table).filter(not(ColumnarValueSchemaUtils::storesDataCellSerializersSeparately))
             .isPresent();
     }
-    private static Optional<ColumnarValueSchema> getSchemaIfColumnar(final BufferedDataTable table) {
+    private static Optional<ValueSchema> getSchemaIfColumnar(final BufferedDataTable table) {
         var delegate = unwrap(table);
         if (delegate instanceof AbstractColumnarContainerTable columnarTable) {
             return Optional.of(columnarTable.getSchema());

@@ -51,10 +51,10 @@ package org.knime.core.data.columnar.table.virtual;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowKeyReadValue;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.row.ReadAccessRow;
 
@@ -77,7 +77,7 @@ final class SparseColumnarRowRead implements RowRead {
 
     private final int m_numColumns;
 
-    SparseColumnarRowRead(final ColumnarValueSchema schema, final ReadAccessRow accessRow,
+    SparseColumnarRowRead(final ValueSchema schema, final ReadAccessRow accessRow,
         final ColumnSelection selection) {
         final var numColumns = schema.numColumns();
         // the row key is not a column in KNIME

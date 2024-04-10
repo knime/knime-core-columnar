@@ -68,7 +68,6 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
@@ -77,6 +76,7 @@ import org.knime.core.data.columnar.table.virtual.persist.Persistor.LoadContext;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -443,7 +443,7 @@ public final class TableTransformNodeSettingsPersistor {
                     return new AppendMissingValuesTransformSpec(loadColumnarValueSchema(s, c.getDataRepository()));
                 }, (t, s) -> {
                     var schema = t.getAppendedSchema();
-                    if (schema instanceof ColumnarValueSchema valueSchema) {
+                    if (schema instanceof ValueSchema valueSchema) {
                         saveMissingColumnsSchema(valueSchema, s);
                     } else {
                         throw new UnsupportedOperationException(
@@ -485,13 +485,13 @@ public final class TableTransformNodeSettingsPersistor {
 
     }
 
-    private static void saveMissingColumnsSchema(final ColumnarValueSchema schema, final NodeSettingsWO settings) {
+    private static void saveMissingColumnsSchema(final ValueSchema schema, final NodeSettingsWO settings) {
         CheckUtils.checkArgument(!ColumnarValueSchemaUtils.hasRowID(schema),
             "A schema used for appending missing values must not have a RowID column because RowIDs can't be missing.");
         saveColumnarValueSchema(schema, settings);
     }
 
-    private static void saveColumnarValueSchema(final ColumnarValueSchema schema, final NodeSettingsWO settings) {
+    private static void saveColumnarValueSchema(final ValueSchema schema, final NodeSettingsWO settings) {
         schema.getSourceSpec().save(settings.addNodeSettings("data_table_spec"));
         var valueFactorySettings = settings.addNodeSettings("value_factories");
         for (int i = 0; i < schema.numColumns(); i++) {
@@ -500,7 +500,7 @@ public final class TableTransformNodeSettingsPersistor {
         }
     }
 
-    private static ColumnarValueSchema loadColumnarValueSchema(final NodeSettingsRO settings,
+    private static ValueSchema loadColumnarValueSchema(final NodeSettingsRO settings,
         final IDataRepository dataRepository) throws InvalidSettingsException {
         var tableSpec = DataTableSpec.load(settings.getNodeSettings("data_table_spec"));
         // the schema contains no RowID

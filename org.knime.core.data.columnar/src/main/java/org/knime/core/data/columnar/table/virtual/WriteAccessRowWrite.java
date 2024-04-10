@@ -54,11 +54,11 @@ import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.row.Selection.ColumnSelection;
 import org.knime.core.table.row.WriteAccessRow;
 
@@ -85,7 +85,7 @@ public final class WriteAccessRowWrite implements RowWrite {
      * @param writeAccess to write to
      * @param selection the selected columns
      */
-    public WriteAccessRowWrite(final ColumnarValueSchema schema, final WriteAccessRow writeAccess,
+    public WriteAccessRowWrite(final ValueSchema schema, final WriteAccessRow writeAccess,
         final ColumnSelection selection) {
         m_accesses = writeAccess;
         final var numColumns = schema.numColumns();
@@ -102,7 +102,7 @@ public final class WriteAccessRowWrite implements RowWrite {
      * @param schema of the table
      * @param writeAccess to write to
      */
-    public WriteAccessRowWrite(final ColumnarValueSchema schema, final WriteAccessRow writeAccess) {
+    public WriteAccessRowWrite(final ValueSchema schema, final WriteAccessRow writeAccess) {
         this(schema, writeAccess, ColumnSelection.all());
     }
 

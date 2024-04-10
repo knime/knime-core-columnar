@@ -72,7 +72,6 @@ import org.knime.core.data.DataType;
 import org.knime.core.data.collection.ListCell;
 import org.knime.core.data.collection.SetCell;
 import org.knime.core.data.collection.SparseListCell;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.ColumnarTableTestUtils.RowWriteConsumer;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.def.BooleanCell;
@@ -85,6 +84,7 @@ import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.WriteValue;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.value.ValueInterfaces.BooleanListReadValue;
 import org.knime.core.data.v2.value.ValueInterfaces.BooleanListWriteValue;
 import org.knime.core.data.v2.value.ValueInterfaces.BooleanSetReadValue;
@@ -167,7 +167,7 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
 
     @FunctionalInterface
     interface SchemaChecker {
-        void accept(ColumnarValueSchema schema);
+        void accept(ValueSchema schema);
     }
 
     private static void testWriteReadRows(final RowWriteConsumer writer, final RowReadConsumer reader,

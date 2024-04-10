@@ -76,8 +76,7 @@ public class ColumnarValueSchemaUtilsTest {
         final var colSpec = new DataColumnSpecCreator("foo", StringCell.TYPE).createSpec();
         final var initialSpec =
             new DataTableSpec("foobar", colSpec);
-        final var initialSchema = new DefaultColumnarValueSchema(
-            ValueSchemaUtils.create(initialSpec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create()));
+        final var initialSchema = ValueSchemaUtils.create(initialSpec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         final var updatedSchema = ColumnarValueSchemaUtils.updateSource(//
             initialSchema, //
             Map.of(0, colSpec.getDomain()), //

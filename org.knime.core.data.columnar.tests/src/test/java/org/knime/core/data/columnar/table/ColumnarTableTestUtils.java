@@ -61,8 +61,6 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
@@ -93,17 +91,17 @@ final class ColumnarTableTestUtils {
         }
     }
 
-    static ColumnarValueSchema createSchema(final int nCols) {
+    static ValueSchema createSchema(final int nCols) {
         return createSchema(nCols, IntCell.TYPE);
     }
 
-    static ColumnarValueSchema createSchema(final int nCols, final DataType type) {
+    static ValueSchema createSchema(final int nCols, final DataType type) {
         final DataTableSpec spec = new DataTableSpec(
             IntStream.range(0, nCols).mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), type).createSpec())
                 .toArray(DataColumnSpec[]::new));
         final ValueSchema valueSchema =
             ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
-        return ColumnarValueSchemaUtils.create(valueSchema);
+        return valueSchema;
     }
 
     static ColumnarRowContainer createColumnarRowContainer() {

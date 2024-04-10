@@ -53,6 +53,7 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.DataSpec;
@@ -63,18 +64,18 @@ import org.knime.core.table.schema.traits.DataTraits;
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  */
-final class UpdatedColumnarValueSchema implements ColumnarValueSchema {
+final class UpdatedColumnarValueSchema implements ValueSchema {
 
     private final DataTableSpec m_updatedSpec;
 
-    private final ColumnarValueSchema m_delegate;
+    private final ValueSchema m_delegate;
 
-    UpdatedColumnarValueSchema(final DataTableSpec spec, final ColumnarValueSchema delegate) {
+    UpdatedColumnarValueSchema(final DataTableSpec spec, final ValueSchema delegate) {
         m_updatedSpec = spec;
         m_delegate = delegate;
     }
 
-    ColumnarValueSchema getDelegate() {
+    ValueSchema getDelegate() {
         return m_delegate;
     }
 

@@ -59,16 +59,15 @@ import java.util.stream.Stream;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.value.BooleanValueFactory;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.data.v2.value.DoubleValueFactory;
 import org.knime.core.data.v2.value.IntValueFactory;
-import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.access.BooleanAccess.BooleanReadAccess;
 import org.knime.core.table.access.DoubleAccess.DoubleReadAccess;
 import org.knime.core.table.access.IntAccess.IntReadAccess;
@@ -117,7 +116,7 @@ public class TestHelper {
         DefaultDataTraits.EMPTY//
     };
 
-    static final ColumnarValueSchema SCHEMA =
+    static final ValueSchema SCHEMA =
         new TestColumnarValueSchema(VALUE_FACTORIES, DATA_SPECS, DATA_TRAITS, SOURCE_SPEC);
 
     ReadAccessRow m_readAccessRow;
@@ -167,7 +166,7 @@ public class TestHelper {
         when(m_readAccessRow.getAccess(3)).thenReturn(m_doubleReadAccess);
     }
 
-    private static class TestColumnarValueSchema implements ColumnarValueSchema {
+    private static class TestColumnarValueSchema implements ValueSchema {
 
         private final ValueFactory<?, ?>[] m_valueFactories;
 
@@ -203,11 +202,6 @@ public class TestHelper {
         @Override
         public DataTableSpec getSourceSpec() {
             return m_sourceSpec;
-        }
-
-        @Override
-        public void save(final NodeSettingsWO settings) {
-            throw new IllegalStateException("This ColumnarValueSchema is only meant for testing purposes.");
         }
 
         @Override

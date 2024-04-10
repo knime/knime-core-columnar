@@ -68,7 +68,6 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.IDataRepository;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
@@ -79,6 +78,7 @@ import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowDataRepository;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.value.DoubleValueFactory;
 import org.knime.core.data.v2.value.IntValueFactory;
 import org.knime.core.node.BufferedDataTable;
@@ -411,7 +411,7 @@ final class TableTransformNodeSettingsPersistorTest {
         }
 
         @Override
-        public ColumnarValueSchema getOutputSchema() {
+        public ValueSchema getOutputSchema() {
             return ColumnarValueSchemaUtils.create(
                 new DataTableSpec(new DataColumnSpecCreator("foo", IntCell.TYPE).createSpec()),
                 new ValueFactory<?, ?>[]{new IntValueFactory()});
@@ -593,7 +593,7 @@ final class TableTransformNodeSettingsPersistorTest {
         }
 
         @Override
-        public ColumnarValueSchema getSchema() {
+        public ValueSchema getSchema() {
             return null;
         }
 
