@@ -50,8 +50,8 @@ package org.knime.core.data.columnar.table.virtual;
 
 import java.io.IOException;
 
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.container.filter.TableFilter;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.row.LookaheadRowAccessible;
@@ -67,11 +67,11 @@ import org.knime.core.table.schema.ColumnarSchema;
  */
 final class BufferedDataTableRowAccessible implements LookaheadRowAccessible {
 
-    private final ColumnarValueSchema m_schema;
+    private final ValueSchema m_schema;
 
     private final BufferedDataTable m_table;
 
-    BufferedDataTableRowAccessible(final BufferedDataTable table, final ColumnarValueSchema schema) {
+    BufferedDataTableRowAccessible(final BufferedDataTable table, final ValueSchema schema) {
         m_schema = schema;
         m_table = table;
     }

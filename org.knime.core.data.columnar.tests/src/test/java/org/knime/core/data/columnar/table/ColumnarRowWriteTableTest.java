@@ -65,8 +65,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IntValue;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.StringValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarTableTestUtils.TestColumnStoreFactory;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.IntCell.IntCellFactory;
@@ -74,6 +72,7 @@ import org.knime.core.data.def.StringCell;
 import org.knime.core.data.def.StringCell.StringCellFactory;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.ValueInterfaces.IntWriteValue;
 import org.knime.core.data.v2.value.ValueInterfaces.StringWriteValue;
@@ -91,7 +90,7 @@ public final class ColumnarRowWriteTableTest {
     public void testDomainInitializationNoDomainComputation() throws IOException {
         final ColumnarRowWriteTableSettings settings = createSettings(true, false);
 
-        final ColumnarValueSchema initialSchema = createTestTableSchemaWithDomains();
+        final ValueSchema initialSchema = createTestTableSchemaWithDomains();
         final DataTableSpec resultingSpec = createAndFillTestTable(initialSchema, settings);
 
         assertEquals(initialSchema.getSourceSpec(), resultingSpec);
@@ -101,7 +100,7 @@ public final class ColumnarRowWriteTableTest {
     public void testNoDomainInitializationDomainComputation() throws IOException {
         final ColumnarRowWriteTableSettings settings = createSettings(false, true);
 
-        final ColumnarValueSchema initialSchema = createTestTableSchemaWithDomains();
+        final ValueSchema initialSchema = createTestTableSchemaWithDomains();
         final DataTableSpec resultingSpec = createAndFillTestTable(initialSchema, settings);
 
         assertTrue(initialSchema.getSourceSpec().equalStructure(resultingSpec));
@@ -112,7 +111,7 @@ public final class ColumnarRowWriteTableTest {
     public void testDomainInitializationDomainComputation() throws IOException {
         final ColumnarRowWriteTableSettings settings = createSettings(true, true);
 
-        final ColumnarValueSchema initialSchema = createTestTableSchemaWithDomains();
+        final ValueSchema initialSchema = createTestTableSchemaWithDomains();
         final DataTableSpec resultingSpec = createAndFillTestTable(initialSchema, settings);
 
         assertTrue(initialSchema.getSourceSpec().equalStructure(resultingSpec));
@@ -134,7 +133,7 @@ public final class ColumnarRowWriteTableTest {
         return new ColumnarRowWriteTableSettings(initializeDomains, calculateDomains, 60, true, true, false, 100, 4);
     }
 
-    private static ColumnarValueSchema createTestTableSchemaWithDomains() {
+    private static ValueSchema createTestTableSchemaWithDomains() {
         final var intColumnSpecCreator = new DataColumnSpecCreator("My int column", IntCell.TYPE);
         intColumnSpecCreator.setDomain(
             new DataColumnDomainCreator(IntCellFactory.create(-123), IntCellFactory.create(42)).createDomain());
@@ -147,10 +146,10 @@ public final class ColumnarRowWriteTableTest {
         final DataColumnSpec stringColumnSpec = stringColumnSpecCreator.createSpec();
 
         final var tableSpec = new DataTableSpec(intColumnSpec, stringColumnSpec);
-        return ColumnarValueSchemaUtils.create(ValueSchemaUtils.create(tableSpec, RowKeyType.CUSTOM, null));
+        return ValueSchemaUtils.create(tableSpec, RowKeyType.CUSTOM, null);
     }
 
-    private static DataTableSpec createAndFillTestTable(final ColumnarValueSchema schema,
+    private static DataTableSpec createAndFillTestTable(final ValueSchema schema,
         final ColumnarRowWriteTableSettings settings) throws IOException {
         final ColumnarRowReadTable readTable;
         try (final var writeTable = createTestTable(schema, settings)) {
@@ -164,7 +163,7 @@ public final class ColumnarRowWriteTableTest {
         }
     }
 
-    private static ColumnarRowWriteTable createTestTable(final ColumnarValueSchema schema,
+    private static ColumnarRowWriteTable createTestTable(final ValueSchema schema,
         final ColumnarRowWriteTableSettings settings) throws IOException {
         return new ColumnarRowWriteTable(schema, TestColumnStoreFactory.INSTANCE, settings);
     }

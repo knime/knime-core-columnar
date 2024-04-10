@@ -76,7 +76,7 @@ import org.knime.core.table.schema.traits.LogicalTypeTrait;
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
 @SuppressWarnings("javadoc")
-public class DefaultColumnarValueSchemaTest {
+public class DefaultValueSchemaTest { // TODO (TP) move to knime-core? (where ValueSchema lives)
 
     static DataTableSpec createSpec(final int nCols) {
         return new DataTableSpec(IntStream.range(0, nCols)
@@ -91,27 +91,28 @@ public class DefaultColumnarValueSchemaTest {
             .toArray(DataColumnSpec[]::new));
     }
 
-    static DefaultColumnarValueSchema createDefaultColumnarValueSchema(final DataTableSpec spec) {
+//    static DefaultValueSchema createDefaultValueSchema(final DataTableSpec spec) { // TODO (TP) do this, when moving next to ValueSchema (which is package-private)
+    static ValueSchema createDefaultValueSchema(final DataTableSpec spec) {
         final ValueSchema valueSchema =
             ValueSchemaUtils.create(spec, RowKeyType.NOKEY, NotInWorkflowWriteFileStoreHandler.create());
-        final ColumnarValueSchema schema = ColumnarValueSchemaUtils.create(valueSchema);
-        return (DefaultColumnarValueSchema)schema;
+//        return (DefaultValueSchema)valueSchema;
+        return valueSchema;
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testGetSpecIndexOutOfBoundsLower() {
-        createDefaultColumnarValueSchema(createSpec(0)).getSpec(-1);
+        createDefaultValueSchema(createSpec(0)).getSpec(-1);
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
     public void testGetSpecIndexOutOfBoundsUpper() {
-        createDefaultColumnarValueSchema(createSpec(0)).getSpec(1);
+        createDefaultValueSchema(createSpec(0)).getSpec(1);
     }
 
     @Test
     public void testLogicalDataTypePresent() {
         final var tableSpec = createSpec(1);
-        final var schema = createDefaultColumnarValueSchema(tableSpec);
+        final var schema = createDefaultValueSchema(tableSpec);
         assertEquals(2, schema.numColumns());
         final var traits = schema.getTraits(1);
         final var logicalType = traits.get(LogicalTypeTrait.class);
@@ -123,7 +124,7 @@ public class DefaultColumnarValueSchemaTest {
     @Test
     public void testLogicalDataTypeOfCollectionValueFactory() {
         final var tableSpec = createCollectionSpec(1);
-        final var schema = createDefaultColumnarValueSchema(tableSpec);
+        final var schema = createDefaultValueSchema(tableSpec);
         assertTrue(schema.<ListReadAccess, ListWriteAccess> getValueFactory(1) instanceof IntListValueFactory);
 
         // Collection value factory logical type traits are expected to be on top layer

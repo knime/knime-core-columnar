@@ -62,8 +62,6 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.RowKey;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarTableTestUtils.TestColumnStoreFactory;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.IntCell;
@@ -89,9 +87,8 @@ public class ColumnarDataContainerDelegateTest extends ColumnarTest {
     @SuppressWarnings("resource")
     private static ColumnarDataContainerDelegate createColumnarDataContainerDelegate(final DataTableSpec spec)
         throws IOException {
-        final ValueSchema valueSchema =
+        final ValueSchema schema =
             ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
-        final ColumnarValueSchema schema = ColumnarValueSchemaUtils.create(valueSchema);
 
         final ColumnarRowWriteTableSettings settings = new ColumnarRowWriteTableSettings(false, 0, false, false, 100, 4);
         final ColumnarRowContainer container =

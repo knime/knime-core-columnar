@@ -69,8 +69,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.BatchSizeRecorder.BatchSizeRecordingWritable;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchStore.ColumnarBatchStoreBuilder;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
@@ -84,14 +82,14 @@ import org.knime.core.data.v2.schema.ValueSchemaUtils;
 @SuppressWarnings("javadoc")
 public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
 
-    private static ColumnarValueSchema generateDefaultSchema() {
+    private static ValueSchema generateDefaultSchema() {
         final DataTableSpec spec = createSpec();
         final ValueSchema valueSchema =
             ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
-        return ColumnarValueSchemaUtils.create(valueSchema);
+        return valueSchema;
     }
 
-    static final ColumnarValueSchema SCHEMA = generateDefaultSchema();
+    static final ValueSchema SCHEMA = generateDefaultSchema();
 
     @Test
     public void testDefaultWrappedBatchStore() throws IOException {

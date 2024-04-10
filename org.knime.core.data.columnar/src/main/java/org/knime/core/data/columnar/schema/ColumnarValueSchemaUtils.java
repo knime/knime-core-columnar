@@ -86,7 +86,7 @@ public final class ColumnarValueSchemaUtils {
      * @param settings the settings to save the ValueSchema to
      */
     // TODO (TP) WIP: Try to remove ColumnarValueSchema.
-    public static void save(final ColumnarValueSchema schema, final NodeSettingsWO settings)
+    public static void save(final ValueSchema schema, final NodeSettingsWO settings)
     {
         if (schema instanceof UpdatedColumnarValueSchema wrapper) {
             save(wrapper.getDelegate(), settings);
@@ -111,8 +111,12 @@ public final class ColumnarValueSchemaUtils {
      * @return true if schema was stores the cell serializers separately, meaning it was created before KNIME Analytics
      *         Platform 4.5.0
      */
-    public static boolean storesDataCellSerializersSeparately(final ColumnarValueSchema schema) {
-        return ValueSchemaUtils.storesDataCellSerializersSeparately(getValueSchema(schema));
+    public static boolean storesDataCellSerializersSeparately(final ValueSchema schema) {
+        if (schema instanceof UpdatedColumnarValueSchema s) {
+            return storesDataCellSerializersSeparately(s.getDelegate());
+        } else {
+            return ValueSchemaUtils.storesDataCellSerializersSeparately(schema);
+        }
     }
 
     /**
@@ -124,20 +128,9 @@ public final class ColumnarValueSchemaUtils {
      * @return the loaded {@link ColumnarValueSchema}
      * @throws InvalidSettingsException if the settings in the LoadContext were invalid
      */
-    public static ColumnarValueSchema load(final ColumnarSchema schema, final ValueSchemaLoadContext context)
+    public static ValueSchema load(final ColumnarSchema schema, final ValueSchemaLoadContext context)
         throws InvalidSettingsException {
         return create(ValueSchemaUtils.load(schema, context));
-    }
-
-    private static ValueSchema getValueSchema(final ColumnarValueSchema schema) {
-        if (schema instanceof DefaultColumnarValueSchema) {
-            return ((DefaultColumnarValueSchema)schema).getSource();
-        } else if (schema instanceof UpdatedColumnarValueSchema) {
-            return getValueSchema(((UpdatedColumnarValueSchema)schema).getDelegate());
-        } else {
-            throw new IllegalArgumentException("Unsupported ColumnarValueSchema type: " + schema.getClass());
-        }
-
     }
 
     /**
@@ -147,8 +140,10 @@ public final class ColumnarValueSchemaUtils {
      *
      * @return a new {@link ColumnarValueSchema}.
      */
-    public static final ColumnarValueSchema create(final ValueSchema source) {
-        return new DefaultColumnarValueSchema(source);
+    // TODO (TP) remove?
+    @Deprecated
+    public static final ValueSchema create(final ValueSchema source) {
+        return source;
     }
 
     /**
@@ -158,8 +153,10 @@ public final class ColumnarValueSchemaUtils {
      * @param valueFactories for the columns including the RowID
      * @return a new {@link ColumnarValueSchema}
      */
-    public static final ColumnarValueSchema create(final DataTableSpec spec, final ValueFactory<?, ?>[] valueFactories) {
-        return create(ValueSchemaUtils.create(spec, valueFactories));
+    // TODO (TP) remove?
+    @Deprecated
+    public static final ValueSchema create(final DataTableSpec spec, final ValueFactory<?, ?>[] valueFactories) {
+        return ValueSchemaUtils.create(spec, valueFactories);
     }
 
     /**
@@ -170,7 +167,7 @@ public final class ColumnarValueSchemaUtils {
      * @param fsHandler FileStoreHandler used by some ValueFactories
      * @return a new schema corresponding to spec
      */
-    public static final ColumnarValueSchema create(final DataTableSpec spec, final RowKeyType rowIDType,
+    public static final ValueSchema create(final DataTableSpec spec, final RowKeyType rowIDType,
         final IWriteFileStoreHandler fsHandler) {
         var valueFactories = Stream.concat(Stream.of(ValueFactoryUtils.getRowKeyValueFactory(rowIDType)), spec.stream()//
             .map(DataColumnSpec::getType)//
@@ -184,7 +181,8 @@ public final class ColumnarValueSchemaUtils {
      * @param schema to check
      * @return true if the schema has a RowID column
      */
-    public static final boolean hasRowID(final ColumnarValueSchema schema) {
+    // TPDP (TP) move to ValueSchemaUtils
+    public static final boolean hasRowID(final ValueSchema schema) {
         return schema.numColumns() > 0 && schema.getValueFactory(0) instanceof RowKeyValueFactory;
     }
 
@@ -198,7 +196,7 @@ public final class ColumnarValueSchemaUtils {
      *
      * @return the updated {@link ColumnarValueSchema}
      */
-    public static final ColumnarValueSchema updateSource(final ColumnarValueSchema source,
+    public static final ValueSchema updateSource(final ValueSchema source,
         final Map<Integer, DataColumnDomain> domainMap, final Map<Integer, DataColumnMetaData[]> metadataMap) {
         final var result = new DataColumnSpec[source.numColumns() - 1];
         for (int i = 0; i < result.length; i++) {//NOSONAR
@@ -233,7 +231,7 @@ public final class ColumnarValueSchemaUtils {
      * @return the schema with the updated spec
      * @throws IllegalArgumentException if the types in schema and spec don't match
      */
-    public static final ColumnarValueSchema updateDataTableSpec(final ColumnarValueSchema schema,
+    public static final ValueSchema updateDataTableSpec(final ValueSchema schema,
         final DataTableSpec spec) {
         return new UpdatedColumnarValueSchema(spec, schema);
     }

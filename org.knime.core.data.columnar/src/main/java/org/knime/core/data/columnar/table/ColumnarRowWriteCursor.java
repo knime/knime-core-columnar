@@ -52,10 +52,10 @@ import java.io.IOException;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.table.virtual.WriteAccessRowWrite;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.WriteAccessRow;
@@ -87,7 +87,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
      * @param factories Value factories for the individual columns
      * @param flushOnForward An optional {@link Flushable} that will be flushed on each forward operation
      */
-    ColumnarRowWriteCursor(final BatchStore store, final ColumnarValueSchema schema, final Flushable flushOnForward) {
+    ColumnarRowWriteCursor(final BatchStore store, final ValueSchema schema, final Flushable flushOnForward) {
 
         m_accessCursor = ColumnarWriteCursorFactory.createWriteCursor(store);
         m_flushOnForward = flushOnForward;
