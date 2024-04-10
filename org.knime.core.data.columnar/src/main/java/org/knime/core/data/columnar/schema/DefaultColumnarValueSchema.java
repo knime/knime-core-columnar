@@ -52,8 +52,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.data.v2.schema.ValueSchemaUtils;
-import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.DataSpec;
@@ -75,11 +73,6 @@ final class DefaultColumnarValueSchema implements ColumnarValueSchema {
 
     ValueSchema getSource() {
         return m_delegate;
-    }
-
-    @Override
-    public void save(final NodeSettingsWO settings) {
-        ValueSchemaUtils.save(m_delegate, settings);
     }
 
     // -------- ValueSchema --------

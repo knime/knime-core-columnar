@@ -46,7 +46,6 @@
 package org.knime.core.data.columnar.schema;
 
 import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.node.NodeSettingsWO;
 
 /**
  * Columnar wrapper around a {@link ValueSchema}.
@@ -54,13 +53,4 @@ import org.knime.core.node.NodeSettingsWO;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @since 4.3
  */
-public interface ColumnarValueSchema extends ValueSchema {
-
-    /**
-    * Saves the wrapped {@link ValueSchema} to the provided settings.
-    *
-    * @param settings the settings to save the ValueSchema to
-    */
-    void save(NodeSettingsWO settings);
-
-}
+public interface ColumnarValueSchema extends ValueSchema {}
