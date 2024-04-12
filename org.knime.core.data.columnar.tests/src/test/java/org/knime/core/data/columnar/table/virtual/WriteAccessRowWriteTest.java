@@ -70,6 +70,7 @@ import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.DoubleCell.DoubleCellFactory;
 import org.knime.core.data.def.IntCell.IntCellFactory;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.data.v2.WriteAccessRowWrite;
 import org.knime.core.data.v2.value.ValueInterfaces.BooleanWriteValue;
 import org.knime.core.data.v2.value.ValueInterfaces.DoubleReadValue;
 import org.knime.core.data.v2.value.ValueInterfaces.DoubleWriteValue;

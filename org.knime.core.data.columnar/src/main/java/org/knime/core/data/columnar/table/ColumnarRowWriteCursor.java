@@ -54,10 +54,10 @@ import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCu
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
-import org.knime.core.data.columnar.table.virtual.WriteAccessRowWrite;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
+import org.knime.core.data.v2.WriteAccessRowWrite;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.NodeLogger;
@@ -98,30 +98,6 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
         m_rowWrite = new WriteAccessRowWrite(schema, m_accessCursor.access());
     }
 
-    // new API v1
-    @Override
-    public RowWrite row() {
-        return m_rowWrite;
-    }
-
-    // new API v1
-    @Override
-    public void commit() {
-        if (m_flushOnForward != null) {
-            try {
-                m_flushOnForward.flush();
-            } catch (IOException ex) {
-                LOGGER.error("Could not flush cursor during forward", ex);
-            }
-        }
-        try {
-            m_accessCursor.commit();
-        } catch (IOException ex) {
-            LOGGER.error("Could not commit row", ex);
-        }
-    }
-
-    // new API v2
     @Override
     public void commit(final RowRead row) {
         m_rowWrite.setFrom(row);
@@ -140,6 +116,21 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
             }
         }
         commit();
+    }
+
+    private void commit() {
+        if (m_flushOnForward != null) {
+            try {
+                m_flushOnForward.flush();
+            } catch (IOException ex) {
+                LOGGER.error("Could not flush cursor during forward", ex);
+            }
+        }
+        try {
+            m_accessCursor.commit();
+        } catch (IOException ex) {
+            LOGGER.error("Could not commit row", ex);
+        }
     }
 
     @Override

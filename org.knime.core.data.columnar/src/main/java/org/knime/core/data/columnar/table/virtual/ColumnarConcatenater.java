@@ -82,7 +82,6 @@ import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
@@ -264,8 +263,7 @@ public final class ColumnarConcatenater {
                     var rowContainer = createRowIDContainer(); //
                     var writeCursor = rowContainer.createCursor(); //
             ) {
-                var schema = ValueSchemaUtils.create(new DataTableSpec(), RowKeyType.CUSTOM, null);
-                var row = new WritableReadAccessRowRead(schema);
+                var row = rowContainer.createRowBuffer();
                 progress.setMessage("Uniquify RowIDs");
                 consumeRowIDs(table, rowID -> {
                     row.setRowKey(uniquifyRowID(rowID));

@@ -48,6 +48,7 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
+import org.knime.core.data.v2.ReadAccessRowRead;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;

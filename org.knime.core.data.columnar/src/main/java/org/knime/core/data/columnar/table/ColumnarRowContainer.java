@@ -89,6 +89,11 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
     }
 
     @Override
+    public ValueSchema getSchema() {
+        return m_columnarTable.getSchema();
+    }
+
+    @Override
     public ColumnarRowWriteCursor createCursor() {
         return m_columnarTable.createCursor();
     }
@@ -135,11 +140,6 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
 
 
     // -- implement RowWriteAccessible --
-
-    @Override
-    public ValueSchema getSchema() {
-        return m_columnarTable.getSchema();
-    }
 
     @Override
     public WriteCursor<WriteAccessRow> getWriteCursor() {
