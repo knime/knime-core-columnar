@@ -59,7 +59,6 @@ import org.knime.core.node.ExtensionTable;
 import org.knime.core.table.cursor.WriteCursor;
 import org.knime.core.table.row.RowWriteAccessible;
 import org.knime.core.table.row.WriteAccessRow;
-import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
@@ -138,7 +137,7 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
     // -- implement RowWriteAccessible --
 
     @Override
-    public ColumnarSchema getSchema() {
+    public ValueSchema getSchema() {
         return m_columnarTable.getSchema();
     }
 
