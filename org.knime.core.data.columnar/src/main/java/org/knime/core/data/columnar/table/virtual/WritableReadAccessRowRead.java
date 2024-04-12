@@ -44,94 +44,60 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jul 28, 2021 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   12 Apr 2024 (pietzsch): created
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import java.util.Arrays;
-
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.v2.RowKeyWriteValue;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.RowWriteCursor;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.table.row.WriteAccessRow;
+import org.knime.core.table.access.BufferedAccesses;
+import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
 
 /**
- * Implements a {@link RowWrite} based on a {@link WriteAccessRow}.
+ * This class implements both {@code RowRead} and {@code RowWrite}.
+ * It can be used as a "staging row" for preparing a {@code RowRead} to be {@link RowWriteCursor#commit(RowRead) committed} to a {@code RowWriteCursor}.
  *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+ * @author Tobias Pietzsch
  */
-// TODO (TP) replace with BufferedRowWrite
-//           --> I think this TODO is outdated now?
-public final class WriteAccessRowWrite implements RowWrite {
+public class WritableReadAccessRowRead extends ReadAccessRowRead implements RowWrite {
 
-    // TODO with a bit of refactoring this could also be used in BufferedRowContainer
-    // TODO (TP) --> I think this TODO is outdated now?
+    private WriteAccessRowWrite m_writeDelegate;
 
-    private final WriteAccessRow m_accesses;
+    public WritableReadAccessRowRead(final ValueSchema schema) {
+        this(schema, BufferedAccesses.createBufferedAccessRow(schema));
+    }
 
-    private final WriteValue<?>[] m_values;
-
-    private final RowKeyWriteValue m_rowKeyValue;
-
-    /**
-     * Constructor.
-     *
-     * @param schema of the table
-     * @param writeAccess to write to
-     */
-    public WriteAccessRowWrite(final ValueSchema schema, final WriteAccessRow writeAccess) {
-        m_accesses = writeAccess;
-        m_values = new WriteValue<?>[schema.numFactories()];
-        Arrays.setAll(m_values, i -> schema.getValueFactory(i).createWriteValue(m_accesses.getWriteAccess(i)));
-        m_rowKeyValue = (RowKeyWriteValue)m_values[0];
+    public WritableReadAccessRowRead(final ValueSchema schema, final BufferedAccessRow bufferedAccessRow) {
+        super(schema, bufferedAccessRow);
+        m_writeDelegate = new WriteAccessRowWrite(schema, bufferedAccessRow);
     }
 
     @Override
     public void setFrom(final RowRead values) {
-
-        // TODO (TP) We could check instanceof ReadAccessRowRead here and directly
-        //           set our WriteAccessRow from their ReadAccessRow
-        //           Would that improve performance in any way?
-        //           Is it always ok to do this? Or do we need to check for compatibility
-        //           of ValueFactories somehow?
-
-        assert values.getNumColumns() == getNumColumns();
-        setRowKey(values.getRowKey());
-        for (int i = 0; i < getNumColumns(); i++) {
-            if (values.isMissing(i)) {
-                setMissing(i);
-            } else {
-                m_values[i + 1].setValue(values.getValue(i));
-            }
-        }
+        m_writeDelegate.setFrom(values);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <W extends WriteValue<?>> W getWriteValue(final int index) {
-        return (W)m_values[index + 1];
-    }
-
-    @Override
-    public int getNumColumns() {
-        return m_values.length - 1;
+        return m_writeDelegate.getWriteValue(index);
     }
 
     @Override
     public void setMissing(final int index) {
-        m_accesses.getWriteAccess(index + 1).setMissing();
+        m_writeDelegate.setMissing(index);
     }
 
     @Override
     public void setRowKey(final String rowKey) {
-        m_rowKeyValue.setRowKey(rowKey);
+        m_writeDelegate.setRowKey(rowKey);
     }
 
     @Override
     public void setRowKey(final RowKeyValue rowKey) {
-        m_rowKeyValue.setRowKey(rowKey);
+        m_writeDelegate.setRowKey(rowKey);
     }
 }
