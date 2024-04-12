@@ -52,10 +52,13 @@ import java.io.IOException;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DataRow;
 import org.knime.core.data.columnar.table.virtual.WriteAccessRowWrite;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.RowWriteCursor;
+import org.knime.core.data.v2.WriteValue;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.cursor.WriteCursor;
@@ -122,6 +125,20 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     @Override
     public void commit(final RowRead row) {
         m_rowWrite.setFrom(row);
+        commit();
+    }
+
+    public void commit(final DataRow row) {
+        m_rowWrite.setRowKey(row.getKey());
+        final int numColumns = m_rowWrite.getNumColumns();
+        for (int i = 0; i < numColumns; i++) {
+            final DataCell cell = row.getCell(i);
+            if (cell.isMissing()) {
+                m_rowWrite.setMissing(i);
+            } else {
+                m_rowWrite.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
+            }
+        }
         commit();
     }
 
