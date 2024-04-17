@@ -107,11 +107,9 @@ class ArrowBatchReader extends AbstractArrowBatchReader implements RandomAccessB
         if (metadata.isEmpty()) {
             // Legacy: For <4.4 the metadata was saved in the footer
             metadataToReturn = footerMetadata;
-        }
-
-        // Before 5.3 we stored the chunk size as all batches (but the last) had the same size,
-        // so we can construct the batch boundaries
-        if (!metadata.containsKey(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY)) {
+        } else if (!metadata.containsKey(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY)) {
+            // Before 5.3 we stored the chunk size as all batches (but the last) had the same size,
+            // so we can construct the batch boundaries
             metadataToReturn = new HashMap<>(metadata);
             if (footerMetadata.containsKey(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY))
             {
