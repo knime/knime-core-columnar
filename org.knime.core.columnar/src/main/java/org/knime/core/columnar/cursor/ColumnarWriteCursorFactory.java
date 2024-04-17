@@ -215,7 +215,7 @@ public final class ColumnarWriteCursorFactory {
             if (m_currentBatch != null) {
 
                 // handle empty tables (fwd was never called)
-                final ReadBatch readBatch = m_currentBatch.close(numValues);
+                final ReadBatch readBatch = m_currentBatch.close(Math.max(numValues, 0));
                 try {
                     m_writer.write(readBatch);
                 } catch (final IOException e) {
