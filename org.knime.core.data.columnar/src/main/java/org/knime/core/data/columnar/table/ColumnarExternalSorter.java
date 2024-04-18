@@ -200,12 +200,27 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
     protected Optional<AbstractColumnarContainerTable[]> createInitialRuns(final ExecutionContext exec, // NOSONAR
             final AbstractColumnarContainerTable inputTable, final Progress progress, final AtomicLong rowsReadCounter)
             throws IOException, CanceledExecutionException {
-
         // return createInitialRunsGreedyRandomAccess(exec, inputTable, progress, rowsReadCounter);
-        return createInitialRunsFixedRandomAccess(exec, inputTable, progress, rowsReadCounter, 10_000_000);
+//        if (inputTable.size() < 2) {
+//            return Optional.empty();
+//        }
+//        try (final var cursor = inputTable.cursor()) {
+//            return Optional.of(createInitialRunsGreedy(exec, () -> true, 50_000, cursor, inputTable.size(),
+//                progress, rowsReadCounter).toArray(AbstractColumnarContainerTable[]::new));
+//        }
+        return createInitialRunsFixedRandomAccess(exec, inputTable, progress, rowsReadCounter, 50_000);
     }
 
-    @SuppressWarnings("resource")
+    @Override
+    protected AbstractColumnarContainerTable[] createInitialRuns(final ExecutionContext exec, final RowCursor input,
+            final long optNumRows, final Progress progress, final AtomicLong rowsReadCounter)
+            throws IOException, CanceledExecutionException {
+        // return createInitialRunsBuffering(exec, input, progress, rowsReadCounter); // NOSONAR
+        // return createInitialRunsGreedy(exec, input, optNumRows, progress, rowsReadCounter);
+        return createInitialRunsGreedy(exec, () -> true, 50_000, input, optNumRows, progress, rowsReadCounter) //
+                .toArray(AbstractColumnarContainerTable[]::new);
+    }
+
     private Optional<AbstractColumnarContainerTable[]> createInitialRunsFixedRandomAccess(final ExecutionContext exec,
             final AbstractColumnarContainerTable inputTable, final Progress progress, final AtomicLong rowsReadCounter,
             final int numRowsPerRun) throws CanceledExecutionException, IOException {
@@ -246,7 +261,8 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
                 progress.update(() -> fraction.apply( //
                     new StringBuilder("Writing temporary table (row ")).append(")").toString());
 
-                runs.add(writeTable(exec, writeCursor -> {
+                @SuppressWarnings("resource")
+                final var tempTable = writeTable(exec, false, writeCursor -> {
                     for (var i = 0; i < sortedIndices.length; i++) {
                         progress.checkCanceled();
                         readCursor.moveTo(offset + sortedIndices[i]);
@@ -255,7 +271,8 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
                         rowsWrittenHere.incrementAndGet();
                         progress.update((1.0 * rowsReadCounter.get() + rowsWritten.incrementAndGet()) / (2 * numRows));
                     }
-                }));
+                });
+                runs.add(tempTable);
                 runStart += sortKeys.size();
                 readCursor.moveTo(runStart - 1);
             }
@@ -273,7 +290,7 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
         }
     }
 
-    @SuppressWarnings({"unused", "resource"})
+    @SuppressWarnings("unused")
     private Optional<AbstractColumnarContainerTable[]> createInitialRunsGreedyRandomAccess(final ExecutionContext exec,
         final AbstractColumnarContainerTable inputTable, final Progress progress, final AtomicLong rowsReadCounter)
         throws CanceledExecutionException, IOException {
@@ -315,7 +332,8 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
                 progress.update(() -> fraction.apply( //
                     new StringBuilder("Writing temporary table (row ")).append(")").toString());
 
-                runs.add(writeTable(exec, writeCursor -> {
+                @SuppressWarnings("resource")
+                final var tempTable = writeTable(exec, false, writeCursor -> {
                     for (var i = 0; i < sortedIndices.length; i++) {
                         progress.checkCanceled();
                         readCursor.moveTo(offset + sortedIndices[i]);
@@ -324,7 +342,8 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
                         rowsWrittenHere.incrementAndGet();
                         progress.update((1.0 * rowsReadCounter.get() + rowsWritten.incrementAndGet()) / (2 * numRows));
                     }
-                }));
+                });
+                runs.add(tempTable);
                 runStart += sortKeys.size();
                 readCursor.moveTo(runStart - 1);
             }
@@ -340,14 +359,6 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
                 clearTable(exec, unclosedRun);
             }
         }
-    }
-
-    @Override
-    protected AbstractColumnarContainerTable[] createInitialRuns(final ExecutionContext exec, final RowCursor input,
-            final long optNumRows, final Progress progress, final AtomicLong rowsReadCounter)
-            throws IOException, CanceledExecutionException {
-        // return createInitialRunsBuffering(exec, input, progress, rowsReadCounter); // NOSONAR
-        return createInitialRunsGreedy(exec, input, optNumRows, progress, rowsReadCounter);
     }
 
     private AbstractColumnarContainerTable[] createInitialRunsGreedy(final ExecutionContext exec, final RowCursor input,
@@ -369,7 +380,7 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
         Supplier<String> messageSupplier =
             () -> fraction.apply(new StringBuilder("Writing temporary table (row ")).append(")").toString();
 
-        return writeTable(exec, output -> { // NOSONAR not too long
+        return writeTable(exec, false, output -> { // NOSONAR not too long
             final var rowWrite = new WriteAccessRowWrite(m_outputSchema, output.access());
             for (var i = 0; i < totalBufferSize; i++) {
                 progress.checkCanceled();
@@ -388,7 +399,7 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
         });
     }
 
-    @SuppressWarnings({"resource", "unused"})
+    @SuppressWarnings("unused")
     private AbstractColumnarContainerTable[] createInitialRunsBuffering(final ExecutionContext exec,
             final RowCursor input, final Progress progress, final AtomicLong rowsReadCounter)
             throws IOException, CanceledExecutionException {
@@ -398,7 +409,8 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
                 final var sortKeys = new ArrayList<Object[]>();
                 final Supplier<String> readMsgSupplier = () -> "Filling buffer";
 
-                final var bufferTable = writeTable(exec, output -> { // NOSONAR
+                @SuppressWarnings("resource")
+                final var bufferTable = writeTable(exec, false, output -> { // NOSONAR
                     final var rowWrite = new WriteAccessRowWrite(m_outputSchema, output.access());
                     do {
                         progress.checkCanceled();
@@ -420,7 +432,8 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
                     new StringBuilder("Writing temporary table (row ")).append(")").toString();
 
                 try (final var bufferRead = new DeletingRowCursor(bufferTable, m_sortColumnSelection)) {
-                    runs.add(writeTable(exec, writeCursor -> {
+                    @SuppressWarnings("resource")
+                    final var tempTable = writeTable(exec, false, writeCursor -> {
                         for (var i = 0; i < sortedIndices.length; i++) { // NOSONAR
                             progress.checkCanceled();
                             rowsWrittenCounter.incrementAndGet();
@@ -429,7 +442,8 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
                             writeCursor.forward();
                             writeCursor.access().setFrom(bufferRead.access());
                         }
-                    }));
+                    });
+                    runs.add(tempTable);
                 }
             }
 
@@ -448,7 +462,7 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
 
     @Override
     protected AbstractColumnarContainerTable mergeToTable(final ExecutionContext exec,
-            final List<AbstractColumnarContainerTable> runsToMerge, final Progress progress,
+            final List<AbstractColumnarContainerTable> runsToMerge, final boolean isLast, final Progress progress,
             final AtomicLong rowsProcessedCounter, final long numOutputRows, final Runnable beforeFinishing)
             throws CanceledExecutionException, IOException {
 
@@ -458,7 +472,7 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
 
         final var numDataColumns = m_outputSchema.numColumns() - 1;
         try (final var mergeCursor = new KWayMergeCursor(m_comparator, deletingCursors, numDataColumns)) {
-            return writeTable(exec, writeCursor -> {
+            return writeTable(exec, isLast, writeCursor -> {
                 while (mergeCursor.canForward()) {
                     progress.checkCanceled();
                     mergeCursor.forward();
@@ -475,18 +489,20 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
 
 
     @SuppressWarnings("resource")
-    private AbstractColumnarContainerTable writeTable(final ExecutionContext exec,
+    private AbstractColumnarContainerTable writeTable(final ExecutionContext exec, final boolean isLast,
             final FailableConsumer<WriteCursor<WriteAccessRow>, CanceledExecutionException> body)
             throws IOException, CanceledExecutionException {
-        final var settings = new ColumnarRowWriteTableSettings(
-            true, // initializeDomains
-            false, // calculateDomains
-            0, // maxPossibleNominalDomainValues
-            false, // checkDuplicateRowKeys
-            true, // useCaching
-            false, // forceSynchronousIO
-            100, // rowBatchSize
-            1);
+
+        final var settings = ColumnarRowWriteTableSettings.builder() //
+            .initializingDomains(true) //
+            .calculatingDomains(false) //
+            .withMaxPossibleNominalDomainValues(0) //
+            .checkingDuplicateRowKeys(false) //
+            .usingCaching(isLast) //
+            .forcingSynchronousIO(false) //
+            .withRowBatchSize(100) //
+            .withMaxPendingBatches(1) //
+            .build();
 
         try (final var container =
                     ColumnarRowContainer.create(exec, m_tableIDSupplier.getAsInt(), m_outputSchema, FACTORY, settings);

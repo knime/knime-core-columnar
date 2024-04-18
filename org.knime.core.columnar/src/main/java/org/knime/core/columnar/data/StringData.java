@@ -81,6 +81,10 @@ public final class StringData {
          */
         void setString(int index, String val);
 
+        default void setFrom(final StringReadData readData, final int sourceIndex, final int targetIndex) {
+            setString(targetIndex, readData.getString(sourceIndex));
+        }
+
         @Override
         StringReadData close(int length);
 

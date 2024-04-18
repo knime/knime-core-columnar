@@ -139,7 +139,7 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
             // The cache will be useful when we have random-access rows but this is not the case yet.
             // .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache())
         }
-        builder.enableDictEncoding(true);
+        builder.enableDictEncoding(false);
         if (settings.isCalculateDomains()) {
             builder.useDomainCalculation( //
                 new DefaultDomainWritableConfig(m_schema, settings.getMaxPossibleNominalDomainValues(),

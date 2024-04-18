@@ -191,4 +191,77 @@ public final class ColumnarRowWriteTableSettings {
     public int getMaxPendingBatches() {
         return m_maxPendingBatches;
     }
+
+    /**
+     * Creates a builder for {@link ColumnarRowWriteTableSettings}.
+     *
+     * @return new builder instance
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * A builder for {@link ColumnarRowWriteTableSettings}.
+     */
+    public static final class Builder {
+
+        private boolean m_initializeDomains;
+        private boolean m_calculateDomains = true;
+        private int m_maxPossibleNominalDomainValues;
+        private boolean m_checkDuplicateRowKeys;
+        private boolean m_forceSynchronousIO;
+        private boolean m_useCaching = true;
+        private int m_rowBatchSize;
+        private int m_maxPendingBatches;
+
+        private Builder() {
+        }
+
+        public Builder initializingDomains(final boolean initializeDomains) {
+            m_initializeDomains = initializeDomains;
+            return this;
+        }
+
+        public Builder calculatingDomains(final boolean calculateDomains) {
+            m_calculateDomains = calculateDomains;
+            return this;
+        }
+
+        public Builder withMaxPossibleNominalDomainValues(final int maxPossibleNominalDomainValues) {
+            m_maxPossibleNominalDomainValues = maxPossibleNominalDomainValues;
+            return this;
+        }
+
+        public Builder checkingDuplicateRowKeys(final boolean checkDuplicateRowKeys) {
+            m_checkDuplicateRowKeys = checkDuplicateRowKeys;
+            return this;
+        }
+
+        public Builder forcingSynchronousIO(final boolean forceSynchronousIO) {
+            m_forceSynchronousIO = forceSynchronousIO;
+            return this;
+        }
+
+        public Builder usingCaching(final boolean useCaching) {
+            m_useCaching = useCaching;
+            return this;
+        }
+
+        public Builder withRowBatchSize(final int rowBatchSize) {
+            m_rowBatchSize = rowBatchSize;
+            return this;
+        }
+
+        public Builder withMaxPendingBatches(final int maxPendingBatches) {
+            m_maxPendingBatches = maxPendingBatches;
+            return this;
+        }
+
+        public ColumnarRowWriteTableSettings build() {
+            return new ColumnarRowWriteTableSettings(m_initializeDomains, m_calculateDomains,
+                m_maxPossibleNominalDomainValues, m_checkDuplicateRowKeys, m_forceSynchronousIO, m_useCaching,
+                m_rowBatchSize, m_maxPendingBatches);
+        }
+    }
 }
