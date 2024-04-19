@@ -75,7 +75,7 @@ import org.knime.core.data.v2.value.StringValueFactory;
 import org.knime.core.expressions.Ast;
 import org.knime.core.expressions.Computer;
 import org.knime.core.expressions.Expressions;
-import org.knime.core.expressions.Expressions.ExpressionError;
+import org.knime.core.expressions.Expressions.ExpressionCompileException;
 import org.knime.core.expressions.ValueType;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
@@ -141,7 +141,7 @@ public class ExpressionMapperFactory implements ColumnarMapperFactory {
 
             m_mapperFactory = Exec.createMapperFactory(ast, columnIndexToComputerFactory);
 
-        } catch (ExpressionError ex) {
+        } catch (ExpressionCompileException ex) {
             throw new IllegalArgumentException(ex);
         }
     }
