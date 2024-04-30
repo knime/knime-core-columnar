@@ -448,6 +448,7 @@ public final class ColumnarVirtualTable {
      * Append a LONG column that contains the current row index.
      *
      * @param columnName the name of the row index column
+     * @return table with added LONG column
      */
     public ColumnarVirtualTable appendRowIndex(final String columnName) {
         final RowIndexTransformSpec transformSpec = new RowIndexTransformSpec();
