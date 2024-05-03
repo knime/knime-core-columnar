@@ -184,5 +184,10 @@ final class ArrowUnsignedLongData {
                     + ". Current version: " + m_version + ".");
             }
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return UInt8Vector.TYPE_WIDTH + 1; // +1 for validity
+        }
     }
 }

@@ -409,5 +409,14 @@ public final class ArrowStructData {
                 .append(Arrays.toString(m_inner))//
                 .toString();
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            int initialNumBytes = 0;
+            for (int i = 0; i < m_inner.length; i++) {
+                initialNumBytes += m_inner[i].initialNumBytesPerElement();
+            }
+            return initialNumBytes;
+        }
     }
 }

@@ -114,6 +114,11 @@ public final class BatchWritableCache implements Flushable, BatchWritable, Rando
         }
 
         @Override
+        public int initialNumBytesPerElement() {
+            return m_writerDelegate.initialNumBytesPerElement();
+        }
+
+        @Override
         public synchronized void close() throws IOException {
             try {
                 if (m_table != null) {

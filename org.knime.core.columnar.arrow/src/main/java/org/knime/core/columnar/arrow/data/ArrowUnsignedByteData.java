@@ -184,5 +184,10 @@ final class ArrowUnsignedByteData {
                     + ". Current version: " + m_version + ".");
             }
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return UInt1Vector.TYPE_WIDTH + 1; // +1 for validity
+        }
     }
 }

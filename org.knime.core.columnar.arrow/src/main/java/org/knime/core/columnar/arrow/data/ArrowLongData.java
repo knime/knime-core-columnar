@@ -256,5 +256,10 @@ public final class ArrowLongData {
                     "Cannot read ArrowLongData with version " + version + ". Current version: " + m_version + ".");
             }
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return BigIntVector.TYPE_WIDTH + 1; // +1 for validity
+        }
     }
 }

@@ -138,6 +138,11 @@ class BatchSizeRecorder {
             m_delegateWriter.write(batch);
         }
 
+        @Override
+        public int initialNumBytesPerElement() {
+            return m_delegateWriter.initialNumBytesPerElement();
+        }
+
     }
 
     private class BatchSizeAugmentedReadable implements RandomAccessBatchReadable {

@@ -184,5 +184,10 @@ final class ArrowUnsignedIntData {
                     + m_version + ".");
             }
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return UInt4Vector.TYPE_WIDTH + 1; // +1 for validity
+        }
     }
 }

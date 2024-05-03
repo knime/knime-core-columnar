@@ -384,5 +384,10 @@ public final class AbstractArrowDictEncodedData {
                 && m_version == other.m_version && m_delegate.equals(other.m_delegate); //
         }
 
+        @Override
+        public int initialNumBytesPerElement() {
+            return m_delegate.initialNumBytesPerElement();
+        }
+
     }
 }

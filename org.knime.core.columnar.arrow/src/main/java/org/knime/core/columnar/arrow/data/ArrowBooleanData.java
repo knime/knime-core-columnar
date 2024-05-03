@@ -169,5 +169,10 @@ public final class ArrowBooleanData {
                     "Cannot read ArrowBooleanData with version " + version + ". Current version: " + m_version + ".");
             }
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return 1; // one bit validity, one bit value is less than a byte, but it's a good estimate
+        }
     }
 }

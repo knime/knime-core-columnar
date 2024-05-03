@@ -280,5 +280,11 @@ public final class ArrowListData {
         public String toString() {
             return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + m_inner + "]";
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            // inner element size + long offset + validity
+            return (m_inner.initialNumBytesPerElement() + 9) * INITIAL_VALUES_PER_LIST;
+        }
     }
 }

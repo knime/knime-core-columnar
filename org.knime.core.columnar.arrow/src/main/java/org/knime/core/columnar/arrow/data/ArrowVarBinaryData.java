@@ -271,5 +271,10 @@ public final class ArrowVarBinaryData {
                     "Cannot read ArrowVarBinaryData with version " + version + ". Current version: " + m_version + ".");
             }
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return (int)INITAL_BYTES_PER_ELEMENT + 1; // +1 for validity
+        }
     }
 }

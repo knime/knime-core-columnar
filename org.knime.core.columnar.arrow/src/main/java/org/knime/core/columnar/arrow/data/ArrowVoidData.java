@@ -195,5 +195,10 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
         public ArrowColumnDataFactoryVersion getVersion() {
             return CURRENT_VERSION;
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return 0;
+        }
     }
 }

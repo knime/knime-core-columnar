@@ -285,6 +285,11 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
             }, m_persistExecutor);
         }
 
+        @Override
+        public int initialNumBytesPerElement() {
+            return m_writerDelegate.initialNumBytesPerElement();
+        }
+
         private void waitForAndHandleFuture() throws InterruptedException, IOException {
             try {
                 m_future.get();

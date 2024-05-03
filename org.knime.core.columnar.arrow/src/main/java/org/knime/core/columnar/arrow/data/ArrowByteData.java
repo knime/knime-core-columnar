@@ -168,5 +168,10 @@ public final class ArrowByteData {
                     "Cannot read ArrowByteData with version " + version + ". Current version: " + m_version + ".");
             }
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return TinyIntVector.TYPE_WIDTH + 1; // +1 for validity
+        }
     }
 }

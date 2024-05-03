@@ -115,6 +115,10 @@ public final class DefaultTestBatchBuffer implements TestBatchBuffer {
             ColumnarTest.OPEN_CLOSEABLES.remove(TestBatchWriter.this);
         }
 
+        @Override
+        public int initialNumBytesPerElement() {
+            throw new UnsupportedOperationException("Not supported.");
+        }
     }
 
     final class TestBatchReader implements RandomAccessBatchReader {

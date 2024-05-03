@@ -76,4 +76,9 @@ public interface BatchWriter extends Closeable {
      */
     void write(ReadBatch batch) throws IOException;
 
+    /**
+     * @return How many bytes will be allocated per element. The prefix initial indicates that this size does not
+     *         necessarily reflect the final size, as string and binary blobs can have variable lengths.
+     */
+    int initialNumBytesPerElement();
 }

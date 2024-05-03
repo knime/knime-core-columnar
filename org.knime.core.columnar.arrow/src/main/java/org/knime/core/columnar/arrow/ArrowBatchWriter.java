@@ -154,6 +154,15 @@ class ArrowBatchWriter implements BatchWriter {
     }
 
     @Override
+    public int initialNumBytesPerElement() {
+        int initialNumBytesPerElement = 0;
+        for (int i = 0; i < m_factories.length; i++) {
+            initialNumBytesPerElement += m_factories[i].initialNumBytesPerElement();
+        }
+        return initialNumBytesPerElement;
+    }
+
+    @Override
     public synchronized void write(final ReadBatch batch) throws IOException {
         if (m_closed) {
             throw new IllegalStateException("Cannot write batch after closing the writer.");
