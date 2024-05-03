@@ -745,8 +745,11 @@ public class HeapBadger {
 
         private void switchToNextBatch() {
             debug("[b] Badger.switchToNextBatch");
+
             // Create the next batch
-            m_current_batch = m_writer.create(m_maxNumRowsPerBatch);
+            int newBatchSize =
+                Math.min(m_maxBatchSizeInBytes / m_writer.initialNumBytesPerElement(), m_maxNumRowsPerBatch);
+            m_current_batch = m_writer.create(newBatchSize);
 
             // Connect the accesses with the current write batch
             for (int col = 0; col < m_accessesToTheCurrentBatch.length; col++) {

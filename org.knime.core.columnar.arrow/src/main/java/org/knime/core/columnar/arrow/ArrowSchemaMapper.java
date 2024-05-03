@@ -279,5 +279,10 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         public String toString() {
             return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + m_delegate + "]";
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return m_delegate.initialNumBytesPerElement();
+        }
     }
 }

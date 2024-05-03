@@ -159,6 +159,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             }
         }
 
+        @Override
+        public int initialNumBytesPerElement() {
+            return m_writerDelegate.initialNumBytesPerElement();
+        }
+
     }
 
     private final class ReadDataCacheReader implements RandomAccessBatchReader {

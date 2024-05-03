@@ -145,6 +145,10 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             ColumnarTest.OPEN_CLOSEABLES.remove(TestBatchWriter.this);
         }
 
+        @Override
+        public int initialNumBytesPerElement() {
+            return m_factories.length;
+        }
     }
 
     final class TestBatchReader implements RandomAccessBatchReader {

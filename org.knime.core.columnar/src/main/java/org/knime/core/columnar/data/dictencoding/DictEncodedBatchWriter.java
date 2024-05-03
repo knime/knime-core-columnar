@@ -132,6 +132,11 @@ public class DictEncodedBatchWriter implements BatchWriter {
         return new DefaultWriteBatch(data);
     }
 
+    @Override
+    public int initialNumBytesPerElement() {
+        return m_delegate.initialNumBytesPerElement();
+    }
+
     private NullableWriteData wrapDictEncodedData(final int i, final NullableWriteData d) {
         return wrapDictEncodedData(DataIndex.createColumnIndex(i), d, m_schema.getSpec(i), m_schema.getTraits(i));
     }

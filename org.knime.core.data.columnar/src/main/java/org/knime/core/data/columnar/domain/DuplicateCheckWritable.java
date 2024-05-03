@@ -131,6 +131,11 @@ public final class DuplicateCheckWritable implements BatchWritable {
             }
         }
 
+        @Override
+        public int initialNumBytesPerElement() {
+            return m_writerDelegate.initialNumBytesPerElement();
+        }
+
         private void waitForPrevBatch() throws InterruptedException, IOException {
             try {
                 m_future.get();

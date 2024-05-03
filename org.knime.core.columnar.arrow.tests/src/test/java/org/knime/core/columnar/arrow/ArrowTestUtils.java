@@ -864,6 +864,11 @@ public final class ArrowTestUtils {
         public ArrowColumnDataFactoryVersion getVersion() {
             return m_version;
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            throw new UnsupportedOperationException("Not implemented");
+        }
     }
 
     /** A factory for creating, reading and writing {@link DictionaryEncodedData}. */
@@ -915,6 +920,11 @@ public final class ArrowTestUtils {
         @Override
         public ArrowColumnDataFactoryVersion getVersion() {
             return ArrowColumnDataFactoryVersion.version(0);
+        }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            throw new UnsupportedOperationException("Not implemented");
         }
     }
 
@@ -1032,6 +1042,10 @@ public final class ArrowTestUtils {
         public ArrowColumnDataFactoryVersion getVersion() {
             return ArrowColumnDataFactoryVersion.version(0);
         }
-    }
 
+        @Override
+        public int initialNumBytesPerElement() {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+    }
 }

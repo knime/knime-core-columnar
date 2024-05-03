@@ -169,5 +169,10 @@ public final class ArrowDoubleData {
                     "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
             }
         }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return Float8Vector.TYPE_WIDTH + 1; // +1 for validity
+        }
     }
 }
