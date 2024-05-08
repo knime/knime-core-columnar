@@ -57,7 +57,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
@@ -76,11 +75,10 @@ import org.knime.core.data.RowKey;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
-import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTableMaterializer.Progress;
 import org.knime.core.data.columnar.table.virtual.NullableValues.NullableReadValue;
 import org.knime.core.data.columnar.table.virtual.NullableValues.NullableWriteValue;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
@@ -89,25 +87,17 @@ import org.knime.core.data.container.CellFactory;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.ColumnRearrangerUtils;
 import org.knime.core.data.container.ColumnRearrangerUtils.RearrangedColumn;
-import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
-import org.knime.core.data.v2.RowContainer;
-import org.knime.core.data.v2.RowKeyValueFactory;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
-import org.knime.core.data.v2.value.VoidRowKeyFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.Node;
 import org.knime.core.table.access.ReadAccess;
-import org.knime.core.table.access.StringAccess;
 import org.knime.core.table.access.WriteAccess;
-import org.knime.core.table.row.RowWriteAccessible;
-import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
 import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
-import org.knime.core.table.virtual.spec.ObserverTransformUtils.ObserverWithRowIndexFactory;
 
 /**
  * Handles the construction (and optimization) of virtual tables that are generated via the ExecutionContext in a node.
@@ -285,7 +275,14 @@ public final class ColumnarRearranger {
 
         ColumnRearrangerUtils.initProcessing(uniqueCellFactories, m_context);
         try {
-            return materializeAppendTable(table, progress, sourceTable, appendedColumns);
+            var appendTable = sourceTable.selectColumns(0).append(appendedColumns); // use RowID from sourceTable
+            return ColumnarVirtualTableMaterializer.materializer() //
+                .sources(table.getSources()) //
+                .materializeRowKey(false) //
+                .progress(progress) //
+                .executionContext(m_context) //
+                .tableIdSupplier(m_tableIdSupplier) //
+                .materialize(appendTable);
         } finally {
             ColumnRearrangerUtils.finishProcessing(uniqueCellFactories);
         }
@@ -313,63 +310,6 @@ public final class ColumnarRearranger {
             createdColumns.put(col, createdCol);
         }
         return createdColumns;
-    }
-
-    /**
-     * Materializes the new columns.
-     *
-     * @param table the unfiltered input table
-     * @param progress for progress reporting
-     * @param sourceTable table containing the
-     * @param appendedColumns table d
-     * @return
-     * @throws CanceledExecutionException
-     * @throws VirtualTableIncompatibleException
-     */
-    private ReferenceTable materializeAppendTable(final ReferenceTable table, final Progress progress,
-        final ColumnarVirtualTable sourceTable, final ColumnarVirtualTable appendedColumns)
-        throws CanceledExecutionException, VirtualTableIncompatibleException {
-
-        ObserverWithRowIndexFactory progressListenerFactory = inputs -> {
-                RowKeyValue rowKey = ((StringAccess.StringReadAccess)inputs[0])::getStringValue;
-                // use 1 based indexing
-                return rowIndex -> progress.update(rowIndex + 1, rowKey);
-        };
-
-        var sinkUUID= UUID.randomUUID();
-        var tableToMaterialize = sourceTable.selectColumns(0) // RowID
-            .append(appendedColumns) // columns to create
-            // observe all created columns to ensure that the progress update happens after the map
-            // because some CellFactories (e.g. in the Math Formula node) expect this call order
-            // see also the implementation in RearrangeColumnsTable
-            .observe(progressListenerFactory,
-                IntStream.rangeClosed(0, appendedColumns.getSchema().numColumns()).toArray())
-            .materialize(sinkUUID);
-        var executor = new GraphVirtualTableExecutor(tableToMaterialize.getProducingTransform());
-        try (var container = createAppendContainer(appendedColumns.getSchema(), m_tableIdSupplier.getAsInt())) {
-            try {
-                executor.execute(table.getSources(), Map.of(sinkUUID, (RowWriteAccessible)container));
-            } catch (CancellationException ex) {
-                throw new CanceledExecutionException(ex.getMessage());
-            } catch (CompletionException ex) {
-                throw ex.getCause();
-            }
-            var appendTable = container.finish();
-            return ReferenceTables.createClearableReferenceTable(sinkUUID, appendTable);
-        } catch (CanceledExecutionException canceledException) {
-            // this stunt is necessary because ColumnarRowContainerUtils.create throws Exception
-            throw canceledException;
-        } catch (VirtualTableIncompatibleException ex) {
-            throw ex;
-        } catch (RuntimeException ex) {
-            throw ex;
-        } catch (Throwable ex) {
-            throw new IllegalStateException("Failed to create append table.", ex);
-        }
-    }
-
-    private interface Progress {
-        void update(final long rowIndex, final RowKeyValue rowKey);
     }
 
     private abstract static class AbstractProgress implements Progress {
@@ -456,24 +396,6 @@ public final class ColumnarRearranger {
 
     private record ConversionResult(ColumnarVirtualTable tableWithConvertedColumns,
         Map<RearrangedColumn, ColumnarVirtualTable> convertedColumns) {
-    }
-
-    private RowContainer createAppendContainer(final ColumnarValueSchema schema, final int tableId) throws Exception {
-        var schemaWithRowID = prependRowID(VoidRowKeyFactory.INSTANCE, schema);
-        var dataContainerSettings = DataContainerSettings.getDefault();
-        var columnarContainerSettings =
-            new ColumnarRowWriteTableSettings(true, dataContainerSettings.getMaxDomainValues(), false, false, 100, 4);
-        return ColumnarRowContainerUtils.create(m_context, tableId, schemaWithRowID, columnarContainerSettings);
-    }
-
-    private static ColumnarValueSchema prependRowID(final RowKeyValueFactory<?, ?> rowIDValueFactory,
-        final ColumnarValueSchema schema) {
-        assert !ColumnarValueSchemaUtils.hasRowID(schema) : "The ColumnarValueSchema already has a RowID";
-        var valueFactories = Stream.concat(//
-            Stream.of(rowIDValueFactory), //
-            IntStream.range(0, schema.numColumns()).mapToObj(schema::getValueFactory)//
-        ).toArray(ValueFactory<?, ?>[]::new);
-        return ColumnarValueSchemaUtils.create(schema.getSourceSpec(), valueFactories);
     }
 
     /**
