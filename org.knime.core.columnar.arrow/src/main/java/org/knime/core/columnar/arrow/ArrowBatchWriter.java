@@ -148,6 +148,10 @@ class ArrowBatchWriter implements BatchWriter {
     public WriteBatch create(final int capacity) {
         final NullableWriteData[] chunk = new NullableWriteData[m_factories.length];
         for (int i = 0; i < m_factories.length; i++) {
+            // NOTE: As seen in https://knime-com.atlassian.net/browse/AP-22395, we saw OutOfMemoryErrors
+            // here because we are creating so many small objects when we have tables with lots (100_000s) of columns.
+            // The row based backend behaves better in that scenario, unfortunately. It can handle 4x more columns with
+            // the same amount of heap memory.
             chunk[i] = ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, capacity);
         }
         return new DefaultWriteBatch(chunk);

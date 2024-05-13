@@ -120,7 +120,10 @@ public class HeapBadger {
         final int maxNumRowsPerBatch, final int maxBatchSizeInBytes, final SharedObjectCache cache) {
         ColumnarSchema schema = writable.getSchema();
 
-        int bufferSize = 20;
+        @SuppressWarnings("resource")
+        int newBatchSize = Math.min(maxBatchSizeInBytes / writable.getWriter().initialNumBytesPerElement(), maxNumRowsPerBatch);
+
+        int bufferSize = Math.min(20, newBatchSize);
         final SerializationQueue async = new AsyncQueue(bufferSize);
         //        final SerializationQueue async = new SyncQueue();
         m_writeCursor = new BadgerWriteCursor(schema, async);
@@ -753,7 +756,7 @@ public class HeapBadger {
             // Connect the accesses with the current write batch
             for (int col = 0; col < m_accessesToTheCurrentBatch.length; col++) {
                 m_accessesToTheCurrentBatch[col].setData(m_current_batch.get(col));
-                m_heapCacheBuffers[col].init(m_maxNumRowsPerBatch);
+                m_heapCacheBuffers[col].init(newBatchSize);
             }
 
             m_batchLocalRowIndex = 0;
