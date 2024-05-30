@@ -1,4 +1,3 @@
-
 /*
  * ------------------------------------------------------------------------
  *
@@ -121,7 +120,7 @@ public final class ColumnarTableBackend implements TableBackend {
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
             final ColumnarRowWriteTableSettings cursorSettings =
-                new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
+                new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.getMaxDomainValues(),
                     settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
         } catch (Exception e) {
@@ -136,7 +135,7 @@ public final class ColumnarTableBackend implements TableBackend {
             final ValueSchema schema =
                 ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
             final ColumnarRowWriteTableSettings containerSettings =
-                new ColumnarRowWriteTableSettings(settings.getInitializeDomain(), settings.getMaxDomainValues(),
+                new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.getMaxDomainValues(),
                     settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(context, repository.generateNewID(),
                 ColumnarValueSchemaUtils.create(schema), containerSettings);

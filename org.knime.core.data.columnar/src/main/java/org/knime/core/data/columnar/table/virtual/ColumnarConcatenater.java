@@ -281,9 +281,10 @@ public final class ColumnarConcatenater {
         }
 
         private RowContainer createRowIDContainer() {
-            var settings = DataContainerSettings.getDefault()//
+            final DataContainerSettings settings = DataContainerSettings.internalBuilder() //
+                .withRowKeysEnabled(false)//
                 .withInitializedDomain(false)//
-                .withRowKeysEnabled(false);
+                .build();
             return BACKEND.create(m_exec, new DataTableSpec(), settings, Node.invokeGetDataRepository(m_exec),
                 Node.invokeGetFileStoreHandler(m_exec));
         }
