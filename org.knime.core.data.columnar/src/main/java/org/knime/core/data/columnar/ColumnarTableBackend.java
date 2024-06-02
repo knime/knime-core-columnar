@@ -114,14 +114,15 @@ public final class ColumnarTableBackend implements TableBackend {
     public DataContainerDelegate create(final DataTableSpec spec, final DataContainerSettings settings,
         final IDataRepository repository, final ILocalDataRepository localRepository,
         final IWriteFileStoreHandler fileStoreHandler) {
-        final ValueSchema schema =
-            ValueSchemaUtils.create(spec, settings.isEnableRowKeys() ? RowKeyType.CUSTOM : RowKeyType.NOKEY,
-                initFileStoreHandler(fileStoreHandler, repository));
+        final boolean isEnableRowKeys = settings.isEnableRowKeys();
+        final ValueSchema schema = ValueSchemaUtils.create(spec, isEnableRowKeys ? RowKeyType.CUSTOM : RowKeyType.NOKEY,
+            initFileStoreHandler(fileStoreHandler, repository));
         final ColumnarValueSchema columnarSchema = ColumnarValueSchemaUtils.create(schema);
         try {
             final ColumnarRowWriteTableSettings cursorSettings =
-                new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
+                new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.isEnableDomainUpdate(),
+                    settings.getMaxDomainValues(), isEnableRowKeys && settings.isCheckDuplicateRowKeys(), true,
+                    settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(repository.generateNewID(), columnarSchema, cursorSettings);
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create DataContainerDelegate for ColumnarTableBackend.", e);
@@ -134,9 +135,11 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final ValueSchema schema =
                 ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
+            final boolean isDuplicateCheck = settings.isEnableRowKeys() && settings.isCheckDuplicateRowKeys();
             final ColumnarRowWriteTableSettings containerSettings =
-                new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.getMaxDomainValues(),
-                    settings.isEnableRowKeys(), settings.isForceSequentialRowHandling(), settings.getRowBatchSize(), maxPendingBatches(settings));
+                new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.isEnableDomainUpdate(),
+                    settings.getMaxDomainValues(), isDuplicateCheck, true, settings.isForceSequentialRowHandling(),
+                    settings.getRowBatchSize(), maxPendingBatches(settings));
             return ColumnarRowContainerUtils.create(context, repository.generateNewID(),
                 ColumnarValueSchemaUtils.create(schema), containerSettings);
         } catch (Exception e) {
