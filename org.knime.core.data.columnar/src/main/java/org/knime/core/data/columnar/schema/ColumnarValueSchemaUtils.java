@@ -45,15 +45,18 @@
  */
 package org.knime.core.data.columnar.schema;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.columnar.table.virtual.persist.Persistor.LoadContext;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.meta.DataColumnMetaData;
 import org.knime.core.data.v2.RowKeyType;
@@ -63,7 +66,6 @@ import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaLoadContext;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
-import org.knime.core.node.ExtensionTable.LoadContext;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.table.access.ReadAccess;
@@ -138,13 +140,15 @@ public final class ColumnarValueSchemaUtils {
     }
 
     /**
-     * Create a new {@link ColumnarValueSchema} based on a {@link DataTableSpec} and {@link ValueFactory ValueFactories}.
+     * Create a new {@link ColumnarValueSchema} based on a {@link DataTableSpec} and {@link ValueFactory
+     * ValueFactories}.
      *
      * @param spec of the table
      * @param valueFactories for the columns including the RowID
      * @return a new {@link ColumnarValueSchema}
      */
-    public static final ColumnarValueSchema create(final DataTableSpec spec, final ValueFactory<?, ?>[] valueFactories) {
+    public static final ColumnarValueSchema create(final DataTableSpec spec,
+        final ValueFactory<?, ?>[] valueFactories) {
         return create(ValueSchemaUtils.create(spec, valueFactories));
     }
 
@@ -219,14 +223,35 @@ public final class ColumnarValueSchemaUtils {
      * @return the schema with the updated spec
      * @throws IllegalArgumentException if the types in schema and spec don't match
      */
-    public static final ColumnarValueSchema updateDataTableSpec(final ColumnarValueSchema schema,
-        final DataTableSpec spec) {
+    public static ColumnarValueSchema updateDataTableSpec(final ColumnarValueSchema schema, final DataTableSpec spec) {
         return new UpdatedColumnarValueSchema(spec, schema);
+    }
+
+    /**
+     * Assign new random column names.
+     *
+     * @param schema input schema
+     * @return a new {@code ColumnarValueSchema}, equivalent to input {@code schema} but with new random column names.
+     */
+    public static ColumnarValueSchema renameToRandomColumnNames(final ColumnarValueSchema schema) {
+        var valueFactories = new ValueFactory<?, ?>[schema.numColumns()];
+        Arrays.setAll(valueFactories, schema::getValueFactory);
+
+        final DataTableSpec sourceSpec = schema.getSourceSpec();
+        var colSpecs = new DataColumnSpec[sourceSpec.getNumColumns()];
+        Arrays.setAll(colSpecs, i -> {
+            DataColumnSpecCreator creator = new DataColumnSpecCreator(sourceSpec.getColumnSpec(i));
+            creator.setName("random-" + UUID.randomUUID().toString());
+            return creator.createSpec();
+        });
+        var spec = new DataTableSpec(colSpecs);
+
+        return create(spec, valueFactories);
     }
 
     private enum EmptyColumnarValueSchema implements ColumnarValueSchema {
 
-        INSTANCE;
+            INSTANCE;
 
         private static final DataTableSpec EMPTY = new DataTableSpec();
 
@@ -274,6 +299,19 @@ public final class ColumnarValueSchemaUtils {
             // nothing to save
         }
 
+    }
+
+    public static ColumnarValueSchema selectColumns(final ColumnarValueSchema schema, final int... columnIndices) {
+
+        var valueFactories = new ValueFactory<?, ?>[columnIndices.length];
+        Arrays.setAll(valueFactories, i -> schema.getValueFactory(columnIndices[i]));
+
+        final DataTableSpec sourceSpec = schema.getSourceSpec();
+        var colSpecs = new DataColumnSpec[columnIndices.length];
+        Arrays.setAll(colSpecs, i -> sourceSpec.getColumnSpec(columnIndices[i] - 1));
+        var spec = new DataTableSpec(colSpecs);
+
+        return create(spec, valueFactories);
     }
 
 }
