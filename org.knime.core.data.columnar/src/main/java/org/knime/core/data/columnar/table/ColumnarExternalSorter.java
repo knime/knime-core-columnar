@@ -204,12 +204,13 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
 //        if (inputTable.size() < 2) {
 //            return Optional.empty();
 //        }
-//        try (final var cursor = inputTable.cursor()) {
-//            return Optional.of(createInitialRunsGreedy(exec, () -> true, 50_000, cursor, inputTable.size(),
-//                progress, rowsReadCounter).toArray(AbstractColumnarContainerTable[]::new));
-//        }
-        return createInitialRunsFixedRandomAccess(exec, inputTable, progress, rowsReadCounter, 50_000);
+        try (final var cursor = inputTable.cursor()) {
+            return Optional.of(createInitialRunsGreedy(exec, () -> true, 2_000_000, cursor, inputTable.size(),
+                progress, rowsReadCounter).toArray(AbstractColumnarContainerTable[]::new));
+        }
+        //return createInitialRunsFixedRandomAccess(exec, inputTable, progress, rowsReadCounter, 50_000);
     }
+
 
     @Override
     protected AbstractColumnarContainerTable[] createInitialRuns(final ExecutionContext exec, final RowCursor input,
@@ -217,7 +218,7 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
             throws IOException, CanceledExecutionException {
         // return createInitialRunsBuffering(exec, input, progress, rowsReadCounter); // NOSONAR
         // return createInitialRunsGreedy(exec, input, optNumRows, progress, rowsReadCounter);
-        return createInitialRunsGreedy(exec, () -> true, 50_000, input, optNumRows, progress, rowsReadCounter) //
+        return createInitialRunsGreedy(exec, () -> true, 2_000_000, input, optNumRows, progress, rowsReadCounter) //
                 .toArray(AbstractColumnarContainerTable[]::new);
     }
 

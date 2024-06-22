@@ -62,7 +62,7 @@ abstract class AbstractReadAccess<T extends NullableReadData> implements Columna
     }
 
     @Override
-    public boolean isMissing() {
+    public final boolean isMissing() {
         return m_data.isMissing(m_index.getIndex());
     }
 

@@ -124,11 +124,15 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            var binaryAccess = (VarBinaryReadAccess)access;
-            if (binaryAccess.hasObjectAndSerializer()) {
-                m_data.setObject(m_index.getIndex(), binaryAccess.getObject(), binaryAccess.getSerializer());
+            if (access.isMissing()) {
+                setMissing();
             } else {
-                m_data.setBytes(m_index.getIndex(), binaryAccess.getByteArray());
+                var binaryAccess = (VarBinaryReadAccess)access;
+                if (binaryAccess.hasObjectAndSerializer()) {
+                    m_data.setObject(m_index.getIndex(), binaryAccess.getObject(), binaryAccess.getSerializer());
+                } else {
+                    m_data.setBytes(m_index.getIndex(), binaryAccess.getByteArray());
+                }
             }
         }
 

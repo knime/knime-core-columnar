@@ -112,15 +112,27 @@ final class CachedStringData {
     static final class CachedStringWriteData
         extends AbstractCachedValueWriteData<StringWriteData, StringReadData, String> implements StringWriteData {
 
+        private boolean m_isSequential;
+
         CachedStringWriteData(final StringWriteData delegate, final ExecutorService executor,
             final CountUpDownLatch serializationLatch, final Consumer<Object> cache) {
             super(delegate, new String[delegate.capacity()], executor, serializationLatch, cache);
+            m_isSequential = true;
         }
 
         @Override
         public void setString(final int index, final String val) {
             m_data[index] = val;
+            m_isSequential = false;
             onSet(index);
+        }
+
+        @Override
+        public void setFrom(final StringReadData readData, final int sourceIndex, final int targetIndex) {
+            m_data[sourceIndex] = readData.setAndGet(m_delegate, sourceIndex, targetIndex);
+            m_delegate.setFrom(readData, sourceIndex, targetIndex);
+            m_data[sourceIndex] = readData.getString(sourceIndex);
+            StringWriteData.super.setFrom(readData, sourceIndex, targetIndex);
         }
 
         @Override
@@ -150,6 +162,13 @@ final class CachedStringData {
                 return m_data[index];
             }
 
+            @Override
+            public String setAndGet(final StringWriteData delegate, final int sourceIndex, final int targetIndex) {
+                delegate.setFrom(m_delegate.close(5), sourceIndex, targetIndex);
+//                delegate.setString(sourceIndex, m_data[sourceIndex]);
+                return m_data[sourceIndex];
+            }
+
         }
     }
 
@@ -172,6 +191,12 @@ final class CachedStringData {
                 m_data[index] = m_delegate.getString(index);
             }
             return m_data[index];
+        }
+
+        @Override
+        public String setAndGet(final StringWriteData delegate, final int sourceIndex, final int targetIndex) {
+            delegate.setFrom(m_delegate, sourceIndex, targetIndex);
+            return getString(sourceIndex);
         }
 
     }

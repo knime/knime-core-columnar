@@ -161,10 +161,14 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            final StructReadAccess structAccess = (StructReadAccess)access;
-            final int numInnerReadAccesses = structAccess.size();
-            for (int i = 0; i < numInnerReadAccesses; i++) {
-                m_inner[i].setFrom(structAccess.getAccess(i));
+            if (access.isMissing()) {
+                setMissing();
+            } else {
+                final StructReadAccess structAccess = (StructReadAccess)access;
+                final int numInnerReadAccesses = structAccess.size();
+                for (int i = 0; i < numInnerReadAccesses; i++) {
+                    m_inner[i].setFrom(structAccess.getAccess(i));
+                }
             }
         }
 

@@ -184,14 +184,18 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            final var listAccess = (ListReadAccess)access;
-            final int listSize = listAccess.size();
-            final var elementAccess = listAccess.getAccess();
-            create(listSize);
-            for (int i = 0; i < listSize; i++) {//NOSONAR
-                setWriteIndex(i);
-                listAccess.setIndex(i);
-                m_writeAccess.setFrom(elementAccess);
+            if (access.isMissing()) {
+                setMissing();
+            } else {
+                final var listAccess = (ListReadAccess)access;
+                final int listSize = listAccess.size();
+                final var elementAccess = listAccess.getAccess();
+                create(listSize);
+                for (int i = 0; i < listSize; i++) {//NOSONAR
+                    setWriteIndex(i);
+                    listAccess.setIndex(i);
+                    m_writeAccess.setFrom(elementAccess);
+                }
             }
         }
 

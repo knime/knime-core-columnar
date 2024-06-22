@@ -100,6 +100,8 @@ final class ColumnarByteAccessFactory implements ColumnarAccessFactory {
             if (access.getClass() == ColumnarByteReadAccess.class) {
                 final var columnar = (ColumnarByteReadAccess)access;
                 m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+            } else if (access.isMissing()) {
+                m_data.setMissing(m_index.getIndex());
             } else {
                 m_data.setByte(m_index.getIndex(), ((ByteReadAccess)access).getByteValue());
             }

@@ -72,11 +72,12 @@ abstract class AbstractWriteAccess<T extends NullableWriteData> implements Colum
 
     @Override
     public final void setFrom(final ReadAccess access) {
-        if (access.isMissing()) {
-            setMissing();
-        } else {
-            setFromNonMissing(access);
-        }
+        setFromNonMissing(access);
+//        if (access.isMissing()) {
+//            setMissing();
+//        } else {
+//            setFromNonMissing(access);
+//        }
     }
 
     protected abstract void setFromNonMissing(ReadAccess access);

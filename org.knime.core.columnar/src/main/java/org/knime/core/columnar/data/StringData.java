@@ -106,6 +106,14 @@ public final class StringData {
          */
         String getString(int index);
 
+        /**
+         * @param delegate
+         * @param sourceIndex
+         * @param targetIndex
+         * @return
+         */
+        String setAndGet(StringWriteData delegate, int sourceIndex, int targetIndex);
+
     }
 
 }
