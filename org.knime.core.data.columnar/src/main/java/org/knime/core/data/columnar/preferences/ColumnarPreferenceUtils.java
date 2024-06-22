@@ -55,7 +55,9 @@ import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryType;
 import java.lang.management.MemoryUsage;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.management.AttributeNotFoundException;
@@ -159,9 +161,7 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getDuplicateCheckExecutor() {
         if (duplicateCheckExecutor == null) {
-            duplicateCheckExecutor =
-                ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
-                    r -> new Thread(r, "KNIME-DuplicateChecker-" + DUPLICATE_CHECK_THREAD_COUNT.incrementAndGet())));
+            duplicateCheckExecutor = createExecutorService("KNIME-DuplicateChecker-", DUPLICATE_CHECK_THREAD_COUNT);
         }
         return duplicateCheckExecutor;
     }
@@ -171,8 +171,7 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getDomainCalcExecutor() {
         if (domainCalcExecutor == null) {
-            domainCalcExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
-                r -> new Thread(r, "KNIME-DomainCalculator-" + DOMAIN_CALC_THREAD_COUNT.incrementAndGet())));
+            domainCalcExecutor = createExecutorService("KNIME-DomainCalculator-", DOMAIN_CALC_THREAD_COUNT);
         }
         return domainCalcExecutor;
     }
@@ -202,10 +201,19 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getSerializeExecutor() {
         if (serializeExecutor == null) {
-            serializeExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
-                r -> new Thread(r, "KNIME-ObjectSerializer-" + SERIALIZE_THREAD_COUNT.incrementAndGet())));
+            serializeExecutor = createExecutorService("KNIME-ObjectSerializer-", SERIALIZE_THREAD_COUNT);
         }
         return serializeExecutor;
+    }
+
+    /**
+     * Factoring creating a new {@link ThreadPoolExecutor} with core pool size = 0 and max pool
+     * size = {@link #getNumThreads()}. Thread names are governed by the method arguments.
+     */
+    private static ExecutorService createExecutorService(final String namePrefix, final AtomicLong threadCounter) {
+        final ExecutorService executor = new ThreadPoolExecutor(0, getNumThreads(), 60, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(), r -> new Thread(r, namePrefix + threadCounter.incrementAndGet()));
+        return ThreadUtils.executorServiceWithContext(executor);
     }
 
     /**
@@ -241,8 +249,7 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getPersistExecutor() {
         if (persistExecutor == null) {
-            persistExecutor = ThreadUtils.executorServiceWithContext(Executors.newFixedThreadPool(getNumThreads(),
-                r -> new Thread(r, "KNIME-ColumnStoreWriter-" + PERSIST_THREAD_COUNT.incrementAndGet())));
+            persistExecutor = createExecutorService("KNIME-ColumnStoreWriter-", PERSIST_THREAD_COUNT);
         }
         return persistExecutor;
     }
