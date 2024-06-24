@@ -71,6 +71,7 @@ import org.knime.core.columnar.arrow.ArrowColumnStoreFactory.ArrowColumnStoreFac
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -122,6 +123,7 @@ public class ArrowColumnStoreTest {
     public void after() throws IOException {
         writePath.delete();
         readPath.delete();
+        MappedMessageSerializerTestUtil.assertAllClosed();
     }
 
     /**
