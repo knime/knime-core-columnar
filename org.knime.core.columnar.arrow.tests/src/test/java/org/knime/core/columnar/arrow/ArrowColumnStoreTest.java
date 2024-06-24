@@ -350,7 +350,7 @@ public class ArrowColumnStoreTest {
             batch.release();
 
             // Ignore batch 2
-            reader.forward();
+            reader.forward().release();
 
             // Read back batch 3
             batch = reader.forward();
@@ -439,7 +439,7 @@ public class ArrowColumnStoreTest {
             batch.release();
 
             // Ignore batch 2
-            reader.forward();
+            reader.forward().release();
 
             // Read back batch 3
             batch = reader.forward();
