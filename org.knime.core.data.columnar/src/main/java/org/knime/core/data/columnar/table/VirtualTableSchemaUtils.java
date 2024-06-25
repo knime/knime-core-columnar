@@ -271,8 +271,11 @@ public final class VirtualTableSchemaUtils {
         throws VirtualTableIncompatibleException {
         final var referenceSchema = extractSchema(table.getReferenceTables()[0]);
         final var appendTable = table.getAppendTable();
-        CheckUtils.checkState(appendTable instanceof AbstractColumnarContainerTable,
-            "Unexpected container table of type '%s' in workflow with Columnar Table Backend detected.");
+        if (!(appendTable instanceof AbstractColumnarContainerTable)) {
+            throw new VirtualTableIncompatibleException(String.format(
+                "Unexpected container table of type '%s' in workflow with Columnar Table Backend detected.",
+                appendTable.getClass()));
+        }
         final var appendSchema = ((AbstractColumnarContainerTable)appendTable).getSchema();
         final var outputSpec = table.getDataTableSpec();
         return rearrangeSchemas(referenceSchema, appendSchema, outputSpec, table::isFromReferenceTable);
