@@ -157,6 +157,13 @@ public final class ArrowStringData {
         public long sizeOf() {
             return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
         }
+
+        @Override
+        public String setAndGet(final StringWriteData delegate, final int sourceIndex, final int targetIndex) {
+            delegate.setFrom(this, sourceIndex, targetIndex);
+            // spare expensive decoding
+            return null;
+        }
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowStringData} */

@@ -97,7 +97,7 @@ final class ColumnarStringAccessFactory
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            if (access instanceof ColumnarStringReadAccess columnar) {
+            if (access.unwrap() instanceof ColumnarStringReadAccess columnar) {
                 m_data.setFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
             } else if (access.isMissing()) {
                 setMissing();

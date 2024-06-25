@@ -130,9 +130,6 @@ final class CachedStringData {
         @Override
         public void setFrom(final StringReadData readData, final int sourceIndex, final int targetIndex) {
             m_data[sourceIndex] = readData.setAndGet(m_delegate, sourceIndex, targetIndex);
-            m_delegate.setFrom(readData, sourceIndex, targetIndex);
-            m_data[sourceIndex] = readData.getString(sourceIndex);
-            StringWriteData.super.setFrom(readData, sourceIndex, targetIndex);
         }
 
         @Override
@@ -196,7 +193,7 @@ final class CachedStringData {
         @Override
         public String setAndGet(final StringWriteData delegate, final int sourceIndex, final int targetIndex) {
             delegate.setFrom(m_delegate, sourceIndex, targetIndex);
-            return getString(sourceIndex);
+            return m_data[sourceIndex];
         }
 
     }

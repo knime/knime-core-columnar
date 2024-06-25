@@ -143,6 +143,12 @@ public final class DictDecodedStringData {
 
             return m_delegate.getString(index);
         }
+
+        @Override
+        public String setAndGet(final StringWriteData delegate, final int sourceIndex, final int targetIndex) {
+            delegate.setFrom(m_delegate, sourceIndex, targetIndex);
+            return getString(sourceIndex);
+        }
     }
 
 }

@@ -154,6 +154,17 @@ public final class ArrowDictEncodedStringData {
             return new ArrowDictEncodedStringReadData<>(m_delegate, m_keyType, m_dictValueLookupTable, start + m_offset,
                 length);
         }
+
+        @Override
+        public String setAndGet(final StringWriteData delegate, final int sourceIndex, final int targetIndex) {
+            if (isMissing(sourceIndex)) {
+                delegate.setMissing(targetIndex);
+                return null;
+            }
+            final String value = getString(sourceIndex);
+            delegate.setString(targetIndex, value);
+            return value;
+        }
     }
 
     /**

@@ -104,8 +104,7 @@ final class ColumnarLongAccessFactory implements ColumnarAccessFactory {
 
         @Override
         public void setFromNonMissing(final ReadAccess access) {
-            if (access.getClass() == ColumnarLongReadAccess.class) {
-                final var columnar = (ColumnarLongReadAccess)access;
+            if (access.unwrap() instanceof ColumnarLongReadAccess columnar) {
                 m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
             } else if (access.isMissing()) {
                 setMissing();
