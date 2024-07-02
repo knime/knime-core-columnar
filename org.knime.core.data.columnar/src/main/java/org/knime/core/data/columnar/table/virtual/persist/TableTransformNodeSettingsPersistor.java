@@ -104,6 +104,8 @@ import com.google.common.collect.Lists;
  */
 public final class TableTransformNodeSettingsPersistor {
 
+    private static final int VERSION = 1;
+
     private static final Map<Class<? extends TableTransformSpec>, TransformSpecPersistor> SPEC_TO_PERSISTOR =
         Stream.of(TransformSpecPersistor.values())
             .collect(toUnmodifiableMap(TransformSpecPersistor::specClass, Function.identity()));
@@ -116,6 +118,8 @@ public final class TableTransformNodeSettingsPersistor {
         var traceBack = new TableTransformTraceBack(tableTransform);
         final Deque<TableTransform> transformsToTraverse = new ArrayDeque<>();
         final Map<TableTransform, Integer> transformIds = new IdentityHashMap<>();
+
+        settings.addInt("version", VERSION);
 
         final NodeSettingsWO transformSettings = settings.addNodeSettings("transforms");
         final NodeSettingsWO connectionSettings = settings.addNodeSettings("connections");
@@ -219,6 +223,12 @@ public final class TableTransformNodeSettingsPersistor {
         var transformSettings = settings.getNodeSettings("transforms");
         var connectionSettings = settings.getNodeSettings("connections");
 
+        // since AP 5.3 we store a version key to be able to track with which version a node's transforms have been saved
+        var version = 0;
+        if (settings.containsKey("version")) {
+            version = settings.getInt("version");
+        }
+
         // Load the transform specs
 
         var transformSpecs = new ArrayList<TableTransformSpec>();
@@ -240,6 +250,43 @@ public final class TableTransformNodeSettingsPersistor {
             final int toTransform = to.getInt("transform");//NOSONAR
             final int toPort = to.getInt("port");//NOSONAR
             parentTransforms.computeIfAbsent(toTransform, k -> new HashMap<>()).put(toPort, fromTransform);
+        }
+
+        if (version == 0) {
+            // In the first version of the TableTransformNodeSettingsPersistor (before AP 5.3), the MapperWithRowIndexFactory
+            // created the row index by itself. We made that more explicit in 5.3 by adding dedicated RowIndexTransformSpec
+            // nodes to the graph. To support backwards compatible loading, we need to add the missing row index node
+            // to the graph, make sure that is the last input to the map node, and update the connections of all adjacent transforms.
+            for (int i = 0; i < transformSpecs.size(); i++) {
+                var t = transformSpecs.get(i);
+                if (t instanceof MapTransformSpec mapTransformSpec
+                    && mapTransformSpec.getMapperFactory() instanceof WrappedColumnarMapperWithRowIndexFactory) {
+                    var rowIndexSpecPos = transformSpecs.size();
+                    transformSpecs.add(new RowIndexTransformSpec(0));
+
+                    // Replace MapTransformSpec with a new one where we included the row index column as last input column
+                    var colSelectionSpecPos = transformSpecs.size();
+                    transformSpecs.add(new SelectColumnsTransformSpec(mapTransformSpec.getColumnSelection()));
+
+                    var numMapInputCols = mapTransformSpec.getColumnSelection().length + 1;
+                    var newInputCols = IntStream.range(0, numMapInputCols).toArray();
+                    var replacementSpec = new MapTransformSpec(newInputCols, mapTransformSpec.getMapperFactory());
+                    transformSpecs.set(i, replacementSpec);
+
+                    // get parent links of this map
+                    var parents = parentTransforms.get(i);
+                    var predecessor = parents.get(0);
+
+                    // link predecessor to new column selection
+                    parentTransforms.put(colSelectionSpecPos, Map.of(0, predecessor));
+
+                    // link column selection to row index
+                    parentTransforms.put(rowIndexSpecPos, Map.of(0, colSelectionSpecPos));
+
+                    // redirect map parent to row index
+                    parents.put(0, rowIndexSpecPos);
+                }
+            }
         }
 
         // Build the TableTransform graph
