@@ -98,6 +98,7 @@ import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.RowIndexTransformSpec;
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
 import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
@@ -313,6 +314,7 @@ final class TableTransformNodeSettingsPersistorTest {
     @Test
     void testLoadMap() throws Exception {
         var settings = rootSettings();
+        settings.addInt("version", 1);
         var transformSettings = addTransformSettings(settings);
         var id = UUID.randomUUID();
         addSourceTransform(id, addSubSettings(transformSettings, 0));
@@ -327,6 +329,36 @@ final class TableTransformNodeSettingsPersistorTest {
             assertEquals(42, testMapperFactory.m_increment, "Unexpected increment.");
         });
         checkSourceTransform(transform.getPrecedingTransforms().get(0), id);
+    }
+
+    @Test
+    void testLoadOldMap() throws Exception {
+        // Maps which use a row index are saved differently since AP 5.3 (the RowIndex is a dedicated transform spec
+        // now). This test checks backwards compatible loading because it doesn't set the "version" key (compare
+        // with the testLoadMap() test above).
+        var settings = rootSettings();
+        var transformSettings = addTransformSettings(settings);
+        var id = UUID.randomUUID();
+        addSourceTransform(id, addSubSettings(transformSettings, 0));
+        addMapSettings(addSubSettings(transformSettings, 1), s -> s.addInt("increment", 42), TestMapperFactory.class,
+            1);
+        var connectionSettings = addConnectionSettings(settings);
+        addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
+        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
+        checkMapTransform(transform, s -> {
+            var wrappedMapperFactory = (WrappedColumnarMapperWithRowIndexFactory)s.getMapperFactory();
+            var testMapperFactory = (TestMapperFactory)wrappedMapperFactory.getMapperWithRowIndexFactory();
+            assertEquals(42, testMapperFactory.m_increment, "Unexpected increment.");
+        });
+
+        // expecting a RowIndexTransformSpec before the map, and a column selection
+        var rowIndexTransform = transform.getPrecedingTransforms().get(0);
+        assertInstanceOf(RowIndexTransformSpec.class, rowIndexTransform.getSpec());
+
+        var selectColumnsTransform = rowIndexTransform.getPrecedingTransforms().get(0);
+        assertInstanceOf(SelectColumnsTransformSpec.class, selectColumnsTransform.getSpec());
+
+        checkSourceTransform(selectColumnsTransform.getPrecedingTransforms().get(0), id);
     }
 
     private static void checkMapTransform(final TableTransform transform,
