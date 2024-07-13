@@ -56,6 +56,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.batch.BatchWritable;
@@ -274,9 +275,19 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
         m_executor = executor;
     }
 
-    // TODO (TP): should this be synchronized? If used multi-threaded, this might lose futures?
     synchronized void enqueueRunnable(final Runnable r) {
         m_future = m_future.thenRunAsync(r, m_executor);
+    }
+
+    /**
+     * Add a runnable to the chain of futures that is executed if and only if any of the previous futures terminated
+     * exceptionally.
+     */
+    synchronized void enqueueExceptionHandler(final Consumer<Throwable> handler) {
+        m_future = m_future.exceptionallyAsync((final Throwable exception) -> {
+            handler.accept(exception);
+            return null; // Need to return null because a (void) return value is expected here
+        }, m_executor);
     }
 
     void waitForAndHandleFuture() throws InterruptedException {
@@ -353,6 +364,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
         // a latch that is counted down after everything else.
         final var closedLatch = new CountDownLatch(1);
         enqueueRunnable(closedLatch::countDown);
+        enqueueExceptionHandler(ex -> closedLatch.countDown()); // also count down in case of a previous exception
         try {
             closedLatch.await();
         } catch (InterruptedException e) {
