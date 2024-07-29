@@ -57,6 +57,7 @@ import java.util.stream.Stream;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.TableBackend;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.AbstractColumnarContainerTable;
@@ -164,6 +165,11 @@ public final class ColumnarTableBackend implements TableBackend {
             + "which gives noticable speed-ups over the row-based format.\n\n"
             + "Please also review the settings in the KNIME preferences\n"
             + "(File -> Preferences -> KNIME -> Table Backend -> Columnar Backend)\n";
+    }
+
+    @Override
+    public long getReservedOffHeapBytes() {
+        return ColumnarPreferenceUtils.getOffHeapMemoryLimit();
     }
 
     // TODO required? how can it ever be null?
