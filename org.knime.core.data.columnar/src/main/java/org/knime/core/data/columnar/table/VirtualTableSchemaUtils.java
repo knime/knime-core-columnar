@@ -270,13 +270,19 @@ public final class VirtualTableSchemaUtils {
     private static ColumnarValueSchema extractSchemaFromRearrangeTable(final RearrangeColumnsTable table)
         throws VirtualTableIncompatibleException {
         final var referenceSchema = extractSchema(table.getReferenceTables()[0]);
+
         final var appendTable = table.getAppendTable();
-        if (!(appendTable instanceof AbstractColumnarContainerTable)) {
+        final ColumnarValueSchema appendSchema;
+        if (appendTable == null) {
+            appendSchema = EMPTY;
+        } else if (appendTable instanceof AbstractColumnarContainerTable colAppendTable) {
+            appendSchema = colAppendTable.getSchema();
+        } else {
             throw new VirtualTableIncompatibleException(String.format(
                 "Unexpected container table of type '%s' in workflow with Columnar Table Backend detected.",
                 appendTable.getClass()));
         }
-        final var appendSchema = ((AbstractColumnarContainerTable)appendTable).getSchema();
+
         final var outputSpec = table.getDataTableSpec();
         return rearrangeSchemas(referenceSchema, appendSchema, outputSpec, table::isFromReferenceTable);
     }
