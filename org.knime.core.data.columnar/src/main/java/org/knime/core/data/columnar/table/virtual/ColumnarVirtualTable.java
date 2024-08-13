@@ -66,7 +66,6 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.columnar.schema.ColumnarValueSchema;
 import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
@@ -92,6 +91,8 @@ import org.knime.core.table.virtual.spec.ObserverTransformSpec;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverFactory;
 import org.knime.core.table.virtual.spec.ObserverTransformUtils;
 import org.knime.core.table.virtual.spec.ObserverTransformUtils.ObserverWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.RowFilterTransformSpec;
+import org.knime.core.table.virtual.spec.RowFilterTransformSpec.RowFilterFactory;
 import org.knime.core.table.virtual.spec.RowIndexTransformSpec;
 import org.knime.core.table.virtual.spec.SelectColumnsTransformSpec;
 import org.knime.core.table.virtual.spec.SliceTransformSpec;
@@ -250,6 +251,26 @@ public final class ColumnarVirtualTable {
      */
     public ColumnarVirtualTable append(final ColumnarVirtualTable table) {
         return append(List.of(table));
+    }
+
+    /**
+     * Create a {@code new ColumnarVirtualTable} by including only rows from this {@code
+     * ColumnarVirtualTable} that match a given predicate. This is defined by an array of {@code n} column indices that
+     * form the inputs of the ({@code n}-ary} filter predicate. The predicate is evaluated on the values of the
+     * respective columns for each row. Rows for which the predicate evaluates to {@code true} will be included, rows
+     * for which the filter predicate evaluates to {@code false} will be removed (skipped). The filter is given by a
+     * {@code RowFilterFactory} which can be used to create multiple instances of the filter predicate for processing
+     * multiple lines in parallel. (Each filter predicate is used single-threaded.) The order in which
+     * {@code columnIndices} are given matters. For example if {@code columnIndices = {5,1,4}}, then values from the
+     * 5th, 1st, and 4th column are provided as inputs 0, 1, and 2, respectively, to the filter predicate.
+     *
+     * @param columnIndices the indices of the columns that are passed to the filter predicate
+     * @param filterFactory factory to create instances of the filter predicate
+     * @return the filtered table
+     */
+    public ColumnarVirtualTable filterRows(final int[] columnIndices, final RowFilterFactory filterFactory) {
+        final TableTransformSpec transformSpec = new RowFilterTransformSpec(columnIndices, filterFactory);
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
 
     /**
