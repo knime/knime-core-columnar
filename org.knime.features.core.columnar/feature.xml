@@ -2,7 +2,7 @@
 <feature
       id="org.knime.features.core.columnar"
       label="KNIME Columnar Table Backend"
-      version="5.3.1.qualifier"
+      version="5.3.2.qualifier"
       provider-name="KNIME AG, Zurich, Switzerland">
 
    <description>
