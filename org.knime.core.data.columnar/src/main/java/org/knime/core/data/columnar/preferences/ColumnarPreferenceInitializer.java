@@ -60,7 +60,7 @@ public final class ColumnarPreferenceInitializer extends AbstractPreferenceIniti
 
     static final String OFF_HEAP_MEM_LIMIT_KEY = "knime.core.data.columnar.off-heap-limit";
 
-    static final int OFF_HEAP_MEM_LIMIT_MIN = 1024;
+    static final int OFF_HEAP_MEM_LIMIT_MIN = 768;
 
     static final int OFF_HEAP_MEM_LIMIT_DEF = computeDefaultOffHeapMemoryLimit();
 
@@ -74,7 +74,7 @@ public final class ColumnarPreferenceInitializer extends AbstractPreferenceIniti
      * A factor that is multiplied with the configured heap and off-heap memory to get the expected memory usage of the
      * application.
      */
-    private static final double JVM_FACTOR = 1.1;
+    private static final double JVM_FACTOR = 1.3;
 
     @Override
     public void initializeDefaultPreferences() {
