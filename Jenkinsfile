@@ -24,6 +24,11 @@ properties([
                 defaultValue: false,
                 description: "Use the HeapBadger instead of the Object Cache",
                 name: "USE_HEAP_BADGER",
+            ),
+            choice(
+                name: 'ARROW_ALLOCATION_MANAGER_TYPE',
+                choices: ['Unsafe', 'Netty'],
+                description: 'Select the Arrow allocation manager type (Netty or Unsafe, default is Unsafe)',
             )
         ],
     ),
@@ -43,10 +48,12 @@ try {
     }
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
-        vmArgs = ''
+        def vmArgsList = []
+        vmArgsList.add("-Darrow.allocation.manager.type=${params['ARROW_ALLOCATION_MANAGER_TYPE']}")
         if (params["USE_HEAP_BADGER"]) {
-            vmArgs = '-Dknime.columnar.heapbadger.enable=true'
+            vmArgsList.add('-Dknime.columnar.heapbadger.enable=true')
         }
+        def vmArgs = vmArgsList.join(' ')
 
         stage("knime-base workflow tests (${vmArgs})") {
             withEnv(["MALLOC_ARENA_MAX=1"]) {
@@ -100,7 +107,6 @@ try {
                             "knime-pmml",
                             "knime-pmml-compilation",
                             "knime-pmml-translation",
-                            "knime-python",
                             "knime-python",
                             "knime-python-legacy",
                             "knime-r",
