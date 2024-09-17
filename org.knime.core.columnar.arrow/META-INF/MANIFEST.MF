@@ -4,21 +4,33 @@ Automatic-Module-Name: org.knime.core.columnar.arrow
 Bundle-Name: KNIME Columnar Store Plugin - Arrow Implementation
 Bundle-SymbolicName: org.knime.core.columnar.arrow;singleton:=true
 Bundle-Version: 5.4.0.qualifier
-Bundle-ClassPath: .
+Bundle-ClassPath: .,
+ libs/arrow-memory-core-14.0.2.jar,
+ libs/arrow-memory-netty-14.0.2.jar,
+ libs/jsr305-3.0.2.jar,
+ libs/arrow-format-14.0.2.jar,
+ libs/arrow-vector-14.0.2.jar,
+ libs/commons-codec-1.15.jar,
+ libs/flatbuffers-java-1.12.0.jar,
+ libs/jackson-annotations-2.15.1.jar,
+ libs/jackson-core-2.15.1.jar,
+ libs/jackson-databind-2.15.1.jar,
+ libs/jackson-datatype-jsr310-2.15.1.jar,
+ libs/jsr305-3.0.2-sources.jar,
+ libs/slf4j-api-1.7.25.jar,
+ libs/netty-buffer-4.1.96.Final.jar,
+ libs/netty-common-4.1.96.Final.jar,
+ libs/arrow-memory-unsafe-14.0.2.jar
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-RequiredExecutionEnvironment: JavaSE-17
 Bundle-ActivationPolicy: lazy
 Require-Bundle: org.knime.core.columnar;bundle-version="[5.4.0,6.0.0)",
  org.knime.core.table;bundle-version="[5.4.0,6.0.0)",
- io.netty.all;bundle-version="[4.1.68,4.2.0)",
  com.google.guava;bundle-version="[19.0.0,20.0.0)",
  slf4j.api;bundle-version="[2.0.12,3.0.0)",
  com.fasterxml.jackson.core.jackson-core;bundle-version="[2.10.2,3.0.0)",
  com.fasterxml.jackson.core.jackson-databind;bundle-version="[2.10.2,3.0.0)",
  com.fasterxml.jackson.core.jackson-annotations;bundle-version="[2.10.2,3.0.0)",
- org.apache.arrow.format;bundle-version="[14.0.2,15.0.0)",
- org.apache.arrow.memory-core;bundle-version="[14.0.2,15.0.0)",
- org.apache.arrow.vector;bundle-version="[14.0.2,15.0.0)",
  com.google.flatbuffers.java;bundle-version="[1.12.0,2.0.0)",
  org.apache.commons.commons-io;bundle-version="[2.15.1,3.0.0)",
  org.bytedeco.javacpp;bundle-version="[1.5.8,2.0.0)",

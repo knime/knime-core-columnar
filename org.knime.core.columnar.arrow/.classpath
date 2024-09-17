@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
+	<classpathentry exported="true" kind="lib" path="libs/arrow-memory-unsafe-14.0.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/netty-common-4.1.96.Final.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/netty-buffer-4.1.96.Final.jar" sourcepath="libs/netty-buffer-4.1.96.Final-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/arrow-format-14.0.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/arrow-vector-14.0.2.jar" sourcepath="libs/arrow-vector-14.0.2-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/commons-codec-1.15.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/flatbuffers-java-1.12.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jackson-annotations-2.15.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jackson-core-2.15.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jackson-databind-2.15.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jackson-datatype-jsr310-2.15.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jsr305-3.0.2-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/slf4j-api-1.7.25.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/arrow-memory-core-14.0.2.jar" sourcepath="libs/arrow-memory-core-14.0.2-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/arrow-memory-netty-14.0.2.jar" sourcepath="libs/arrow-memory-netty-14.0.2-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jsr305-3.0.2.jar" sourcepath="libs/jsr305-3.0.2-sources.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-17">
 		<attributes>
 			<attribute name="module" value="true"/>
