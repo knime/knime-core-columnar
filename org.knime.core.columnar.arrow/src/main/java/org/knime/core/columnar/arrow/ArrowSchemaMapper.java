@@ -272,7 +272,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
         @Override
         public int hashCode() {
-            return Objects.hash(m_traits, m_delegate);
+            return Objects.hash(m_traits, m_delegate, m_version);
         }
 
         @Override

@@ -393,7 +393,7 @@ public final class ArrowStructData {
 
         @Override
         public int hashCode() {
-            return Objects.hash(m_version, m_inner);
+            return Objects.hash(m_version, Arrays.deepHashCode(m_inner));
         }
 
         private static final String childNameAtIndex(final int index) {
