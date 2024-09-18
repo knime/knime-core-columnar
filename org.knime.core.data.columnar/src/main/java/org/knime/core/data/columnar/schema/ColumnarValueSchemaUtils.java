@@ -48,9 +48,13 @@ package org.knime.core.data.columnar.schema;
 import java.util.Arrays;
 import java.util.UUID;
 
+import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.RowKeyValueFactory;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 
 /**
  * Utility class to work with {@link ColumnarValueSchema}s.
