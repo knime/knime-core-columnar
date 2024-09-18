@@ -47,7 +47,9 @@ package org.knime.core.columnar.arrow;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 
@@ -105,6 +107,13 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     private static final ArrowSchemaMapper INSTANCE = new ArrowSchemaMapper();
 
+    private record FactoryWithTraitsKey(ArrowColumnDataFactory factory, DataTraits traits) {
+    }
+
+    // There will ever only be a rather limited set of different factories used, so in case of many
+    // columns we cache and reuse the factories for other columns
+    private final Map<FactoryWithTraitsKey, ArrowColumnDataFactory> m_usedFactories = new ConcurrentHashMap<>();
+
     private ArrowSchemaMapper() {
         // Singleton and the instance is only used in #map
     }
@@ -134,75 +143,81 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowBooleanDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowBooleanDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowByteDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowByteDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowDoubleDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowDoubleDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowFloatDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowFloatDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowIntDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowIntDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowLongDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowLongDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return wrap(new ArrowDictEncodedVarBinaryDataFactory(traits), traits);
+            return wrapCached(new ArrowDictEncodedVarBinaryDataFactory(traits), traits);
         } else {
-            return wrap(ArrowVarBinaryDataFactory.INSTANCE, traits);
+            return wrapCached(ArrowVarBinaryDataFactory.INSTANCE, traits);
         }
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
-        return wrap(ArrowVoidDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowVoidDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
         final var innerFactories = new ArrowColumnDataFactory[spec.size()];
         Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
-        return wrap(new ArrowStructDataFactory(innerFactories), traits);
+        return wrapCached(new ArrowStructDataFactory(innerFactories), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
         final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
-        return wrap(new ArrowListDataFactory(inner), traits);
+        return wrapCached(new ArrowListDataFactory(inner), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return wrap(new ArrowDictEncodedStringDataFactory(traits), traits);
+            return wrapCached(new ArrowDictEncodedStringDataFactory(traits), traits);
         }
-        return wrap(ArrowStringDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowStringDataFactory.INSTANCE, traits);
+    }
+
+    ArrowColumnDataFactory wrapCached(final ArrowColumnDataFactory factory, final DataTraits traits) {
+        return m_usedFactories.computeIfAbsent(new FactoryWithTraitsKey(factory, traits), key -> {
+            if (key.traits.hasTrait(LogicalTypeTrait.class) || key.traits.hasTrait(DictEncodingTrait.class)) {
+                return new ExtensionArrowColumnDataFactory(key.factory, key.traits);
+            }
+
+            return factory;
+        });
     }
 
     static ArrowColumnDataFactory wrap(final ArrowColumnDataFactory factory, final DataTraits traits) {
-        if (traits.hasTrait(LogicalTypeTrait.class) || traits.hasTrait(DictEncodingTrait.class)) {
-            return new ExtensionArrowColumnDataFactory(factory, traits);
-        }
-
-        return factory;
+        return INSTANCE.wrapCached(factory, traits);
     }
 
     static final class ExtensionArrowColumnDataFactory implements ArrowColumnDataFactory {
