@@ -53,6 +53,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 
 /**
@@ -254,6 +255,6 @@ public final class ArrowColumnDataFactoryVersion {
 
     @Override
     public int hashCode() {
-        return 31 * m_version + Arrays.hashCode(m_childrenVersions);
+        return Objects.hash(m_version, Arrays.hashCode(m_childrenVersions));
     }
 }
