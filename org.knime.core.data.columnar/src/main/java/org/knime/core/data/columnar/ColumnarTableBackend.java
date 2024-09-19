@@ -48,6 +48,7 @@ package org.knime.core.data.columnar;
 import static java.util.function.Predicate.not;
 import static org.knime.core.data.columnar.table.virtual.reference.ReferenceTables.createReferenceTables;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.IntSupplier;
@@ -165,6 +166,11 @@ public final class ColumnarTableBackend implements TableBackend {
             + "which gives noticable speed-ups over the row-based format.\n\n"
             + "Please also review the settings in the KNIME preferences\n"
             + "(File -> Preferences -> KNIME -> Table Backend -> Columnar Backend)\n";
+    }
+
+    @Override
+    public List<Capability> getCapabilities() {
+        return List.of(Capability.FAST_SLICING);
     }
 
     @Override
