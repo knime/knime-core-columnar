@@ -49,6 +49,7 @@ import java.nio.file.Path;
 
 import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.AllocationOutcome;
+import org.apache.arrow.memory.AllocatorConfigUtil;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.bytedeco.javacpp.Loader;
@@ -79,7 +80,8 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArrowColumnStoreFactory.class);
 
-    private static final boolean DISABLE_HARD_MEMORY_LIMIT = Boolean.getBoolean("knime.columnar.disablehardmemorylimit");
+    private static final boolean DISABLE_HARD_MEMORY_LIMIT =
+        Boolean.getBoolean("knime.columnar.disablehardmemorylimit");
 
     private static final boolean DISABLE_MEMORY_ALERT = Boolean.getBoolean("knime.columnar.disablememoryalert");
 
@@ -121,7 +123,8 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     }
 
     private ArrowColumnStoreFactory(final long memoryLimit) {
-        m_allocator = new RootAllocator(new AllocationListener() {
+
+        var allocatorConfig = AllocatorConfigUtil.createConfig(new AllocationListener() {
 
             @Override
             public void onAllocation(final long size) {
@@ -138,6 +141,8 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
             }
 
         }, DISABLE_HARD_MEMORY_LIMIT ? Long.MAX_VALUE : memoryLimit);
+        m_allocator = new RootAllocator(allocatorConfig);
+
         m_compression = ArrowCompressionUtil.getDefaultCompression();
     }
 
