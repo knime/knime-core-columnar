@@ -719,7 +719,7 @@ public class HeapBadger {
             debug("[b]       sizeof batch:       " + m_current_batch.usedSizeFor(m_batchLocalRowIndex));
             debug("[b]       max batch sizeof:   " + m_maxBatchSizeInBytes);
             if (m_batchLocalRowIndex >= m_maxNumRowsPerBatch
-                || m_current_batch.usedSizeFor(m_batchLocalRowIndex) > m_maxBatchSizeInBytes) {
+                || m_current_batch.usedSizeFor(m_batchLocalRowIndex) >= m_maxBatchSizeInBytes) {
                 debug("[b]   switch to new batch");
                 // TODO if we have written more data in some columns make sure we do not loose it
                 writeCurrentBatch();
