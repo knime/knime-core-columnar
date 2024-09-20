@@ -152,6 +152,13 @@ public final class HeapCacheBuffers {
          * @return
          */
         ARRAY_TYPE getArray();
+
+        /**
+         * Indicate whether this buffer should be cached or not
+         * @param enabled
+         */
+        void setCacheable(final boolean enabled);
+
     }
 
     private enum UncachedHeapBuffer implements HeapCacheBuffer<Object[]> {
@@ -186,10 +193,17 @@ public final class HeapCacheBuffers {
             }
 
         }
+
+        @Override
+        public void setCacheable(final boolean enabled) {
+            // ignore
+        }
     }
 
     private static class StringHeapCacheBuffer implements HeapCacheBuffer<String[]> {
         private String[] m_data;
+
+        private boolean m_cacheable = true;
 
         @Override
         public void init(final int capacity) {
@@ -203,7 +217,7 @@ public final class HeapCacheBuffers {
 
         @Override
         public String[] getArray() {
-            return m_data;
+            return m_cacheable ? m_data : null;
         }
 
         private class StringHeapCacheBufferWriteAccess implements WriteAccess {
@@ -223,10 +237,17 @@ public final class HeapCacheBuffers {
                 m_data[m_index] = ((StringReadAccess)access).getStringValue();
             }
         }
+
+        @Override
+        public void setCacheable(final boolean enabled) {
+            m_cacheable = enabled;
+        }
     }
 
     private static class VarBinaryHeapCacheBuffer implements HeapCacheBuffer<Object[]> {
         private Object[] m_data;
+
+        private boolean m_cacheable = true;
 
         @Override
         public void init(final int capacity) {
@@ -240,7 +261,7 @@ public final class HeapCacheBuffers {
 
         @Override
         public Object[] getArray() {
-            return m_data;
+            return m_cacheable ? m_data : null;
         }
 
         private class VarBinaryHeapCacheBufferWriteAccess implements WriteAccess {
@@ -259,6 +280,11 @@ public final class HeapCacheBuffers {
             public void setFrom(final ReadAccess access) {
                 m_data[m_index] = ((VarBinaryReadAccess)access).getObject();
             }
+        }
+
+        @Override
+        public void setCacheable(final boolean enabled) {
+            m_cacheable = enabled;
         }
     }
 
@@ -303,6 +329,11 @@ public final class HeapCacheBuffers {
                     m_innerFactories[i].getAccess(m_index).setFrom(structAccess.getAccess(i));
                 }
             }
+        }
+
+        @Override
+        public void setCacheable(final boolean enabled) {
+            // ignored -- the decision whether an array is cached is determined on each child
         }
     }
 }
