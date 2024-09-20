@@ -263,8 +263,12 @@ public final class ColumnarConcatenater {
                     var rowContainer = createRowIDContainer(); //
                     var writeCursor = rowContainer.createCursor(); //
             ) {
+                var row = rowContainer.createRowBuffer();
                 progress.setMessage("Uniquify RowIDs");
-                consumeRowIDs(table, rowID -> writeCursor.forward().setRowKey(uniquifyRowID(rowID)), progress);
+                consumeRowIDs(table, rowID -> {
+                    row.setRowKey(uniquifyRowID(rowID));
+                    writeCursor.commit(row);
+                }, progress);
                 return rowContainer.finish();
             } catch (Exception ex) {
                 throw new IllegalStateException(ex);

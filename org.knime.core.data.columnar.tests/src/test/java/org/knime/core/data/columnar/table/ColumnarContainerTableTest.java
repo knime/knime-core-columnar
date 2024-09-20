@@ -56,7 +56,7 @@ import java.io.IOException;
 import org.junit.Test;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.data.columnar.table.ColumnarTableTestUtils.TestColumnStoreFactory;
-import org.knime.core.data.v2.RowWrite;
+import org.knime.core.data.v2.RowBuffer;
 import org.knime.core.data.v2.value.ValueInterfaces.IntWriteValue;
 
 /**
@@ -75,10 +75,11 @@ public class ColumnarContainerTableTest extends ColumnarTest {
         try (final ColumnarRowContainer container =
             ColumnarRowContainer.create(null, tableId, createSchema(1), TestColumnStoreFactory.INSTANCE, settings);
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
+            final RowBuffer row = container.createRowBuffer();
             for (int i = 0; i < nRows; i++) {
-                final RowWrite row = cursor.forward();
                 row.setRowKey(Integer.toString(i));
                 row.<IntWriteValue> getWriteValue(0).setIntValue(i);
+                cursor.commit(row);
             }
             try (@SuppressWarnings("resource")
             final AbstractColumnarContainerTable table = (AbstractColumnarContainerTable)container.finishInternal()) {

@@ -63,6 +63,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
+import org.knime.core.data.v2.RowBuffer;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.schema.ValueSchema;
@@ -141,8 +142,8 @@ final class ColumnarTableTestUtils {
         final DataType type, final RowWriteConsumer setter, final ExecutionContext exec) {
         try (final ColumnarRowContainer container = createColumnarRowContainer(nCols, type, exec);
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
+            final RowBuffer row = container.createRowBuffer();
             for (int i = 0; i < nRows; i++) {
-                final RowWrite row = cursor.forward();
                 row.setRowKey(Integer.toString(i));
                 for (int j = 0; j < nCols; j++) {
                     if (i % 2 == 0) { // NOSONAR
@@ -151,6 +152,7 @@ final class ColumnarTableTestUtils {
                         setter.accept(row, j, i);
                     }
                 }
+                cursor.commit(row);
             }
             return (UnsavedColumnarContainerTable)container.finishInternal();
         } catch (Exception e) {

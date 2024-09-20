@@ -60,7 +60,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.container.ContainerTable;
@@ -68,8 +67,6 @@ import org.knime.core.data.container.DataContainerDelegate;
 import org.knime.core.data.container.DataContainerException;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
-import org.knime.core.data.v2.RowWrite;
-import org.knime.core.data.v2.WriteValue;
 import org.knime.core.node.workflow.NodeContext;
 import org.knime.core.util.DuplicateKeyException;
 
@@ -277,16 +274,7 @@ final class ColumnarDataContainerDelegate implements DataContainerDelegate {
      * @param row the row to be written
      */
     private void writeRowIntoCursor(final DataRow row) {
-        final RowWrite rowWrite = m_delegateCursor.forward();
-        rowWrite.setRowKey(row.getKey());
-        for (int i = 0; i < m_numColumns; i++) {
-            final DataCell cell = row.getCell(i);
-            if (cell.isMissing()) {
-                rowWrite.setMissing(i);
-            } else {
-                rowWrite.<WriteValue<DataCell>> getWriteValue(i).setValue(cell);
-            }
-        }
+        m_delegateCursor.commit(row);
     }
 
     /**

@@ -140,9 +140,7 @@ public class ColumnarRowWriteCursorTest extends ColumnarTest {
         RowWrite rowWrite = null;
         assertEquals(readCursor.getNumColumns(), writeCursor.getNumColumns());
         while ((rowRead = readCursor.forward()) != null) {
-            assertTrue(writeCursor.canForward());
-            rowWrite = writeCursor.forward();
-            rowWrite.setFrom(rowRead);
+            writeCursor.commit(rowRead);
         }
     }
 

@@ -48,20 +48,6 @@
  */
 package org.knime.core.data.columnar.filter;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.util.Arrays;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.junit.Test;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.data.container.filter.TableFilter;
-
 /**
  * Contains unit tests for {@link TableFilterUtils}.
  *
@@ -70,92 +56,5 @@ import org.knime.core.data.container.filter.TableFilter;
 @SuppressWarnings("javadoc")
 public class TableFilterUtilsTest {
 
-    private static final TableFilter EMPTY = new TableFilter.Builder().build();
-
-    @Test
-    public void testDefinesRowRange() {
-        TableFilter onlyFrom = TableFilter.filterRowsFromIndex(10);
-        assertTrue(TableFilterUtils.definesRowRange(onlyFrom));
-        TableFilter onlyTo = TableFilter.filterRowsToIndex(13);
-        assertTrue(TableFilterUtils.definesRowRange(onlyTo));
-        TableFilter range = TableFilter.filterRangeOfRows(10, 13);
-        assertTrue(TableFilterUtils.definesRowRange(range));
-        assertFalse(TableFilterUtils.definesRowRange(EMPTY));
-    }
-
-    @Test
-    public void testExtractFrom() {
-        TableFilter from = TableFilter.filterRowsFromIndex(10);
-        assertEquals(10, TableFilterUtils.extractFromIndex(from));
-        assertEquals(0, TableFilterUtils.extractFromIndex(EMPTY));
-    }
-
-    @Test
-    public void testExtactTo() {
-        TableFilter to = TableFilter.filterRowsToIndex(12);
-        assertEquals(12, TableFilterUtils.extractToIndex(to, 100));
-        assertEquals(99, TableFilterUtils.extractToIndex(EMPTY, 100));
-    }
-
-    @Test
-    public void testDefinesColumnFilter() {
-        TableFilter filter = TableFilter.materializeCols(0, 2);
-        assertTrue(TableFilterUtils.definesColumnFilter(filter));
-        assertFalse(TableFilterUtils.definesColumnFilter(EMPTY));
-    }
-
-    @Test
-    public void testExtractPhysicalColumnIndices() {
-        TableFilter filter = TableFilter.materializeCols(0, 2);
-        int[] expected = {0, 1, 3};
-        assertArrayEquals(expected, TableFilterUtils.extractPhysicalColumnIndices(filter, 5));
-        expected = new int[] {0, 1, 2, 3, 4};
-        assertArrayEquals(expected, TableFilterUtils.extractPhysicalColumnIndices(EMPTY, 5));
-    }
-
-    @Test
-    public void testHasFilter() {
-        TableFilter onlyCols = TableFilter.materializeCols(1, 2, 3);
-        assertTrue(TableFilterUtils.hasFilter(onlyCols));
-        TableFilter onlyFromIndex = TableFilter.filterRowsFromIndex(3);
-        assertTrue(TableFilterUtils.hasFilter(onlyFromIndex));
-        TableFilter onlyToIndex = TableFilter.filterRowsToIndex(7);
-        assertTrue(TableFilterUtils.hasFilter(onlyToIndex));
-        TableFilter fromAndToIndex = TableFilter.filterRangeOfRows(3, 7);
-        assertTrue(TableFilterUtils.hasFilter(fromAndToIndex));
-        TableFilter noFilter = new TableFilter.Builder().build();
-        assertFalse(TableFilterUtils.hasFilter(noFilter));
-    }
-
-    @Test
-    public void testCreateColumnSelectionAllColumnsFiltered() {
-        TableFilter filter = TableFilter.materializeCols();
-        Optional<ColumnSelection> selection = TableFilterUtils.createColumnSelection(filter, 5);
-        assertTrue(selection.isPresent());
-        checkSelection(selection.get(), 5, 0);
-    }
-
-    private static void checkSelection(final ColumnSelection selection, final int expectedSize,
-        final int... selectedIndices) {
-        assertEquals(expectedSize, selection.numColumns());
-        Set<Integer> selected = Arrays.stream(selectedIndices).boxed().collect(Collectors.toSet());
-        for (int i = 0; i < expectedSize; i++) {
-            assertEquals(selected.contains(i), selection.isSelected(i));
-        }
-    }
-
-    @Test
-    public void testCreateColumnSelectionSomeColumnsFiltered() {
-        TableFilter filter = TableFilter.materializeCols(0, 2, 4);
-        Optional<ColumnSelection> selection = TableFilterUtils.createColumnSelection(filter, 6);
-        assertTrue(selection.isPresent());
-        checkSelection(selection.get(), 6, 0, 1, 3, 5);
-    }
-
-    @Test
-    public void testCreateColumnSelectionNoColumnsFiltered() throws Exception {
-        TableFilter filter = new TableFilter.Builder().build();
-        Optional<ColumnSelection> selection = TableFilterUtils.createColumnSelection(filter, 5);
-        assertTrue(selection.isEmpty());
-    }
+    // TODO (TP) add test for TableFilterUtils.toSelection()
 }

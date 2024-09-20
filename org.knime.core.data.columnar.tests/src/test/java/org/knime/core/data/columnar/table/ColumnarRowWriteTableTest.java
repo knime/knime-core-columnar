@@ -70,8 +70,8 @@ import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.IntCell.IntCellFactory;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.def.StringCell.StringCellFactory;
+import org.knime.core.data.v2.RowBuffer;
 import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.RowWrite;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.ValueInterfaces.IntWriteValue;
@@ -154,7 +154,7 @@ public final class ColumnarRowWriteTableTest {
         final ColumnarRowReadTable readTable;
         try (final var writeTable = createTestTable(schema, settings)) {
             try (final var cursor = writeTable.createCursor()) {
-                writeTestData(cursor);
+                writeTestData(cursor, schema);
                 readTable = writeTable.finish();
             }
         }
@@ -168,16 +168,18 @@ public final class ColumnarRowWriteTableTest {
         return new ColumnarRowWriteTable(schema, TestColumnStoreFactory.INSTANCE, settings);
     }
 
-    private static void writeTestData(final ColumnarRowWriteCursor cursor) {
-        final RowWrite row0 = cursor.forward();
-        row0.setRowKey(RowKey.createRowKey(0l));
-        row0.<IntWriteValue> getWriteValue(0).setIntValue(-234);
-        row0.<StringWriteValue> getWriteValue(1).setStringValue("My third string");
+    private static void writeTestData(final ColumnarRowWriteCursor cursor, final ValueSchema schema) {
+        final RowBuffer row = RowBuffer.forSchema(schema);
 
-        final RowWrite row1 = cursor.forward();
-        row1.setRowKey(RowKey.createRowKey(1l));
-        row1.<IntWriteValue> getWriteValue(0).setIntValue(21);
-        row1.<StringWriteValue> getWriteValue(1).setStringValue("My fourth string");
+        row.setRowKey(RowKey.createRowKey(0l));
+        row.<IntWriteValue> getWriteValue(0).setIntValue(-234);
+        row.<StringWriteValue> getWriteValue(1).setStringValue("My third string");
+        cursor.commit(row);
+
+        row.setRowKey(RowKey.createRowKey(1l));
+        row.<IntWriteValue> getWriteValue(0).setIntValue(21);
+        row.<StringWriteValue> getWriteValue(1).setStringValue("My fourth string");
+        cursor.commit(row);
     }
 
     private static void checkDomains(final int intColExpectedLowerBound, final int intColExpectedUpperBound,
