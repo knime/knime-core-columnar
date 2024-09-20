@@ -53,6 +53,7 @@ import java.nio.ByteBuffer;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.BaseVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -187,7 +188,9 @@ public final class ArrowStringData {
 
         @Override
         public int initialNumBytesPerElement() {
-            return (int)INITAL_BYTES_PER_ELEMENT + 1; // +1 for validity
+            return (int)INITAL_BYTES_PER_ELEMENT // data buffer
+                + BaseVariableWidthVector.OFFSET_WIDTH // offset buffer
+                + 1; // validity bit
         }
     }
 }

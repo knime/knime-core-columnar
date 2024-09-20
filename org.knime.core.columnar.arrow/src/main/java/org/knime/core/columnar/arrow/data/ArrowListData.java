@@ -207,6 +207,7 @@ public final class ArrowListData {
 
         /**
          * Create a new factory for Arrow list data.
+         *
          * @param inner the factory to create the type of the list elements
          */
         public ArrowListDataFactory(final ArrowColumnDataFactory inner) {
@@ -226,12 +227,15 @@ public final class ArrowListData {
         public ArrowListWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final ListVector v = (ListVector)vector;
+            // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
+            // the child vector
+            v.setInitialCapacity(capacity);
+            v.allocateNew();
+
             // Data vector
             final FieldVector dataVector = v.getDataVector();
             final ArrowWriteData data =
                 m_inner.createWrite(dataVector, dictionaryIdSupplier, allocator, capacity * INITIAL_VALUES_PER_LIST);
-            v.setInitialCapacity(capacity);
-            v.allocateNew();
             return new ArrowListWriteData(v, data);
         }
 
@@ -283,8 +287,9 @@ public final class ArrowListData {
 
         @Override
         public int initialNumBytesPerElement() {
-            // inner element size + long offset + validity
-            return (m_inner.initialNumBytesPerElement() + 9) * INITIAL_VALUES_PER_LIST;
+            return m_inner.initialNumBytesPerElement() * INITIAL_VALUES_PER_LIST // data buffer
+                + BaseRepeatedValueVector.OFFSET_WIDTH // offset buffer
+                + 1; // validity bit
         }
     }
 }
