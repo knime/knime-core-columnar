@@ -68,7 +68,6 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.WrappedColumnarMapperWithRowIndexFactory;
@@ -487,7 +486,7 @@ public final class TableTransformNodeSettingsPersistor {
     }
 
     private static void saveMissingColumnsSchema(final ValueSchema schema, final NodeSettingsWO settings) {
-        CheckUtils.checkArgument(!ColumnarValueSchemaUtils.hasRowID(schema),
+        CheckUtils.checkArgument(!ValueSchemaUtils.hasRowID(schema),
             "A schema used for appending missing values must not have a RowID column because RowIDs can't be missing.");
         saveColumnarValueSchema(schema, settings);
     }
