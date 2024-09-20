@@ -1,0 +1,145 @@
+/*
+ * ------------------------------------------------------------------------
+ *
+ *  Copyright by KNIME AG, Zurich, Switzerland
+ *  Website: http://www.knime.com; Email: contact@knime.com
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License, Version 3, as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *
+ *  Additional permission under GNU GPL version 3 section 7:
+ *
+ *  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+ *  Hence, KNIME and ECLIPSE are both independent programs and are not
+ *  derived from each other. Should, however, the interpretation of the
+ *  GNU GPL Version 3 ("License") under any applicable laws result in
+ *  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
+ *  you the additional permission to use and propagate KNIME together with
+ *  ECLIPSE with only the license terms in place for ECLIPSE applying to
+ *  ECLIPSE and the GNU GPL Version 3 applying for KNIME, provided the
+ *  license terms of ECLIPSE themselves allow for the respective use and
+ *  propagation of ECLIPSE together with KNIME.
+ *
+ *  Additional permission relating to nodes for KNIME that extend the Node
+ *  Extension (and in particular that are based on subclasses of NodeModel,
+ *  NodeDialog, and NodeView) and that only interoperate with KNIME through
+ *  standard APIs ("Nodes"):
+ *  Nodes are deemed to be separate and independent programs and to not be
+ *  covered works.  Notwithstanding anything to the contrary in the
+ *  License, the License does not apply to Nodes, you are not required to
+ *  license Nodes under the License, and you are granted a license to
+ *  prepare and propagate Nodes, in each case even if such Nodes are
+ *  propagated with or for interoperation with KNIME.  The owner of a Node
+ *  may freely choose the license terms applicable to such Node, including
+ *  when such Node is propagated with or for interoperation with KNIME.
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 20, 2024 (benjamin): created
+ */
+package org.knime.core.columnar.onheap.data;
+
+import org.knime.core.columnar.data.DoubleData.DoubleReadData;
+import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+
+/**
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ */
+public final class OnHeapDoubleData extends AbstractReferencedData implements DoubleReadData, DoubleWriteData {
+
+    // or use a ByteBuffer??
+    private double[] m_data;
+
+    // TODO move validity to abstract class? Maybe in-line the ValidityBuffer class?
+    private ValidityBuffer m_validity;
+
+    public OnHeapDoubleData(final int capacity) {
+        m_data = new double[capacity];
+        m_validity = new ValidityBuffer(capacity);
+    }
+
+    // ReferenceData
+
+    @Override
+    protected void closeResources() {
+        m_data = null;
+        m_validity = null;
+    }
+
+    @Override
+    public long sizeOf() {
+        return m_data.length * Integer.BYTES + m_validity.sizeOf();
+    }
+
+    // WriteData
+
+    @Override
+    public void setMissing(final int index) {
+        m_validity.set(index, false);
+    }
+
+    @Override
+    public void expand(final int minimumCapacity) {
+        setNumElements(minimumCapacity);
+    }
+
+    @Override
+    public int capacity() {
+        return m_data.length;
+    }
+
+    @Override
+    public long usedSizeFor(final int numElements) {
+        return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
+    }
+
+    @Override
+    public void setDouble(final int index, final double val) {
+        m_data[index] = val;
+        m_validity.set(index, true);
+    }
+
+    @Override
+    public DoubleReadData close(final int length) {
+        setNumElements(length);
+        return this;
+    }
+
+    @Override
+    public double getDouble(final int index) {
+        return m_data[index];
+    }
+
+    @Override
+    public boolean isMissing(final int index) {
+        return !m_validity.isSet(index);
+    }
+
+    @Override
+    public int length() {
+        return m_data.length;
+    }
+
+    /**
+     * Expand or shrink the data to the given size.
+     *
+     * @param numElements the new size of the data
+     */
+    private void setNumElements(final int numElements) {
+        m_validity.setNumElements(numElements);
+
+        var newData = new double[numElements];
+        System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+        m_data = newData;
+    }
+}
