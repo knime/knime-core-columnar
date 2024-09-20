@@ -49,7 +49,6 @@
 package org.knime.core.columnar.access;
 
 import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.table.access.ReadAccess;
 
 /**
  *
@@ -71,21 +70,9 @@ abstract class AbstractWriteAccess<T extends NullableWriteData> implements Colum
     }
 
     @Override
-    public final void setFrom(final ReadAccess access) {
-        if (access.isMissing()) {
-            setMissing();
-        } else {
-            setFromNonMissing(access);
-        }
-    }
-
-    protected abstract void setFromNonMissing(ReadAccess access);
-
-    @Override
     public void setData(final NullableWriteData data) {
         @SuppressWarnings("unchecked")
         final T casted = (T)data;
         m_data = casted;
     }
-
 }

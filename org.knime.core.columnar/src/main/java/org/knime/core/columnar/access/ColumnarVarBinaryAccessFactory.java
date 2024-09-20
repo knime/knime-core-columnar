@@ -96,6 +96,7 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
         public <T> T getObject(final ObjectDeserializer<T> deserializer) {
             return m_data.getObject(m_index.getIndex(), deserializer);
         }
+
     }
 
     static final class ColumnarVarBinaryWriteAccess extends AbstractWriteAccess<VarBinaryWriteData>
@@ -118,19 +119,24 @@ final class ColumnarVarBinaryAccessFactory implements ColumnarAccessFactory {
         }
 
         @Override
-        public <T> void setObject(final T value, final ObjectSerializer<T> serializer) {
-            m_data.setObject(m_index.getIndex(), value, serializer);
-        }
-
-        @Override
-        public void setFromNonMissing(final ReadAccess access) {
-            var binaryAccess = (VarBinaryReadAccess)access;
-            if (binaryAccess.hasObjectAndSerializer()) {
-                m_data.setObject(m_index.getIndex(), binaryAccess.getObject(), binaryAccess.getSerializer());
+        public void setFromInternal(final ReadAccess readAccess) {
+            if (readAccess instanceof ColumnarVarBinaryReadAccess varBinaryAccess) {
+                m_data.setFrom(varBinaryAccess.m_data, varBinaryAccess.m_index.getIndex(), m_index.getIndex());
+            } else if (readAccess.isMissing()) {
+                setMissing();
             } else {
-                m_data.setBytes(m_index.getIndex(), binaryAccess.getByteArray());
+                final var binaryAccess = (VarBinaryReadAccess)readAccess;
+                if (binaryAccess.hasObjectAndSerializer()) {
+                    setObject(binaryAccess.getObject(), binaryAccess.getSerializer());
+                } else {
+                    setByteArray(binaryAccess.getByteArray());
+                }
             }
         }
 
+        @Override
+        public <T> void setObject(final T value, final ObjectSerializer<T> serializer) {
+            m_data.setObject(m_index.getIndex(), value, serializer);
+        }
     }
 }

@@ -53,6 +53,7 @@ import org.knime.core.columnar.testing.data.TestStringData.TestStringDataFactory
 import org.knime.core.columnar.testing.data.TestStructData.TestStructDataFactory;
 import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
@@ -135,11 +136,30 @@ public final class TestDictEncodedStringData<K> extends AbstractTestDictEncodedD
     }
 
     @Override
+    public void setStringBytes(final int index, final byte[] val) {
+        setString(index, new StringEncoder().decode(val));
+    }
+
+    @Override
     public String getString(final int index) {
         K dictKey = getDictKey(index);
 
         return m_dictKeyToVal.computeIfAbsent(dictKey,
             k -> ((StringReadData)m_delegate.getReadDataAt(1)).getString(index));
+    }
+
+    @Override
+    public byte[] getStringBytesNullable(final int index) {
+        return null;
+    }
+
+    @Override
+    public void setFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+        if (readData.isMissing(fromIndex)) {
+            setMissing(toIndex);
+        } else {
+            setString(toIndex, readData.getString(fromIndex));
+        }
     }
 
     @Override

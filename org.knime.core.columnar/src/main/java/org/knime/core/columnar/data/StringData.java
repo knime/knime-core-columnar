@@ -81,9 +81,12 @@ public final class StringData {
          */
         void setString(int index, String val);
 
+        void setStringBytes(int index, byte[] val);
+
         @Override
         StringReadData close(int length);
 
+        void setFrom(StringReadData readData, int fromIndex, int toIndex);
     }
 
     /**
@@ -102,6 +105,10 @@ public final class StringData {
          */
         String getString(int index);
 
+        /**
+         * @param index
+         * @return
+         */
+        byte[] getStringBytesNullable(int index);
     }
-
 }

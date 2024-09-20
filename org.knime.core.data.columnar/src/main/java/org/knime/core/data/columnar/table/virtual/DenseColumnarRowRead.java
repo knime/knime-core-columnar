@@ -112,5 +112,4 @@ final class DenseColumnarRowRead implements ColumnarRowRead {
             columns[i].setFrom(m_accesses[i]);
         }
     }
-
 }

@@ -118,7 +118,8 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
             @SuppressWarnings("resource") // Will be closed along with the container table.
             final ColumnarRowReadTable finishedColumnarTable = m_columnarTable.finish();
             m_finishedTable =
-                UnsavedColumnarContainerTable.create(m_id, finishedColumnarTable, m_columnarTable.getStoreFlusher());
+                UnsavedColumnarContainerTable.create(m_id, finishedColumnarTable, () -> {
+                });
         }
         return m_finishedTable;
     }

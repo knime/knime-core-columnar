@@ -148,6 +148,7 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
             updateInnerData();
             return m_innerData.isMissing(index);
         }
+
     }
 
     static final class ColumnarListWriteAccess<W extends NullableWriteData> extends AbstractWriteAccess<ListWriteData>
@@ -183,17 +184,21 @@ final class ColumnarListAccessFactory<R extends NullableReadData, // NOSONAR
         }
 
         @Override
-        public void setFromNonMissing(final ReadAccess access) {
-            final var listAccess = (ListReadAccess)access;
-            final int listSize = listAccess.size();
-            final var elementAccess = listAccess.getAccess();
-            create(listSize);
-            for (int i = 0; i < listSize; i++) {//NOSONAR
-                setWriteIndex(i);
-                listAccess.setIndex(i);
-                m_writeAccess.setFrom(elementAccess);
+        public void setFromInternal(final ReadAccess readAccess) {
+            if (readAccess.isMissing()) {
+                setMissing();
+            } else {
+                ListReadAccess listAccess = (ListReadAccess)readAccess;
+                final var size = listAccess.size();
+                create(size);
+                final var elementReadAccess = listAccess.getAccess();
+                final var elementWriteAccess = getWriteAccess();
+                for (var i = 0; i < size; i++) {
+                    setWriteIndex(i);
+                    listAccess.setIndex(i);
+                    elementWriteAccess.setFrom(elementReadAccess);
+                }
             }
         }
-
     }
 }

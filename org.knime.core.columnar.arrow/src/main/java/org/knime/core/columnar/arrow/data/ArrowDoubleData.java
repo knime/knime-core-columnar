@@ -89,9 +89,12 @@ public final class ArrowDoubleData {
         }
 
         @Override
-        public void copyFrom(final DoubleReadData readData, final int fromIndex, final int toIndex) {
-            if (readData instanceof ArrowDoubleReadData arrow) {
-                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+        public void setFrom(final DoubleReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowDoubleReadData arrowReadData) {
+                // no caches: transfer bytes between Arrow buffers, including "missing" information
+                m_vector.copyFromSafe(arrowReadData.m_offset + fromIndex, m_offset + toIndex, arrowReadData.m_vector);
+            } else if (readData.isMissing(fromIndex)) {
+                setMissing(toIndex);
             } else {
                 setDouble(toIndex, readData.getDouble(fromIndex));
             }

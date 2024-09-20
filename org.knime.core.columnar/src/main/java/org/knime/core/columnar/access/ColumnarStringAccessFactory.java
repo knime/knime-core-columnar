@@ -51,8 +51,7 @@ import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.StringAccess.StringReadAccess;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
 
-final class ColumnarStringAccessFactory
-    implements ColumnarAccessFactory {
+final class ColumnarStringAccessFactory implements ColumnarAccessFactory {
 
     /** INSTANCE **/
     static final ColumnarStringAccessFactory INSTANCE = new ColumnarStringAccessFactory();
@@ -70,7 +69,8 @@ final class ColumnarStringAccessFactory
         return new ColumnarStringWriteAccess(index);
     }
 
-    static final class ColumnarStringReadAccess extends AbstractReadAccess<StringReadData> implements StringReadAccess {
+    static final class ColumnarStringReadAccess extends AbstractReadAccess<StringReadData>
+        implements StringReadAccess {
 
         ColumnarStringReadAccess(final ColumnDataIndex index) {
             super(index);
@@ -81,10 +81,14 @@ final class ColumnarStringAccessFactory
             return m_data.getString(m_index.getIndex());
         }
 
+        @Override
+        public byte[] getUTF8Nullable() {
+            return m_data.getStringBytesNullable(m_index.getIndex());
+        }
     }
 
     static final class ColumnarStringWriteAccess extends AbstractWriteAccess<StringWriteData>
-    implements StringWriteAccess {
+        implements StringWriteAccess {
 
         ColumnarStringWriteAccess(final ColumnDataIndex index) {
             super(index);
@@ -96,9 +100,20 @@ final class ColumnarStringAccessFactory
         }
 
         @Override
-        public void setFromNonMissing(final ReadAccess access) {
-            m_data.setString(m_index.getIndex(), ((StringReadAccess)access).getStringValue());
+        public void setFromInternal(final ReadAccess readAccess) {
+            if (readAccess instanceof ColumnarStringReadAccess columnar) {
+                m_data.setFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+            } else if (readAccess.isMissing()) {
+                setMissing();
+            } else {
+                final var stringAccess = (StringReadAccess)readAccess;
+                final var raw = stringAccess.getUTF8Nullable();
+                if (raw != null) {
+                    m_data.setStringBytes(m_index.getIndex(), raw);
+                } else {
+                    setStringValue(stringAccess.getStringValue());
+                }
+            }
         }
-
     }
 }

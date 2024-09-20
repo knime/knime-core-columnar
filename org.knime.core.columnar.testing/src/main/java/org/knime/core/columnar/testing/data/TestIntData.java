@@ -106,12 +106,16 @@ public final class TestIntData extends AbstractTestData implements IntWriteData,
     }
 
     @Override
-    public void writeToAccess(final WriteAccess access, final int index) {
-        ((IntWriteAccess)access).setIntValue(getInt(index));
+    public void setFrom(final IntReadData data, final int fromIndex, final int toIndex) {
+        if (data.isMissing(fromIndex)) {
+            setMissing(toIndex);
+        } else {
+            setInt(toIndex, data.getInt(fromIndex));
+        }
     }
 
     @Override
-    public void copyFrom(final IntReadData readData, final int fromIndex, final int toIndex) {
-        setInt(toIndex, readData.getInt(fromIndex));
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((IntWriteAccess)access).setIntValue(getInt(index));
     }
 }

@@ -657,7 +657,7 @@ public class HeapBadger {
 
         private int m_batchLocalRowIndex;
 
-        private final HeapCacheBuffer<?>[] m_heapCacheBuffers;
+        private HeapCacheBuffer<?>[] m_heapCacheBuffers;
 
         private int m_numBatchesWritten;
 
@@ -790,6 +790,7 @@ public class HeapBadger {
             if (m_current_batch != null) {
                 m_current_batch.release();
             }
+            m_heapCacheBuffers = null;
             m_writer.close();
         }
     }

@@ -142,4 +142,13 @@ public final class TestVarBinaryData extends AbstractTestData implements VarBina
 //        ((VarBinaryWriteAccess)access).setByteArray(getBytes(index));
         throw new UnsupportedOperationException("Var binaries are too complicated for now");
     }
+
+    @Override
+    public void setFrom(final VarBinaryReadData data, final int fromIndex, final int toIndex) {
+        if (data.isMissing(fromIndex)) {
+            setMissing(toIndex);
+        } else {
+            setBytes(toIndex, data.getBytes(fromIndex));
+        }
+    }
 }

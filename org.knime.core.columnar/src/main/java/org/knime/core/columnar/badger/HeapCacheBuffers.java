@@ -94,14 +94,10 @@ public final class HeapCacheBuffers {
             return new StringHeapCacheBuffer();
         } else if (spec instanceof VarBinaryDataSpec) {
             return new VarBinaryHeapCacheBuffer();
-        } else if (spec instanceof StructDataSpec) {
-            var structSpec = (StructDataSpec)spec;
-            var structTraits = (StructDataTraits)traits;
-            return createHeapCacheStructBuffer(index, structSpec, structTraits);
-        } else if (spec instanceof ListDataSpec) {
-            var listSpec = (ListDataSpec)spec;
-            var listTraits = (ListDataTraits)traits;
-            return createHeapCacheListBuffer(index, listSpec, listTraits);
+        } else if (spec instanceof StructDataSpec structSpec) {
+            return createHeapCacheStructBuffer(index, structSpec, (StructDataTraits)traits);
+        } else if (spec instanceof ListDataSpec listSpec) {
+            return createHeapCacheListBuffer(index, listSpec, (ListDataTraits)traits);
         } else {
             return UncachedHeapBuffer.INSTANCE;
         }
@@ -188,7 +184,7 @@ public final class HeapCacheBuffers {
             }
 
             @Override
-            public void setFrom(final ReadAccess access) {
+            public void setFromInternal(final ReadAccess readAccess) {
                 // NOOP
             }
 
@@ -233,8 +229,12 @@ public final class HeapCacheBuffers {
             }
 
             @Override
-            public void setFrom(final ReadAccess access) {
-                m_data[m_index] = ((StringReadAccess)access).getStringValue();
+            public void setFromInternal(final ReadAccess readAccess) {
+                if (readAccess.isMissing()) {
+                    setMissing();
+                } else {
+                    m_data[m_index] = ((StringReadAccess)readAccess).getStringValue();
+                }
             }
         }
 
@@ -277,8 +277,12 @@ public final class HeapCacheBuffers {
             }
 
             @Override
-            public void setFrom(final ReadAccess access) {
-                m_data[m_index] = ((VarBinaryReadAccess)access).getObject();
+            public void setFromInternal(final ReadAccess readAccess) {
+                if (readAccess.isMissing()) {
+                    setMissing();
+                } else {
+                    m_data[m_index] = ((VarBinaryReadAccess)readAccess).getObject();
+                }
             }
         }
 
@@ -323,10 +327,14 @@ public final class HeapCacheBuffers {
             }
 
             @Override
-            public void setFrom(final ReadAccess access) {
-                final StructReadAccess structAccess = (StructReadAccess)access;
-                for (int i = 0; i < m_innerFactories.length; i++) {
-                    m_innerFactories[i].getAccess(m_index).setFrom(structAccess.getAccess(i));
+            public void setFromInternal(final ReadAccess readAccess) {
+                if (readAccess.isMissing()) {
+                    setMissing();
+                } else {
+                    final StructReadAccess structAccess = (StructReadAccess)readAccess;
+                    for (int i = 0; i < m_innerFactories.length; i++) {
+                        m_innerFactories[i].getAccess(m_index).setFrom(structAccess.getAccess(i));
+                    }
                 }
             }
         }

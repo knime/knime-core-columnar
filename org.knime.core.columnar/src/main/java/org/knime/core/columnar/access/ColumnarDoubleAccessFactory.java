@@ -87,7 +87,6 @@ final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
         public double getDoubleValue() {
             return m_data.getDouble(m_index.getIndex());
         }
-
     }
 
     static final class ColumnarDoubleWriteAccess extends AbstractWriteAccess<DoubleWriteData>
@@ -103,12 +102,13 @@ final class ColumnarDoubleAccessFactory implements ColumnarAccessFactory {
         }
 
         @Override
-        public void setFromNonMissing(final ReadAccess access) {
-            if (access.getClass() == ColumnarDoubleReadAccess.class) {
-                final var columnar = (ColumnarDoubleReadAccess)access;
-                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+        public void setFromInternal(final ReadAccess readAccess) {
+            if (readAccess instanceof ColumnarDoubleReadAccess doubleAccess) {
+                m_data.setFrom(doubleAccess.m_data, doubleAccess.m_index.getIndex(), m_index.getIndex());
+            } else if (readAccess.isMissing()) {
+                setMissing();
             } else {
-                m_data.setDouble(m_index.getIndex(), ((DoubleReadAccess)access).getDoubleValue());
+                setDoubleValue(((DoubleReadAccess)readAccess).getDoubleValue());
             }
         }
     }

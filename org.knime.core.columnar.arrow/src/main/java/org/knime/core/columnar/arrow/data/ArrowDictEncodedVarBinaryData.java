@@ -133,6 +133,15 @@ public final class ArrowDictEncodedVarBinaryData {
 
             setDictKey(index, dictKey);
         }
+
+        @Override
+        public void setFrom(final VarBinaryReadData data, final int fromIndex, final int toIndex) {
+            if (data.isMissing(fromIndex)) {
+                setMissing(toIndex);
+            } else {
+                setBytes(toIndex, data.getBytes(fromIndex));
+            }
+        }
     }
 
     /**

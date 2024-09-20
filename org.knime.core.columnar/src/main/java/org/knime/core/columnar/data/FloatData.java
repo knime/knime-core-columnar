@@ -79,19 +79,10 @@ public final class FloatData {
          */
         void setFloat(int index, float val);
 
-        /**
-         * Copies an entry from the given {@link FloatReadData} as if by calling
-         * {@code setFloat(toIndex, readData.getFloat(fromIndex))}, but may be implemented more efficiently.
-         *
-         * @param readData read data to extract a (non-missing) value from
-         * @param fromIndex index in {@code readData}
-         * @param toIndex index to write the extracted value to
-         */
-        void copyFrom(FloatReadData readData, int fromIndex, int toIndex);
-
         @Override
         FloatReadData close(int length);
 
+        void setFrom(FloatReadData readData, int fromIndex, int toIndex);
     }
 
     /**
@@ -107,7 +98,5 @@ public final class FloatData {
          * @return the float element at the given index (row)
          */
         float getFloat(int index);
-
     }
-
 }

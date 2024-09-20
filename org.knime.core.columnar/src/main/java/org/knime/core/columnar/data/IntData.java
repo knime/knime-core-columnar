@@ -78,19 +78,10 @@ public final class IntData {
          */
         void setInt(int index, int val);
 
-        /**
-         * Copies an entry from the given {@link IntReadData} as if by calling
-         * {@code setInt(toIndex, readData.getInt(fromIndex))}, but may be implemented more efficiently.
-         *
-         * @param readData read data to extract a (non-missing) value from
-         * @param fromIndex index in {@code readData}
-         * @param toIndex index to write the extracted value to
-         */
-        void copyFrom(IntReadData readData, int fromIndex, int toIndex);
-
         @Override
         IntReadData close(int length);
 
+        void setFrom(IntReadData data, int fromIndex, int toIndex);
     }
 
     /**
@@ -106,7 +97,5 @@ public final class IntData {
          * @return the int element at the given index (row)
          */
         int getInt(int index);
-
     }
-
 }

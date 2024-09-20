@@ -76,19 +76,10 @@ public final class BooleanData {
          */
         void setBoolean(int index, boolean val);
 
-        /**
-         * Copies an entry from the given {@link BooleanReadData} as if by calling
-         * {@code setBoolean(toIndex, readData.getBoolean(fromIndex))}, but may be implemented more efficiently.
-         *
-         * @param readData read data to extract a (non-missing) value from
-         * @param fromIndex index in {@code readData}
-         * @param toIndex index to write the extracted value to
-         */
-        void copyFrom(BooleanReadData readData, int fromIndex, int toIndex);
-
         @Override
         BooleanReadData close(int length);
 
+        void setFrom(BooleanReadData data, int fromIndex, int toIndex);
     }
 
     /**
@@ -105,7 +96,5 @@ public final class BooleanData {
          * @return the boolean element at the given index (row)
          */
         boolean getBoolean(int index);
-
     }
-
 }

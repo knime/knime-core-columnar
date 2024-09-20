@@ -93,8 +93,7 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
         return new ColumnarStructReadAccess(m_inner, index);
     }
 
-    static final class ColumnarStructReadAccess extends AbstractReadAccess<StructReadData>
-        implements StructReadAccess {
+    static final class ColumnarStructReadAccess extends AbstractReadAccess<StructReadData> implements StructReadAccess {
 
         private final ColumnarReadAccess[] m_inner;
 
@@ -125,7 +124,6 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
                 m_inner[i].setData(m_data.getReadDataAt(i));
             }
         }
-
     }
 
     static final class ColumnarStructWriteAccess extends AbstractWriteAccess<StructWriteData>
@@ -160,13 +158,15 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
         }
 
         @Override
-        public void setFromNonMissing(final ReadAccess access) {
-            final StructReadAccess structAccess = (StructReadAccess)access;
-            final int numInnerReadAccesses = structAccess.size();
-            for (int i = 0; i < numInnerReadAccesses; i++) {
-                m_inner[i].setFrom(structAccess.getAccess(i));
+        public void setFromInternal(final ReadAccess readAccess) {
+            if (readAccess.isMissing()) {
+                setMissing();
+            } else {
+                final var structAccess = (StructReadAccess)readAccess;
+                for (var i = 0; i < m_inner.length; i++) {
+                    m_inner[i].setFrom(structAccess.getAccess(i));
+                }
             }
         }
-
     }
 }

@@ -93,6 +93,7 @@ public final class VarBinaryData {
         @Override
         VarBinaryReadData close(int length);
 
+        void setFrom(VarBinaryReadData data, int fromIndex, int toIndex);
     }
 
     /**
@@ -122,5 +123,4 @@ public final class VarBinaryData {
          */
         <T> T getObject(int index, ObjectDeserializer<T> deserializer);
     }
-
 }

@@ -106,12 +106,16 @@ public final class TestBooleanData extends AbstractTestData implements BooleanWr
     }
 
     @Override
-    public void writeToAccess(final WriteAccess access, final int index) {
-        ((BooleanWriteAccess)access).setBooleanValue(getBoolean(index));
+    public void setFrom(final BooleanReadData data, final int fromIndex, final int toIndex) {
+        if (data.isMissing(fromIndex)) {
+            setMissing(toIndex);
+        } else {
+            setBoolean(toIndex, data.getBoolean(fromIndex));
+        }
     }
 
     @Override
-    public void copyFrom(final BooleanReadData readData, final int fromIndex, final int toIndex) {
-        setBoolean(toIndex, readData.getBoolean(fromIndex));
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((BooleanWriteAccess)access).setBooleanValue(getBoolean(index));
     }
 }

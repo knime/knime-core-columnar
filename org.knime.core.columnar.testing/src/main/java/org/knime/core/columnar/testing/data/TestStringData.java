@@ -49,6 +49,7 @@ import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.table.access.StringAccess.StringWriteAccess;
 import org.knime.core.table.access.WriteAccess;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -113,6 +114,25 @@ public final class TestStringData extends AbstractTestData implements StringWrit
     @Override
     public void writeToAccess(final WriteAccess access, final int index) {
         ((StringWriteAccess)access).setStringValue(getString(index));
+    }
+
+    @Override
+    public void setStringBytes(final int index, final byte[] val) {
+        setString(index, new StringEncoder().decode(val));
+    }
+
+    @Override
+    public byte[] getStringBytesNullable(final int index) {
+        return null;
+    }
+
+    @Override
+    public void setFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+        if (readData.isMissing(fromIndex)) {
+            setMissing(toIndex);
+        } else {
+            setString(toIndex, readData.getString(fromIndex));
+        }
     }
 
     @Override

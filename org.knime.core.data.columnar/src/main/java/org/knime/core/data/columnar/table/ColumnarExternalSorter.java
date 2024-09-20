@@ -59,7 +59,7 @@ import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
-import org.apache.commons.lang3.Functions.FailableConsumer;
+import org.apache.commons.lang3.function.FailableConsumer;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -202,7 +202,9 @@ public final class ColumnarExternalSorter extends ExternalSorter<AbstractColumna
             throws IOException, CanceledExecutionException {
 
         // return createInitialRunsGreedyRandomAccess(exec, inputTable, progress, rowsReadCounter);
-        return createInitialRunsFixedRandomAccess(exec, inputTable, progress, rowsReadCounter, 10_000_000);
+        try (final var cursor = inputTable.cursor()) {
+            return Optional.of(createInitialRunsGreedy(exec, cursor, inputTable.size(), progress, rowsReadCounter));
+        }
     }
 
     @SuppressWarnings("resource")

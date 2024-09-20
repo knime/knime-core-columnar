@@ -102,14 +102,14 @@ final class ColumnarIntAccessFactory
         }
 
         @Override
-        public void setFromNonMissing(final ReadAccess access) {
-            if (access.getClass() == ColumnarIntReadAccess.class) {
-                final var columnar = (ColumnarIntReadAccess)access;
-                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+        public void setFromInternal(final ReadAccess readAccess) {
+            if (readAccess instanceof ColumnarIntReadAccess columnarAccess) {
+                m_data.setFrom(columnarAccess.m_data, columnarAccess.m_index.getIndex(), m_index.getIndex());
+            } else if (readAccess.isMissing()) {
+                setMissing();
             } else {
-                m_data.setInt(m_index.getIndex(), ((IntReadAccess)access).getIntValue());
+                setIntValue(((IntReadAccess)readAccess).getIntValue());
             }
         }
-
     }
 }

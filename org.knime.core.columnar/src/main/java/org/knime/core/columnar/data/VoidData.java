@@ -73,7 +73,6 @@ public final class VoidData {
         @Override
         default void setMissing(final int index) {
         }
-
     }
 
     /**
@@ -93,7 +92,5 @@ public final class VoidData {
         @Override
         default void retain() {
         }
-
     }
-
 }

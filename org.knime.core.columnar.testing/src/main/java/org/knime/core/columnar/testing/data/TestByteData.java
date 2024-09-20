@@ -106,12 +106,16 @@ public final class TestByteData extends AbstractTestData implements ByteWriteDat
     }
 
     @Override
-    public void writeToAccess(final WriteAccess access, final int index) {
-        ((ByteWriteAccess)access).setByteValue(getByte(index));
+    public void setFrom(final ByteReadData readData, final int fromIndex, final int toIndex) {
+        if (readData.isMissing(fromIndex)) {
+            setMissing(toIndex);
+        } else {
+            setByte(toIndex, readData.getByte(fromIndex));
+        }
     }
 
     @Override
-    public void copyFrom(final ByteReadData readData, final int fromIndex, final int toIndex) {
-        setByte(toIndex, readData.getByte(fromIndex));
+    public void writeToAccess(final WriteAccess access, final int index) {
+        ((ByteWriteAccess)access).setByteValue(getByte(index));
     }
 }

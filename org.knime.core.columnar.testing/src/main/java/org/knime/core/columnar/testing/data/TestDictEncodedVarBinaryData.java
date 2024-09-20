@@ -181,6 +181,15 @@ public final class TestDictEncodedVarBinaryData<K> extends AbstractTestDictEncod
     }
 
     @Override
+    public void setFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
+        if (readData.isMissing(fromIndex)) {
+            setMissing(toIndex);
+        } else {
+            setBytes(toIndex, readData.getBytes(fromIndex));
+        }
+    }
+
+    @Override
     public void writeToAccess(final WriteAccess access, final int index) {
         throw new UnsupportedOperationException("Writing to Access not implemented for Dict Encoded VarBinary in test");
     }

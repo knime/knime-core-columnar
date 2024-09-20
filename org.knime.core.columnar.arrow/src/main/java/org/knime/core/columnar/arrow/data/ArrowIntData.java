@@ -88,11 +88,13 @@ public final class ArrowIntData {
         }
 
         @Override
-        public void copyFrom(final IntReadData readData, final int fromIndex, final int toIndex) {
-            if (readData instanceof ArrowIntReadData arrow) {
-                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+        public void setFrom(final IntReadData data, final int fromIndex, final int toIndex) {
+            if (data instanceof ArrowIntReadData arrowData) {
+                m_vector.copyFromSafe(arrowData.m_offset + fromIndex, m_offset + toIndex, arrowData.m_vector);
+            } else if (data.isMissing(fromIndex)) {
+                setMissing(toIndex);
             } else {
-                setInt(toIndex, readData.getInt(fromIndex));
+                setInt(toIndex, data.getInt(fromIndex));
             }
         }
 

@@ -56,6 +56,7 @@ import org.knime.core.columnar.data.dictencoding.AbstractDictDecodedData.Abstrac
 import org.knime.core.columnar.data.dictencoding.DictElementCache.ColumnDictElementCache;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  * Provide {@link StringWriteData} and {@link StringReadData} access to underlying dictionary encoded data by allowing
@@ -79,6 +80,8 @@ public final class DictDecodedStringData {
     public static class DictDecodedStringWriteData<K>
         extends AbstractDictDecodedWriteData<K, DictEncodedStringWriteData<K>>
         implements StringWriteData {
+
+        private static final StringEncoder ENCODER = new StringEncoder();
 
         /**
          * Create a {@link DictDecodedStringWriteData} wrapping a {@link DictEncodedStringWriteData} provided by a
@@ -106,11 +109,20 @@ public final class DictDecodedStringData {
             m_delegate.setString(index, val);
         }
 
+        @Override
+        public void setStringBytes(final int index, final byte[] val) {
+            setString(index, ENCODER.decode(val));
+        }
+
+        @Override
+        public void setFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+            m_delegate.setFrom(readData, fromIndex, toIndex);
+        }
+
         @SuppressWarnings("unchecked")
         @Override
         public StringReadData close(final int length) {
-            return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)m_delegate.close(length),
-                m_cache);
+            return new DictDecodedStringReadData<K>((DictEncodedStringReadData<K>)m_delegate.close(length), m_cache);
         }
     }
 
@@ -124,6 +136,7 @@ public final class DictDecodedStringData {
      */
     public static class DictDecodedStringReadData<K> extends AbstractDictDecodedReadData<K, DictEncodedStringReadData<K>>
         implements StringReadData {
+
         /**
          * Create a {@link DictDecodedStringReadData} wrapping a {@link DictEncodedStringReadData} provided by a
          * back-end.
@@ -143,6 +156,10 @@ public final class DictDecodedStringData {
 
             return m_delegate.getString(index);
         }
-    }
 
+        @Override
+        public byte[] getStringBytesNullable(final int index) {
+            return m_delegate.getStringBytesNullable(index);
+        }
+    }
 }

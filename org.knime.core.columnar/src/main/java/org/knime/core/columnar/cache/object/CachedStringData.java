@@ -61,6 +61,7 @@ import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StringData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  * Contains all classes related to caching string data.
@@ -124,6 +125,20 @@ final class CachedStringData {
         }
 
         @Override
+        public void setStringBytes(final int index, final byte[] val) {
+            setString(index, new StringEncoder().decode(val));
+        }
+
+        @Override
+        public void setFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+            if (readData.isMissing(fromIndex)) {
+                setMissing(toIndex);
+            } else {
+                setString(toIndex, readData.getString(fromIndex));
+            }
+        }
+
+        @Override
         void serializeAt(final int index) {
             m_delegate.setString(index, m_data[index]);
         }
@@ -150,6 +165,14 @@ final class CachedStringData {
                 return m_data[index];
             }
 
+            @Override
+            public byte[] getStringBytesNullable(final int index) {
+                if (m_readDelegate != null) {
+                    return m_readDelegate.getStringBytesNullable(index);
+                } else {
+                    return null; // NOSONAR `null` means bytes not readily available
+                }
+            }
         }
     }
 
@@ -174,6 +197,9 @@ final class CachedStringData {
             return m_data[index];
         }
 
+        @Override
+        public byte[] getStringBytesNullable(final int index) {
+            return m_delegate.getStringBytesNullable(index);
+        }
     }
-
 }

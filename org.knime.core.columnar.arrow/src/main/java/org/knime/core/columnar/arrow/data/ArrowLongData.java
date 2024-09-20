@@ -90,11 +90,13 @@ public final class ArrowLongData {
         }
 
         @Override
-        public void copyFrom(final LongReadData readData, final int fromIndex, final int toIndex) {
-            if (readData instanceof ArrowLongReadData arrow) {
-                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+        public void setFrom(final LongReadData data, final int fromIndex, final int toIndex) {
+            if (data instanceof ArrowLongReadData arrowData) {
+                m_vector.copyFromSafe(arrowData.m_offset + fromIndex, m_offset + toIndex, arrowData.m_vector);
+            } else if (data.isMissing(fromIndex)) {
+                setMissing(toIndex);
             } else {
-                setLong(toIndex, readData.getLong(fromIndex));
+                setLong(toIndex, data.getLong(fromIndex));
             }
         }
 
@@ -150,7 +152,6 @@ public final class ArrowLongData {
             final long value = DurationVector.get(m_vector.getDataBuffer(), m_offset + index);
             return value;
         }
-
     }
 
     /**

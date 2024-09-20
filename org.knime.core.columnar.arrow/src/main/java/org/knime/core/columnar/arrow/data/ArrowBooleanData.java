@@ -89,11 +89,13 @@ public final class ArrowBooleanData {
         }
 
         @Override
-        public void copyFrom(final BooleanReadData readData, final int fromIndex, final int toIndex) {
-            if (readData instanceof ArrowBooleanReadData arrow) {
-                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+        public void setFrom(final BooleanReadData data, final int fromIndex, final int toIndex) {
+            if (data instanceof ArrowBooleanReadData arrowData) {
+                m_vector.copyFrom(arrowData.m_offset + fromIndex, m_offset + toIndex, arrowData.m_vector);
+            } else if (data.isMissing(fromIndex)) {
+                setMissing(toIndex);
             } else {
-                setBoolean(toIndex, readData.getBoolean(fromIndex));
+                setBoolean(toIndex, data.getBoolean(fromIndex));
             }
         }
 

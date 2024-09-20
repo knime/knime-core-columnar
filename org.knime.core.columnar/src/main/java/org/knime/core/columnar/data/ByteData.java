@@ -78,19 +78,15 @@ public final class ByteData {
          */
         void setByte(int index, byte val);
 
-        /**
-         * Copies an entry from the given {@link ByteReadData} as if by calling
-         * {@code setByte(toIndex, readData.getByte(fromIndex))}, but may be implemented more efficiently.
-         *
-         * @param readData read data to extract a (non-missing) value from
-         * @param fromIndex index in {@code readData}
-         * @param toIndex index to write the extracted value to
-         */
-        void copyFrom(ByteReadData readData, int fromIndex, int toIndex);
-
         @Override
         ByteReadData close(int length);
 
+        /**
+         * @param readData
+         * @param fromIndex
+         * @param toIndex
+         */
+        void setFrom(ByteReadData readData, int fromIndex, int toIndex);
     }
 
     /**
@@ -106,7 +102,5 @@ public final class ByteData {
          * @return the byte element at the given index (row)
          */
         byte getByte(int index);
-
     }
-
 }

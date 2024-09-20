@@ -95,7 +95,6 @@ final class ColumnarVoidAccessFactory implements ColumnarAccessFactory {
         public DataSpec getDataSpec() {
             return VoidDataSpec.INSTANCE;
         }
-
     }
 
     static final class VoidWriteAccess implements ColumnarWriteAccess {
@@ -113,9 +112,8 @@ final class ColumnarVoidAccessFactory implements ColumnarAccessFactory {
         }
 
         @Override
-        public void setFrom(final ReadAccess access) {
+        public void setFromInternal(final ReadAccess readAccess) {
             // there is no actual data
         }
-
     }
 }

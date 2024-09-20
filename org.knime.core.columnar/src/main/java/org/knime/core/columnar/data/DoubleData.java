@@ -79,18 +79,10 @@ public final class DoubleData {
          */
         void setDouble(int index, double val);
 
-        /**
-         * Copies an entry from the given {@link DoubleReadData} as if by calling
-         * {@code setDouble(toIndex, readData.getDouble(fromIndex))}, but may be implemented more efficiently.
-         *
-         * @param readData read data to extract a (non-missing) value from
-         * @param fromIndex index in {@code readData}
-         * @param toIndex index to write the extracted value to
-         */
-        void copyFrom(DoubleReadData readData, int fromIndex, int toIndex);
-
         @Override
         DoubleReadData close(int length);
+
+        void setFrom(final DoubleReadData readData, final int fromIndex, final int toIndex);
 
     }
 
@@ -107,7 +99,5 @@ public final class DoubleData {
          * @return the double element at the given index (row)
          */
         double getDouble(int index);
-
     }
-
 }

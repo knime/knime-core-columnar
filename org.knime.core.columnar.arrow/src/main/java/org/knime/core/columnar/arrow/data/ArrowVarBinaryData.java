@@ -106,6 +106,17 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
+        public void setFrom(final VarBinaryReadData data, final int fromIndex, final int toIndex) {
+            if (data instanceof ArrowVarBinaryReadData arrowReadData) {
+                m_vector.copyFromSafe(arrowReadData.m_offset + fromIndex, m_offset + toIndex, arrowReadData.m_vector);
+            } else if (data.isMissing(fromIndex)) {
+                setMissing(toIndex);
+            } else {
+                setBytes(toIndex, data.getBytes(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowWriteData slice(final int start) {
             return new ArrowVarBinaryWriteData(m_vector, m_offset + start);
         }

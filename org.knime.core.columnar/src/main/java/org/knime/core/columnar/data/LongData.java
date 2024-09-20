@@ -78,19 +78,10 @@ public final class LongData {
          */
         void setLong(int index, long val);
 
-        /**
-         * Copies an entry from the given {@link LongReadData} as if by calling
-         * {@code setLong(toIndex, readData.getLong(fromIndex))}, but may be implemented more efficiently.
-         *
-         * @param readData read data to extract a (non-missing) value from
-         * @param fromIndex index in {@code readData}
-         * @param toIndex index to write the extracted value to
-         */
-        void copyFrom(LongReadData readData, int fromIndex, int toIndex);
-
         @Override
         LongReadData close(int length);
 
+        void setFrom(LongReadData data, int fromIndex, int toIndex);
     }
 
     /**
@@ -106,7 +97,5 @@ public final class LongData {
          * @return the long element at the given index
          */
         long getLong(int index);
-
     }
-
 }

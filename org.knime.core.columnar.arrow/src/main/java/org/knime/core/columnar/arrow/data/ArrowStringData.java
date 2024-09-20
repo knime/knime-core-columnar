@@ -83,7 +83,7 @@ public final class ArrowStringData {
 
     /** Arrow implementation of {@link StringReadData}. */
     public static final class ArrowStringWriteData extends AbstractArrowWriteData<VarCharVector>
-        implements StringWriteData {
+    implements StringWriteData {
 
         private StringEncoder m_encoder = new StringEncoder();
 
@@ -99,6 +99,28 @@ public final class ArrowStringData {
         public void setString(final int index, final String val) {
             final ByteBuffer encoded = m_encoder.encode(val);
             m_vector.setSafe(m_offset + index, encoded, 0, encoded.limit());
+        }
+
+        @Override
+        public void setStringBytes(final int index, final byte[] str) {
+            m_vector.setSafe(m_offset + index, str, 0, str.length);
+        }
+
+        @Override
+        public void setFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowStringReadData arrowReadData) {
+                // no caches: transfer bytes between Arrow buffers, including "missing" information
+                m_vector.copyFromSafe(arrowReadData.m_offset + fromIndex, m_offset + toIndex, arrowReadData.m_vector);
+            } else if (readData.isMissing(fromIndex)) {
+                setMissing(toIndex);
+            } else {
+                final var raw = readData.getStringBytesNullable(fromIndex);
+                if (raw != null) {
+                    setStringBytes(toIndex, raw);
+                } else {
+                    setString(toIndex, readData.getString(fromIndex));
+                }
+            }
         }
 
         @Override
@@ -137,6 +159,11 @@ public final class ArrowStringData {
         @Override
         public String getString(final int index) {
             return m_decoder.decode(m_vector.get(m_offset + index));
+        }
+
+        @Override
+        public byte[] getStringBytesNullable(final int index) {
+            return m_vector.get(m_offset + index);
         }
 
         @Override

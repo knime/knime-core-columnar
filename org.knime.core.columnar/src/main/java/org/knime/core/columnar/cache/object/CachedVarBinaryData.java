@@ -149,6 +149,17 @@ final class CachedVarBinaryData {
         }
 
         @Override
+        public void setFrom(final VarBinaryReadData readData, final int fromIndex, final int toIndex) {
+            if (readData.isMissing(fromIndex)) {
+                setMissing(toIndex);
+            } else if (readData instanceof CachedVarBinaryReadData cachedData) {
+                cachedData.setInto(fromIndex, this, toIndex);
+            } else {
+                setBytes(toIndex, readData.getBytes(fromIndex));
+            }
+        }
+
+        @Override
         void serializeAt(final int index) {
             final ObjectSerializer<?> serializer = m_serializers[index];
             if (serializer != null) {
@@ -179,6 +190,20 @@ final class CachedVarBinaryData {
 
             CachedVarBinaryReadData(final int length) {
                 super(length);
+            }
+
+            @SuppressWarnings("unchecked")
+            synchronized void setInto(final int fromIndex, final CachedVarBinaryWriteData cachedVarBinaryWriteData,
+                final int toIndex) {
+                // early termination if we have the right kind of data cached
+                if (m_data[fromIndex] instanceof byte[] bytes) {
+                    cachedVarBinaryWriteData.setBytes(toIndex, bytes);
+                    // } else if (m_readData != null) {
+                    //     cachedVarBinaryWriteData.setFrom(m_readData, fromIndex, toIndex);
+                } else {
+                    cachedVarBinaryWriteData.setObject(toIndex, m_data[fromIndex],
+                        (ObjectSerializer<Object>)m_serializers[fromIndex]);
+                }
             }
 
             @Override
@@ -278,6 +303,5 @@ final class CachedVarBinaryData {
             }
             return (T)m_data[index];
         }
-
     }
 }

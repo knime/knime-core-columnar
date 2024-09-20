@@ -108,6 +108,11 @@ public final class DictDecodedVarBinaryData {
             final var delegate = (DictEncodedVarBinaryReadData<K>)m_delegate.close(length);
             return new DictDecodedVarBinaryReadData<K>(delegate, m_cache);
         }
+
+        @Override
+        public void setFrom(final VarBinaryReadData data, final int fromIndex, final int toIndex) {
+            m_delegate.setFrom(data, fromIndex, toIndex);
+        }
     }
 
     /**

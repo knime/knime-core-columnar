@@ -81,7 +81,6 @@ final class ColumnarByteAccessFactory implements ColumnarAccessFactory {
         public byte getByteValue() {
             return m_data.getByte(m_index.getIndex());
         }
-
     }
 
     static final class ColumnarByteWriteAccess extends AbstractWriteAccess<ByteWriteData> implements ByteWriteAccess {
@@ -96,14 +95,14 @@ final class ColumnarByteAccessFactory implements ColumnarAccessFactory {
         }
 
         @Override
-        public void setFromNonMissing(final ReadAccess access) {
-            if (access.getClass() == ColumnarByteReadAccess.class) {
-                final var columnar = (ColumnarByteReadAccess)access;
-                m_data.copyFrom(columnar.m_data, columnar.m_index.getIndex(), m_index.getIndex());
+        public void setFromInternal(final ReadAccess readAccess) {
+            if (readAccess instanceof ColumnarByteReadAccess columnarAccess) {
+                m_data.setFrom(columnarAccess.m_data, columnarAccess.m_index.getIndex(), m_index.getIndex());
+            } else if (readAccess.isMissing()) {
+                setMissing();
             } else {
-                m_data.setByte(m_index.getIndex(), ((ByteReadAccess)access).getByteValue());
+                setByteValue(((ByteReadAccess)readAccess).getByteValue());
             }
         }
-
     }
 }

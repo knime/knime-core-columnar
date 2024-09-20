@@ -98,9 +98,11 @@ final class ArrowUnsignedByteData {
         }
 
         @Override
-        public void copyFrom(final ByteReadData readData, final int fromIndex, final int toIndex) {
-            if (readData instanceof ArrowUnsignedByteReadData arrow) {
-                m_vector.copyFrom(arrow.m_offset + fromIndex, m_offset + toIndex, arrow.m_vector);
+        public void setFrom(final ByteReadData readData, final int fromIndex, final int toIndex) {
+            if (readData instanceof ArrowUnsignedByteReadData arrowData) {
+                m_vector.copyFrom(arrowData.m_offset + fromIndex, m_offset + toIndex, arrowData.m_vector);
+            } else if (readData.isMissing(fromIndex)) {
+                setMissing(toIndex);
             } else {
                 setByte(toIndex, readData.getByte(fromIndex));
             }

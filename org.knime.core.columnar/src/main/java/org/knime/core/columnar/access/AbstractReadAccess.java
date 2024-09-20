@@ -72,5 +72,4 @@ abstract class AbstractReadAccess<T extends NullableReadData> implements Columna
         final T casted = (T)data;
         m_data = casted;
     }
-
 }

@@ -71,6 +71,7 @@ import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  * Dictionary encoded string data implementation using Arrow as back end.
@@ -112,6 +113,20 @@ public final class ArrowDictEncodedStringData {
         }
 
         @Override
+        public void setStringBytes(final int index, final byte[] val) {
+            setString(index, new StringEncoder().decode(val)); // TODO inefficient
+        }
+
+        @Override
+        public void setFrom(final StringReadData readData, final int fromIndex, final int toIndex) {
+            if (readData.isMissing(fromIndex)) {
+                setMissing(toIndex);
+            } else {
+                setString(toIndex, readData.getString(fromIndex));
+            }
+        }
+
+        @Override
         public ArrowDictEncodedStringWriteData<K> slice(final int start) {
             return new ArrowDictEncodedStringWriteData<>(m_delegate, m_keyType, start + m_offset, m_dict,
                 m_keyGenerator);
@@ -132,6 +147,7 @@ public final class ArrowDictEncodedStringData {
      */
     public static final class ArrowDictEncodedStringReadData<K> extends AbstractArrowDictEncodedReadData<String, K>
         implements DictEncodedStringReadData<K> {
+
         private ArrowDictEncodedStringReadData(final ArrowStructReadData delegate, final KeyType keyType) {
             super(delegate, keyType);
         }
@@ -147,6 +163,13 @@ public final class ArrowDictEncodedStringData {
             return m_dict.computeIfAbsent(dictIndex,
                 i -> ((StringReadData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX))
                     .getString(m_dictValueLookupTable[index + m_offset]));
+        }
+
+        @Override
+        public byte[] getStringBytesNullable(final int index) {
+            final var readData =
+                ((StringReadData)m_delegate.getReadDataAt(AbstractArrowDictEncodedData.DICT_ENTRY_DATA_INDEX));
+            return readData.getStringBytesNullable(m_dictValueLookupTable[index + m_offset]);
         }
 
         @Override

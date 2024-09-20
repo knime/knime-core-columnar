@@ -62,10 +62,10 @@ sealed interface ColumnarRowRead extends RowRead permits SparseColumnarRowRead, 
 
     /**
      * Writes the contents of this row into the given write accesses by invoking
-     * {@link WriteAccess#setFrom(org.knime.core.table.access.ReadAccess)} for each column.
+     * {@link org.knime.core.table.access.ReadAccess#copyInto(WriteAccess)} for each column.
      *
-     * @param accesses write accesses of the output row, must have length {@code numColumns() + 1} with the first
-     *     write access designated for the row key
+     * @param accesses write accesses of the output row, must have length {@code numColumns() + 1} with the first write
+     *            access designated for the row key
      */
     void writeTo(WriteAccess[] accesses);
 }
