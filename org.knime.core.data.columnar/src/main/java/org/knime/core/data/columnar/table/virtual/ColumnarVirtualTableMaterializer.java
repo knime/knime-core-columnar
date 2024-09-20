@@ -57,7 +57,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.knime.core.data.RowKeyValue;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
@@ -172,7 +171,7 @@ public final class ColumnarVirtualTableMaterializer {
     private ValueSchema createContainerSchema(final ValueSchema virtualTableSchema) {
         var rowIDValueFactory = m_materializeRowKey ? DefaultRowKeyValueFactory.INSTANCE : VoidRowKeyFactory.INSTANCE;
 
-        assert ColumnarValueSchemaUtils.hasRowID(virtualTableSchema) : "The ColumnarValueSchema should have a RowID";
+        assert ValueSchemaUtils.hasRowID(virtualTableSchema) : "The ColumnarValueSchema should have a RowID";
         var valueFactories = Stream.concat( //
             Stream.of(rowIDValueFactory), //
             IntStream.range(1, virtualTableSchema.numColumns()).mapToObj(virtualTableSchema::getValueFactory) //
@@ -182,7 +181,7 @@ public final class ColumnarVirtualTableMaterializer {
     }
 
     private RowContainer createContainer(final ValueSchema schema) throws Exception {
-        assert ColumnarValueSchemaUtils.hasRowID(schema) : "The ColumnarValueSchema should have a RowID";
+        assert ValueSchemaUtils.hasRowID(schema) : "The ColumnarValueSchema should have a RowID";
         var dataContainerSettings = DataContainerSettings.getDefault();
         var columnarContainerSettings =
             new ColumnarRowWriteTableSettings(true, dataContainerSettings.getMaxDomainValues(), false, false, 100, 4);

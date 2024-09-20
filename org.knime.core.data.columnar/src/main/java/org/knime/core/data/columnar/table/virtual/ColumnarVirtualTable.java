@@ -48,7 +48,6 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
-import static org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils.hasRowID;
 import static org.knime.core.table.virtual.spec.SelectColumnsTransformSpec.indicesAfterDrop;
 import static org.knime.core.table.virtual.spec.SelectColumnsTransformSpec.indicesAfterKeepOnly;
 
@@ -64,7 +63,6 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
-import org.knime.core.data.columnar.schema.ColumnarValueSchemaUtils;
 import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
@@ -185,11 +183,11 @@ public final class ColumnarVirtualTable {
      * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
      */
     public ColumnarVirtualTable renameToRandomColumnNames() {
-        return new ColumnarVirtualTable(m_transform, ColumnarValueSchemaUtils.renameToRandomColumnNames(m_valueSchema));
+        return new ColumnarVirtualTable(m_transform, ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema));
     }
 
     private static ValueSchema selectColumns(final ValueSchema schema, final int... columnIndices) {
-        var hasRowID = hasRowID(schema);
+        var hasRowID = ValueSchemaUtils.hasRowID(schema);
         if (hasRowID && Arrays.stream(columnIndices).skip(1).anyMatch(i -> i == 0)) {
             // If schema has a RowID, then the RowID column (in this table) is at index 0.
             // It must either be dropped or remain at index 0.
@@ -295,7 +293,7 @@ public final class ColumnarVirtualTable {
     }
 
     private static ValueSchema dropRowID(final ValueSchema schema) {
-        if (ColumnarValueSchemaUtils.hasRowID(schema)) {
+        if (ValueSchemaUtils.hasRowID(schema)) {
             return ValueSchemaUtils.create(schema.getSourceSpec(), IntStream.range(1, schema.numColumns())//
                 .mapToObj(schema::getValueFactory)//
                 .toArray(ValueFactory<?, ?>[]::new));
@@ -408,7 +406,7 @@ public final class ColumnarVirtualTable {
     }
 
     private static ColumnarVirtualTable filterRowID(final ColumnarVirtualTable table) {
-        return hasRowID(table.getSchema()) ? table.dropColumns(0) : table;
+        return ValueSchemaUtils.hasRowID(table.getSchema()) ? table.dropColumns(0) : table;
     }
 
     private static ValueSchema appendSchemas(final List<ValueSchema> schemas) {
