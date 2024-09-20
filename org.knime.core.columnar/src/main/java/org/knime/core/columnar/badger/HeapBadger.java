@@ -229,6 +229,7 @@ public class HeapBadger {
          * @throws InterruptedException if interrupted while waiting
          * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
          */
+        // TODO (TP): also rename to commit() ?
         int forward() throws InterruptedException, IOException;
 
         /**
@@ -260,6 +261,7 @@ public class HeapBadger {
          *
          * @return number of calls to {@link #forward()}
          */
+        // TODO (TP): rename to numRows() or numCommits() ?
         long numForwards();
     }
 
@@ -827,32 +829,25 @@ public class HeapBadger {
             return m_access;
         }
 
-        private int m_current = -1;
+        private int m_current = 0;
 
         @Override
-        public boolean forward() {
-            debug("[c:" + this + "] BadgerWriteCursor.forward");
+        public void commit() throws IOException {
+            debug("[c:" + this + "] BadgerWriteCursor.commit");
             if (m_closed) {
-                throw new IllegalStateException("Cannot forward a closed write cursor");
-            }
-
-            if (m_current < 0) {
-                m_current = 0;
-                return true;
+                throw new IllegalStateException("Cannot commit to a closed write cursor");
             }
 
             try {
                 m_buffers[m_current].setFrom(m_access);
                 debug("[c:" + this + "]   -> m_queue.forward()");
                 m_current = m_queue.forward();
-            } catch (IOException | InterruptedException ex) {
-                // can throw IOException if serialization of any previous row has failed
+            } catch (InterruptedException e) {
                 // can throw InterruptedException if the cursor had to wait for free buffers to write to and got interrupted
-                throw new RuntimeException(ex);
+                throw new RuntimeException(e); // let's pretend it is a RuntimeException?
             }
             debug("[c:" + this + "]   <- m_queue.forward()");
             debug("[c:" + this + "]   m_current = " + m_current);
-            return true;
         }
 
         @Override
@@ -908,8 +903,8 @@ public class HeapBadger {
         }
 
         @Override
-        public long getNumForwards() {
-            return (m_current < 0) ? 0 : (m_queue.numForwards());
+        public long numRows() {
+            return m_queue.numForwards();
         }
     }
 }

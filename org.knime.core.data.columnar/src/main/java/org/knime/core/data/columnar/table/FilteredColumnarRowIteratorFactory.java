@@ -45,6 +45,7 @@
  */
 package org.knime.core.data.columnar.table;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -61,6 +62,7 @@ import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
+import org.knime.core.table.row.Selection.ColumnSelection;
 
 /**
  * Factory for {@link CloseableRowIterator CloseableRowIterators} supporting column selection.
@@ -312,6 +314,18 @@ final class FilteredColumnarRowIteratorFactory {
 
     static CloseableRowIterator create(final RowCursor cursor, final Set<Integer> materializeColumnIndices) {
         final int[] selection = materializeColumnIndices.stream().sorted().mapToInt(Integer::intValue).toArray();
+        return create(cursor, selection);
+    }
+
+    static CloseableRowIterator create(final RowCursor cursor, final ColumnSelection columnSelection) {
+        // get the selected columns, not counting the row key at column 0, which is assumed to be always selected.
+        final int[] cols = columnSelection.getSelected(1, cursor.getNumColumns() + 1);
+        // adjust column indices for row key
+        Arrays.setAll(cols, i -> cols[i] - 1);
+        return create(cursor, cols);
+    }
+
+    private static CloseableRowIterator create(final RowCursor cursor, final int[] selection) {
         if (selection.length == 1) {
             return new SingleCellRowIterator(cursor, selection[0]);
         } else if (cursor.getNumColumns() <= WIDE_TABLE_THRESHOLD

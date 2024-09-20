@@ -390,7 +390,7 @@ public final class ColumnarTableBackend implements TableBackend {
                 var writeCursor = rowContainer.createCursor();
                 var readCursor = table.cursor()) {
             while (readCursor.canForward()) {
-                writeCursor.forward().setFrom(readCursor.forward());
+                writeCursor.commit(readCursor.forward());
             }
             return rowContainer.finish();
         } catch (Exception ex) {

@@ -59,7 +59,7 @@ public class ColumnarTableCopyNodeModel extends NodeModel {
                 // can actually be parallelized later
                 RowRead row = null;
                 while ((row = inCursor.forward()) != null) {
-                    outCursor.forward().setFrom(row);
+                    outCursor.commit(row);
                 }
                 return new BufferedDataTable[]{container.finish()};
             }

@@ -362,15 +362,14 @@ class HeapBadgerWriteCursorTest {
     private static boolean writeToHeapBadger(final HeapBadger badger, final TestData[] data, final long numRows,
         final RowCallback rowCallback) throws IOException {
         try (WriteCursor<WriteAccessRow> cursor = badger.getWriteCursor()) {
-            cursor.forward();
             for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
                 for (int col = 0; col < data.length; col++) {
                     data[col].writeTo(cursor.access().getWriteAccess(col), rowIdx);
                 }
-                if (!rowCallback.keepGoing(rowIdx, cursor)) {
+                if (!rowCallback.keepGoing(rowIdx, cursor)) { // TODO (TP): should this be done after commit()?
                     return false;
                 }
-                cursor.forward();
+                cursor.commit();
             }
             cursor.finish();
         }

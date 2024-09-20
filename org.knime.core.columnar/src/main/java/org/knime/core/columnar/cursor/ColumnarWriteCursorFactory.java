@@ -98,17 +98,19 @@ public final class ColumnarWriteCursorFactory {
     }
 
     /**
-     * A {@link WriteCursor} that is backed by a {@link BatchWriter} and tracks the number of times {@link #forward()}
-     * is called.
+     * A {@link WriteCursor} that is backed by a {@link BatchWriter} and tracks the number of times {@link #commit()} is
+     * called.
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
     public interface ColumnarWriteCursor extends WriteCursor<WriteAccessRow> {
 
         /**
-         * @return the number of times {@link #forward()} has been called successfully on this cursor
+         * Get the number of rows that have been written to this cursor.
+         *
+         * @return the number of rows written
          */
-        long getNumForwards();
+        long numRows();
     }
 
     /**
@@ -150,7 +152,7 @@ public final class ColumnarWriteCursorFactory {
 
         private boolean m_adjusting;
 
-        private long m_numForwards;
+        private long m_numRows;
 
         ColumnarWriteCursorImpl(final BatchWritable store) {
             m_writer = store.getWriter();
@@ -159,22 +161,20 @@ public final class ColumnarWriteCursorFactory {
             final ColumnarSchema schema = store.getSchema();
             m_accesses = createWriteAccesses(schema.specStream(), this);
             switchToNextData();
-            m_currentIndex = -1;
         }
 
         @Override
-        public final boolean forward() {
-            m_numForwards++;
+        public void commit() throws IOException {
+            m_numRows++;
             m_currentIndex++;
             if (m_currentIndex > m_currentMaxIndex) {
                 switchToNextData();
             }
-            return true;
         }
 
         @Override
-        public long getNumForwards() {
-            return m_numForwards - 1;
+        public long numRows() {
+            return m_numRows;
         }
 
         @Override

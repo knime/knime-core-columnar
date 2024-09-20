@@ -48,11 +48,10 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
-import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.data.columnar.filter.TableFilterUtils;
-import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.container.filter.TableFilter;
+import org.knime.core.data.v2.ReadAccessRowRead;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowRead;
 import org.knime.core.data.v2.schema.ValueSchema;
@@ -107,11 +106,9 @@ final class ColumnarRowCursorFactory {
 
         private final RowRead m_rowRead;
 
-        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate, final ValueSchema schema,
-            final ColumnSelection selection) {
+        private DefaultRowCursor(final LookaheadCursor<ReadAccessRow> delegate, final ValueSchema schema) {
             m_delegate = delegate;
-            ReadAccessRow access = delegate.access();
-            m_rowRead = VirtualTableUtils.createRowRead(schema, access, selection);
+            m_rowRead = new ReadAccessRowRead(schema, delegate.access());
         }
 
         @Override
@@ -153,10 +150,8 @@ final class ColumnarRowCursorFactory {
             return new EmptyRowCursor(schema);
         }
 
-        var numColumns = schema.numColumns();
-        var selection = filter == null ? Selection.all() : TableFilterUtils.createSelection(filter, numColumns, size);
-        var columnSelection = ColumnSelection.fromSelection(selection, numColumns);
-        return new DefaultRowCursor(ColumnarCursorFactory.create(store, selection), schema, columnSelection);
+        var selection = filter == null ? Selection.all() : TableFilterUtils.toSelection(filter, size);
+        return new DefaultRowCursor(ColumnarCursorFactory.create(store, selection), schema);
     }
 
     private ColumnarRowCursorFactory() {

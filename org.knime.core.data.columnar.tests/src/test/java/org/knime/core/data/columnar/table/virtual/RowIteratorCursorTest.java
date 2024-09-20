@@ -51,20 +51,27 @@ package org.knime.core.data.columnar.table.virtual;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.knime.core.data.columnar.table.virtual.WriteAccessRowWriteTest.createRow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.function.Function;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.knime.core.data.BooleanValue;
+import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DoubleValue;
 import org.knime.core.data.IntValue;
+import org.knime.core.data.MissingCell;
+import org.knime.core.data.RowKey;
 import org.knime.core.data.container.CloseableRowIterator;
+import org.knime.core.data.def.BooleanCell.BooleanCellFactory;
+import org.knime.core.data.def.DefaultRow;
+import org.knime.core.data.def.DoubleCell.DoubleCellFactory;
+import org.knime.core.data.def.IntCell.IntCellFactory;
 import org.knime.core.table.access.BooleanAccess.BooleanReadAccess;
 import org.knime.core.table.access.DoubleAccess.DoubleReadAccess;
 import org.knime.core.table.access.IntAccess.IntReadAccess;
@@ -137,5 +144,18 @@ public class RowIteratorCursorTest {
         if (!doubleIsMissing) {
             assertEquals(((DoubleValue)row.getCell(2)).getDoubleValue(), doubleAccess.getDoubleValue(), 1e-8);
         }
+    }
+
+    static DataRow createRow(final String rowKey, final Boolean booleanValue, final Integer intValue,
+        final Double doubleValue) {
+        final RowKey key = new RowKey(rowKey);
+        final DataCell booleanCell = createIfNotNull(booleanValue, BooleanCellFactory::create);
+        final DataCell intCell = createIfNotNull(intValue, IntCellFactory::create);
+        final DataCell doubleCell = createIfNotNull(doubleValue, DoubleCellFactory::create);
+        return new DefaultRow(key, booleanCell, intCell, doubleCell);
+    }
+
+    private static <T> DataCell createIfNotNull(final T value, final Function<T, DataCell> cellFactory) {
+        return value != null ? cellFactory.apply(value) : new MissingCell("no value");
     }
 }

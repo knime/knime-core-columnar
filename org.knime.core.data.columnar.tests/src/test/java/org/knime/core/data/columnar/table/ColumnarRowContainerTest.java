@@ -55,6 +55,7 @@ import java.io.IOException;
 
 import org.junit.Test;
 import org.knime.core.columnar.testing.ColumnarTest;
+import org.knime.core.data.v2.RowBuffer;
 import org.knime.core.node.ExtensionTable;
 import org.knime.core.util.DuplicateKeyException;
 
@@ -92,10 +93,13 @@ public class ColumnarRowContainerTest extends ColumnarTest {
     public void testDuplicateKeyExceptionOnClose() {
         try (final ColumnarRowContainer container = createColumnarRowContainer();
                 final ColumnarRowWriteCursor cursor = container.createCursor()) {
+            final RowBuffer row = container.createRowBuffer();
             for (int i = 0; i < CAPACITY; i++) {
-                cursor.forward().setRowKey("1");
+                row.setRowKey("1");
+                cursor.commit(row);
             }
-            cursor.forward().setRowKey("1");
+            row.setRowKey("1");
+            cursor.commit(row);
             // since heap badger we need to flush before close to run into the duplicate key error.
             // But that would've made sense before too
             cursor.finish();

@@ -52,8 +52,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.table.row.Selection;
 
@@ -65,121 +63,45 @@ import org.knime.core.table.row.Selection;
 public final class TableFilterUtils {
 
     /**
-     * Checks if the provided {@link TableFilter} actually filters any columns or rows.
+     * Get the {@link Selection} corresponding to the given {@link TableFilter}.
+     * <p>
+     * {@code TableFilter} are used in the {@code BufferedDataTable} API, where the row key column is always present and
+     * is not included in the column count. {@code Selection} is used in the {@code RowAccessible} API, where the row
+     * key column is not treated separately and is just column 0. Therefore, column index {@code i} in the
+     * {@code TableFilter} becomes column index {@code i+1} in the {@code Selection}, and the returned {@code Selection}
+     * always contains column {@code 0} (the row key).
+     * <p>
+     * {@code TableFilter} may express an open row range, where all rows are retained, starting from a given index.
+     * {@code Selection} cannot express this. It includes either all rows, or a closed row range. The {@code numRows}
+     * argument is used to determine the upper bound of the row range of the {@code Selection}, if the
+     * {@code TableFilter} contains an open row range with only the start index given. (Otherwise, {@code numRows} is
+     * ignored).
      *
-     * @param filter to check
-     * @return {@code true} if either columns or rows are filtered
+     * @param filter the selected columns and row range
+     * @param numRows the number of rows in the table
+     * @return the {@code Selection} that is equivalent to {@code filter}
      */
-    public static boolean hasFilter(final TableFilter filter) {
-        return filter.getMaterializeColumnIndices().isPresent() || filter.getFromRowIndex().isPresent()
-            || filter.getToRowIndex().isPresent();
-    }
-
-    /**
-     * Checks if the TableFilter defines a row range i.e. at least one of {@link TableFilter#getFromRowIndex()} and
-     * {@link TableFilter#getToRowIndex()} returns a non-empty Optional.
-     *
-     * @param filter to check
-     * @return {@code true} if the TableFilter defines a range of rows
-     */
-    public static boolean definesRowRange(final TableFilter filter) {
-        return filter.getFromRowIndex().isPresent() || filter.getToRowIndex().isPresent();
-    }
-
-    /**
-     * Returns the index to start iterating at.
-     *
-     * @param filter to extract the from index from
-     * @return the from index defined in the TableFilter or 0 if no from index is specified
-     */
-    public static long extractFromIndex(final TableFilter filter) {
-        return filter.getFromRowIndex().orElse(0L);
-    }
-
-    /**
-     * Returns the index to stop iterating at.
-     *
-     * @param filter to extract the to index from
-     * @param size number of rows in the table that is filtered
-     * @return the to index defined in TableFilter or {@code size - 1} if no to index is specified
-     */
-    public static long extractToIndex(final TableFilter filter, final long size) {
-        return filter.getToRowIndex().orElse(size - 1);
-    }
-
-    /**
-     * Checks if the TableFilter defines a column filter.
-     *
-     * @param filter to check
-     * @return {@code true} if the TableFilter defines a column filter
-     */
-    public static boolean definesColumnFilter(final TableFilter filter) {
-        return filter.getMaterializeColumnIndices().isPresent();
-    }
-
-    /**
-     * Extracts the column filter indices from TableFilter. The indices are sorted and incremented by 1 because the row
-     * key is not considered to be a column in KNIME but is a column in fast tables.
-     *
-     * @param filter to extract the column filter from
-     * @param numColumns the number of columns in the fast table
-     * @return the column filter defined in the TableFilter adapted to fast tables, or all indices if TableFilter
-     *         doesn't define a column filter
-     */
-    public static int[] extractPhysicalColumnIndices(final TableFilter filter, final int numColumns) {
-        return filter.getMaterializeColumnIndices()//
-            .map(TableFilterUtils::toSortedIntArrayWithRowKey) // extract filter
-            .orElseGet(() -> IntStream.range(0, numColumns).toArray());// no filter -> include all column
-    }
-
-    private static int[] toSortedIntArrayWithRowKey(final Set<Integer> materializedColumns) {
-        return IntStream.concat(IntStream.of(0), // the first column is the row key and has to always be included
-            materializedColumns.stream()//
-                .mapToInt(Integer::intValue)//
-                .sorted()//
-                .map(i -> i + 1))// the table filter doesn't include the row key as first column
-            .toArray();
-    }
-
-    /**
-     * Creates a {@link ColumnSelection} based on the provided {@link TableFilter}.
-     *
-     * @param filter to extract the {@link ColumnSelection} from
-     * @param numColumns number of columns in the table the filter is applied to
-     * @return an {@link Optional} of the {@link ColumnSelection} contained in {@link TableFilter} or
-     *         {@link Optional#empty()} if the TableFilter doesn't filter any columns
-     */
-    public static Optional<ColumnSelection> createColumnSelection(final TableFilter filter, final int numColumns) {
-        return filter.getMaterializeColumnIndices()//
-            .map(TableFilterUtils::toSortedIntArrayWithRowKey)//
-            .map(i -> new FilteredColumnSelection(numColumns, i));
-    }
-
-    /**
-     * Create a {@link Selection} based on the provided {@link TableFilter}.
-     *
-     * @param filter to extract the {@link Selection} from
-     * @param numColumns number of columns in the table the filter is applied to
-     * @param numRows number of rows in the table that is filtered
-     * @return the Selection equivalent to the {@link TableFilter}
-     */
-    public static Selection createSelection(final TableFilter filter, final int numColumns, final long numRows) {
-        // Columns
-        final var columns = definesColumnFilter(filter)
-            ? Selection.ColumnSelection.all().retain(extractPhysicalColumnIndices(filter, numColumns))
-            : Selection.ColumnSelection.all();
-
-        // Rows
-        final var rows = Selection.RowRangeSelection.all().retain( //
-            /* from */ extractFromIndex(filter), //
-            /* to   */ extractToIndex(filter, numRows) + 1 //
-        );
-
-        return Selection.all().retainColumns(columns).retainRows(rows);
+    public static Selection toSelection(final TableFilter filter, final long numRows) {
+        Selection selection = Selection.all();
+        final Optional<Set<Integer>> columnIndices = filter.getMaterializeColumnIndices();
+        if (columnIndices.isPresent()) {
+            final int[] cols = IntStream.concat( //
+                IntStream.of(0), // the row key column is always included and therefore not subject to TableFilter
+                columnIndices.get().stream().mapToInt(i -> i + 1) // adjust for the row key column
+            ).toArray();
+            selection = selection.retainColumns(cols);
+        }
+        final Optional<Long> fromRowIndex = filter.getFromRowIndex();
+        final Optional<Long> toRowIndex = filter.getToRowIndex();
+        if (fromRowIndex.isPresent() || toRowIndex.isPresent()) {
+            final long fromIndex = fromRowIndex.orElse(0L);
+            final long toIndex = toRowIndex.orElse(numRows - 1) + 1; // TableFilter toRowIndex is inclusive, Selection toIndex is exclusive
+            selection = selection.retainRows(fromIndex, toIndex);
+        }
+        return selection;
     }
 
     private TableFilterUtils() {
         // static utility class
     }
-
 }
