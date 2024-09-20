@@ -145,4 +145,11 @@ public class ArrowVoidDataTest extends AbstractArrowDataTest<ArrowVoidData, Arro
     public void testWriteReadMissing() { // NOSONAR
         // Void data does not support missing values
     }
+
+    @Override
+    public void testInitialNumBytesPerElement() { // NOSONAR
+        // Void data is special - it does not allocate any memory
+        var initialNumBytes = m_factory.initialNumBytesPerElement();
+        assertEquals("Initial num bytes per element should be greater than zero", 0, initialNumBytes);
+    }
 }

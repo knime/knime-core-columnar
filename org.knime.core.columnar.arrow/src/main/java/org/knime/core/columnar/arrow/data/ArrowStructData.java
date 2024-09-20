@@ -307,6 +307,11 @@ public final class ArrowStructData {
         public ArrowStructWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
             final StructVector v = (StructVector)vector;
+            // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
+            // the child vector
+            v.setInitialCapacity(capacity);
+            v.allocateNew();
+
             // Children
             final ArrowWriteData[] children = new ArrowWriteData[m_inner.length];
             for (int i = 0; i < children.length; i++) {
@@ -314,8 +319,6 @@ public final class ArrowStructData {
                 final FieldVector childVector = v.getChild(childNameAtIndex(i));
                 children[i] = m_inner[i].createWrite(childVector, dictionaryIdSupplier, allocator, capacity);
             }
-            v.setInitialCapacity(capacity);
-            v.allocateNew();
             return new ArrowStructWriteData(v, children);
         }
 

@@ -560,8 +560,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -606,8 +605,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -653,8 +651,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -674,5 +671,42 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             batch.release();
         }
         Files.delete(tmp.asPath());
+    }
+
+    /**
+     * Test that {@link ArrowColumnDataFactory#initialNumBytesPerElement()} returns a reasonable estimate for the
+     * allocated size.
+     */
+    @Test
+    public void testInitialNumBytesPerElement() {
+        var initialNumBytes = m_factory.initialNumBytesPerElement();
+        assertTrue("Initial num bytes per element should be greater than zero", initialNumBytes > 0);
+
+        checkInitialNumBytesPerElementFor(4);
+        checkInitialNumBytesPerElementFor(200);
+    }
+
+    private void checkInitialNumBytesPerElementFor(final int num_values) {
+        var data = createWrite(num_values);
+        try {
+            var size = data.sizeOf();
+            var expectedSize = m_factory.initialNumBytesPerElement() * num_values;
+
+            // Make sure we are not under-estimating the size by much
+            // (for small data types and few elements we might under-estimate but sill end up with 16 bytes)
+            var upperLimit = Math.max((int)(expectedSize * 1.2), 16);
+            assertTrue("Initial size for %d elements was %d bytes, expected: %d bytes (max %d bytes)"
+                .formatted(num_values, size, expectedSize, upperLimit), size <= upperLimit);
+
+            // Make sure we are not over estimating the size by much
+            // (exclude boolean because it only uses 1 bit per element but we estimate 1 byte per element)
+            if (expectedSize > num_values) {
+                var lowerLimit = (int)(expectedSize * 0.5);
+                assertTrue("Initial size for %d elements was %d bytes, expected: %d bytes (at least %d bytes)"
+                    .formatted(num_values, size, expectedSize, lowerLimit), size >= lowerLimit);
+            }
+        } finally {
+            data.close(num_values).release();
+        }
     }
 }

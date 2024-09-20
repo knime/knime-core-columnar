@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.BaseLargeVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.LargeVarBinaryVector;
@@ -274,7 +275,9 @@ public final class ArrowVarBinaryData {
 
         @Override
         public int initialNumBytesPerElement() {
-            return (int)INITAL_BYTES_PER_ELEMENT + 1; // +1 for validity
+            return (int)INITAL_BYTES_PER_ELEMENT // data buffer
+                + BaseLargeVariableWidthVector.OFFSET_WIDTH // offset buffer
+                + 1; // validity bit
         }
     }
 }
