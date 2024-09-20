@@ -201,7 +201,8 @@ public final class ColumnarWriteCursorFactory {
             throw new UnsupportedOperationException("TODO: ColumnarWriteCursorImpl.flush() should probably not be called?");
             // TODO (TP): This was implemented before as
             //   writeCurrentBatch(m_currentIndex + 1);
-            //
+            //   If we do this, then that would set m_currentBatch = null, but not switch to a new batch or prepare for that in any way.
+            //   So basically, after flush() no further rows can be written, which is surely not intended.
         }
 
         @Override
