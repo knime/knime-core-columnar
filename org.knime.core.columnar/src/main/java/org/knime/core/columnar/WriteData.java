@@ -52,7 +52,8 @@ package org.knime.core.columnar;
  */
 public interface WriteData extends ReferencedData {
 
-    // TODO do we still need expand and capacity?
+    // TODO(AP-23348) The HeapBadger does not need expand and capacity. Therefore, they could be removed from the API.
+    // Check how much of the implementation can be removed. Lists also use expand.
 
     /**
      * Expand the data, potentially increasing capacity. Note that the capacity to which the data will be expanded might
@@ -68,6 +69,9 @@ public interface WriteData extends ReferencedData {
      * @return capacity, i.e., maximum number of elements
      */
     int capacity();
+
+    // TODO(AP-23383) ArrowWriteData does not release memory on close and therefore does not implement the contract of
+    //                usedSizeFor
 
     /**
      * Close and dispose of this writable data, creating a readable data of a certain length. The data may only be
@@ -86,7 +90,6 @@ public interface WriteData extends ReferencedData {
      * with the same length will result in an {@link ReadData} object with the same memory footprint (e.g.
      * {@link ReadData#sizeOf()}).
      *
-     * TODO - Is this true???
      *
      * @param numElements
      * @return the memory footprint in bytes
