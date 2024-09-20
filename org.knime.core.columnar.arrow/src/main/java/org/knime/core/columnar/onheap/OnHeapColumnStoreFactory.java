@@ -50,8 +50,14 @@ package org.knime.core.columnar.onheap;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.IntFunction;
 
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.vector.ipc.message.ArrowFieldNode;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.PathBackedFileHandle;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
@@ -152,6 +158,26 @@ public final class OnHeapColumnStoreFactory implements ColumnStoreFactory {
         }
     }
 
+    // TODO Or should there be a factory around it like the ArrowColumnDataFactory?
+    public interface ToArrowConvertible {
+
+        // TODO use for the schema
+        Field getField();
+
+        // TODO pass compression to use for the buffers
+        // Note for compression with LZ4 JNI we need to copy the original buffer to off-heap
+        // Therefore, we could use the Vector here after all
+        /**
+         * Append the field nodes and buffers to the given lists.
+         *
+         * @param fieldNodes
+         * @param buffers
+         */
+        void appendFieldNodesAndBuffers(ArrayList<ArrowFieldNode> fieldNodes, List<ArrowBuf> buffers);
+    }
+
+    // TODO we could copy the ArrowBatchWriter and adapt it to use our on-heap data instead of the Arrow data
+    // see OnHeapDataFactory
     public static final class OnHeapBatchWriter implements BatchWriter {
 
         private final ColumnarSchema m_schema;
@@ -177,7 +203,16 @@ public final class OnHeapColumnStoreFactory implements ColumnStoreFactory {
 
         @Override
         public void write(final ReadBatch batch) throws IOException {
-            // TODO Auto-generated method stub
+            var fieldNodes = new ArrayList<ArrowFieldNode>();
+            var buffers = new ArrayList<ArrowBuf>();
+            for (int i = 0; i < batch.numData(); i++) {
+                var data = (ToArrowConvertible)batch.get(i);
+                data.appendFieldNodesAndBuffers(fieldNodes, buffers);
+            }
+
+            try (var recordBatch = new ArrowRecordBatch(batch.length(), fieldNodes, buffers)) {
+
+            }
 
         }
 
