@@ -105,12 +105,23 @@ abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractRef
      */
     protected F closeWithLength(final int length) {
         m_vector.setValueCount(length);
-        final F vector = m_vector;
+
+        // NB:
+        // We need to create a new vector and transfer it because there is no other way to slice the vector
+        //   ("setValueCount" does not slice the buffer)
+        // This does not allocate memory
+        // - "createVector" uses empty buffers
+        // - "splitAndTransfer" slices the buffers
+        F slicedVector = (F)m_vector.getField().createVector(m_vector.getAllocator());
+        m_vector.makeTransferPair(slicedVector).splitAndTransfer(0, length);
+
+        m_vector.close();
         m_vector = null;
         if (getReferenceCount() != 1) {
             throw new IllegalStateException("Closed with outstanding references");
         }
-        return vector;
+
+        return slicedVector;
     }
 
     @Override

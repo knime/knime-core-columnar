@@ -153,6 +153,9 @@ public final class ArrowStructData {
                 childValidtiyBuffers[i] = child.getValidityBuffer();
             }
 
+            // TODO This causes problems
+            // We close the children in line 142 but use the vector still has the children's vectors as children and
+            // therefore we look at buffers that are closed already
             setValidityFromChildren(validityBuffer, childValidtiyBuffers, length);
 
             return new ArrowStructReadData(closeWithLength(length),

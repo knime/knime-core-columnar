@@ -525,6 +525,23 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         rd.release();
     }
 
+    /** Test {@link W#usedSizeFor(int)} */
+    @Test
+    public void testUsedSizeFor() {
+        var capacity = 1024;
+        var numValues = 20;
+        var wd = createWrite(capacity);
+
+        for (int i = 0; i < numValues; i++) {
+            setValue(wd, i, i);
+        }
+
+        var usedSizeForNumVals = wd.usedSizeFor(numValues);
+        var rd = castR(wd.close(numValues));
+        assertEquals(rd.sizeOf(), usedSizeForNumVals);
+        rd.release();
+    }
+
     /** Test {@link R#length()} */
     @Test
     public void testLength() {
