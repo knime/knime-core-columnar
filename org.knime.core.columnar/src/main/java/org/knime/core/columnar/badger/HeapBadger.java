@@ -355,28 +355,28 @@ public class HeapBadger {
             rethrowExceptionInErrorCase();
 
             final ReentrantLock lock = this.m_lock;
-            debug("[c] ACQUIRING LOCK IN FORWARD");
+            //debug("[c] ACQUIRING LOCK IN FORWARD");
             lock.lock();
-            debug("[c] LOCKED IN FORWARD");
+            //debug("[c] LOCKED IN FORWARD");
             try {
-                debug("[c]  Q m_current = " + m_current);
-                debug("[c]  Q m_bound = " + m_bound);
-                debug("[c]  Q m_offset = " + m_offset);
+                //debug("[c]  Q m_current = " + m_current);
+                //debug("[c]  Q m_bound = " + m_bound);
+                //debug("[c]  Q m_offset = " + m_offset);
                 if (++m_current == m_wrap_at) {
                     m_current = 0;
                     m_offset += m_wrap_at;
                 }
                 while (m_current == m_bound && m_exception == null) {
-                    debug("[c]  Q -> m_notFull.await();");
+                    //debug("[c]  Q -> m_notFull.await();");
                     m_notFull.await();
-                    debug("[c]  Q <- m_notFull.await();");
+                    //debug("[c]  Q <- m_notFull.await();");
                 }
                 m_notEmpty.signal();
-                debug("[c]  Q m_current = " + m_current);
-                debug("[c]  Q m_bound = " + m_bound);
-                debug("[c]  Q m_offset = " + m_offset);
+                //debug("[c]  Q m_current = " + m_current);
+                //debug("[c]  Q m_bound = " + m_bound);
+                //debug("[c]  Q m_offset = " + m_offset);
             } finally {
-                debug("[c] UNLOCKING IN FORWARD");
+                //debug("[c] UNLOCKING IN FORWARD");
                 lock.unlock();
             }
 
@@ -461,20 +461,20 @@ public class HeapBadger {
             boolean doClose;
             boolean doFinish;
             while (true) {
-                debug("[b] - 0 -");
-                debug("[b] - previous_head = " + previous_head);
-                debug("[b] ACQUIRING LOCK IN LOOP");
+                //debug("[b] - 0 -");
+                //debug("[b] - previous_head = " + previous_head);
+                //debug("[b] ACQUIRING LOCK IN LOOP");
                 lock.lock();
-                debug("[b] LOCKED IN LOOP");
+                //debug("[b] LOCKED IN LOOP");
                 try {
                     head = m_current;
                     doClose = m_closing;
                     doFinish = m_finishing;
-                    debug("[b] - 1 -");
-                    debug("[b] - head = " + head);
-                    debug("[b] - doFinish = " + doFinish);
+                    //debug("[b] - 1 -");
+                    //debug("[b] - head = " + head);
+                    //debug("[b] - doFinish = " + doFinish);
                     while (head == previous_head && !doFinish && !doClose) {
-                        debug("[b] - -> m_notEmpty.await();");
+                        //debug("[b] - -> m_notEmpty.await();");
                         try {
                             m_notEmpty.await();
                         } catch (InterruptedException ex) {
@@ -484,22 +484,22 @@ public class HeapBadger {
                             m_notFull.signal();
                             m_closed.signal();
                             m_finished.signal();
-                            debug("[b] ERROR EXIT a) because of " + ex.getMessage());
+                            //debug("[b] ERROR EXIT a) because of " + ex.getMessage());
                             return;
                         }
-                        debug("[b] - <- m_notEmpty.await();");
+                        //debug("[b] - <- m_notEmpty.await();");
                         head = m_current;
                         doClose = m_closing;
                         doFinish = m_finishing;
-                        debug("[b] - head = " + head);
-                        debug("[b] - doFinish = " + doFinish);
+                        //debug("[b] - head = " + head);
+                        //debug("[b] - doFinish = " + doFinish);
                     }
                 } finally {
-                    debug("[b] UNLOCKING IN LOOP");
+                    //debug("[b] UNLOCKING IN LOOP");
                     lock.unlock();
                 }
 
-                debug("[b] - 2 -");
+                //debug("[b] - 2 -");
                 // Note that m_previous_head..head maybe empty in case we are finishing
                 try {
                     serializer.serialize(previous_head, head);
@@ -509,23 +509,23 @@ public class HeapBadger {
                 } catch (Exception e) {
                     // in case of an exception, we remember it and quit the serialization loop
                     m_exception = e;
-                    debug("[b] LOOP ERROR EXIT -- acquiring LOCK");
+                    //debug("[b] LOOP ERROR EXIT -- acquiring LOCK");
                     lock.lock();
-                    debug("[b] LOOP ERROR EXIT -- LOCKING");
+                    //debug("[b] LOOP ERROR EXIT -- LOCKING");
                     // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
                     m_notFull.signal();
                     m_closed.signal();
                     m_finished.signal();
-                    debug("[b] LOOP ERROR EXIT -- UNLOCKING");
+                    //debug("[b] LOOP ERROR EXIT -- UNLOCKING");
                     lock.unlock();
-                    debug("[b] ERROR EXIT b) because of " + e.getMessage());
+                    //debug("[b] ERROR EXIT b) because of " + e.getMessage());
                     return;
                 }
 
-                debug("[b] - 3 -");
-                debug("[b] ACQUIRING LOCK AT END OF ITERATION");
+                //debug("[b] - 3 -");
+                //debug("[b] ACQUIRING LOCK AT END OF ITERATION");
                 lock.lock();
-                debug("[b] LOCKED AT END OF ITERATION");
+                //debug("[b] LOCKED AT END OF ITERATION");
                 try {
                     m_bound = (head + m_bufferSize) % m_wrap_at;
                     m_notFull.signal();
@@ -538,10 +538,10 @@ public class HeapBadger {
                         return;
                     }
                 } finally {
-                    debug("[b] UNLOCKING AT END OF ITERATION");
+                    //debug("[b] UNLOCKING AT END OF ITERATION");
                     lock.unlock();
                 }
-                debug("[b] - 4 -");
+                //debug("[b] - 4 -");
 
                 previous_head = head;
             }
@@ -550,9 +550,9 @@ public class HeapBadger {
         @Override
         public void close() throws IOException {
             final ReentrantLock lock = this.m_lock;
-            debug("[b] Close -- acquiring LOCK");
+            //debug("[b] Close -- acquiring LOCK");
             lock.lock();
-            debug("[b] Close -- LOCKING");
+            //debug("[b] Close -- LOCKING");
             try {
                 if (m_exception != null) {
                     return;
@@ -563,18 +563,18 @@ public class HeapBadger {
                 }
 
                 if (!m_finishing) {
-                    debug("[b] Close -- waiting for closed signal");
+                    //debug("[b] Close -- waiting for closed signal");
                     m_closing = true;
                     m_closed.await();
                 }
 
-                debug("[b]  close AsyncQueue");
+                //debug("[b]  close AsyncQueue");
             } catch (InterruptedException ex) {
                 throw new IOException(ex);
             } finally {
                 m_serializer.close();
                 lock.unlock();
-                debug("[b] Close -- UNLOCKING");
+                //debug("[b] Close -- UNLOCKING");
             }
         }
     }
@@ -690,7 +690,7 @@ public class HeapBadger {
         }
 
         private void writeBufferedRow(final int row) throws IOException {
-            debug("[b] Badger.writeBufferedRow( row=" + row + " )");
+            //debug("[b] Badger.writeBufferedRow( row=" + row + " )");
             final BufferedAccessRow bufferedRow = m_buffers[row];
 
             // Set the data from the buffer
@@ -711,13 +711,13 @@ public class HeapBadger {
             }
             ++m_batchLocalRowIndex;
 
-            debug("[b]       localRowIdx:        " + m_batchLocalRowIndex);
-            debug("[b]       maxNumRowsPerBatch: " + m_maxNumRowsPerBatch);
-            debug("[b]       sizeof batch:       " + m_current_batch.usedSizeFor(m_batchLocalRowIndex));
-            debug("[b]       max batch sizeof:   " + m_maxBatchSizeInBytes);
+            //debug("[b]       localRowIdx:        " + m_batchLocalRowIndex);
+            //debug("[b]       maxNumRowsPerBatch: " + m_maxNumRowsPerBatch);
+            //debug("[b]       sizeof batch:       " + m_current_batch.usedSizeFor(m_batchLocalRowIndex));
+            //debug("[b]       max batch sizeof:   " + m_maxBatchSizeInBytes);
             if (m_batchLocalRowIndex >= m_maxNumRowsPerBatch
                 || m_current_batch.usedSizeFor(m_batchLocalRowIndex) > m_maxBatchSizeInBytes) {
-                debug("[b]   switch to new batch");
+                //debug("[b]   switch to new batch");
                 // TODO if we have written more data in some columns make sure we do not loose it
                 writeCurrentBatch();
                 switchToNextBatch();
@@ -726,7 +726,7 @@ public class HeapBadger {
 
         private synchronized void writeCurrentBatch() throws IOException {
             // synchronized so that getNumBatchesWritten and writeCurrentBatch cannot be called at the same time
-            debug("[b] Badger.writeCurrentBatch");
+            //debug("[b] Badger.writeCurrentBatch");
             ReadBatch readBatch = m_current_batch.close(m_batchLocalRowIndex);
             m_writer.write(readBatch);
 
@@ -744,7 +744,7 @@ public class HeapBadger {
         }
 
         private void switchToNextBatch() {
-            debug("[b] Badger.switchToNextBatch");
+            //debug("[b] Badger.switchToNextBatch");
             // Create the next batch
             m_current_batch = m_writer.create(m_maxNumRowsPerBatch);
 
@@ -762,7 +762,7 @@ public class HeapBadger {
          */
         @Override
         public void serialize(final int previous_head, final int head) throws IOException, InterruptedException {
-            debug("[b] Badger.serialize( previous_head=" + previous_head + ", head=" + head + " )");
+            //debug("[b] Badger.serialize( previous_head=" + previous_head + ", head=" + head + " )");
             int from = previous_head;
             int to = head;
             if (to < from) {
@@ -773,7 +773,7 @@ public class HeapBadger {
                 if (Thread.interrupted()) {
                     throw new InterruptedException("Serialization interrupted");
                 }
-                debug("[b]   writeBufferedRow(" + (i % m_bufferSize) + ")  ... i=" + i);
+                //debug("[b]   writeBufferedRow(" + (i % m_bufferSize) + ")  ... i=" + i);
                 writeBufferedRow(i % m_bufferSize);
             }
         }
@@ -786,7 +786,7 @@ public class HeapBadger {
 
         @Override
         public void close() throws IOException {
-            debug("[b]  close Badger");
+            //debug("[b]  close Badger");
             if (m_current_batch != null) {
                 m_current_batch.release();
             }
@@ -825,7 +825,7 @@ public class HeapBadger {
 
         @Override
         public boolean forward() {
-            debug("[c:" + this + "] BadgerWriteCursor.forward");
+            //debug("[c:" + this + "] BadgerWriteCursor.forward");
             if (m_closed) {
                 throw new IllegalStateException("Cannot forward a closed write cursor");
             }
@@ -837,32 +837,32 @@ public class HeapBadger {
 
             try {
                 m_buffers[m_current].setFrom(m_access);
-                debug("[c:" + this + "]   -> m_queue.forward()");
+                //debug("[c:" + this + "]   -> m_queue.forward()");
                 m_current = m_queue.forward();
             } catch (IOException | InterruptedException ex) {
                 // can throw IOException if serialization of any previous row has failed
                 // can throw InterruptedException if the cursor had to wait for free buffers to write to and got interrupted
                 throw new RuntimeException(ex);
             }
-            debug("[c:" + this + "]   <- m_queue.forward()");
-            debug("[c:" + this + "]   m_current = " + m_current);
+            //debug("[c:" + this + "]   <- m_queue.forward()");
+            //debug("[c:" + this + "]   m_current = " + m_current);
             return true;
         }
 
         @Override
         public void flush() throws IOException {
-            debug("[c:" + this + "] BadgerWriteCursor.flush");
+            //debug("[c:" + this + "] BadgerWriteCursor.flush");
             if (m_closed) {
                 // TODO (TP): should we rather
                 //              throw new IllegalStateException("Cannot flush a closed write cursor");
                 //            ???
-                debug("[c:" + this + "] !! already closed, ignoring call !!");
+                //debug("[c:" + this + "] !! already closed, ignoring call !!");
                 return;
             }
             try {
-                debug("[c:" + this + "]   -> m_queue.flush()");
+                //debug("[c:" + this + "]   -> m_queue.flush()");
                 m_queue.flush();
-                debug("[c:" + this + "]   <- m_queue.flush()");
+                //debug("[c:" + this + "]   <- m_queue.flush()");
             } catch (InterruptedException e) {
                 throw new RuntimeException(e); // let's pretend it is a RuntimeException?
             }
@@ -870,19 +870,19 @@ public class HeapBadger {
 
         @Override
         public void finish() throws IOException {
-            debug("[c:" + this + "] BadgerWriteCursor.finish");
+            //debug("[c:" + this + "] BadgerWriteCursor.finish");
             if (m_closed) {
                 // TODO (TP): should we rather
                 //              throw new IllegalStateException("Cannot finish a closed write cursor");
                 //            ???
-                debug("[c:" + this + "] !! already closed, ignoring call !!");
+                //debug("[c:" + this + "] !! already closed, ignoring call !!");
                 return;
             }
             try {
-                debug("[c:" + this + "]   -> m_queue.finish()");
+                //debug("[c:" + this + "]   -> m_queue.finish()");
                 m_queue.finish();
-                m_closed = true;
-                debug("[c:" + this + "]   <- m_queue.finish()");
+                close(); // TODO correct?
+                //debug("[c:" + this + "]   <- m_queue.finish()");
             } catch (InterruptedException e) {
                 throw new RuntimeException(e); // let's pretend it is a RuntimeException?
             }
@@ -898,7 +898,7 @@ public class HeapBadger {
             m_closed = true;
             m_serializationThread.interrupt();
             m_queue.close();
-            debug("[c:" + this + "] --- Closing the Badger Write Cursor ");
+            //debug("[c:" + this + "] --- Closing the Badger Write Cursor ");
         }
 
         @Override
