@@ -161,7 +161,8 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getDuplicateCheckExecutor() {
         if (duplicateCheckExecutor == null) {
-            duplicateCheckExecutor = createExecutorService("KNIME-DuplicateChecker-", DUPLICATE_CHECK_THREAD_COUNT);
+            duplicateCheckExecutor =
+                createExecutorService("KNIME-DuplicateChecker-", DUPLICATE_CHECK_THREAD_COUNT, false);
         }
         return duplicateCheckExecutor;
     }
@@ -171,7 +172,7 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getDomainCalcExecutor() {
         if (domainCalcExecutor == null) {
-            domainCalcExecutor = createExecutorService("KNIME-DomainCalculator-", DOMAIN_CALC_THREAD_COUNT);
+            domainCalcExecutor = createExecutorService("KNIME-DomainCalculator-", DOMAIN_CALC_THREAD_COUNT, false);
         }
         return domainCalcExecutor;
     }
@@ -201,7 +202,7 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getSerializeExecutor() {
         if (serializeExecutor == null) {
-            serializeExecutor = createExecutorService("KNIME-ObjectSerializer-", SERIALIZE_THREAD_COUNT);
+            serializeExecutor = createExecutorService("KNIME-ObjectSerializer-", SERIALIZE_THREAD_COUNT, true);
         }
         return serializeExecutor;
     }
@@ -210,10 +211,11 @@ public final class ColumnarPreferenceUtils {
      * Factoring creating a new {@link ThreadPoolExecutor} with core pool size = 0 and max pool
      * size = {@link #getNumThreads()}. Thread names are governed by the method arguments.
      */
-    private static ExecutorService createExecutorService(final String namePrefix, final AtomicLong threadCounter) {
+    private static ExecutorService createExecutorService(final String namePrefix, final AtomicLong threadCounter,
+        final boolean needsNodeContext) {
         final ExecutorService executor = new ThreadPoolExecutor(0, getNumThreads(), 60, TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(), r -> new Thread(r, namePrefix + threadCounter.incrementAndGet()));
-        return ThreadUtils.executorServiceWithContext(executor);
+        return needsNodeContext ? ThreadUtils.executorServiceWithContext(executor) : executor;
     }
 
     /**
@@ -249,7 +251,7 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized ExecutorService getPersistExecutor() {
         if (persistExecutor == null) {
-            persistExecutor = createExecutorService("KNIME-ColumnStoreWriter-", PERSIST_THREAD_COUNT);
+            persistExecutor = createExecutorService("KNIME-ColumnStoreWriter-", PERSIST_THREAD_COUNT, false);
         }
         return persistExecutor;
     }
