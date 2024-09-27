@@ -72,7 +72,7 @@ public final class ArrowBooleanData {
     }
 
     /** Arrow implementation of {@link BooleanWriteData}. */
-    public static final class ArrowBooleanWriteData extends AbstractArrowWriteData<BitVector>
+    public static final class ArrowBooleanWriteData extends AbstractArrowWriteData<BitVector, ArrowBooleanReadData>
         implements BooleanWriteData {
 
         private ArrowBooleanWriteData(final BitVector vector) {
@@ -99,11 +99,9 @@ public final class ArrowBooleanData {
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowBooleanReadData close(final int length) {
-            final BitVector vector = closeWithLength(length);
-            return new ArrowBooleanReadData(vector,
-                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+        public ArrowBooleanReadData close(final FieldVector vector) {
+            return new ArrowBooleanReadData((BitVector)vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), vector.getValueCount()));
         }
     }
 

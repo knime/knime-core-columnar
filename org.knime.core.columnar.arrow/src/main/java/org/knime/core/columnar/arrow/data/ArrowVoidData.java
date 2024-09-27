@@ -70,7 +70,7 @@ import org.knime.core.columnar.data.VoidData.VoidWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidReadData, ArrowReadData {
+public final class ArrowVoidData implements VoidWriteData, ArrowWriteData<ArrowVoidData>, VoidReadData, ArrowReadData {
 
     private int m_capacity;
 
@@ -120,6 +120,12 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
         }
         m_vector.setValueCount(length);
         return new ArrowVoidData(m_vector, m_capacity);
+    }
+
+    @Override
+    public ArrowVoidData close(final FieldVector vector) {
+        m_vector.close();
+        return new ArrowVoidData((NullVector)vector, vector.getValueCapacity());
     }
 
     @Override

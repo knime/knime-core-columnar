@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import org.apache.arrow.vector.FieldVector;
 import org.knime.core.columnar.data.NullableWriteData;
 
 /**
@@ -58,7 +59,7 @@ import org.knime.core.columnar.data.NullableWriteData;
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowWriteData extends NullableWriteData {
+public interface ArrowWriteData<R extends ArrowReadData> extends NullableWriteData {
 
     /**
      * Slice the this object to the given start. Note that this only affects what data is returned when accessing the
@@ -67,7 +68,7 @@ public interface ArrowWriteData extends NullableWriteData {
      * @param start the first index of the slice
      * @return the sliced data
      */
-    ArrowWriteData slice(int start);
+    ArrowWriteData<R> slice(int start);
 
     /**
      * {@inheritDoc}
@@ -75,5 +76,7 @@ public interface ArrowWriteData extends NullableWriteData {
      * Note: The returned {@link ArrowReadData} is not sliced.
      */
     @Override
-    ArrowReadData close(int length);
+    R close(int length);
+
+    R close(FieldVector vector);
 }

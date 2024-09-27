@@ -74,7 +74,8 @@ public final class ArrowLongData {
     }
 
     /** Arrow implementation of {@link LongWriteData}. */
-    public static final class ArrowLongWriteData extends AbstractArrowWriteData<BigIntVector> implements LongWriteData {
+    public static final class ArrowLongWriteData extends AbstractArrowWriteData<BigIntVector, ArrowLongReadData>
+        implements LongWriteData {
 
         private ArrowLongWriteData(final BigIntVector vector) {
             super(vector);
@@ -90,7 +91,7 @@ public final class ArrowLongData {
         }
 
         @Override
-        public ArrowWriteData slice(final int start) {
+        public ArrowLongWriteData slice(final int start) {
             return new ArrowLongWriteData(m_vector, m_offset + start);
         }
 
@@ -100,10 +101,9 @@ public final class ArrowLongData {
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowLongReadData close(final int length) {
-            final BigIntVector vector = closeWithLength(length);
-            return new ArrowLongReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+        public ArrowLongReadData close(final FieldVector vector) {
+            return new ArrowLongReadData((BigIntVector)vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), vector.getValueCount()));
         }
     }
 
@@ -246,8 +246,7 @@ public final class ArrowLongData {
                 } else if (vector instanceof TimeNanoVector) {
                     return new ArrowTimeNanoLongReadData((TimeNanoVector)vector, missingValues);
                 } else {
-                    return new ArrowLongReadData((BigIntVector)vector,
-                        missingValues);
+                    return new ArrowLongReadData((BigIntVector)vector, missingValues);
                 }
             } else if (m_version.equals(version)) {
                 return new ArrowLongReadData((BigIntVector)vector, missingValues);

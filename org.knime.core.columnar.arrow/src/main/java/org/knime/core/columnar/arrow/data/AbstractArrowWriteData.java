@@ -67,7 +67,8 @@ import org.knime.core.columnar.WriteData;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractReferencedData implements ArrowWriteData {
+abstract class AbstractArrowWriteData<F extends FieldVector, R extends ArrowReadData> extends AbstractReferencedData
+    implements ArrowWriteData<R> {
 
     /** The vector. Use {@link #m_offset} when accessing vector data. */
     protected F m_vector;
@@ -103,7 +104,7 @@ abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractRef
      * @param length the value count
      * @return the vector with the set value count
      */
-    protected F closeWithLength(final int length) {
+    private F closeWithLength(final int length) {
         m_vector.setValueCount(length);
 
         // NB:
@@ -122,6 +123,12 @@ abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractRef
         }
 
         return slicedVector;
+    }
+
+    @Override
+    @SuppressWarnings("resource") // Resource closed by ReadData
+    public final R close(final int length) {
+        return close(closeWithLength(length));
     }
 
     @Override

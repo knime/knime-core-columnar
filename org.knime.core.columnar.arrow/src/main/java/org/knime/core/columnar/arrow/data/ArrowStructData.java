@@ -85,7 +85,7 @@ public final class ArrowStructData {
     }
 
     /** Arrow implementation of {@link StructWriteData}. */
-    public static final class ArrowStructWriteData extends AbstractArrowWriteData<StructVector>
+    public static final class ArrowStructWriteData extends AbstractArrowWriteData<StructVector, ArrowStructReadData>
         implements StructWriteData {
 
         private final ArrowWriteData[] m_children;
@@ -132,34 +132,29 @@ public final class ArrowStructData {
         }
 
         @Override
-        @SuppressWarnings("resource") // Validity buffer and child vectors closed by m_vector, vector closed by ReadData
-        public ArrowStructReadData close(final int length) {
+        public ArrowStructReadData close(final FieldVector vector) {
             final int numChildren = m_children.length;
-
-            // Close the children
-            final ArrowReadData[] readChildren = new ArrowReadData[numChildren];
-            for (int i = 0; i < numChildren; i++) {
-                readChildren[i] = m_children[i].close(length);
-            }
+            var structVector = (StructVector)vector;
 
             // Set the validity buffer
-            final ArrowBuf validityBuffer = m_vector.getValidityBuffer();
+            final ArrowBuf validityBuffer = vector.getValidityBuffer();
 
             // Get the validity buffers of the children
-            final List<FieldVector> childVectors = m_vector.getChildrenFromFields();
+            final List<FieldVector> childVectors = vector.getChildrenFromFields();
             final ArrowBuf[] childValidtiyBuffers = new ArrowBuf[childVectors.size()];
             for (int i = 0; i < childVectors.size(); i++) {
                 final FieldVector child = childVectors.get(i);
                 childValidtiyBuffers[i] = child.getValidityBuffer();
             }
+            setValidityFromChildren(validityBuffer, childValidtiyBuffers, vector.getValueCount());
 
-            // TODO This causes problems
-            // We close the children in line 142 but use the vector still has the children's vectors as children and
-            // therefore we look at buffers that are closed already
-            setValidityFromChildren(validityBuffer, childValidtiyBuffers, length);
-
-            return new ArrowStructReadData(closeWithLength(length),
-                MissingValues.forValidityBuffer(validityBuffer, length), readChildren);
+            // Close the children
+            final ArrowReadData[] readChildren = new ArrowReadData[numChildren];
+            for (int i = 0; i < numChildren; i++) {
+                readChildren[i] = m_children[i].close(childVectors.get(i));
+            }
+            return new ArrowStructReadData(structVector,
+                MissingValues.forValidityBuffer(validityBuffer, structVector.getValueCount()), readChildren);
         }
 
         @Override
@@ -283,8 +278,8 @@ public final class ArrowStructData {
 
         private static ArrowColumnDataFactoryVersion[] getVersions(final ArrowColumnDataFactory[] factories) {
             return Stream.of(factories)//
-                    .map(ArrowColumnDataFactory::getVersion)//
-                    .toArray(ArrowColumnDataFactoryVersion[]::new);
+                .map(ArrowColumnDataFactory::getVersion)//
+                .toArray(ArrowColumnDataFactoryVersion[]::new);
         }
 
         /**
