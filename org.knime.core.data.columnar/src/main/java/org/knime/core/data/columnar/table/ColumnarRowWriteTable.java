@@ -263,4 +263,13 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
     public WriteCursor<WriteAccessRow> getWriteCursor() {
         return m_writeCursor.getAccessCursor();
     }
+
+    /**
+     * How many rows were added to the table.
+     *
+     * @return number of rows added to the table
+     */
+    public long size() {
+        return m_writeCursor.size();
+    }
 }

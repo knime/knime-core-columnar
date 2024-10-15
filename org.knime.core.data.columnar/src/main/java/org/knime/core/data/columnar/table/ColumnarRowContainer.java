@@ -146,4 +146,9 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
     public WriteCursor<WriteAccessRow> getWriteCursor() {
         return m_columnarTable.getWriteCursor();
     }
+
+    @Override
+    public long size() {
+        return m_columnarTable.size();
+    }
 }

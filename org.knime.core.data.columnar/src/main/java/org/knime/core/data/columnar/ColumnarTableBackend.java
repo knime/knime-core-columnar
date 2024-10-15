@@ -81,10 +81,10 @@ import org.knime.core.data.container.ILocalDataRepository;
 import org.knime.core.data.container.WrappedTable;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
-import org.knime.core.data.v2.RowBatch;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.SizeAwareDataTable;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
@@ -339,7 +339,8 @@ public final class ColumnarTableBackend implements TableBackend {
 
     @Override
     public void chunked(final ExecutionContext exec, final BufferedDataTable table, final long chunkSize,
-        final IntSupplier tableIdSupplier, final Predicate<RowBatch> batchConsumer) throws CanceledExecutionException {
+        final IntSupplier tableIdSupplier, final Predicate<SizeAwareDataTable> batchConsumer)
+        throws CanceledExecutionException {
         // number of chunks
         final long numberChunks = (table.size() + chunkSize - 1) / chunkSize;
         var current = Selection.RowRangeSelection.all();
@@ -357,7 +358,7 @@ public final class ColumnarTableBackend implements TableBackend {
         try {
             final var slices = sliceTable(exec, table, selection, tableIdSupplier);
             for (final var slice : slices) {
-                if (!batchConsumer.test(new RowBatch() {
+                if (!batchConsumer.test(new SizeAwareDataTable() {
 
                     @Override
                     public DataTableSpec getDataTableSpec() {
