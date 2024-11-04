@@ -18,3 +18,8 @@ Require-Bundle: org.knime.core;bundle-version="[5.4.0,6.0.0)",
  junit-jupiter-params;bundle-version="[5.9.2,6.0.0)"
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-ActivationPolicy: lazy
+Bundle-ClassPath: libs/commons-math3-3.6.1.jar,
+ libs/jmh-core-1.37.jar,
+ libs/jmh-generator-annprocess-1.37.jar,
+ libs/jopt-simple-5.0.4.jar,
+ .
