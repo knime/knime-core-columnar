@@ -222,8 +222,8 @@ class HeapBadgerWriteCursorTest {
     void testFailingSerializer() throws IOException {
         try {
             runFillAndCheckHeapBadgerTest(25, 100, Integer.MAX_VALUE, new int[]{25}, new FailingSerializeObjectData());
-        } catch (RuntimeException e) {
-            assertEquals("java.io.IOException: Error during serialization: This serializer is buggy", e.getMessage());
+        } catch (IOException e) {
+            assertEquals("Error during serialization: This serializer is buggy", e.getMessage());
             return;
         }
         fail("Expected an exception to be thrown");
