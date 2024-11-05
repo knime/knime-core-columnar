@@ -24,7 +24,12 @@ properties([
                 defaultValue: false,
                 description: "Use the HeapBadger instead of the Object Cache",
                 name: "USE_HEAP_BADGER",
-            )
+            ),
+            booleanParam(
+                defaultValue: BRANCH_NAME == 'master',
+                description: "Run the benchmarks",
+                name: "RUN_BENCHMARKS",
+            ),
         ],
     ),
     buildDiscarder(logRotator(numToKeepStr: '5')),
@@ -122,6 +127,39 @@ try {
                         [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
                     ]
                 )
+            }
+        }
+    }
+
+    // TODO run on a specific benchmark node
+    if (params["RUN_BENCHMARKS"]) {
+        node('maven && java17 && ubuntu22.04 && workflow-tests') {
+            stage('Run benchmarks') {
+                env.lastStage = env.STAGE_NAME
+
+                // Checkout source code
+                checkout scm
+
+                // Run benchmarks
+                withMaven(mavenOpts: '-Xmx10G') {
+                    withCredentials([
+                        usernamePassword(credentialsId: 'ARTIFACTORY_CREDENTIALS',
+                        passwordVariable: 'ARTIFACTORY_PASSWORD',
+                        usernameVariable: 'ARTIFACTORY_LOGIN'),
+                    ]) {
+                        sh '''
+                            mvn -e -Dmaven.test.failure.ignore=true -Dtycho.localArtifacts=ignore -Dknime.p2.repo=${P2_REPO} clean verify -Pbenchmark
+                        '''
+                    }
+                }
+
+                // Archive results
+                resultFile = "target/benchmark-results.json"
+                sh """
+                    jq -s add \$(find . -path "*/target/surefire-reports/benchmark-results.json") > ${WORKSPACE}/${resultFile}
+                """
+                archiveArtifacts artifacts: resultFile
+                jmhReport resultFile
             }
         }
     }
