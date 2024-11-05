@@ -29,14 +29,32 @@
         <knime.sonar-env>Sonarcloud</knime.sonar-env>
 	</properties>
 
+	<profiles>
+		<profile>
+			<id>build</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<modules>
+				<module>org.knime.core.columnar.tests</module>
+				<module>org.knime.core.columnar.arrow.tests</module>
+				<module>org.knime.core.data.columnar.tests</module>
+			</modules>
+		</profile>
+		<profile>
+			<id>benchmark</id>
+			<modules>
+				<module>org.knime.core.columnar.benchmarks.tests/libs/fetch_jars</module>
+				<module>org.knime.core.columnar.benchmarks.tests</module>
+			</modules>
+		</profile>
+	</profiles>
+
 	<modules>
 		<module>org.knime.core.columnar</module>
 		<module>org.knime.core.columnar.testing</module>
-		<module>org.knime.core.columnar.tests</module>
 		<module>org.knime.core.columnar.arrow</module>
-		<module>org.knime.core.columnar.arrow.tests</module>
 		<module>org.knime.core.data.columnar</module>
-		<module>org.knime.core.data.columnar.tests</module>
 		<module>org.knime.features.core.columnar</module>
 		<module>org.knime.update.core.columnar</module>
 	</modules>
