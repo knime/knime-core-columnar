@@ -33,3 +33,4 @@
 *.sym binary filter=lfs diff=lfs merge=lfs
 *.msi binary filter=lfs diff=lfs merge=lfs
 *.tar.gz binary filter=lfs diff=lfs merge=lfs
+org.knime.core.columnar.benchmarks.tests/workflows/data/flight_64MB.csv filter=lfs diff=lfs merge=lfs -text
