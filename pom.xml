@@ -47,6 +47,28 @@
 				<module>org.knime.core.columnar.benchmarks.tests/libs/fetch_jars</module>
 				<module>org.knime.core.columnar.benchmarks.tests</module>
 			</modules>
+		<repositories>
+			<repository>
+				<id>p2-knime-javasnippet</id>
+				<layout>p2</layout>
+				<url>${knime.javasnippet.p2}</url>
+			</repository>
+			<repository>
+				<id>p2-knime-json</id>
+				<layout>p2</layout>
+				<url>${knime.json.p2}</url>
+			</repository>
+			<repository>
+				<id>p2-knime-base-expressions</id>
+				<layout>p2</layout>
+				<url>${knime.base.expressions.p2}</url>
+			</repository>
+			<repository>
+				<id>p2-knime-scripting-editor</id>
+				<layout>p2</layout>
+				<url>${knime.scripting.editor.p2}</url>
+			</repository>
+		</repositories>
 		</profile>
 	</profiles>
 
