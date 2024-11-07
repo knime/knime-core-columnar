@@ -77,7 +77,7 @@ import org.knime.core.table.row.Selection;
 public final class ColumnarRowReadTable implements RandomRowAccessible {
 
     /** a system property to disable all caches in a read table for testing */
-    private static final boolean DISABLE_CACHES = Boolean.getBoolean("knime.columnar.disablecaches.readtable");
+    private static final String DISABLE_CACHES_SYS_PROP = "knime.columnar.disablecaches.readtable";
 
     private final ValueSchema m_schema;
 
@@ -109,7 +109,7 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
     private static ColumnarBatchReadStore wrapInColumnarStore(final BatchReadStore store) {
         var builder = new ColumnarBatchReadStoreBuilder(store) //
             .enableDictEncoding(true); //
-        if (!DISABLE_CACHES) {
+        if (!Boolean.getBoolean(DISABLE_CACHES_SYS_PROP)) {
             builder.useColumnDataCache(ColumnarPreferenceUtils.getColumnDataCache()) //
                 .useHeapCache(ColumnarPreferenceUtils.getHeapCache()); //
 

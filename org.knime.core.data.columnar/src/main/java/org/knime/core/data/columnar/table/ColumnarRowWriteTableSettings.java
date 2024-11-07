@@ -60,10 +60,10 @@ import org.knime.core.data.v2.RowContainer;
 public final class ColumnarRowWriteTableSettings {
 
     /** a system property to disable all caches in a write table for testing */
-    private static final boolean DISABLE_CACHES = Boolean.getBoolean("knime.columnar.disablecaches.writetable");
+    private static final String DISABLE_CACHES_SYS_PROP = "knime.columnar.disablecaches.writetable";
 
     /** a system property to enforce using the heap badger as it is not the default yet */
-    private static final boolean USE_HEAP_BADGER = Boolean.getBoolean("knime.columnar.heapbadger.enable");
+    private static final String USE_HEAP_BADGER_SYS_PROP = "knime.columnar.heapbadger.enable";
 
     private final boolean m_initializeDomains;
 
@@ -161,7 +161,7 @@ public final class ColumnarRowWriteTableSettings {
     }
 
     boolean isUseCaching() {
-        return !DISABLE_CACHES && m_useCaching;
+        return !Boolean.getBoolean(DISABLE_CACHES_SYS_PROP) && m_useCaching;
     }
 
     boolean isForceSynchronousIO() {
@@ -169,7 +169,7 @@ public final class ColumnarRowWriteTableSettings {
     }
 
     static boolean useHeapBadger() {
-        return USE_HEAP_BADGER;
+        return Boolean.getBoolean(USE_HEAP_BADGER_SYS_PROP);
     }
 
     /**
