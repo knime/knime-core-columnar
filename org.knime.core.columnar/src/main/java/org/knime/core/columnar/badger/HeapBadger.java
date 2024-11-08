@@ -670,11 +670,13 @@ public class HeapBadger {
             m_buffers = buffers;
             m_bufferSize = buffers.length;
 
-            m_maxNumRowsPerBatch = maxNumRowsPerBatch;
-            m_maxBatchSizeInBytes = maxBatchSizeInBytes;
 
             m_writer = store.getWriter();
             m_current_batch = null;
+
+            int initialNumBytesPerElement = m_writer.initialNumBytesPerElement();
+            m_maxNumRowsPerBatch = Math.min(maxBatchSizeInBytes / initialNumBytesPerElement, maxNumRowsPerBatch);
+            m_maxBatchSizeInBytes = maxBatchSizeInBytes;
 
             final ColumnarSchema schema = store.getSchema();
             final int numColumns = schema.numColumns();
@@ -751,14 +753,12 @@ public class HeapBadger {
             debug("[b] Badger.switchToNextBatch");
 
             // Create the next batch
-            int newBatchSize =
-                Math.min(m_maxBatchSizeInBytes / m_writer.initialNumBytesPerElement(), m_maxNumRowsPerBatch);
-            m_current_batch = m_writer.create(newBatchSize);
+            m_current_batch = m_writer.create(m_maxNumRowsPerBatch);
 
             // Connect the accesses with the current write batch
             for (int col = 0; col < m_accessesToTheCurrentBatch.length; col++) {
                 m_accessesToTheCurrentBatch[col].setData(m_current_batch.get(col));
-                m_heapCacheBuffers[col].init(newBatchSize);
+                m_heapCacheBuffers[col].init(m_maxNumRowsPerBatch);
             }
 
             m_batchLocalRowIndex = 0;

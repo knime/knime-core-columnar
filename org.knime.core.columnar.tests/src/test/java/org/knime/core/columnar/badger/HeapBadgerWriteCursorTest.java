@@ -155,6 +155,18 @@ class HeapBadgerWriteCursorTest {
     }
 
     @Test
+    @DisplayName("batching by initial size of many columns")
+    void testInitialSizeLimitsMaxRows() throws IOException {
+        runFillAndCheckHeapBadgerTest( //
+            100, // num rows
+            1_000_000, // max num rows per batch
+            1024, // max batch size in bytes
+            new int[]{51, 49}, // expected num rows
+            new int[][]{}, IntStream.range(0, 20).mapToObj(i -> TestDataImpl.STRING).toArray(TestData[]::new) // test data
+        );
+    }
+
+    @Test
     @DisplayName("write - flush - write")
     void testWriteAfterFlush() throws IOException {
         runFillAndCheckHeapBadgerTest( //
