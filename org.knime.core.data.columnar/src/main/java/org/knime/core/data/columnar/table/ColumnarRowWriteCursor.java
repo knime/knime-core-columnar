@@ -123,17 +123,13 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     }
 
     private void commit() {
-        if (m_flushOnForward != null) {
-            try {
-                m_flushOnForward.flush();
-            } catch (IOException ex) {
-                LOGGER.error("Could not flush cursor during forward", ex);
-            }
-        }
         try {
+            if (m_flushOnForward != null) {
+                m_flushOnForward.flush();
+            }
             m_accessCursor.commit();
         } catch (IOException ex) {
-            LOGGER.error("Could not commit row", ex);
+            throw new RuntimeException(ex);
         }
     }
 
