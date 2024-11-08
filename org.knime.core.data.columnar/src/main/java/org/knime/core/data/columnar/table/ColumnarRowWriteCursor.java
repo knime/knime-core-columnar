@@ -104,7 +104,11 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
         commit();
     }
 
-    public void commit(final DataRow row) {
+    void commit(final DataRow row) {
+        // N.B. Instead of calling this, one could also call
+        //      commit(RowRead.from(row));
+        //      but this would create a new wrapper every time.
+        //      We could reuse the same RwoRead.suppliedBy(...) wrapper, but that would complicate the calling code
         m_rowWrite.setRowKey(row.getKey());
         final int numColumns = m_rowWrite.getNumColumns();
         for (int i = 0; i < numColumns; i++) {
