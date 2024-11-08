@@ -10,10 +10,16 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
-	<classpathentry kind="src" path="src">
+	<classpathentry kind="src" output="bin/test-classes" path="src">
 		<attributes>
 			<attribute name="test" value="true"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="src" output="bin/apt-test-classes" path=".apt_generated_tests">
+		<attributes>
+			<attribute name="test" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="bin/apt-classes" path=".apt_generated"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -21,6 +21,13 @@ To execute the benchmarks, run the following command in the repository’s root 
 mvn clean verify -Pbenchmark
 ```
 
+### Running in Eclipse
+
+To run the benchmarks in Eclipse:
+- Execute the `BenchmarkRunner` class as a "JUnit Plug-in Test".
+- Use the `-Dbenchmark.include.regex` system property with a regex that matches the benchmark name to include only specific tests for faster feedback.
+- Use "Project -> Clean..." to rebuild the test classes if you encounter `ClassNotFoundException: org.knime.my.package.jmh_generated.<...>_jmhTest cannot be found by org.knime.core.columnar.benchmarks.tests_5.4.0.qualifier`.
+
 ### Viewing Results
 
 - After running the benchmarks locally, find the results at `org.knime.core.columnar.benchmarks.tests/target/surefire-reports/benchmark-results.json`.
