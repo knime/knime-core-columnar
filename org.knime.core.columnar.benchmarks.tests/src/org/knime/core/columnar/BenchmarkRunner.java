@@ -68,7 +68,7 @@ public class BenchmarkRunner {
      * are run. Use this for development.
      */
     private static final String INCLUDE_BENCHMARKS =
-        System.getProperty("org.knime.core.columnar.benchmarks.includes", Defaults.INCLUDE_BENCHMARKS);
+        System.getProperty("benchmark.include.regex", Defaults.INCLUDE_BENCHMARKS);
 
     @Test
     void runBenchmarks() throws RunnerException {

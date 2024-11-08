@@ -76,6 +76,7 @@
                         <exclude>**/*jmhType**</exclude>
                     </excludes>
                     <argLine>
+                        -Dbenchmark.include.regex=${benchmark.include.regex}
                         -Darrow.enable_unsafe_memory_access=true
                         -Darrow.memory.debug.allocator=false
                         -Darrow.enable_null_check_for_get=false
