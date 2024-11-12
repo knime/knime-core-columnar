@@ -50,8 +50,6 @@ package org.knime.core.data.columnar.table.virtual;
 
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletionException;
 import java.util.function.IntSupplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -139,23 +137,21 @@ public final class ColumnarVirtualTableMaterializer {
             return rowIndex -> m_progress.update(rowIndex + 1, rowKey);
         };
 
-        var sinkUUID = UUID.randomUUID();
-        var tableWithObserve = tableToMaterialize
-            // observe all created columns to ensure that the progress update happens after the map
-            // because some CellFactories (e.g. in the Math Formula node) expect this call order
-            // see also the implementation in RearrangeColumnsTable
-            .observe(progressListenerFactory, IntStream.range(0, tableToMaterialize.getSchema().numColumns()).toArray())
-            .materialize(sinkUUID);
-        var executor = new GraphVirtualTableExecutor(tableWithObserve.getProducingTransform());
-        try (var container = createContainer(createContainerSchema(tableToMaterialize.getSchema()))) {
-            try {
-                executor.execute(m_sources, Map.of(sinkUUID, (RowWriteAccessible)container));
-            } catch (CancellationException ex) {
-                throw new CanceledExecutionException(ex.getMessage());
-            } catch (CompletionException ex) {
-                throw ex.getCause();
+
+        try (var writable = createContainer(createContainerSchema(tableToMaterialize.getSchema()));
+                var writeCursor = ((RowWriteAccessible)writable).getWriteCursor();
+                var readable =
+                    new GraphVirtualTableExecutor(tableToMaterialize.getProducingTransform()).execute(m_sources).get(0);
+                var readCursor = readable.createCursor();) {
+            RowKeyValue rowKey = ((StringAccess.StringReadAccess)readCursor.access().getAccess(0))::getStringValue;
+            long rowIndex = 1; // use 1 based indexing
+            while (readCursor.forward()) {
+                writeCursor.access().setFrom(readCursor.access());
+                writeCursor.commit();
+                m_progress.update(rowIndex++, rowKey);
             }
-            return ReferenceTables.createClearableReferenceTable(sinkUUID, container.finish());
+            var sinkUUID = UUID.randomUUID();
+            return ReferenceTables.createClearableReferenceTable(sinkUUID, writable.finish());
         } catch (CanceledExecutionException canceledException) {
             // this stunt is necessary because ColumnarRowContainerUtils.create throws Exception
             throw canceledException;

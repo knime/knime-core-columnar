@@ -78,13 +78,13 @@ import org.knime.core.table.cursor.LookaheadCursor;
 import org.knime.core.table.cursor.RandomAccessCursor;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
+import org.knime.core.table.virtual.spec.AppendMapTransformSpec;
 import org.knime.core.table.virtual.spec.AppendMissingValuesTransformSpec;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
-import org.knime.core.table.virtual.spec.MaterializeTransformSpec;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverFactory;
 import org.knime.core.table.virtual.spec.ObserverTransformUtils;
@@ -409,6 +409,10 @@ public final class ColumnarVirtualTable {
         return ValueSchemaUtils.hasRowID(table.getSchema()) ? table.dropColumns(0) : table;
     }
 
+    private static ValueSchema appendSchemas(final ValueSchema... schemas) {
+        return appendSchemas(Arrays.asList(schemas));
+    }
+
     private static ValueSchema appendSchemas(final List<ValueSchema> schemas) {
         var valueFactories = schemas.stream()//
             .flatMap(ColumnarVirtualTable::valueFactoryStream)//
@@ -467,12 +471,6 @@ public final class ColumnarVirtualTable {
             .collect(Collectors.toList());
     }
 
-    public ColumnarVirtualTable materialize(final UUID sinkIdentifier) {
-        final MaterializeTransformSpec transformSpec = new MaterializeTransformSpec(sinkIdentifier);
-        var emptySchema = createColumnarValueSchema(new ValueFactory<?, ?>[0], new DataTableSpec());
-        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), emptySchema);
-    }
-
     /**
      * Append a LONG column that contains the current row index.
      *
@@ -495,6 +493,19 @@ public final class ColumnarVirtualTable {
         columns[columns.length - 1] = m_valueSchema.numColumns();
         final ColumnarMapperFactory factory = new WrappedColumnarMapperWithRowIndexFactory(mapperFactory);
         return appendRowIndex(tmpUniqueRowIndexColumnName()).map(factory, columns);
+    }
+
+    public ColumnarVirtualTable appendMap(final ColumnarMapperFactory mapperFactory, final int... columnIndices) {
+        final TableTransformSpec transformSpec = new AppendMapTransformSpec(columnIndices, mapperFactory);
+        final ValueSchema schema = appendSchemas(m_valueSchema, mapperFactory.getOutputSchema());
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), schema);
+    }
+
+    public ColumnarVirtualTable appendMap(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
+        final int[] columns = Arrays.copyOf(columnIndices, columnIndices.length + 1);
+        columns[columns.length - 1] = m_valueSchema.numColumns();
+        final ColumnarMapperFactory factory = new WrappedColumnarMapperWithRowIndexFactory(mapperFactory);
+        return appendRowIndex(tmpUniqueRowIndexColumnName()).appendMap(factory, columns);
     }
 
     public ColumnarVirtualTable observe(final ObserverFactory observerFactory, final int... columnIndices) {
