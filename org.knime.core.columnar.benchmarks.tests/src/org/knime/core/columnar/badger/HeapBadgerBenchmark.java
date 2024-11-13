@@ -194,8 +194,6 @@ public class HeapBadgerBenchmark {
         final ColumnarWriteCursor cursor, final WriteAccessRow rowAccess) throws IOException {
         // Loop over rows
         for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
-            cursor.forward();
-
             // Loop over columns
             for (int colIdx = 0; colIdx < numCols; colIdx++) {
                 var intAccess = (IntWriteAccess)rowAccess.getWriteAccess(colIdx);
@@ -206,6 +204,7 @@ public class HeapBadgerBenchmark {
                     intAccess.setIntValue(val);
                 }
             }
+            cursor.commit();
         }
         cursor.finish();
     }
@@ -236,8 +235,6 @@ public class HeapBadgerBenchmark {
         final ColumnarWriteCursor cursor, final WriteAccessRow rowAccess) throws IOException {
         // Loop over rows
         for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
-            cursor.forward();
-
             // Loop over columns
             for (int colIdx = 0; colIdx < numCols; colIdx++) {
                 var stringAccess = (StringWriteAccess)rowAccess.getWriteAccess(colIdx);
@@ -248,6 +245,7 @@ public class HeapBadgerBenchmark {
                     stringAccess.setStringValue(val);
                 }
             }
+            cursor.commit();
         }
         cursor.finish();
     }
@@ -297,8 +295,6 @@ public class HeapBadgerBenchmark {
         final ColumnarWriteCursor cursor, final WriteAccessRow rowAccess) throws IOException {
         // Loop over rows
         for (long rowIdx = 0; rowIdx < numRows; rowIdx++) {
-            cursor.forward();
-
             // Loop over columns
             for (int colIdx = 0; colIdx < numCols; colIdx++) {
                 var stringAccess = (StringWriteAccess)rowAccess.getWriteAccess(colIdx);
@@ -316,6 +312,7 @@ public class HeapBadgerBenchmark {
                     stringAccess.setStringValue(val);
                 }
             }
+            cursor.commit();
         }
         cursor.finish();
     }
