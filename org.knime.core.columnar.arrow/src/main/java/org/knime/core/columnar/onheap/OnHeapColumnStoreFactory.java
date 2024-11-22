@@ -50,46 +50,19 @@ package org.knime.core.columnar.onheap;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.IntFunction;
 
-import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.vector.ipc.message.ArrowFieldNode;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
-import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.memory.RootAllocator;
 import org.knime.core.columnar.arrow.PathBackedFileHandle;
+import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.onheap.data.OnHeapDoubleData;
-import org.knime.core.columnar.onheap.data.OnHeapIntData;
-import org.knime.core.columnar.onheap.data.OnHeapStringData;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.columnar.store.ColumnStoreFactoryCreator;
 import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.table.schema.BooleanDataSpec;
-import org.knime.core.table.schema.ByteDataSpec;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.DoubleDataSpec;
-import org.knime.core.table.schema.FloatDataSpec;
-import org.knime.core.table.schema.IntDataSpec;
-import org.knime.core.table.schema.ListDataSpec;
-import org.knime.core.table.schema.LongDataSpec;
-import org.knime.core.table.schema.StringDataSpec;
-import org.knime.core.table.schema.StructDataSpec;
-import org.knime.core.table.schema.VarBinaryDataSpec;
-import org.knime.core.table.schema.VoidDataSpec;
-import org.knime.core.table.schema.traits.DataTraits;
-import org.knime.core.table.schema.traits.ListDataTraits;
-import org.knime.core.table.schema.traits.StructDataTraits;
 
 /**
  *
@@ -129,7 +102,10 @@ public final class OnHeapColumnStoreFactory implements ColumnStoreFactory {
 
         @Override
         public BatchWriter getWriter() {
-            return new OnHeapBatchWriter(m_schema, m_fileHandle);
+            var allocator = new RootAllocator(); // TODO global
+            var factories = OnHeapSchemaMapper.map(m_schema);
+            return new OnHeapToArrowBatchWriter(m_fileHandle, factories,
+                ArrowCompressionUtil.ARROW_LZ4_FRAME_COMPRESSION, allocator);
         }
 
         @Override
@@ -155,137 +131,6 @@ public final class OnHeapColumnStoreFactory implements ColumnStoreFactory {
         @Override
         public void close() throws IOException {
             // TODO Auto-generated method stub
-        }
-    }
-
-    // TODO Or should there be a factory around it like the ArrowColumnDataFactory?
-    public interface ToArrowConvertible {
-
-        // TODO use for the schema
-        Field getField();
-
-        // TODO pass compression to use for the buffers
-        // Note for compression with LZ4 JNI we need to copy the original buffer to off-heap
-        // Therefore, we could use the Vector here after all
-        /**
-         * Append the field nodes and buffers to the given lists.
-         *
-         * @param fieldNodes
-         * @param buffers
-         */
-        void appendFieldNodesAndBuffers(ArrayList<ArrowFieldNode> fieldNodes, List<ArrowBuf> buffers);
-    }
-
-    // TODO we could copy the ArrowBatchWriter and adapt it to use our on-heap data instead of the Arrow data
-    // see OnHeapDataFactory
-    public static final class OnHeapBatchWriter implements BatchWriter {
-
-        private final ColumnarSchema m_schema;
-
-        private final FileHandle m_fileHandle;
-
-        OnHeapBatchWriter(final ColumnarSchema schema, final FileHandle fileHandle) {
-            m_schema = schema;
-            m_fileHandle = fileHandle;
-        }
-
-        @Override
-        public WriteBatch create(final int capacity) {
-            var numColumns = m_schema.numColumns();
-            var data = new NullableWriteData[numColumns];
-            for (int i = 0; i < numColumns; i++) {
-                var specWithTraits = m_schema.getSpecWithTraits(i);
-                var dataFactory = specWithTraits.spec().accept(DataFactoryFromSpecs.INSTANCE, specWithTraits.traits());
-                data[i] = dataFactory.apply(capacity);
-            }
-            return new DefaultWriteBatch(data);
-        }
-
-        @Override
-        public void write(final ReadBatch batch) throws IOException {
-            var fieldNodes = new ArrayList<ArrowFieldNode>();
-            var buffers = new ArrayList<ArrowBuf>();
-            for (int i = 0; i < batch.numData(); i++) {
-                var data = (ToArrowConvertible)batch.get(i);
-                data.appendFieldNodesAndBuffers(fieldNodes, buffers);
-            }
-
-            try (var recordBatch = new ArrowRecordBatch(batch.length(), fieldNodes, buffers)) {
-
-            }
-
-        }
-
-        @Override
-        public void close() throws IOException {
-            // TODO Auto-generated method stub
-
-        }
-    }
-
-    public static final class DataFactoryFromSpecs
-        implements DataSpec.MapperWithTraits<IntFunction<NullableWriteData>> {
-
-        public static final DataFactoryFromSpecs INSTANCE = new DataFactoryFromSpecs();
-
-        private DataFactoryFromSpecs() {
-            // singleton
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final BooleanDataSpec spec, final DataTraits traits) {
-            throw new UnsupportedOperationException("Not implemented yet");
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final ByteDataSpec spec, final DataTraits traits) {
-            throw new UnsupportedOperationException("Not implemented yet");
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final DoubleDataSpec spec, final DataTraits traits) {
-            return OnHeapDoubleData::new;
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final FloatDataSpec spec, final DataTraits traits) {
-            throw new UnsupportedOperationException("Not implemented yet");
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final IntDataSpec spec, final DataTraits traits) {
-            return OnHeapIntData::new;
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final LongDataSpec spec, final DataTraits traits) {
-            throw new UnsupportedOperationException("Not implemented yet");
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final VarBinaryDataSpec spec, final DataTraits traits) {
-            throw new UnsupportedOperationException("Not implemented yet");
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final VoidDataSpec spec, final DataTraits traits) {
-            throw new UnsupportedOperationException("Not implemented yet");
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final StructDataSpec spec, final StructDataTraits traits) {
-            throw new UnsupportedOperationException("Not implemented yet");
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
-            throw new UnsupportedOperationException("Not implemented yet");
-        }
-
-        @Override
-        public IntFunction<NullableWriteData> visit(final StringDataSpec spec, final DataTraits traits) {
-            // TODO dictionary encoding
-            return OnHeapStringData::new;
         }
     }
 }
