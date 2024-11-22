@@ -48,12 +48,15 @@
  */
 package org.knime.core.columnar.onheap.data;
 
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.vector.BitVectorHelper;
+
 /**
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 public final class ValidityBuffer {
 
-    // TODO implement in a more efficient way (only one bit per value)
+    // TODO(min-performance) implement in a more efficient way (only one bit per value)
     private boolean[] m_validity;
 
     public static long usedSizeFor(final int capacity) {
@@ -104,5 +107,11 @@ public final class ValidityBuffer {
     public long sizeOf() {
         // TODO be more efficient
         return m_validity.length;
+    }
+
+    public void copyTo(final ArrowBuf validityBuffer) {
+        for (int i = 0; i < m_validity.length; i++) {
+            BitVectorHelper.setValidityBit(validityBuffer, i, m_validity[i] ? 1 : 0);
+        }
     }
 }

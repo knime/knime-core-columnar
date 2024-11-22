@@ -84,14 +84,12 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.FileHandle;
 import org.slf4j.Logger;
@@ -109,8 +107,8 @@ class OnHeapToArrowBatchWriter implements BatchWriter {
 
     private final FileHandle m_fileHandle;
 
-    // TODO replace with a new thingy
-    private final ArrowColumnDataFactory[] m_factories;
+    /** Factories used to get the vectors and dicts from the columns */
+    private final OnHeapDataFactory[] m_factories;
 
     private final ArrowCompression m_compression;
 
@@ -135,7 +133,7 @@ class OnHeapToArrowBatchWriter implements BatchWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    OnHeapToArrowBatchWriter(final FileHandle file, final ArrowColumnDataFactory[] factories,
+    OnHeapToArrowBatchWriter(final FileHandle file, final OnHeapDataFactory[] factories,
         final ArrowCompression compression, final BufferAllocator allocator) {
         m_fileHandle = file;
         m_factories = factories;
@@ -149,9 +147,22 @@ class OnHeapToArrowBatchWriter implements BatchWriter {
     public WriteBatch create(final int capacity) {
         final NullableWriteData[] chunk = new NullableWriteData[m_factories.length];
         for (int i = 0; i < m_factories.length; i++) {
-            chunk[i] = ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, capacity);
+            // NOTE: As seen in https://knime-com.atlassian.net/browse/AP-22395, we saw OutOfMemoryErrors
+            // here because we are creating so many small objects when we have tables with lots (100_000s) of columns.
+            // The row based backend behaves better in that scenario, unfortunately. It can handle 4x more columns with
+            // the same amount of heap memory.
+            chunk[i] = m_factories[i].createWrite(capacity);
         }
         return new DefaultWriteBatch(chunk);
+    }
+
+    @Override
+    public int initialNumBytesPerElement() {
+        int initialNumBytesPerElement = 0;
+        for (int i = 0; i < m_factories.length; i++) {
+            initialNumBytesPerElement += m_factories[i].initialNumBytesPerElement();
+        }
+        return initialNumBytesPerElement;
     }
 
     @Override
@@ -166,10 +177,10 @@ class OnHeapToArrowBatchWriter implements BatchWriter {
 
         // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
-            final NullableReadData data = batch.get(i);
-            final ArrowColumnDataFactory factory = m_factories[i];
+            final var data = batch.get(i);
+            final var factory = m_factories[i];
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-            final FieldVector vector = factory.getVector(data);
+            final FieldVector vector = factory.getVector(data, String.valueOf(i), m_allocator);
             final DictionaryProvider dictionaries = factory.getDictionaries(data);
             final Field field = vector.getField();
 
@@ -258,7 +269,6 @@ class OnHeapToArrowBatchWriter implements BatchWriter {
     synchronized long numRows() {
         return m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
     }
-
 
     @Override
     public synchronized void close() throws IOException {

@@ -48,12 +48,29 @@
  */
 package org.knime.core.columnar.onheap;
 
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
+
 /**
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 public interface OnHeapDataFactory {
 
+    NullableWriteData createWrite(int capacity);
     // TODO replace ArrowColumnDataFactory
+
+    FieldVector getVector(NullableReadData data, String name, BufferAllocator allocator);
+
+    DictionaryProvider getDictionaries(NullableReadData data);
+
+    int initialNumBytesPerElement();
+
+    // TODO return ArrowColumnDataFactoryVersion
+    Object getVersion();
+
 
 }

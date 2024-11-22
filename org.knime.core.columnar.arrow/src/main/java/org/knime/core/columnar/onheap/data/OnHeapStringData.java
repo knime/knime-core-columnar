@@ -48,8 +48,16 @@
  */
 package org.knime.core.columnar.onheap.data;
 
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.columnar.onheap.OnHeapDataFactory;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  *
@@ -57,13 +65,15 @@ import org.knime.core.columnar.data.StringData.StringWriteData;
  */
 public final class OnHeapStringData extends AbstractReferencedData implements StringReadData, StringWriteData {
 
+    public static final Factory FACTORY = new Factory();
+
     // or use a ByteBuffer??
     private String[] m_data;
 
     // TODO move validity to abstract class? Maybe in-line the ValidityBuffer class?
     private ValidityBuffer m_validity;
 
-    public OnHeapStringData(final int capacity) {
+    private OnHeapStringData(final int capacity) {
         m_data = new String[capacity];
         m_validity = new ValidityBuffer(capacity);
     }
@@ -141,5 +151,58 @@ public final class OnHeapStringData extends AbstractReferencedData implements St
         var newData = new String[numElements];
         System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
         m_data = newData;
+    }
+
+    // TODO extract common functionallity
+    private static final class Factory implements OnHeapDataFactory {
+
+        @Override
+        public NullableWriteData createWrite(final int capacity) {
+            return new OnHeapStringData(capacity);
+        }
+
+        @Override
+        public FieldVector getVector(final NullableReadData data, final String name, final BufferAllocator allocator) {
+            var d = (OnHeapStringData)data; // TODO generic?
+
+            // Note: We create a Vector here and therefore transfer the data to off-heap
+            // The compression requires the data to be off-heap
+            // If we could compress from on-heap to off-heap (or to whereever), we would save a copy but would need to
+            // change the writer significantly
+
+            var vector = new VarCharVector(name, allocator);
+
+            // Copy the data
+            var encoder = new StringEncoder();
+            // TODO we serialize here????? Can this be right???
+            for (int i = 0; i < d.m_data.length; i++) {
+                var val = d.m_data[i];
+                if (val != null) {
+                    var encoded = encoder.encode(val);
+                    vector.setSafe(i, encoded, 0, encoded.limit());
+                }
+            }
+
+            // Copy the validity
+            d.m_validity.copyTo(vector.getValidityBuffer());
+
+            return vector;
+        }
+
+        @Override
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
+            return null;
+        }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        @Override
+        public Object getVersion() {
+            return "0";
+        }
     }
 }
