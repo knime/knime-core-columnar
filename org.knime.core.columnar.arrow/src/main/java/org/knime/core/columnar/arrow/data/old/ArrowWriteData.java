@@ -44,68 +44,36 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 30, 2020 (benjamin): created
+ *   Oct 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
- * Test {@link ArrowIntData}
+ * Arrow implementation of {@link NullableWriteData}. Can be sliced with {@link #slice(int)}.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * The API of ArrowWriteData is NOT thread safe, especially expand and set should not be
+ * called at the same time from different threads!
+ *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowIntDataTest extends AbstractArrowDataTest<ArrowIntWriteData, ArrowIntReadData> {
+public interface ArrowWriteData extends NullableWriteData {
 
-    /** Create the test for {@link ArrowIntData} */
-    public ArrowIntDataTest() {
-        super(ArrowIntDataFactory.INSTANCE);
-    }
+    /**
+     * Slice the this object to the given start. Note that this only affects what data is returned when accessing the
+     * data with an index. This does not effect {@link #capacity()} and {@link #expand(int)}.
+     *
+     * @param start the first index of the slice
+     * @return the sliced data
+     */
+    ArrowWriteData slice(int start);
 
+    /**
+     * {@inheritDoc}
+     *
+     * Note: The returned {@link ArrowReadData} is not sliced.
+     */
     @Override
-    protected ArrowIntWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowIntWriteData);
-        return (ArrowIntWriteData)o;
-    }
-
-    @Override
-    protected ArrowIntReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowIntReadData);
-        return (ArrowIntReadData)o;
-    }
-
-    @Override
-    protected void setValue(final ArrowIntWriteData data, final int index, final int seed) {
-        data.setInt(index, seed);
-    }
-
-    @Override
-    protected void checkValue(final ArrowIntReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getInt(index));
-    }
-
-    @Override
-    protected boolean isReleasedW(final ArrowIntWriteData data) {
-        return data.m_vector == null;
-    }
-
-    @Override
-    @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowIntReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
-    }
-
-    @Override
-    protected long getMinSize(final int valueCount, final int capacity) {
-        return 4 * capacity // 4 bytes per value for data
-            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
-    }
+    ArrowReadData close(int length);
 }

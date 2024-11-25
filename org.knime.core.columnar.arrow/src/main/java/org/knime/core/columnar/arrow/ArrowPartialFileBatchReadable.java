@@ -52,6 +52,7 @@ import java.nio.file.Path;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.SequentialBatchReadable;
 import org.knime.core.columnar.batch.SequentialBatchReader;

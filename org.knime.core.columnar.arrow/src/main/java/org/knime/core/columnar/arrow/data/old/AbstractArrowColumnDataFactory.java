@@ -44,68 +44,78 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 30, 2020 (benjamin): created
+ *   Nov 4, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import java.util.Objects;
 
-import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntWriteData;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
- * Test {@link ArrowIntData}
+ * Abstract implementation of {@link ArrowColumnDataFactory} for {@link ArrowReadData} which extend
+ * {@link AbstractArrowReadData}. Holds the current version.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * Overwrite {@link #getDictionaries(NullableReadData)} if the data object contains dictionaries.
+ *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowIntDataTest extends AbstractArrowDataTest<ArrowIntWriteData, ArrowIntReadData> {
+@SuppressWarnings("javadoc")
+abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory {
 
-    /** Create the test for {@link ArrowIntData} */
-    public ArrowIntDataTest() {
-        super(ArrowIntDataFactory.INSTANCE);
+    /** The current version */
+    protected final ArrowColumnDataFactoryVersion m_version;
+
+    /**
+     * Create a new abstract {@link ArrowColumnDataFactory}.
+     *
+     * @param version the current version
+     */
+    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
+        m_version = version;
     }
 
     @Override
-    protected ArrowIntWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowIntWriteData);
-        return (ArrowIntWriteData)o;
+    public FieldVector getVector(final NullableReadData data) {
+        return ((AbstractArrowReadData<?>)data).m_vector;
     }
 
     @Override
-    protected ArrowIntReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowIntReadData);
-        return (ArrowIntReadData)o;
+    public DictionaryProvider getDictionaries(final NullableReadData data) {
+        return null;
     }
 
     @Override
-    protected void setValue(final ArrowIntWriteData data, final int index, final int seed) {
-        data.setInt(index, seed);
+    public ArrowColumnDataFactoryVersion getVersion() {
+        return m_version;
     }
 
     @Override
-    protected void checkValue(final ArrowIntReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getInt(index));
+    public int hashCode() {
+        return Objects.hash(m_version);
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowIntWriteData data) {
-        return data.m_vector == null;
+    public boolean equals(final Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        AbstractArrowColumnDataFactory other = (AbstractArrowColumnDataFactory)obj;
+        return m_version.equals(other.m_version);
     }
 
     @Override
-    @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowIntReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+    public String toString() {
+        return this.getClass().getSimpleName() + ".v" + m_version.getVersion();
     }
 
-    @Override
-    protected long getMinSize(final int valueCount, final int capacity) {
-        return 4 * capacity // 4 bytes per value for data
-            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
-    }
 }

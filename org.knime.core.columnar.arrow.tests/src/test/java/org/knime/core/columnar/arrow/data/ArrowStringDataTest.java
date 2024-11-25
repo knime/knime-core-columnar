@@ -57,9 +57,10 @@ import java.util.Random;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringReadData;
-import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowStringData;
+import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringWriteData;
 
 import com.google.common.base.Utf8;
 

@@ -59,9 +59,10 @@ import java.util.Random;
 
 import org.junit.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
-import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryWriteData;
 import org.knime.core.table.io.ReadableDataInputStream;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;

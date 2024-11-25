@@ -46,7 +46,7 @@
  * History
  *   Oct 13, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -65,10 +65,9 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Struct;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.NestedDictionaryProvider;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;

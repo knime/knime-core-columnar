@@ -56,6 +56,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+
 /**
  * A class describing the version of a {@link ArrowColumnDataFactory}. The version consists of an integer number and a
  * list of versions for eventual children of the factory.

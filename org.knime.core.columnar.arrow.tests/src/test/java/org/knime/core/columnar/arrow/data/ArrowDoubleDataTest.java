@@ -52,9 +52,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleReadData;
-import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowDoubleData;
+import org.knime.core.columnar.arrow.data.old.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowDoubleData.ArrowDoubleReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowDoubleData.ArrowDoubleWriteData;
 
 /**
  * Test {@link ArrowDoubleData}

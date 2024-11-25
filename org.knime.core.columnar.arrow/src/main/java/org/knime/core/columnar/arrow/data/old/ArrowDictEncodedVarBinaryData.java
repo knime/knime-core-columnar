@@ -46,7 +46,7 @@
  * History
  *   Aug 11, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,14 +55,13 @@ import java.util.function.LongSupplier;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedDataFactory;
-import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedReadData;
-import org.knime.core.columnar.arrow.data.AbstractArrowDictEncodedData.AbstractArrowDictEncodedWriteData;
-import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
-import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
-import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowDictEncodedData.AbstractArrowDictEncodedDataFactory;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowDictEncodedData.AbstractArrowDictEncodedReadData;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowDictEncodedData.AbstractArrowDictEncodedWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowStructData.ArrowStructReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowStructData.ArrowStructWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;

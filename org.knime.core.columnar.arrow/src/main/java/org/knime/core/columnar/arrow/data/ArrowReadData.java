@@ -64,5 +64,6 @@ public interface ArrowReadData extends NullableReadData {
      * @param length the length of the slice
      * @return the sliced data
      */
-    ArrowReadData slice(int start, int length);
+    // TODO(onheap-arrow): slice is needed for lists, right??
+    //    ArrowReadData slice(int start, int length);
 }

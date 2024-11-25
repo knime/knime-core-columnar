@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;

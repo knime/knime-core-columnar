@@ -46,7 +46,7 @@
  * History
  *   Aug 11, 2021 (Carsten Haubold, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.util.HashMap;
 import java.util.Objects;
@@ -56,14 +56,13 @@ import java.util.function.LongSupplier;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
-import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
-import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowUnsignedIntData.ArrowUnsignedIntDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowStructData.ArrowStructDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowStructData.ArrowStructReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowStructData.ArrowStructWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedByteData.ArrowUnsignedByteDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedIntData.ArrowUnsignedIntDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedLongData.ArrowUnsignedLongDataFactory;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;

@@ -50,6 +50,7 @@ import java.io.IOException;
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;

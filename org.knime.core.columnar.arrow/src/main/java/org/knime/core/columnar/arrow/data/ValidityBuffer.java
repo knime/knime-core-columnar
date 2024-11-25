@@ -44,68 +44,82 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 30, 2020 (benjamin): created
+ *   Sep 20, 2024 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntWriteData;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.vector.BitVectorHelper;
 
 /**
- * Test {@link ArrowIntData}
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public class ArrowIntDataTest extends AbstractArrowDataTest<ArrowIntWriteData, ArrowIntReadData> {
+final class ValidityBuffer {
 
-    /** Create the test for {@link ArrowIntData} */
-    public ArrowIntDataTest() {
-        super(ArrowIntDataFactory.INSTANCE);
+    // TODO(min-performance) implement in a more efficient way (only one bit per value)
+    private boolean[] m_validity;
+
+    public static long usedSizeFor(final int capacity) {
+        return capacity;
     }
 
-    @Override
-    protected ArrowIntWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowIntWriteData);
-        return (ArrowIntWriteData)o;
+    /**
+     * Creates a new validity buffer with the given capacity.
+     *
+     * @param capacity the capacity of the validity buffer
+     */
+    public ValidityBuffer(final int capacity) {
+        m_validity = new boolean[capacity];
     }
 
-    @Override
-    protected ArrowIntReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowIntReadData);
-        return (ArrowIntReadData)o;
+    /**
+     * Sets the validity of the value at the given index.
+     *
+     * @param index the index of the value
+     * @param b the validity of the value
+     */
+    public void set(final int index, final boolean b) {
+        m_validity[index] = b;
     }
 
-    @Override
-    protected void setValue(final ArrowIntWriteData data, final int index, final int seed) {
-        data.setInt(index, seed);
+    /**
+     * @param index the index of the value
+     * @return the validity of the value at the given index
+     */
+    public boolean isSet(final int index) {
+        return m_validity[index];
     }
 
-    @Override
-    protected void checkValue(final ArrowIntReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getInt(index));
+    /**
+     * Expands or shrinks the validity buffer to the given capacity.
+     *
+     * @param numElements the new capacity
+     */
+    public void setNumElements(final int numElements) {
+        var newValidity = new boolean[numElements];
+        System.arraycopy(m_validity, 0, newValidity, 0, Math.min(numElements, m_validity.length));
+        m_validity = newValidity;
     }
 
-    @Override
-    protected boolean isReleasedW(final ArrowIntWriteData data) {
-        return data.m_vector == null;
+    /**
+     * @return the size of the validity buffer in bytes
+     */
+    public long sizeOf() {
+        // TODO be more efficient
+        return m_validity.length;
     }
 
-    @Override
-    @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowIntReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+    public void copyTo(final ArrowBuf validityBuffer) {
+        for (int i = 0; i < m_validity.length; i++) {
+            BitVectorHelper.setValidityBit(validityBuffer, i, m_validity[i] ? 1 : 0);
+        }
     }
 
-    @Override
-    protected long getMinSize(final int valueCount, final int capacity) {
-        return 4 * capacity // 4 bytes per value for data
-            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    public static ValidityBuffer createFrom(final ArrowBuf validityBuffer, final int length) {
+        var validity = new ValidityBuffer(length);
+        for (int i = 0; i < length; i++) {
+            validity.set(i, BitVectorHelper.get(validityBuffer, i) == 1);
+        }
+        return validity;
     }
 }

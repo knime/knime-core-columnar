@@ -42,155 +42,135 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   Nov 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BaseVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.Float4Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.StringData.StringReadData;
-import org.knime.core.columnar.data.StringData.StringWriteData;
-import org.knime.core.table.util.StringEncoder;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.data.FloatData.FloatReadData;
+import org.knime.core.columnar.data.FloatData.FloatWriteData;
 
 /**
- * Arrow implementation of {@link StringWriteData} and {@link StringReadData}.
+ * Arrow implementation of {@link FloatWriteData} and {@link FloatReadData}.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowStringData {
+public final class ArrowFloatData {
 
-    /**
-     * The initial number of bytes allocated for each element. 32 is a good estimate for UTF-8 encoded Strings and more
-     * memory is allocated when needed.
-     */
-    private static final long INITAL_BYTES_PER_ELEMENT = 32;
-
-    private ArrowStringData() {
+    private ArrowFloatData() {
     }
 
-    /** Arrow implementation of {@link StringReadData}. */
-    public static final class ArrowStringWriteData extends AbstractArrowWriteData<VarCharVector>
-        implements StringWriteData {
+    /** Arrow implementation of {@link FloatWriteData}. */
+    public static final class ArrowFloatWriteData extends AbstractArrowWriteData<Float4Vector>
+        implements FloatWriteData {
 
-        private StringEncoder m_encoder = new StringEncoder();
-
-        private ArrowStringWriteData(final VarCharVector vector) {
+        private ArrowFloatWriteData(final Float4Vector vector) {
             super(vector);
         }
 
-        private ArrowStringWriteData(final VarCharVector vector, final int offset) {
+        private ArrowFloatWriteData(final Float4Vector vector, final int offset) {
             super(vector, offset);
         }
 
         @Override
-        public void setString(final int index, final String val) {
-            final ByteBuffer encoded = m_encoder.encode(val);
-            m_vector.setSafe(m_offset + index, encoded, 0, encoded.limit());
+        public void setFloat(final int index, final float val) {
+            m_vector.set(m_offset + index, val);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowStringWriteData(m_vector, m_offset + start);
+            return new ArrowFloatWriteData(m_vector, m_offset + start);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
         }
 
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowStringReadData close(final int length) {
-            final VarCharVector vector = closeWithLength(length);
-            return new ArrowStringReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+        public ArrowFloatReadData close(final int length) {
+            final Float4Vector vector = closeWithLength(length);
+            return new ArrowFloatReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
-    /** Arrow implementation of {@link StringReadData}. */
-    public static final class ArrowStringReadData extends AbstractArrowReadData<VarCharVector>
-        implements StringReadData {
+    /** Arrow implementation of {@link FloatReadData}. */
+    public static final class ArrowFloatReadData extends AbstractArrowReadData<Float4Vector> implements FloatReadData {
 
-        private final StringEncoder m_decoder = new StringEncoder();
-
-        private ArrowStringReadData(final VarCharVector vector, final MissingValues missingValues) {
+        private ArrowFloatReadData(final Float4Vector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
 
-        private ArrowStringReadData(final VarCharVector vector, final MissingValues missingValues, final int offset,
+        private ArrowFloatReadData(final Float4Vector vector, final MissingValues missingValues, final int offset,
             final int length) {
             super(vector, missingValues, offset, length);
         }
 
         @Override
-        public String getString(final int index) {
-            return m_decoder.decode(m_vector.get(m_offset + index));
+        public float getFloat(final int index) {
+            return m_vector.get(m_offset + index);
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowStringReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowFloatReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
         }
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowStringData} */
-    public static final class ArrowStringDataFactory extends AbstractArrowColumnDataFactory {
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowFloatData} */
+    public static final class ArrowFloatDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowStringDataFactory} */
-        public static final ArrowStringDataFactory INSTANCE = new ArrowStringDataFactory();
+        /** Singleton instance of {@link ArrowFloatDataFactory} */
+        public static final ArrowFloatDataFactory INSTANCE = new ArrowFloatDataFactory();
 
-        private ArrowStringDataFactory() {
+        private ArrowFloatDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.VARCHAR.getType());
+            return Field.nullable(name, MinorType.FLOAT4.getType());
         }
 
         @Override
-        public ArrowStringWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowFloatWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            final VarCharVector v = (VarCharVector)vector;
-            v.allocateNew(INITAL_BYTES_PER_ELEMENT * capacity, capacity);
-            return new ArrowStringWriteData(v);
+            final Float4Vector v = (Float4Vector)vector;
+            v.allocateNew(capacity);
+            return new ArrowFloatWriteData(v);
         }
 
         @Override
-        public ArrowStringReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowFloatReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowStringReadData((VarCharVector)vector,
+                return new ArrowFloatReadData((Float4Vector)vector,
                     MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
-                    "Cannot read ArrowStringData with version " + version + ". Current version: " + m_version + ".");
+                    "Cannot read ArrowFloatData with version " + version + ". Current version: " + m_version + ".");
             }
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return (int)INITAL_BYTES_PER_ELEMENT // data buffer
-                + BaseVariableWidthVector.OFFSET_WIDTH // offset buffer
-                + 1; // validity bit
+            return Float4Vector.TYPE_WIDTH + 1; // +1 for validity
         }
     }
 }

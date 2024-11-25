@@ -77,6 +77,7 @@ import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory
 import org.knime.core.columnar.arrow.ArrowTestUtils.SimpleData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.SimpleDataFactory;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
 import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
