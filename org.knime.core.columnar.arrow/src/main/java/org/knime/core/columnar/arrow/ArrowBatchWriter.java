@@ -152,7 +152,7 @@ class ArrowBatchWriter implements BatchWriter {
             // here because we are creating so many small objects when we have tables with lots (100_000s) of columns.
             // The row based backend behaves better in that scenario, unfortunately. It can handle 4x more columns with
             // the same amount of heap memory.
-            chunk[i] = ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, capacity);
+            chunk[i] = m_factories[i].createWrite(capacity);
         }
         return new DefaultWriteBatch(chunk);
     }
@@ -172,6 +172,8 @@ class ArrowBatchWriter implements BatchWriter {
             throw new IllegalStateException("Cannot write batch after closing the writer.");
         }
 
+        // TODO create sub-allocator and release it after writing the batch
+
         final List<Field> fields = new ArrayList<>(m_factories.length);
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
@@ -181,7 +183,7 @@ class ArrowBatchWriter implements BatchWriter {
             final NullableReadData data = batch.get(i);
             final ArrowColumnDataFactory factory = m_factories[i];
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-            final FieldVector vector = factory.getVector(data);
+            final FieldVector vector = factory.getVector(data, String.valueOf(i), m_allocator);
             final DictionaryProvider dictionaries = factory.getDictionaries(data);
             final Field field = vector.getField();
 

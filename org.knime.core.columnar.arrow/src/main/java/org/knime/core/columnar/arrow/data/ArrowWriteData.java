@@ -67,7 +67,8 @@ public interface ArrowWriteData extends NullableWriteData {
      * @param start the first index of the slice
      * @return the sliced data
      */
-    ArrowWriteData slice(int start);
+    // TODO(onheap-arrow): slice is needed for lists, right??
+    //    ArrowWriteData slice(int start);
 
     /**
      * {@inheritDoc}

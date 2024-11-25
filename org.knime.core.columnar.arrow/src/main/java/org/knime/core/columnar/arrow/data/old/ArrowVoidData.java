@@ -46,7 +46,7 @@
  * History
  *   Sep 24, 2020 (dietzc): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.function.LongSupplier;
@@ -58,7 +58,6 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.VoidData.VoidReadData;

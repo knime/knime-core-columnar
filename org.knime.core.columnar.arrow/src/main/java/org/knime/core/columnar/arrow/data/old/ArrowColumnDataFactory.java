@@ -43,7 +43,7 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -52,8 +52,8 @@ import java.util.function.LongSupplier;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.knime.core.columnar.arrow.data.ArrowReadData;
-import org.knime.core.columnar.arrow.data.ArrowWriteData;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 
@@ -84,12 +84,28 @@ public interface ArrowColumnDataFactory {
     // ===================== Creating new ColumnWriteData =====================
 
     /**
+     * Get the Arrow {@link Field} describing the vector of the data object.
+     *
+     * @param name the name of the field
+     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
+     *            from this supplier. Other ids might be used already in the parent data object.
+     * @return the Arrow description for the vector type
+     */
+    Field getField(String name, LongSupplier dictionaryIdSupplier);
+
+    /**
      * Create an empty column data for writing.
      *
+     * @param vector the empty vector with the type according to {@link #getField(String, LongSupplier)}.
+     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
+     *            from this supplier. Other ids might be used already in the parent data object. Also take as many
+     *            dictionary ids from the supplier as in {@link #getField(String, LongSupplier)}.
+     * @param allocator the allocator used for memory allocation of dictionary vectors
      * @param capacity the initial capacity to allocate
      * @return the {@link NullableWriteData}
      */
-    ArrowWriteData createWrite(int capacity);
+    ArrowWriteData createWrite(FieldVector vector, LongSupplier dictionaryIdSupplier, BufferAllocator allocator,
+        int capacity);
 
     // ===================== Reading ColumnReadData ===========================
 
@@ -110,11 +126,9 @@ public interface ArrowColumnDataFactory {
 
     /**
      * @param data a column data holding some values
-     * @param name the name of the vector
-     * @param allocator the allocator to allocate memory
      * @return a {@link FieldVector} which should be written to disk
      */
-    FieldVector getVector(NullableReadData data, String name, BufferAllocator allocator);
+    FieldVector getVector(NullableReadData data);
 
     /**
      * @param data a column data holding some values
@@ -137,7 +151,25 @@ public interface ArrowColumnDataFactory {
         return id::getAndIncrement;
     }
 
-    // TODO extract into own file
+    /**
+     * Utility method to create a new instance of {@link NullableWriteData} with a newly allocated vector. First creates a
+     * field using {@link #getField(String, LongSupplier)}. Then allocates a new vector for this field and creates the
+     * {@link NullableWriteData} using {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}.
+     *
+     * @param factory the factory to create the column data
+     * @param name the name of the vector
+     * @param allocator the allocator to allocate memory
+     * @param capacity the capacity of the data
+     * @return a new {@link NullableWriteData} object
+     */
+    @SuppressWarnings("resource") // Vector resource handled by ColumnWriteData
+    public static NullableWriteData createWrite(final ArrowColumnDataFactory factory, final String name,
+        final BufferAllocator allocator, final int capacity) {
+        final Field field = factory.getField(name, newDictionaryIdSupplier());
+        final FieldVector vector = field.createVector(allocator);
+        return factory.createWrite(vector, newDictionaryIdSupplier(), allocator, capacity);
+    }
+
     /** A class holding the null count for a vector and its children. */
     public static final class ArrowVectorNullCount {
 

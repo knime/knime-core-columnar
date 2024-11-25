@@ -57,12 +57,13 @@ import java.util.Random;
 import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListReadData;
-import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListWriteData;
-import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
-import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowListData;
+import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryWriteData;
 
 /**
  * Test {@link ArrowListData} with a list consisting of integer values.

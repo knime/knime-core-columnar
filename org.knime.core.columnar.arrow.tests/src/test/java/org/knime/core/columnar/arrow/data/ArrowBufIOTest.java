@@ -54,8 +54,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.knime.core.columnar.arrow.data.ArrowBufIO.deserialize;
-import static org.knime.core.columnar.arrow.data.ArrowBufIO.serialize;
+import static org.knime.core.columnar.arrow.data.old.ArrowBufIO.deserialize;
+import static org.knime.core.columnar.arrow.data.old.ArrowBufIO.serialize;
 
 import java.io.EOFException;
 

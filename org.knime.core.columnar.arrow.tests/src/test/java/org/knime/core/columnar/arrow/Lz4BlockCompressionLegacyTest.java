@@ -60,6 +60,7 @@ import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;

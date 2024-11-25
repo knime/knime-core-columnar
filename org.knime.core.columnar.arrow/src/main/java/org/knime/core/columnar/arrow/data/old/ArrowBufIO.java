@@ -46,7 +46,7 @@
  * History
  *   Oct 17, 2020 (dietzc): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.DataInput;
 import java.io.DataOutput;

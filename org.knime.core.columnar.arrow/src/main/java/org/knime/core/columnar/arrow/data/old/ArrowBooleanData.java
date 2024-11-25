@@ -43,54 +43,53 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.Float4Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.FloatData.FloatReadData;
-import org.knime.core.columnar.data.FloatData.FloatWriteData;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.data.BooleanData.BooleanReadData;
+import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
 
 /**
- * Arrow implementation of {@link FloatWriteData} and {@link FloatReadData}.
+ * Arrow implementation of {@link BooleanWriteData} and {@link BooleanReadData}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowFloatData {
+public final class ArrowBooleanData {
 
-    private ArrowFloatData() {
+    private ArrowBooleanData() {
     }
 
-    /** Arrow implementation of {@link FloatWriteData}. */
-    public static final class ArrowFloatWriteData extends AbstractArrowWriteData<Float4Vector>
-        implements FloatWriteData {
+    /** Arrow implementation of {@link BooleanWriteData}. */
+    public static final class ArrowBooleanWriteData extends AbstractArrowWriteData<BitVector>
+        implements BooleanWriteData {
 
-        private ArrowFloatWriteData(final Float4Vector vector) {
+        private ArrowBooleanWriteData(final BitVector vector) {
             super(vector);
         }
 
-        private ArrowFloatWriteData(final Float4Vector vector, final int offset) {
+        private ArrowBooleanWriteData(final BitVector vector, final int offset) {
             super(vector, offset);
         }
 
         @Override
-        public void setFloat(final int index, final float val) {
-            m_vector.set(m_offset + index, val);
+        public void setBoolean(final int index, final boolean val) {
+            m_vector.set(m_offset + index, val ? 1 : 0);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowFloatWriteData(m_vector, m_offset + start);
+            return new ArrowBooleanWriteData(m_vector, m_offset + start);
         }
 
         @Override
@@ -100,32 +99,33 @@ public final class ArrowFloatData {
 
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowFloatReadData close(final int length) {
-            final Float4Vector vector = closeWithLength(length);
-            return new ArrowFloatReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+        public ArrowBooleanReadData close(final int length) {
+            final BitVector vector = closeWithLength(length);
+            return new ArrowBooleanReadData(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
-    /** Arrow implementation of {@link FloatReadData}. */
-    public static final class ArrowFloatReadData extends AbstractArrowReadData<Float4Vector> implements FloatReadData {
+    /** Arrow implementation of {@link BooleanReadData}. */
+    public static final class ArrowBooleanReadData extends AbstractArrowReadData<BitVector> implements BooleanReadData {
 
-        private ArrowFloatReadData(final Float4Vector vector, final MissingValues missingValues) {
+        private ArrowBooleanReadData(final BitVector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
 
-        private ArrowFloatReadData(final Float4Vector vector, final MissingValues missingValues, final int offset,
+        private ArrowBooleanReadData(final BitVector vector, final MissingValues missingValues, final int offset,
             final int length) {
             super(vector, missingValues, offset, length);
         }
 
         @Override
-        public float getFloat(final int index) {
-            return m_vector.get(m_offset + index);
+        public boolean getBoolean(final int index) {
+            return m_vector.get(m_offset + index) != 0;
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowFloatReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowBooleanReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -134,44 +134,44 @@ public final class ArrowFloatData {
         }
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowFloatData} */
-    public static final class ArrowFloatDataFactory extends AbstractArrowColumnDataFactory {
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowBooleanData} */
+    public static final class ArrowBooleanDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowFloatDataFactory} */
-        public static final ArrowFloatDataFactory INSTANCE = new ArrowFloatDataFactory();
+        /** Singleton instance of {@link ArrowBooleanDataFactory} */
+        public static final ArrowBooleanDataFactory INSTANCE = new ArrowBooleanDataFactory();
 
-        private ArrowFloatDataFactory() {
+        private ArrowBooleanDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.FLOAT4.getType());
+            return Field.nullable(name, MinorType.BIT.getType());
         }
 
         @Override
-        public ArrowFloatWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowBooleanWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            final Float4Vector v = (Float4Vector)vector;
+            final BitVector v = (BitVector)vector;
             v.allocateNew(capacity);
-            return new ArrowFloatWriteData(v);
+            return new ArrowBooleanWriteData(v);
         }
 
         @Override
-        public ArrowFloatReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowBooleanReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowFloatReadData((Float4Vector)vector,
+                return new ArrowBooleanReadData((BitVector)vector,
                     MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
-                    "Cannot read ArrowFloatData with version " + version + ". Current version: " + m_version + ".");
+                    "Cannot read ArrowBooleanData with version " + version + ". Current version: " + m_version + ".");
             }
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return Float4Vector.TYPE_WIDTH + 1; // +1 for validity
+            return 1; // one bit validity, one bit value is less than a byte, but it's a good estimate
         }
     }
 }

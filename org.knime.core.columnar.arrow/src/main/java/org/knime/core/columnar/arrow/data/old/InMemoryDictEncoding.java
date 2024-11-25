@@ -46,7 +46,7 @@
  * History
  *   Nov 9, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;

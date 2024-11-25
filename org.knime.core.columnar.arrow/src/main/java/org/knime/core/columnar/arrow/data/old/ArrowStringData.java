@@ -42,152 +42,154 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.BaseVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.UInt1Vector;
+import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.ByteData.ByteReadData;
-import org.knime.core.columnar.data.ByteData.ByteWriteData;
-import org.knime.core.table.schema.DataSpec;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
+import org.knime.core.table.util.StringEncoder;
 
 /**
- * Arrow implementation of {@link ByteWriteData} and {@link ByteReadData} representing unsigned values.
+ * Arrow implementation of {@link StringWriteData} and {@link StringReadData}.
  *
- * Only to represent dictionary keys where we want to use the full range of 8 bits for non-negative numbers. There is no
- * {@link DataSpec} available for unsigned bytes, because Java does not support these as primitive types.
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
- * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-final class ArrowUnsignedByteData {
+public final class ArrowStringData {
 
-    private ArrowUnsignedByteData() {
+    /**
+     * The initial number of bytes allocated for each element. 32 is a good estimate for UTF-8 encoded Strings and more
+     * memory is allocated when needed.
+     */
+    private static final long INITAL_BYTES_PER_ELEMENT = 32;
+
+    private ArrowStringData() {
     }
 
-    /** Arrow implementation of unsigned {@link ByteWriteData}. */
-    public static final class ArrowUnsignedByteWriteData extends AbstractArrowWriteData<UInt1Vector>
-        implements ByteWriteData {
+    /** Arrow implementation of {@link StringReadData}. */
+    public static final class ArrowStringWriteData extends AbstractArrowWriteData<VarCharVector>
+        implements StringWriteData {
 
-        private ArrowUnsignedByteWriteData(final UInt1Vector vector) {
+        private StringEncoder m_encoder = new StringEncoder();
+
+        private ArrowStringWriteData(final VarCharVector vector) {
             super(vector);
         }
 
-        private ArrowUnsignedByteWriteData(final UInt1Vector vector, final int offset) {
+        private ArrowStringWriteData(final VarCharVector vector, final int offset) {
             super(vector, offset);
         }
 
-        /**
-         * The signed byte value will be interpreted as unsigned byte, meaning all negative values will be mapped to
-         * values larger than {@link Byte#MAX_VALUE}.
-         */
         @Override
-        public void setByte(final int index, final byte val) {
-            m_vector.set(m_offset + index, val);
+        public void setString(final int index, final String val) {
+            final ByteBuffer encoded = m_encoder.encode(val);
+            m_vector.setSafe(m_offset + index, encoded, 0, encoded.limit());
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowUnsignedByteWriteData(m_vector, m_offset + start);
+            return new ArrowStringWriteData(m_vector, m_offset + start);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
         }
 
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowUnsignedByteReadData close(final int length) {
-            final UInt1Vector vector = closeWithLength(length);
-            return new ArrowUnsignedByteReadData(vector,
-                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+        public ArrowStringReadData close(final int length) {
+            final VarCharVector vector = closeWithLength(length);
+            return new ArrowStringReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
-    /** Arrow implementation of unsigned {@link ByteReadData}. */
-    public static final class ArrowUnsignedByteReadData extends AbstractArrowReadData<UInt1Vector>
-        implements ByteReadData {
+    /** Arrow implementation of {@link StringReadData}. */
+    public static final class ArrowStringReadData extends AbstractArrowReadData<VarCharVector>
+        implements StringReadData {
 
-        private ArrowUnsignedByteReadData(final UInt1Vector vector, final MissingValues missingValues) {
+        private final StringEncoder m_decoder = new StringEncoder();
+
+        private ArrowStringReadData(final VarCharVector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
 
-        private ArrowUnsignedByteReadData(final UInt1Vector vector, final MissingValues missingValues, final int offset,
+        private ArrowStringReadData(final VarCharVector vector, final MissingValues missingValues, final int offset,
             final int length) {
             super(vector, missingValues, offset, length);
         }
 
-        /**
-         * The underlying unsigned byte value will be interpreted as signed byte, such that values larger than
-         * {@link Byte#MAX_VALUE} will be returned as negative numbers.
-         */
         @Override
-        public byte getByte(final int index) {
-            return m_vector.get(m_offset + index);
+        public String getString(final int index) {
+            return m_decoder.decode(m_vector.get(m_offset + index));
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowUnsignedByteReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowStringReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
         }
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowUnsignedByteData} */
-    @SuppressWarnings("javadoc")
-    public static final class ArrowUnsignedByteDataFactory extends AbstractArrowColumnDataFactory {
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowStringData} */
+    public static final class ArrowStringDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowUnsignedByteDataFactory} */
-        public static final ArrowUnsignedByteDataFactory INSTANCE = new ArrowUnsignedByteDataFactory();
+        /** Singleton instance of {@link ArrowStringDataFactory} */
+        public static final ArrowStringDataFactory INSTANCE = new ArrowStringDataFactory();
 
-        private ArrowUnsignedByteDataFactory() {
+        private ArrowStringDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.UINT1.getType());
+            return Field.nullable(name, MinorType.VARCHAR.getType());
         }
 
         @Override
-        public ArrowUnsignedByteWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowStringWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            final UInt1Vector v = (UInt1Vector)vector;
-            v.allocateNew(capacity);
-            return new ArrowUnsignedByteWriteData(v);
+            final VarCharVector v = (VarCharVector)vector;
+            v.allocateNew(INITAL_BYTES_PER_ELEMENT * capacity, capacity);
+            return new ArrowStringWriteData(v);
         }
 
         @Override
-        public ArrowUnsignedByteReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowStringReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowUnsignedByteReadData((UInt1Vector)vector,
+                return new ArrowStringReadData((VarCharVector)vector,
                     MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
-                throw new IOException("Cannot read ArrowUnsignedByteData with version " + version
-                    + ". Current version: " + m_version + ".");
+                throw new IOException(
+                    "Cannot read ArrowStringData with version " + version + ". Current version: " + m_version + ".");
             }
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return UInt1Vector.TYPE_WIDTH + 1; // +1 for validity
+            return (int)INITAL_BYTES_PER_ELEMENT // data buffer
+                + BaseVariableWidthVector.OFFSET_WIDTH // offset buffer
+                + 1; // validity bit
         }
     }
 }

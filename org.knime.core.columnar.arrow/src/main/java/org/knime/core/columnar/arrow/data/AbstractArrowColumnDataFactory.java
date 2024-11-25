@@ -50,7 +50,6 @@ package org.knime.core.columnar.arrow.data;
 
 import java.util.Objects;
 
-import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
@@ -77,11 +76,6 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
      */
     protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
         m_version = version;
-    }
-
-    @Override
-    public FieldVector getVector(final NullableReadData data) {
-        return ((AbstractArrowReadData<?>)data).m_vector;
     }
 
     @Override

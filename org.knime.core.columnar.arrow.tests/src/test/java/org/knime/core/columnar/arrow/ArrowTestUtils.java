@@ -80,10 +80,12 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.arrow.data.ArrowReadData;
-import org.knime.core.columnar.arrow.data.ArrowWriteData;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
+import org.knime.core.columnar.onheap.ArrowVectorNullCount;
 import org.knime.core.columnar.store.FileHandle;
 
 /**

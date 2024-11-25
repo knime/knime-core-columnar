@@ -43,63 +43,52 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.UInt8Vector;
+import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.LongData.LongReadData;
-import org.knime.core.columnar.data.LongData.LongWriteData;
-import org.knime.core.table.schema.DataSpec;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
 
 /**
- * Arrow implementation of {@link LongWriteData} and {@link LongReadData} representing unsigned values.
- *
- * Only to represent dictionary keys where we want to use the full range of 64 bits for non-negative numbers. There is
- * no {@link DataSpec} available for unsigned longs, because Java does not support these as primitive types.
+ * Arrow implementation of {@link IntWriteData} and {@link IntReadData}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
- * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-final class ArrowUnsignedLongData {
+public final class ArrowIntData {
 
-    private ArrowUnsignedLongData() {
+    private ArrowIntData() {
     }
 
-    /** Arrow implementation of unsigned {@link LongWriteData}. */
-    public static final class ArrowUnsignedLongWriteData extends AbstractArrowWriteData<UInt8Vector>
-        implements LongWriteData {
+    /** Arrow implementation of {@link IntWriteData}. */
+    public static final class ArrowIntWriteData extends AbstractArrowWriteData<IntVector> implements IntWriteData {
 
-        private ArrowUnsignedLongWriteData(final UInt8Vector vector) {
+        private ArrowIntWriteData(final IntVector vector) {
             super(vector);
         }
 
-        private ArrowUnsignedLongWriteData(final UInt8Vector vector, final int offset) {
+        private ArrowIntWriteData(final IntVector vector, final int offset) {
             super(vector, offset);
         }
 
-        /**
-         * The signed long value will be interpreted as unsigned long, meaning all negative values will be mapped to
-         * values larger than {@link Long#MAX_VALUE}.
-         */
         @Override
-        public void setLong(final int index, final long val) {
+        public void setInt(final int index, final int val) {
             m_vector.set(m_offset + index, val);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowUnsignedLongWriteData(m_vector, m_offset + start);
+            return new ArrowIntWriteData(m_vector, m_offset + start);
         }
 
         @Override
@@ -109,38 +98,32 @@ final class ArrowUnsignedLongData {
 
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowUnsignedLongReadData close(final int length) {
-            final UInt8Vector vector = closeWithLength(length);
-            return new ArrowUnsignedLongReadData(vector,
-                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+        public ArrowIntReadData close(final int length) {
+            final IntVector vector = closeWithLength(length);
+            return new ArrowIntReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
-    /** Arrow implementation of unsigned {@link LongReadData}. */
-    public static final class ArrowUnsignedLongReadData extends AbstractArrowReadData<UInt8Vector>
-        implements LongReadData {
+    /** Arrow implementation of {@link IntReadData}. */
+    public static final class ArrowIntReadData extends AbstractArrowReadData<IntVector> implements IntReadData {
 
-        private ArrowUnsignedLongReadData(final UInt8Vector vector, final MissingValues missingValues) {
+        private ArrowIntReadData(final IntVector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
 
-        private ArrowUnsignedLongReadData(final UInt8Vector vector, final MissingValues missingValues, final int offset,
+        private ArrowIntReadData(final IntVector vector, final MissingValues missingValues, final int offset,
             final int length) {
             super(vector, missingValues, offset, length);
         }
 
-        /**
-         * The underlying unsigned long value will be interpreted as signed long, such that values larger than
-         * {@link Long#MAX_VALUE} will be returned as negative numbers.
-         */
         @Override
-        public long getLong(final int index) {
+        public int getInt(final int index) {
             return m_vector.get(m_offset + index);
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowUnsignedLongReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowIntReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -149,45 +132,44 @@ final class ArrowUnsignedLongData {
         }
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowUnsignedLongData} */
-    @SuppressWarnings("javadoc")
-    public static final class ArrowUnsignedLongDataFactory extends AbstractArrowColumnDataFactory {
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowIntData} */
+    public static final class ArrowIntDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowUnsignedLongDataFactory} */
-        public static final ArrowUnsignedLongDataFactory INSTANCE = new ArrowUnsignedLongDataFactory();
+        /** Singleton instance of {@link ArrowIntDataFactory} */
+        public static final ArrowIntDataFactory INSTANCE = new ArrowIntDataFactory();
 
-        private ArrowUnsignedLongDataFactory() {
+        private ArrowIntDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.UINT8.getType());
+            return Field.nullable(name, MinorType.INT.getType());
         }
 
         @Override
-        public ArrowUnsignedLongWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowIntWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            final UInt8Vector v = (UInt8Vector)vector;
+            final IntVector v = (IntVector)vector;
             v.allocateNew(capacity);
-            return new ArrowUnsignedLongWriteData(v);
+            return new ArrowIntWriteData(v);
         }
 
         @Override
-        public ArrowUnsignedLongReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowIntReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowUnsignedLongReadData((UInt8Vector)vector,
+                return new ArrowIntReadData((IntVector)vector,
                     MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
-                throw new IOException("Cannot read ArrowUnsignedLongData with version " + version
-                    + ". Current version: " + m_version + ".");
+                throw new IOException(
+                    "Cannot read ArrowIntData with version " + version + ". Current version: " + m_version + ".");
             }
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return UInt8Vector.TYPE_WIDTH + 1; // +1 for validity
+            return IntVector.TYPE_WIDTH + 1; // +1 for validity
         }
     }
 }

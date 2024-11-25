@@ -43,54 +43,62 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.UInt4Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.BooleanData.BooleanReadData;
-import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
+import org.knime.core.table.schema.DataSpec;
 
 /**
- * Arrow implementation of {@link BooleanWriteData} and {@link BooleanReadData}.
+ * Arrow implementation of {@link IntWriteData} and {@link IntReadData} representing unsigned values.
+ *
+ * Only to represent dictionary keys where we want to use the full range of 32 bits for non-negative numbers. There is
+ * no {@link DataSpec} available for unsigned integers, because Java does not support these as primitive types.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowBooleanData {
+final class ArrowUnsignedIntData {
 
-    private ArrowBooleanData() {
+    private ArrowUnsignedIntData() {
     }
 
-    /** Arrow implementation of {@link BooleanWriteData}. */
-    public static final class ArrowBooleanWriteData extends AbstractArrowWriteData<BitVector>
-        implements BooleanWriteData {
+    /** Arrow implementation of unsigned {@link IntWriteData}. */
+    public static final class ArrowUnsignedIntWriteData extends AbstractArrowWriteData<UInt4Vector>
+        implements IntWriteData {
 
-        private ArrowBooleanWriteData(final BitVector vector) {
+        private ArrowUnsignedIntWriteData(final UInt4Vector vector) {
             super(vector);
         }
 
-        private ArrowBooleanWriteData(final BitVector vector, final int offset) {
+        private ArrowUnsignedIntWriteData(final UInt4Vector vector, final int offset) {
             super(vector, offset);
         }
 
+        /**
+         * The signed integer value will be interpreted as unsigned int, meaning all negative values will be mapped to
+         * values larger than {@link Integer#MAX_VALUE}.
+         */
         @Override
-        public void setBoolean(final int index, final boolean val) {
-            m_vector.set(m_offset + index, val ? 1 : 0);
+        public void setInt(final int index, final int val) {
+            m_vector.set(m_offset + index, val);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowBooleanWriteData(m_vector, m_offset + start);
+            return new ArrowUnsignedIntWriteData(m_vector, m_offset + start);
         }
 
         @Override
@@ -100,33 +108,38 @@ public final class ArrowBooleanData {
 
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowBooleanReadData close(final int length) {
-            final BitVector vector = closeWithLength(length);
-            return new ArrowBooleanReadData(vector,
+        public ArrowUnsignedIntReadData close(final int length) {
+            final UInt4Vector vector = closeWithLength(length);
+            return new ArrowUnsignedIntReadData(vector,
                 MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
-    /** Arrow implementation of {@link BooleanReadData}. */
-    public static final class ArrowBooleanReadData extends AbstractArrowReadData<BitVector> implements BooleanReadData {
+    /** Arrow implementation of unsigned {@link IntReadData}. */
+    public static final class ArrowUnsignedIntReadData extends AbstractArrowReadData<UInt4Vector>
+        implements IntReadData {
 
-        private ArrowBooleanReadData(final BitVector vector, final MissingValues missingValues) {
+        private ArrowUnsignedIntReadData(final UInt4Vector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
 
-        private ArrowBooleanReadData(final BitVector vector, final MissingValues missingValues, final int offset,
+        private ArrowUnsignedIntReadData(final UInt4Vector vector, final MissingValues missingValues, final int offset,
             final int length) {
             super(vector, missingValues, offset, length);
         }
 
+        /**
+         * The underlying unsigned int value will be interpreted as signed int, such that values larger than
+         * {@link Integer#MAX_VALUE} will be returned as negative numbers.
+         */
         @Override
-        public boolean getBoolean(final int index) {
-            return m_vector.get(m_offset + index) != 0;
+        public int getInt(final int index) {
+            return m_vector.get(m_offset + index);
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowBooleanReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowUnsignedIntReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -135,44 +148,45 @@ public final class ArrowBooleanData {
         }
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowBooleanData} */
-    public static final class ArrowBooleanDataFactory extends AbstractArrowColumnDataFactory {
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowUnsignedIntData} */
+    @SuppressWarnings("javadoc")
+    public static final class ArrowUnsignedIntDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowBooleanDataFactory} */
-        public static final ArrowBooleanDataFactory INSTANCE = new ArrowBooleanDataFactory();
+        /** Singleton instance of {@link ArrowUnsignedIntDataFactory} */
+        public static final ArrowUnsignedIntDataFactory INSTANCE = new ArrowUnsignedIntDataFactory();
 
-        private ArrowBooleanDataFactory() {
+        private ArrowUnsignedIntDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.BIT.getType());
+            return Field.nullable(name, MinorType.UINT4.getType());
         }
 
         @Override
-        public ArrowBooleanWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowUnsignedIntWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            final BitVector v = (BitVector)vector;
+            final UInt4Vector v = (UInt4Vector)vector;
             v.allocateNew(capacity);
-            return new ArrowBooleanWriteData(v);
+            return new ArrowUnsignedIntWriteData(v);
         }
 
         @Override
-        public ArrowBooleanReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowUnsignedIntReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowBooleanReadData((BitVector)vector,
+                return new ArrowUnsignedIntReadData((UInt4Vector)vector,
                     MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
-                throw new IOException(
-                    "Cannot read ArrowBooleanData with version " + version + ". Current version: " + m_version + ".");
+                throw new IOException("Cannot read ArrowUnsignedIntData with version " + version + ". Current version: "
+                    + m_version + ".");
             }
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return 1; // one bit validity, one bit value is less than a byte, but it's a good estimate
+            return UInt4Vector.TYPE_WIDTH + 1; // +1 for validity
         }
     }
 }

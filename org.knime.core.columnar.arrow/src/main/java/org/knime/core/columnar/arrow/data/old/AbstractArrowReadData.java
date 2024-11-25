@@ -46,7 +46,7 @@
  * History
  *   Nov 4, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BitVectorHelper;
