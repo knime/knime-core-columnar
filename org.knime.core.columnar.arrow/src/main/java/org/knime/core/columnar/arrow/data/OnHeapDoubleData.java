@@ -46,26 +46,29 @@
  * History
  *   Sep 20, 2024 (benjamin): created
  */
-package org.knime.core.columnar.onheap.data;
+package org.knime.core.columnar.arrow.data;
+
+import java.io.IOException;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.util.MemoryUtil;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.data.NullableWriteData;
-import org.knime.core.columnar.onheap.OnHeapDataFactory;
 
 /**
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class OnHeapDoubleData extends AbstractReferencedData implements DoubleReadData, DoubleWriteData {
+public final class OnHeapDoubleData extends AbstractReferencedData
+    implements DoubleReadData, DoubleWriteData, ArrowReadData, ArrowWriteData {
 
-    public static final OnHeapDataFactory FACTORY = new Factory();
+    public static final ArrowColumnDataFactory FACTORY = new Factory();
 
     // or use a ByteBuffer??
     private double[] m_data;
@@ -76,6 +79,11 @@ public final class OnHeapDoubleData extends AbstractReferencedData implements Do
     private OnHeapDoubleData(final int capacity) {
         m_data = new double[capacity];
         m_validity = new ValidityBuffer(capacity);
+    }
+
+    private OnHeapDoubleData(final double[] data, final ValidityBuffer validity) {
+        m_data = data;
+        m_validity = validity;
     }
 
     // ReferenceData
@@ -120,7 +128,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData implements Do
     }
 
     @Override
-    public DoubleReadData close(final int length) {
+    public OnHeapDoubleData close(final int length) {
         setNumElements(length);
         return this;
     }
@@ -154,12 +162,41 @@ public final class OnHeapDoubleData extends AbstractReferencedData implements Do
     }
 
     // TODO extract common functionallity
-    private static final class Factory implements OnHeapDataFactory {
+    private static final class Factory extends AbstractArrowColumnDataFactory {
+
+        private Factory() {
+            super(ArrowColumnDataFactoryVersion.version(0));
+        }
 
         private static final int DOUBLE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(double[].class);
 
         @Override
-        public NullableWriteData createWrite(final int capacity) {
+        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+
+            // TODO what is the null count for???
+
+            if (m_version.equals(version)) {
+                var valueCount = vector.getValueCount();
+                var data = new double[valueCount];
+                MemoryUtil.UNSAFE.copyMemory(//
+                    null, //
+                    vector.getDataBufferAddress(), //
+                    data, //
+                    DOUBLE_ARRAY_BASE_OFFSET, //
+                    data.length * 8 //
+                );
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+                return new OnHeapDoubleData(data, validity);
+            } else {
+                throw new IOException(
+                    "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
+            }
+        }
+
+        @Override
+        public OnHeapDoubleData createWrite(final int capacity) {
             return new OnHeapDoubleData(capacity);
         }
 
@@ -191,19 +228,9 @@ public final class OnHeapDoubleData extends AbstractReferencedData implements Do
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return null;
-        }
-
-        @Override
         public int initialNumBytesPerElement() {
             // TODO Auto-generated method stub
             return 0;
-        }
-
-        @Override
-        public Object getVersion() {
-            return "0";
         }
     }
 }

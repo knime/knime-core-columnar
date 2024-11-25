@@ -52,7 +52,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowVoidData;
+import org.knime.core.columnar.arrow.data.old.ArrowVoidData.ArrowVoidDataFactory;
 
 /**
  * Test {@link ArrowVoidData}

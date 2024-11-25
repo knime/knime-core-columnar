@@ -63,6 +63,7 @@ import org.apache.arrow.vector.ipc.message.ArrowFooter;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializer;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;

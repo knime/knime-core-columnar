@@ -56,12 +56,13 @@ import java.util.Random;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
-import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
-import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListReadData;
-import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowListData;
+import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListWriteData;
 
 /**
  * Test {@link ArrowListData} with a recursive lists.

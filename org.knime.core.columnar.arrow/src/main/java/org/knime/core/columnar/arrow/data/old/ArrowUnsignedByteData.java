@@ -43,46 +43,54 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.TinyIntVector;
+import org.apache.arrow.vector.UInt1Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
+import org.knime.core.table.schema.DataSpec;
 
 /**
- * Arrow implementation of {@link ByteWriteData} and {@link ByteReadData}.
+ * Arrow implementation of {@link ByteWriteData} and {@link ByteReadData} representing unsigned values.
+ *
+ * Only to represent dictionary keys where we want to use the full range of 8 bits for non-negative numbers. There is no
+ * {@link DataSpec} available for unsigned bytes, because Java does not support these as primitive types.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowByteData {
+final class ArrowUnsignedByteData {
 
-    private ArrowByteData() {
+    private ArrowUnsignedByteData() {
     }
 
-    /** Arrow implementation of {@link ByteWriteData}. */
-    public static final class ArrowByteWriteData extends AbstractArrowWriteData<TinyIntVector>
+    /** Arrow implementation of unsigned {@link ByteWriteData}. */
+    public static final class ArrowUnsignedByteWriteData extends AbstractArrowWriteData<UInt1Vector>
         implements ByteWriteData {
 
-        private ArrowByteWriteData(final TinyIntVector vector) {
+        private ArrowUnsignedByteWriteData(final UInt1Vector vector) {
             super(vector);
         }
 
-        private ArrowByteWriteData(final TinyIntVector vector, final int offset) {
+        private ArrowUnsignedByteWriteData(final UInt1Vector vector, final int offset) {
             super(vector, offset);
         }
 
+        /**
+         * The signed byte value will be interpreted as unsigned byte, meaning all negative values will be mapped to
+         * values larger than {@link Byte#MAX_VALUE}.
+         */
         @Override
         public void setByte(final int index, final byte val) {
             m_vector.set(m_offset + index, val);
@@ -90,7 +98,7 @@ public final class ArrowByteData {
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowByteWriteData(m_vector, m_offset + start);
+            return new ArrowUnsignedByteWriteData(m_vector, m_offset + start);
         }
 
         @Override
@@ -100,24 +108,30 @@ public final class ArrowByteData {
 
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowByteReadData close(final int length) {
-            final TinyIntVector vector = closeWithLength(length);
-            return new ArrowByteReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+        public ArrowUnsignedByteReadData close(final int length) {
+            final UInt1Vector vector = closeWithLength(length);
+            return new ArrowUnsignedByteReadData(vector,
+                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
-    /** Arrow implementation of {@link ByteReadData}. */
-    public static final class ArrowByteReadData extends AbstractArrowReadData<TinyIntVector> implements ByteReadData {
+    /** Arrow implementation of unsigned {@link ByteReadData}. */
+    public static final class ArrowUnsignedByteReadData extends AbstractArrowReadData<UInt1Vector>
+        implements ByteReadData {
 
-        private ArrowByteReadData(final TinyIntVector vector, final MissingValues missingValues) {
+        private ArrowUnsignedByteReadData(final UInt1Vector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
 
-        private ArrowByteReadData(final TinyIntVector vector, final MissingValues missingValues, final int offset,
+        private ArrowUnsignedByteReadData(final UInt1Vector vector, final MissingValues missingValues, final int offset,
             final int length) {
             super(vector, missingValues, offset, length);
         }
 
+        /**
+         * The underlying unsigned byte value will be interpreted as signed byte, such that values larger than
+         * {@link Byte#MAX_VALUE} will be returned as negative numbers.
+         */
         @Override
         public byte getByte(final int index) {
             return m_vector.get(m_offset + index);
@@ -125,7 +139,7 @@ public final class ArrowByteData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowByteReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowUnsignedByteReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -134,44 +148,45 @@ public final class ArrowByteData {
         }
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowByteData} */
-    public static final class ArrowByteDataFactory extends AbstractArrowColumnDataFactory {
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowUnsignedByteData} */
+    @SuppressWarnings("javadoc")
+    public static final class ArrowUnsignedByteDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowByteDataFactory} */
-        public static final ArrowByteDataFactory INSTANCE = new ArrowByteDataFactory();
+        /** Singleton instance of {@link ArrowUnsignedByteDataFactory} */
+        public static final ArrowUnsignedByteDataFactory INSTANCE = new ArrowUnsignedByteDataFactory();
 
-        private ArrowByteDataFactory() {
+        private ArrowUnsignedByteDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.TINYINT.getType());
+            return Field.nullable(name, MinorType.UINT1.getType());
         }
 
         @Override
-        public ArrowByteWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowUnsignedByteWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            final TinyIntVector v = (TinyIntVector)vector;
+            final UInt1Vector v = (UInt1Vector)vector;
             v.allocateNew(capacity);
-            return new ArrowByteWriteData(v);
+            return new ArrowUnsignedByteWriteData(v);
         }
 
         @Override
-        public ArrowByteReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowUnsignedByteReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowByteReadData((TinyIntVector)vector,
+                return new ArrowUnsignedByteReadData((UInt1Vector)vector,
                     MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
-                throw new IOException(
-                    "Cannot read ArrowByteData with version " + version + ". Current version: " + m_version + ".");
+                throw new IOException("Cannot read ArrowUnsignedByteData with version " + version
+                    + ". Current version: " + m_version + ".");
             }
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return TinyIntVector.TYPE_WIDTH + 1; // +1 for validity
+            return UInt1Vector.TYPE_WIDTH + 1; // +1 for validity
         }
     }
 }

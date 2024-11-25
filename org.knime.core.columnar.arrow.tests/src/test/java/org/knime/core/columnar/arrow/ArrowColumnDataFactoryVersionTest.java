@@ -57,7 +57,7 @@ import static org.knime.core.table.schema.DataSpecs.LOGICAL_TYPE;
 
 import org.junit.Test;
 import org.knime.core.columnar.arrow.ArrowSchemaMapper.ExtensionArrowColumnDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 
 /**
