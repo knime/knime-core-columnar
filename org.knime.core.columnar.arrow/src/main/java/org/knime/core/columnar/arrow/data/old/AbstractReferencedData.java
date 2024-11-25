@@ -44,59 +44,48 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Nov 4, 2020 (benjamin): created
+ *   Sep 25, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.complex.ListVector;
-import org.apache.arrow.vector.complex.StructVector;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.knime.core.columnar.ReferencedData;
 
 /**
- * Utility class for calculating the size of vectors in memory.
+ * Abstract implementation of {@link ReferencedData} which counts the references in an {@link AtomicInteger} and calls
+ * the a {@link Runnable} if all references have been released.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-final class ArrowSizeUtils {
+abstract class AbstractReferencedData implements ReferencedData {
 
-    private ArrowSizeUtils() {
-        // Utility class
+    private final AtomicInteger m_refCounter = new AtomicInteger(1);
+
+    /**
+     * @return the current amount of references
+     */
+    protected int getReferenceCount() {
+        return m_refCounter.get();
+    }
+
+    @Override
+    public void release() {
+        // NB: This is thread safe because this will only be 0 for 1 thread
+        if (m_refCounter.decrementAndGet() == 0) {
+            closeResources();
+        }
+    }
+
+    @Override
+    public void retain() {
+        if (m_refCounter.getAndUpdate(x -> x > 0 ? x + 1 : x) <= 0) {
+            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
+        }
     }
 
     /**
-     * @param vector with fixed width data (Having a data buffer and a validity buffer)
-     * @return size of the vector in memory
+     * Called when all references have been released. Close all resources.
      */
-    @SuppressWarnings("resource")
-    static long sizeOfFixedWidth(final FieldVector vector) {
-        return vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity();
-    }
-
-    /**
-     * @param vector with variable width data (Having a data buffer, a validity buffer, and an offset buffer)
-     * @return size of the vector in memory
-     */
-    @SuppressWarnings("resource")
-    static long sizeOfVariableWidth(final FieldVector vector) {
-        return vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity()
-            + vector.getOffsetBuffer().capacity();
-    }
-
-    /**
-     * @param vector a list vector
-     * @return size of the vector in memory (not including children)
-     */
-    @SuppressWarnings("resource")
-    static long sizeOfList(final ListVector vector) {
-        return vector.getValidityBuffer().capacity() + vector.getOffsetBuffer().capacity();
-    }
-
-    /**
-     * @param vector a struct vector
-     * @return size of the vector in memory (not including children)
-     */
-    @SuppressWarnings("resource")
-    static long sizeOfStruct(final StructVector vector) {
-        return vector.getValidityBuffer().capacity();
-    }
+    protected abstract void closeResources();
 }

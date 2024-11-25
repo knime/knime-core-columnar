@@ -43,54 +43,53 @@
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.Float8Vector;
+import org.apache.arrow.vector.TinyIntVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
-import org.knime.core.columnar.data.DoubleData.DoubleReadData;
-import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.columnar.arrow.data.old.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.data.ByteData.ByteReadData;
+import org.knime.core.columnar.data.ByteData.ByteWriteData;
 
 /**
- * Arrow implementation of {@link DoubleWriteData} and {@link DoubleReadData}.
+ * Arrow implementation of {@link ByteWriteData} and {@link ByteReadData}.
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowDoubleData {
+public final class ArrowByteData {
 
-    private ArrowDoubleData() {
+    private ArrowByteData() {
     }
 
-    /** Arrow implementation of {@link DoubleWriteData}. */
-    public static final class ArrowDoubleWriteData extends AbstractArrowWriteData<Float8Vector>
-        implements DoubleWriteData {
+    /** Arrow implementation of {@link ByteWriteData}. */
+    public static final class ArrowByteWriteData extends AbstractArrowWriteData<TinyIntVector>
+        implements ByteWriteData {
 
-        private ArrowDoubleWriteData(final Float8Vector vector) {
+        private ArrowByteWriteData(final TinyIntVector vector) {
             super(vector);
         }
 
-        private ArrowDoubleWriteData(final Float8Vector vector, final int offset) {
+        private ArrowByteWriteData(final TinyIntVector vector, final int offset) {
             super(vector, offset);
         }
 
         @Override
-        public void setDouble(final int index, final double val) {
+        public void setByte(final int index, final byte val) {
             m_vector.set(m_offset + index, val);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowDoubleWriteData(m_vector, m_offset + start);
+            return new ArrowByteWriteData(m_vector, m_offset + start);
         }
 
         @Override
@@ -100,33 +99,32 @@ public final class ArrowDoubleData {
 
         @Override
         @SuppressWarnings("resource") // Resource closed by ReadData
-        public ArrowDoubleReadData close(final int length) {
-            final Float8Vector vector = closeWithLength(length);
-            return new ArrowDoubleReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+        public ArrowByteReadData close(final int length) {
+            final TinyIntVector vector = closeWithLength(length);
+            return new ArrowByteReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
         }
     }
 
-    /** Arrow implementation of {@link DoubleReadData}. */
-    public static final class ArrowDoubleReadData extends AbstractArrowReadData<Float8Vector>
-        implements DoubleReadData {
+    /** Arrow implementation of {@link ByteReadData}. */
+    public static final class ArrowByteReadData extends AbstractArrowReadData<TinyIntVector> implements ByteReadData {
 
-        private ArrowDoubleReadData(final Float8Vector vector, final MissingValues missingValues) {
+        private ArrowByteReadData(final TinyIntVector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
 
-        private ArrowDoubleReadData(final Float8Vector vector, final MissingValues missingValues, final int offset,
+        private ArrowByteReadData(final TinyIntVector vector, final MissingValues missingValues, final int offset,
             final int length) {
             super(vector, missingValues, offset, length);
         }
 
         @Override
-        public double getDouble(final int index) {
+        public byte getByte(final int index) {
             return m_vector.get(m_offset + index);
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowDoubleReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowByteReadData(m_vector, m_missingValues, m_offset + start, length);
         }
 
         @Override
@@ -135,44 +133,44 @@ public final class ArrowDoubleData {
         }
     }
 
-    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowDoubleData} */
-    public static final class ArrowDoubleDataFactory extends AbstractArrowColumnDataFactory {
+    /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowByteData} */
+    public static final class ArrowByteDataFactory extends AbstractArrowColumnDataFactory {
 
-        /** Singleton instance of {@link ArrowDoubleDataFactory} */
-        public static final ArrowDoubleDataFactory INSTANCE = new ArrowDoubleDataFactory();
+        /** Singleton instance of {@link ArrowByteDataFactory} */
+        public static final ArrowByteDataFactory INSTANCE = new ArrowByteDataFactory();
 
-        private ArrowDoubleDataFactory() {
+        private ArrowByteDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.FLOAT8.getType());
+            return Field.nullable(name, MinorType.TINYINT.getType());
         }
 
         @Override
-        public ArrowDoubleWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        public ArrowByteWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
             final BufferAllocator allocator, final int capacity) {
-            final Float8Vector v = (Float8Vector)vector;
+            final TinyIntVector v = (TinyIntVector)vector;
             v.allocateNew(capacity);
-            return new ArrowDoubleWriteData(v);
+            return new ArrowByteWriteData(v);
         }
 
         @Override
-        public ArrowDoubleReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowByteReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (m_version.equals(version)) {
-                return new ArrowDoubleReadData((Float8Vector)vector,
+                return new ArrowByteReadData((TinyIntVector)vector,
                     MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
             } else {
                 throw new IOException(
-                    "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
+                    "Cannot read ArrowByteData with version " + version + ". Current version: " + m_version + ".");
             }
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return Float8Vector.TYPE_WIDTH + 1; // +1 for validity
+            return TinyIntVector.TYPE_WIDTH + 1; // +1 for validity
         }
     }
 }
