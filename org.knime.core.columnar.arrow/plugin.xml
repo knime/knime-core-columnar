@@ -4,7 +4,7 @@
    <extension
          point="org.knime.core.data.columnar.ColumnStoreFactory">
       <ColumnStoreFactory
-            factoryCreator="org.knime.core.columnar.onheap.OnHeapColumnStoreFactory$OnHeapColumnStoreFactoryCreator">
+            factoryCreator="org.knime.core.columnar.arrow.ArrowColumnStoreFactory$ArrowColumnStoreFactoryCreator">
       </ColumnStoreFactory>
    </extension>
 
