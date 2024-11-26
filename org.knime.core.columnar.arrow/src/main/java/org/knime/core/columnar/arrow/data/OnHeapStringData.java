@@ -51,37 +51,37 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.util.MemoryUtil;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.Float8Vector;
+import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.data.DoubleData.DoubleReadData;
-import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.StringData.StringReadData;
+import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.table.schema.traits.DataTraits;
+import org.knime.core.table.util.StringEncoder;
 
 /**
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class OnHeapDoubleData extends AbstractReferencedData
-    implements DoubleReadData, DoubleWriteData, ArrowReadData, ArrowWriteData {
+public final class OnHeapStringData extends AbstractReferencedData
+    implements StringReadData, StringWriteData, ArrowReadData, ArrowWriteData {
 
     // or use a ByteBuffer??
-    private double[] m_data;
+    private String[] m_data;
 
     // TODO move validity to abstract class? Maybe in-line the ValidityBuffer class?
     private ValidityBuffer m_validity;
 
-    private OnHeapDoubleData(final int capacity) {
-        m_data = new double[capacity];
+    private OnHeapStringData(final int capacity) {
+        m_data = new String[capacity];
         m_validity = new ValidityBuffer(capacity);
     }
 
-    private OnHeapDoubleData(final double[] data, final ValidityBuffer validity) {
+    private OnHeapStringData(final String[] data, final ValidityBuffer validity) {
         m_data = data;
         m_validity = validity;
     }
@@ -122,19 +122,19 @@ public final class OnHeapDoubleData extends AbstractReferencedData
     }
 
     @Override
-    public void setDouble(final int index, final double val) {
+    public void setString(final int index, final String val) {
         m_data[index] = val;
         m_validity.set(index, true);
     }
 
     @Override
-    public OnHeapDoubleData close(final int length) {
+    public OnHeapStringData close(final int length) {
         setNumElements(length);
         return this;
     }
 
     @Override
-    public double getDouble(final int index) {
+    public String getString(final int index) {
         return m_data[index];
     }
 
@@ -156,7 +156,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
     private void setNumElements(final int numElements) {
         m_validity.setNumElements(numElements);
 
-        var newData = new double[numElements];
+        var newData = new String[numElements];
         System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
         m_data = newData;
     }
@@ -168,8 +168,6 @@ public final class OnHeapDoubleData extends AbstractReferencedData
             super(ArrowColumnDataFactoryVersion.version(0), traits);
         }
 
-        private static final int DOUBLE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(double[].class);
-
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
@@ -177,18 +175,22 @@ public final class OnHeapDoubleData extends AbstractReferencedData
             // TODO what is the null count for???
 
             if (m_version.equals(version)) {
+
+                var decoder = new StringEncoder();
                 var valueCount = vector.getValueCount();
-                var data = new double[valueCount];
-                MemoryUtil.UNSAFE.copyMemory(//
-                    null, //
-                    vector.getDataBufferAddress(), //
-                    data, //
-                    DOUBLE_ARRAY_BASE_OFFSET, //
-                    data.length * 8 //
-                );
+                var v = (VarCharVector)vector;
+
+                var data = new String[valueCount];
+
+                for (int i = 0; i < valueCount; i++) {
+                    var val = v.get(i);
+                    if (val != null) {
+                        data[i] = decoder.decode(val);
+                    }
+                }
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-                return new OnHeapDoubleData(data, validity);
+                return new OnHeapStringData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
@@ -196,30 +198,32 @@ public final class OnHeapDoubleData extends AbstractReferencedData
         }
 
         @Override
-        public OnHeapDoubleData createWrite(final int capacity) {
-            return new OnHeapDoubleData(capacity);
+        public OnHeapStringData createWrite(final int capacity) {
+            return new OnHeapStringData(capacity);
         }
 
         @Override
         public FieldVector getVector(final NullableReadData data, final String name, final BufferAllocator allocator) {
-            var d = (OnHeapDoubleData)data; // TODO generic?
+            var d = (OnHeapStringData)data; // TODO generic?
 
             // Note: We create a Vector here and therefore transfer the data to off-heap
             // The compression requires the data to be off-heap
             // If we could compress from on-heap to off-heap (or to whereever), we would save a copy but would need to
             // change the writer significantly
-            var vector = (Float8Vector)createVector(Field.nullable(name, MinorType.FLOAT8.getType()), allocator);
+
+            var vector = (VarCharVector)createVector(Field.nullable(name, MinorType.VARCHAR.getType()), allocator);
             vector.allocateNew(d.capacity());
 
             // Copy the data
-            // Or should we rather use ByteBuffer for `m_data` and use vector.getDataBuffer().setBytes()
-            MemoryUtil.UNSAFE.copyMemory(//
-                d.m_data, //
-                DOUBLE_ARRAY_BASE_OFFSET, //
-                null, //
-                vector.getDataBufferAddress(), //
-                d.m_data.length * 8 //
-            );
+            var encoder = new StringEncoder();
+            // TODO we serialize here????? Can this be right???
+            for (int i = 0; i < d.m_data.length; i++) {
+                var val = d.m_data[i];
+                if (val != null) {
+                    var encoded = encoder.encode(val);
+                    vector.setSafe(i, encoded, 0, encoded.limit());
+                }
+            }
 
             // Copy the validity
             d.m_validity.copyTo(vector.getValidityBuffer());
@@ -227,6 +231,11 @@ public final class OnHeapDoubleData extends AbstractReferencedData
             vector.setValueCount(d.capacity());
 
             return vector;
+        }
+
+        @Override
+        public DictionaryProvider getDictionaries(final NullableReadData data) {
+            return null;
         }
 
         @Override
