@@ -160,7 +160,13 @@ public class SimpleLinearWorkflowBenchmark {
         return benchmarkWorkflow;
     }
 
-    @Param
+    @Param //
+    // ({ //
+    //        "COLUMNAR__HEAP_BATCH__RC_OFF__WC_OFF", //
+    //        "COLUMNAR__HEAP_BATCH__RC_ON__WC_ON", //
+    //        "COLUMNAR__LEGACY_BATCH__RC_OFF__WC_OFF", //
+    //        "COLUMNAR__LEGACY_BATCH__RC_ON__WC_ON", //
+    //    })
     Params backend_batching_readCaches_writeCaches; // NOSONAR: name displayed as JMH parameter
 
     private BenchmarkWorkflow m_workflow;
