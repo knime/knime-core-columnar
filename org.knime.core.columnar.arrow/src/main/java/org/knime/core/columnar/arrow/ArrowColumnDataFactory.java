@@ -52,6 +52,7 @@ import java.util.function.LongSupplier;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -109,12 +110,23 @@ public interface ArrowColumnDataFactory {
     // ===================== Getting data for writing =========================
 
     /**
-     * @param data a column data holding some values
-     * @param name the name of the vector
-     * @param allocator the allocator to allocate memory
-     * @return a {@link FieldVector} which should be written to disk
+     * Get the Arrow {@link Field} describing the vector of the data object.
+     *
+     * @param name the name of the field
+     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
+     *            from this supplier. Other ids might be used already in the parent data object.
+     * @return the Arrow description for the vector type
      */
-    FieldVector getVector(NullableReadData data, String name, BufferAllocator allocator);
+    Field getField(String name, LongSupplier dictionaryIdSupplier);
+
+    /**
+     * Copy the data to the given arrow vector. The vector is created from the given field but can have an extension
+     * type.
+     *
+     * @param data the data to copy
+     * @param vector the vector to copy the data to
+     */
+    void copyToVector(NullableReadData data, FieldVector vector);
 
     /**
      * @param data a column data holding some values

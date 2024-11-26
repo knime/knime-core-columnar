@@ -49,8 +49,8 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -60,7 +60,6 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
-import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.util.StringEncoder;
 
 /**
@@ -69,6 +68,8 @@ import org.knime.core.table.util.StringEncoder;
  */
 public final class OnHeapStringData extends AbstractReferencedData
     implements StringReadData, StringWriteData, ArrowReadData, ArrowWriteData {
+
+    public static final Factory FACTORY = new Factory();
 
     // or use a ByteBuffer??
     private String[] m_data;
@@ -164,8 +165,8 @@ public final class OnHeapStringData extends AbstractReferencedData
     // TODO extract common functionallity
     public static final class Factory extends AbstractArrowColumnDataFactory {
 
-        public Factory(final DataTraits traits) {
-            super(ArrowColumnDataFactoryVersion.version(0), traits);
+        private Factory() {
+            super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         @Override
@@ -203,15 +204,15 @@ public final class OnHeapStringData extends AbstractReferencedData
         }
 
         @Override
-        public FieldVector getVector(final NullableReadData data, final String name, final BufferAllocator allocator) {
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            return Field.nullable(name, MinorType.VARCHAR.getType());
+        }
+
+        @Override
+        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
             var d = (OnHeapStringData)data; // TODO generic?
+            var vector = (VarCharVector)fieldVector;
 
-            // Note: We create a Vector here and therefore transfer the data to off-heap
-            // The compression requires the data to be off-heap
-            // If we could compress from on-heap to off-heap (or to whereever), we would save a copy but would need to
-            // change the writer significantly
-
-            var vector = (VarCharVector)createVector(Field.nullable(name, MinorType.VARCHAR.getType()), allocator);
             vector.allocateNew(d.capacity());
 
             // Copy the data
@@ -229,8 +230,6 @@ public final class OnHeapStringData extends AbstractReferencedData
             d.m_validity.copyTo(vector.getValidityBuffer());
 
             vector.setValueCount(d.capacity());
-
-            return vector;
         }
 
         @Override
