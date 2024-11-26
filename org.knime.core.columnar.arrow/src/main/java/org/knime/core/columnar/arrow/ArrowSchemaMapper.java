@@ -132,7 +132,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
-        return wrapCached(new OnHeapDoubleData.Factory(traits), traits);
+        return wrapCached(OnHeapDoubleData.FACTORY, traits);
     }
 
     @Override
@@ -190,7 +190,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         //            return wrapCached(new ArrowDictEncodedStringDataFactory(traits), traits);
         //        }
         // TODO the caching does not work like that
-        return wrapCached(new OnHeapStringData.Factory(traits), traits);
+        return wrapCached(OnHeapStringData.FACTORY, traits);
     }
 
     ArrowColumnDataFactory wrapCached(final ArrowColumnDataFactory factory, final DataTraits traits) {

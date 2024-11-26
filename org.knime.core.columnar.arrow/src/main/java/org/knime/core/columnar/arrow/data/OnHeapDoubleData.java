@@ -49,8 +49,8 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
+import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.util.MemoryUtil;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float8Vector;
@@ -61,7 +61,6 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  *
@@ -69,6 +68,8 @@ import org.knime.core.table.schema.traits.DataTraits;
  */
 public final class OnHeapDoubleData extends AbstractReferencedData
     implements DoubleReadData, DoubleWriteData, ArrowReadData, ArrowWriteData {
+
+    public static final Factory FACTORY = new Factory();
 
     // or use a ByteBuffer??
     private double[] m_data;
@@ -164,8 +165,8 @@ public final class OnHeapDoubleData extends AbstractReferencedData
     // TODO extract common functionallity
     public static final class Factory extends AbstractArrowColumnDataFactory {
 
-        public Factory(final DataTraits traits) {
-            super(ArrowColumnDataFactoryVersion.version(0), traits);
+        private Factory() {
+            super(ArrowColumnDataFactoryVersion.version(0));
         }
 
         private static final int DOUBLE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(double[].class);
@@ -201,14 +202,15 @@ public final class OnHeapDoubleData extends AbstractReferencedData
         }
 
         @Override
-        public FieldVector getVector(final NullableReadData data, final String name, final BufferAllocator allocator) {
-            var d = (OnHeapDoubleData)data; // TODO generic?
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            return Field.nullable(name, MinorType.FLOAT8.getType());
+        }
 
-            // Note: We create a Vector here and therefore transfer the data to off-heap
-            // The compression requires the data to be off-heap
-            // If we could compress from on-heap to off-heap (or to whereever), we would save a copy but would need to
-            // change the writer significantly
-            var vector = (Float8Vector)createVector(Field.nullable(name, MinorType.FLOAT8.getType()), allocator);
+        @Override
+        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+            var d = (OnHeapDoubleData)data; // TODO generic?
+            var vector = (Float8Vector)fieldVector;
+
             vector.allocateNew(d.capacity());
 
             // Copy the data
@@ -224,9 +226,8 @@ public final class OnHeapDoubleData extends AbstractReferencedData
             // Copy the validity
             d.m_validity.copyTo(vector.getValidityBuffer());
 
+            // Set the value count
             vector.setValueCount(d.capacity());
-
-            return vector;
         }
 
         @Override
