@@ -202,7 +202,7 @@ class ArrowBatchWriter implements BatchWriter {
             // The compression requires the data to be off-heap
             // If we could compress from on-heap to off-heap (or to whereever), we would save a copy but would need to
             // change the writer significantly
-            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
+            @SuppressWarnings("resource") // Vectors are closed later all at once
             var vector = field.createVector(m_allocator);
             factory.copyToVector(data, vector);
 
@@ -234,6 +234,8 @@ class ArrowBatchWriter implements BatchWriter {
 
         // Write the vectors
         writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
+
+        vectors.forEach(FieldVector::close);
 
         // Remember batch boundary for footer
         var previousBatchEnd = m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
