@@ -51,7 +51,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData;
+import org.knime.core.columnar.arrow.data.OnHeapIntData;
 import org.knime.core.columnar.arrow.data.OnHeapStringData;
+import org.knime.core.columnar.arrow.data.OnHeapVoidData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.schema.BooleanDataSpec;
@@ -142,7 +144,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
-        throw new UnsupportedOperationException("nyi");
+        return wrapCached(OnHeapIntData.FACTORY, traits);
     }
 
     @Override
@@ -163,8 +165,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
-        throw new UnsupportedOperationException("nyi");
-        // return wrapCached(ArrowVoidDataFactory.INSTANCE, traits);
+        return wrapCached(OnHeapVoidData.FACTORY, traits);
     }
 
     @Override
