@@ -50,10 +50,15 @@ package org.knime.core.columnar.arrow.data;
 
 import java.util.Objects;
 
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Abstract implementation of {@link ArrowColumnDataFactory} for {@link ArrowReadData} which extend
@@ -66,16 +71,29 @@ import org.knime.core.columnar.data.NullableReadData;
 @SuppressWarnings("javadoc")
 abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory {
 
+    // TODO reorder version and traits
     /** The current version */
     protected final ArrowColumnDataFactoryVersion m_version;
+
+    private final DataTraits m_traits;
 
     /**
      * Create a new abstract {@link ArrowColumnDataFactory}.
      *
      * @param version the current version
+     * @param traits the traits of the data, used to wrap create the extension type if needed
      */
-    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
+    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version, final DataTraits traits) {
         m_version = version;
+        m_traits = traits;
+    }
+
+    protected FieldVector createVector(final Field field, final BufferAllocator allocator) {
+        // TODO should we put the vector creation somewhere else?
+        // - old impl: In a Delegator class
+        // - maybe: In the writer directly? Does it have the traits from the schema?
+        var extensionField = ExtensionTypes.wrapInExtensionTypeIfNecessary(field, m_traits);
+        return extensionField.createVector(allocator);
     }
 
     @Override
@@ -90,7 +108,7 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_version);
+        return Objects.hash(m_version, m_traits);
     }
 
     @Override
@@ -105,7 +123,7 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
             return false;
         }
         AbstractArrowColumnDataFactory other = (AbstractArrowColumnDataFactory)obj;
-        return m_version.equals(other.m_version);
+        return m_traits.equals(other.m_traits) && m_version.equals(other.m_version);
     }
 
     @Override
