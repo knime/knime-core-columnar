@@ -86,13 +86,14 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.FileHandle;
+import org.knime.core.table.schema.traits.DataTraits;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,6 +111,8 @@ class ArrowBatchWriter implements BatchWriter {
 
     /** Factories used to get the vectors and dicts from the columns */
     private final ArrowColumnDataFactory[] m_factories;
+
+    private final DataTraits[] m_traits;
 
     private final ArrowCompression m_compression;
 
@@ -134,10 +137,11 @@ class ArrowBatchWriter implements BatchWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    ArrowBatchWriter(final FileHandle file, final ArrowColumnDataFactory[] factories,
+    ArrowBatchWriter(final FileHandle file, final ArrowColumnDataFactory[] factories, final DataTraits[] traits,
         final ArrowCompression compression, final BufferAllocator allocator) {
         m_fileHandle = file;
         m_factories = factories;
+        m_traits = traits;
         m_compression = compression;
         m_allocator = allocator;
         m_firstWrite = true;
@@ -178,14 +182,32 @@ class ArrowBatchWriter implements BatchWriter {
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
 
+        // TODO do we need th later mapping of dictionary ids?
+        // TODO should we move the dictionary id supplier here?
+        // TODO are these kind of dictionaries used at all anymore? (maybe for backward compatibility?)
+        final var dictionaryIdSupplier = ArrowColumnDataFactory.newDictionaryIdSupplier();
+
         // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
-            final NullableReadData data = batch.get(i);
-            final ArrowColumnDataFactory factory = m_factories[i];
+
+            final var data = batch.get(i);
+            final var factory = m_factories[i];
+            final var traits = m_traits[i];
+
+            // Create the field including the extension type
+            var field = ExtensionTypes
+                .wrapInExtensionTypeIfNecessary(factory.getField(String.valueOf(i), dictionaryIdSupplier), traits);
+
+            // Note: We create a Vector here and therefore transfer the data to off-heap
+            // The compression requires the data to be off-heap
+            // If we could compress from on-heap to off-heap (or to whereever), we would save a copy but would need to
+            // change the writer significantly
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-            final FieldVector vector = factory.getVector(data, String.valueOf(i), m_allocator);
+            var vector = field.createVector(m_allocator);
+            factory.copyToVector(data, vector);
+
+            // TODO how the fuck does this work?
             final DictionaryProvider dictionaries = factory.getDictionaries(data);
-            final Field field = vector.getField();
 
             if (m_firstWrite) {
                 // Get the field for the schema and collect dictionaries
@@ -271,7 +293,6 @@ class ArrowBatchWriter implements BatchWriter {
     synchronized long numRows() {
         return m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
     }
-
 
     @Override
     public synchronized void close() throws IOException {

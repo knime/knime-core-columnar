@@ -46,17 +46,18 @@
 package org.knime.core.columnar.arrow;
 
 import java.io.IOException;
+import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * A {@link BatchStore} implementation for Arrow.
@@ -74,7 +75,7 @@ public final class ArrowBatchStore extends AbstractArrowBatchReadable implements
         final BufferAllocator allocator) {
         super(schema, fileSupplier, allocator);
         m_factories = ArrowSchemaMapper.map(schema);
-        m_writer = new ArrowBatchWriter(fileSupplier, m_factories, compression, m_allocator);
+        m_writer = new ArrowBatchWriter(fileSupplier, m_factories, getTraits(schema), compression, m_allocator);
     }
 
     @Override
@@ -118,4 +119,9 @@ public final class ArrowBatchStore extends AbstractArrowBatchReadable implements
         super.close();
     }
 
+    private static DataTraits[] getTraits(final ColumnarSchema schema) {
+        return IntStream.range(0, schema.numColumns()) //
+            .mapToObj(schema::getTraits) //
+            .toArray(DataTraits[]::new);
+    }
 }
