@@ -53,36 +53,36 @@ import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.util.MemoryUtil;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.Float8Vector;
+import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.data.DoubleData.DoubleReadData;
-import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.columnar.data.IntData.IntReadData;
+import org.knime.core.columnar.data.IntData.IntWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 
 /**
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class OnHeapDoubleData extends AbstractReferencedData
-    implements DoubleReadData, DoubleWriteData, ArrowReadData, ArrowWriteData {
+public final class OnHeapIntData extends AbstractReferencedData
+    implements IntReadData, IntWriteData, ArrowReadData, ArrowWriteData {
 
     public static final Factory FACTORY = new Factory();
 
     // or use a ByteBuffer??
-    private double[] m_data;
+    private int[] m_data;
 
     // TODO move validity to abstract class? Maybe in-line the ValidityBuffer class?
     private ValidityBuffer m_validity;
 
-    private OnHeapDoubleData(final int capacity) {
-        m_data = new double[capacity];
+    private OnHeapIntData(final int capacity) {
+        m_data = new int[capacity];
         m_validity = new ValidityBuffer(capacity);
     }
 
-    private OnHeapDoubleData(final double[] data, final ValidityBuffer validity) {
+    private OnHeapIntData(final int[] data, final ValidityBuffer validity) {
         m_data = data;
         m_validity = validity;
     }
@@ -123,19 +123,19 @@ public final class OnHeapDoubleData extends AbstractReferencedData
     }
 
     @Override
-    public void setDouble(final int index, final double val) {
+    public void setInt(final int index, final int val) {
         m_data[index] = val;
         m_validity.set(index, true);
     }
 
     @Override
-    public OnHeapDoubleData close(final int length) {
+    public OnHeapIntData close(final int length) {
         setNumElements(length);
         return this;
     }
 
     @Override
-    public double getDouble(final int index) {
+    public int getInt(final int index) {
         return m_data[index];
     }
 
@@ -157,7 +157,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
     private void setNumElements(final int numElements) {
         m_validity.setNumElements(numElements);
 
-        var newData = new double[numElements];
+        var newData = new int[numElements];
         System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
         m_data = newData;
     }
@@ -169,7 +169,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 
-        private static final int DOUBLE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(double[].class);
+        private static final int INT_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(int[].class);
 
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
@@ -179,17 +179,17 @@ public final class OnHeapDoubleData extends AbstractReferencedData
 
             if (m_version.equals(version)) {
                 var valueCount = vector.getValueCount();
-                var data = new double[valueCount];
+                var data = new int[valueCount];
                 MemoryUtil.UNSAFE.copyMemory(//
                     null, //
                     vector.getDataBufferAddress(), //
                     data, //
-                    DOUBLE_ARRAY_BASE_OFFSET, //
+                    INT_ARRAY_BASE_OFFSET, //
                     data.length * 8 //
                 );
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-                return new OnHeapDoubleData(data, validity);
+                return new OnHeapIntData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
@@ -197,19 +197,19 @@ public final class OnHeapDoubleData extends AbstractReferencedData
         }
 
         @Override
-        public OnHeapDoubleData createWrite(final int capacity) {
-            return new OnHeapDoubleData(capacity);
+        public OnHeapIntData createWrite(final int capacity) {
+            return new OnHeapIntData(capacity);
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.FLOAT8.getType());
+            return Field.nullable(name, MinorType.INT.getType());
         }
 
         @Override
         public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
-            var d = (OnHeapDoubleData)data; // TODO generic?
-            var vector = (Float8Vector)fieldVector;
+            var d = (OnHeapIntData)data; // TODO generic?
+            var vector = (IntVector)fieldVector;
 
             vector.allocateNew(d.capacity());
 
@@ -217,7 +217,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
             // Or should we rather use ByteBuffer for `m_data` and use vector.getDataBuffer().setBytes()
             MemoryUtil.UNSAFE.copyMemory(//
                 d.m_data, //
-                DOUBLE_ARRAY_BASE_OFFSET, //
+                INT_ARRAY_BASE_OFFSET, //
                 null, //
                 vector.getDataBufferAddress(), //
                 d.m_data.length * vector.getTypeWidth() //
@@ -233,7 +233,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
         @Override
         public int initialNumBytesPerElement() {
             // TODO
-            return 9;
+            return 5;
         }
     }
 }

@@ -239,8 +239,8 @@ public final class OnHeapStringData extends AbstractReferencedData
 
         @Override
         public int initialNumBytesPerElement() {
-            // TODO Auto-generated method stub
-            return 0;
+            // TODO
+            return 1;
         }
     }
 }
