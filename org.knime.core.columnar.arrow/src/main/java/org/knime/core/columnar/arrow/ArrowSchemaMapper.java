@@ -51,6 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData;
+import org.knime.core.columnar.arrow.data.OnHeapStringData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.schema.BooleanDataSpec;
@@ -131,7 +132,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapDoubleData.FACTORY, traits);
+        return wrapCached(new OnHeapDoubleData.Factory(traits), traits);
     }
 
     @Override
@@ -183,11 +184,13 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
-        throw new UnsupportedOperationException("nyi");
+        //        throw new UnsupportedOperationException("nyi");
+        // TODO dict encoded?
         //        if (DictEncodingTrait.isEnabled(traits)) {
         //            return wrapCached(new ArrowDictEncodedStringDataFactory(traits), traits);
         //        }
-        //        return wrapCached(ArrowStringDataFactory.INSTANCE, traits);
+        // TODO the caching does not work like that
+        return wrapCached(new OnHeapStringData.Factory(traits), traits);
     }
 
     ArrowColumnDataFactory wrapCached(final ArrowColumnDataFactory factory, final DataTraits traits) {
@@ -205,99 +208,4 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     static ArrowColumnDataFactory wrap(final ArrowColumnDataFactory factory, final DataTraits traits) {
         return INSTANCE.wrapCached(factory, traits);
     }
-
-    //    static final class ExtensionArrowColumnDataFactory implements ArrowColumnDataFactory {
-    //
-    //        private final ArrowColumnDataFactory m_delegate;
-    //
-    //        private final DataTraits m_traits;
-    //
-    //        private final ArrowColumnDataFactoryVersion m_version;
-    //
-    //        private static final int CURRENT_VERSION = 0;
-    //
-    //        ExtensionArrowColumnDataFactory(final ArrowColumnDataFactory delegate, final DataTraits traits) {
-    //            m_delegate = delegate;
-    //            m_traits = traits;
-    //            m_version = ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, m_delegate.getVersion());
-    //        }
-    //
-    //        ArrowColumnDataFactory getDelegate() {
-    //            return m_delegate;
-    //        }
-    //
-    //        @Override
-    //        public org.knime.core.columnar.arrow.data.ArrowWriteData createWrite(final int capacity) {
-    //            return m_delegate.createWrite(capacity);
-    //        }
-    //
-    //        /**
-    //         * {@inheritDoc}
-    //         */
-    //        @Override
-    //        public FieldVector getVector(final NullableReadData data, final String name, final BufferAllocator allocator) {
-    //            // TODO Auto-generated method stub
-    //            return null;
-    //        }
-    //
-    //        @Override
-    //        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-    //            var storageField = m_delegate.getField(name, dictionaryIdSupplier);
-    //            return ExtensionTypes.wrapInExtensionTypeIfNecessary(storageField, m_traits);
-    //        }
-    //
-    //        @Override
-    //        public ArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-    //            final BufferAllocator allocator, final int capacity) {
-    //            return m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity);
-    //        }
-    //
-    //        @Override
-    //        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
-    //            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-    //            return m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0));
-    //        }
-    //
-    //        @Override
-    //        public FieldVector getVector(final NullableReadData data) {
-    //            return m_delegate.getVector(data);
-    //        }
-    //
-    //        @Override
-    //        public DictionaryProvider getDictionaries(final NullableReadData data) {
-    //            return m_delegate.getDictionaries(data);
-    //        }
-    //
-    //        @Override
-    //        public ArrowColumnDataFactoryVersion getVersion() {
-    //            return m_version;
-    //        }
-    //
-    //        @Override
-    //        public boolean equals(final Object obj) {
-    //            if (obj == this) {
-    //                return true;
-    //            }
-    //            if (obj instanceof ExtensionArrowColumnDataFactory) {
-    //                var other = (ExtensionArrowColumnDataFactory)obj;
-    //                return m_traits.equals(other.m_traits) && m_delegate.equals(other.m_delegate);
-    //            }
-    //            return false;
-    //        }
-    //
-    //        @Override
-    //        public int hashCode() {
-    //            return Objects.hash(m_traits, m_delegate, m_version);
-    //        }
-    //
-    //        @Override
-    //        public String toString() {
-    //            return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + m_delegate + "]";
-    //        }
-    //
-    //        @Override
-    //        public int initialNumBytesPerElement() {
-    //            return m_delegate.initialNumBytesPerElement();
-    //        }
-    //    }
 }
