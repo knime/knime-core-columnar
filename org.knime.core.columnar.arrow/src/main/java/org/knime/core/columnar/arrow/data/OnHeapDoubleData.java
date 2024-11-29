@@ -97,7 +97,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
 
     @Override
     public long sizeOf() {
-        return m_data.length * Integer.BYTES + m_validity.sizeOf();
+        return m_data.length * Double.BYTES + m_validity.sizeOf();
     }
 
     // WriteData
@@ -162,6 +162,11 @@ public final class OnHeapDoubleData extends AbstractReferencedData
         m_data = newData;
     }
 
+    // TODO used for testing. Needed?
+    boolean isReleased() {
+        return m_data == null;
+    }
+
     // TODO extract common functionallity
     public static final class Factory extends AbstractArrowColumnDataFactory {
 
@@ -185,7 +190,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
                     vector.getDataBufferAddress(), //
                     data, //
                     DOUBLE_ARRAY_BASE_OFFSET, //
-                    data.length * 8 //
+                    data.length * Double.BYTES //
                 );
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
