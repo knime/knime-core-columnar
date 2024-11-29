@@ -185,7 +185,7 @@ public final class OnHeapIntData extends AbstractReferencedData
                     vector.getDataBufferAddress(), //
                     data, //
                     INT_ARRAY_BASE_OFFSET, //
-                    data.length * 8 //
+                    data.length * Integer.BYTES //
                 );
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
