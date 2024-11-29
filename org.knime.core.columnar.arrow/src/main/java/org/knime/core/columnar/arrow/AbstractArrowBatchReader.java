@@ -78,10 +78,9 @@ import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory.ArrowVectorNullCount;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory.ArrowVectorNullCount;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.filter.ColumnSelection;
@@ -157,14 +156,23 @@ abstract class AbstractArrowBatchReader {
         final DictionaryProvider dictionaries = readDictionaries(index);
 
         // Create the ColumnData
-        return m_columnSelection.createBatch(i -> {
-            try {
-                return m_factories[i].createRead(vectors[i].m_vector, vectors[i].m_nullCount, dictionaries,
-                    m_factoryVersions[i]);
-            } catch (IOException e) {
-                throw new IllegalStateException("Exception while reading column data.", e);
+        try {
+            return m_columnSelection.createBatch(i -> {
+                try {
+                    return m_factories[i].createRead(vectors[i].m_vector, vectors[i].m_nullCount, dictionaries,
+                        m_factoryVersions[i]);
+                } catch (IOException e) {
+                    throw new IllegalStateException("Exception while reading column data.", e);
+                }
+            });
+        } finally {
+            // TODO we also need to close the dictionaries (or the createRead method should do that?)
+            for (FieldVectorAndNullCount vector : vectors) {
+                if (vector != null) {
+                    vector.m_vector.close();
+                }
             }
-        });
+        }
     }
 
     /** Read the vectors at the given batch index using the reader */
