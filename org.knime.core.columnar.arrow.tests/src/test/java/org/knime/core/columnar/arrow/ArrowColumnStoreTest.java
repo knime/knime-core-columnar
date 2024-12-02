@@ -71,7 +71,6 @@ import org.knime.core.columnar.arrow.ArrowColumnStoreFactory.ArrowColumnStoreFac
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
@@ -90,6 +89,7 @@ import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
+import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
@@ -308,12 +308,14 @@ public class ArrowColumnStoreTest {
         // Therefore we cannot use the store.
         final int chunkSize = 64;
         final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new DictionaryEncodedDataFactory()};
+        final DataTraits[] traits = new DataTraits[]{DefaultDataTraits.EMPTY};
 
         // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator()) {
 
             @SuppressWarnings("resource")
-            final ArrowBatchWriter writer = new ArrowBatchWriter(writePath, factories, ARROW_NO_COMPRESSION, allocator);
+            final ArrowBatchWriter writer =
+                new ArrowBatchWriter(writePath, factories, traits, ARROW_NO_COMPRESSION, allocator);
             ReadBatch batch;
 
             // Write batch 0
