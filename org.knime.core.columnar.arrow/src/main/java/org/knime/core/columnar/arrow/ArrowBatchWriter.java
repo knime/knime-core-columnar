@@ -215,7 +215,9 @@ class ArrowBatchWriter implements BatchWriter {
             var vector = field.createVector(m_allocator);
             factory.copyToVector(data, vector);
 
-            // TODO how the fuck does this work?
+            // TODO Remove dictionary handling from here
+            // It is not used anymore (see implementations of getDictionaries)
+            // It is only used in the ArrowDictEncodedLegacyDateTimeVarBinaryReadData but this can only be read, not written
             final DictionaryProvider dictionaries = factory.getDictionaries(data);
 
             if (m_firstWrite) {
