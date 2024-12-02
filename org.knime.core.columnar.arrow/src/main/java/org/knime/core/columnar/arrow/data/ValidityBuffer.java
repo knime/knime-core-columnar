@@ -56,11 +56,10 @@ import org.apache.arrow.vector.BitVectorHelper;
  */
 final class ValidityBuffer {
 
-    // TODO(min-performance) implement in a more efficient way (only one bit per value)
-    private boolean[] m_validity;
+    private byte[] m_validity;
 
     public static long usedSizeFor(final int capacity) {
-        return capacity;
+        return BitVectorHelper.getValidityBufferSize(capacity);
     }
 
     /**
@@ -69,17 +68,37 @@ final class ValidityBuffer {
      * @param capacity the capacity of the validity buffer
      */
     public ValidityBuffer(final int capacity) {
-        m_validity = new boolean[capacity];
+        m_validity = new byte[BitVectorHelper.getValidityBufferSize(capacity)];
+    }
+
+    private ValidityBuffer(final byte[] validity) {
+        m_validity = validity;
     }
 
     /**
      * Sets the validity of the value at the given index.
      *
      * @param index the index of the value
-     * @param b the validity of the value
+     * @param value the validity of the value
      */
-    public void set(final int index, final boolean b) {
-        m_validity[index] = b;
+    public void set(final int index, final boolean value) {
+        var byteIndex = BitVectorHelper.byteIndex(index);
+        var bitIndex = BitVectorHelper.bitIndex(index);
+
+        // TODO copied from BitVectorHelper.setValidityBit
+
+        // the byte is promoted to an int, because according to Java specification,
+        // bytes will be promoted to ints automatically, upon expression evaluation.
+        // by promoting it manually, we avoid the unnecessary conversions.
+        int currentByte = m_validity[byteIndex];
+        final int bitMask = 1 << bitIndex;
+        if (value) {
+            currentByte |= bitMask;
+        } else {
+            currentByte &= ~bitMask;
+        }
+
+        m_validity[byteIndex] = (byte)currentByte;
     }
 
     /**
@@ -87,7 +106,9 @@ final class ValidityBuffer {
      * @return the validity of the value at the given index
      */
     public boolean isSet(final int index) {
-        return m_validity[index];
+        var byteIndex = BitVectorHelper.byteIndex(index);
+        var bitIndex = BitVectorHelper.bitIndex(index);
+        return ((m_validity[byteIndex] >> bitIndex) & 0x01) == 1;
     }
 
     /**
@@ -96,8 +117,8 @@ final class ValidityBuffer {
      * @param numElements the new capacity
      */
     public void setNumElements(final int numElements) {
-        var newValidity = new boolean[numElements];
-        System.arraycopy(m_validity, 0, newValidity, 0, Math.min(numElements, m_validity.length));
+        var newValidity = new byte[BitVectorHelper.getValidityBufferSize(numElements)];
+        System.arraycopy(m_validity, 0, newValidity, 0, Math.min(newValidity.length, m_validity.length));
         m_validity = newValidity;
     }
 
@@ -105,21 +126,17 @@ final class ValidityBuffer {
      * @return the size of the validity buffer in bytes
      */
     public long sizeOf() {
-        // TODO be more efficient
         return m_validity.length;
     }
 
     public void copyTo(final ArrowBuf validityBuffer) {
-        for (int i = 0; i < m_validity.length; i++) {
-            BitVectorHelper.setValidityBit(validityBuffer, i, m_validity[i] ? 1 : 0);
-        }
+        validityBuffer.setBytes(0, m_validity, 0, m_validity.length);
     }
 
     public static ValidityBuffer createFrom(final ArrowBuf validityBuffer, final int length) {
-        var validity = new ValidityBuffer(length);
-        for (int i = 0; i < length; i++) {
-            validity.set(i, BitVectorHelper.get(validityBuffer, i) == 1);
-        }
-        return validity;
+        var numBytes = BitVectorHelper.getValidityBufferSize(length);
+        var validity = new byte[numBytes];
+        validityBuffer.getBytes(0, validity, 0, numBytes);
+        return new ValidityBuffer(validity);
     }
 }
