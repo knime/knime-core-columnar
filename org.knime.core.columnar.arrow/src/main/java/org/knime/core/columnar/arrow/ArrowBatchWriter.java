@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
@@ -93,6 +94,7 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.FileHandle;
+import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,6 +148,13 @@ class ArrowBatchWriter implements BatchWriter {
         m_allocator = allocator;
         m_firstWrite = true;
         m_closed = false;
+    }
+
+    /** Utility to get the traits for a schema. */
+    static DataTraits[] getTraits(final ColumnarSchema schema) {
+        return IntStream.range(0, schema.numColumns()) //
+            .mapToObj(schema::getTraits) //
+            .toArray(DataTraits[]::new);
     }
 
     @Override

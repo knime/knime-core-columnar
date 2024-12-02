@@ -60,7 +60,6 @@ import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
@@ -143,8 +142,8 @@ public class Lz4BlockCompressionLegacyTest {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(SCHEMA);
         try (final RootAllocator alloc = new RootAllocator(); //
                 @SuppressWarnings("deprecation")
-                final ArrowBatchWriter writer =
-                    new ArrowBatchWriter(FILE, factories, ARROW_LZ4_BLOCK_COMPRESSION, alloc)) {
+                final ArrowBatchWriter writer = new ArrowBatchWriter(FILE, factories,
+                    ArrowBatchWriter.getTraits(SCHEMA), ARROW_LZ4_BLOCK_COMPRESSION, alloc)) {
             for (int b = 0; b < NUM_BATCHES; b++) {
                 writeBatch(writer, b);
             }
