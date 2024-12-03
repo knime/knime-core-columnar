@@ -116,6 +116,16 @@ public final class OnHeapVoidData extends AbstractReferencedData
         return m_capacity;
     }
 
+    @Override
+    public ArrowWriteData slice(final int start) {
+        return new OnHeapVoidData(m_capacity);
+    }
+
+    @Override
+    public ArrowReadData slice(final int start, final int length) {
+        return new OnHeapVoidData(length);
+    }
+
     // TODO extract common functionallity
     public static final class Factory extends AbstractArrowColumnDataFactory {
 

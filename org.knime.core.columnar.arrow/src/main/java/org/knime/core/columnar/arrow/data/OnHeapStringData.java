@@ -66,103 +66,115 @@ import org.knime.core.table.util.StringEncoder;
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class OnHeapStringData extends AbstractReferencedData
-    implements StringReadData, StringWriteData, ArrowReadData, ArrowWriteData {
+public final class OnHeapStringData {
 
     public static final Factory FACTORY = new Factory();
 
-    // or use a ByteBuffer??
-    private String[] m_data;
-
-    // TODO move validity to abstract class? Maybe in-line the ValidityBuffer class?
-    private ValidityBuffer m_validity;
-
-    private OnHeapStringData(final int capacity) {
-        m_data = new String[capacity];
-        m_validity = new ValidityBuffer(capacity);
+    private OnHeapStringData() {
     }
 
-    private OnHeapStringData(final String[] data, final ValidityBuffer validity) {
-        m_data = data;
-        m_validity = validity;
+    public static final class OnHeapStringWriteData extends AbstractArrowWriteData implements StringWriteData {
+
+        private String[] m_data;
+
+        private OnHeapStringWriteData(final int capacity) {
+            super(capacity);
+            m_data = new String[capacity];
+        }
+
+        private OnHeapStringWriteData(final int offset, final String[] data, final ValidityBuffer validity) {
+            super(offset, validity);
+            m_data = data;
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_data.length;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
+        }
+
+        @Override
+        public long sizeOf() {
+            return m_data.length * Integer.BYTES + m_validity.sizeOf();
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new OnHeapStringWriteData(m_offset + start, m_data, m_validity);
+        }
+
+        @Override
+        public void setString(final int index, final String val) {
+            m_data[index + m_offset] = val;
+            setValid(index);
+        }
+
+        @Override
+        protected void closeResources() {
+            // No resources to close for on-heap data
+        }
+
+        @Override
+        public OnHeapStringReadData close(final int length) {
+            setNumElements(length);
+            return new OnHeapStringReadData(m_data, m_validity);
+        }
+
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            m_validity.setNumElements(numElements);
+
+            var newData = new String[numElements];
+            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+            m_data = newData;
+        }
     }
 
-    // ReferenceData
+    public static final class OnHeapStringReadData extends AbstractArrowReadData implements StringReadData {
 
-    @Override
-    protected void closeResources() {
-        m_data = null;
-        m_validity = null;
+        private final String[] m_data;
+
+        public OnHeapStringReadData(final String[] data, final ValidityBuffer validity) {
+            super(validity, data.length);
+            m_data = data;
+        }
+
+        public OnHeapStringReadData(final String[] data, final ValidityBuffer validity, final int offset,
+            final int length) {
+            super(validity, offset, length);
+            m_data = data;
+        }
+
+        @Override
+        public long sizeOf() {
+            // TODO size of the strings
+            return m_data.length * Integer.BYTES + m_validity.sizeOf();
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new OnHeapStringReadData(m_data, m_validity, m_offset + start, length);
+        }
+
+        @Override
+        public String getString(final int index) {
+            return m_data[index + m_offset];
+        }
     }
 
-    @Override
-    public long sizeOf() {
-        return m_data.length * Integer.BYTES + m_validity.sizeOf();
-    }
-
-    // WriteData
-
-    @Override
-    public void setMissing(final int index) {
-        m_validity.set(index, false);
-    }
-
-    @Override
-    public void expand(final int minimumCapacity) {
-        setNumElements(minimumCapacity);
-    }
-
-    @Override
-    public int capacity() {
-        return m_data.length;
-    }
-
-    @Override
-    public long usedSizeFor(final int numElements) {
-        return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
-    }
-
-    @Override
-    public void setString(final int index, final String val) {
-        m_data[index] = val;
-        m_validity.set(index, true);
-    }
-
-    @Override
-    public OnHeapStringData close(final int length) {
-        setNumElements(length);
-        return this;
-    }
-
-    @Override
-    public String getString(final int index) {
-        return m_data[index];
-    }
-
-    @Override
-    public boolean isMissing(final int index) {
-        return !m_validity.isSet(index);
-    }
-
-    @Override
-    public int length() {
-        return m_data.length;
-    }
-
-    /**
-     * Expand or shrink the data to the given size.
-     *
-     * @param numElements the new size of the data
-     */
-    private void setNumElements(final int numElements) {
-        m_validity.setNumElements(numElements);
-
-        var newData = new String[numElements];
-        System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
-        m_data = newData;
-    }
-
-    // TODO extract common functionallity
     public static final class Factory extends AbstractArrowColumnDataFactory {
 
         private Factory() {
@@ -170,7 +182,7 @@ public final class OnHeapStringData extends AbstractReferencedData
         }
 
         @Override
-        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public OnHeapStringReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
 
             // TODO what is the null count for???
@@ -184,23 +196,25 @@ public final class OnHeapStringData extends AbstractReferencedData
                 var data = new String[valueCount];
 
                 for (int i = 0; i < valueCount; i++) {
-                    var val = v.get(i);
-                    if (val != null) {
-                        data[i] = decoder.decode(val);
+                    if (!v.isNull(i)) {
+                        var val = v.get(i);
+                        if (val != null) {
+                            data[i] = decoder.decode(val);
+                        }
                     }
                 }
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-                return new OnHeapStringData(data, validity);
+                return new OnHeapStringReadData(data, validity);
             } else {
                 throw new IOException(
-                    "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
+                    "Cannot read ArrowStringData with version " + version + ". Current version: " + m_version + ".");
             }
         }
 
         @Override
-        public OnHeapStringData createWrite(final int capacity) {
-            return new OnHeapStringData(capacity);
+        public OnHeapStringWriteData createWrite(final int capacity) {
+            return new OnHeapStringWriteData(capacity);
         }
 
         @Override
@@ -210,26 +224,32 @@ public final class OnHeapStringData extends AbstractReferencedData
 
         @Override
         public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
-            var d = (OnHeapStringData)data; // TODO generic?
+            var d = (OnHeapStringReadData)data; // TODO generic?
             var vector = (VarCharVector)fieldVector;
 
-            vector.allocateNew(d.capacity());
+            vector.allocateNew(d.length());
 
             // Copy the data
             var encoder = new StringEncoder();
             // TODO we serialize here????? Can this be right???
-            for (int i = 0; i < d.m_data.length; i++) {
-                var val = d.m_data[i];
-                if (val != null) {
-                    var encoded = encoder.encode(val);
-                    vector.setSafe(i, encoded, 0, encoded.limit());
+            for (int i = 0; i < d.length(); i++) {
+                if (!d.isMissing(i)) {
+                    var val = d.getString(i);
+                    if (val != null) {
+                        var encoded = encoder.encode(val);
+                        vector.setSafe(i, encoded, 0, encoded.limit());
+                    } else {
+                        vector.setNull(i);
+                    }
+                } else {
+                    vector.setNull(i);
                 }
             }
 
             // Copy the validity
             d.m_validity.copyTo(vector.getValidityBuffer());
 
-            vector.setValueCount(d.capacity());
+            vector.setValueCount(d.length());
         }
 
         @Override
