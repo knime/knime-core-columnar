@@ -44,69 +44,83 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Nov 4, 2020 (benjamin): created
+ *   Dec 3, 2024 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
+import org.apache.arrow.memory.ArrowBuf;
+
 /**
- * TODO javadoc
- *
- * TODO should the read and write data be combined?
- *
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-@SuppressWarnings("javadoc")
-abstract class AbstractArrowReadData extends AbstractReferencedData implements ArrowReadData {
+public final class OffsetsBuffer {
 
-    // TODO private? public?
-    protected final ValidityBuffer m_validity;
+    private int[] m_offsets;
 
-    /** An offset describing where the values of this object start in the vector. */
-    protected final int m_offset;
+    private int m_nextIndex;
 
-    /** The length of the data */
-    protected final int m_length;
-
-    // TODO missing values optimization (ALL_MISSING, SOME_MISSING, NO_MISSING)
-    /**
-     * Create an abstract {@link ArrowReadData} with the given vector, an offset of 0 and the length of the vector.
-     *
-     * @param vector the vector
-     * @param missingValues if all, no or some values are missing
-     */
-    public AbstractArrowReadData(final ValidityBuffer validity, final int length) {
-        this(validity, 0, length);
+    public OffsetsBuffer(final int capacity) {
+        m_offsets = new int[capacity + 1];
+        m_nextIndex = 0;
     }
 
-    /**
-     * Create an abstract {@link ArrowReadData} with the given vector.
-     *
-     *
-     * @param vector the vector
-     * @param missingValues if all, no or some values are missing
-     * @param offset the offset
-     * @param length the length of this data
-     */
-    public AbstractArrowReadData(final ValidityBuffer validity, final int offset, final int length) {
-        m_validity = validity;
-        m_offset = offset;
-        m_length = length;
+    public OffsetsBuffer(final int[] offsets) {
+        m_offsets = offsets;
+        m_nextIndex = offsets.length - 1;
     }
 
-    @Override
-    public final boolean isMissing(final int index) {
-        return !m_validity.isSet(index + m_offset);
+    public void setNumElements(final int numElements) {
+        var newOffsets = new int[numElements + 1];
+        System.arraycopy(m_offsets, 0, newOffsets, 0, Math.min(m_offsets.length, numElements + 1));
+        m_offsets = newOffsets;
+
+        // Update the next index if it is out of bounds
+        m_nextIndex = Math.min(m_nextIndex, numElements);
     }
 
-    @Override
-    public int length() {
-        return m_length;
+    public int getLastOffset() {
+        return m_offsets[m_nextIndex];
     }
 
-    @Override
-    protected void closeResources() {
-        // TODO nothing to do?
+    public int putValue(final int index, final int size) {
+        var startOffset = getLastOffset();
+        var endOffset = startOffset + size;
+
+        // Fill holes with the start offset
+        for (int i = m_nextIndex + 1; i <= index; i++) {
+            m_offsets[i] = startOffset;
+        }
+        m_nextIndex = index + 1;
+        m_offsets[m_nextIndex] = endOffset;
+
+        return endOffset;
     }
 
-    // TODO overwrite toString
+    public void endBuffer(final int length) {
+        var lastOffset = getLastOffset();
+
+        // Fill hole in the offset buffer if necessary
+        for (int i = m_nextIndex + 1; i <= length; i++) {
+            m_offsets[i] = lastOffset;
+        }
+        m_nextIndex = length;
+    }
+
+    public int getStartIndex(final int index) {
+        return m_offsets[index];
+    }
+
+    public int getEndIndex(final int index) {
+        return m_offsets[index + 1];
+    }
+
+    public void copyTo(final ArrowBuf offsetBuffer) {
+        MemoryCopyUtils.copy(m_offsets, offsetBuffer);
+    }
+
+    public static OffsetsBuffer createFrom(final ArrowBuf offsetBuffer, final int length) {
+        var offsets = new int[length + 1];
+        MemoryCopyUtils.copy(offsetBuffer, offsets);
+        return new OffsetsBuffer(offsets);
+    }
 }
