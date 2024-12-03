@@ -102,30 +102,29 @@ public class OnHeapVoidDataTest extends AbstractArrowDataTest<OnHeapVoidData, On
         return 0;
     }
 
-    // TODO(slice)
-    //    @Override
-    //    public void testSlice() {
-    //        final int numValues = 32;
-    //        final int sliceStart = 5;
-    //        final int sliceLength = 10;
-    //
-    //        final ArrowVoidData writeData = createWrite(numValues);
-    //        final ArrowVoidData readData = castR(writeData.close(numValues));
-    //        final ArrowVoidData slicedData = readData.slice(sliceStart, sliceLength);
-    //        assertEquals(sliceLength, slicedData.length());
-    //
-    //        writeData.release();
-    //        readData.release();
-    //    }
-    //
-    //    @Override
-    //    public void testSliceOfSlice() { // NOSONAR
-    //    }
-    //
-    //    @Override
-    //    public void testSlicedSetMissing() { // NOSONAR
-    //        // Void data does not support missing values
-    //    }
+    @Override
+    public void testSlice() {
+        final int numValues = 32;
+        final int sliceStart = 5;
+        final int sliceLength = 10;
+
+        var writeData = createWrite(numValues);
+        var readData = castR(writeData.close(numValues));
+        var slicedData = readData.slice(sliceStart, sliceLength);
+        assertEquals(sliceLength, slicedData.length());
+
+        writeData.release();
+        readData.release();
+    }
+
+    @Override
+    public void testSliceOfSlice() { // NOSONAR
+    }
+
+    @Override
+    public void testSlicedSetMissing() { // NOSONAR
+        // Void data does not support missing values
+    }
 
     @Override
     public void testReferenceCounting() { // NOSONAR
