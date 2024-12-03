@@ -44,7 +44,7 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 30, 2020 (benjamin): created
+ *   Dec 3, 2024 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
@@ -52,60 +52,100 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowLongData;
-import org.knime.core.columnar.arrow.data.old.ArrowLongData.ArrowLongDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowLongData.ArrowLongReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowLongData.ArrowLongWriteData;
 
 /**
- * Test {@link ArrowLongData}
+ * Test {@link OnHeapVoidData}.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public class ArrowLongDataTest extends AbstractArrowDataTest<ArrowLongWriteData, ArrowLongReadData> {
+public class OnHeapVoidDataTest extends AbstractArrowDataTest<OnHeapVoidData, OnHeapVoidData> {
 
-    /** Create the test for {@link ArrowLongData} */
-    public ArrowLongDataTest() {
-        super(ArrowLongDataFactory.INSTANCE);
+    /** Create the test for the {@link OnHeapVoidData}. */
+    public OnHeapVoidDataTest() {
+        super(OnHeapVoidData.FACTORY);
     }
 
     @Override
-    protected ArrowLongWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowLongWriteData);
-        return (ArrowLongWriteData)o;
+    protected OnHeapVoidData castW(final Object o) {
+        assertTrue(o instanceof OnHeapVoidData);
+        return (OnHeapVoidData)o;
     }
 
     @Override
-    protected ArrowLongReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowLongReadData);
-        return (ArrowLongReadData)o;
+    protected OnHeapVoidData castR(final Object o) {
+        assertTrue(o instanceof OnHeapVoidData);
+        return (OnHeapVoidData)o;
     }
 
     @Override
-    protected void setValue(final ArrowLongWriteData data, final int index, final int seed) {
-        data.setLong(index, seed);
+    protected void setValue(final OnHeapVoidData data, final int index, final int seed) {
+        // No value to set
     }
 
     @Override
-    protected void checkValue(final ArrowLongReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getLong(index), 0);
+    protected void checkValue(final OnHeapVoidData data, final int index, final int seed) {
+        // No value to check
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowLongWriteData data) {
-        return data.m_vector == null;
+    protected boolean isReleasedW(final OnHeapVoidData data) {
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowLongReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+    protected boolean isReleasedR(final OnHeapVoidData data) {
+        return false;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 8 * capacity // 8 bytes per value for data
-            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+        return 0;
+    }
+
+    // TODO(slice)
+    //    @Override
+    //    public void testSlice() {
+    //        final int numValues = 32;
+    //        final int sliceStart = 5;
+    //        final int sliceLength = 10;
+    //
+    //        final ArrowVoidData writeData = createWrite(numValues);
+    //        final ArrowVoidData readData = castR(writeData.close(numValues));
+    //        final ArrowVoidData slicedData = readData.slice(sliceStart, sliceLength);
+    //        assertEquals(sliceLength, slicedData.length());
+    //
+    //        writeData.release();
+    //        readData.release();
+    //    }
+    //
+    //    @Override
+    //    public void testSliceOfSlice() { // NOSONAR
+    //    }
+    //
+    //    @Override
+    //    public void testSlicedSetMissing() { // NOSONAR
+    //        // Void data does not support missing values
+    //    }
+
+    @Override
+    public void testReferenceCounting() { // NOSONAR
+        // The void vector is holding no data so we don't care about releasing it
+    }
+
+    @Override
+    public void testMissing() { // NOSONAR
+        // Void data does not support missing values
+    }
+
+    @Override
+    public void testWriteReadMissing() { // NOSONAR
+        // Void data does not support missing values
+    }
+
+    @Override
+    public void testInitialNumBytesPerElement() { // NOSONAR
+        // Void data is special - it does not allocate any memory
+        var initialNumBytes = m_factory.initialNumBytesPerElement();
+        assertEquals("Initial num bytes per element should be greater than zero", 0, initialNumBytes);
     }
 }
