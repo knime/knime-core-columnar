@@ -188,13 +188,7 @@ public final class OnHeapIntData {
             if (m_version.equals(version)) {
                 var valueCount = vector.getValueCount();
                 var data = new int[valueCount];
-                MemoryUtil.UNSAFE.copyMemory(//
-                    null, //
-                    vector.getDataBufferAddress(), //
-                    data, //
-                    INT_ARRAY_BASE_OFFSET, //
-                    data.length * Integer.BYTES //
-                );
+                MemoryCopyUtils.copy(vector.getDataBufferAddress(), data);
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
                 return new OnHeapIntReadData(data, validity);
@@ -222,13 +216,7 @@ public final class OnHeapIntData {
             vector.allocateNew(d.length());
 
             // Copy the data
-            MemoryUtil.UNSAFE.copyMemory(//
-                d.m_data, //
-                INT_ARRAY_BASE_OFFSET, //
-                null, //
-                vector.getDataBufferAddress(), //
-                d.m_data.length * vector.getTypeWidth() //
-            );
+            MemoryCopyUtils.copy(d.m_data, vector.getDataBufferAddress());
 
             // Copy the validity
             d.m_validity.copyTo(vector.getValidityBuffer());
