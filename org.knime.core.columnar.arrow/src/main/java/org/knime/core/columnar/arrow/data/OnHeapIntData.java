@@ -115,7 +115,7 @@ public final class OnHeapIntData {
         @Override
         public void setInt(final int index, final int val) {
             m_data[index + m_offset] = val;
-            setValid(index);
+            setValid(index + m_offset);
         }
 
         @Override
