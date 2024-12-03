@@ -44,36 +44,49 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 30, 2020 (benjamin): created
+ *   Nov 4, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.knime.core.columnar.data.NullableWriteData;
-
 /**
- * Arrow implementation of {@link NullableWriteData}. Can be sliced with {@link #slice(int)}.
- *
- * The API of ArrowWriteData is NOT thread safe, especially expand and set should not be called at the same time from
- * different threads!
+ * TODO javadoc
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowWriteData extends NullableWriteData {
+@SuppressWarnings("javadoc")
+abstract class AbstractArrowWriteData extends AbstractReferencedData implements ArrowWriteData {
+
+    protected final ValidityBuffer m_validity;
+
+    /** An offset describing where the values of this object start in the vector. */
+    protected final int m_offset;
 
     /**
-     * Slice the this object to the given start. Note that this only affects what data is returned when accessing the
-     * data with an index. This does not effect {@link #capacity()} and {@link #expand(int)}.
-     *
-     * @param start the first index of the slice
-     * @return the sliced data
+     * TODO javadoc
      */
-    ArrowWriteData slice(int start);
+    public AbstractArrowWriteData(final int capacity) {
+        m_validity = new ValidityBuffer(capacity);
+        m_offset = 0;
+    }
 
     /**
-     * {@inheritDoc}
+     * TODO javadoc
      *
-     * Note: The returned {@link ArrowReadData} is not sliced.
+     * @param offset the offset
      */
+    public AbstractArrowWriteData(final int offset, final ValidityBuffer validity) {
+        m_validity = validity;
+        m_offset = offset;
+    }
+
     @Override
-    ArrowReadData close(int length);
+    public void setMissing(final int index) {
+        m_validity.set(index, false);
+    }
+
+    protected void setValid(final int index) {
+        m_validity.set(index, true);
+    }
+
+    // TODO overwrite toString
 }

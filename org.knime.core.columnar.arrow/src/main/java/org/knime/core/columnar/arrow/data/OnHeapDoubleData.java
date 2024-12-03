@@ -66,108 +66,116 @@ import org.knime.core.columnar.data.NullableReadData;
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class OnHeapDoubleData extends AbstractReferencedData
-    implements DoubleReadData, DoubleWriteData, ArrowReadData, ArrowWriteData {
+public final class OnHeapDoubleData {
 
     public static final Factory FACTORY = new Factory();
 
-    // or use a ByteBuffer??
-    private double[] m_data;
-
-    // TODO move validity to abstract class? Maybe in-line the ValidityBuffer class?
-    private ValidityBuffer m_validity;
-
-    private OnHeapDoubleData(final int capacity) {
-        m_data = new double[capacity];
-        m_validity = new ValidityBuffer(capacity);
+    private OnHeapDoubleData() {
     }
 
-    private OnHeapDoubleData(final double[] data, final ValidityBuffer validity) {
-        m_data = data;
-        m_validity = validity;
+    public static final class OnHeapDoubleWriteData extends AbstractArrowWriteData implements DoubleWriteData {
+
+        private double[] m_data;
+
+        private OnHeapDoubleWriteData(final int capacity) {
+            super(capacity);
+            m_data = new double[capacity];
+        }
+
+        private OnHeapDoubleWriteData(final int offset, final double[] data, final ValidityBuffer validity) {
+            super(offset, validity);
+            m_data = data;
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_data.length; // TODO - offset??
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
+        }
+
+        @Override
+        public long sizeOf() {
+            return m_data.length * Double.BYTES + m_validity.sizeOf();
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new OnHeapDoubleWriteData(m_offset + start, m_data, m_validity);
+        }
+
+        @Override
+        public void setDouble(final int index, final double val) {
+            m_data[index + m_offset] = val;
+            setValid(index);
+        }
+
+        @Override
+        protected void closeResources() {
+            // TODO not needed for on-heap, right?
+        }
+
+        @Override
+        public OnHeapDoubleReadData close(final int length) {
+            setNumElements(length);
+            return new OnHeapDoubleReadData(m_data, m_validity);
+        }
+
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            m_validity.setNumElements(numElements);
+
+            var newData = new double[numElements];
+            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+            m_data = newData;
+        }
     }
 
-    // ReferenceData
+    public static final class OnHeapDoubleReadData extends AbstractArrowReadData implements DoubleReadData {
 
-    @Override
-    protected void closeResources() {
-        m_data = null;
-        m_validity = null;
+        private final double[] m_data;
+
+        public OnHeapDoubleReadData(final double[] data, final ValidityBuffer validity) {
+            super(validity, data.length);
+            m_data = data;
+        }
+
+        public OnHeapDoubleReadData(final double[] data, final ValidityBuffer validity, final int offset,
+            final int length) {
+            super(validity, offset, length);
+            m_data = data;
+        }
+
+        @Override
+        public long sizeOf() {
+            return m_data.length * Double.BYTES + m_validity.sizeOf();
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new OnHeapDoubleReadData(m_data, m_validity, m_offset + start, length);
+        }
+
+        @Override
+        public double getDouble(final int index) {
+            return m_data[index + m_offset];
+        }
+
     }
 
-    @Override
-    public long sizeOf() {
-        return m_data.length * Double.BYTES + m_validity.sizeOf();
-    }
-
-    // WriteData
-
-    @Override
-    public void setMissing(final int index) {
-        m_validity.set(index, false);
-    }
-
-    @Override
-    public void expand(final int minimumCapacity) {
-        setNumElements(minimumCapacity);
-    }
-
-    @Override
-    public int capacity() {
-        return m_data.length;
-    }
-
-    @Override
-    public long usedSizeFor(final int numElements) {
-        return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
-    }
-
-    @Override
-    public void setDouble(final int index, final double val) {
-        m_data[index] = val;
-        m_validity.set(index, true);
-    }
-
-    @Override
-    public OnHeapDoubleData close(final int length) {
-        setNumElements(length);
-        return this;
-    }
-
-    @Override
-    public double getDouble(final int index) {
-        return m_data[index];
-    }
-
-    @Override
-    public boolean isMissing(final int index) {
-        return !m_validity.isSet(index);
-    }
-
-    @Override
-    public int length() {
-        return m_data.length;
-    }
-
-    /**
-     * Expand or shrink the data to the given size.
-     *
-     * @param numElements the new size of the data
-     */
-    private void setNumElements(final int numElements) {
-        m_validity.setNumElements(numElements);
-
-        var newData = new double[numElements];
-        System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
-        m_data = newData;
-    }
-
-    // TODO used for testing. Needed?
-    boolean isReleased() {
-        return m_data == null;
-    }
-
-    // TODO extract common functionallity
+    // TODO extract common functionality
     public static final class Factory extends AbstractArrowColumnDataFactory {
 
         private Factory() {
@@ -177,7 +185,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
         private static final int DOUBLE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(double[].class);
 
         @Override
-        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public OnHeapDoubleReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
 
             // TODO what is the null count for???
@@ -194,7 +202,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
                 );
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-                return new OnHeapDoubleData(data, validity);
+                return new OnHeapDoubleReadData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
@@ -202,8 +210,8 @@ public final class OnHeapDoubleData extends AbstractReferencedData
         }
 
         @Override
-        public OnHeapDoubleData createWrite(final int capacity) {
-            return new OnHeapDoubleData(capacity);
+        public OnHeapDoubleWriteData createWrite(final int capacity) {
+            return new OnHeapDoubleWriteData(capacity);
         }
 
         @Override
@@ -213,10 +221,10 @@ public final class OnHeapDoubleData extends AbstractReferencedData
 
         @Override
         public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
-            var d = (OnHeapDoubleData)data; // TODO generic?
+            var d = (OnHeapDoubleReadData)data; // TODO generic?
             var vector = (Float8Vector)fieldVector;
 
-            vector.allocateNew(d.capacity());
+            vector.allocateNew(d.length());
 
             // Copy the data
             // Or should we rather use ByteBuffer for `m_data` and use vector.getDataBuffer().setBytes()
@@ -232,7 +240,7 @@ public final class OnHeapDoubleData extends AbstractReferencedData
             d.m_validity.copyTo(vector.getValidityBuffer());
 
             // Set the value count
-            vector.setValueCount(d.capacity());
+            vector.setValueCount(d.length());
         }
 
         @Override

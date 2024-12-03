@@ -74,6 +74,9 @@ public final class OnHeapListData {
     private OnHeapListData() {
     }
 
+    // TODO should I combine ArrowWriteData and ArrowReadData into one. This is only split because of the child data but
+    // other implementations do not split
+
     public static final class OnHeapListWriteData extends AbstractReferencedData
         implements ListWriteData, ArrowWriteData {
 
@@ -152,6 +155,10 @@ public final class OnHeapListData {
 
         private final ArrowReadData m_data;
 
+        private final int[] m_offsets;
+
+        private final ValidityBuffer m_validity;
+
         @Override
         public boolean isMissing(final int index) {
             // TODO Auto-generated method stub
@@ -180,6 +187,12 @@ public final class OnHeapListData {
         protected void closeResources() {
             // TODO Auto-generated method stub
 
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            // TODO Auto-generated method stub
+            return null;
         }
     }
 
@@ -216,12 +229,12 @@ public final class OnHeapListData {
 
         @Override
         public void copyToVector(final NullableReadData data, final FieldVector vector) {
-            ArrowWriteData childData = null;
-            long[] offsets = null;
-            ValidityBuffer validity = null;
-
             var d = (OnHeapListReadData)data;
             var v = (ListVector)vector;
+
+            var childData = d.m_data;
+            long[] offsets = d.m_offsets;
+            ValidityBuffer validity = d.m_validity;
 
             // TODO is this comment still valid?
             // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
@@ -230,7 +243,7 @@ public final class OnHeapListData {
             v.allocateNew();
 
 
-            // TODO copy offsets and validity
+
 
             m_inner.copyToVector(d.m_data, v.getDataVector());
 
