@@ -52,63 +52,61 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleReadData;
-import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleWriteData;
-import org.knime.core.columnar.arrow.data.old.ArrowDoubleData;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntReadData;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntWriteData;
 
 /**
- * Test {@link ArrowDoubleData}
+ * Test {@link OnHeapIntData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public class OnHeapDoubleDataTest extends AbstractArrowDataTest<OnHeapDoubleWriteData, OnHeapDoubleReadData> {
+public class OnHeapIntDataTest extends AbstractArrowDataTest<OnHeapIntWriteData, OnHeapIntReadData> {
 
-    /** Create the test for {@link OnHeapDoubleData} */
-    public OnHeapDoubleDataTest() {
-        super(OnHeapDoubleData.FACTORY);
+    /** Create the test for {@link OnHeapIntData} */
+    public OnHeapIntDataTest() {
+        super(OnHeapIntData.FACTORY);
     }
 
     @Override
-    protected OnHeapDoubleWriteData castW(final Object o) {
-        assertTrue(o instanceof OnHeapDoubleWriteData);
-        return (OnHeapDoubleWriteData)o;
+    protected OnHeapIntWriteData castW(final Object o) {
+        assertTrue(o instanceof OnHeapIntWriteData);
+        return (OnHeapIntWriteData)o;
     }
 
     @Override
-    protected OnHeapDoubleReadData castR(final Object o) {
-        assertTrue(o instanceof OnHeapDoubleReadData);
-        return (OnHeapDoubleReadData)o;
+    protected OnHeapIntReadData castR(final Object o) {
+        assertTrue(o instanceof OnHeapIntReadData);
+        return (OnHeapIntReadData)o;
     }
 
-    private static double valueFor(final int seed) {
-        return seed * 1.2;
-    }
-
-    @Override
-    protected void setValue(final OnHeapDoubleWriteData data, final int index, final int seed) {
-        data.setDouble(index, valueFor(seed));
-
+    private static int valueFor(final int seed) {
+        return seed * 2;
     }
 
     @Override
-    protected void checkValue(final OnHeapDoubleReadData data, final int index, final int seed) {
-        assertEquals(valueFor(seed), data.getDouble(index), 0);
+    protected void setValue(final OnHeapIntWriteData data, final int index, final int seed) {
+        data.setInt(index, valueFor(seed));
     }
 
     @Override
-    protected boolean isReleasedW(final OnHeapDoubleWriteData data) {
+    protected void checkValue(final OnHeapIntReadData data, final int index, final int seed) {
+        assertEquals(valueFor(seed), data.getInt(index));
+    }
+
+    @Override
+    protected boolean isReleasedW(final OnHeapIntWriteData data) {
         return false;
     }
 
     @Override
-    protected boolean isReleasedR(final OnHeapDoubleReadData data) {
+    protected boolean isReleasedR(final OnHeapIntReadData data) {
         return false;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 8 * capacity // 8 bytes per value for data
+        return 4L * capacity // 4 bytes per value for data
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }
