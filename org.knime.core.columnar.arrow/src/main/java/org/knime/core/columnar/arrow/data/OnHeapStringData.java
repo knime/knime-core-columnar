@@ -115,7 +115,7 @@ public final class OnHeapStringData {
         @Override
         public void setString(final int index, final String val) {
             m_data[index + m_offset] = val;
-            setValid(index);
+            setValid(index + m_offset);
         }
 
         @Override

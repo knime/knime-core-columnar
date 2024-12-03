@@ -93,7 +93,7 @@ abstract class AbstractArrowReadData extends AbstractReferencedData implements A
 
     @Override
     public final boolean isMissing(final int index) {
-        return !m_validity.isSet(index);
+        return !m_validity.isSet(index + m_offset);
     }
 
     @Override
