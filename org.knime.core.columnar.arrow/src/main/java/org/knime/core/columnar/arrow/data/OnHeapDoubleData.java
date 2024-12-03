@@ -135,6 +135,7 @@ public final class OnHeapDoubleData {
          * @param numElements the new size of the data
          */
         private void setNumElements(final int numElements) {
+            // TODO we copy each time. Only copy if necessary! (implement for all data types)
             m_validity.setNumElements(numElements);
 
             var newData = new double[numElements];
