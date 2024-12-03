@@ -46,99 +46,66 @@
  * History
  *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-
-import org.apache.commons.lang3.RandomStringUtils;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowStringData;
-import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringWriteData;
-
-import com.google.common.base.Utf8;
+import org.knime.core.columnar.arrow.data.old.ArrowDoubleData;
+import org.knime.core.columnar.arrow.data.old.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowDoubleData.ArrowDoubleReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowDoubleData.ArrowDoubleWriteData;
 
 /**
- * Test {@link ArrowStringData}
+ * Test {@link ArrowDoubleData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowStringDataTest extends AbstractArrowDataTest<ArrowStringWriteData, ArrowStringReadData> {
+public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleWriteData, ArrowDoubleReadData> {
 
-    private static final int MAX_LENGTH = 100;
-
-    private static final Map<Integer, String> VALUES = new HashMap<>();
-
-    // Because generating random Strings takes to much time
-    private static final String DEFAULT_STRING = "foobar";
-
-    /** Create the test for {@link ArrowStringData} */
-    public ArrowStringDataTest() {
-        super(ArrowStringDataFactory.INSTANCE);
+    /** Create the test for {@link ArrowDoubleData} */
+    public ArrowDoubleDataTest() {
+        super(ArrowDoubleDataFactory.INSTANCE);
     }
 
     @Override
-    protected ArrowStringWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowStringWriteData);
-        return (ArrowStringWriteData)o;
+    protected ArrowDoubleWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowDoubleWriteData);
+        return (ArrowDoubleWriteData)o;
     }
 
     @Override
-    protected ArrowStringReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowStringReadData);
-        return (ArrowStringReadData)o;
+    protected ArrowDoubleReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowDoubleReadData);
+        return (ArrowDoubleReadData)o;
     }
 
     @Override
-    protected void setValue(final ArrowStringWriteData data, final int index, final int seed) {
-        data.setString(index, valueFor(seed));
+    protected void setValue(final ArrowDoubleWriteData data, final int index, final int seed) {
+        data.setDouble(index, seed);
     }
 
     @Override
-    protected void checkValue(final ArrowStringReadData data, final int index, final int seed) {
-        assertEquals(valueFor(seed), data.getString(index));
+    protected void checkValue(final ArrowDoubleReadData data, final int index, final int seed) {
+        assertEquals(seed, data.getDouble(index), 0);
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowStringWriteData data) {
+    protected boolean isReleasedW(final ArrowDoubleWriteData data) {
         return data.m_vector == null;
     }
 
     @Override
-    @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowStringReadData data) {
+    @SuppressWarnings("resource") // Resources handled by vector
+    protected boolean isReleasedR(final ArrowDoubleReadData data) {
         return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        long numBytes = 0;
-        for (int i = 0; i < valueCount; i++) {
-            numBytes += Utf8.encodedLength(valueFor(i));
-        }
-
-        return numBytes // data
-            + 4L * (capacity + 1) // 4 byte per value for offset buffer
+        return 8 * capacity // 8 bytes per value for data
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
-    }
-
-    private static String valueFor(final int seed) {
-        if (seed > 50) {
-            // Return a fixed value for all larger seeds
-            // Generating random Strings takes a long time
-            return DEFAULT_STRING;
-        }
-        return VALUES.computeIfAbsent(seed, s -> {
-            final Random random = new Random(s);
-            final int count = random.nextInt(MAX_LENGTH);
-            return RandomStringUtils.random(count, 0, Integer.MAX_VALUE, true, true, null, random);
-        });
     }
 }

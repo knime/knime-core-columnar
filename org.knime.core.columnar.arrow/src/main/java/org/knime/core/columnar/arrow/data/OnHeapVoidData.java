@@ -107,6 +107,7 @@ public final class OnHeapVoidData extends AbstractReferencedData
 
     @Override
     public OnHeapVoidData close(final int length) {
+        m_capacity = length;
         return this;
     }
 

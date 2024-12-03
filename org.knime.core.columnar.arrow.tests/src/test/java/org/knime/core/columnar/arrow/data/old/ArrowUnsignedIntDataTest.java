@@ -46,67 +46,67 @@
  * History
  *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowUnsignedByteData;
-import org.knime.core.columnar.arrow.data.old.ArrowUnsignedByteData.ArrowUnsignedByteDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowUnsignedByteData.ArrowUnsignedByteReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowUnsignedByteData.ArrowUnsignedByteWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedIntData;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedIntData.ArrowUnsignedIntDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedIntData.ArrowUnsignedIntReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedIntData.ArrowUnsignedIntWriteData;
 
 /**
- * Test {@link ArrowUnsignedByteData}
+ * Test {@link ArrowUnsignedIntData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-public class ArrowUnsignedByteDataTest extends AbstractArrowDataTest<ArrowUnsignedByteWriteData, ArrowUnsignedByteReadData> {
+public class ArrowUnsignedIntDataTest extends AbstractArrowDataTest<ArrowUnsignedIntWriteData, ArrowUnsignedIntReadData> {
 
-    /** Create the test for {@link ArrowUnsignedByteData} */
-    public ArrowUnsignedByteDataTest() {
-        super(ArrowUnsignedByteDataFactory.INSTANCE);
+    /** Create the test for {@link ArrowUnsignedIntData} */
+    public ArrowUnsignedIntDataTest() {
+        super(ArrowUnsignedIntDataFactory.INSTANCE);
     }
 
     @Override
-    protected ArrowUnsignedByteWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowUnsignedByteWriteData);
-        return (ArrowUnsignedByteWriteData)o;
+    protected ArrowUnsignedIntWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowUnsignedIntWriteData);
+        return (ArrowUnsignedIntWriteData)o;
     }
 
     @Override
-    protected ArrowUnsignedByteReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowUnsignedByteReadData);
-        return (ArrowUnsignedByteReadData)o;
+    protected ArrowUnsignedIntReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowUnsignedIntReadData);
+        return (ArrowUnsignedIntReadData)o;
     }
 
     @Override
-    protected void setValue(final ArrowUnsignedByteWriteData data, final int index, final int seed) {
-        data.setByte(index, (byte)seed);
+    protected void setValue(final ArrowUnsignedIntWriteData data, final int index, final int seed) {
+        data.setInt(index, seed);
     }
 
     @Override
-    protected void checkValue(final ArrowUnsignedByteReadData data, final int index, final int seed) {
-        assertEquals((byte)seed, data.getByte(index));
+    protected void checkValue(final ArrowUnsignedIntReadData data, final int index, final int seed) {
+        assertEquals(seed, data.getInt(index));
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowUnsignedByteWriteData data) {
+    protected boolean isReleasedW(final ArrowUnsignedIntWriteData data) {
         return data.m_vector == null;
     }
 
     @Override
     @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowUnsignedByteReadData data) {
+    protected boolean isReleasedR(final ArrowUnsignedIntReadData data) {
         return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 1 * capacity // 1 byte per value for data
+        return 4 * capacity // 4 bytes per value for data
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }
