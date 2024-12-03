@@ -74,37 +74,38 @@ public final class OnHeapListData {
     private OnHeapListData() {
     }
 
-    // TODO should I combine ArrowWriteData and ArrowReadData into one. This is only split because of the child data but
-    // other implementations do not split
+    public static final class OnHeapListWriteData extends AbstractArrowWriteData implements ListWriteData {
 
-    public static final class OnHeapListWriteData extends AbstractReferencedData
-        implements ListWriteData, ArrowWriteData {
+        private int m_capacity;
 
         private ArrowWriteData m_data;
 
-        private int[] m_offsets;
-
-        private ValidityBuffer m_validity;
+        private OffsetsBuffer m_offsets;
 
         private OnHeapListWriteData(final int capacity, final ArrowWriteData data) {
+            super(capacity);
+            m_capacity = capacity;
             m_data = data;
-            m_offsets = new int[capacity + 1];
-            m_validity = new ValidityBuffer(capacity);
+            m_offsets = new OffsetsBuffer(capacity);
         }
 
-        @Override
-        public void setMissing(final int index) {
-            m_validity.set(index, false);
+        private OnHeapListWriteData(final int offset, final ArrowWriteData data, final OffsetsBuffer offsets,
+            final ValidityBuffer validity, final int capacity) {
+            super(offset, validity);
+            m_capacity = capacity;
+            m_data = data;
+            m_offsets = offsets;
         }
 
         @Override
         public void expand(final int minimumCapacity) {
             setNumElements(minimumCapacity);
+            m_capacity = minimumCapacity;
         }
 
         @Override
         public int capacity() {
-            return m_offsets.length - 1;
+            return m_capacity;
         }
 
         @Override
@@ -121,20 +122,35 @@ public final class OnHeapListData {
 
         @Override
         public OnHeapListReadData close(final int length) {
-            // TODO Auto-generated method stub
-            return null;
+            setNumElements(length);
+            m_offsets.endBuffer(length);
+            return new OnHeapListReadData(m_data.close(m_offsets.getLastOffset()), m_offsets, m_validity, length);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return new OnHeapListWriteData(m_offset + start, m_data, m_offsets, m_validity, m_capacity);
         }
 
         @Override
         public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
-            // TODO Auto-generated method stub
-            return null;
+            var startOffset = m_offsets.getLastOffset();
+            var endOffset = m_offsets.putValue(m_offset + index, size);
+
+            // Set the validity bit
+            setValid(index + m_offset);
+
+            // TODO be smarter here and do not copy on each new list
+            m_data.expand(endOffset);
+
+            @SuppressWarnings("unchecked")
+            var data = (C)m_data.slice(startOffset);
+            return data;
         }
 
         @Override
         protected void closeResources() {
-            // TODO Auto-generated method stub
-
+            // TODO not needed for on-heap, right?
         }
 
         /**
@@ -143,32 +159,30 @@ public final class OnHeapListData {
          * @param numElements the new size of the data
          */
         private void setNumElements(final int numElements) {
+            // Note: m_data is expanded when setting the elements inside the list
             m_validity.setNumElements(numElements);
-
-            var newOffsets = new int[numElements + 1];
-            System.arraycopy(m_offsets, 0, newOffsets, 0, Math.min(m_offsets.length, numElements));
-            m_offsets = newOffsets;
+            m_offsets.setNumElements(numElements);
         }
     }
 
-    public static final class OnHeapListReadData extends AbstractReferencedData implements ListReadData, ArrowReadData {
+    public static final class OnHeapListReadData extends AbstractArrowReadData implements ListReadData {
 
         private final ArrowReadData m_data;
 
-        private final int[] m_offsets;
+        private final OffsetsBuffer m_offsets;
 
-        private final ValidityBuffer m_validity;
-
-        @Override
-        public boolean isMissing(final int index) {
-            // TODO Auto-generated method stub
-            return false;
+        private OnHeapListReadData(final ArrowReadData data, final OffsetsBuffer offsets, final ValidityBuffer validity,
+            final int length) {
+            super(validity, length);
+            m_data = data;
+            m_offsets = offsets;
         }
 
-        @Override
-        public int length() {
-            // TODO Auto-generated method stub
-            return 0;
+        private OnHeapListReadData(final ArrowReadData data, final OffsetsBuffer offsets, final ValidityBuffer validity,
+            final int offset, final int length) {
+            super(validity, offset, length);
+            m_data = data;
+            m_offsets = offsets;
         }
 
         @Override
@@ -179,20 +193,22 @@ public final class OnHeapListData {
 
         @Override
         public <C extends NullableReadData> C createReadData(final int index) {
-            // TODO Auto-generated method stub
-            return null;
+            // Slice the data
+            final int start = m_offsets.getStartIndex(m_offset + index);
+            final int length = m_offsets.getEndIndex(m_offset + index) - start;
+            @SuppressWarnings("unchecked")
+            final C data = (C)m_data.slice(start, length);
+            return data;
         }
 
         @Override
         protected void closeResources() {
-            // TODO Auto-generated method stub
-
+            // TODO not needed for on-heap, right?
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            // TODO Auto-generated method stub
-            return null;
+            return new OnHeapListReadData(m_data, m_offsets, m_validity, m_offset + start, length);
         }
     }
 
@@ -216,15 +232,25 @@ public final class OnHeapListData {
 
         @Override
         public ArrowWriteData createWrite(final int capacity) {
-            // TODO Auto-generated method stub
-            return null;
+            return new OnHeapListWriteData(capacity, m_inner.createWrite(capacity));
         }
 
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            // TODO Auto-generated method stub
-            return null;
+            if (m_version.equals(version)) {
+                var valueCount = vector.getValueCount();
+                var listVector = (ListVector)vector;
+                var dataVector = listVector.getDataVector();
+                var offsets = OffsetsBuffer.createFrom(vector.getOffsetBuffer(), valueCount);
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+                var data = m_inner.createRead(dataVector, nullCount, provider, version);
+                return new OnHeapListReadData(data, offsets, validity, valueCount);
+            } else {
+                throw new IOException(
+                    "Cannot read ArrowListData with version " + version + ". Current version: " + m_version + ".");
+            }
         }
 
         @Override
@@ -232,21 +258,19 @@ public final class OnHeapListData {
             var d = (OnHeapListReadData)data;
             var v = (ListVector)vector;
 
-            var childData = d.m_data;
-            long[] offsets = d.m_offsets;
-            ValidityBuffer validity = d.m_validity;
-
             // TODO is this comment still valid?
             // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
             // the child vector
             v.setInitialCapacity(d.length());
             v.allocateNew();
 
-
-
-
             m_inner.copyToVector(d.m_data, v.getDataVector());
 
+            d.m_validity.copyTo(vector.getValidityBuffer());
+            d.m_offsets.copyTo(vector.getOffsetBuffer());
+
+            v.setLastSet(d.length() - 1);
+            v.setValueCount(d.length());
         }
 
         @Override
