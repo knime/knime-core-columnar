@@ -45,10 +45,10 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -62,10 +62,10 @@ import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.RootAllocator;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
@@ -107,7 +107,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     }
 
     /**
-     * Check if the object is of class W an cast.
+     * Check if the object is of class W and cast.
      *
      * @param o an object
      * @return the cast object
@@ -115,7 +115,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     protected abstract W castW(Object o);
 
     /**
-     * Check if the object is of class R an cast.
+     * Check if the object is of class R and cast.
      *
      * @param o an object
      * @return the cast object
@@ -132,8 +132,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     protected abstract void setValue(W data, int index, int seed);
 
     /**
-     * Check the value at the given index using the seed. Should be the same as set in
-     * {@link #setValue(ArrowWriteData, int, int)}.
+     * Check the value at the given index using the seed.
      *
      * @param data the data object
      * @param index the index
@@ -161,7 +160,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     protected abstract long getMinSize(int valueCount, int capacity);
 
     /** Initialize the root allocator before running a test */
-    @Before
+    @BeforeEach
     public void before() {
         final int segmentSize = 1;
         m_alloc = new RootAllocator(AllocationListener.NOOP, Long.MAX_VALUE,
@@ -169,7 +168,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     }
 
     /** Close the root allocator after running a test */
-    @After
+    @AfterEach
     public void after() {
         MappedMessageSerializerTestUtil.assertAllClosed();
         m_alloc.close();
@@ -248,118 +247,117 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         readData.release();
     }
 
-    // TODO implement or delete slice
     /** Test reading and writing of sliced data */
-    //    @Test
-    //    public void testSlice() {
-    //        final int numValues = 32;
-    //        final int sliceStart = 5;
-    //        final int sliceLength = 10;
-    //
-    //        final W writeData = createWrite(numValues);
-    //        // Write into a slice
-    //        final W slicedWrite = castW(writeData.slice(sliceStart));
-    //        for (int i = 0; i < sliceLength; i++) {
-    //            setValue(slicedWrite, i, i);
-    //        }
-    //
-    //        // Read everything
-    //        final R readData = castR(writeData.close(numValues));
-    //        for (int i = 0; i < numValues; i++) {
-    //            if (i >= sliceStart && i < sliceStart + sliceLength) {
-    //                // Inside the written slice
-    //                assertFalse(readData.isMissing(i));
-    //                checkValue(readData, i, i - sliceStart);
-    //            } else {
-    //                // Outside the written slice
-    //                assertTrue(readData.isMissing(i));
-    //            }
-    //        }
-    //
-    //        // Read only the slice
-    //        final R slicedRead = castR(readData.slice(sliceStart, sliceLength));
-    //        assertEquals(sliceLength, slicedRead.length());
-    //        for (int i = 0; i < sliceLength; i++) {
-    //            assertFalse(slicedRead.isMissing(i));
-    //            checkValue(slicedRead, i, i);
-    //        }
-    //
-    //        readData.release();
-    //    }
-    //
-    //    /** Test reading and writing missing values in sliced data */
-    //    @Test
-    //    public void testSlicedSetMissing() {
-    //        final int numValues = 32;
-    //        final int sliceStart = 20;
-    //        final int sliceLength = 12;
-    //
-    //        final W writeData = createWrite(numValues);
-    //        // Write into a slice
-    //        final W slicedWrite = castW(writeData.slice(sliceStart));
-    //        for (int i = 0; i < sliceLength; i++) {
-    //            if (i % 2 == 0) {
-    //                setValue(slicedWrite, i, i);
-    //            } else {
-    //                slicedWrite.setMissing(i);
-    //            }
-    //        }
-    //
-    //        // Read the slice
-    //        final R readData = castR(writeData.close(numValues));
-    //        final R slicedRead = castR(readData.slice(sliceStart, sliceLength));
-    //        for (int i = 0; i < sliceLength; i++) {
-    //            if (i % 2 == 0) {
-    //                assertFalse(slicedRead.isMissing(i));
-    //            } else {
-    //                assertTrue(slicedRead.isMissing(i));
-    //            }
-    //        }
-    //
-    //        readData.release();
-    //    }
-    //
-    //    /** Test slice of slice and writing of sliced data */
-    //    @Test
-    //    public void testSliceOfSlice() {
-    //        final int numValues = 32;
-    //        final int slice1Start = 5;
-    //        final int slice2Start = 3;
-    //        final int sliceLength = 5;
-    //
-    //        final W writeData = createWrite(numValues);
-    //        final W slicedWrite1 = castW(writeData.slice(slice1Start));
-    //        final W slicedWrite2 = castW(slicedWrite1.slice(slice2Start));
-    //
-    //        // Write into a slice
-    //        for (int i = 0; i < sliceLength; i++) {
-    //            setValue(slicedWrite2, i, i);
-    //        }
-    //
-    //        // Read everything
-    //        final R readData = castR(writeData.close(numValues));
-    //        for (int i = 0; i < numValues; i++) {
-    //            if (i >= slice1Start + slice2Start && i < slice1Start + slice2Start + sliceLength) {
-    //                // Inside the written slice
-    //                assertFalse(readData.isMissing(i));
-    //                checkValue(readData, i, i - slice1Start - slice2Start);
-    //            } else {
-    //                // Outside the written slice
-    //                assertTrue(readData.isMissing(i));
-    //            }
-    //        }
-    //
-    //        // Read only the slice
-    //        final R slicedRead1 = castR(readData.slice(slice1Start, 10));
-    //        final R slicedRead2 = castR(slicedRead1.slice(slice2Start, sliceLength));
-    //        assertEquals(sliceLength, slicedRead2.length());
-    //        for (int i = 0; i < sliceLength; i++) {
-    //            assertFalse(slicedRead2.isMissing(i));
-    //            checkValue(slicedRead2, i, i);
-    //        }
-    //
-    //        readData.release();
-    //    }
+    @Test
+    public void testSlice() {
+        final int numValues = 32;
+        final int sliceStart = 5;
+        final int sliceLength = 10;
+
+        final W writeData = createWrite(numValues);
+        // Write into a slice
+        final W slicedWrite = castW(writeData.slice(sliceStart));
+        for (int i = 0; i < sliceLength; i++) {
+            setValue(slicedWrite, i, i);
+        }
+
+        // Read everything
+        final R readData = castR(writeData.close(numValues));
+        for (int i = 0; i < numValues; i++) {
+            if (i >= sliceStart && i < sliceStart + sliceLength) {
+                // Inside the written slice
+                assertFalse(readData.isMissing(i));
+                checkValue(readData, i, i - sliceStart);
+            } else {
+                // Outside the written slice
+                assertTrue(readData.isMissing(i));
+            }
+        }
+
+        // Read only the slice
+        final R slicedRead = castR(readData.slice(sliceStart, sliceLength));
+        assertEquals(sliceLength, slicedRead.length());
+        for (int i = 0; i < sliceLength; i++) {
+            assertFalse(slicedRead.isMissing(i));
+            checkValue(slicedRead, i, i);
+        }
+
+        readData.release();
+    }
+
+    /** Test reading and writing missing values in sliced data */
+    @Test
+    public void testSlicedSetMissing() {
+        final int numValues = 32;
+        final int sliceStart = 20;
+        final int sliceLength = 12;
+
+        final W writeData = createWrite(numValues);
+        // Write into a slice
+        final W slicedWrite = castW(writeData.slice(sliceStart));
+        for (int i = 0; i < sliceLength; i++) {
+            if (i % 2 == 0) {
+                setValue(slicedWrite, i, i);
+            } else {
+                slicedWrite.setMissing(i);
+            }
+        }
+
+        // Read the slice
+        final R readData = castR(writeData.close(numValues));
+        final R slicedRead = castR(readData.slice(sliceStart, sliceLength));
+        for (int i = 0; i < sliceLength; i++) {
+            if (i % 2 == 0) {
+                assertFalse(slicedRead.isMissing(i));
+            } else {
+                assertTrue(slicedRead.isMissing(i));
+            }
+        }
+
+        readData.release();
+    }
+
+    /** Test slice of slice and writing of sliced data */
+    @Test
+    public void testSliceOfSlice() {
+        final int numValues = 32;
+        final int slice1Start = 5;
+        final int slice2Start = 3;
+        final int sliceLength = 5;
+
+        final W writeData = createWrite(numValues);
+        final W slicedWrite1 = castW(writeData.slice(slice1Start));
+        final W slicedWrite2 = castW(slicedWrite1.slice(slice2Start));
+
+        // Write into a slice
+        for (int i = 0; i < sliceLength; i++) {
+            setValue(slicedWrite2, i, i);
+        }
+
+        // Read everything
+        final R readData = castR(writeData.close(numValues));
+        for (int i = 0; i < numValues; i++) {
+            if (i >= slice1Start + slice2Start && i < slice1Start + slice2Start + sliceLength) {
+                // Inside the written slice
+                assertFalse(readData.isMissing(i));
+                checkValue(readData, i, i - slice1Start - slice2Start);
+            } else {
+                // Outside the written slice
+                assertTrue(readData.isMissing(i));
+            }
+        }
+
+        // Read only the slice
+        final R slicedRead1 = castR(readData.slice(slice1Start, 10));
+        final R slicedRead2 = castR(slicedRead1.slice(slice2Start, sliceLength));
+        assertEquals(sliceLength, slicedRead2.length());
+        for (int i = 0; i < sliceLength; i++) {
+            assertFalse(slicedRead2.isMissing(i));
+            checkValue(slicedRead2, i, i);
+        }
+
+        readData.release();
+    }
 
     /**
      * Test reading different indices in R at the same time.
@@ -415,7 +413,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     }
 
     /** Test #retain() and #release() for W and R */
-    @Ignore // TODO the onheap data is one object for write and read and therefore the test does not work
+    @Disabled("TODO the onheap data is one object for write and read and therefore the test does not work")
     @Test
     public void testReferenceCounting() {
         int numValues = 8;
@@ -517,15 +515,15 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         final int numValues = 8213;
         final W wd = createWrite(numValues);
         long minSize = getMinSize(0, numValues);
-        assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
+        assertTrue(wd.sizeOf() >= minSize, "Size too small. Got " + wd.sizeOf() + ", expected >= " + minSize);
         for (int i = 0; i < numValues; i++) {
             setValue(wd, i, i);
             minSize = getMinSize(i, numValues);
-            assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
+            assertTrue(wd.sizeOf() >= minSize, "Size too small. Got " + wd.sizeOf() + ", expected >= " + minSize);
         }
         final R rd = castR(wd.close(numValues));
         minSize = getMinSize(numValues, numValues);
-        assertTrue("Size to small. Got " + rd.sizeOf() + ", expected >= " + minSize, rd.sizeOf() >= minSize);
+        assertTrue(rd.sizeOf() >= minSize, "Size too small. Got " + rd.sizeOf() + ", expected >= " + minSize);
         rd.release();
     }
 
@@ -690,7 +688,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     @Test
     public void testInitialNumBytesPerElement() {
         var initialNumBytes = m_factory.initialNumBytesPerElement();
-        assertTrue("Initial num bytes per element should be greater than zero", initialNumBytes > 0);
+        assertTrue(initialNumBytes > 0, "Initial num bytes per element should be greater than zero");
 
         checkInitialNumBytesPerElementFor(4);
         checkInitialNumBytesPerElementFor(200);
@@ -703,17 +701,19 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             var expectedSize = m_factory.initialNumBytesPerElement() * num_values;
 
             // Make sure we are not under-estimating the size by much
-            // (for small data types and few elements we might under-estimate but sill end up with 16 bytes)
+            // (for small data types and few elements we might under-estimate but still end up with 16 bytes)
             var upperLimit = Math.max((int)(expectedSize * 1.2), 16);
-            assertTrue("Initial size for %d elements was %d bytes, expected: %d bytes (max %d bytes)"
-                .formatted(num_values, size, expectedSize, upperLimit), size <= upperLimit);
+            assertTrue(size <= upperLimit,
+                "Initial size for %d elements was %d bytes, expected: %d bytes (max %d bytes)".formatted(num_values,
+                    size, expectedSize, upperLimit));
 
-            // Make sure we are not over estimating the size by much
+            // Make sure we are not over-estimating the size by much
             // (exclude boolean because it only uses 1 bit per element but we estimate 1 byte per element)
             if (expectedSize > num_values) {
                 var lowerLimit = (int)(expectedSize * 0.5);
-                assertTrue("Initial size for %d elements was %d bytes, expected: %d bytes (at least %d bytes)"
-                    .formatted(num_values, size, expectedSize, lowerLimit), size >= lowerLimit);
+                assertTrue(size >= lowerLimit,
+                    "Initial size for %d elements was %d bytes, expected: %d bytes (at least %d bytes)"
+                        .formatted(num_values, size, expectedSize, lowerLimit));
             }
         } finally {
             data.close(num_values).release();
