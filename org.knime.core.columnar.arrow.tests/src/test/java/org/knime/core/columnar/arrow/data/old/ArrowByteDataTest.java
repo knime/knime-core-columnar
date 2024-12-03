@@ -46,90 +46,65 @@
  * History
  *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Random;
-
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData;
-import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowByteData;
+import org.knime.core.columnar.arrow.data.old.ArrowByteData.ArrowByteDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowByteData.ArrowByteReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowByteData.ArrowByteWriteData;
 
 /**
- * Test {@link ArrowVarBinaryData} with the setObject and getObject methods
+ * Test {@link ArrowByteData}
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowVarBinaryWriteData, ArrowVarBinaryReadData> {
+public class ArrowByteDataTest extends AbstractArrowDataTest<ArrowByteWriteData, ArrowByteReadData> {
 
-    private static final int MAX_LENGTH = 100;
-
-    /** Create the test for {@link ArrowVarBinaryData} */
-    public ArrowObjectDataTest() {
-        super(ArrowVarBinaryDataFactory.INSTANCE);
+    /** Create the test for {@link ArrowByteData} */
+    public ArrowByteDataTest() {
+        super(ArrowByteDataFactory.INSTANCE);
     }
 
     @Override
-    protected ArrowVarBinaryWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowVarBinaryWriteData);
-        return (ArrowVarBinaryWriteData)o;
+    protected ArrowByteWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowByteWriteData);
+        return (ArrowByteWriteData)o;
     }
 
     @Override
-    protected ArrowVarBinaryReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowVarBinaryReadData);
-        return (ArrowVarBinaryReadData)o;
+    protected ArrowByteReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowByteReadData);
+        return (ArrowByteReadData)o;
     }
 
     @Override
-    protected void setValue(final ArrowVarBinaryWriteData data, final int index, final int seed) {
-        data.setObject(index, valueFor(seed), (output, object) -> {
-            output.writeInt(object.length);
-            output.write(object);
-        });
+    protected void setValue(final ArrowByteWriteData data, final int index, final int seed) {
+        data.setByte(index, (byte)seed);
     }
 
     @Override
-    protected void checkValue(final ArrowVarBinaryReadData data, final int index, final int seed) {
-        final byte[] read = data.getObject(index, input -> {
-            final byte[] object = new byte[input.readInt()];
-            input.readFully(object);
-            return object;
-        });
-        assertArrayEquals(valueFor(seed), read);
+    protected void checkValue(final ArrowByteReadData data, final int index, final int seed) {
+        assertEquals((byte)seed, data.getByte(index), 0);
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowVarBinaryWriteData data) {
+    protected boolean isReleasedW(final ArrowByteWriteData data) {
         return data.m_vector == null;
     }
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleasedR(final ArrowVarBinaryReadData data) {
+    protected boolean isReleasedR(final ArrowByteReadData data) {
         return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        long numBytes = 0;
-        for (int i = 0; i < valueCount; i++) {
-            numBytes += new Random(i).nextInt(MAX_LENGTH);
-        }
-        return numBytes // data buffer
-            + 4 * capacity // offset buffer
-            + (long)Math.ceil(capacity / 8.0); // validity buffer
-    }
-
-    private static byte[] valueFor(final int seed) {
-        final Random random = new Random(seed);
-        final byte[] bytes = new byte[random.nextInt(MAX_LENGTH)];
-        random.nextBytes(bytes);
-        return bytes;
+        return capacity // 1 byte per value for data
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }
