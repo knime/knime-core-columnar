@@ -44,71 +44,62 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 30, 2020 (benjamin): created
+ *   Dec 3, 2024 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
 
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntReadData;
-import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntWriteData;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.util.MemoryUtil;
 
 /**
- * Test {@link OnHeapIntData}
- *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public class OnHeapIntDataTest extends AbstractArrowDataTest<OnHeapIntWriteData, OnHeapIntReadData> {
+final class MemoryCopyUtils {
 
-    /** Create the test for {@link OnHeapIntData} */
-    public OnHeapIntDataTest() {
-        super(OnHeapIntData.FACTORY);
+    private static final int INT_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(int[].class);
+
+    MemoryCopyUtils() {
     }
 
-    @Override
-    protected OnHeapIntWriteData castW(final Object o) {
-        assertTrue(o instanceof OnHeapIntWriteData, "Object is not an instance of OnHeapIntWriteData");
-        return (OnHeapIntWriteData)o;
+    /**
+     * Copy the content of the given source address to the given destination array. Fills the destination array from the
+     * beginning to the end.
+     *
+     * @param source the source memory address
+     * @param destination the destination int array
+     */
+    public static void copy(final ArrowBuf source, final int[] destination) {
+        copy(source.memoryAddress(), destination);
     }
 
-    @Override
-    protected OnHeapIntReadData castR(final Object o) {
-        assertTrue(o instanceof OnHeapIntReadData, "Object is not an instance of OnHeapIntReadData");
-        return (OnHeapIntReadData)o;
+    /**
+     * Copy the content of the given source address to the given destination array. Fills the destination array from the
+     * beginning to the end.
+     *
+     * @param sourceAddress the source memory address
+     * @param destination the destination int array
+     */
+    public static void copy(final long sourceAddress, final int[] destination) {
+        MemoryUtil.UNSAFE.copyMemory(//
+            null, // source object
+            sourceAddress, // source offset
+            destination, // destination object
+            INT_ARRAY_BASE_OFFSET, // destination offset
+            destination.length * Integer.BYTES // number of bytes
+        );
     }
 
-    private static int valueFor(final int seed) {
-        return seed * 2;
+    public static void copy(final int[] source, final ArrowBuf destination) {
+        copy(source, destination.memoryAddress());
     }
 
-    @Override
-    protected void setValue(final OnHeapIntWriteData data, final int index, final int seed) {
-        data.setInt(index, valueFor(seed));
-    }
-
-    @Override
-    protected void checkValue(final OnHeapIntReadData data, final int index, final int seed) {
-        assertEquals(valueFor(seed), data.getInt(index),
-            "Value at index " + index + " does not match expected value for seed " + seed);
-    }
-
-    @Override
-    protected boolean isReleasedW(final OnHeapIntWriteData data) {
-        return false;
-    }
-
-    @Override
-    protected boolean isReleasedR(final OnHeapIntReadData data) {
-        return false;
-    }
-
-    @Override
-    protected long getMinSize(final int valueCount, final int capacity) {
-        return 4L * capacity // 4 bytes per value for data
-            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    public static void copy(final int[] source, final long destinationAddress) {
+        MemoryUtil.UNSAFE.copyMemory(//
+            source, // source object
+            INT_ARRAY_BASE_OFFSET, // source offset
+            null, // destination object
+            destinationAddress, // destination offset
+            source.length * Integer.BYTES // number of bytes
+        );
     }
 }
