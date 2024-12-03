@@ -115,7 +115,7 @@ public final class OnHeapDoubleData {
         @Override
         public void setDouble(final int index, final double val) {
             m_data[index + m_offset] = val;
-            setValid(index);
+            setValid(index + m_offset);
         }
 
         @Override
