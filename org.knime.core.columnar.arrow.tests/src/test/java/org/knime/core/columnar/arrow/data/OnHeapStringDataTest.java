@@ -1,6 +1,7 @@
 /*
  * ------------------------------------------------------------------------
  *
+
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -51,64 +52,93 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+import org.apache.commons.lang3.RandomStringUtils;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleReadData;
-import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleWriteData;
-import org.knime.core.columnar.arrow.data.old.ArrowDoubleData;
+import org.knime.core.columnar.arrow.data.OnHeapStringData.OnHeapStringReadData;
+import org.knime.core.columnar.arrow.data.OnHeapStringData.OnHeapStringWriteData;
+
+import com.google.common.base.Utf8;
 
 /**
- * Test {@link ArrowDoubleData}
+ * Test {@link OnHeapStringData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public class OnHeapDoubleDataTest extends AbstractArrowDataTest<OnHeapDoubleWriteData, OnHeapDoubleReadData> {
+public class OnHeapStringDataTest extends AbstractArrowDataTest<OnHeapStringWriteData, OnHeapStringReadData> {
 
-    /** Create the test for {@link OnHeapDoubleData} */
-    public OnHeapDoubleDataTest() {
-        super(OnHeapDoubleData.FACTORY);
+    private static final int MAX_LENGTH = 100;
+
+    private static final Map<Integer, String> VALUES = new HashMap<>();
+
+    // Because generating random Strings takes too much time
+    private static final String DEFAULT_STRING = "foobar";
+
+    /** Create the test for {@link OnHeapStringData} */
+    public OnHeapStringDataTest() {
+        super(OnHeapStringData.FACTORY);
     }
 
     @Override
-    protected OnHeapDoubleWriteData castW(final Object o) {
-        assertTrue(o instanceof OnHeapDoubleWriteData);
-        return (OnHeapDoubleWriteData)o;
+    protected OnHeapStringWriteData castW(final Object o) {
+        assertTrue(o instanceof OnHeapStringWriteData);
+        return (OnHeapStringWriteData)o;
     }
 
     @Override
-    protected OnHeapDoubleReadData castR(final Object o) {
-        assertTrue(o instanceof OnHeapDoubleReadData);
-        return (OnHeapDoubleReadData)o;
-    }
-
-    private static double valueFor(final int seed) {
-        return seed * 1.2;
+    protected OnHeapStringReadData castR(final Object o) {
+        assertTrue(o instanceof OnHeapStringReadData);
+        return (OnHeapStringReadData)o;
     }
 
     @Override
-    protected void setValue(final OnHeapDoubleWriteData data, final int index, final int seed) {
-        data.setDouble(index, valueFor(seed));
-
+    protected void setValue(final OnHeapStringWriteData data, final int index, final int seed) {
+        data.setString(index, valueFor(seed));
     }
 
     @Override
-    protected void checkValue(final OnHeapDoubleReadData data, final int index, final int seed) {
-        assertEquals(valueFor(seed), data.getDouble(index), 0);
+    protected void checkValue(final OnHeapStringReadData data, final int index, final int seed) {
+        assertEquals(valueFor(seed), data.getString(index));
     }
 
     @Override
-    protected boolean isReleasedW(final OnHeapDoubleWriteData data) {
+    protected boolean isReleasedW(final OnHeapStringWriteData data) {
+        // On-heap data does not have resources that need explicit release
         return false;
     }
 
     @Override
-    protected boolean isReleasedR(final OnHeapDoubleReadData data) {
+    protected boolean isReleasedR(final OnHeapStringReadData data) {
+        // On-heap data does not have resources that need explicit release
         return false;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 8 * capacity // 8 bytes per value for data
+        long numBytes = 0;
+        for (int i = 0; i < valueCount; i++) {
+            numBytes += Utf8.encodedLength(valueFor(i));
+        }
+
+        return numBytes // data
+            + 4L * (capacity + 1) // 4 bytes per value for offset buffer
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
+
+    private static String valueFor(final int seed) {
+        if (seed > 50) {
+            // Return a fixed value for all larger seeds
+            // Generating random Strings takes a long time
+            return DEFAULT_STRING;
+        }
+        return VALUES.computeIfAbsent(seed, s -> {
+            final Random random = new Random(s);
+            final int count = random.nextInt(MAX_LENGTH);
+            return RandomStringUtils.random(count, 0, Integer.MAX_VALUE, true, true, null, random);
+        });
     }
 }
