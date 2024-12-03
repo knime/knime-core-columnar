@@ -46,100 +46,100 @@
  * History
  *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-import org.apache.arrow.vector.UInt8Vector;
-import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.LargeVarBinaryVector;
+import org.apache.arrow.vector.UInt1Vector;
 import org.apache.arrow.vector.complex.StructVector;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedStringData;
-import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
-import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedVarBinaryData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData;
+import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryWriteData;
 import org.knime.core.columnar.arrow.data.old.ArrowStructData.ArrowStructReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowUnsignedLongData.ArrowUnsignedLongReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowUnsignedLongData.ArrowUnsignedLongWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedByteData.ArrowUnsignedByteReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowUnsignedByteData.ArrowUnsignedByteWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
 
-import com.google.common.base.Utf8;
-
 /**
- * Test {@link ArrowDictEncodedStringData}
+ * Test {@link ArrowDictEncodedVarBinaryData}
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowDictEncodedStringWriteData<Long>, ArrowDictEncodedStringReadData<Long>> {
+public class ArrowDictEncodedVarBinaryDataTest extends AbstractArrowDataTest<ArrowDictEncodedVarBinaryWriteData<Byte>, ArrowDictEncodedVarBinaryReadData<Byte>> {
 
     private static final int MAX_LENGTH = 100;
 
-    private static final int NUM_DIFFERENT_STRINGS = 20;
+    private static final Map<Integer, Object> VALUES = new HashMap<>();
 
-    private static final Map<Integer, String> VALUES = new HashMap<>();
+    private static final int NUM_DIFFERENT_VALUES = 20;
 
-    /** Create the test for {@link ArrowDictEncodedStringData} */
-    public ArrowDictEncodedStringDataTest() {
-        super(new ArrowDictEncodedStringDataFactory(new DefaultDataTraits(new DictEncodingTrait(KeyType.LONG_KEY))));
+    /** Create the test for {@link ArrowVarBinaryData} */
+    public ArrowDictEncodedVarBinaryDataTest() {
+        super(new ArrowDictEncodedVarBinaryDataFactory(new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY))));
     }
 
     @Override
-    protected ArrowDictEncodedStringWriteData<Long> createWrite(final int numValues) {
+    protected ArrowDictEncodedVarBinaryWriteData<Byte> createWrite(final int numValues) {
         final var data = super.createWrite(numValues);
-        data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.LONG_KEY));
+        data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY));
         return data;
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    protected ArrowDictEncodedStringWriteData<Long> castW(final Object o) {
-        assertTrue(o instanceof ArrowDictEncodedStringWriteData);
-        return (ArrowDictEncodedStringWriteData<Long>)o;
+    protected ArrowDictEncodedVarBinaryWriteData<Byte> castW(final Object o) {
+        assertTrue(o instanceof ArrowDictEncodedVarBinaryWriteData);
+        return (ArrowDictEncodedVarBinaryWriteData<Byte>)o;
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    protected ArrowDictEncodedStringReadData<Long> castR(final Object o) {
-        assertTrue(o instanceof ArrowDictEncodedStringReadData);
-        return (ArrowDictEncodedStringReadData<Long>)o;
+    protected ArrowDictEncodedVarBinaryReadData<Byte> castR(final Object o) {
+        assertTrue(o instanceof ArrowDictEncodedVarBinaryReadData);
+        return (ArrowDictEncodedVarBinaryReadData<Byte>)o;
     }
 
     @Override
-    protected void setValue(final ArrowDictEncodedStringWriteData<Long> data, final int index, final int seed) {
-        data.setString(index, valueFor(seed));
+    protected void setValue(final ArrowDictEncodedVarBinaryWriteData<Byte> data, final int index, final int seed) {
+        data.setBytes(index, valueFor(seed));
     }
 
     @Override
-    protected void checkValue(final ArrowDictEncodedStringReadData<Long> data, final int index, final int seed) {
-        assertEquals(valueFor(seed), data.getString(index));
+    protected void checkValue(final ArrowDictEncodedVarBinaryReadData<Byte> data, final int index, final int seed) {
+        assertArrayEquals(valueFor(seed), data.getBytes(index));
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowDictEncodedStringWriteData<Long> data) {
+    protected boolean isReleasedW(final ArrowDictEncodedVarBinaryWriteData<Byte> data) {
         return data.m_delegate.m_vector == null &&
-                ((ArrowUnsignedLongWriteData)data.m_delegate.getWriteDataAt(0)).m_vector == null &&
-                ((ArrowStringWriteData)data.m_delegate.getWriteDataAt(1)).m_vector == null;
+                ((ArrowUnsignedByteWriteData)data.m_delegate.getWriteDataAt(0)).m_vector == null &&
+                ((ArrowVarBinaryWriteData)data.m_delegate.getWriteDataAt(1)).m_vector == null;
     }
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleasedR(final ArrowDictEncodedStringReadData<Long> data) {
+    protected boolean isReleasedR(final ArrowDictEncodedVarBinaryReadData<Byte> data) {
         final ArrowStructReadData d = data.m_delegate;
-        final UInt8Vector keyVector = ((ArrowUnsignedLongReadData)d.getReadDataAt(0)).m_vector;
-        final VarCharVector valueVector = ((ArrowStringReadData)d.getReadDataAt(1)).m_vector;
+        final UInt1Vector keyVector = ((ArrowUnsignedByteReadData)d.getReadDataAt(0)).m_vector;
+        final LargeVarBinaryVector valueVector = ((ArrowVarBinaryReadData)d.getReadDataAt(1)).m_vector;
         final StructVector vector = d.m_vector;
 
         boolean keysReleased = keyVector.getDataBuffer().capacity() == 0 //
@@ -149,41 +149,44 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
         return vector.getValidityBuffer().capacity() == 0 && keysReleased && valuesReleased;
     }
 
+    private static byte[] valueFor(final int seed) {
+        final Random random = new Random(seed);
+        final int key = random.nextInt(NUM_DIFFERENT_VALUES);
+
+        return (byte[])VALUES.computeIfAbsent(key, s -> {
+            final byte[] bytes = new byte[random.nextInt(MAX_LENGTH)];
+            random.nextBytes(bytes);
+            return bytes;
+        });
+    }
+
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
         long numBytes = 0;
         assertFalse(VALUES.isEmpty());
         for (var value : VALUES.values()) {
-            numBytes += Utf8.encodedLength(value);
+            numBytes += ((byte[])value).length;
         }
         return numBytes + 4 * capacity // value data buffer with offset
             + capacity * 8 // key data buffer
             + 3 * (long)Math.ceil(capacity / 8.0); // validity buffers of struct, key, value
     }
 
-    private static String valueFor(final int seed) {
-        final Random random = new Random(seed);
-        final int key = random.nextInt(NUM_DIFFERENT_STRINGS);
-
-        return VALUES.computeIfAbsent(key, s -> {
-            final int count = random.nextInt(MAX_LENGTH);
-            return RandomStringUtils.random(count, 0, Integer.MAX_VALUE, true, true, null, random);
-        });
-    }
-
     /** Test reading data of a slice, where the dictionary values are stored outside of the slice */
     @Test
-    public void testReadSliceDictLutWithValueOutsideOfSlice() {
+    public void testSliceDictLut() {
         final int numValues = 32;
         final int sliceStart = 5;
         final int sliceLength = 10;
-        final String testString = "adsfghjk";
+        Random random = new Random(numValues);
+        final byte[] testData = new byte[64];
+        random.nextBytes(testData);
 
         // Write outside to inside of the slice.
         // Value should only be stored at position 0 outside of slice
         final var writeData = createWrite(numValues);
         for (int i = 0; i < sliceStart + sliceLength; i++) {
-            writeData.setString(i, testString);
+            writeData.setBytes(i, testData);
         }
 
         // Read only the slice. The value should still be found
@@ -191,7 +194,7 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
         final var slicedRead = castR(readData.slice(sliceStart, sliceLength));
         for (int i = 0; i < sliceLength; i++) {
             assertFalse(slicedRead.isMissing(i));
-            assertEquals(slicedRead.getString(i), testString);
+            assertTrue(Arrays.equals(slicedRead.getBytes(i), testData));
         }
 
         readData.release();
@@ -203,18 +206,20 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
         final int numValues = 32;
         final int sliceStart = 5;
         final int sliceLength = 10;
-        final String testString = "adsfghjk";
+        Random random = new Random(numValues);
+        final byte[] testData = new byte[64];
+        random.nextBytes(testData);
 
         // Write outside to inside of the slice.
         // Value should only be stored at position 0 outside of slice
         final var writeData = createWrite(numValues);
         for (int i = 0; i < sliceStart; i++) {
-            writeData.setString(i, testString);
+            writeData.setBytes(i, testData);
         }
 
         final var slicedWrite = writeData.slice(sliceStart);
         for (int i = 0; i < sliceLength; i++) {
-            slicedWrite.setString(i, testString);
+            slicedWrite.setBytes(i, testData);
         }
 
         // Read full data
@@ -222,8 +227,8 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
         for (int i = 0; i < numValues; i++) {
             if (i < sliceStart + sliceLength) {
                 assertFalse(readData.isMissing(i));
-                assertEquals(testString, readData.getString(i));
-                assertEquals((long)0, (long)readData.getDictKey(i));
+                assertTrue(Arrays.equals(testData, readData.getBytes(i)));
+                assertEquals(0, (byte)readData.getDictKey(i));
             } else {
                 assertTrue(readData.isMissing(i));
             }

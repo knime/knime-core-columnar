@@ -46,43 +46,39 @@
  * History
  *   Oct 22, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.old.ArrowListData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntWriteData;
 import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListReadData;
 import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryWriteData;
 
 /**
- * Test {@link ArrowListData} with a recursive lists.
+ * Test {@link ArrowListData} with a list consisting of integer values.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListWriteData, ArrowListReadData> {
+public class ArrowVarBinaryListDataTest extends AbstractArrowDataTest<ArrowListWriteData, ArrowListReadData> {
 
-    private static final int MAX_LENGTH_1 = 5;
+    private static final int MAX_LENGTH = 4;
 
-    private static final int MAX_LENGTH_2 = 5;
+    private static final int MAX_OBJECT_SIZE = 3;
 
     /** Create the test for {@link ArrowListData} */
-    public ArrowRecursiveListDataTest() {
-        super(createFactory());
-    }
-
-    private static ArrowListDataFactory createFactory() {
-        return new ArrowListDataFactory(
-            new ArrowListDataFactory(ArrowIntDataFactory.INSTANCE));
+    public ArrowVarBinaryListDataTest() {
+        super(new ArrowListDataFactory(ArrowVarBinaryDataFactory.INSTANCE));
     }
 
     @Override
@@ -106,94 +102,66 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
         }
 
         final Random random = new Random(seed);
-        final int size1 = random.nextInt(MAX_LENGTH_1);
-        final int[] size2 = getInnerSizes(random, size1);
-        final ArrowListWriteData inner1 = data.createWriteData(index, size1);
-        for (int i = 0; i < size1; i++) {
-            final ArrowIntWriteData inner2 = inner1.createWriteData(i, size2[i]);
-            for (int j = 0; j < size2[i]; j++) {
-                inner2.setInt(j, random.nextInt());
-            }
+        final int size = random.nextInt(MAX_LENGTH);
+        final ArrowVarBinaryWriteData inner = data.createWriteData(index, size);
+        for (int i = 0; i < size; i++) {
+            byte[] valueFor = valueFor(random);
+            inner.setBytes(i, valueFor);
         }
     }
 
     @Override
     protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
-        final ArrowListReadData inner1 = data.createReadData(index);
+        final ArrowVarBinaryReadData element = data.createReadData(index);
         if (seed == 1) {
-            assertEquals(0, inner1.length());
+            assertEquals(0, element.length());
             return;
         }
 
         final Random random = new Random(seed);
-        final int size1 = random.nextInt(MAX_LENGTH_1);
-        final int[] size2 = getInnerSizes(random, size1);
-        assertEquals(size1, inner1.length());
+        final int size = random.nextInt(MAX_LENGTH);
+        assertEquals(size, element.length());
 
-        for (int i = 0; i < size1; i++) {
-            final ArrowIntReadData inner2 = inner1.createReadData(i);
-            assertEquals(size2[i], inner2.length());
-            for (int j = 0; j < size2[i]; j++) {
-                assertEquals(random.nextInt(), inner2.getInt(j));
-            }
+        for (int i = 0; i < size; i++) {
+            byte[] object = element.getBytes(i);
+            assertArrayEquals(valueFor(random), object);
         }
     }
 
     @Override
     protected boolean isReleasedW(final ArrowListWriteData data) {
         return data.m_vector == null;
-        // TODO(benjamin) check inner data
     }
 
     @Override
     @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowListReadData data) {
-        final ArrowListReadData d1 = castR(data);
-        final ArrowListReadData d2 = (ArrowListReadData)d1.m_data;
-        final ListVector listVector1 = d1.m_vector;
-        final ListVector listVector2 = d2.m_vector;
-        final IntVector intVector = ((ArrowIntReadData)d2.m_data).m_vector;
+        final ArrowListReadData d = castR(data);
+        final ListVector listVector = d.m_vector;
+        final LargeVarBinaryVector bVector = ((ArrowVarBinaryReadData)d.m_data).m_vector;
 
-        final boolean list1Released = listVector1.getOffsetBuffer().capacity() == 0 //
-            && listVector1.getValidityBuffer().capacity() == 0;
-        final boolean list2Released = listVector2.getOffsetBuffer().capacity() == 0 //
-            && listVector2.getValidityBuffer().capacity() == 0;
-        final boolean intReleased = intVector.getDataBuffer().capacity() == 0 //
-            && intVector.getValidityBuffer().capacity() == 0;
-        return list1Released && list2Released && intReleased;
+        final boolean bReleased = bVector.getDataBuffer().capacity() == 0 //
+            && bVector.getValidityBuffer().capacity() == 0 //
+            && bVector.getOffsetBuffer().capacity() == 0;
+        return listVector.getOffsetBuffer().capacity() == 0 //
+            && listVector.getValidityBuffer().capacity() == 0 //
+            && bReleased;
+    }
+
+    @Override
+    public void testSizeOf() { // NOSONAR
+        // Do not test here
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return (long)Math.ceil(capacity / 8.0) // Validity buffer
-            + (capacity + 1) * 4 // Offset buffer
-            + getInnerMinSize(valueCount);
+        // Not tested here
+        return 0;
     }
 
-    private static long getInnerMinSize(final int valueCount) {
-        long inner1Count = 0;
-        long inner2Count = 0;
-        for (int i = 0; i < valueCount; i++) {
-            if (i != 1) {
-                final Random random = new Random(i);
-                final int listSize = random.nextInt(MAX_LENGTH_1);
-                inner1Count += listSize;
-                for (int list2Size : getInnerSizes(random, listSize)) {
-                    inner2Count += list2Size;
-                }
-            }
-        }
-        return (long)Math.ceil(inner1Count / 8.0) // Inner1: validity buffer
-            + (long)Math.ceil(inner2Count / 8.0) // Inner2: validity buffer
-            + (inner1Count + 1) * 4 // Inner1: Offset buffer
-            + inner2Count * 4; // Inner2: data buffer
-    }
-
-    private static int[] getInnerSizes(final Random random, final int size) {
-        final int[] innerSizes = new int[size];
-        for (int i = 0; i < size; i++) {
-            innerSizes[i] = random.nextInt(MAX_LENGTH_2);
-        }
-        return innerSizes;
+    private static byte[] valueFor(final Random random) {
+        final byte[] bytes = new byte[random.nextInt(MAX_OBJECT_SIZE)];
+        random.nextBytes(bytes);
+        return bytes;
     }
 }

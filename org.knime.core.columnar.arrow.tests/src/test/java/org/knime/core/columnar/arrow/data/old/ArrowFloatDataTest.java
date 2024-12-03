@@ -46,65 +46,66 @@
  * History
  *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.data.old;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowByteData;
-import org.knime.core.columnar.arrow.data.old.ArrowByteData.ArrowByteDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowByteData.ArrowByteReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowByteData.ArrowByteWriteData;
+import org.knime.core.columnar.arrow.data.old.ArrowFloatData;
+import org.knime.core.columnar.arrow.data.old.ArrowFloatData.ArrowFloatDataFactory;
+import org.knime.core.columnar.arrow.data.old.ArrowFloatData.ArrowFloatReadData;
+import org.knime.core.columnar.arrow.data.old.ArrowFloatData.ArrowFloatWriteData;
 
 /**
- * Test {@link ArrowByteData}
+ * Test {@link ArrowFloatData}.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowByteDataTest extends AbstractArrowDataTest<ArrowByteWriteData, ArrowByteReadData> {
+public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatWriteData, ArrowFloatReadData> {
 
-    /** Create the test for {@link ArrowByteData} */
-    public ArrowByteDataTest() {
-        super(ArrowByteDataFactory.INSTANCE);
+    /** Create the test for {@link ArrowFloatData} */
+    public ArrowFloatDataTest() {
+        super(ArrowFloatDataFactory.INSTANCE);
     }
 
     @Override
-    protected ArrowByteWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowByteWriteData);
-        return (ArrowByteWriteData)o;
+    protected ArrowFloatWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowFloatWriteData);
+        return (ArrowFloatWriteData)o;
     }
 
     @Override
-    protected ArrowByteReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowByteReadData);
-        return (ArrowByteReadData)o;
+    protected ArrowFloatReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowFloatReadData);
+        return (ArrowFloatReadData)o;
     }
 
     @Override
-    protected void setValue(final ArrowByteWriteData data, final int index, final int seed) {
-        data.setByte(index, (byte)seed);
+    protected void setValue(final ArrowFloatWriteData data, final int index, final int seed) {
+        data.setFloat(index, seed);
     }
 
     @Override
-    protected void checkValue(final ArrowByteReadData data, final int index, final int seed) {
-        assertEquals((byte)seed, data.getByte(index), 0);
+    protected void checkValue(final ArrowFloatReadData data, final int index, final int seed) {
+        assertEquals(seed, data.getFloat(index), 0);
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowByteWriteData data) {
+    protected boolean isReleasedW(final ArrowFloatWriteData data) {
         return data.m_vector == null;
     }
 
     @Override
     @SuppressWarnings("resource") // Resources handled by vector
-    protected boolean isReleasedR(final ArrowByteReadData data) {
+    protected boolean isReleasedR(final ArrowFloatReadData data) {
         return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return capacity // 1 byte per value for data
+        return 4 * capacity // 4 bytes per value for data
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }
