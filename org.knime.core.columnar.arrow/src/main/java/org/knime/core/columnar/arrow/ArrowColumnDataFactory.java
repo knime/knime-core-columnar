@@ -49,7 +49,6 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -62,18 +61,13 @@ import com.google.common.base.Preconditions;
 
 /**
  * An {@link ArrowColumnDataFactory} is used for input and output of a specific Arrow column data type. Can be used to
- * create a new empty instance ({@link #getField(String, LongSupplier)} and
- * {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}), wrap vectors and dictionaries that have been
- * read from a file
- * ({@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)}) and get
- * vectors and dictionaries that need to be written to a file ({@link #getVector(NullableReadData)} and
- * {@link #getDictionaries(NullableReadData)}).
- * </p>
- * The static method {@link #createWrite(ArrowColumnDataFactory, String, BufferAllocator, int)} can be used to create
- * new {@link NullableWriteData} in just one step.
+ * create a new empty instance ({@link #createWrite(int)} and wrap vectors and dictionaries that have been read from a
+ * file ({@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)}) and
+ * create Apache Arrow vectors and dictionaries that need to be written to a file
+ * ({@link #copyToVector(NullableReadData, FieldVector)} and {@link #getDictionaries(NullableReadData)}).
  * </p>
  * A factor has a {@link ArrowColumnDataFactoryVersion}. Make sure to update the version if
- * {@link #getVector(NullableReadData)} or {@link #getDictionaries(NullableReadData)} change. Implement
+ * {@link #copyToVector(NullableReadData, FieldVector)} or {@link #getDictionaries(NullableReadData)} change. Implement
  * {@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)} such that
  * vectors and dictionaries from all prior versions can be wrapped in an appropriate {@link NullableReadData} object.
  *
