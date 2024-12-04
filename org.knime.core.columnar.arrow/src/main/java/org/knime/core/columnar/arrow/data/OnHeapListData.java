@@ -123,7 +123,7 @@ public final class OnHeapListData {
         @Override
         public OnHeapListReadData close(final int length) {
             setNumElements(length);
-            m_offsets.endBuffer(length);
+            m_offsets.completeBuffer(length);
             return new OnHeapListReadData(m_data.close(m_offsets.getLastOffset()), m_offsets, m_validity, length);
         }
 
@@ -135,7 +135,7 @@ public final class OnHeapListData {
         @Override
         public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
             var startOffset = m_offsets.getLastOffset();
-            var endOffset = m_offsets.putValue(m_offset + index, size);
+            var endOffset = m_offsets.setOffsetAtIndex(m_offset + index, size);
 
             // Set the validity bit
             setValid(index + m_offset);

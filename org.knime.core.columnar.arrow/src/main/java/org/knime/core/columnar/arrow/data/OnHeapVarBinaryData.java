@@ -91,7 +91,7 @@ public final class OnHeapVarBinaryData {
             m_dataCapacity = capacity * 32; // initial estimate
             m_data = new byte[m_dataCapacity];
             m_dataLength = 0;
-            m_offsets.putValue(0, 0); // initial offset
+            m_offsets.setOffsetAtIndex(0, 0); // initial offset
         }
 
         private OnHeapVarBinaryWriteData(final int offset, final byte[] data, final OffsetsBuffer offsets,
@@ -114,9 +114,9 @@ public final class OnHeapVarBinaryData {
             System.arraycopy(val, 0, m_data, m_dataLength, val.length);
 
             // Update offsets
-            int startOffset = m_dataLength;
+            int startOffset = m_dataLength; // TODO is `dataLength` needed or should we use `m_offsets.getLastOffset()`?
             m_dataLength += val.length;
-            m_offsets.putValue(m_offset + index + 1, m_dataLength);
+            m_offsets.setOffsetAtIndex(m_offset + index, m_dataLength);
 
             // Set validity bit
             setValid(m_offset + index);
@@ -144,7 +144,7 @@ public final class OnHeapVarBinaryData {
             int endOffset = ((ByteArrayDataOutput)dataOutput).getPosition();
 
             m_dataLength = endOffset;
-            m_offsets.putValue(m_offset + index + 1, endOffset);
+            m_offsets.setOffsetAtIndex(m_offset + index + 1, endOffset);
 
             // Set validity bit
             setValid(m_offset + index);
@@ -188,7 +188,7 @@ public final class OnHeapVarBinaryData {
         @Override
         public OnHeapVarBinaryReadData close(final int length) {
             m_validity.setNumElements(length);
-            m_offsets.endBuffer(length + 1); // +1 for last offset
+            m_offsets.completeBuffer(length + 1); // +1 for last offset
             // Trim the data array to the actual data length
             byte[] data = new byte[m_dataLength];
             System.arraycopy(m_data, 0, data, 0, m_dataLength);
