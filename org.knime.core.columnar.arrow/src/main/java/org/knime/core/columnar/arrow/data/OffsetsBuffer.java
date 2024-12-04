@@ -59,6 +59,10 @@ public final class OffsetsBuffer {
 
     private int m_nextIndex;
 
+    public static int usedSizeFor(final int capacity) {
+        return (capacity + 1) * Integer.BYTES;
+    }
+
     public OffsetsBuffer(final int capacity) {
         m_offsets = new int[capacity + 1];
         m_nextIndex = 0;
@@ -112,6 +116,10 @@ public final class OffsetsBuffer {
 
     public int getEndIndex(final int index) {
         return m_offsets[index + 1];
+    }
+
+    public int sizeOf() {
+        return m_offsets.length * Integer.BYTES;
     }
 
     public void copyTo(final ArrowBuf offsetBuffer) {
