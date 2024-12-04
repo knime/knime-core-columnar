@@ -177,7 +177,7 @@ class OffsetsBufferTest {
 
         buffer.setOffsetAtIndex(0, 3);
         buffer.setOffsetAtIndex(1, 4);
-        buffer.completeBuffer(4); // total elements supposed to be 4
+        buffer.completeBuffer(5); // total elements supposed to be 5
 
         // Indices 2, 3, and 4 should be filled with last offset
         int lastOffset = buffer.getLastOffset(); // Should be 7
