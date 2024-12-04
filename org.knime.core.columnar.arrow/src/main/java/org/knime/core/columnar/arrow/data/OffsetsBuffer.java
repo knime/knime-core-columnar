@@ -161,8 +161,13 @@ final class OffsetsBuffer {
      *
      * @param index the element index
      * @return the start offset
+     * @throws IndexOutOfBoundsException if the index is out of bounds
      */
     public int getStartIndex(final int index) {
+        if (index < 0 || index >= m_offsets.length - 1) {
+            throw new IndexOutOfBoundsException(
+                "Index " + index + " out of bounds for length " + (m_offsets.length - 1));
+        }
         return m_offsets[index];
     }
 
@@ -171,8 +176,13 @@ final class OffsetsBuffer {
      *
      * @param index the element index
      * @return the end offset
+     * @throws IndexOutOfBoundsException if the index is out of bounds
      */
     public int getEndIndex(final int index) {
+        if (index < 0 || index >= m_offsets.length - 1) {
+            throw new IndexOutOfBoundsException(
+                "Index " + index + " out of bounds for length " + (m_offsets.length - 1));
+        }
         return m_offsets[index + 1];
     }
 
@@ -207,3 +217,4 @@ final class OffsetsBuffer {
         return new OffsetsBuffer(offsets);
     }
 }
+
