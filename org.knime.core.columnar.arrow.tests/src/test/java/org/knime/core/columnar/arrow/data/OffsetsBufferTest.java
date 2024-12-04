@@ -48,7 +48,9 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
@@ -187,6 +189,29 @@ class OffsetsBufferTest {
             assertEquals(lastOffset, buffer.getEndIndex(i),
                 "getEndIndex should be lastOffset after completeBuffer at index " + i);
         }
+    }
+
+    /** Tests that accessing out-of-bounds indices throws IndexOutOfBoundsException. */
+    @Test
+    void testOutOfBoundsAccess() {
+        OffsetsBuffer buffer = new OffsetsBuffer(3);
+
+        buffer.setOffsetAtIndex(0, 3);
+        buffer.setOffsetAtIndex(1, 4);
+
+        // Accessing valid indices should not throw exceptions
+        assertDoesNotThrow(() -> buffer.getStartIndex(0), "Accessing valid start index should not throw exception");
+        assertDoesNotThrow(() -> buffer.getEndIndex(0), "Accessing valid end index should not throw exception");
+
+        // Accessing out-of-bounds indices should throw IndexOutOfBoundsException
+        assertThrows(IndexOutOfBoundsException.class, () -> buffer.getStartIndex(-1),
+            "Accessing negative index should throw IndexOutOfBoundsException");
+        assertThrows(IndexOutOfBoundsException.class, () -> buffer.getEndIndex(-1),
+            "Accessing negative index should throw IndexOutOfBoundsException");
+        assertThrows(IndexOutOfBoundsException.class, () -> buffer.getStartIndex(3),
+            "Accessing index beyond capacity should throw IndexOutOfBoundsException");
+        assertThrows(IndexOutOfBoundsException.class, () -> buffer.getEndIndex(3),
+            "Accessing index beyond capacity should throw IndexOutOfBoundsException");
     }
 
     /** Tests the copyTo and createFrom methods using an Arrow buffer. */
