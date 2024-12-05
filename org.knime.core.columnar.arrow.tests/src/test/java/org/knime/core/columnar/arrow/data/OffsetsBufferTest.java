@@ -59,6 +59,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the {@link OffsetsBuffer} class.
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 class OffsetsBufferTest {
 
@@ -164,7 +166,7 @@ class OffsetsBufferTest {
             readBuffer.get(5);
         }, "Expected IndexOutOfBoundsException for out-of-bounds index");
 
-        assertEquals("Index 5 is out of bounds", exception.getMessage(),
+        assertEquals("Index 5 out of bounds for length 2", exception.getMessage(),
             "Exception message should indicate out-of-bounds index");
     }
 
@@ -265,7 +267,7 @@ class OffsetsBufferTest {
             readBuffer.get(4);
         }, "Expected IndexOutOfBoundsException for index beyond the new numElements");
 
-        assertEquals("Index 4 is out of bounds", exception.getMessage(),
+        assertEquals("Index 4 out of bounds for length 3", exception.getMessage(),
             "Exception message should indicate out-of-bounds index");
     }
 
@@ -309,4 +311,3 @@ class OffsetsBufferTest {
         return writeBuffer.close();
     }
 }
-
