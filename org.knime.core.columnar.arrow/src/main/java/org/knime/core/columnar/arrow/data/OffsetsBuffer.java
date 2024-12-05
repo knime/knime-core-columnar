@@ -1,7 +1,6 @@
 /*
  * ------------------------------------------------------------------------
  *
-
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -45,176 +44,126 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Dec 3, 2024 (benjamin): created
+ *   Dec 5, 2024 (benjamin): created
  */
 package org.knime.core.columnar.arrow.data;
-
-import java.util.Arrays;
 
 import org.apache.arrow.memory.ArrowBuf;
 
 /**
- * Holds the offsets of elements in a buffer or array.
- * <P>
- * For example, the offsets {@code [0, 3, 7, 10, 13]} indicate:
+ * Utility class for managing Arrow offsets buffers, which map elements to their corresponding start and end indices.
+ * <p>
+ * For example, given offsets {@code [0, 3, 7, 10, 13]}, the elements are mapped as:
  * <ul>
- * <li>Element 0 is at indices 0 to 3 (exclusive of 3)</li>
- * <li>Element 1 is at indices 3 to 7 (exclusive of 7)</li>
- * <li>Element 2 is at indices 7 to 10 (exclusive of 10)</li>
- * <li>Element 3 is at indices 10 to 13 (exclusive of 13)</li>
+ * <li>Element 0: indices 0 (inclusive) to 3 (exclusive)</li>
+ * <li>Element 1: indices 3 (inclusive) to 7 (exclusive)</li>
+ * <li>Element 2: indices 7 (inclusive) to 10 (exclusive)</li>
+ * <li>Element 3: indices 10 (inclusive) to 13 (exclusive)</li>
  * </ul>
- * <P>
- * This is in line with the Arrow specification and can be copied to and from an Arrow buffer.
+ * This follows the Apache Arrow specification and allows for efficient data serialization and deserialization using
+ * Arrow buffers.
+ * </p>
+ * <p>
+ * The {@code OffsetsBuffer} class provides interfaces for writing to and reading from offsets buffers, and methods to
+ * create these buffers.
+ * </p>
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-final class OffsetsBuffer {
+public final class OffsetsBuffer {
 
-    private int[] m_offsets;
-
-    private int m_nextIndex;
-
-    /**
-     * Computes the size in bytes required to store the offsets for a given capacity.
-     *
-     * @param capacity the number of elements
-     * @return the size in bytes required
-     */
-    public static int usedSizeFor(final int capacity) {
-        return (capacity + 1) * Integer.BYTES;
+    private OffsetsBuffer() {
+        // Prevent instantiation
     }
 
     /**
-     * Constructs an {@code OffsetsBuffer} with the specified capacity.
+     * Represents a range of indices corresponding to a data element, with a start index (inclusive) and an end index
+     * (exclusive).
      *
-     * @param capacity the number of elements
+     * @param start start index of the data element (inclusive)
+     * @param end end index of the data element (exclusive)
      */
-    public OffsetsBuffer(final int capacity) {
-        m_offsets = new int[capacity + 1];
-        m_nextIndex = 0;
+    public record DataIndex(int start, int end) {
     }
 
     /**
-     * Constructs an {@code OffsetsBuffer} from an existing offsets array.
-     *
-     * @param offsets the offsets array
+     * Interface for writing to an offsets buffer, allowing the addition of elements with specified lengths.
      */
-    OffsetsBuffer(final int[] offsets) {
-        this.m_offsets = Arrays.copyOf(offsets, offsets.length);
-        this.m_nextIndex = offsets.length - 1;
+    public interface OffsetsWriteBuffer {
+
+        /**
+         * Adds an element at the specified index with the given length to the offsets buffer. The index must not be
+         * less than the last index added. Fills up holes in the buffer with elements of length 0 if necessary.
+         *
+         * @param index the index at which to add the element
+         * @param elementLength the length of the element
+         * @return a {@code DataIndex} representing the start and end indices of the added element
+         * @throws IndexOutOfBoundsException if the index is less than the last index added
+         */
+        DataIndex add(int index, int elementLength);
+
+        /**
+         * Closes the write buffer and returns a read buffer for accessing the offsets.
+         *
+         * @return an {@code OffsetsReadBuffer} for reading the offsets
+         */
+        OffsetsReadBuffer close();
+
+        /**
+         * Sets the number of elements in the offsets buffer, expanding or shrinking it as necessary. Fills up the
+         * remaining elements with zero-length elements if the last element is not at the end of the buffer.
+         *
+         * @param numElements the new number of elements
+         * @throws IllegalArgumentException if {@code numElements} is negative
+         */
+        void setNumElements(int numElements);
     }
 
     /**
-     * Sets the number of elements and resizes the offsets array accordingly.
-     *
-     * @param numElements the new number of elements
+     * Interface for reading from an offsets buffer, providing access to the start and end indices of elements.
      */
-    public void setNumElements(final int numElements) {
-        m_offsets = Arrays.copyOf(m_offsets, numElements + 1);
-        m_nextIndex = Math.min(m_nextIndex, numElements);
+    public interface OffsetsReadBuffer {
+
+        /**
+         * Retrieves the start and end indices for the element at the specified index.
+         *
+         * @param index the index of the element
+         * @return a {@code DataIndex} representing the start (inclusive) and end (exclusive) indices
+         * @throws IndexOutOfBoundsException if the index is out of bounds
+         */
+        DataIndex get(int index);
+
+        /**
+         * Copies the offsets buffer data to the specified Arrow buffer.
+         *
+         * @param buffer the target {@code ArrowBuf} to which the offsets will be copied
+         * @throws NullPointerException if {@code buffer} is null
+         */
+        void copyTo(ArrowBuf buffer);
     }
 
     /**
-     * Returns the last offset value.
+     * Creates a new write buffer with the specified initial number of elements.
      *
-     * @return the last offset
+     * @param initialNumElements the initial number of elements in the buffer
+     * @return an {@code OffsetsWriteBuffer} for writing offsets
+     * @throws IllegalArgumentException if {@code initialNumElements} is negative
      */
-    public int getLastOffset() {
-        return m_offsets[m_nextIndex];
+    public static OffsetsWriteBuffer createWriteBuffer(final int initialNumElements) {
+        // TODO implement
+        return null;
     }
 
     /**
-     * Updates the offsets array at the specified index with the given size.
+     * Creates a read buffer from the given Arrow buffer.
      *
-     * @param index the index at which to set the offset
-     * @param size the size of the value
-     * @return the end offset after inserting the value
+     * @param buffer the {@code ArrowBuf} containing offsets data
+     * @param numElements the number of elements in the buffer
+     * @return an {@code OffsetsReadBuffer} for reading offsets
+     * @throws NullPointerException if {@code buffer} is null
      */
-    public int setOffsetAtIndex(final int index, final int size) {
-        int startOffset = getLastOffset();
-        int endOffset = startOffset + size;
-
-        // Fill holes with the start offset
-        Arrays.fill(m_offsets, m_nextIndex + 1, index + 1, startOffset);
-
-        m_nextIndex = index + 1;
-        m_offsets[m_nextIndex] = endOffset;
-
-        return endOffset;
-    }
-
-    /**
-     * Completes the buffer by filling any remaining offsets up to the specified length.
-     *
-     * @param length the total number of elements
-     */
-    public void completeBuffer(final int length) {
-        int lastOffset = getLastOffset();
-
-        // Fill holes in the offset buffer if necessary
-        Arrays.fill(m_offsets, m_nextIndex + 1, length + 1, lastOffset);
-        m_nextIndex = length;
-    }
-
-    /**
-     * Returns the start index for the specified element index.
-     *
-     * @param index the element index
-     * @return the start offset
-     * @throws IndexOutOfBoundsException if the index is out of bounds
-     */
-    public int getStartIndex(final int index) {
-        if (index < 0 || index >= m_offsets.length - 1) {
-            throw new IndexOutOfBoundsException(
-                "Index " + index + " out of bounds for length " + (m_offsets.length - 1));
-        }
-        return m_offsets[index];
-    }
-
-    /**
-     * Returns the end index for the specified element index.
-     *
-     * @param index the element index
-     * @return the end offset
-     * @throws IndexOutOfBoundsException if the index is out of bounds
-     */
-    public int getEndIndex(final int index) {
-        if (index < 0 || index >= m_offsets.length - 1) {
-            throw new IndexOutOfBoundsException(
-                "Index " + index + " out of bounds for length " + (m_offsets.length - 1));
-        }
-        return m_offsets[index + 1];
-    }
-
-    /**
-     * Returns the size in bytes of the offsets buffer.
-     *
-     * @return the size in bytes
-     */
-    public int sizeOf() {
-        return m_offsets.length * Integer.BYTES;
-    }
-
-    /**
-     * Copies the offsets to the specified Arrow buffer.
-     *
-     * @param offsetBuffer the target Arrow buffer
-     */
-    public void copyTo(final ArrowBuf offsetBuffer) {
-        MemoryCopyUtils.copy(m_offsets, offsetBuffer);
-    }
-
-    /**
-     * Creates an {@code OffsetsBuffer} from an Arrow buffer.
-     *
-     * @param offsetBuffer the source Arrow buffer
-     * @param length the number of elements
-     * @return a new {@code OffsetsBuffer} initialized from the Arrow buffer
-     */
-    public static OffsetsBuffer createFrom(final ArrowBuf offsetBuffer, final int length) {
-        int[] offsets = new int[length + 1];
-        MemoryCopyUtils.copy(offsetBuffer, offsets);
-        return new OffsetsBuffer(offsets);
+    public static OffsetsReadBuffer createReadBuffer(final ArrowBuf buffer, final int numElements) {
+        // TODO implement
+        return null;
     }
 }
-
