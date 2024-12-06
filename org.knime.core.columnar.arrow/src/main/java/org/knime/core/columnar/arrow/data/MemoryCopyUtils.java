@@ -52,20 +52,39 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.util.MemoryUtil;
 
 /**
+ * Utility class for copying memory contents between ArrowBufs and primitive arrays using Unsafe.
+ *
+ * This class now supports both int[] and long[] arrays.
+ *
+ * Methods assume that:
+ * <ul>
+ * <li>The entire array should be copied (from start to end).</li>
+ * <li>The ArrowBuf is large enough to hold the entire array being copied.</li>
+ * <li>The calls are trusted, and no additional bounds checks (beyond what Unsafe might enforce) are performed.</li>
+ * </ul>
+ *
+ * Use with caution.
+ *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 final class MemoryCopyUtils {
 
     private static final int INT_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(int[].class);
 
-    MemoryCopyUtils() {
+    private static final int LONG_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(long[].class);
+
+    private MemoryCopyUtils() {
+        // Prevent instantiation
     }
 
+    // ------------------------------------------------------------------------
+    // int[] copy methods
+    // ------------------------------------------------------------------------
+
     /**
-     * Copy the content of the given source address to the given destination array. Fills the destination array from the
-     * beginning to the end.
+     * Copy the content of the given source ArrowBuf into the given int array.
      *
-     * @param source the source memory address
+     * @param source the source ArrowBuf
      * @param destination the destination int array
      */
     public static void copy(final ArrowBuf source, final int[] destination) {
@@ -73,33 +92,100 @@ final class MemoryCopyUtils {
     }
 
     /**
-     * Copy the content of the given source address to the given destination array. Fills the destination array from the
-     * beginning to the end.
+     * Copy the content of the given source address to the given int array.
      *
      * @param sourceAddress the source memory address
      * @param destination the destination int array
      */
     public static void copy(final long sourceAddress, final int[] destination) {
-        MemoryUtil.UNSAFE.copyMemory(//
+        MemoryUtil.UNSAFE.copyMemory( //
             null, // source object
             sourceAddress, // source offset
             destination, // destination object
             INT_ARRAY_BASE_OFFSET, // destination offset
-            destination.length * Integer.BYTES // number of bytes
+            (long)destination.length * Integer.BYTES // number of bytes
         );
     }
 
+    /**
+     * Copy the content of the given int array into the given ArrowBuf.
+     *
+     * @param source the source int array
+     * @param destination the destination ArrowBuf
+     */
     public static void copy(final int[] source, final ArrowBuf destination) {
         copy(source, destination.memoryAddress());
     }
 
+    /**
+     * Copy the content of the given int array into the given destination address.
+     *
+     * @param source the source int array
+     * @param destinationAddress the destination memory address
+     */
     public static void copy(final int[] source, final long destinationAddress) {
-        MemoryUtil.UNSAFE.copyMemory(//
+        MemoryUtil.UNSAFE.copyMemory( //
             source, // source object
             INT_ARRAY_BASE_OFFSET, // source offset
             null, // destination object
             destinationAddress, // destination offset
-            source.length * Integer.BYTES // number of bytes
+            (long)source.length * Integer.BYTES // number of bytes
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // long[] copy methods
+    // ------------------------------------------------------------------------
+
+    /**
+     * Copy the content of the given source ArrowBuf into the given long array.
+     *
+     * @param source the source ArrowBuf
+     * @param destination the destination long array
+     */
+    public static void copy(final ArrowBuf source, final long[] destination) {
+        copy(source.memoryAddress(), destination);
+    }
+
+    /**
+     * Copy the content of the given source address to the given long array.
+     *
+     * @param sourceAddress the source memory address
+     * @param destination the destination long array
+     */
+    public static void copy(final long sourceAddress, final long[] destination) {
+        MemoryUtil.UNSAFE.copyMemory( //
+            null, // source object
+            sourceAddress, // source offset
+            destination, // destination object
+            LONG_ARRAY_BASE_OFFSET, // destination offset
+            (long)destination.length * Long.BYTES // number of bytes
+        );
+    }
+
+    /**
+     * Copy the content of the given long array into the given ArrowBuf.
+     *
+     * @param source the source long array
+     * @param destination the destination ArrowBuf
+     */
+    public static void copy(final long[] source, final ArrowBuf destination) {
+        copy(source, destination.memoryAddress());
+    }
+
+    /**
+     * Copy the content of the given long array into the given destination address.
+     *
+     * @param source the source long array
+     * @param destinationAddress the destination memory address
+     */
+    public static void copy(final long[] source, final long destinationAddress) {
+        MemoryUtil.UNSAFE.copyMemory( //
+            source, // source object
+            LONG_ARRAY_BASE_OFFSET, // source offset
+            null, // destination object
+            destinationAddress, // destination offset
+            (long)source.length * Long.BYTES // number of bytes
         );
     }
 }
