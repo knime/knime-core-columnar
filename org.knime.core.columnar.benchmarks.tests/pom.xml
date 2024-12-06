@@ -10,6 +10,7 @@
 
     <properties>
         <revision>5.5.0</revision>
+        <benchmark.include.regex>.*</benchmark.include.regex>
     </properties>
 
     <build>
