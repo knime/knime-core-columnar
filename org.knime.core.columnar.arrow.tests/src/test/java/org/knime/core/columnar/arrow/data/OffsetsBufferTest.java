@@ -59,6 +59,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the {@link OffsetsBuffer} class.
+ * <P>
+ * Tests the functionality of the OffsetsBuffer, including creation of write and read buffers, adding elements,
+ * retrieving offsets, and copying data to and from ArrowBufs.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
@@ -100,6 +103,93 @@ class OffsetsBufferTest {
 
         assertEquals("buffer cannot be null", exception.getMessage(),
             "Exception message should indicate that buffer is null");
+    }
+
+    /**
+     * Tests creating a read buffer from an ArrowBuf and retrieving offsets.
+     */
+    @Test
+    void testCreateReadBufferFromArrowBuf() {
+        // Prepare offsets data
+        int[] offsets = {0, 3, 7, 10, 13};
+        int numElements = offsets.length - 1;
+        int bufferSize = offsets.length * Integer.BYTES;
+
+        // Allocate ArrowBuf and write offsets data
+        try (ArrowBuf arrowBuf = allocator.buffer(bufferSize)) {
+            for (int i = 0; i < offsets.length; i++) {
+                arrowBuf.setInt(i * Integer.BYTES, offsets[i]);
+            }
+
+            // Create read buffer from ArrowBuf
+            OffsetsBuffer.OffsetsReadBuffer readBuffer = OffsetsBuffer.createReadBuffer(arrowBuf, numElements);
+
+            // Verify elements
+            for (int i = 0; i < numElements; i++) {
+                OffsetsBuffer.DataIndex dataIndex = readBuffer.get(i);
+                assertEquals(offsets[i], dataIndex.start(), "Element " + i + " start index should match");
+                assertEquals(offsets[i + 1], dataIndex.end(), "Element " + i + " end index should match");
+            }
+        }
+    }
+
+    /**
+     * Tests creating a read buffer with mismatched numElements and buffer size.
+     */
+    @Test
+    void testCreateReadBufferWithMismatchedNumElements() {
+        // Prepare offsets data with 4 elements but specify numElements as 3
+        int[] offsets = {0, 3, 7, 10};
+        int incorrectNumElements = 2; // Incorrect
+        int bufferSize = offsets.length * Integer.BYTES;
+
+        // Allocate ArrowBuf and write offsets data
+        try (ArrowBuf arrowBuf = allocator.buffer(bufferSize)) {
+            for (int i = 0; i < offsets.length; i++) {
+                arrowBuf.setInt(i * Integer.BYTES, offsets[i]);
+            }
+
+            // Create read buffer with incorrect numElements
+            OffsetsBuffer.OffsetsReadBuffer readBuffer = OffsetsBuffer.createReadBuffer(arrowBuf, incorrectNumElements);
+
+            // Verify elements up to incorrectNumElements
+            for (int i = 0; i < incorrectNumElements; i++) {
+                OffsetsBuffer.DataIndex dataIndex = readBuffer.get(i);
+                assertEquals(offsets[i], dataIndex.start(), "Element " + i + " start index should match");
+                assertEquals(offsets[i + 1], dataIndex.end(), "Element " + i + " end index should match");
+            }
+
+            // Accessing beyond incorrectNumElements should throw IndexOutOfBoundsException
+            int outOfBoundsIndex = incorrectNumElements;
+            assertThrows(IndexOutOfBoundsException.class, () -> {
+                readBuffer.get(outOfBoundsIndex);
+            }, "Expected IndexOutOfBoundsException for index beyond numElements");
+        }
+    }
+
+    /**
+     * Tests creating a read buffer with negative numElements.
+     */
+    @Test
+    void testCreateReadBufferWithNegativeNumElements() {
+        int[] offsets = {0, 3, 7};
+        int bufferSize = offsets.length * Integer.BYTES;
+
+        // Allocate ArrowBuf and write offsets data
+        try (ArrowBuf arrowBuf = allocator.buffer(bufferSize)) {
+            for (int i = 0; i < offsets.length; i++) {
+                arrowBuf.setInt(i * Integer.BYTES, offsets[i]);
+            }
+
+            // Attempt to create read buffer with negative numElements
+            int negativeNumElements = -1;
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+                OffsetsBuffer.createReadBuffer(arrowBuf, negativeNumElements);
+            }, "Expected IllegalArgumentException for negative numElements");
+
+            assertEquals("numElements cannot be negative", exception.getMessage(),
+                "Exception message should indicate negative numElements");
+        }
     }
 
     /**

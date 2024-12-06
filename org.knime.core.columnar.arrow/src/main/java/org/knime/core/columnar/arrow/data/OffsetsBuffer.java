@@ -182,6 +182,17 @@ public final class OffsetsBuffer {
             }
             return new OffsetsReadBuffer(m_offsets, m_numElements);
         }
+
+        /**
+         * Returns the start index of the element at the specified index.
+         *
+         * @param index the index of the element
+         * @return the start index of the element
+         */
+        public int getStartIndex(final int index) {
+            Objects.checkIndex(index, m_lastIndexAdded + 1);
+            return m_offsets[index];
+        }
     }
 
     /**
@@ -203,6 +214,9 @@ public final class OffsetsBuffer {
         @SuppressWarnings("resource") // Objects.requireNonNull just returns the same buffer
         private OffsetsReadBuffer(final ArrowBuf buffer, final int numElements) {
             Objects.requireNonNull(buffer, "buffer cannot be null");
+            if (numElements < 0) {
+                throw new IllegalArgumentException("numElements cannot be negative");
+            }
             this.m_numElements = numElements;
             this.m_offsets = new int[numElements + 1];
             // Copy data from ArrowBuf to offsets array
@@ -258,5 +272,16 @@ public final class OffsetsBuffer {
      */
     public static OffsetsReadBuffer createReadBuffer(final ArrowBuf buffer, final int numElements) {
         return new OffsetsReadBuffer(buffer, numElements);
+    }
+
+    /**
+     * Computes the size in bytes required to store the offsets for a given capacity if they are serialized to an Arrow
+     * buffer.
+     *
+     * @param capacity the number of elements
+     * @return the size in bytes required
+     */
+    public static int usedSizeFor(final int capacity) {
+        return (capacity + 1) * Integer.BYTES;
     }
 }
