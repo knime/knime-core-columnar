@@ -60,6 +60,8 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.OffsetsReadBuffer;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.OffsetsWriteBuffer;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -80,16 +82,16 @@ public final class OnHeapListData {
 
         private ArrowWriteData m_data;
 
-        private OffsetsBuffer m_offsets;
+        private OffsetsWriteBuffer m_offsets;
 
         private OnHeapListWriteData(final int capacity, final ArrowWriteData data) {
             super(capacity);
             m_capacity = capacity;
             m_data = data;
-            m_offsets = new OffsetsBuffer(capacity);
+            m_offsets = OffsetsBuffer.createWriteBuffer(capacity);
         }
 
-        private OnHeapListWriteData(final int offset, final ArrowWriteData data, final OffsetsBuffer offsets,
+        private OnHeapListWriteData(final int offset, final ArrowWriteData data, final OffsetsWriteBuffer offsets,
             final ValidityBuffer validity, final int capacity) {
             super(offset, validity);
             m_capacity = capacity;
@@ -122,9 +124,11 @@ public final class OnHeapListData {
 
         @Override
         public OnHeapListReadData close(final int length) {
+            // NOTE: setNumElements also shrinks the offsets buffer if necessary
             setNumElements(length);
-            m_offsets.completeBuffer(length);
-            return new OnHeapListReadData(m_data.close(m_offsets.getLastOffset()), m_offsets, m_validity, length);
+            var readOffsets = m_offsets.close();
+            return new OnHeapListReadData(m_data.close(readOffsets.get(length - 1).end()), readOffsets, m_validity,
+                length);
         }
 
         @Override
@@ -134,17 +138,16 @@ public final class OnHeapListData {
 
         @Override
         public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
-            var startOffset = m_offsets.getLastOffset();
-            var endOffset = m_offsets.setOffsetAtIndex(m_offset + index, size);
+            var dataIndex = m_offsets.add(index + m_offset, size);
 
             // Set the validity bit
             setValid(index + m_offset);
 
             // TODO be smarter here and do not copy on each new list
-            m_data.expand(endOffset);
+            m_data.expand(dataIndex.end());
 
             @SuppressWarnings("unchecked")
-            var data = (C)m_data.slice(startOffset);
+            var data = (C)m_data.slice(dataIndex.start());
             return data;
         }
 
@@ -169,17 +172,17 @@ public final class OnHeapListData {
 
         private final ArrowReadData m_data;
 
-        private final OffsetsBuffer m_offsets;
+        private final OffsetsReadBuffer m_offsets;
 
-        private OnHeapListReadData(final ArrowReadData data, final OffsetsBuffer offsets, final ValidityBuffer validity,
-            final int length) {
+        private OnHeapListReadData(final ArrowReadData data, final OffsetsReadBuffer readOffsets,
+            final ValidityBuffer validity, final int length) {
             super(validity, length);
             m_data = data;
-            m_offsets = offsets;
+            m_offsets = readOffsets;
         }
 
-        private OnHeapListReadData(final ArrowReadData data, final OffsetsBuffer offsets, final ValidityBuffer validity,
-            final int offset, final int length) {
+        private OnHeapListReadData(final ArrowReadData data, final OffsetsReadBuffer offsets,
+            final ValidityBuffer validity, final int offset, final int length) {
             super(validity, offset, length);
             m_data = data;
             m_offsets = offsets;
@@ -194,10 +197,9 @@ public final class OnHeapListData {
         @Override
         public <C extends NullableReadData> C createReadData(final int index) {
             // Slice the data
-            final int start = m_offsets.getStartIndex(m_offset + index);
-            final int length = m_offsets.getEndIndex(m_offset + index) - start;
+            var dataIndex = m_offsets.get(index + m_offset);
             @SuppressWarnings("unchecked")
-            final C data = (C)m_data.slice(start, length);
+            final C data = (C)m_data.slice(dataIndex.start(), dataIndex.end() - dataIndex.start());
             return data;
         }
 
@@ -242,7 +244,7 @@ public final class OnHeapListData {
                 var valueCount = vector.getValueCount();
                 var listVector = (ListVector)vector;
                 var dataVector = listVector.getDataVector();
-                var offsets = OffsetsBuffer.createFrom(vector.getOffsetBuffer(), valueCount);
+                var offsets = OffsetsBuffer.createReadBuffer(vector.getOffsetBuffer(), valueCount);
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
                 var data = m_inner.createRead(dataVector, nullCount, provider, version);
