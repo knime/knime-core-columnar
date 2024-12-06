@@ -60,8 +60,8 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.OffsetsBuffer.OffsetsReadBuffer;
-import org.knime.core.columnar.arrow.data.OffsetsBuffer.OffsetsWriteBuffer;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.IntOffsetsReadBuffer;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.IntOffsetsWriteBuffer;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -82,16 +82,16 @@ public final class OnHeapListData {
 
         private ArrowWriteData m_data;
 
-        private OffsetsWriteBuffer m_offsets;
+        private IntOffsetsWriteBuffer m_offsets;
 
         private OnHeapListWriteData(final int capacity, final ArrowWriteData data) {
             super(capacity);
             m_capacity = capacity;
             m_data = data;
-            m_offsets = OffsetsBuffer.createWriteBuffer(capacity);
+            m_offsets = OffsetsBuffer.createIntWriteBuffer(capacity);
         }
 
-        private OnHeapListWriteData(final int offset, final ArrowWriteData data, final OffsetsWriteBuffer offsets,
+        private OnHeapListWriteData(final int offset, final ArrowWriteData data, final IntOffsetsWriteBuffer offsets,
             final ValidityBuffer validity, final int capacity) {
             super(offset, validity);
             m_capacity = capacity;
@@ -172,16 +172,16 @@ public final class OnHeapListData {
 
         private final ArrowReadData m_data;
 
-        private final OffsetsReadBuffer m_offsets;
+        private final IntOffsetsReadBuffer m_offsets;
 
-        private OnHeapListReadData(final ArrowReadData data, final OffsetsReadBuffer readOffsets,
+        private OnHeapListReadData(final ArrowReadData data, final IntOffsetsReadBuffer readOffsets,
             final ValidityBuffer validity, final int length) {
             super(validity, length);
             m_data = data;
             m_offsets = readOffsets;
         }
 
-        private OnHeapListReadData(final ArrowReadData data, final OffsetsReadBuffer offsets,
+        private OnHeapListReadData(final ArrowReadData data, final IntOffsetsReadBuffer offsets,
             final ValidityBuffer validity, final int offset, final int length) {
             super(validity, offset, length);
             m_data = data;
@@ -244,7 +244,7 @@ public final class OnHeapListData {
                 var valueCount = vector.getValueCount();
                 var listVector = (ListVector)vector;
                 var dataVector = listVector.getDataVector();
-                var offsets = OffsetsBuffer.createReadBuffer(vector.getOffsetBuffer(), valueCount);
+                var offsets = OffsetsBuffer.createIntReadBuffer(vector.getOffsetBuffer(), valueCount);
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
                 var data = m_inner.createRead(dataVector, nullCount, provider, version);
