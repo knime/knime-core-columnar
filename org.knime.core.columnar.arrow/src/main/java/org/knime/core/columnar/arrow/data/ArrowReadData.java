@@ -49,6 +49,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.VoidData.VoidReadData;
 
 /**
  * Arrow implementation of {@link NullableReadData}. Can be sliced with {@link #slice(int, int)}.
@@ -65,4 +66,10 @@ public interface ArrowReadData extends NullableReadData {
      * @return the sliced data
      */
     ArrowReadData slice(int start, int length);
+
+    /**
+     * @return the validity buffer used from this data or {@code null} if the data is {@link VoidReadData} and therefore
+     *         always missing.
+     */
+    ValidityBuffer getValidityBuffer();
 }
