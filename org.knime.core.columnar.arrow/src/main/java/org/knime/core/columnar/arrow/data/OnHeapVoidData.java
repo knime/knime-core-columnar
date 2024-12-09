@@ -126,6 +126,11 @@ public final class OnHeapVoidData extends AbstractReferencedData
         return new OnHeapVoidData(length);
     }
 
+    @Override
+    public ValidityBuffer getValidityBuffer() {
+        return null;
+    }
+
     // TODO extract common functionallity
     public static final class Factory extends AbstractArrowColumnDataFactory {
 
