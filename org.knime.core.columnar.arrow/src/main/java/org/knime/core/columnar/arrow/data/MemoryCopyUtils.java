@@ -188,4 +188,24 @@ final class MemoryCopyUtils {
             (long)source.length * Long.BYTES // number of bytes
         );
     }
+
+    // ------------------------------------------------------------------------
+    // byte big arrays
+    // ------------------------------------------------------------------------
+
+    public static void copy(final ArrowBuf source, final byte[][] destination) {
+        long offset = 0;
+        for (int i = 0; i < destination.length; i++) {
+            source.getBytes(offset, destination[i]);
+            offset += destination[i].length;
+        }
+    }
+
+    public static void copy(final byte[][] source, final ArrowBuf destination) {
+        long offset = 0;
+        for (int i = 0; i < source.length; i++) {
+            destination.setBytes(offset, source[i]);
+            offset += source[i].length;
+        }
+    }
 }
