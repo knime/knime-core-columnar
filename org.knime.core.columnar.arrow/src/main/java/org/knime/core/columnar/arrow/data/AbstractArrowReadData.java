@@ -108,5 +108,10 @@ abstract class AbstractArrowReadData extends AbstractReferencedData implements A
         // TODO nothing to do?
     }
 
+    @Override
+    public ValidityBuffer getValidityBuffer() {
+        return m_validity;
+    }
+
     // TODO overwrite toString
 }

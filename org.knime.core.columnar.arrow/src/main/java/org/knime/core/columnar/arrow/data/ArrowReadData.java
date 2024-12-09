@@ -65,4 +65,6 @@ public interface ArrowReadData extends NullableReadData {
      * @return the sliced data
      */
     ArrowReadData slice(int start, int length);
+
+    ValidityBuffer getValidityBuffer();
 }

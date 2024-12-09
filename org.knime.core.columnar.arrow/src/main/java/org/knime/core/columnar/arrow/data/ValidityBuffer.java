@@ -133,6 +133,15 @@ final class ValidityBuffer {
         validityBuffer.setBytes(0, m_validity, 0, m_validity.length);
     }
 
+    public void setFrom(final ValidityBuffer... buffers) {
+        for (int i = 0; i < m_validity.length; i++) {
+            m_validity[i] = 0;
+            for (var buffer : buffers) {
+                m_validity[i] |= buffer.m_validity[i];
+            }
+        }
+    }
+
     public static ValidityBuffer createFrom(final ArrowBuf validityBuffer, final int length) {
         var numBytes = BitVectorHelper.getValidityBufferSize(length);
         var validity = new byte[numBytes];
