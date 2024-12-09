@@ -52,44 +52,46 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import it.unimi.dsi.fastutil.BigArrays;
+import it.unimi.dsi.fastutil.bytes.ByteBigList;
+
 /**
- * Custom DataOutput that writes directly into a byte array without copying.
+ * Custom DataOutput that writes directly into a {@link ByteBigList}.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-abstract class ByteArrayDataOutput implements DataOutput {
-    protected byte[] m_data;
+class ByteBigListDataOutput implements DataOutput {
+    protected ByteBigList m_data;
 
-    protected int m_position;
+    protected long m_position;
 
-    public ByteArrayDataOutput(final byte[] data, final int startPosition) {
+    public ByteBigListDataOutput(final ByteBigList data, final long startPosition) {
         m_data = data;
         m_position = startPosition;
     }
 
-    protected abstract void ensureCapacity(int newLength);
-
-    public int getPosition() {
+    public long getPosition() {
         return m_position;
     }
 
     @Override
     public void write(final int b) throws IOException {
-        ensureCapacity(m_position + 1);
-        m_data[m_position++] = (byte)b;
+        m_data.add((byte)b);
+        m_position++;
     }
 
     @Override
     public void write(final byte[] b) throws IOException {
-        ensureCapacity(m_position + b.length);
-        System.arraycopy(b, 0, m_data, m_position, b.length);
+        var bigB = BigArrays.wrap(b); // Note that this just wraps if b has less than SEGMENT_SIZE elements
+        m_data.addElements(m_position, bigB);
         m_position += b.length;
     }
 
     @Override
     public void write(final byte[] b, final int off, final int len) throws IOException {
-        ensureCapacity(m_position + len);
-        System.arraycopy(b, off, m_data, m_position, len);
+        // TODO this might copy even if not necessary
+        var bigB = BigArrays.wrap(b);
+        m_data.addElements(m_position, bigB, off, len);
         m_position += len;
     }
 
@@ -105,9 +107,10 @@ abstract class ByteArrayDataOutput implements DataOutput {
 
     @Override
     public void writeShort(final int v) throws IOException {
-        ensureCapacity(m_position + 2);
-        m_data[m_position++] = (byte)((v >>> 8) & 0xFF);
-        m_data[m_position++] = (byte)(v & 0xFF);
+        m_data.add((byte)((v >>> 8) & 0xFF));
+        m_position++;
+        m_data.add((byte)(v & 0xFF));
+        m_position++;
     }
 
     @Override
@@ -117,18 +120,21 @@ abstract class ByteArrayDataOutput implements DataOutput {
 
     @Override
     public void writeInt(final int v) throws IOException {
-        ensureCapacity(m_position + 4);
-        m_data[m_position++] = (byte)((v >>> 24) & 0xFF);
-        m_data[m_position++] = (byte)((v >>> 16) & 0xFF);
-        m_data[m_position++] = (byte)((v >>> 8) & 0xFF);
-        m_data[m_position++] = (byte)(v & 0xFF);
+        m_data.add((byte)((v >>> 24) & 0xFF));
+        m_position++;
+        m_data.add((byte)((v >>> 16) & 0xFF));
+        m_position++;
+        m_data.add((byte)((v >>> 8) & 0xFF));
+        m_position++;
+        m_data.add((byte)(v & 0xFF));
+        m_position++;
     }
 
     @Override
     public void writeLong(final long v) throws IOException {
-        ensureCapacity(m_position + 8);
         for (int i = 7; i >= 0; i--) {
-            m_data[m_position++] = (byte)(v >>> (i * 8));
+            m_data.add((byte)(v >>> (i * 8)));
+            m_position++;
         }
     }
 
@@ -145,16 +151,15 @@ abstract class ByteArrayDataOutput implements DataOutput {
     @Override
     public void writeBytes(final String s) throws IOException {
         int len = s.length();
-        ensureCapacity(m_position + len);
         for (int i = 0; i < len; i++) {
-            m_data[m_position++] = (byte)s.charAt(i);
+            m_data.add((byte)s.charAt(i));
+            m_position++;
         }
     }
 
     @Override
     public void writeChars(final String s) throws IOException {
         int len = s.length();
-        ensureCapacity(m_position + len * 2);
         for (int i = 0; i < len; i++) {
             writeChar(s.charAt(i));
         }
