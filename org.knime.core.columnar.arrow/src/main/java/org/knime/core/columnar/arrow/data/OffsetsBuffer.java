@@ -403,8 +403,9 @@ public final class OffsetsBuffer {
          * @return the start index of the element
          */
         public long getStartIndex(final int index) {
-            Objects.checkIndex(index, m_lastIndexAdded + 1);
-            return m_offsets[index];
+            // TODO this is strange logic
+            var idx = Math.max(Math.min(index, m_lastIndexAdded + 1), 0);
+            return m_offsets[idx];
         }
     }
 
