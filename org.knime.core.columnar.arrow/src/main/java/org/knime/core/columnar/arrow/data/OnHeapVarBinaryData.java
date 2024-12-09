@@ -210,14 +210,11 @@ public final class OnHeapVarBinaryData {
 
         private final LongOffsetsReadBuffer m_offsets;
 
-        private final ValidityBuffer m_validity;
-
         private OnHeapVarBinaryReadData(final byte[] data, final LongOffsetsReadBuffer offsets,
             final ValidityBuffer validity, final int length) {
             super(validity, length);
             m_data = data;
             m_offsets = offsets;
-            m_validity = validity;
         }
 
         private OnHeapVarBinaryReadData(final byte[] data, final LongOffsetsReadBuffer offsets,
@@ -225,7 +222,6 @@ public final class OnHeapVarBinaryData {
             super(validity, offset, length);
             m_data = data;
             m_offsets = offsets;
-            m_validity = validity;
         }
 
         @Override

@@ -148,26 +148,27 @@ public class OnHeapVarBinaryDataTest extends AbstractArrowDataTest<OnHeapVarBina
     public void testByteArraySerialization() throws IOException {
         final int numValues = 3;
         OnHeapVarBinaryWriteData data = createWrite(numValues);
-        byte[] blob = "TestData".getBytes();
+        byte[][] blobs = new byte[][]{"TestData".getBytes(), "Foo".getBytes(), "Bar".getBytes()};
 
         ObjectSerializer<byte[]> serializer = (out, v) -> out.write(v);
         ObjectDeserializer<byte[]> deserializer = (in) -> in.readBytes();
 
-        data.setBytes(0, blob);
-        data.setObject(1, blob, serializer);
+        data.setBytes(0, blobs[0]);
+        data.setObject(1, blobs[1], serializer);
         var outStream = new ByteArrayOutputStream();
-        serializer.serialize(new DataOutputStream(outStream), blob);
+        serializer.serialize(new DataOutputStream(outStream), blobs[2]);
         data.setBytes(2, outStream.toByteArray());
 
         OnHeapVarBinaryReadData readData = data.close(numValues);
 
         for (int i = 0; i < numValues; i++) {
-            assertArrayEquals(blob, readData.getBytes(i), "Byte array at index " + i + " does not match expected blob");
-            assertArrayEquals(blob, readData.getObject(i, deserializer),
+            assertArrayEquals(blobs[i], readData.getBytes(i),
+                "Byte array at index " + i + " does not match expected blob");
+            assertArrayEquals(blobs[i], readData.getObject(i, deserializer),
                 "Deserialized object at index " + i + " does not match expected blob");
-            byte[] deserializedFromBytes = deserializer
-                    .deserialize(new ReadableDataInputStream(new ByteArrayInputStream(readData.getBytes(i))));
-            assertArrayEquals(blob, deserializedFromBytes,
+            byte[] deserializedFromBytes =
+                deserializer.deserialize(new ReadableDataInputStream(new ByteArrayInputStream(readData.getBytes(i))));
+            assertArrayEquals(blobs[i], deserializedFromBytes,
                 "Deserialized from bytes at index " + i + " does not match expected blob");
         }
     }
