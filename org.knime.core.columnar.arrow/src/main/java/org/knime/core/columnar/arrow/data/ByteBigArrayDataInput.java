@@ -54,21 +54,24 @@ import java.nio.charset.StandardCharsets;
 
 import org.knime.core.table.io.ReadableDataInput;
 
+import it.unimi.dsi.fastutil.BigArrays;
+import it.unimi.dsi.fastutil.bytes.ByteBigArrays;
+
 /**
- * Custom DataInput that reads directly from a byte array without copying.
+ * Custom DataInput that reads directly from a {@link ByteBigArrays byte big array}.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-class ByteArrayDataInput implements ReadableDataInput {
-    private final byte[] m_data;
+class ByteBigArrayDataInput implements ReadableDataInput {
+    private final byte[][] m_data;
 
-    private final int m_start;
+    private final long m_start;
 
-    private final int m_end;
+    private final long m_end;
 
-    private int m_position;
+    private long m_position;
 
-    public ByteArrayDataInput(final byte[] data, final int start, final int end) {
+    public ByteBigArrayDataInput(final byte[][] data, final long start, final long end) {
         m_data = data;
         m_start = start;
         m_end = end;
@@ -81,7 +84,7 @@ class ByteArrayDataInput implements ReadableDataInput {
         if (m_position + len > m_end) {
             throw new EOFException();
         }
-        System.arraycopy(m_data, m_position, b, 0, len);
+        BigArrays.copyFromBig(m_data, m_position, b, 0, len);
         m_position += len;
     }
 
@@ -90,7 +93,7 @@ class ByteArrayDataInput implements ReadableDataInput {
         if (m_position + len > m_end) {
             throw new EOFException();
         }
-        System.arraycopy(m_data, m_position, b, off, len);
+        BigArrays.copyFromBig(m_data, m_position, b, off, len);
         m_position += len;
     }
 
@@ -108,28 +111,31 @@ class ByteArrayDataInput implements ReadableDataInput {
         if (m_position >= m_end) {
             return -1; // End of stream reached
         }
-        int available = m_end - m_position;
-        int toRead = Math.min(len, available);
-        System.arraycopy(m_data, m_position, b, off, toRead);
+        long available = m_end - m_position;
+        int toRead = (int)Math.min(len, available); // len is an int, so this is safe
+        BigArrays.copyFromBig(m_data, m_position, b, off, toRead);
         m_position += toRead;
         return toRead;
     }
 
     @Override
     public byte[] readBytes() throws IOException {
-        int remaining = m_end - m_position;
+        long remaining = m_end - m_position;
+        if (remaining > Integer.MAX_VALUE) {
+            throw new IndexOutOfBoundsException("Data too large to read into byte array");
+        }
         if (remaining < 0) {
             throw new EOFException();
         }
-        byte[] result = new byte[remaining];
-        System.arraycopy(m_data, m_position, result, 0, remaining);
+        byte[] result = new byte[(int)remaining];
+        BigArrays.copyFromBig(m_data, m_position, result, 0, (int)remaining);
         m_position = m_end;
         return result;
     }
 
     @Override
     public int skipBytes(final int n) throws IOException {
-        int k = Math.min(n, m_end - m_position);
+        int k = (int)Math.min(n, m_end - m_position);
         m_position += k;
         return k;
     }
@@ -144,7 +150,7 @@ class ByteArrayDataInput implements ReadableDataInput {
         if (m_position >= m_end) {
             throw new EOFException();
         }
-        return m_data[m_position++];
+        return BigArrays.get(m_data, m_position++);
     }
 
     @Override

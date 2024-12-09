@@ -54,8 +54,6 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.ArrowType.LargeBinary;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.OffsetsBuffer.IntDataIndex;
-import org.knime.core.columnar.arrow.data.OffsetsBuffer.LongDataIndex;
 import org.knime.core.columnar.arrow.data.OffsetsBuffer.LongOffsetsReadBuffer;
 import org.knime.core.columnar.arrow.data.OffsetsBuffer.LongOffsetsWriteBuffer;
 import org.knime.core.columnar.data.NullableReadData;
@@ -63,6 +61,10 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
+
+import it.unimi.dsi.fastutil.BigArrays;
+import it.unimi.dsi.fastutil.bytes.ByteBigArrayBigList;
+import it.unimi.dsi.fastutil.bytes.ByteBigArrays;
 
 /**
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
@@ -74,15 +76,10 @@ public final class OnHeapVarBinaryData {
     private OnHeapVarBinaryData() {
     }
 
-    // TODO Remove this method. We should support more than Integer.MAX_VALUE bytes.
-    private static IntDataIndex offsetsToInt(final LongDataIndex offsets) {
-        return new IntDataIndex((int)offsets.start(), (int)offsets.end());
-    }
-
     /** Implementation of {@link VarBinaryWriteData} that writes directly into the flattened byte array. */
     public static final class OnHeapVarBinaryWriteData extends AbstractArrowWriteData implements VarBinaryWriteData {
 
-        private byte[] m_data;
+        private ByteBigArrayBigList m_data;
 
         private LongOffsetsWriteBuffer m_offsets;
 
@@ -92,11 +89,11 @@ public final class OnHeapVarBinaryData {
             super(capacity);
             m_capacity = capacity;
             m_offsets = OffsetsBuffer.createLongWriteBuffer(capacity);
-            m_data = new byte[capacity * 32]; // initial estimate
+            m_data = new ByteBigArrayBigList(capacity * 32); // initial estimate
         }
 
-        private OnHeapVarBinaryWriteData(final int offset, final byte[] data, final LongOffsetsWriteBuffer offsets,
-            final ValidityBuffer validity, final int capacity) {
+        private OnHeapVarBinaryWriteData(final int offset, final ByteBigArrayBigList data,
+            final LongOffsetsWriteBuffer offsets, final ValidityBuffer validity, final int capacity) {
             super(offset, validity);
             m_data = data;
             m_offsets = offsets;
@@ -105,13 +102,11 @@ public final class OnHeapVarBinaryData {
 
         @Override
         public void setBytes(final int index, final byte[] val) {
-            var dataIndex = offsetsToInt(m_offsets.add(m_offset + index, val.length));
-
-            // Ensure capacity of data array
-            ensureDataCapacity(dataIndex.end());
+            var dataIndex = m_offsets.add(m_offset + index, val.length);
 
             // Copy val into data array
-            System.arraycopy(val, 0, m_data, dataIndex.start(), val.length);
+            var bigVal = BigArrays.wrap(val); // Note that this wraps the array if it fits the segment size
+            m_data.addElements(m_data.size64(), bigVal);
 
             // Set validity bit
             setValid(m_offset + index);
@@ -119,17 +114,10 @@ public final class OnHeapVarBinaryData {
 
         @Override
         public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
-            // TODO support more than Integer.MAX_VALUE bytes
-            int startIndex = (int)m_offsets.getStartIndex(m_offset + index);
+            long startIndex = m_offsets.getStartIndex(m_offset + index);
 
             // Create a custom DataOutput that writes directly into m_data
-            var dataOutput = new ByteArrayDataOutput(m_data, startIndex) {
-                @Override
-                protected void ensureCapacity(final int newLength) {
-                    OnHeapVarBinaryWriteData.this.ensureDataCapacity(newLength);
-                    m_data = OnHeapVarBinaryWriteData.this.m_data; // Update reference in case array was reallocated
-                }
-            };
+            var dataOutput = new ByteBigListDataOutput(m_data, startIndex);
 
             try {
                 serializer.serialize(dataOutput, value);
@@ -138,22 +126,11 @@ public final class OnHeapVarBinaryData {
             }
 
             // Add offset to offsets buffer
-            var elementLength = ((ByteArrayDataOutput)dataOutput).getPosition() - startIndex;
+            var elementLength = dataOutput.getPosition() - startIndex;
             m_offsets.add(m_offset + index, elementLength);
 
             // Set validity bit
             setValid(m_offset + index);
-        }
-
-        private void ensureDataCapacity(final int requiredCapacity) {
-            if (requiredCapacity > m_data.length) {
-                // TODO is this smart? should we use a different strategy?
-                // Expand the data array
-                int newCapacity = Math.max(requiredCapacity, m_data.length * 2);
-                byte[] newData = new byte[newCapacity];
-                System.arraycopy(m_data, 0, newData, 0, m_data.length);
-                m_data = newData;
-            }
         }
 
         @Override
@@ -172,7 +149,7 @@ public final class OnHeapVarBinaryData {
 
         @Override
         public long usedSizeFor(final int numElements) {
-            return m_data.length + OffsetsBuffer.usedLongSizeFor(numElements + 1)
+            return m_data.size64() + OffsetsBuffer.usedLongSizeFor(numElements + 1)
                 + ValidityBuffer.usedSizeFor(numElements);
         }
 
@@ -186,9 +163,9 @@ public final class OnHeapVarBinaryData {
             m_validity.setNumElements(length);
             m_offsets.setNumElements(length);
             var readOffsets = m_offsets.close();
-            // Trim the data array to the actual data length (TODO is this necessary?)
-            byte[] data = new byte[offsetsToInt(readOffsets.get(length - 1)).end()];
-            System.arraycopy(m_data, 0, data, 0, data.length);
+
+            // Trim the data array to the actual data length
+            var data = BigArrays.trim(m_data.elements(), readOffsets.get(length - 1).end());
             return new OnHeapVarBinaryReadData(data, m_offsets.close(), m_validity, length);
         }
 
@@ -206,18 +183,18 @@ public final class OnHeapVarBinaryData {
     /** Implementation of {@link VarBinaryReadData} that reads directly from the flattened byte array. */
     public static final class OnHeapVarBinaryReadData extends AbstractArrowReadData implements VarBinaryReadData {
 
-        private final byte[] m_data;
+        private final byte[][] m_data;
 
         private final LongOffsetsReadBuffer m_offsets;
 
-        private OnHeapVarBinaryReadData(final byte[] data, final LongOffsetsReadBuffer offsets,
+        private OnHeapVarBinaryReadData(final byte[][] data, final LongOffsetsReadBuffer offsets,
             final ValidityBuffer validity, final int length) {
             super(validity, length);
             m_data = data;
             m_offsets = offsets;
         }
 
-        private OnHeapVarBinaryReadData(final byte[] data, final LongOffsetsReadBuffer offsets,
+        private OnHeapVarBinaryReadData(final byte[][] data, final LongOffsetsReadBuffer offsets,
             final ValidityBuffer validity, final int offset, final int length) {
             super(validity, offset, length);
             m_data = data;
@@ -226,18 +203,21 @@ public final class OnHeapVarBinaryData {
 
         @Override
         public byte[] getBytes(final int index) {
-            var dataIndex = offsetsToInt(m_offsets.get(m_offset + index));
-            int length = dataIndex.end() - dataIndex.start();
-            byte[] val = new byte[length];
-            System.arraycopy(m_data, dataIndex.start(), val, 0, length);
+            var dataIndex = m_offsets.get(m_offset + index);
+            long length = dataIndex.end() - dataIndex.start();
+            if (length > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Data length exceeds maximum integer value");
+            }
+            byte[] val = new byte[(int)length];
+            BigArrays.copyFromBig(m_data, dataIndex.start(), val, 0, (int)length);
             return val;
         }
 
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
             int idx = m_offset + index;
-            var dataIndex = offsetsToInt(m_offsets.get(idx));
-            var dataInput = new ByteArrayDataInput(m_data, dataIndex.start(), dataIndex.end());
+            var dataIndex = m_offsets.get(idx);
+            var dataInput = new ByteBigArrayDataInput(m_data, dataIndex.start(), dataIndex.end());
 
             try {
                 return deserializer.deserialize(dataInput);
@@ -253,7 +233,7 @@ public final class OnHeapVarBinaryData {
 
         @Override
         public long sizeOf() {
-            return m_data.length + OffsetsBuffer.usedLongSizeFor(m_length) + m_validity.sizeOf();
+            return BigArrays.length(m_data) + OffsetsBuffer.usedLongSizeFor(m_length) + m_validity.sizeOf();
         }
 
         @Override
@@ -288,8 +268,10 @@ public final class OnHeapVarBinaryData {
                 int valueCount = vector.getValueCount();
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
                 var offsets = OffsetsBuffer.createLongReadBuffer(vector.getOffsetBuffer(), valueCount);
-                byte[] data = new byte[(int)vector.getDataBuffer().capacity()];
-                vector.getDataBuffer().getBytes(0, data);
+
+                var data = ByteBigArrays.newBigArray(vector.getDataBuffer().capacity());
+                MemoryCopyUtils.copy(vector.getDataBuffer(), data);
+
                 return new OnHeapVarBinaryReadData(data, offsets, validity, valueCount);
             } else {
                 throw new IOException("Cannot read OnHeapVarBinaryData with version " + version + ". Current version: "
@@ -303,9 +285,9 @@ public final class OnHeapVarBinaryData {
             var v = (LargeVarBinaryVector)vector;
 
             // Make sure the buffers are allocated with the correct size
-            v.allocateNew(d.m_data.length, d.length());
+            v.allocateNew(BigArrays.length(d.m_data), d.length());
 
-            v.getDataBuffer().setBytes(0, d.m_data, 0, d.m_data.length);
+            MemoryCopyUtils.copy(d.m_data, v.getDataBuffer());
             d.m_offsets.copyTo(v.getOffsetBuffer());
             d.m_validity.copyTo(v.getValidityBuffer());
 
