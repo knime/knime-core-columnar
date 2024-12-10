@@ -99,7 +99,7 @@ public final class OnHeapDoubleData {
 
         @Override
         public long usedSizeFor(final int numElements) {
-            return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
+            return numElements * Double.BYTES + ValidityBuffer.usedSizeFor(numElements);
         }
 
         @Override
