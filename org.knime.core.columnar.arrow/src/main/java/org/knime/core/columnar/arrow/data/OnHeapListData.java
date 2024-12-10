@@ -112,14 +112,14 @@ public final class OnHeapListData {
 
         @Override
         public long usedSizeFor(final int numElements) {
-            // TODO Auto-generated method stub
-            return 0;
+            return ValidityBuffer.usedSizeFor(numElements) //
+                + OffsetsBuffer.usedIntSizeFor(numElements) //
+                + m_data.usedSizeFor(m_offsets.getNumData(numElements));
         }
 
         @Override
         public long sizeOf() {
-            // TODO Auto-generated method stub
-            return 0;
+            return usedSizeFor(m_capacity);
         }
 
         @Override
@@ -190,8 +190,7 @@ public final class OnHeapListData {
 
         @Override
         public long sizeOf() {
-            // TODO Auto-generated method stub
-            return 0;
+            return m_validity.sizeOf() + OffsetsBuffer.usedIntSizeFor(m_length) + m_data.sizeOf();
         }
 
         @Override

@@ -196,6 +196,15 @@ public final class OffsetsBuffer {
             Objects.checkIndex(index, m_lastIndexAdded + 1);
             return m_offsets[index];
         }
+
+        /**
+         * @param numElements the number of elements
+         * @return the end index of all data if the number of elements is numElements
+         */
+        public int getNumData(final int numElements) {
+            var idx = Math.min(numElements - 1, m_lastIndexAdded);
+            return m_offsets[idx + 1]; // end index
+        }
     }
 
     /**
