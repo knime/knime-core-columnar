@@ -50,12 +50,14 @@ package org.knime.core.columnar.arrow.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.knime.core.columnar.arrow.data.OffsetsBuffer.createIntReadBuffer;
+import static org.knime.core.columnar.arrow.data.OffsetsBuffer.createIntWriteBuffer;
 
-import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.RootAllocator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.IntOffsetsReadBuffer;
 
 /**
  * Unit tests for the {@link OffsetsBuffer} class.
@@ -84,8 +86,8 @@ class OffsetsBufferTest {
      */
     @Test
     void testCreateWriteBufferWithNegativeInitialElements() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            OffsetsBuffer.createWriteBuffer(-1);
+        var exception = assertThrows(IllegalArgumentException.class, () -> {
+            createIntWriteBuffer(-1);
         }, "Expected IllegalArgumentException for negative initialNumElements");
 
         assertEquals("initialNumElements cannot be negative", exception.getMessage(),
@@ -97,8 +99,8 @@ class OffsetsBufferTest {
      */
     @Test
     void testCreateReadBufferWithNullArrowBuf() {
-        NullPointerException exception = assertThrows(NullPointerException.class, () -> {
-            OffsetsBuffer.createReadBuffer(null, 0);
+        var exception = assertThrows(NullPointerException.class, () -> {
+            createIntReadBuffer(null, 0);
         }, "Expected NullPointerException when buffer is null");
 
         assertEquals("buffer cannot be null", exception.getMessage(),
@@ -116,17 +118,17 @@ class OffsetsBufferTest {
         int bufferSize = offsets.length * Integer.BYTES;
 
         // Allocate ArrowBuf and write offsets data
-        try (ArrowBuf arrowBuf = allocator.buffer(bufferSize)) {
+        try (var arrowBuf = allocator.buffer(bufferSize)) {
             for (int i = 0; i < offsets.length; i++) {
                 arrowBuf.setInt(i * Integer.BYTES, offsets[i]);
             }
 
             // Create read buffer from ArrowBuf
-            OffsetsBuffer.OffsetsReadBuffer readBuffer = OffsetsBuffer.createReadBuffer(arrowBuf, numElements);
+            var readBuffer = createIntReadBuffer(arrowBuf, numElements);
 
             // Verify elements
             for (int i = 0; i < numElements; i++) {
-                OffsetsBuffer.DataIndex dataIndex = readBuffer.get(i);
+                var dataIndex = readBuffer.get(i);
                 assertEquals(offsets[i], dataIndex.start(), "Element " + i + " start index should match");
                 assertEquals(offsets[i + 1], dataIndex.end(), "Element " + i + " end index should match");
             }
@@ -144,17 +146,17 @@ class OffsetsBufferTest {
         int bufferSize = offsets.length * Integer.BYTES;
 
         // Allocate ArrowBuf and write offsets data
-        try (ArrowBuf arrowBuf = allocator.buffer(bufferSize)) {
+        try (var arrowBuf = allocator.buffer(bufferSize)) {
             for (int i = 0; i < offsets.length; i++) {
                 arrowBuf.setInt(i * Integer.BYTES, offsets[i]);
             }
 
             // Create read buffer with incorrect numElements
-            OffsetsBuffer.OffsetsReadBuffer readBuffer = OffsetsBuffer.createReadBuffer(arrowBuf, incorrectNumElements);
+            var readBuffer = createIntReadBuffer(arrowBuf, incorrectNumElements);
 
             // Verify elements up to incorrectNumElements
             for (int i = 0; i < incorrectNumElements; i++) {
-                OffsetsBuffer.DataIndex dataIndex = readBuffer.get(i);
+                var dataIndex = readBuffer.get(i);
                 assertEquals(offsets[i], dataIndex.start(), "Element " + i + " start index should match");
                 assertEquals(offsets[i + 1], dataIndex.end(), "Element " + i + " end index should match");
             }
@@ -176,15 +178,15 @@ class OffsetsBufferTest {
         int bufferSize = offsets.length * Integer.BYTES;
 
         // Allocate ArrowBuf and write offsets data
-        try (ArrowBuf arrowBuf = allocator.buffer(bufferSize)) {
+        try (var arrowBuf = allocator.buffer(bufferSize)) {
             for (int i = 0; i < offsets.length; i++) {
                 arrowBuf.setInt(i * Integer.BYTES, offsets[i]);
             }
 
             // Attempt to create read buffer with negative numElements
             int negativeNumElements = -1;
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-                OffsetsBuffer.createReadBuffer(arrowBuf, negativeNumElements);
+            var exception = assertThrows(IllegalArgumentException.class, () -> {
+                createIntReadBuffer(arrowBuf, negativeNumElements);
             }, "Expected IllegalArgumentException for negative numElements");
 
             assertEquals("numElements cannot be negative", exception.getMessage(),
@@ -198,18 +200,18 @@ class OffsetsBufferTest {
     @Test
     void testAddAndRetrieveOffsets() {
         // Using createAndPopulateBuffer utility method
-        OffsetsBuffer.OffsetsReadBuffer readBuffer = createAndPopulateBuffer(3, 4, 2);
+        var readBuffer = createAndPopulateBuffer(3, 4, 2);
 
         // Verify elements
-        OffsetsBuffer.DataIndex index0 = readBuffer.get(0);
+        var index0 = readBuffer.get(0);
         assertEquals(0, index0.start(), "Element 0 start index should be 0");
         assertEquals(3, index0.end(), "Element 0 end index should be 3");
 
-        OffsetsBuffer.DataIndex index1 = readBuffer.get(1);
+        var index1 = readBuffer.get(1);
         assertEquals(3, index1.start(), "Element 1 start index should be 3");
         assertEquals(7, index1.end(), "Element 1 end index should be 7");
 
-        OffsetsBuffer.DataIndex index2 = readBuffer.get(2);
+        var index2 = readBuffer.get(2);
         assertEquals(7, index2.start(), "Element 2 start index should be 7");
         assertEquals(9, index2.end(), "Element 2 end index should be 9");
     }
@@ -219,10 +221,10 @@ class OffsetsBufferTest {
      */
     @Test
     void testAddWithInvalidIndexOrder() {
-        OffsetsBuffer.OffsetsWriteBuffer writeBuffer = OffsetsBuffer.createWriteBuffer(0);
+        var writeBuffer = createIntWriteBuffer(0);
 
         writeBuffer.add(0, 3);
-        IndexOutOfBoundsException exception = assertThrows(IndexOutOfBoundsException.class, () -> {
+        var exception = assertThrows(IndexOutOfBoundsException.class, () -> {
             writeBuffer.add(-1, 4);
         }, "Expected IndexOutOfBoundsException for index less than last index added");
 
@@ -235,9 +237,9 @@ class OffsetsBufferTest {
      */
     @Test
     void testSetNumElementsNegative() {
-        OffsetsBuffer.OffsetsWriteBuffer writeBuffer = OffsetsBuffer.createWriteBuffer(0);
+        var writeBuffer = createIntWriteBuffer(0);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+        var exception = assertThrows(IllegalArgumentException.class, () -> {
             writeBuffer.setNumElements(-5);
         }, "Expected IllegalArgumentException for negative numElements");
 
@@ -250,9 +252,9 @@ class OffsetsBufferTest {
      */
     @Test
     void testGetWithOutOfBoundsIndex() {
-        OffsetsBuffer.OffsetsReadBuffer readBuffer = createAndPopulateBuffer(3, 4);
+        var readBuffer = createAndPopulateBuffer(3, 4);
 
-        IndexOutOfBoundsException exception = assertThrows(IndexOutOfBoundsException.class, () -> {
+        var exception = assertThrows(IndexOutOfBoundsException.class, () -> {
             readBuffer.get(5);
         }, "Expected IndexOutOfBoundsException for out-of-bounds index");
 
@@ -265,12 +267,12 @@ class OffsetsBufferTest {
      */
     @Test
     void testCopyToArrowBuf() {
-        OffsetsBuffer.OffsetsReadBuffer readBuffer = createAndPopulateBuffer(3, 4, 2);
+        var readBuffer = createAndPopulateBuffer(3, 4, 2);
 
         int numElements = 3;
         int bufferSize = (numElements + 1) * Integer.BYTES;
 
-        try (ArrowBuf arrowBuf = allocator.buffer(bufferSize)) {
+        try (var arrowBuf = allocator.buffer(bufferSize)) {
             readBuffer.copyTo(arrowBuf);
 
             assertEquals(0, arrowBuf.getInt(0), "Offset at position 0 should be 0");
@@ -285,9 +287,9 @@ class OffsetsBufferTest {
      */
     @Test
     void testCopyToNullArrowBuf() {
-        OffsetsBuffer.OffsetsReadBuffer readBuffer = createAndPopulateBuffer();
+        var readBuffer = createAndPopulateBuffer();
 
-        NullPointerException exception = assertThrows(NullPointerException.class, () -> {
+        var exception = assertThrows(NullPointerException.class, () -> {
             readBuffer.copyTo(null);
         }, "Expected NullPointerException when copying to null buffer");
 
@@ -300,18 +302,18 @@ class OffsetsBufferTest {
      */
     @Test
     void testFillHolesWithZeroLengthElements() {
-        OffsetsBuffer.OffsetsWriteBuffer writeBuffer = OffsetsBuffer.createWriteBuffer(5);
+        var writeBuffer = createIntWriteBuffer(5);
         writeBuffer.add(0, 3);
         writeBuffer.add(2, 4); // Index 1 should be filled with zero-length element
         writeBuffer.add(4, 2); // Index 3 should be filled with zero-length element
 
-        OffsetsBuffer.OffsetsReadBuffer readBuffer = writeBuffer.close();
+        var readBuffer = writeBuffer.close();
 
-        OffsetsBuffer.DataIndex index1 = readBuffer.get(1);
+        var index1 = readBuffer.get(1);
         assertEquals(3, index1.start(), "Element 1 start index should be 3");
         assertEquals(3, index1.end(), "Element 1 end index should be 3 (zero-length)");
 
-        OffsetsBuffer.DataIndex index3 = readBuffer.get(3);
+        var index3 = readBuffer.get(3);
         assertEquals(7, index3.start(), "Element 3 start index should be 7");
         assertEquals(7, index3.end(), "Element 3 end index should be 7 (zero-length)");
     }
@@ -321,7 +323,7 @@ class OffsetsBufferTest {
      */
     @Test
     void testSetNumElementsExpandBuffer() {
-        OffsetsBuffer.OffsetsWriteBuffer writeBuffer = OffsetsBuffer.createWriteBuffer(2);
+        var writeBuffer = createIntWriteBuffer(2);
         writeBuffer.add(0, 3);
         writeBuffer.add(1, 4);
 
@@ -330,9 +332,9 @@ class OffsetsBufferTest {
         writeBuffer.add(2, 2);
         writeBuffer.add(3, 1);
 
-        OffsetsBuffer.OffsetsReadBuffer readBuffer = writeBuffer.close();
+        var readBuffer = writeBuffer.close();
 
-        OffsetsBuffer.DataIndex index3 = readBuffer.get(3);
+        var index3 = readBuffer.get(3);
         assertEquals(9, index3.start(), "Element 3 start index should be 9");
         assertEquals(10, index3.end(), "Element 3 end index should be 10");
     }
@@ -342,7 +344,7 @@ class OffsetsBufferTest {
      */
     @Test
     void testSetNumElementsShrinkBuffer() {
-        OffsetsBuffer.OffsetsWriteBuffer writeBuffer = OffsetsBuffer.createWriteBuffer(5);
+        var writeBuffer = createIntWriteBuffer(5);
         writeBuffer.add(0, 3);
         writeBuffer.add(1, 4);
         writeBuffer.add(2, 2);
@@ -351,9 +353,9 @@ class OffsetsBufferTest {
 
         writeBuffer.setNumElements(3); // Shrink to 3 elements
 
-        OffsetsBuffer.OffsetsReadBuffer readBuffer = writeBuffer.close();
+        var readBuffer = writeBuffer.close();
 
-        IndexOutOfBoundsException exception = assertThrows(IndexOutOfBoundsException.class, () -> {
+        var exception = assertThrows(IndexOutOfBoundsException.class, () -> {
             readBuffer.get(4);
         }, "Expected IndexOutOfBoundsException for index beyond the new numElements");
 
@@ -366,22 +368,22 @@ class OffsetsBufferTest {
      */
     @Test
     void testCloseFillsRemainingElements() {
-        OffsetsBuffer.OffsetsWriteBuffer writeBuffer = OffsetsBuffer.createWriteBuffer(5);
+        var writeBuffer = createIntWriteBuffer(5);
         writeBuffer.add(0, 3);
         writeBuffer.add(2, 4);
 
         // Close without adding elements at index 1, 3, 4
-        OffsetsBuffer.OffsetsReadBuffer readBuffer = writeBuffer.close();
+        var readBuffer = writeBuffer.close();
 
-        OffsetsBuffer.DataIndex index1 = readBuffer.get(1);
+        var index1 = readBuffer.get(1);
         assertEquals(3, index1.start(), "Element 1 start index should be 3");
         assertEquals(3, index1.end(), "Element 1 end index should be 3 (zero-length)");
 
-        OffsetsBuffer.DataIndex index3 = readBuffer.get(3);
+        var index3 = readBuffer.get(3);
         assertEquals(7, index3.start(), "Element 3 start index should be 7");
         assertEquals(7, index3.end(), "Element 3 end index should be 7 (zero-length)");
 
-        OffsetsBuffer.DataIndex index4 = readBuffer.get(4);
+        var index4 = readBuffer.get(4);
         assertEquals(7, index4.start(), "Element 4 start index should be 7");
         assertEquals(7, index4.end(), "Element 4 end index should be 7 (zero-length)");
     }
@@ -392,9 +394,9 @@ class OffsetsBufferTest {
      * @param lengths the lengths of the elements to add
      * @return the closed read buffer after adding elements
      */
-    private static OffsetsBuffer.OffsetsReadBuffer createAndPopulateBuffer(final int... lengths) {
+    private static IntOffsetsReadBuffer createAndPopulateBuffer(final int... lengths) {
         int numElements = lengths.length;
-        OffsetsBuffer.OffsetsWriteBuffer writeBuffer = OffsetsBuffer.createWriteBuffer(numElements);
+        var writeBuffer = createIntWriteBuffer(numElements);
         for (int i = 0; i < lengths.length; i++) {
             writeBuffer.add(i, lengths[i]);
         }
