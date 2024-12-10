@@ -128,7 +128,7 @@ public final class OnHeapStructData {
         @Override
         public long usedSizeFor(final int numElements) {
             long size = ValidityBuffer.usedSizeFor(numElements);
-            for (NullableWriteData child : m_children) {
+            for (var child : m_children) {
                 size += child.usedSizeFor(numElements);
             }
             return size;
