@@ -105,19 +105,17 @@ public final class OffsetsBuffer5000 {
         private int m_lastIndexAdded;
 
         private IntOffsetsBuffer(final int numElements) {
-            this.m_offsets = new int[numElements + 1];
-            this.m_lastIndexAdded = -1;
+            m_offsets = new int[numElements + 1];
+            m_lastIndexAdded = -1;
+        }
+
+        public IntOffsetsBuffer(final int[] offsets) {
+            m_offsets = offsets;
+            m_lastIndexAdded = offsets.length - 2;
         }
 
         public int lastWrittenIndex() {
             return m_lastIndexAdded;
-        }
-
-        /**
-         * @param offsets
-         */
-        public IntOffsetsBuffer(final int[] offsets) {
-            // TODO Auto-generated constructor stub
         }
 
         /**
