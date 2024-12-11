@@ -52,7 +52,7 @@ import java.util.stream.IntStream;
 
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData;
 import org.knime.core.columnar.arrow.data.OnHeapIntData;
-import org.knime.core.columnar.arrow.data.OnHeapStringData;
+import org.knime.core.columnar.arrow.data.OnHeapStringData5000;
 import org.knime.core.columnar.arrow.data.OnHeapVoidData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -191,7 +191,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         //            return wrapCached(new ArrowDictEncodedStringDataFactory(traits), traits);
         //        }
         // TODO the caching does not work like that
-        return wrapCached(OnHeapStringData.FACTORY, traits);
+        return wrapCached(OnHeapStringData5000.FACTORY, traits);
     }
 
     ArrowColumnDataFactory wrapCached(final ArrowColumnDataFactory factory, final DataTraits traits) {
