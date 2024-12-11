@@ -53,6 +53,7 @@ import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.badger.BatchingWritable;
 import org.knime.core.columnar.badger.HeapBadger;
+import org.knime.core.columnar.badger.HeapCache;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -324,13 +325,12 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
     }
 
     private void initHeapBadger(final SharedObjectCache heapCache) {
-        if (heapCache == null) {
-            return;
+        if (heapCache != null) {
+            m_readable = new HeapCache(m_readable, heapCache);
         }
 
-        m_heapBadger = new HeapBadger(m_writable, m_readable, heapCache,
+        m_heapBadger = new HeapBadger(m_writable, m_readable,
             ColumnarPreferenceUtils.getHeapBadgerSerializationExecutor());
-        m_readable = m_heapBadger.getHeapCache();
         m_writable = null; // FIXME
 
         // No need for another MemoryAlertListener. The HeapBadger only keeps a small number of rows in the buffer. We could maybe implement flush instead of finish...
@@ -415,17 +415,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         }
 
         m_writeCursor.close();
-
-        if (m_heapBadger != null) {
-            // close the writer
-            m_heapBadger.getWriteCursor().close();
-            // close the reader
-            m_heapBadger.getHeapCache().close();
-        } else {
-            // this also closes the delegates and all caches
-            m_writable.getWriter().close();
-            m_readable.close();
-        }
+        m_readable.close();
     }
 
     @SuppressWarnings("resource") // The heap badger write cursor is closed separately
