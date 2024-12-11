@@ -63,9 +63,6 @@ import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.cache.ColumnDataUniqueId;
-import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
-import org.knime.core.columnar.cache.object.shared.SoftReferencedObjectCache;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.table.access.BufferedAccesses;
@@ -101,8 +98,6 @@ public class HeapBadger {
 
     private final Badger m_badger;
 
-    private final HeapCache m_heapCache;
-
     private final BatchWritable m_writeDelegate;
 
     private final Thread m_serializationThread;
@@ -114,10 +109,9 @@ public class HeapBadger {
      * @param readable
      * @param maxNumRowsPerBatch
      * @param maxBatchSizeInBytes
-     * @param cache
      */
     public HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable,
-        final int maxNumRowsPerBatch, final int maxBatchSizeInBytes, final SharedObjectCache cache) {
+        final int maxNumRowsPerBatch, final int maxBatchSizeInBytes) {
         ColumnarSchema schema = writable.getSchema();
 
         @SuppressWarnings("resource")
@@ -129,7 +123,6 @@ public class HeapBadger {
         //        final SerializationQueue async = new SyncQueue();
         m_writeCursor = new BadgerWriteCursor(schema, async);
         m_badger = new Badger(writable, m_writeCursor.m_buffers, maxNumRowsPerBatch, maxBatchSizeInBytes);
-        m_heapCache = new HeapCache(readable, cache);
         m_writeDelegate = writable;
 
         m_serializationThread = new Thread(() -> {
@@ -141,38 +134,22 @@ public class HeapBadger {
     /**
      * Constructor
      *
+     * @param writable
+     * @param readable
+     */
+    public HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable) {
+        this(writable, readable, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES);
+    }
+
+    /**
+     * Constructor
+     *
      * @param store
      */
     public HeapBadger(final BatchStore store) {
-        this(store, store, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES,
-            new SoftReferencedObjectCache());
+        this(store, store);
     }
 
-    /**
-     * Constructor
-     *
-     * @param store
-     * @param cache
-     */
-    public HeapBadger(final BatchStore store, final SharedObjectCache cache) {
-        this(store, store, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES, cache);
-    }
-
-    /**
-     * Constructor
-     *
-     * @param writable
-     * @param readable
-     * @param cache
-     */
-    public HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable,
-        final SharedObjectCache cache) {
-        this(writable, readable, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES, cache);
-    }
-
-    HeapBadger(final BatchStore store, final int maxNumRowsPerBatch, final int maxBatchSizeInBytes) {
-        this(store, store, maxNumRowsPerBatch, maxBatchSizeInBytes, new SoftReferencedObjectCache());
-    }
 
     /**
      * @return the {@link ColumnarWriteCursor} that can be populated with data. Internally it fills a ring buffer that
@@ -180,14 +157,6 @@ public class HeapBadger {
      */
     public ColumnarWriteCursor getWriteCursor() {
         return m_writeCursor;
-    }
-
-    /**
-     * @return The heap cache that has the "readable" interface and sees the data cached by this badger. Use the Badger
-     *         in the write direction and the Cache in the read direction!
-     */
-    public HeapCache getHeapCache() {
-        return m_heapCache;
     }
 
     /**
@@ -737,15 +706,6 @@ public class HeapBadger {
             debug("[b] Badger.writeCurrentBatch");
             ReadBatch readBatch = m_current_batch.close(m_batchLocalRowIndex);
             m_writer.write(readBatch);
-
-            // save data in cache
-            for (int col = 0; col < m_writeDelegate.getSchema().numColumns(); col++) {
-                var data = m_heapCacheBuffers[col].getArray();
-                if (null != data) {
-                    m_heapCache.cacheData((Object[])data,
-                        new ColumnDataUniqueId(m_heapCache, col, m_numBatchesWritten));
-                }
-            }
             readBatch.release();
             m_current_batch = null;
             m_numBatchesWritten++;
