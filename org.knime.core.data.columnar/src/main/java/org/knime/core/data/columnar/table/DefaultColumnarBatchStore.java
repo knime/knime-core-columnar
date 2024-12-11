@@ -168,8 +168,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
          * @param cache The heap cache to use for storing the data, or pass null to disable the heap cache
          * @return This {@link ColumnarBatchStoreBuilder} to continue configuring it.
          */
-        public ColumnarBatchStoreBuilder useHeapBadger(final SharedObjectCache cache) {
-            m_heapCache = cache;
+        public ColumnarBatchStoreBuilder useHeapBadger() {
             m_useHeapBadger = true;
             return this;
         }

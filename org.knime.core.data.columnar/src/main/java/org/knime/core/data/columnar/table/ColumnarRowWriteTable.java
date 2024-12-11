@@ -125,18 +125,17 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
                     ColumnarPreferenceUtils.getColumnDataCache(), ColumnarPreferenceUtils.getPersistExecutor())
                 .useSmallTableCache(ColumnarPreferenceUtils.getSmallTableCache());
 
-            if (ColumnarRowWriteTableSettings.useHeapBadger()) {
-                builder.useHeapBadger(ColumnarPreferenceUtils.getHeapCache());
-            } else {
-                builder.useHeapCache( //
-                    ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
-                    ColumnarPreferenceUtils.getSerializeExecutor());//
-            }
+            builder.useHeapCache( //
+                ColumnarPreferenceUtils.getHeapCache(), ColumnarPreferenceUtils.getPersistExecutor(),
+                ColumnarPreferenceUtils.getSerializeExecutor());//
 
             // NOTE:
             // We do not use the ReadBatchCache for now because it can cause a deadlock on a memory alert.
             // The cache will be useful when we have random-access rows but this is not the case yet.
             // .useReadBatchCache(ColumnarPreferenceUtils.getReadBatchCache())
+        }
+        if (ColumnarRowWriteTableSettings.useHeapBadger()) {
+            builder.useHeapBadger();
         }
         builder.enableDictEncoding(true);
         if (settings.isCalculateDomains()) {
