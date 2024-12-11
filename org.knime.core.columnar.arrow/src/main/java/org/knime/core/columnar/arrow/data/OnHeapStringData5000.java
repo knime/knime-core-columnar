@@ -49,7 +49,7 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -63,6 +63,8 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.table.util.StringEncoder;
+
+import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 
 /**
  *
@@ -94,14 +96,17 @@ public final class OnHeapStringData5000 {
      * @param offsets the offsets buffer to keep track of the offsets in the target array
      * @param length the number of strings to copy
      */
-    private static void encode(final String[] source, final int startIdx, final byte[] target,
+    private static void encode(final String[] source, final int startIdx, final ByteArrayList target,
         final IntOffsetsBuffer offsets, final int length) {
         var encoder = new StringEncoder();
         for (var i = startIdx; i < startIdx + length; i++) {
             var str = source[i];
-            var bytes = encoder.encode(str).array(); // TODO encode directly into the target array?
-            var dataIndex = offsets.add(i, bytes.length);
-            System.arraycopy(bytes, 0, target, dataIndex.start(), bytes.length);
+            if (str != null) {
+                // TODO encode directly into the target array?
+                var bytes = str.getBytes(StandardCharsets.UTF_8);
+                var dataIndex = offsets.add(i, bytes.length);
+                target.addElements(dataIndex.start(), bytes);
+            }
         }
     }
 
@@ -118,7 +123,7 @@ public final class OnHeapStringData5000 {
 
         private String[] m_data;
 
-        private byte[] m_dataBytes;
+        private ByteArrayList m_dataBytes;
 
         private IntOffsetsBuffer m_offsets; // TODO include in size
 
@@ -133,7 +138,7 @@ public final class OnHeapStringData5000 {
         private OnHeapStringWriteData(final int capacity) {
             super(capacity);
             m_data = new String[capacity];
-            m_dataBytes = new byte[0];
+            m_dataBytes = new ByteArrayList();
             m_offsets = OffsetsBuffer5000.createIntBuffer(capacity);
         }
 
@@ -258,11 +263,11 @@ public final class OnHeapStringData5000 {
 
         private final String[] m_data;
 
-        private final byte[] m_dataBytes;
+        private final ByteArrayList m_dataBytes;
 
         private final IntOffsetsBuffer m_offsets;
 
-        public OnHeapStringReadData(final String[] data, final byte[] dataBytes, final IntOffsetsBuffer offsets,
+        public OnHeapStringReadData(final String[] data, final ByteArrayList dataBytes, final IntOffsetsBuffer offsets,
             final ValidityBuffer validity) {
             super(validity, data.length);
             m_data = data;
@@ -297,8 +302,10 @@ public final class OnHeapStringData5000 {
                 // Decode the string
                 var dataIndex = m_offsets.get(index + m_offset);
 
-                // TODO is this correct
-                var val = encoder.decode(ByteBuffer.wrap(m_dataBytes, dataIndex.start(), dataIndex.length()));
+                // TODO decode directly from the byte array?
+                var bytes = new byte[dataIndex.length()];
+                m_dataBytes.getElements(dataIndex.start(), bytes, 0, dataIndex.length());
+                var val = encoder.decode(bytes);
 
                 m_data[index + m_offset] = val;
             }
@@ -341,7 +348,8 @@ public final class OnHeapStringData5000 {
                 var dataBytes = new byte[offsets.getNumData(valueCount)];
                 vector.getDataBuffer().getBytes(0, dataBytes);
 
-                return new OnHeapStringReadData(new String[valueCount], dataBytes, offsets, validity);
+                return new OnHeapStringReadData(new String[valueCount], new ByteArrayList(dataBytes), offsets,
+                    validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowStringData with version " + version + ". Current version: " + m_version + ".");
@@ -369,9 +377,9 @@ public final class OnHeapStringData5000 {
                 encode(d.m_data, lastBytesIdx + 1, d.m_dataBytes, d.m_offsets, d.length() - lastBytesIdx - 1);
             }
 
-            vector.allocateNew(d.m_dataBytes.length, d.length());
+            vector.allocateNew(d.m_dataBytes.size(), d.length());
 
-            vector.getDataBuffer().setBytes(0, d.m_dataBytes);
+            vector.getDataBuffer().setBytes(0, d.m_dataBytes.elements(), 0, d.m_dataBytes.size());
             d.m_validity.copyTo(vector.getValidityBuffer());
             d.m_offsets.copyTo(vector.getOffsetBuffer());
 
