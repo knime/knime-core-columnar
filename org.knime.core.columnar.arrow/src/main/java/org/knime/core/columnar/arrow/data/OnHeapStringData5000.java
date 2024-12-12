@@ -106,6 +106,8 @@ public final class OnHeapStringData5000 {
                 var bytes = str.getBytes(StandardCharsets.UTF_8);
                 var dataIndex = offsets.add(i, bytes.length);
                 target.addElements(dataIndex.start(), bytes);
+            } else {
+                offsets.add(i, 0);
             }
         }
     }
@@ -142,10 +144,12 @@ public final class OnHeapStringData5000 {
             m_offsets = OffsetsBuffer5000.createIntBuffer(capacity);
         }
 
-        private OnHeapStringWriteData(final int offset, final String[] data, final ValidityBuffer validity) {
+        private OnHeapStringWriteData(final int offset, final String[] data, final ByteArrayList dataBytes,
+            final IntOffsetsBuffer offsets, final ValidityBuffer validity) {
             super(offset, validity);
             m_data = data;
-            // TODO pass data bytes and offsets buffer
+            m_dataBytes = dataBytes;
+            m_offsets = offsets;
         }
 
         @Override
@@ -172,7 +176,7 @@ public final class OnHeapStringData5000 {
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new OnHeapStringWriteData(m_offset + start, m_data, m_validity);
+            return new OnHeapStringWriteData(m_offset + start, m_data, m_dataBytes, m_offsets, m_validity);
         }
 
         @Override
@@ -189,7 +193,7 @@ public final class OnHeapStringData5000 {
         @Override
         public OnHeapStringReadData close(final int length) {
             setNumElements(length);
-            // TODO give the offsets buffer and byte array to the read data
+            // note the offsets reflect the current state of the dataBytes (not necessarily all strings of this data)
             return new OnHeapStringReadData(m_data, m_dataBytes, m_offsets, m_validity);
         }
 
@@ -275,12 +279,12 @@ public final class OnHeapStringData5000 {
             m_offsets = offsets;
         }
 
-        public OnHeapStringReadData(final String[] data, final ValidityBuffer validity, final int offset,
-            final int length) {
+        public OnHeapStringReadData(final String[] data, final ByteArrayList dataBytes, final IntOffsetsBuffer offsets,
+            final ValidityBuffer validity, final int offset, final int length) {
             super(validity, offset, length);
             m_data = data;
-            m_dataBytes = null; // TODO pass objects for slice
-            m_offsets = null;
+            m_dataBytes = dataBytes;
+            m_offsets = offsets;
         }
 
         @Override
@@ -291,7 +295,7 @@ public final class OnHeapStringData5000 {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new OnHeapStringReadData(m_data, m_validity, m_offset + start, length);
+            return new OnHeapStringReadData(m_data, m_dataBytes, m_offsets, m_validity, m_offset + start, length);
         }
 
         @Override
