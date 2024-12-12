@@ -148,4 +148,23 @@ final class ValidityBuffer {
         validityBuffer.getBytes(0, validity, 0, numBytes);
         return new ValidityBuffer(validity);
     }
+
+    @Override
+    public String toString() {
+        // Each byte has 8 bits, so total elements = m_validity.length * 8
+        int totalElements = m_validity.length * 8;
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+
+        for (int i = 0; i < totalElements; i++) {
+            // Use the isSet() method to determine if the bit is set (1) or not (0)
+            sb.append(isSet(i) ? '1' : '0');
+            if (i < totalElements - 1) {
+                sb.append(", ");
+            }
+        }
+
+        sb.append("]");
+        return sb.toString();
+    }
 }
