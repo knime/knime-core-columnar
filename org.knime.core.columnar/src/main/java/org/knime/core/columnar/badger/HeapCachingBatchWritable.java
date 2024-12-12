@@ -52,7 +52,6 @@ import java.util.function.UnaryOperator;
 
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.DefaultReadBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
@@ -92,7 +91,6 @@ public final class HeapCachingBatchWritable implements BatchWritable {
      * @param writable the delegate to which to write
      * @param cache the in-heap cache for storing object data
      */
-    @SuppressWarnings("resource")
     public HeapCachingBatchWritable(final BatchWritable writable, final HeapCache cache) {
         m_heapCache = cache;
         m_writer = new HeapCachingWriter(writable, m_heapCache);
@@ -114,9 +112,14 @@ public final class HeapCachingBatchWritable implements BatchWritable {
 
         private final NullableWriteData[] m_wrappedData;
 
-        private HeapCachingWriteBatch(final WriteBatch delegate, final UnaryOperator<NullableWriteData[]> wrapper) {
+        private final ReadDataWrapper<NullableReadData[], NullableWriteData[]> m_readDataWrapper;
+
+        private HeapCachingWriteBatch(final WriteBatch delegate, //
+            final UnaryOperator<NullableWriteData[]> writeDataWrapper, //
+            final ReadDataWrapper<NullableReadData[], NullableWriteData[]> readDataWrapper) {
             m_delegate = delegate;
-            m_wrappedData = wrapper.apply(m_delegate.getUnsafe());
+            m_wrappedData = writeDataWrapper.apply(m_delegate.getUnsafe());
+            m_readDataWrapper = readDataWrapper;
         }
 
         @Override
@@ -166,9 +169,73 @@ public final class HeapCachingBatchWritable implements BatchWritable {
 
         @Override
         public ReadBatch close(final int length) {
-            final var readData = new NullableReadData[m_wrappedData.length];
-            Arrays.setAll(readData, i -> m_wrappedData[i].close(length));
-            return new DefaultReadBatch(readData);
+            var delegateReadBatch = m_delegate.close(length);
+            return new HeapCachingReadBatch(delegateReadBatch,
+                m_readDataWrapper.apply(delegateReadBatch.getUnsafe(), m_wrappedData, length));
+        }
+    }
+
+    private static final class HeapCachingReadBatch implements ReadBatch {
+
+        private final ReadBatch m_delegate;
+
+        private final NullableReadData[] m_wrappedData;
+
+        private HeapCachingReadBatch(final ReadBatch delegate, final NullableReadData[] wrappedData) {
+            m_delegate = delegate;
+            m_wrappedData = wrappedData;
+        }
+
+        @Override
+        public int numData() {
+            return m_delegate.numData();
+        }
+
+        @Override
+        public NullableReadData[] getUnsafe() {
+            return m_wrappedData;
+        }
+
+        @Override
+        public void retain() {
+            m_delegate.retain();
+        }
+
+        @Override
+        public boolean tryRetain() {
+            return m_delegate.tryRetain();
+        }
+
+        @Override
+        public void release() {
+            m_delegate.release();
+        }
+
+        @Override
+        public long sizeOf() {
+            return m_delegate.sizeOf();
+        }
+
+        @Override
+        public boolean isMissing(final int index) {
+            return m_delegate.isMissing(index);
+        }
+
+        @Override
+        public NullableReadData get(final int index) {
+            return m_wrappedData[index];
+        }
+
+        @Override
+        public int length() {
+            return m_delegate.length();
+        }
+
+        @Override
+        public ReadBatch decorate(final DataDecorator transformer) {
+            final var transformedDatas = new NullableReadData[m_wrappedData.length];
+            Arrays.setAll(transformedDatas, i -> transformer.decorate(i, m_wrappedData[i]));
+            return new HeapCachingReadBatch(m_delegate.decorate(transformer), transformedDatas);
         }
     }
 
@@ -180,26 +247,29 @@ public final class HeapCachingBatchWritable implements BatchWritable {
 
         private final UnaryOperator<NullableWriteData[]> m_wrapWriteData;
 
-        private final CacheReadData<NullableReadData[]> m_cacher;
+        private final ReadDataWrapper<NullableReadData[], NullableWriteData[]> m_wrapReadData;
+
+        private final CacheReadData<NullableReadData[]> m_cacheReadData;
 
         private int m_numBatchesWritten;
 
         private HeapCachingWriter(final BatchWritable writable, final HeapCache cache) {
             m_writerDelegate = writable.getWriter();
             m_schema = writable.getSchema();
-            m_wrapWriteData = createWrapper(m_schema);
-            m_cacher = createCacher(m_schema, cache);
+            m_wrapWriteData = createWriteWrapper(m_schema);
+            m_wrapReadData = createReadWrapper(m_schema);
+            m_cacheReadData = createCacher(m_schema, cache);
         }
 
         @Override
         public WriteBatch create(final int capacity) {
-            return new HeapCachingWriteBatch(m_writerDelegate.create(capacity), m_wrapWriteData);
+            return new HeapCachingWriteBatch(m_writerDelegate.create(capacity), m_wrapWriteData, m_wrapReadData);
         }
 
         @Override
         public void write(final ReadBatch batch) throws IOException {
-            m_cacher.cache(batch.getUnsafe(), m_numBatchesWritten);
-            m_writerDelegate.write(batch);
+            m_cacheReadData.apply(batch.getUnsafe(), m_numBatchesWritten);
+            m_writerDelegate.write(((HeapCachingReadBatch)batch).m_delegate);
             m_numBatchesWritten++;
         }
 
@@ -214,10 +284,10 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         }
     }
 
-    private static UnaryOperator<NullableWriteData[]> createWrapper(final ColumnarSchema schema) {
+    private static UnaryOperator<NullableWriteData[]> createWriteWrapper(final ColumnarSchema schema) {
         @SuppressWarnings("unchecked")
         final UnaryOperator<NullableWriteData>[] wrappers = new UnaryOperator[schema.numColumns()];
-        Arrays.setAll(wrappers, i -> createWrapper(schema.getSpec(i)));
+        Arrays.setAll(wrappers, i -> createWriteWrapper(schema.getSpec(i)));
         if (Arrays.stream(wrappers).noneMatch(CachingWriteDataWrapper.class::isInstance)) {
             // if none of the wrappers are caching, we don't need to wrap anything
             return data -> data;
@@ -230,16 +300,16 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         }
     }
 
-    private static UnaryOperator<NullableWriteData> createWrapper(final DataSpec spec) {
+    private static UnaryOperator<NullableWriteData> createWriteWrapper(final DataSpec spec) {
         if (spec instanceof StringDataSpec) {
-            return CachingStringWriteData.WRAPPER;
+            return CachingStringWriteData.WRITE_WRAPPER;
         } else if (spec instanceof VarBinaryDataSpec) {
-            return CachingVarBinaryWriteData.WRAPPER;
+            return CachingVarBinaryWriteData.WRITE_WRAPPER;
         } else if (spec instanceof StructDataSpec structSpec) {
             @SuppressWarnings("unchecked")
             final UnaryOperator<NullableWriteData>[] innerWrappers = new UnaryOperator[structSpec.size()];
-            Arrays.setAll(innerWrappers, i -> createWrapper(structSpec.getDataSpec(i)));
-            return CachingStructWriteData.wrapper(innerWrappers);
+            Arrays.setAll(innerWrappers, i -> createWriteWrapper(structSpec.getDataSpec(i)));
+            return CachingStructWriteData.createWriteWrapper(innerWrappers);
         } else {
             return d -> d;
         }
@@ -247,8 +317,48 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     }
 
     @FunctionalInterface
+    private interface ReadDataWrapper<R, W> {
+        R apply(R readData, W writeData, int batchLength);
+    }
+
+    private static ReadDataWrapper<NullableReadData[], NullableWriteData[]>
+        createReadWrapper(final ColumnarSchema schema) {
+        @SuppressWarnings("unchecked")
+        final ReadDataWrapper<NullableReadData, NullableWriteData>[] wrappers =
+            new ReadDataWrapper[schema.numColumns()];
+        Arrays.setAll(wrappers, i -> createReadWrapper(schema.getSpec(i), DataIndex.createColumnIndex(i)));
+        return (readData, writeData, batchLength) -> {
+            final NullableReadData[] wrapped = new NullableReadData[wrappers.length];
+            Arrays.setAll(wrapped, i -> wrappers[i].apply(readData[i], writeData[i], batchLength));
+            return wrapped;
+        };
+    }
+
+    /**
+     * @param dataIndex the index of the data (may be nested)
+     */
+    private static ReadDataWrapper<NullableReadData, NullableWriteData> createReadWrapper(final DataSpec spec,
+        final DataIndex dataIndex) {
+        if (spec instanceof StringDataSpec) {
+            return CachingStringReadData.READ_WRAPPER;
+        } else if (spec instanceof VarBinaryDataSpec) {
+            return CachingVarBinaryReadData.READ_WRAPPER;
+        } else if (spec instanceof StructDataSpec structSpec) {
+            @SuppressWarnings("unchecked")
+            final ReadDataWrapper<NullableReadData, NullableWriteData>[] innerCachers =
+                new ReadDataWrapper[structSpec.size()];
+            Arrays.setAll(innerCachers, i -> createReadWrapper(structSpec.getDataSpec(i), dataIndex.getChild(i)));
+            // TODO (TP): optimization: detect if all wrappers are NOOPs, and return a NOOP
+            return CachingStructReadData.createReadWrapper(innerCachers);
+        } else {
+            return (readData, writeData, batchLength) -> readData;
+        }
+        // TODO AP-18333: Properly implement caching lists of objects
+    }
+
+    @FunctionalInterface
     private interface CacheReadData<T> {
-        void cache(T data, int batchIndex);
+        void apply(T data, int batchIndex);
     }
 
     private static CacheReadData<NullableReadData[]> createCacher(final ColumnarSchema schema,
@@ -259,7 +369,7 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         // TODO (TP): optimization: detect if all cachers are NOOPs, and return a NOOP
         return (data, batchIndex) -> {
             for (int i = 0; i < cachers.length; i++) {
-                cachers[i].cache(data[i], batchIndex);
+                cachers[i].apply(data[i], batchIndex);
             }
         };
     }
@@ -270,14 +380,14 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     private static CacheReadData<NullableReadData> createCacher(final DataSpec spec, final HeapCache heapCache,
         final DataIndex dataIndex) {
         if (spec instanceof StringDataSpec) {
-            return CachingStringReadData.cacher(heapCache, dataIndex);
+            return CachingStringReadData.createCacher(heapCache, dataIndex);
         } else if (spec instanceof VarBinaryDataSpec) {
-            return CachingVarBinaryReadData.cacher(heapCache, dataIndex);
+            return CachingVarBinaryReadData.createCacher(heapCache, dataIndex);
         } else if (spec instanceof StructDataSpec structSpec) {
             @SuppressWarnings("unchecked")
             final CacheReadData<NullableReadData>[] innerCachers = new CacheReadData[structSpec.size()];
             Arrays.setAll(innerCachers, i -> createCacher(structSpec.getDataSpec(i), heapCache, dataIndex.getChild(i)));
-            return CachingStructReadData.cacher(heapCache, dataIndex, innerCachers);
+            return CachingStructReadData.createCacher(innerCachers);
         } else {
             return (data, batchIndex) -> {
                 // NOOP
@@ -338,12 +448,9 @@ public final class HeapCachingBatchWritable implements BatchWritable {
 
         @Override
         public final R close(final int length) {
-            @SuppressWarnings("unchecked")
-            final R readData = (R)m_delegate.close(length);
-            return closeCache(readData, length);
+            throw new UnsupportedOperationException(
+                "This should never be called: close() the delegate WriteBatch instead.");
         }
-
-        abstract R closeCache(R delegate, int length);
     }
 
     private static abstract class AbstractCachingReadData<T extends NullableReadData> implements NullableReadData {
@@ -386,7 +493,7 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     private static final class CachingStringWriteData extends AbstractCachingWriteData<StringWriteData, StringReadData>
         implements StringWriteData {
 
-        static final CachingWriteDataWrapper WRAPPER =
+        static final CachingWriteDataWrapper WRITE_WRAPPER =
             delegate -> new CachingStringWriteData((StringWriteData)delegate);
 
         private String[] m_data;
@@ -411,24 +518,30 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         void expandCache(final int minimumCapacity) {
             m_data = Arrays.copyOf(m_data, m_delegate.capacity());
         }
-
-        @Override
-        StringReadData closeCache(final StringReadData delegate, final int length) {
-            return new CachingStringReadData(delegate, Arrays.copyOf(m_data, length));
-        }
     }
 
     private static final class CachingStringReadData extends AbstractCachingReadData<StringReadData>
         implements StringReadData {
 
-        static CacheReadData<NullableReadData> cacher(final HeapCache heapCache, final DataIndex dataIndex) {
-            return (data, batchIndex) -> {
-                final var id = new ColumnDataUniqueId(heapCache, dataIndex, batchIndex);
-                heapCache.cacheData(((CachingStringReadData)data).m_data, id);
+        static ReadDataWrapper<NullableReadData, NullableWriteData> READ_WRAPPER =
+            (readData, writeData, batchLength) -> {
+                // truncate String[] array held in CachingStringWriteData to batchLength
+                String[] data = ((CachingStringWriteData)writeData).m_data;
+                if (data.length != batchLength) {
+                    data = Arrays.copyOf(data, batchLength);
+                }
+
+                // wrap the delegate StringReadData and String[] data
+                // (we cannot put it into the cache yet because we don't know the batchIndex until it's written)
+                return new CachingStringReadData((StringReadData)readData, data);
             };
+
+        static CacheReadData<NullableReadData> createCacher(final HeapCache heapCache, final DataIndex dataIndex) {
+            return (data, batchIndex) -> heapCache.cacheData(((CachingStringReadData)data).m_data,
+                new ColumnDataUniqueId(heapCache, dataIndex, batchIndex));
         }
 
-        private String[] m_data;
+        private final String[] m_data;
 
         private CachingStringReadData(final StringReadData delegate, final String[] cachedData) {
             super(delegate);
@@ -439,17 +552,13 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         public String getString(final int index) {
             return m_data[index];
         }
-
-        String[] getCachedData() {
-            return m_data;
-        }
     }
 
     private static final class CachingVarBinaryWriteData
         extends AbstractCachingWriteData<VarBinaryWriteData, VarBinaryReadData>
         implements VarBinaryWriteData {
 
-        static final CachingWriteDataWrapper WRAPPER =
+        static final CachingWriteDataWrapper WRITE_WRAPPER =
             delegate -> new CachingVarBinaryWriteData((VarBinaryWriteData)delegate);
 
         private Object[] m_data;
@@ -479,24 +588,29 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         void expandCache(final int minimumCapacity) {
             m_data = Arrays.copyOf(m_data, m_delegate.capacity());
         }
-
-        @Override
-        VarBinaryReadData closeCache(final VarBinaryReadData delegate, final int length) {
-            return new CachingVarBinaryReadData(delegate, Arrays.copyOf(m_data, length));
-        }
     }
 
     private static final class CachingVarBinaryReadData extends AbstractCachingReadData<VarBinaryReadData>
         implements VarBinaryReadData {
 
-        static CacheReadData<NullableReadData> cacher(final HeapCache heapCache, final DataIndex dataIndex) {
-            return (data, batchIndex) -> {
-                final var id = new ColumnDataUniqueId(heapCache, dataIndex, batchIndex);
-                heapCache.cacheData(((CachingVarBinaryReadData)data).m_data, id);
+        static ReadDataWrapper<NullableReadData, NullableWriteData> READ_WRAPPER =
+            (readData, writeData, batchLength) -> {
+                // truncate Object[] array held in CachingVarBinaryWriteData to batchLength
+                Object[] data = ((CachingVarBinaryWriteData)writeData).m_data;
+                if (data.length != batchLength) {
+                    data = Arrays.copyOf(data, batchLength);
+                }
+                // wrap the delegate VarBinaryReadData and Object[] data
+                // (we cannot put it into the cache yet because we don't know the batchIndex until it's written)
+                return new CachingVarBinaryReadData((VarBinaryReadData)readData, data);
             };
+
+        static CacheReadData<NullableReadData> createCacher(final HeapCache heapCache, final DataIndex dataIndex) {
+            return (data, batchIndex) -> heapCache.cacheData(((CachingVarBinaryReadData)data).m_data,
+                new ColumnDataUniqueId(heapCache, dataIndex, batchIndex));
         }
 
-        private Object[] m_data;
+        private final Object[] m_data;
 
         private CachingVarBinaryReadData(final VarBinaryReadData delegate, final Object[] cachedData) {
             super(delegate);
@@ -513,16 +627,12 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         public byte[] getBytes(final int index) {
             return m_delegate.getBytes(index);
         }
-
-        Object[] getCachedData() {
-            return m_data;
-        }
     }
 
     private static final class CachingStructWriteData extends AbstractCachingWriteData<StructWriteData, StructReadData>
         implements StructWriteData {
 
-        static final CachingWriteDataWrapper wrapper(final UnaryOperator<NullableWriteData>[] innerWrappers) {
+        static final CachingWriteDataWrapper createWriteWrapper(final UnaryOperator<NullableWriteData>[] innerWrappers) {
             return d -> {
                 var delegate = (StructWriteData)d;
                 var cachingChildren = new NullableWriteData[innerWrappers.length];
@@ -557,26 +667,27 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         public <C extends NullableWriteData> C getWriteDataAt(final int index) {
             return (C)m_cachingChildren[index];
         }
-
-        @Override
-        StructReadData closeCache(final StructReadData delegate, final int length) {
-            final var readChildren = new NullableReadData[m_cachingChildren.length];
-            for (int i = 0; i < m_cachingChildren.length; ++i) {
-                readChildren[i] = ((AbstractCachingWriteData<?, ?>)m_cachingChildren[i])
-                    .closeCache(delegate.getReadDataAt(i), length);
-            }
-            return new CachingStructReadData(delegate, readChildren);
-        }
     }
 
     private static final class CachingStructReadData extends AbstractCachingReadData<StructReadData>
         implements StructReadData {
 
-        static CacheReadData<NullableReadData> cacher(final HeapCache heapCache, final DataIndex dataIndex,
-            final CacheReadData<NullableReadData>[] innerCachers) {
+        static ReadDataWrapper<NullableReadData, NullableWriteData>
+            createReadWrapper(final ReadDataWrapper<NullableReadData, NullableWriteData>[] innerWrappers) {
+            return (readData, writeData, batchLength) -> {
+                var cachingChildren = new NullableReadData[innerWrappers.length];
+                var readStruct = (StructReadData)readData;
+                var writeStruct = (StructWriteData)writeData;
+                Arrays.setAll(cachingChildren, i -> innerWrappers[i].apply( //
+                    readStruct.getReadDataAt(i), writeStruct.getWriteDataAt(i), batchLength));
+                return new CachingStructReadData(readStruct, cachingChildren);
+            };
+        }
+
+        static CacheReadData<NullableReadData> createCacher(final CacheReadData<NullableReadData>[] innerCachers) {
             return (data, batchIndex) -> {
                 for (int i = 0; i < innerCachers.length; ++i) {
-                    innerCachers[i].cache(((StructReadData)data).getReadDataAt(i), batchIndex);
+                    innerCachers[i].apply(((StructReadData)data).getReadDataAt(i), batchIndex);
                 }
             };
         }
