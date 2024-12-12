@@ -49,7 +49,6 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -58,13 +57,9 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.OffsetsBuffer5000.IntOffsetsBuffer;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
-import org.knime.core.table.util.StringEncoder;
-
-import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 
 /**
  *
@@ -88,31 +83,6 @@ public final class OnHeapStringData5000 {
     }
 
     /**
-     * Encodes the given strings into the target byte array. Starts at the string
-     *
-     * @param source the strings to encode
-     * @param startIdx the index of the fist string to encode
-     * @param target the target byte array
-     * @param offsets the offsets buffer to keep track of the offsets in the target array
-     * @param length the number of strings to copy
-     */
-    private static void encode(final String[] source, final int startIdx, final ByteArrayList target,
-        final IntOffsetsBuffer offsets, final int length) {
-        var encoder = new StringEncoder();
-        for (var i = startIdx; i < startIdx + length; i++) {
-            var str = source[i];
-            if (str != null) {
-                // TODO encode directly into the target array?
-                var bytes = str.getBytes(StandardCharsets.UTF_8);
-                var dataIndex = offsets.add(i, bytes.length);
-                target.addElements(dataIndex.start(), bytes);
-            } else {
-                offsets.add(i, 0);
-            }
-        }
-    }
-
-    /**
      * Holds the data of a string column in a combination of a string array and a byte array.
      *
      * Note that none of the two representations is guaranteed to be complete to the last set index.
@@ -123,33 +93,16 @@ public final class OnHeapStringData5000 {
      */
     public static final class OnHeapStringWriteData extends AbstractArrowWriteData implements CopyableStringWriteData {
 
-        private String[] m_data;
-
-        private ByteArrayList m_dataBytes;
-
-        private IntOffsetsBuffer m_offsets; // TODO include in size
-
-        /**
-         * @return the index of the last element that was written to the <code>m_dataBytes</code> array. Note that
-         *         <code>m_data</code> can contain values with larger indices.
-         */
-        private int lastWrittenBytesIndex() {
-            return m_offsets.lastWrittenIndex();
-        }
+        private final LazyEncodedStringList m_data;
 
         private OnHeapStringWriteData(final int capacity) {
             super(capacity);
-            m_data = new String[capacity];
-            m_dataBytes = new ByteArrayList();
-            m_offsets = OffsetsBuffer5000.createIntBuffer(capacity);
+            m_data = new LazyEncodedStringList(capacity);
         }
 
-        private OnHeapStringWriteData(final int offset, final String[] data, final ByteArrayList dataBytes,
-            final IntOffsetsBuffer offsets, final ValidityBuffer validity) {
+        private OnHeapStringWriteData(final int offset, final LazyEncodedStringList data, final ValidityBuffer validity) {
             super(offset, validity);
             m_data = data;
-            m_dataBytes = dataBytes;
-            m_offsets = offsets;
         }
 
         @Override
@@ -159,7 +112,7 @@ public final class OnHeapStringData5000 {
 
         @Override
         public int capacity() {
-            return m_data.length;
+            return m_data.size();
         }
 
         @Override
@@ -171,17 +124,17 @@ public final class OnHeapStringData5000 {
         @Override
         public long sizeOf() {
             // TODO das ist doch quatsch, oder?
-            return m_data.length * Integer.BYTES + m_validity.sizeOf();
+            return m_data.size() * Integer.BYTES + m_validity.sizeOf();
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new OnHeapStringWriteData(m_offset + start, m_data, m_dataBytes, m_offsets, m_validity);
+            return new OnHeapStringWriteData(m_offset + start, m_data, m_validity);
         }
 
         @Override
         public void setString(final int index, final String val) {
-            m_data[index + m_offset] = val;
+            m_data.setString(index + m_offset, val);
             setValid(index + m_offset);
         }
 
@@ -194,7 +147,7 @@ public final class OnHeapStringData5000 {
         public OnHeapStringReadData close(final int length) {
             setNumElements(length);
             // note the offsets reflect the current state of the dataBytes (not necessarily all strings of this data)
-            return new OnHeapStringReadData(m_data, m_dataBytes, m_offsets, m_validity);
+            return new OnHeapStringReadData(m_data, m_validity);
         }
 
         /**
@@ -204,36 +157,15 @@ public final class OnHeapStringData5000 {
          */
         private void setNumElements(final int numElements) {
             m_validity.setNumElements(numElements);
-
-            var newData = new String[numElements];
-            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
-            m_data = newData;
-
-            m_offsets.setNumElements(numElements);
+            m_data.setNumElements(numElements);
         }
 
         // LOW LEVEL COPY
 
         @Override
         public void setStringBytes(final int index, final byte[] val) {
-            var idx = m_offset + index;
-
-            // Note - we prefer to encode the previous values to decoding this one, because
-            // - it is likely that we need the byte representation of the previous values anyway
-            // - we have two representations of the data in the newer data object, so this will be more flexible and
-            //   efficient to work with
-
-            // Encode the values that not yet encoded
-            var lastBytesIdx = lastWrittenBytesIndex();
-            if (lastBytesIdx < idx - 1) {
-                // Encode the values up to the last index
-                encode(m_data, lastBytesIdx + 1, m_dataBytes, m_offsets, idx - lastBytesIdx - 1);
-            }
-
-            // Copy over the new value
-            var dataIndex = m_offsets.add(idx, val.length);
-            System.arraycopy(val, 0, m_dataBytes, dataIndex.start(), val.length);
-            setValid(idx);
+            m_data.setStringBytes(index + m_offset, val);
+            setValid(index + m_offset);
         }
 
         @Override
@@ -242,19 +174,7 @@ public final class OnHeapStringData5000 {
                 if (onHeapStringData.isMissing(sourceIndex)) {
                     setMissing(targetIndex + m_offset);
                 } else {
-                    // Copy the string
-                    // Note that this can be null if the data was just read and not yet decoded. In this case, the
-                    // bytes will be set and the string will be decoded on access
-                    m_data[targetIndex + m_offset] = onHeapStringData.getString(sourceIndex);
-
-                    // Copy the bytes if they are present (must be present if the string is null)
-                    if (onHeapStringData.m_offsets.lastWrittenIndex() >= sourceIndex) {
-                        var sourceDataIndex = onHeapStringData.m_offsets.get(sourceIndex);
-                        var targetDataIndex = m_offsets.add(targetIndex + m_offset, sourceDataIndex.length());
-                        System.arraycopy(onHeapStringData.m_dataBytes, sourceDataIndex.start(), m_dataBytes,
-                            targetDataIndex.start(), sourceDataIndex.length());
-                    }
-
+                    m_data.setFrom(onHeapStringData.m_data, sourceIndex, targetIndex + m_offset);
                 }
             }
         }
@@ -262,70 +182,41 @@ public final class OnHeapStringData5000 {
 
     public static final class OnHeapStringReadData extends AbstractArrowReadData implements CopyableStringReadData {
 
-        // TODO is this better than just using String.decode()?
-        private final StringEncoder encoder = new StringEncoder();
+        private final LazyEncodedStringList m_data;
 
-        private final String[] m_data;
-
-        private final ByteArrayList m_dataBytes;
-
-        private final IntOffsetsBuffer m_offsets;
-
-        public OnHeapStringReadData(final String[] data, final ByteArrayList dataBytes, final IntOffsetsBuffer offsets,
-            final ValidityBuffer validity) {
-            super(validity, data.length);
+        public OnHeapStringReadData(final LazyEncodedStringList data, final ValidityBuffer validity) {
+            super(validity, data.size());
             m_data = data;
-            m_dataBytes = dataBytes;
-            m_offsets = offsets;
         }
 
-        public OnHeapStringReadData(final String[] data, final ByteArrayList dataBytes, final IntOffsetsBuffer offsets,
-            final ValidityBuffer validity, final int offset, final int length) {
+        public OnHeapStringReadData(final LazyEncodedStringList data, final ValidityBuffer validity, final int offset,
+            final int length) {
             super(validity, offset, length);
             m_data = data;
-            m_dataBytes = dataBytes;
-            m_offsets = offsets;
         }
 
         @Override
         public long sizeOf() {
             // TODO size of the strings
-            return m_data.length * Integer.BYTES + m_validity.sizeOf();
+            return m_data.size() * Integer.BYTES + m_validity.sizeOf();
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new OnHeapStringReadData(m_data, m_dataBytes, m_offsets, m_validity, m_offset + start, length);
+            return new OnHeapStringReadData(m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public String getString(final int index) {
             // Assuming not missing (the caller has to check)
-
-            if (m_data[index + m_offset] == null) {
-                // Decode the string
-                var dataIndex = m_offsets.get(index + m_offset);
-
-                // TODO decode directly from the byte array?
-                var bytes = new byte[dataIndex.length()];
-                m_dataBytes.getElements(dataIndex.start(), bytes, 0, dataIndex.length());
-                var val = encoder.decode(bytes);
-
-                m_data[index + m_offset] = val;
-            }
-
-            return m_data[index + m_offset];
+            return m_data.getString(index + m_offset);
         }
 
         @Override
         public byte[] getStringBytesNullable(final int index) {
-            if (!isMissing(index + m_offset) && m_offsets.lastWrittenIndex() >= index + m_offset) {
-                var dataIndex = m_offsets.get(index + m_offset);
-                var bytes = new byte[dataIndex.length()];
-                System.arraycopy(m_dataBytes, dataIndex.start(), bytes, 0, bytes.length);
-                return bytes;
+            if (!isMissing(index + m_offset)) {
+                return m_data.getStringBytesNullable(index + m_offset);
             } else {
-                // TODO should we encode the data now?
                 return null;
             }
         }
@@ -348,12 +239,9 @@ public final class OnHeapStringData5000 {
                 var valueCount = vector.getValueCount();
                 var v = (VarCharVector)vector;
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
-                var offsets = OffsetsBuffer5000.createIntBuffer(vector.getOffsetBuffer(), valueCount);
-                var dataBytes = new byte[offsets.getNumData(valueCount)];
-                vector.getDataBuffer().getBytes(0, dataBytes);
+                var data = LazyEncodedStringList.createFrom(vector.getDataBuffer(), vector.getOffsetBuffer(), valueCount);
 
-                return new OnHeapStringReadData(new String[valueCount], new ByteArrayList(dataBytes), offsets,
-                    validity);
+                return new OnHeapStringReadData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowStringData with version " + version + ". Current version: " + m_version + ".");
@@ -375,17 +263,8 @@ public final class OnHeapStringData5000 {
             var d = (OnHeapStringReadData)data; // TODO generic?
             var vector = (VarCharVector)fieldVector;
 
-            // Encode strings if not all of them are encoded yet
-            var lastBytesIdx = d.m_offsets.lastWrittenIndex();
-            if (lastBytesIdx < d.length() - 1) {
-                encode(d.m_data, lastBytesIdx + 1, d.m_dataBytes, d.m_offsets, d.length() - lastBytesIdx - 1);
-            }
-
-            vector.allocateNew(d.m_dataBytes.size(), d.length());
-
-            vector.getDataBuffer().setBytes(0, d.m_dataBytes.elements(), 0, d.m_dataBytes.size());
+            d.m_data.copyTo(vector);
             d.m_validity.copyTo(vector.getValidityBuffer());
-            d.m_offsets.copyTo(vector.getOffsetBuffer());
 
             vector.setLastSet(d.length() - 1);
             vector.setValueCount(d.length());
