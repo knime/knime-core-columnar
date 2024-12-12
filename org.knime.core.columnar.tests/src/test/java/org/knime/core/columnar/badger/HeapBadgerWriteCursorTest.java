@@ -320,15 +320,17 @@ class HeapBadgerWriteCursorTest {
     ) throws IOException {
         try (TestBatchStore batchStore = createTestStore(testData)) {
             var cache = new MockSharedObjectCache();
-            var badger = new HeapBadger(batchStore, batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes, cache);
+            var readable = new HeapCache(batchStore, cache);
+            var writable = new HeapCachingBatchWritable(batchStore, readable);
+            var badger = new HeapBadger(writable, readable, maxNumRowsPerBatch, maxBatchSizeInBytes);
             if (!writeToHeapBadger(badger, testData, numRows, rowCallback)) {
                 return;
             }
 
             assertWrittenData(testData, expectedNumRows, batchStore);
             if (expectedCacheDataIndices.length > 0) {
-                assertDataInCache(cache, badger.getHeapCache(), expectedCacheDataIndices);
-                assertWrittenData(testData, expectedNumRows, badger.getHeapCache(), batchStore.numBatches());
+                assertDataInCache(cache, readable, expectedCacheDataIndices);
+                assertWrittenData(testData, expectedNumRows, readable, batchStore.numBatches());
             }
         }
     }
