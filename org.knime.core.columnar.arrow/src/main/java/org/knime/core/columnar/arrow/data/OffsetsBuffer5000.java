@@ -232,6 +232,11 @@ public final class OffsetsBuffer5000 {
             Objects.requireNonNull(buffer, "buffer cannot be null");
             MemoryCopyUtils.copy(m_offsets, buffer);
         }
+
+        @Override
+        public String toString() {
+            return "IntOffsetsBuffer{" + "m_offsets=" + m_offsets + ", m_lastIndexAdded=" + m_lastIndexAdded + '}';
+        }
     }
 
     /**
