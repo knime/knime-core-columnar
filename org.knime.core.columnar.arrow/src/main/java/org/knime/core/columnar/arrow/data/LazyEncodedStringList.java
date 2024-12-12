@@ -83,7 +83,7 @@ public class LazyEncodedStringList {
     public LazyEncodedStringList(final int capacity) {
         m_data = new String[capacity];
         m_dataBytes = new ByteArrayList();
-        m_offsets = OffsetsBuffer5000.createIntBuffer(capacity);
+        m_offsets = new IntOffsetsBuffer(capacity);
     }
 
     private LazyEncodedStringList(final String[] data, final ByteArrayList byteArrayList,

@@ -104,12 +104,18 @@ public final class OffsetsBuffer5000 {
 
         private int m_lastIndexAdded;
 
-        private IntOffsetsBuffer(final int numElements) {
-            m_offsets = new int[numElements + 1];
+        /**
+         * Creates a new int-based write buffer with the specified initial number of elements.
+         *
+         * @param initialNumElements the initial number of elements in the buffer
+         * @throws IllegalArgumentException if {@code initialNumElements} is negative
+         */
+        public IntOffsetsBuffer(final int initialNumElements) {
+            m_offsets = new int[initialNumElements + 1];
             m_lastIndexAdded = -1;
         }
 
-        public IntOffsetsBuffer(final int[] offsets) {
+        private IntOffsetsBuffer(final int[] offsets) {
             m_offsets = offsets;
             m_lastIndexAdded = offsets.length - 2;
         }
@@ -124,8 +130,6 @@ public final class OffsetsBuffer5000 {
         public int numElements() {
             return m_offsets.length - 1;
         }
-
-        // Writing
 
         /**
          * Adds an element at the specified index with the given length to the offsets buffer. The index must not be
@@ -237,17 +241,6 @@ public final class OffsetsBuffer5000 {
         public String toString() {
             return "IntOffsetsBuffer{" + "m_offsets=" + m_offsets + ", m_lastIndexAdded=" + m_lastIndexAdded + '}';
         }
-    }
-
-    /**
-     * Creates a new int-based write buffer with the specified initial number of elements.
-     *
-     * @param initialNumElements the initial number of elements in the buffer
-     * @return an {@code IntOffsetsWriteBuffer} for writing int-based offsets
-     * @throws IllegalArgumentException if {@code initialNumElements} is negative
-     */
-    public static IntOffsetsBuffer createIntBuffer(final int initialNumElements) {
-        return new IntOffsetsBuffer(initialNumElements);
     }
 
     /**
