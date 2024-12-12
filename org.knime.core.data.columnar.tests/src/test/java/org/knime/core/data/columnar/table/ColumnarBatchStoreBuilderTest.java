@@ -149,8 +149,7 @@ public class ColumnarBatchStoreBuilderTest extends ColumnarTest {
     @Test
     public void testHeapBadger() throws IOException {
         try (final TestBatchStore delegate = TestBatchStore.create(SCHEMA)) {
-            final var cache = new SoftReferencedObjectCache();
-            final var builder = new ColumnarBatchStoreBuilder(delegate).useHeapBadger(cache);
+            final var builder = new ColumnarBatchStoreBuilder(delegate).useHeapBadger();
             try (final var wrappedStore = builder.build(); //
                     var writeCursor = wrappedStore.getBatchingWriteCursor()) {
                 assertNotNull(writeCursor);
