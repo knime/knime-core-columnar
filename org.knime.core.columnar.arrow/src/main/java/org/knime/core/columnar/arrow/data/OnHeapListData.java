@@ -50,6 +50,7 @@ package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -72,6 +73,10 @@ import org.knime.core.columnar.data.NullableWriteData;
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 public final class OnHeapListData {
+
+    public static ArrowColumnDataFactory factory(final ArrowColumnDataFactory inner) {
+        return new Factory(inner);
+    }
 
     private OnHeapListData() {
     }
@@ -220,7 +225,7 @@ public final class OnHeapListData {
         private final ArrowColumnDataFactory m_inner;
 
         protected Factory(final ArrowColumnDataFactory inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION));
+            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, inner.getVersion()));
             m_inner = inner;
         }
 
@@ -246,7 +251,7 @@ public final class OnHeapListData {
                 var offsets = OffsetsBuffer.createIntReadBuffer(vector.getOffsetBuffer(), valueCount);
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-                var data = m_inner.createRead(dataVector, nullCount, provider, version);
+                var data = m_inner.createRead(dataVector, nullCount, provider, version.getChildVersion(0));
                 return new OnHeapListReadData(data, offsets, validity, valueCount);
             } else {
                 throw new IOException(
@@ -278,6 +283,16 @@ public final class OnHeapListData {
         public int initialNumBytesPerElement() {
             // TODO Auto-generated method stub
             return 0;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(m_inner, super.hashCode());
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            return super.equals(obj) && m_inner.equals(((Factory)obj).m_inner);
         }
     }
 }

@@ -50,9 +50,16 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
+import org.knime.core.columnar.arrow.data.OnHeapByteData;
+import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData;
+import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData;
 import org.knime.core.columnar.arrow.data.OnHeapIntData;
+import org.knime.core.columnar.arrow.data.OnHeapListData;
+import org.knime.core.columnar.arrow.data.OnHeapLongData;
 import org.knime.core.columnar.arrow.data.OnHeapStringData5000;
+import org.knime.core.columnar.arrow.data.OnHeapStructData;
+import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData;
 import org.knime.core.columnar.arrow.data.OnHeapVoidData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -129,7 +136,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
-        throw new UnsupportedOperationException("nyi");
+        return wrapCached(OnHeapByteData.FACTORY, traits);
     }
 
     @Override
@@ -149,17 +156,15 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
-        throw new UnsupportedOperationException("nyi");
+        return wrapCached(OnHeapLongData.FACTORY, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            throw new UnsupportedOperationException("nyi");
-            //            return wrapCached(new ArrowDictEncodedVarBinaryDataFactory(traits), traits);
+            return wrapCached(OnHeapDictEncodedVarBinaryData.factory(traits), traits);
         } else {
-            throw new UnsupportedOperationException("nyi");
-            //            return wrapCached(ArrowVarBinaryDataFactory.INSTANCE, traits);
+            return wrapCached(OnHeapVarBinaryData.FACTORY, traits);
         }
     }
 
@@ -172,24 +177,20 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
     public ArrowColumnDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
         final var innerFactories = new ArrowColumnDataFactory[spec.size()];
         Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
-        throw new UnsupportedOperationException("nyi");
-        // return wrapCached(new ArrowStructDataFactory(innerFactories), traits);
+        return wrapCached(OnHeapStructData.factory(innerFactories), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
         final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
-        throw new UnsupportedOperationException("nyi");
-        // return wrapCached(new ArrowListDataFactory(inner), traits);
+        return wrapCached(OnHeapListData.factory(inner), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
-        //        throw new UnsupportedOperationException("nyi");
-        // TODO dict encoded?
-        //        if (DictEncodingTrait.isEnabled(traits)) {
-        //            return wrapCached(new ArrowDictEncodedStringDataFactory(traits), traits);
-        //        }
+        if (DictEncodingTrait.isEnabled(traits)) {
+            return wrapCached(OnHeapDictEncodedStringData.factory(traits), traits);
+        }
         // TODO the caching does not work like that
         return wrapCached(OnHeapStringData5000.FACTORY, traits);
     }
