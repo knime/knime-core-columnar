@@ -357,7 +357,7 @@ class HeapBadgerWriteCursorTest {
             var cache = new MockSharedObjectCache();
             var readable = new HeapCache(batchStore, cache);
             var writable = new HeapCachingBatchWritable(batchStore, readable);
-            var badger = new HeapBadger(writable, readable, maxNumRowsPerBatch, maxBatchSizeInBytes, null);
+            var badger = new HeapBadger(writable, maxNumRowsPerBatch, maxBatchSizeInBytes, null);
             if (!writeToHeapBadger(badger, testData, numRows, rowCallback)) {
                 return;
             }
