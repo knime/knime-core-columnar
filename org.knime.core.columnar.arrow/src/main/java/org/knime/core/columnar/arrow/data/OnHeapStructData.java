@@ -73,7 +73,7 @@ import org.knime.core.columnar.data.StructData.StructWriteData;
  */
 public final class OnHeapStructData {
 
-    public static ArrowColumnDataFactory factory(final ArrowColumnDataFactory... inner) {
+    public static Factory factory(final ArrowColumnDataFactory... inner) {
         return new Factory(inner);
     }
 
@@ -254,7 +254,7 @@ public final class OnHeapStructData {
         }
 
         @Override
-        public ArrowWriteData createWrite(final int capacity) {
+        public OnHeapStructWriteData createWrite(final int capacity) {
             var children = new ArrowWriteData[m_inner.length];
             for (int i = 0; i < m_inner.length; i++) {
                 children[i] = m_inner[i].createWrite(capacity);
@@ -263,7 +263,7 @@ public final class OnHeapStructData {
         }
 
         @Override
-        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public OnHeapStructReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (!(vector instanceof StructVector)) {
                 throw new IOException("Expected a StructVector, but got: " + vector.getClass().getSimpleName());
