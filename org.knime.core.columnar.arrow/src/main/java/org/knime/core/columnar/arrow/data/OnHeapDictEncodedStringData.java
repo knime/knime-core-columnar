@@ -78,6 +78,10 @@ public final class OnHeapDictEncodedStringData {
     private OnHeapDictEncodedStringData() {
     }
 
+    public static ArrowColumnDataFactory factory(final DataTraits traits) {
+        return new OnHeapDictEncodedStringDataFactory(traits);
+    }
+
     /**
      * Arrow implementation of {@link DictEncodedStringWriteData};
      *

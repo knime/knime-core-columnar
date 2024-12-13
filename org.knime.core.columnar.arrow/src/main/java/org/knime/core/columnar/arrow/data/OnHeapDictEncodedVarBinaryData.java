@@ -79,6 +79,10 @@ public final class OnHeapDictEncodedVarBinaryData {
     private OnHeapDictEncodedVarBinaryData() {
     }
 
+    public static ArrowColumnDataFactory factory(final DataTraits traits) {
+        return new OnHeapDictEncodedVarBinaryDataFactory(traits);
+    }
+
     /**
      * Arrow implementation of {@link DictEncodedVarBinaryWriteData}
      *
@@ -189,7 +193,7 @@ public final class OnHeapDictEncodedVarBinaryData {
          *
          * @param traits containing the KeyType to use for dict encoding
          */
-        public OnHeapDictEncodedVarBinaryDataFactory(final DataTraits traits) {
+        private OnHeapDictEncodedVarBinaryDataFactory(final DataTraits traits) {
             super(traits, OnHeapVarBinaryData.FACTORY, CURRENT_VERSION);
         }
 
