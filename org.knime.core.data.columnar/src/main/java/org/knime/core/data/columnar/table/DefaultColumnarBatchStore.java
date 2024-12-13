@@ -54,6 +54,7 @@ import java.util.concurrent.ExecutorService;
 import org.knime.core.columnar.badger.BatchingWritable;
 import org.knime.core.columnar.badger.HeapBadger;
 import org.knime.core.columnar.badger.HeapCache;
+import org.knime.core.columnar.badger.HeapCachingBatchWritable;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -323,13 +324,14 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         return m_batchSizeRecorder.wrap(writable);
     }
 
-    private void initHeapBadger(final SharedObjectCache heapCache) {
-        if (heapCache != null) {
-            m_readable = new HeapCache(m_readable, heapCache);
+    private void initHeapBadger(final SharedObjectCache cache) {
+        if (cache != null) {
+            var heapCache = new HeapCache(m_readable, cache);
+            m_readable = heapCache;
+            m_writable = new HeapCachingBatchWritable(m_writable, heapCache);
         }
 
-        m_heapBadger = new HeapBadger(m_writable, m_readable,
-            ColumnarPreferenceUtils.getHeapBadgerSerializationExecutor());
+        m_heapBadger = new HeapBadger(m_writable, ColumnarPreferenceUtils.getHeapBadgerSerializationExecutor());
         m_writable = null; // FIXME
 
         // No need for another MemoryAlertListener. The HeapBadger only keeps a small number of rows in the buffer. We could maybe implement flush instead of finish...

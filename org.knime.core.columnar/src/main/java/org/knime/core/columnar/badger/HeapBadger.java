@@ -160,6 +160,17 @@ public class HeapBadger {
      *
      * @param writable
      * @param readable
+     * @param execService
+     */
+    public HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable, final ExecutorService execService) {
+        this(writable, readable, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES, execService);
+    }
+
+    /**
+     * Constructor
+     *
+     * @param writable
+     * @param readable
      */
     public HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable) {
         this(writable, readable, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES, null);
