@@ -69,7 +69,7 @@ import org.knime.core.columnar.data.NullableReadData;
  */
 public final class OnHeapByteData {
 
-    public static final Factory FACTORY = new Factory();
+    public static final OnHeayByteDataFactory FACTORY = new OnHeayByteDataFactory();
 
     private OnHeapByteData() {
     }
@@ -175,9 +175,9 @@ public final class OnHeapByteData {
         }
     }
 
-    public static final class Factory extends AbstractArrowColumnDataFactory {
+    public static final class OnHeayByteDataFactory extends AbstractArrowColumnDataFactory {
 
-        private Factory() {
+        private OnHeayByteDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 

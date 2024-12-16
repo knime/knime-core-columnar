@@ -68,7 +68,7 @@ import org.knime.core.table.util.StringEncoder;
  */
 public final class OnHeapStringData {
 
-    public static final Factory FACTORY = new Factory();
+    public static final OnHeapStringDataFactory FACTORY = new OnHeapStringDataFactory();
 
     private OnHeapStringData() {
     }
@@ -175,9 +175,9 @@ public final class OnHeapStringData {
         }
     }
 
-    public static final class Factory extends AbstractArrowColumnDataFactory {
+    public static final class OnHeapStringDataFactory extends AbstractArrowColumnDataFactory {
 
-        private Factory() {
+        private OnHeapStringDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 

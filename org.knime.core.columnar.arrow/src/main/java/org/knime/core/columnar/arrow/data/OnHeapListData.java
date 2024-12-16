@@ -75,7 +75,7 @@ import org.knime.core.columnar.data.NullableWriteData;
 public final class OnHeapListData {
 
     public static ArrowColumnDataFactory factory(final ArrowColumnDataFactory inner) {
-        return new Factory(inner);
+        return new OnHeapListDataFactory(inner);
     }
 
     private OnHeapListData() {
@@ -218,13 +218,13 @@ public final class OnHeapListData {
         }
     }
 
-    public static final class Factory extends AbstractArrowColumnDataFactory {
+    public static final class OnHeapListDataFactory extends AbstractArrowColumnDataFactory {
 
         private static final int CURRENT_VERSION = 0;
 
         private final ArrowColumnDataFactory m_inner;
 
-        protected Factory(final ArrowColumnDataFactory inner) {
+        protected OnHeapListDataFactory(final ArrowColumnDataFactory inner) {
             super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, inner.getVersion()));
             m_inner = inner;
         }
@@ -285,6 +285,9 @@ public final class OnHeapListData {
             return 0;
         }
 
+        // <<<<< START
+        // TODO move child handling to abstract parent - it can be empty for factorys withouth children
+
         @Override
         public int hashCode() {
             return Objects.hash(m_inner, super.hashCode());
@@ -292,7 +295,14 @@ public final class OnHeapListData {
 
         @Override
         public boolean equals(final Object obj) {
-            return super.equals(obj) && m_inner.equals(((Factory)obj).m_inner);
+            return super.equals(obj) && m_inner.equals(((OnHeapListDataFactory)obj).m_inner);
         }
+
+        @Override
+        public String toString() {
+            return this.getClass().getSimpleName() + ".v" + m_version + "[" + m_inner + "]";
+        }
+
+        // <<<<< END
     }
 }

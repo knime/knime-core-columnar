@@ -46,6 +46,7 @@
 package org.knime.core.columnar.arrow;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
@@ -147,9 +148,9 @@ public interface ArrowColumnDataFactory {
     /** A class holding the null count for a vector and its children. */
     public static final class ArrowVectorNullCount {
 
-        private int m_nullCount;
+        private final int m_nullCount;
 
-        private ArrowVectorNullCount[] m_children;
+        private final ArrowVectorNullCount[] m_children;
 
         /**
          * Create a {@link ArrowVectorNullCount} with the given null count for the vector and its children.
@@ -174,6 +175,12 @@ public interface ArrowColumnDataFactory {
          */
         public ArrowVectorNullCount getChild(final int index) {
             return m_children[index];
+        }
+
+        @Override
+        public String toString() {
+            return "ArrowVectorNullCount [m_nullCount=" + m_nullCount + ", m_children=" + Arrays.toString(m_children)
+                + "]";
         }
     }
 

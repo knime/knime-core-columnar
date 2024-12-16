@@ -77,7 +77,7 @@ public final class OnHeapStringData5000 {
         byte[] getStringBytesNullable(int index);
     }
 
-    public static final Factory FACTORY = new Factory();
+    public static final OnHeapStringDataFactory FACTORY = new OnHeapStringDataFactory();
 
     private OnHeapStringData5000() {
     }
@@ -222,9 +222,9 @@ public final class OnHeapStringData5000 {
         }
     }
 
-    public static final class Factory extends AbstractArrowColumnDataFactory {
+    public static final class OnHeapStringDataFactory extends AbstractArrowColumnDataFactory {
 
-        private Factory() {
+        private OnHeapStringDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(0));
         }
 

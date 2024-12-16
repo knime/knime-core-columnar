@@ -71,7 +71,7 @@ public class OnHeapSimpleListDataTest extends AbstractArrowDataTest<OnHeapListWr
 
     /** Create the test for {@link OnHeapListData} */
     public OnHeapSimpleListDataTest() {
-        super(new OnHeapListData.Factory(OnHeapIntData.FACTORY));
+        super(OnHeapListData.factory(OnHeapIntData.FACTORY));
     }
 
     @Override
