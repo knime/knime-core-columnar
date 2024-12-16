@@ -48,8 +48,11 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.DataInput;
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 import org.knime.core.table.io.ReadableDataInput;
@@ -162,14 +165,14 @@ class ByteBigArrayDataInput implements ReadableDataInput {
     public short readShort() throws IOException {
         int ch1 = readUnsignedByte();
         int ch2 = readUnsignedByte();
-        return (short)((ch1 << 8) + ch2);
+        return (short)((ch2 << 8) + ch1);
     }
 
     @Override
     public int readUnsignedShort() throws IOException {
         int ch1 = readUnsignedByte();
         int ch2 = readUnsignedByte();
-        return (ch1 << 8) + ch2;
+        return (ch2 << 8) + ch1;
     }
 
     @Override
@@ -183,20 +186,20 @@ class ByteBigArrayDataInput implements ReadableDataInput {
         int ch2 = readUnsignedByte();
         int ch3 = readUnsignedByte();
         int ch4 = readUnsignedByte();
-        return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + ch4);
+        return ((ch4 << 24) + (ch3 << 16) + (ch2 << 8) + ch1);
     }
 
     @Override
     public long readLong() throws IOException {
-        long ch1 = ((long)readUnsignedByte()) << 56;
-        long ch2 = ((long)readUnsignedByte()) << 48;
-        long ch3 = ((long)readUnsignedByte()) << 40;
-        long ch4 = ((long)readUnsignedByte()) << 32;
-        long ch5 = ((long)readUnsignedByte()) << 24;
-        long ch6 = ((long)readUnsignedByte()) << 16;
-        long ch7 = ((long)readUnsignedByte()) << 8;
-        long ch8 = (readUnsignedByte());
-        return ch1 + ch2 + ch3 + ch4 + ch5 + ch6 + ch7 + ch8;
+        long ch1 = (readUnsignedByte());
+        long ch2 = ((long)readUnsignedByte()) << 8;
+        long ch3 = ((long)readUnsignedByte()) << 16;
+        long ch4 = ((long)readUnsignedByte()) << 24;
+        long ch5 = ((long)readUnsignedByte()) << 32;
+        long ch6 = ((long)readUnsignedByte()) << 40;
+        long ch7 = ((long)readUnsignedByte()) << 48;
+        long ch8 = ((long)readUnsignedByte()) << 56;
+        return ch8 + ch7 + ch6 + ch5 + ch4 + ch3 + ch2 + ch1;
     }
 
     @Override
@@ -214,11 +217,39 @@ class ByteBigArrayDataInput implements ReadableDataInput {
         throw new UnsupportedOperationException("readLine not supported");
     }
 
+    /**
+     * Reads in a string that has been encoded using UTF-8 format. The general contract of {@code readUTF} is that it
+     * reads a representation of a Unicode character string encoded in UTF-8 format; this string of characters is then
+     * returned as a String.
+     * <p>
+     *
+     * First, four bytes are read and used to construct a 32-bit integer in exactly the manner of the {@code readInt}
+     * method. This integer value is called the <i>UTF length</i> and specifies the number of additional bytes to be
+     * read. These bytes are then converted to a string via the {@link Charset#decode(ByteBuffer) decode} method of
+     * {@link StandardCharsets#UTF_8}.
+     * <p>
+     *
+     * If end of file is encountered at any time during this entire process, then an {@code EOFException} is thrown.
+     * <p>
+     *
+     * The implementation of this method differs from the contract of {@link DataInput#readUTF()} in two ways:
+     * <ol>
+     * <li>It expects to-be-decoded strings to be encoded not in modified UTF-8 format, but in standard UTF-8
+     * format.</li>
+     * <li>It allows reading encoded strings with a length of up to {@link Integer#MAX_VALUE} bytes.</li>
+     * </ol>
+     *
+     * {@code ByteBigListDataOutput#writeUTF(String)} may be used to write data that is suitable for reading by this
+     * method.
+     *
+     * @return a Unicode string.
+     * @exception EOFException if this stream reaches the end before reading all the bytes.
+     */
     @Override
     public String readUTF() throws IOException {
-        int utflen = readUnsignedShort();
-        byte[] bytearr = new byte[utflen];
-        readFully(bytearr, 0, utflen);
-        return new String(bytearr, StandardCharsets.UTF_8);
+        // TODO use StringEncoder?
+        final byte[] out = new byte[readInt()];
+        readFully(out);
+        return new String(out, StandardCharsets.UTF_8);
     }
 }

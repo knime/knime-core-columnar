@@ -107,9 +107,9 @@ class ByteBigListDataOutput implements DataOutput {
 
     @Override
     public void writeShort(final int v) throws IOException {
-        m_data.add((byte)((v >>> 8) & 0xFF));
-        m_position++;
         m_data.add((byte)(v & 0xFF));
+        m_position++;
+        m_data.add((byte)((v >>> 8) & 0xFF));
         m_position++;
     }
 
@@ -120,19 +120,19 @@ class ByteBigListDataOutput implements DataOutput {
 
     @Override
     public void writeInt(final int v) throws IOException {
-        m_data.add((byte)((v >>> 24) & 0xFF));
-        m_position++;
-        m_data.add((byte)((v >>> 16) & 0xFF));
+        m_data.add((byte)(v & 0xFF));
         m_position++;
         m_data.add((byte)((v >>> 8) & 0xFF));
         m_position++;
-        m_data.add((byte)(v & 0xFF));
+        m_data.add((byte)((v >>> 16) & 0xFF));
+        m_position++;
+        m_data.add((byte)((v >>> 24) & 0xFF));
         m_position++;
     }
 
     @Override
     public void writeLong(final long v) throws IOException {
-        for (int i = 7; i >= 0; i--) {
+        for (int i = 0; i < 8; i++) {
             m_data.add((byte)(v >>> (i * 8)));
             m_position++;
         }
@@ -165,10 +165,28 @@ class ByteBigListDataOutput implements DataOutput {
         }
     }
 
+    /**
+     * Writes four bytes of length information to the output stream, followed by the UTF-8 representation of every
+     * character in the string <code>s</code>. If <code>s</code> is <code>null</code>, a
+     * <code>NullPointerException</code> is thrown. The length of the information represents the number of bytes of the
+     * encoded string and is written to the output stream in exactly the manner of the <code>writeInt</code> method.
+     * <p>
+     *
+     * The implementation of this method differs from the contract of {@link DataOutput#writeUTF(String)} in two ways:
+     * <ol>
+     * <li>It encodes strings not in modified UTF-8 format, but in standard UTF-8 format.</li>
+     * <li>It allows writing encoded strings with a length of up to {@link Integer#MAX_VALUE} bytes.</li>
+     * </ol>
+     *
+     * The bytes written by this method may be read by the {@link ByteBigArrayDataInput#readUTF()}, which will then
+     * return a <code>String</code> equal to <code>s</code>.
+     *
+     * @param s the string value to be written.
+     */
     @Override
     public void writeUTF(final String s) throws IOException {
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-        writeShort(bytes.length);
+        writeInt(bytes.length);
         write(bytes);
     }
 }
