@@ -316,7 +316,7 @@ public final class AbstractOnHeapDictEncodedData {
      */
     abstract static class AbstractOnHeapDictEncodedDataFactory implements ArrowColumnDataFactory {
 
-        protected final OnHeapStructData.Factory m_delegate;
+        protected final OnHeapStructData.OnHeapStructDataFactory m_delegate;
 
         protected final KeyType m_keyType;
 
