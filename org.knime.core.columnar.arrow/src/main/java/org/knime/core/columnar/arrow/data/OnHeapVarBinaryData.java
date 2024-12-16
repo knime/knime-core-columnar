@@ -51,6 +51,7 @@ import java.util.function.LongSupplier;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.ArrowType.LargeBinary;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
@@ -61,6 +62,8 @@ import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
+
+import com.google.common.base.Preconditions;
 
 import it.unimi.dsi.fastutil.BigArrays;
 import it.unimi.dsi.fastutil.bytes.ByteBigArrayBigList;
@@ -242,13 +245,62 @@ public final class OnHeapVarBinaryData {
         }
     }
 
+    static final class OnHeapDictEncodedLegacyDateTimeVarBinaryReadData extends AbstractArrowReadData
+        implements VarBinaryReadData {
+
+        private final int[] m_indices;
+
+        private final OnHeapVarBinaryReadData m_dictionary;
+
+        public OnHeapDictEncodedLegacyDateTimeVarBinaryReadData(final int[] indices,
+            final OnHeapVarBinaryReadData dictionary, final ValidityBuffer validity) {
+            super(validity, indices.length);
+            m_indices = indices;
+            m_dictionary = dictionary;
+        }
+
+        public OnHeapDictEncodedLegacyDateTimeVarBinaryReadData(final int[] indices,
+            final OnHeapVarBinaryReadData dictionary, final ValidityBuffer validity, final int offset,
+            final int length) {
+            super(validity, offset, length);
+            m_indices = indices;
+            m_dictionary = dictionary;
+        }
+
+        @Override
+        public long sizeOf() {
+            return m_validity.sizeOf() + m_indices.length * Integer.BYTES + m_dictionary.sizeOf();
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new OnHeapDictEncodedLegacyDateTimeVarBinaryReadData(m_indices, m_dictionary, m_validity,
+                m_offset + start, length);
+        }
+
+        @Override
+        public byte[] getBytes(final int index) {
+            return m_dictionary.getBytes(m_indices[m_offset + index]);
+        }
+
+        @Override
+        public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
+            return m_dictionary.getObject(m_indices[m_offset + index], deserializer);
+        }
+
+    }
+
     /** Factory class for {@link OnHeapVarBinaryData}. */
     public static final class OnHeapVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        /**
+         * In version 0 we implemented dict encoding in order to load ZonedDateTime data in a backwards compatible way.
+         * Newer versions don't support dict encoding because they should use our own struct dict encoding.
+         */
+        private static final ArrowColumnDataFactoryVersion V0 = ArrowColumnDataFactoryVersion.version(0);
 
         private OnHeapVarBinaryDataFactory() {
-            super(CURRENT_VERSION);
+            super(1);
         }
 
         @Override
@@ -264,19 +316,44 @@ public final class OnHeapVarBinaryData {
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (m_version.equals(version)) {
-                int valueCount = vector.getValueCount();
-                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
-                var offsets = OffsetsBuffer.createLongReadBuffer(vector.getOffsetBuffer(), valueCount);
+            if (V0.equals(version)) {
+                var dictionaryEncoding = vector.getField().getDictionary();
+                if (dictionaryEncoding != null) {
+                    var dict = provider.lookup(dictionaryEncoding.getId());
+                    Preconditions.checkArgument(dict.getVectorType().equals(MinorType.LARGEVARBINARY.getType()),
+                        "Encountered dictionary vector of type '%s' but expected a LargeVarBinaryVector.");
 
-                var data = ByteBigArrays.newBigArray(vector.getDataBuffer().capacity());
-                MemoryCopyUtils.copy(vector.getDataBuffer(), data);
+                    var dictionary = readFromVector(dict.getVector());
 
-                return new OnHeapVarBinaryReadData(data, offsets, validity, valueCount);
+                    // Read indices
+                    var valueCount = vector.getValueCount();
+                    var indices = new int[valueCount];
+                    MemoryCopyUtils.copy(vector.getDataBufferAddress(), indices);
+                    var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+                    return new OnHeapDictEncodedLegacyDateTimeVarBinaryReadData(indices, dictionary, validity);
+                } else {
+                    return readFromVector(vector);
+                }
+            } else if (m_version.equals(version)) {
+                return readFromVector(vector);
             } else {
                 throw new IOException("Cannot read OnHeapVarBinaryData with version " + version + ". Current version: "
                     + m_version + ".");
             }
+        }
+
+        private static OnHeapVarBinaryReadData readFromVector(final FieldVector vector) {
+
+            int valueCount = vector.getValueCount();
+            var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+            var offsets = OffsetsBuffer.createLongReadBuffer(vector.getOffsetBuffer(), valueCount);
+
+            // TODO use last offset instead of capacity?
+            var data = ByteBigArrays.newBigArray(vector.getDataBuffer().capacity());
+            MemoryCopyUtils.copy(vector.getDataBuffer(), data);
+
+            return new OnHeapVarBinaryReadData(data, offsets, validity, valueCount);
         }
 
         @Override
