@@ -50,6 +50,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
+import org.knime.core.columnar.arrow.data.OnHeapBooleanData;
 import org.knime.core.columnar.arrow.data.OnHeapByteData;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData;
@@ -131,7 +132,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
-        throw new UnsupportedOperationException("nyi");
+        return wrapCached(OnHeapBooleanData.FACTORY, traits);
     }
 
     @Override
