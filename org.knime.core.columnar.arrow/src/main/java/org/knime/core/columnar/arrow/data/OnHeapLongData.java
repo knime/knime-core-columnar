@@ -173,6 +173,12 @@ public final class OnHeapLongData {
 
     public static final class OnHeapLongDataFactory extends AbstractArrowColumnDataFactory {
 
+        /**
+         * Also supports reading longs from DurationVectors and TimeNanoVectors. This is necessary for backwards
+         * compatibility of date&time types which now simply use BigIntVector.
+         */
+        private static final ArrowColumnDataFactoryVersion V0 = ArrowColumnDataFactoryVersion.version(0);
+
         private OnHeapLongDataFactory() {
             super(1);
         }
@@ -181,9 +187,12 @@ public final class OnHeapLongData {
         public OnHeapLongReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
 
-            // TODO backward compatibility for TimeNano and Duration
-
-            if (m_version.equals(version)) {
+            // NOTE:
+            // V1 was introduced for backward compatibility with old date&time types. Previously, (V0) we had separate
+            // data implementations for them that used DurationVector and TimeNanoVector. For backward compatibility, we
+            // read these vectors into LongData as well. They require no special handling here because they are just
+            // signed 64-bit integers.
+            if (V0.equals(version) || m_version.equals(version)) {
                 var valueCount = vector.getValueCount();
                 var data = new long[valueCount];
                 MemoryCopyUtils.copy(vector.getDataBufferAddress(), data);
