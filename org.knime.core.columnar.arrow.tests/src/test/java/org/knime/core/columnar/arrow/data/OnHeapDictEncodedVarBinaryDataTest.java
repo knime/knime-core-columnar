@@ -60,7 +60,6 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryWriteData;
 import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData;
@@ -85,8 +84,7 @@ public class OnHeapDictEncodedVarBinaryDataTest
 
     /** Create the test for {@link ArrowVarBinaryData} */
     public OnHeapDictEncodedVarBinaryDataTest() {
-        super(
-            new OnHeapDictEncodedVarBinaryDataFactory(new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY))));
+        super(OnHeapDictEncodedVarBinaryData.factory(new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY))));
     }
 
     @Override

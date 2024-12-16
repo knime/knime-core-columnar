@@ -71,7 +71,7 @@ import it.unimi.dsi.fastutil.bytes.ByteBigArrays;
  */
 public final class OnHeapVarBinaryData {
 
-    public static final Factory FACTORY = new Factory();
+    public static final OnHeapVarBinaryDataFactory FACTORY = new OnHeapVarBinaryDataFactory();
 
     private OnHeapVarBinaryData() {
     }
@@ -243,11 +243,11 @@ public final class OnHeapVarBinaryData {
     }
 
     /** Factory class for {@link OnHeapVarBinaryData}. */
-    public static final class Factory extends AbstractArrowColumnDataFactory {
+    public static final class OnHeapVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
 
         private static final int CURRENT_VERSION = 0;
 
-        private Factory() {
+        private OnHeapVarBinaryDataFactory() {
             super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION));
         }
 

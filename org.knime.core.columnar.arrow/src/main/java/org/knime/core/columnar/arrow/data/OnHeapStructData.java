@@ -50,7 +50,9 @@ package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -73,8 +75,8 @@ import org.knime.core.columnar.data.StructData.StructWriteData;
  */
 public final class OnHeapStructData {
 
-    public static Factory factory(final ArrowColumnDataFactory... inner) {
-        return new Factory(inner);
+    public static OnHeapStructDataFactory factory(final ArrowColumnDataFactory... inner) {
+        return new OnHeapStructDataFactory(inner);
     }
 
     private OnHeapStructData() {
@@ -225,16 +227,37 @@ public final class OnHeapStructData {
         }
     }
 
-    public static final class Factory extends AbstractArrowColumnDataFactory {
+    public static final class OnHeapStructDataFactory extends AbstractArrowColumnDataFactory {
 
         private static final int CURRENT_VERSION = 0;
 
         private final ArrowColumnDataFactory[] m_inner;
 
-        private Factory(final ArrowColumnDataFactory... inner) {
+        private OnHeapStructDataFactory(final ArrowColumnDataFactory... inner) {
             super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, childVersions(inner)));
             m_inner = inner;
         }
+
+        // <<<<< START
+        // TODO move child handling to abstract parent - it can be empty for factorys withouth children
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(super.hashCode(), m_inner);
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            return super.equals(obj) && obj instanceof OnHeapStructDataFactory
+                && ((OnHeapStructDataFactory)obj).m_inner.equals(m_inner);
+        }
+
+        @Override
+        public String toString() {
+            return this.getClass().getSimpleName() + ".v" + m_version.getVersion() + Arrays.toString(m_inner);
+        }
+
+        // <<<<< END
 
         private static ArrowColumnDataFactoryVersion[] childVersions(final ArrowColumnDataFactory[] factories) {
             ArrowColumnDataFactoryVersion[] versions = new ArrowColumnDataFactoryVersion[factories.length];
