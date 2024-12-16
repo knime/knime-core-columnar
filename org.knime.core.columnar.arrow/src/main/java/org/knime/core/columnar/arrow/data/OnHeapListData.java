@@ -251,7 +251,7 @@ public final class OnHeapListData {
                 var offsets = OffsetsBuffer.createIntReadBuffer(vector.getOffsetBuffer(), valueCount);
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-                var data = m_inner.createRead(dataVector, nullCount, provider, version.getChildVersion(0));
+                var data = m_inner.createRead(dataVector, nullCount.getChild(0), provider, version.getChildVersion(0));
                 return new OnHeapListReadData(data, offsets, validity, valueCount);
             } else {
                 throw new IOException(
