@@ -178,7 +178,7 @@ public final class OnHeapByteData {
     public static final class OnHeayByteDataFactory extends AbstractArrowColumnDataFactory {
 
         private OnHeayByteDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
         }
 
         private static final int BYTE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(byte[].class);

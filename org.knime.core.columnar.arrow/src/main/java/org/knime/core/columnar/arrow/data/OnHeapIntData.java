@@ -176,7 +176,7 @@ public final class OnHeapIntData {
     public static final class OnHeapIntDataFactory extends AbstractArrowColumnDataFactory {
 
         private OnHeapIntDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
         }
 
         private static final int INT_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(int[].class);

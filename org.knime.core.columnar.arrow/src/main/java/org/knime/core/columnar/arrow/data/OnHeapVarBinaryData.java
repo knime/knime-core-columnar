@@ -248,7 +248,7 @@ public final class OnHeapVarBinaryData {
         private static final int CURRENT_VERSION = 0;
 
         private OnHeapVarBinaryDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION));
+            super(CURRENT_VERSION);
         }
 
         @Override
