@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -70,18 +71,23 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
     /** The current version */
     protected final ArrowColumnDataFactoryVersion m_version;
 
+    protected final ArrowColumnDataFactory[] m_children;
+
     /**
      * Create a new abstract {@link ArrowColumnDataFactory}.
      *
      * @param version the current version
-     * @param traits the traits of the data, used to wrap create the extension type if needed
+     * @param children nested factories if any. These are part of the version but the tree structure of the factories
+     *            does not have to be reflected by the vectors or the data.
      */
-    protected AbstractArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
-        m_version = version;
+    protected AbstractArrowColumnDataFactory(final int version, final ArrowColumnDataFactory... children) {
+        m_version = constructVersion(version, children);
+        m_children = children;
     }
 
     @Override
     public DictionaryProvider getDictionaries(final NullableReadData data) {
+        // TODO default to looking at the children??
         return null;
     }
 
@@ -92,7 +98,7 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_version);
+        return Objects.hash(m_version, Arrays.hashCode(m_children));
     }
 
     @Override
@@ -107,12 +113,21 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
             return false;
         }
         AbstractArrowColumnDataFactory other = (AbstractArrowColumnDataFactory)obj;
-        return m_version.equals(other.m_version);
+        return m_version.equals(other.m_version) && Arrays.equals(m_children, other.m_children);
     }
 
     @Override
     public String toString() {
-        return this.getClass().getSimpleName() + ".v" + m_version.getVersion();
+        var childrenString = m_children.length == 0 ? "" : Arrays.toString(m_children);
+        return this.getClass().getSimpleName() + ".v" + m_version.getVersion() + childrenString;
     }
 
+    private static ArrowColumnDataFactoryVersion constructVersion(final int version,
+        final ArrowColumnDataFactory... children) {
+        var childVersions = new ArrowColumnDataFactoryVersion[children.length];
+        for (int i = 0; i < children.length; i++) {
+            childVersions[i] = children[i].getVersion();
+        }
+        return ArrowColumnDataFactoryVersion.version(version, childVersions);
+    }
 }

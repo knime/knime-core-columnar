@@ -50,9 +50,7 @@ package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -231,56 +229,24 @@ public final class OnHeapStructData {
 
         private static final int CURRENT_VERSION = 0;
 
-        private final ArrowColumnDataFactory[] m_inner;
-
         private OnHeapStructDataFactory(final ArrowColumnDataFactory... inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, childVersions(inner)));
-            m_inner = inner;
-        }
-
-        // <<<<< START
-        // TODO move child handling to abstract parent - it can be empty for factorys withouth children
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(super.hashCode(), m_inner);
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            return super.equals(obj) && obj instanceof OnHeapStructDataFactory
-                && ((OnHeapStructDataFactory)obj).m_inner.equals(m_inner);
-        }
-
-        @Override
-        public String toString() {
-            return this.getClass().getSimpleName() + ".v" + m_version.getVersion() + Arrays.toString(m_inner);
-        }
-
-        // <<<<< END
-
-        private static ArrowColumnDataFactoryVersion[] childVersions(final ArrowColumnDataFactory[] factories) {
-            ArrowColumnDataFactoryVersion[] versions = new ArrowColumnDataFactoryVersion[factories.length];
-            for (int i = 0; i < factories.length; i++) {
-                versions[i] = factories[i].getVersion();
-            }
-            return versions;
+            super(CURRENT_VERSION, inner);
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            List<Field> children = new ArrayList<>(m_inner.length);
-            for (int i = 0; i < m_inner.length; i++) {
-                children.add(m_inner[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
+            List<Field> children = new ArrayList<>(m_children.length);
+            for (int i = 0; i < m_children.length; i++) {
+                children.add(m_children[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
             }
             return new Field(name, new FieldType(true, MinorType.STRUCT.getType(), null), children);
         }
 
         @Override
         public OnHeapStructWriteData createWrite(final int capacity) {
-            var children = new ArrowWriteData[m_inner.length];
-            for (int i = 0; i < m_inner.length; i++) {
-                children[i] = m_inner[i].createWrite(capacity);
+            var children = new ArrowWriteData[m_children.length];
+            for (int i = 0; i < m_children.length; i++) {
+                children[i] = m_children[i].createWrite(capacity);
             }
             return new OnHeapStructWriteData(capacity, children);
         }
@@ -295,11 +261,11 @@ public final class OnHeapStructData {
             int valueCount = sv.getValueCount();
             ValidityBuffer validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-            var children = new ArrowReadData[m_inner.length];
-            for (int i = 0; i < m_inner.length; i++) {
+            var children = new ArrowReadData[m_children.length];
+            for (int i = 0; i < m_children.length; i++) {
                 var childVector = (FieldVector)sv.getChildByOrdinal(i);
                 children[i] =
-                    m_inner[i].createRead(childVector, nullCount.getChild(i), provider, version.getChildVersion(i));
+                    m_children[i].createRead(childVector, nullCount.getChild(i), provider, version.getChildVersion(i));
             }
 
             return new OnHeapStructReadData(children, validity, valueCount);
@@ -308,7 +274,7 @@ public final class OnHeapStructData {
         @Override
         public int initialNumBytesPerElement() {
             int sum = 0;
-            for (ArrowColumnDataFactory f : m_inner) {
+            for (var f : m_children) {
                 sum += f.initialNumBytesPerElement();
             }
             return sum;
@@ -324,9 +290,9 @@ public final class OnHeapStructData {
 
             d.m_validity.copyTo(sv.getValidityBuffer());
 
-            for (int i = 0; i < m_inner.length; i++) {
-                FieldVector childVector = (FieldVector)sv.getChildByOrdinal(i);
-                m_inner[i].copyToVector(d.getReadDataAt(i), childVector);
+            for (int i = 0; i < m_children.length; i++) {
+                var childVector = (FieldVector)sv.getChildByOrdinal(i);
+                m_children[i].copyToVector(d.getReadDataAt(i), childVector);
             }
 
             sv.setValueCount(d.length());
@@ -336,8 +302,8 @@ public final class OnHeapStructData {
         public DictionaryProvider getDictionaries(final NullableReadData data) {
             OnHeapStructReadData d = (OnHeapStructReadData)data;
             List<DictionaryProvider> providers = new ArrayList<>();
-            for (int i = 0; i < m_inner.length; i++) {
-                DictionaryProvider p = m_inner[i].getDictionaries(d.getReadDataAt(i));
+            for (int i = 0; i < m_children.length; i++) {
+                DictionaryProvider p = m_children[i].getDictionaries(d.getReadDataAt(i));
                 if (p != null) {
                     providers.add(p);
                 }

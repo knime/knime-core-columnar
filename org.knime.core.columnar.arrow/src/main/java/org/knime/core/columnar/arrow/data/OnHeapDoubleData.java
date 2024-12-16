@@ -180,7 +180,7 @@ public final class OnHeapDoubleData {
     public static final class OnHeapDoubleDataFactory extends AbstractArrowColumnDataFactory {
 
         private OnHeapDoubleDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
         }
 
         private static final int DOUBLE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(double[].class);

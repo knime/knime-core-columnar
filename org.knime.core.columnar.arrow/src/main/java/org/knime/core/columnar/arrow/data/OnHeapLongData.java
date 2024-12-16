@@ -174,7 +174,7 @@ public final class OnHeapLongData {
     public static final class OnHeapLongDataFactory extends AbstractArrowColumnDataFactory {
 
         private OnHeapLongDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(1));
+            super(1);
         }
 
         @Override

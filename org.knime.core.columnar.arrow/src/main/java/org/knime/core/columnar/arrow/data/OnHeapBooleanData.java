@@ -180,7 +180,7 @@ public final class OnHeapBooleanData {
     public static final class OnHeapBooleanDataFactory extends AbstractArrowColumnDataFactory {
 
         private OnHeapBooleanDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
         }
 
         @Override

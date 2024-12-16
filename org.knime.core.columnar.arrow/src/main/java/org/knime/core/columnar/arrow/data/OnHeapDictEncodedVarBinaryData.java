@@ -199,14 +199,14 @@ public final class OnHeapDictEncodedVarBinaryData {
 
         @Override
         public ArrowWriteData createWrite(final int capacity) {
-            return new OnHeapDictEncodedVarBinaryWriteData<>(m_delegate.createWrite(capacity), m_keyType);
+            return new OnHeapDictEncodedVarBinaryWriteData<>(createWriteDelegate(capacity), m_keyType);
         }
 
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            return new OnHeapDictEncodedVarBinaryReadData<>(
-                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)), m_keyType);
+            return new OnHeapDictEncodedVarBinaryReadData<>(createReadDelegate(vector, nullCount, provider, version),
+                m_keyType);
         }
     }
 }
