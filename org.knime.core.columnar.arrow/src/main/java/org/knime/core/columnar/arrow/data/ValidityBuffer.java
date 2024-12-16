@@ -56,6 +56,8 @@ import org.apache.arrow.vector.BitVectorHelper;
  */
 final class ValidityBuffer {
 
+    // TODO transform this into a class with static utilities that help handle a byte[] as a bit vector
+
     private byte[] m_validity;
 
     public static long usedSizeFor(final int capacity) {
