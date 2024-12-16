@@ -135,7 +135,7 @@ public final class OnHeapVoidData extends AbstractReferencedData
     public static final class OnHeapVoidDataFactory extends AbstractArrowColumnDataFactory {
 
         private OnHeapVoidDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
         }
 
         @Override

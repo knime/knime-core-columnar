@@ -225,7 +225,7 @@ public final class OnHeapStringData5000 {
     public static final class OnHeapStringDataFactory extends AbstractArrowColumnDataFactory {
 
         private OnHeapStringDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
         }
 
         @Override

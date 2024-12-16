@@ -50,7 +50,6 @@ package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -222,23 +221,20 @@ public final class OnHeapListData {
 
         private static final int CURRENT_VERSION = 0;
 
-        private final ArrowColumnDataFactory m_inner;
-
         protected OnHeapListDataFactory(final ArrowColumnDataFactory inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, inner.getVersion()));
-            m_inner = inner;
+            super(CURRENT_VERSION, inner);
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            final Field data = m_inner.getField("listData", dictionaryIdSupplier);
+            final Field data = m_children[0].getField("listData", dictionaryIdSupplier);
             return new Field(name, new FieldType(true, MinorType.LIST.getType(), null),
                 Collections.singletonList(data));
         }
 
         @Override
         public ArrowWriteData createWrite(final int capacity) {
-            return new OnHeapListWriteData(capacity, m_inner.createWrite(capacity));
+            return new OnHeapListWriteData(capacity, m_children[0].createWrite(capacity));
         }
 
         @Override
@@ -251,7 +247,8 @@ public final class OnHeapListData {
                 var offsets = OffsetsBuffer.createIntReadBuffer(vector.getOffsetBuffer(), valueCount);
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-                var data = m_inner.createRead(dataVector, nullCount.getChild(0), provider, version.getChildVersion(0));
+                var data =
+                    m_children[0].createRead(dataVector, nullCount.getChild(0), provider, version.getChildVersion(0));
                 return new OnHeapListReadData(data, offsets, validity, valueCount);
             } else {
                 throw new IOException(
@@ -270,7 +267,7 @@ public final class OnHeapListData {
             v.setInitialCapacity(d.length());
             v.allocateNew();
 
-            m_inner.copyToVector(d.m_data, v.getDataVector());
+            m_children[0].copyToVector(d.m_data, v.getDataVector());
 
             d.m_validity.copyTo(vector.getValidityBuffer());
             d.m_offsets.copyTo(vector.getOffsetBuffer());
@@ -284,25 +281,5 @@ public final class OnHeapListData {
             // TODO Auto-generated method stub
             return 0;
         }
-
-        // <<<<< START
-        // TODO move child handling to abstract parent - it can be empty for factorys withouth children
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(m_inner, super.hashCode());
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            return super.equals(obj) && m_inner.equals(((OnHeapListDataFactory)obj).m_inner);
-        }
-
-        @Override
-        public String toString() {
-            return this.getClass().getSimpleName() + ".v" + m_version + "[" + m_inner + "]";
-        }
-
-        // <<<<< END
     }
 }

@@ -180,15 +180,15 @@ public final class OnHeapDictEncodedStringData {
 
         @Override
         public OnHeapDictEncodedStringWriteData<?> createWrite(final int capacity) {
-            return new OnHeapDictEncodedStringWriteData<>(m_delegate.createWrite(capacity), m_keyType);
+            return new OnHeapDictEncodedStringWriteData<>(createWriteDelegate(capacity), m_keyType);
         }
 
         @Override
         public OnHeapDictEncodedStringReadData<?> createRead(final FieldVector vector,
             final ArrowVectorNullCount nullCount, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            return new OnHeapDictEncodedStringReadData<>(
-                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)), m_keyType);
+            return new OnHeapDictEncodedStringReadData<>(createReadDelegate(vector, nullCount, provider, version),
+                m_keyType);
         }
     }
 }
