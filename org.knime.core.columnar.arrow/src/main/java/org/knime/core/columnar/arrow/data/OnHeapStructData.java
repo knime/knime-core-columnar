@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.LongSupplier;
+import java.util.stream.Stream;
 
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.complex.StructVector;
@@ -227,7 +228,12 @@ public final class OnHeapStructData {
 
     public static final class OnHeapStructDataFactory extends AbstractArrowColumnDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        private static final int CURRENT_VERSION = 1;
+
+        /**
+         * Also covers support for legacy date&time data types.
+         */
+        private static final int V0 = 0;
 
         private OnHeapStructDataFactory(final ArrowColumnDataFactory... inner) {
             super(CURRENT_VERSION, inner);
@@ -254,18 +260,31 @@ public final class OnHeapStructData {
         @Override
         public OnHeapStructReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (!(vector instanceof StructVector)) {
-                throw new IOException("Expected a StructVector, but got: " + vector.getClass().getSimpleName());
+
+            var childVersions = version.getChildVersions();
+            if (version.getVersion() == V0) {
+                if (childVersions.length == 0) {
+                    // in case of legacy date&time data we used Arrow structs directly and hence there are no versions
+                    // for the children, however, we know that all versions were 0 (and that there was no more nesting)
+                    childVersions = Stream.generate(() -> ArrowColumnDataFactoryVersion.version(0)) //
+                        .limit(m_children.length) //
+                        .toArray(ArrowColumnDataFactoryVersion[]::new);
+                }
+            } else if (version.getVersion() != CURRENT_VERSION) {
+                throw new IOException("Cannot read ArrowStructData with version " + version.getVersion()
+                    + ". Current version: " + CURRENT_VERSION + ".");
             }
-            StructVector sv = (StructVector)vector;
-            int valueCount = sv.getValueCount();
+
+            // NOTE: This code is valid for V0 and V1 (CURRENT_VERSION)
+            // (they only differ for the saved child versions which is handled above)
+            StructVector v = (StructVector)vector;
+            int valueCount = v.getValueCount();
             ValidityBuffer validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
             var children = new ArrowReadData[m_children.length];
             for (int i = 0; i < m_children.length; i++) {
-                var childVector = (FieldVector)sv.getChildByOrdinal(i);
-                children[i] =
-                    m_children[i].createRead(childVector, nullCount.getChild(i), provider, version.getChildVersion(i));
+                var childVector = (FieldVector)v.getChildByOrdinal(i);
+                children[i] = m_children[i].createRead(childVector, nullCount.getChild(i), provider, childVersions[i]);
             }
 
             return new OnHeapStructReadData(children, validity, valueCount);
