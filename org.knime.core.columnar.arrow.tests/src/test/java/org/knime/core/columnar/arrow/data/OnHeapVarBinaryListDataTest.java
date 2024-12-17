@@ -46,52 +46,52 @@
  * History
  *   Oct 22, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data.old;
+package org.knime.core.columnar.arrow.data;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowListData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntWriteData;
-import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListReadData;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryReadData;
+import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryWriteData;
 
 /**
- * Test {@link ArrowListData} with a list consisting of integer values.
+ * Test {@link OnHeapListData} with a list consisting of integer values.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWriteData, ArrowListReadData> {
+public class OnHeapVarBinaryListDataTest extends AbstractArrowDataTest<OnHeapListWriteData, OnHeapListReadData> {
 
-    private static final int MAX_LENGTH = 100;
+    private static final int MAX_LENGTH = 4;
 
-    /** Create the test for {@link ArrowListData} */
-    public ArrowSimpleListDataTest() {
-        super(new ArrowListDataFactory(ArrowIntDataFactory.INSTANCE));
+    private static final int MAX_OBJECT_SIZE = 3;
+
+    /** Create the test for {@link OnHeapListData} */
+    public OnHeapVarBinaryListDataTest() {
+        super(new OnHeapListDataFactory(OnHeapVarBinaryDataFactory.INSTANCE));
     }
 
     @Override
-    protected ArrowListWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowListWriteData);
-        return (ArrowListWriteData)o;
+    protected OnHeapListWriteData castW(final Object o) {
+        assertTrue(o instanceof OnHeapListWriteData);
+        return (OnHeapListWriteData)o;
     }
 
     @Override
-    protected ArrowListReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowListReadData);
-        return (ArrowListReadData)o;
+    protected OnHeapListReadData castR(final Object o) {
+        assertTrue(o instanceof OnHeapListReadData);
+        return (OnHeapListReadData)o;
     }
 
     @Override
-    protected void setValue(final ArrowListWriteData data, final int index, final int seed) {
+    protected void setValue(final OnHeapListWriteData data, final int index, final int seed) {
         if (seed == 1) {
             // Test the special case with an empty list
             data.createWriteData(index, 0);
@@ -100,15 +100,16 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
 
         final Random random = new Random(seed);
         final int size = random.nextInt(MAX_LENGTH);
-        final ArrowIntWriteData inner = data.createWriteData(index, size);
+        final OnHeapVarBinaryWriteData inner = data.createWriteData(index, size);
         for (int i = 0; i < size; i++) {
-            inner.setInt(i, random.nextInt());
+            byte[] valueFor = valueFor(random);
+            inner.setBytes(i, valueFor);
         }
     }
 
     @Override
-    protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
-        final ArrowIntReadData element = data.createReadData(index);
+    protected void checkValue(final OnHeapListReadData data, final int index, final int seed) {
+        final OnHeapVarBinaryReadData element = data.createReadData(index);
         if (seed == 1) {
             assertEquals(0, element.length());
             return;
@@ -119,43 +120,35 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
         assertEquals(size, element.length());
 
         for (int i = 0; i < size; i++) {
-            assertEquals(random.nextInt(), element.getInt(i));
+            byte[] object = element.getBytes(i);
+            assertArrayEquals(valueFor(random), object);
         }
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowListWriteData data) {
-        return data.m_vector == null;
+    protected boolean isReleasedW(final OnHeapListWriteData data) {
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowListReadData data) {
-        final ArrowListReadData d = castR(data);
-        final ListVector listVector = d.m_vector;
-        final IntVector intVector = ((ArrowIntReadData)d.m_data).m_vector;
+    protected boolean isReleasedR(final OnHeapListReadData data) {
+        return false;
+    }
 
-        final boolean intReleased = intVector.getDataBuffer().capacity() == 0 //
-            && intVector.getValidityBuffer().capacity() == 0;
-        return listVector.getOffsetBuffer().capacity() == 0 //
-            && listVector.getValidityBuffer().capacity() == 0 //
-            && intReleased;
+    @Override
+    public void testSizeOf() { // NOSONAR
+        // Do not test here
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        final long innerValueCount = getInnerValueCount(valueCount);
-        return (long)Math.ceil(capacity / 8.0) // Validity buffer
-            + (long)Math.ceil(innerValueCount / 8.0) // Inner: validity buffer
-            + (capacity + 1) * 4 // Offset buffer
-            + innerValueCount * 4; // Inner: data buffer
+        // Not tested here
+        return 0;
     }
 
-    private static long getInnerValueCount(final int valueCount) {
-        long c = 0;
-        for (int i = 0; i < valueCount; i++) {
-            c += i == 1 ? 0 : new Random(i).nextInt(MAX_LENGTH);
-        }
-        return c;
+    private static byte[] valueFor(final Random random) {
+        final byte[] bytes = new byte[random.nextInt(MAX_OBJECT_SIZE)];
+        random.nextBytes(bytes);
+        return bytes;
     }
 }
