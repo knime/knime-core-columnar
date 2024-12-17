@@ -51,33 +51,28 @@ package org.knime.core.columnar.arrow;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.knime.core.table.schema.DataSpecs.DICT_ENCODING;
-import static org.knime.core.table.schema.DataSpecs.DOUBLE;
-import static org.knime.core.table.schema.DataSpecs.INT;
-import static org.knime.core.table.schema.DataSpecs.LIST;
-import static org.knime.core.table.schema.DataSpecs.LOGICAL_TYPE;
-import static org.knime.core.table.schema.DataSpecs.LONG;
 import static org.knime.core.table.schema.DataSpecs.STRING;
-import static org.knime.core.table.schema.DataSpecs.STRUCT;
 import static org.knime.core.table.schema.DataSpecs.VARBINARY;
 
 import java.util.Arrays;
 
 import org.junit.Test;
-import org.knime.core.columnar.arrow.ArrowSchemaMapper.ExtensionArrowColumnDataFactory;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowBooleanData.ArrowBooleanDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowByteData.ArrowByteDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapBooleanData.OnHeapBooleanDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapByteData.OnHeapByteDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData.OnHeapDictEncodedStringDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapFloatData.OnHeapFloatDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapLongData.OnHeapLongDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapStringData5000.OnHeapStringDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapVoidData.OnHeapVoidDataFactory;
 import org.knime.core.columnar.arrow.data.old.ArrowDoubleData.ArrowDoubleDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowFloatData.ArrowFloatDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowLongData.ArrowLongDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.data.old.ArrowStructData.ArrowStructDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
@@ -102,111 +97,111 @@ public class ArrowSchemaMapperTest {
     /** Test mapping double specs to a {@link ArrowDoubleDataFactory} */
     @Test
     public void testMapDoubleSpec() {
-        testMapSingleSpec(DataSpec.doubleSpec(), ArrowDoubleDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.doubleSpec(), OnHeapDoubleDataFactory.INSTANCE);
     }
 
-    /** Test mapping int specs to a {@link ArrowIntDataFactory} */
+    /** Test mapping int specs to a {@link OnHeapIntDataFactory} */
     @Test
     public void testMapIntSpec() {
-        testMapSingleSpec(DataSpec.intSpec(), ArrowIntDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.intSpec(), OnHeapIntDataFactory.INSTANCE);
     }
 
-    /** Test mapping long specs to a {@link ArrowLongDataFactory} */
+    /** Test mapping long specs to a {@link OnHeapLongDataFactory} */
     @Test
     public void testMapLongSpec() {
-        testMapSingleSpec(DataSpec.longSpec(), ArrowLongDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.longSpec(), OnHeapLongDataFactory.INSTANCE);
     }
 
-    /** Test mapping float specs to a {@link ArrowFloatDataFactory} */
+    /** Test mapping float specs to a {@link OnHeapFloatDataFactory} */
     @Test
     public void testMapFloatSpec() {
-        testMapSingleSpec(DataSpec.floatSpec(), ArrowFloatDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.floatSpec(), OnHeapFloatDataFactory.INSTANCE);
     }
 
-    /** Test mapping boolean specs to a {@link ArrowBooleanDataFactory} */
+    /** Test mapping boolean specs to a {@link OnHeapBooleanDataFactory} */
     @Test
     public void testMapBooleanSpec() {
-        testMapSingleSpec(DataSpec.booleanSpec(), ArrowBooleanDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.booleanSpec(), OnHeapBooleanDataFactory.INSTANCE);
     }
 
-    /** Test mapping byte specs to a {@link ArrowByteDataFactory} */
+    /** Test mapping byte specs to a {@link OnHeapByteDataFactory} */
     @Test
     public void testMapByteSpec() {
-        testMapSingleSpec(DataSpec.byteSpec(), ArrowByteDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.byteSpec(), OnHeapByteDataFactory.INSTANCE);
     }
 
-    /** Test mapping var binary specs to a {@link ArrowVarBinaryDataFactory} */
+    /** Test mapping var binary specs to a {@link OnHeapVarBinaryDataFactory} */
     @Test
     public void testMapVarBinarySpec() {
-        testMapSingleSpec(DataSpec.varBinarySpec(), ArrowVarBinaryDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.varBinarySpec(), OnHeapVarBinaryDataFactory.INSTANCE);
     }
 
-    /** Test mapping void specs to a {@link ArrowVoidDataFactory} */
+    /** Test mapping void specs to a {@link OnHeapVoidDataFactory} */
     @Test
     public void testMapVoidSpec() {
-        testMapSingleSpec(DataSpec.voidSpec(), ArrowVoidDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.voidSpec(), OnHeapVoidDataFactory.INSTANCE);
     }
 
-    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
+    /** Test mapping DictEncodedStringData specs to a {@link OnHeapDictEncodedStringDataFactory} */
     @Test
     public void testMapDictEncodedStringDataSpec() {
         testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING)),
-            new ArrowDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
+            new OnHeapDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
     }
 
-    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
+    /** Test mapping DictEncodedStringData specs to a {@link OnHeapDictEncodedStringDataFactory} */
     @Test
     public void testMapDictEncodedStringDataSpec_ByteKey() {
         testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.BYTE_KEY))),
-            new ArrowDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.BYTE_KEY)));
+            new OnHeapDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.BYTE_KEY)));
     }
 
-    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
+    /** Test mapping DictEncodedStringData specs to a {@link OnHeapDictEncodedStringDataFactory} */
     @Test
     public void testMapDictEncodedStringDataSpec_IntKey() {
         testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.INT_KEY))),
-            new ArrowDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.INT_KEY)));
+            new OnHeapDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.INT_KEY)));
     }
 
-    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
+    /** Test mapping DictEncodedStringData specs to a {@link OnHeapDictEncodedStringDataFactory} */
     @Test
     public void testMapDictEncodedStringDataSpec_LongKey() {
         testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.LONG_KEY))),
-            new ArrowDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
+            new OnHeapDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
     }
 
-    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
+    /** Test mapping DictEncodedStringData specs to a {@link OnHeapDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec() {
         testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING)),
-            new ArrowDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
+            new OnHeapDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
     }
 
-    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
+    /** Test mapping DictEncodedStringData specs to a {@link OnHeapDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec_ByteKey() {
         testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.BYTE_KEY))),
-            new ArrowDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.BYTE_KEY)));
+            new OnHeapDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.BYTE_KEY)));
     }
 
-    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
+    /** Test mapping DictEncodedStringData specs to a {@link OnHeapDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec_IntKey() {
         testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.INT_KEY))),
-            new ArrowDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.INT_KEY)));
+            new OnHeapDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.INT_KEY)));
     }
 
-    /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
+    /** Test mapping DictEncodedStringData specs to a {@link OnHeapDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec_LongKey() {
         testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.LONG_KEY))),
-            new ArrowDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
+            new OnHeapDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
     }
 
-    /** Test mapping String specs to a {@link ArrowStringDataFactory} */
+    /** Test mapping String specs to a {@link OnHeapStringDataFactory} */
     @Test
     public void testMapStringSpec() {
-        testMapSingleSpec(DataSpec.stringSpec(), ArrowStringDataFactory.INSTANCE);
+        testMapSingleSpec(DataSpec.stringSpec(), OnHeapStringDataFactory.INSTANCE);
     }
 
     /** Test mapping void specs to a {@link ArrowStructDataFactory} */
@@ -215,76 +210,17 @@ public class ArrowSchemaMapperTest {
         // Simple
         StructDataSpec spec = new StructDataSpec(DataSpec.doubleSpec(), DataSpec.intSpec());
         testMapSingleSpec(spec,
-            new ArrowStructDataFactory(ArrowDoubleDataFactory.INSTANCE, ArrowIntDataFactory.INSTANCE));
+            new OnHeapStructDataFactory(OnHeapDoubleDataFactory.INSTANCE, OnHeapIntDataFactory.INSTANCE));
 
         // Complex
         StructDataSpec inner = new StructDataSpec(DataSpec.doubleSpec(), DataSpec.longSpec());
         StructDataSpec outer = new StructDataSpec(DataSpec.stringSpec(), DataSpec.intSpec(), inner);
-        testMapSingleSpec(outer, new ArrowStructDataFactory(//
-            ArrowStringDataFactory.INSTANCE, //
-            ArrowIntDataFactory.INSTANCE, //
-            new ArrowStructDataFactory(//
-                ArrowDoubleDataFactory.INSTANCE, //
-                ArrowLongDataFactory.INSTANCE)));
-    }
-
-    /** Test mapping void specs to a {@link ArrowStructDataFactory} */
-    @Test
-    public void testMapStructSpecWithLogicalType() {
-        // Simple
-        final var schema = ColumnarSchema.of(LIST.of(DOUBLE(LOGICAL_TYPE("foo"))));
-
-        testMapSchema(schema, new ArrowListDataFactory(//
-            new ExtensionArrowColumnDataFactory(ArrowDoubleDataFactory.INSTANCE,
-                new DefaultDataTraits(LOGICAL_TYPE("foo")))));
-
-        // Complex
-        final var complexSchema = ColumnarSchema
-            .of(STRUCT(LOGICAL_TYPE("outer")).of(STRING, INT, STRUCT.of(DOUBLE, LONG(LOGICAL_TYPE("inner")))));
-
-        testMapSchemaWrapped(complexSchema, new ExtensionArrowColumnDataFactory(new ArrowStructDataFactory(//
-            ArrowStringDataFactory.INSTANCE, //
-            ArrowIntDataFactory.INSTANCE, //
-            new ArrowStructDataFactory(//
-                ArrowDoubleDataFactory.INSTANCE, new ExtensionArrowColumnDataFactory(ArrowLongDataFactory.INSTANCE,
-                    new DefaultDataTraits(LOGICAL_TYPE("inner"))))),
-            complexSchema.getTraits(0)));
-    }
-
-    /**
-     * Test that wrapping factories with empty traits returns the identical factory,
-     * and that even internal traits in nested columns do not change the type of the outer factory
-     * **/
-    @Test
-    public void testWrapEmptyTraits() {
-        final var factory = ArrowIntDataFactory.INSTANCE;
-        assertEquals(factory, ArrowSchemaMapper.wrap(factory, DefaultDataTraits.EMPTY));
-
-        final var nestedFactory = new ArrowStructDataFactory(factory);
-        final var nestedTraits = ColumnarSchema.of(STRUCT.of(INT(LOGICAL_TYPE("foo")))).getTraits(0);
-        assertEquals(nestedFactory, ArrowSchemaMapper.wrap(nestedFactory, nestedTraits));
-
-        final var listFactory = new ArrowListDataFactory(factory);
-        final var listTraits = ColumnarSchema.of(LIST.of(INT(LOGICAL_TYPE("foo")))).getTraits(0);
-        assertEquals(listFactory, ArrowSchemaMapper.wrap(listFactory, listTraits));
-    }
-
-    /** Test that ArrowColumnDataFactories are wrapped if the traits contain logical types or dict encoding **/
-    @Test
-    public void testWrapTraits() {
-        final var factory = ArrowIntDataFactory.INSTANCE;
-        final var traits = ColumnarSchema.of(INT(LOGICAL_TYPE("foo"))).getTraits(0);
-        assertEquals(new ExtensionArrowColumnDataFactory(factory, traits), ArrowSchemaMapper.wrap(factory, traits));
-
-        final var nestedFactory = new ArrowStructDataFactory(factory);
-        final var nestedTraits = ColumnarSchema.of(STRUCT(LOGICAL_TYPE("foo")).of(INT)).getTraits(0);
-        assertEquals(new ExtensionArrowColumnDataFactory(new ArrowStructDataFactory(factory), nestedTraits),
-            ArrowSchemaMapper.wrap(nestedFactory, nestedTraits));
-
-        final var listFactory = new ArrowListDataFactory(factory);
-        final var listTraits = ColumnarSchema.of(LIST(LOGICAL_TYPE("foo")).of(INT)).getTraits(0);
-        assertEquals(new ExtensionArrowColumnDataFactory(new ArrowListDataFactory(factory), listTraits),
-            ArrowSchemaMapper.wrap(listFactory, listTraits));
+        testMapSingleSpec(outer, new OnHeapStructDataFactory(//
+            OnHeapStringDataFactory.INSTANCE, //
+            OnHeapIntDataFactory.INSTANCE, //
+            new OnHeapStructDataFactory(//
+                OnHeapDoubleDataFactory.INSTANCE, //
+                OnHeapLongDataFactory.INSTANCE)));
     }
 
     /** Test mapping list specs to a {@link ArrowListDataFactory} */
@@ -292,16 +228,16 @@ public class ArrowSchemaMapperTest {
     public void testMapListSpec() {
         // Simple
         ListDataSpec spec = new ListDataSpec(DataSpec.doubleSpec());
-        testMapSingleSpec(spec, new ArrowListDataFactory(ArrowDoubleDataFactory.INSTANCE));
+        testMapSingleSpec(spec, new OnHeapListDataFactory(OnHeapDoubleDataFactory.INSTANCE));
 
         // Complex
         StructDataSpec inner = new StructDataSpec(DataSpec.stringSpec(), DataSpec.doubleSpec());
         ListDataSpec middle = new ListDataSpec(inner);
         ListDataSpec outer = new ListDataSpec(middle);
-        testMapSingleSpec(outer, new ArrowListDataFactory(//
-            new ArrowListDataFactory(//
-                new ArrowStructDataFactory(//
-                    ArrowStringDataFactory.INSTANCE, ArrowDoubleDataFactory.INSTANCE))));
+        testMapSingleSpec(outer, new OnHeapListDataFactory(//
+            new OnHeapListDataFactory(//
+                new OnHeapStructDataFactory(//
+                    OnHeapStringDataFactory.INSTANCE, OnHeapDoubleDataFactory.INSTANCE))));
     }
 
     // TODO test for other specs when implemented
@@ -322,18 +258,10 @@ public class ArrowSchemaMapperTest {
         final ColumnarSchema schema = new DefaultColumnarSchema(specs, traits);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(4, factories.length);
-        assertSame(ArrowDoubleDataFactory.INSTANCE, ((ExtensionArrowColumnDataFactory)factories[0]).getDelegate());
-        assertSame(ArrowLongDataFactory.INSTANCE, unwrap(factories[1]));
-        assertSame(ArrowDoubleDataFactory.INSTANCE, unwrap(factories[2]));
-        assertSame(ArrowIntDataFactory.INSTANCE, unwrap(factories[3]));
-    }
-
-    private static ArrowColumnDataFactory unwrap(final ArrowColumnDataFactory factory) {
-        if (factory instanceof ExtensionArrowColumnDataFactory) {
-            return ((ExtensionArrowColumnDataFactory)factory).getDelegate();
-        }
-
-        return factory;
+        assertSame(OnHeapDoubleDataFactory.INSTANCE, factories[0]);
+        assertSame(OnHeapLongDataFactory.INSTANCE, factories[1]);
+        assertSame(OnHeapDoubleDataFactory.INSTANCE, factories[2]);
+        assertSame(OnHeapIntDataFactory.INSTANCE, factories[3]);
     }
 
     /** Test mapping a single column of the given spec. */
@@ -344,13 +272,6 @@ public class ArrowSchemaMapperTest {
     }
 
     private static void testMapSchema(final ColumnarSchema schema, final ArrowColumnDataFactory expectedFactory) {
-        final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
-        assertEquals(1, factories.length);
-        var factory = factories[0];
-        assertEquals(expectedFactory, unwrap(factory));
-    }
-
-    private static void testMapSchemaWrapped(final ColumnarSchema schema, final ArrowColumnDataFactory expectedFactory) {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
         var factory = factories[0];

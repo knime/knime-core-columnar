@@ -55,8 +55,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Random;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntReadData;
 import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListReadData;
 import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListWriteData;
 
@@ -71,7 +73,7 @@ public class OnHeapSimpleListDataTest extends AbstractArrowDataTest<OnHeapListWr
 
     /** Create the test for {@link OnHeapListData} */
     public OnHeapSimpleListDataTest() {
-        super(OnHeapListData.factory(OnHeapIntData.FACTORY));
+        super(new OnHeapListDataFactory(OnHeapIntDataFactory.INSTANCE));
     }
 
     @Override

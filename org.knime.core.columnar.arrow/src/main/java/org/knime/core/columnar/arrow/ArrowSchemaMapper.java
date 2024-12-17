@@ -50,19 +50,19 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
-import org.knime.core.columnar.arrow.data.OnHeapBooleanData;
-import org.knime.core.columnar.arrow.data.OnHeapByteData;
+import org.knime.core.columnar.arrow.data.OnHeapBooleanData.OnHeapBooleanDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapByteData.OnHeapByteDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData;
-import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData;
-import org.knime.core.columnar.arrow.data.OnHeapDoubleData;
-import org.knime.core.columnar.arrow.data.OnHeapFloatData;
-import org.knime.core.columnar.arrow.data.OnHeapIntData;
-import org.knime.core.columnar.arrow.data.OnHeapListData;
-import org.knime.core.columnar.arrow.data.OnHeapLongData;
-import org.knime.core.columnar.arrow.data.OnHeapStringData5000;
-import org.knime.core.columnar.arrow.data.OnHeapStructData;
-import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData;
-import org.knime.core.columnar.arrow.data.OnHeapVoidData;
+import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapFloatData.OnHeapFloatDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapLongData.OnHeapLongDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapStringData5000.OnHeapStringDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapVoidData.OnHeapVoidDataFactory;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.schema.BooleanDataSpec;
@@ -133,47 +133,47 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
-        return OnHeapBooleanData.FACTORY;
+        return OnHeapBooleanDataFactory.INSTANCE;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
-        return OnHeapByteData.FACTORY;
+        return OnHeapByteDataFactory.INSTANCE;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
-        return OnHeapDoubleData.FACTORY;
+        return OnHeapDoubleDataFactory.INSTANCE;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
-        return OnHeapFloatData.FACTORY;
+        return OnHeapFloatDataFactory.INSTANCE;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
-        return OnHeapIntData.FACTORY;
+        return OnHeapIntDataFactory.INSTANCE;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
-        return OnHeapLongData.FACTORY;
+        return OnHeapLongDataFactory.INSTANCE;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
             return m_usedFactories.computeIfAbsent(new SpecWithTraitsKey(spec, traits),
-                key -> OnHeapDictEncodedVarBinaryData.factory(traits));
+                key -> new OnHeapDictEncodedVarBinaryDataFactory(traits));
         } else {
-            return OnHeapVarBinaryData.FACTORY;
+            return OnHeapVarBinaryDataFactory.INSTANCE;
         }
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
-        return OnHeapVoidData.FACTORY;
+        return OnHeapVoidDataFactory.INSTANCE;
     }
 
     @Override
@@ -187,7 +187,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
             // If another thread added the same factory this is not an issue because they are equal
             var innerFactories = new ArrowColumnDataFactory[spec.size()];
             Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
-            var factory = OnHeapStructData.factory(innerFactories);
+            var factory = new OnHeapStructDataFactory(innerFactories);
             m_usedFactories.put(key, factory);
             return factory;
         }
@@ -203,7 +203,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
             // Note: We cannot use computeIfAbsent here to prevent recursive update by the inner factory
             // If another thread added the same factory this is not an issue because they are equal
             var innerFactory = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
-            var factory = OnHeapListData.factory(innerFactory);
+            var factory = new OnHeapListDataFactory(innerFactory);
             m_usedFactories.put(key, factory);
             return factory;
         }
@@ -215,7 +215,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
             return m_usedFactories.computeIfAbsent(new SpecWithTraitsKey(spec, traits),
                 key -> OnHeapDictEncodedStringData.factory(traits));
         } else {
-            return OnHeapStringData5000.FACTORY;
+            return OnHeapStringDataFactory.INSTANCE;
         }
     }
 }

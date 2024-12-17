@@ -52,6 +52,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.OnHeapBooleanData.OnHeapBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapBooleanData.OnHeapBooleanReadData;
 import org.knime.core.columnar.arrow.data.OnHeapBooleanData.OnHeapBooleanWriteData;
 
@@ -64,7 +65,7 @@ public class OnHeapBooleanDataTest extends AbstractArrowDataTest<OnHeapBooleanWr
 
     /** Create the test for {@link OnHeapBooleanData} */
     public OnHeapBooleanDataTest() {
-        super(OnHeapBooleanData.FACTORY);
+        super(OnHeapBooleanDataFactory.INSTANCE);
     }
 
     @Override

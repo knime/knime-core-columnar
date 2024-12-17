@@ -60,6 +60,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryWriteData;
 import org.knime.core.table.io.ReadableDataInputStream;
@@ -78,7 +79,7 @@ public class OnHeapVarBinaryDataTest extends AbstractArrowDataTest<OnHeapVarBina
 
     /** Create the test for {@link OnHeapVarBinaryData} */
     public OnHeapVarBinaryDataTest() {
-        super(OnHeapVarBinaryData.FACTORY);
+        super(OnHeapVarBinaryDataFactory.INSTANCE);
     }
 
     @Override

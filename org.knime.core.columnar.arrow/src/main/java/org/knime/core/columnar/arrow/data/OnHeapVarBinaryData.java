@@ -74,8 +74,6 @@ import it.unimi.dsi.fastutil.bytes.ByteBigArrays;
  */
 public final class OnHeapVarBinaryData {
 
-    public static final OnHeapVarBinaryDataFactory FACTORY = new OnHeapVarBinaryDataFactory();
-
     private OnHeapVarBinaryData() {
     }
 
@@ -292,6 +290,8 @@ public final class OnHeapVarBinaryData {
 
     /** Factory class for {@link OnHeapVarBinaryData}. */
     public static final class OnHeapVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
+
+        public static final OnHeapVarBinaryDataFactory INSTANCE = new OnHeapVarBinaryDataFactory();
 
         /**
          * In version 0 we implemented dict encoding in order to load ZonedDateTime data in a backwards compatible way.
