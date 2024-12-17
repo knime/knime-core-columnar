@@ -51,7 +51,6 @@ package org.knime.core.columnar.arrow.data;
 import java.util.Arrays;
 import java.util.Objects;
 
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.data.NullableReadData;
@@ -83,12 +82,6 @@ abstract class AbstractArrowColumnDataFactory implements ArrowColumnDataFactory 
     protected AbstractArrowColumnDataFactory(final int version, final ArrowColumnDataFactory... children) {
         m_version = constructVersion(version, children);
         m_children = children;
-    }
-
-    @Override
-    public DictionaryProvider getDictionaries(final NullableReadData data) {
-        // TODO default to looking at the children??
-        return null;
     }
 
     @Override
