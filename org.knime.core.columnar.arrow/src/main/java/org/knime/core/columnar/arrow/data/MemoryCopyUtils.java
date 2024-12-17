@@ -73,6 +73,10 @@ final class MemoryCopyUtils {
 
     private static final int LONG_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(long[].class);
 
+    private static final int FLOAT_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(float[].class);
+
+    private static final int DOUBLE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(double[].class);
+
     private MemoryCopyUtils() {
         // Prevent instantiation
     }
@@ -186,6 +190,118 @@ final class MemoryCopyUtils {
             null, // destination object
             destinationAddress, // destination offset
             (long)source.length * Long.BYTES // number of bytes
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // float[] copy methods
+    // ------------------------------------------------------------------------
+
+    /**
+     * Copy the content of the given source ArrowBuf into the given float array.
+     *
+     * @param source the source ArrowBuf
+     * @param destination the destination float array
+     */
+    public static void copy(final ArrowBuf source, final float[] destination) {
+        copy(source.memoryAddress(), destination);
+    }
+
+    /**
+     * Copy the content of the given source address to the given float array.
+     *
+     * @param sourceAddress the source memory address
+     * @param destination the destination float array
+     */
+    public static void copy(final long sourceAddress, final float[] destination) {
+        MemoryUtil.UNSAFE.copyMemory( //
+            null, // source object
+            sourceAddress, // source offset
+            destination, // destination object
+            FLOAT_ARRAY_BASE_OFFSET, // destination offset
+            (long)destination.length * Float.BYTES // number of bytes
+        );
+    }
+
+    /**
+     * Copy the content of the given float array into the given ArrowBuf.
+     *
+     * @param source the source float array
+     * @param destination the destination ArrowBuf
+     */
+    public static void copy(final float[] source, final ArrowBuf destination) {
+        copy(source, destination.memoryAddress());
+    }
+
+    /**
+     * Copy the content of the given float array into the given destination address.
+     *
+     * @param source the source float array
+     * @param destinationAddress the destination memory address
+     */
+    public static void copy(final float[] source, final long destinationAddress) {
+        MemoryUtil.UNSAFE.copyMemory( //
+            source, // source object
+            FLOAT_ARRAY_BASE_OFFSET, // source offset
+            null, // destination object
+            destinationAddress, // destination offset
+            (long)source.length * Float.BYTES // number of bytes
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // double[] copy methods
+    // ------------------------------------------------------------------------
+
+    /**
+     * Copy the content of the given source ArrowBuf into the given double array.
+     *
+     * @param source the source ArrowBuf
+     * @param destination the destination double array
+     */
+    public static void copy(final ArrowBuf source, final double[] destination) {
+        copy(source.memoryAddress(), destination);
+    }
+
+    /**
+     * Copy the content of the given source address to the given double array.
+     *
+     * @param sourceAddress the source memory address
+     * @param destination the destination double array
+     */
+    public static void copy(final long sourceAddress, final double[] destination) {
+        MemoryUtil.UNSAFE.copyMemory( //
+            null, // source object
+            sourceAddress, // source offset
+            destination, // destination object
+            DOUBLE_ARRAY_BASE_OFFSET, // destination offset
+            (long)destination.length * Float.BYTES // number of bytes
+        );
+    }
+
+    /**
+     * Copy the content of the given double array into the given ArrowBuf.
+     *
+     * @param source the source double array
+     * @param destination the destination ArrowBuf
+     */
+    public static void copy(final double[] source, final ArrowBuf destination) {
+        copy(source, destination.memoryAddress());
+    }
+
+    /**
+     * Copy the content of the given double array into the given destination address.
+     *
+     * @param source the source double array
+     * @param destinationAddress the destination memory address
+     */
+    public static void copy(final double[] source, final long destinationAddress) {
+        MemoryUtil.UNSAFE.copyMemory( //
+            source, // source object
+            DOUBLE_ARRAY_BASE_OFFSET, // source offset
+            null, // destination object
+            destinationAddress, // destination offset
+            (long)source.length * Float.BYTES // number of bytes
         );
     }
 
