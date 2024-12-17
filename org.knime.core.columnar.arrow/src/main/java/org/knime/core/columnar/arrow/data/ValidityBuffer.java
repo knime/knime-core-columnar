@@ -52,9 +52,11 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BitVectorHelper;
 
 /**
+ * TODO visibility?
+ *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-final class ValidityBuffer {
+public final class ValidityBuffer {
 
     // TODO transform this into a class with static utilities that help handle a byte[] as a bit vector
 

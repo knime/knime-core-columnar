@@ -48,9 +48,9 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -63,6 +63,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
@@ -75,12 +76,12 @@ import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
-import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
+import org.knime.core.columnar.arrow.data.ValidityBuffer;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.store.FileHandle;
 
@@ -154,13 +155,13 @@ public final class ArrowTestUtils {
      */
     public static void checkData(final SimpleData data, final boolean hasMissing, final int count, final long seed) {
         final Random random = new Random(seed);
-        assertEquals(count, data.length());
+        assertEquals(count, data.length(), "Data length should match the expected count.");
         for (int i = 0; i < count; i++) {
             if (hasMissing && random.nextDouble() < 0.4) {
-                assertTrue(data.isMissing(i));
+                assertTrue(data.isMissing(i), "Value at index " + i + " should be missing.");
             } else {
-                assertFalse(data.isMissing(i));
-                assertEquals(random.nextInt(), data.data[i]);
+                assertFalse(data.isMissing(i), "Value at index " + i + " should not be missing.");
+                assertEquals(random.nextInt(), data.data[i], "Value at index " + i + " does not match.");
             }
         }
     }
@@ -201,16 +202,189 @@ public final class ArrowTestUtils {
 
         // The dictionary
         final int numDistinct = random.nextInt(10) + 5;
-        assertEquals(numDistinct, data.getDictionarySize());
+        assertEquals(numDistinct, data.getDictionarySize(),
+            "Dictionary size should match the expected number of distinct values.");
         for (int i = 0; i < numDistinct; i++) {
-            assertEquals(random.nextLong(), data.getDictionaryValue(i));
+            assertEquals(random.nextLong(), data.getDictionaryValue(i),
+                "Dictionary value at index " + i + " does not match.");
         }
 
         // Check the data values
         for (int i = 0; i < count; i++) {
-            assertFalse(data.isMissing(i));
-            assertEquals(random.nextInt(numDistinct), data.getDataValue(i));
+            assertFalse(data.isMissing(i), "Data value at index " + i + " should not be missing.");
+            assertEquals(random.nextInt(numDistinct), data.getDataValue(i),
+                "Data value at index " + i + " does not match.");
         }
+    }
+
+    /**
+     * Set the values of a {@link ComplexData} object and close it.
+     *
+     * @param data the data object
+     * @param count the number of values to write
+     * @param seed the seed defining the values
+     * @return the closed {@link NullableReadData}.
+     */
+    public static ComplexData fillData(final ComplexData data, final int count, final long seed) {
+        final Random random = new Random(seed);
+
+        // Fill dictionary G:
+        final int numDistinctG = random.nextInt(5) + 5;
+        // Clear and resize dictionary G if needed (it's initially sized at construction)
+        // dictG_values is a List<byte[]>, we can just clear and add.
+        data.dictG_values.clear();
+        for (int i = 0; i < numDistinctG; i++) {
+            data.addDictGValue(nextBytes(random));
+        }
+
+        // Fill dictionary E:
+        final int numDistinctE = random.nextInt(5) + 5;
+        data.dictE_values.clear();
+        for (int i = 0; i < numDistinctE; i++) {
+            data.addDictEValue(nextBytes(random));
+        }
+
+        // Fill dictionary B:
+        final int numDistinctB = random.nextInt(5) + 5;
+        // Resize dictB arrays if needed
+        if (data.getDictBSize() != numDistinctB) {
+            data.dictB_gIndices = Arrays.copyOf(data.dictB_gIndices, numDistinctB);
+            data.dictB_h = Arrays.copyOf(data.dictB_h, numDistinctB);
+        }
+        for (int i = 0; i < numDistinctB; i++) {
+            data.setDictB_gIndex(i, random.nextInt(numDistinctG));
+            data.setDictB_h(i, random.nextInt());
+        }
+
+        // Fill the struct vector fields:
+        // For each of the count values:
+        // a: random long
+        // b: random int in [0, numDistinctB)
+        // c: a list of 0 to 3 integers
+        // d:
+        //   e: random int in [0, numDistinctE)
+        //   f: random boolean
+        // No missing values are introduced.
+        data.expand(count);
+        for (int i = 0; i < count; i++) {
+            data.setFieldA(i, random.nextLong());
+            data.setFieldBIndex(i, random.nextInt(numDistinctB));
+
+            final int listSize = random.nextInt(4); // 0 to 3
+            List<Integer> cList = new ArrayList<>(listSize);
+            for (int j = 0; j < listSize; j++) {
+                cList.add(random.nextInt());
+            }
+            data.setFieldC(i, cList);
+
+            data.setFieldD_eIndex(i, random.nextInt(numDistinctE));
+            data.setFieldD_f(i, random.nextBoolean());
+        }
+
+        return data.close(count);
+    }
+
+    /**
+     * Check the values in the {@link ComplexData} to match what was set by {@link #fillData(ComplexData, int, long)}.
+     *
+     * @param data the data object
+     * @param count the number of values to check
+     * @param seed the seed defining the values
+     */
+    public static void checkData(final ComplexData data, final int count, final long seed) {
+        final Random random = new Random(seed);
+
+        assertEquals(count, data.length(), "Data length should match the expected count.");
+
+        // Check dictionary G:
+        final int numDistinctG = random.nextInt(5) + 5;
+        assertEquals(numDistinctG, data.getDictGSize(),
+            "Dictionary G size should match the expected number of distinct values.");
+        for (int i = 0; i < numDistinctG; i++) {
+            byte[] expected = nextBytes(random);
+            byte[] actual = data.getDictGValue(i);
+            assertTrue(Arrays.equals(expected, actual), "Dictionary G value at index " + i + " does not match.");
+        }
+
+        // Check dictionary E:
+        final int numDistinctE = random.nextInt(5) + 5;
+        assertEquals(numDistinctE, data.getDictESize(),
+            "Dictionary E size should match the expected number of distinct values.");
+        for (int i = 0; i < numDistinctE; i++) {
+            byte[] expected = nextBytes(random);
+            byte[] actual = data.getDictEValue(i);
+            assertTrue(Arrays.equals(expected, actual), "Dictionary E value at index " + i + " does not match.");
+        }
+
+        // Check dictionary B:
+        final int numDistinctB = random.nextInt(5) + 5;
+        assertEquals(numDistinctB, data.getDictBSize(),
+            "Dictionary B size should match the expected number of distinct values.");
+        for (int i = 0; i < numDistinctB; i++) {
+            int expectedGIndex = random.nextInt(numDistinctG);
+            int expectedH = random.nextInt();
+            int actualGIndex = data.getDictB_gIndex(i);
+            int actualH = data.getDictB_h(i);
+
+            assertEquals(expectedGIndex, actualGIndex, "Dictionary B 'g' value at index " + i + " does not match.");
+            assertEquals(expectedH, actualH, "Dictionary B 'h' value at index " + i + " does not match.");
+        }
+
+        // Check the main vector fields:
+        for (int i = 0; i < count; i++) {
+            // None should be missing
+            assertFalse(data.isMissing(i), "Value at index " + i + " should not be missing.");
+
+            // a
+            long expectedA = random.nextLong();
+            long actualA = data.getFieldA(i);
+            assertEquals(expectedA, actualA, "Field 'a' value at index " + i + " does not match.");
+
+            // b
+            int expectedBIndex = random.nextInt(numDistinctB);
+            int actualBIndex = data.getFieldBIndex(i);
+            assertEquals(expectedBIndex, actualBIndex,
+                "Field 'b' (dictionary index) value at index " + i + " does not match.");
+
+            // c
+            int listSize = random.nextInt(4);
+            List<Integer> expectedC = new ArrayList<>(listSize);
+            for (int j = 0; j < listSize; j++) {
+                expectedC.add(random.nextInt());
+            }
+
+            List<Integer> actualC = data.getFieldC(i);
+            if (listSize == 0) {
+                // The old code always wrote a list (even if empty), so null should not occur
+                assertTrue(actualC != null && actualC.isEmpty(), "Field 'c' list at index " + i + " should be empty.");
+            } else {
+                assertTrue(actualC != null && actualC.size() == listSize,
+                    "Field 'c' list at index " + i + " should have size " + listSize + ".");
+                for (int j = 0; j < listSize; j++) {
+                    assertEquals(expectedC.get(j), actualC.get(j),
+                        "Field 'c' list element at index " + i + ", element " + j + " does not match.");
+                }
+            }
+
+            // d
+            // e
+            int expectedEIndex = random.nextInt(numDistinctE);
+            int actualEIndex = data.getFieldD_eIndex(i);
+            assertEquals(expectedEIndex, actualEIndex,
+                "Field 'd.e' (dictionary index) value at index " + i + " does not match.");
+
+            // f
+            boolean expectedF = random.nextBoolean();
+            boolean actualF = data.getFieldD_f(i);
+            assertEquals(expectedF, actualF, "Field 'd.f' (boolean) value at index " + i + " does not match.");
+        }
+    }
+
+    /** Utility to get a random amount of bytes from a random instance, same as old implementation. */
+    private static final byte[] nextBytes(final Random random) {
+        final byte[] bytes = new byte[random.nextInt(10) + 5];
+        random.nextBytes(bytes);
+        return bytes;
     }
 
     /**
@@ -292,136 +466,19 @@ public final class ArrowTestUtils {
             return missing.get(index);
         }
 
-        //        @Override
-        //        public ArrowReadData slice(final int start, final int length) {
-        //            return null;
-        //        }
-        //
-        //        @Override
-        //        public ArrowWriteData slice(final int start) {
-        //            return null;
-        //        }
-    }
-
-    /**
-     * A {@link ArrowReadData} and {@link ArrowWriteData} implementation holding a dictionary for testing. Holds an
-     * index array which can be accessed with {@link #data} and a dictionary which can be accessed with
-     * {@link #dictionaryValues}. Use {@link DictionaryEncodedDataFactory} to create new instances.
-     */
-    public static final class DictionaryEncodedData implements ArrowReadData, ArrowWriteData {
-
-        private int[] data; // indices into the dictionary
-
-        private BitSet missing;
-
-        private long[] dictionaryValues;
-
-        private int length;
-
-        private final long dictionaryId;
-
-        public DictionaryEncodedData(final int capacity, final int dictCapacity, final long dictionaryId) {
-            data = new int[capacity];
-            missing = new BitSet(capacity);
-            dictionaryValues = new long[dictCapacity];
-            length = 0;
-            this.dictionaryId = dictionaryId;
+        @Override
+        public ValidityBuffer getValidityBuffer() {
+            return null;
         }
 
         @Override
-        public int length() {
-            return length;
+        public ArrowReadData slice(final int start, final int length) {
+            return null;
         }
 
         @Override
-        public void release() {
-            // No-op
-        }
-
-        @Override
-        public void retain() {
-            throw new IllegalStateException("DictionaryEncodedData can only be referenced by one instance.");
-        }
-
-        @Override
-        public long sizeOf() {
-            return data.length * Integer.BYTES + missing.size() / 8 + dictionaryValues.length * Long.BYTES;
-        }
-
-        @Override
-        public long usedSizeFor(final int numElements) {
-            return numElements * Integer.BYTES + missing.size() / 8 + dictionaryValues.length * Long.BYTES;
-        }
-
-        @Override
-        public int capacity() {
-            return data.length;
-        }
-
-        @Override
-        public void expand(final int minimumCapacity) {
-            if (data.length < minimumCapacity) {
-                int newCapacity = data.length;
-                while (newCapacity < minimumCapacity) {
-                    newCapacity *= 2;
-                }
-                data = Arrays.copyOf(data, newCapacity);
-            }
-        }
-
-        @Override
-        public void setMissing(final int index) {
-            missing.set(index);
-        }
-
-        @Override
-        public DictionaryEncodedData close(final int length) {
-            if (length < 0 || length > capacity()) {
-                throw new IllegalArgumentException("Invalid length");
-            }
-            this.length = length;
-            return this;
-        }
-
-        @Override
-        public boolean isMissing(final int index) {
-            return missing.get(index);
-        }
-
-        //        @Override
-        //        public ArrowReadData slice(final int start, final int length) {
-        //            return null;
-        //        }
-        //
-        //        @Override
-        //        public ArrowWriteData slice(final int start) {
-        //            return null;
-        //        }
-
-        public void setDictionaryValue(final int index, final long value) {
-            dictionaryValues[index] = value;
-        }
-
-        public long getDictionaryValue(final int index) {
-            return dictionaryValues[index];
-        }
-
-        public void setDataValue(final int index, final int dictIndex) {
-            data[index] = dictIndex;
-        }
-
-        public int getDataValue(final int index) {
-            return data[index];
-        }
-
-        public int getDictionarySize() {
-            return dictionaryValues.length;
-        }
-
-        public void setDictionarySize(final int size) {
-            if (size > dictionaryValues.length) {
-                dictionaryValues = Arrays.copyOf(dictionaryValues, size);
-            }
+        public ArrowWriteData slice(final int start) {
+            return null;
         }
     }
 
@@ -498,11 +555,6 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return null;
-        }
-
-        @Override
         public ArrowColumnDataFactoryVersion getVersion() {
             return m_version;
         }
@@ -513,22 +565,145 @@ public final class ArrowTestUtils {
         }
     }
 
+    /**
+     * A {@link ArrowReadData} and {@link ArrowWriteData} implementation holding a dictionary for testing. Holds an
+     * index array which can be accessed with {@link #data} and a dictionary which can be accessed with
+     * {@link #dictionaryValues}. Use {@link DictionaryEncodedDataFactory} to create new instances.
+     */
+    public static final class DictionaryEncodedData implements ArrowReadData, ArrowWriteData {
+
+        private int[] data; // indices into the dictionary
+
+        private BitSet missing;
+
+        private long[] dictionaryValues;
+
+        private int length;
+
+        public DictionaryEncodedData(final int capacity, final int dictCapacity) {
+            data = new int[capacity];
+            missing = new BitSet(capacity);
+            dictionaryValues = new long[dictCapacity];
+            length = 0;
+        }
+
+        @Override
+        public int length() {
+            return length;
+        }
+
+        @Override
+        public void release() {
+            // No-op
+        }
+
+        @Override
+        public void retain() {
+            throw new IllegalStateException("DictionaryEncodedData can only be referenced by one instance.");
+        }
+
+        @Override
+        public long sizeOf() {
+            return data.length * Integer.BYTES + missing.size() / 8 + dictionaryValues.length * Long.BYTES;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return numElements * Integer.BYTES + missing.size() / 8 + dictionaryValues.length * Long.BYTES;
+        }
+
+        @Override
+        public int capacity() {
+            return data.length;
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            if (data.length < minimumCapacity) {
+                int newCapacity = data.length;
+                while (newCapacity < minimumCapacity) {
+                    newCapacity *= 2;
+                }
+                data = Arrays.copyOf(data, newCapacity);
+            }
+        }
+
+        @Override
+        public void setMissing(final int index) {
+            missing.set(index);
+        }
+
+        @Override
+        public DictionaryEncodedData close(final int length) {
+            if (length < 0 || length > capacity()) {
+                throw new IllegalArgumentException("Invalid length");
+            }
+            this.length = length;
+            return this;
+        }
+
+        @Override
+        public boolean isMissing(final int index) {
+            return missing.get(index);
+        }
+
+        public void setDictionaryValue(final int index, final long value) {
+            dictionaryValues[index] = value;
+        }
+
+        public long getDictionaryValue(final int index) {
+            return dictionaryValues[index];
+        }
+
+        public void setDataValue(final int index, final int dictIndex) {
+            data[index] = dictIndex;
+        }
+
+        public int getDataValue(final int index) {
+            return data[index];
+        }
+
+        public int getDictionarySize() {
+            return dictionaryValues.length;
+        }
+
+        public void setDictionarySize(final int size) {
+            dictionaryValues = Arrays.copyOf(dictionaryValues, size);
+        }
+
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return null;
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return null;
+        }
+
+        @Override
+        public ValidityBuffer getValidityBuffer() {
+            return null;
+        }
+    }
+
     /** A factory for creating, reading and writing {@link DictionaryEncodedData}. */
     public static final class DictionaryEncodedDataFactory implements ArrowColumnDataFactory {
 
-        private long dictionaryId;
+        private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
+            return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);
+        }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            this.dictionaryId = dictionaryIdSupplier.getAsLong();
-            final DictionaryEncoding dictionary = new DictionaryEncoding(dictionaryId, false, null);
+            final DictionaryEncoding dictionary = encoding(dictionaryIdSupplier);
             return new Field(name, new FieldType(true, MinorType.INT.getType(), dictionary), null);
         }
 
         @Override
         public ArrowWriteData createWrite(final int capacity) {
             int dictCapacity = 10; // default dictionary size
-            return new DictionaryEncodedData(capacity, dictCapacity, dictionaryId);
+            return new DictionaryEncodedData(capacity, dictCapacity);
         }
 
         @Override
@@ -555,7 +730,7 @@ public final class ArrowTestUtils {
             int length = intVector.getValueCount();
             int dictLength = dictVector.getValueCount();
 
-            DictionaryEncodedData data = new DictionaryEncodedData(length, dictLength, dictionaryId);
+            DictionaryEncodedData data = new DictionaryEncodedData(length, dictLength);
             // Read dictionary values
             for (int i = 0; i < dictLength; i++) {
                 if (dictVector.isNull(i)) {
@@ -595,10 +770,11 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
+        public DictionaryProvider createDictionaries(final NullableReadData data,
+            final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator) {
             DictionaryEncodedData dictData = (DictionaryEncodedData)data;
             // Create the dictionary vector
-            BigIntVector dictVector = new BigIntVector("dictionary", null);
+            BigIntVector dictVector = new BigIntVector("dictionary", allocator);
             int dictLength = dictData.getDictionarySize();
             dictVector.allocateNew(dictLength);
             for (int i = 0; i < dictLength; i++) {
@@ -607,8 +783,7 @@ public final class ArrowTestUtils {
             dictVector.setValueCount(dictLength);
 
             // Create dictionary encoding
-            DictionaryEncoding encoding = new DictionaryEncoding(dictData.dictionaryId, false, null);
-            Dictionary dictionary = new Dictionary(dictVector, encoding);
+            Dictionary dictionary = new Dictionary(dictVector, encoding(dictionaryIdSupplier));
             return new MapDictionaryProvider(dictionary);
         }
 
@@ -652,16 +827,8 @@ public final class ArrowTestUtils {
         // Dictionary E
         private List<byte[]> dictE_values;
 
-        // Dictionary IDs
-        public final long dictionaryIdB;
-
-        public final long dictionaryIdE;
-
-        public final long dictionaryIdG;
-
         @SuppressWarnings("unchecked")
-        public ComplexData(final int capacity, final int dictBSize, final int dictGSize, final int dictESize,
-            final long dictionaryIdB, final long dictionaryIdE, final long dictionaryIdG) {
+        public ComplexData(final int capacity, final int dictBSize, final int dictGSize, final int dictESize) {
             // initialize arrays with capacities
             fieldA = new long[capacity];
             fieldBIndices = new int[capacity];
@@ -676,10 +843,6 @@ public final class ArrowTestUtils {
 
             dictG_values = new ArrayList<>(dictGSize);
             dictE_values = new ArrayList<>(dictESize);
-
-            this.dictionaryIdB = dictionaryIdB;
-            this.dictionaryIdE = dictionaryIdE;
-            this.dictionaryIdG = dictionaryIdG;
 
             length = 0;
         }
@@ -776,15 +939,20 @@ public final class ArrowTestUtils {
             return this;
         }
 
-        //        @Override
-        //        public ArrowReadData slice(final int start, final int length) {
-        //            return null;
-        //        }
-        //
-        //        @Override
-        //        public ArrowWriteData slice(final int start) {
-        //            return null;
-        //        }
+        @Override
+        public ArrowWriteData slice(final int start) {
+            return null;
+        }
+
+        @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return null;
+        }
+
+        @Override
+        public ValidityBuffer getValidityBuffer() {
+            return null;
+        }
 
         // Getters and setters for data and dictionaries
 
@@ -875,39 +1043,44 @@ public final class ArrowTestUtils {
 
     public static final class ComplexDataFactory implements ArrowColumnDataFactory {
 
-        private long dictionaryIdB;
+        private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
+            return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);
+        }
 
-        private long dictionaryIdE;
+        private static Field field(final String name, final MinorType type) {
+            return Field.nullable(name, type.getType());
+        }
 
-        private long dictionaryIdG;
+        private static Field field(final String name, final DictionaryEncoding encoding) {
+            return new Field(name, new FieldType(true, MinorType.INT.getType(), encoding), null);
+        }
+
+        private static Field field(final String name, final MinorType type, final Field... children) {
+            return new Field(name, new FieldType(true, type.getType(), null), Arrays.asList(children));
+        }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            // Get IDs for dictionaries
-            dictionaryIdB = dictionaryIdSupplier.getAsLong();
-            dictionaryIdE = dictionaryIdSupplier.getAsLong();
-            dictionaryIdG = dictionaryIdSupplier.getAsLong();
-
-            // Create DictionaryEncodings
-            final DictionaryEncoding encodingB = new DictionaryEncoding(dictionaryIdB, false, null);
-            final DictionaryEncoding encodingE = new DictionaryEncoding(dictionaryIdE, false, null);
-            final DictionaryEncoding encodingG = new DictionaryEncoding(dictionaryIdG, false, null);
+            final DictionaryEncoding encodingB = encoding(dictionaryIdSupplier);
+            final DictionaryEncoding encodingE = encoding(dictionaryIdSupplier);
+            // Id for dictionary G. We cannot create the field yet because it is a child of a dictionary
+            dictionaryIdSupplier.getAsLong();
 
             // Most inner fields
-            final Field a = new Field("a", FieldType.nullable(new ArrowType.Int(64, true)), null);
-            final Field f = new Field("f", FieldType.nullable(new ArrowType.Bool()), null);
-            final Field cChild = new Field("cChild", FieldType.nullable(new ArrowType.Int(32, true)), null);
+            final Field a = field("a", MinorType.BIGINT);
+            final Field f = field("f", MinorType.BIT);
+            final Field cChild = field("cChild", MinorType.INT);
 
             // Dictionary index vectors
-            final Field b = new Field("b", new FieldType(true, new ArrowType.Int(32, true), encodingB), null);
-            final Field e = new Field("e", new FieldType(true, new ArrowType.Int(32, true), encodingE), null);
+            final Field b = field("b", encodingB);
+            final Field e = field("e", encodingE);
 
             // Complex vectors
-            final Field c = new Field("c", FieldType.nullable(ArrowType.List.INSTANCE), Arrays.asList(cChild));
-            final Field d = new Field("d", FieldType.nullable(ArrowType.Struct.INSTANCE), Arrays.asList(e, f));
+            final Field c = field("c", MinorType.LIST, cChild);
+            final Field d = field("d", MinorType.STRUCT, e, f);
 
             // The final struct vector
-            return new Field(name, FieldType.nullable(ArrowType.Struct.INSTANCE), Arrays.asList(a, b, c, d));
+            return field(name, MinorType.STRUCT, a, b, c, d);
         }
 
         @Override
@@ -915,8 +1088,7 @@ public final class ArrowTestUtils {
             int dictBInitialSize = 10;
             int dictGInitialSize = 10;
             int dictEInitialSize = 10;
-            return new ComplexData(capacity, dictBInitialSize, dictGInitialSize, dictEInitialSize, dictionaryIdB,
-                dictionaryIdE, dictionaryIdG);
+            return new ComplexData(capacity, dictBInitialSize, dictGInitialSize, dictEInitialSize);
         }
 
         @Override
@@ -1009,8 +1181,7 @@ public final class ArrowTestUtils {
             int dictGSize = dictVarBinaryVectorG.getValueCount();
             int dictESize = dictVarBinaryVectorE.getValueCount();
 
-            ComplexData data =
-                new ComplexData(length, dictBSize, dictGSize, dictESize, dictionaryIdB, dictionaryIdE, dictionaryIdG);
+            ComplexData data = new ComplexData(length, dictBSize, dictGSize, dictESize);
 
             // Read dictionary G
             for (int i = 0; i < dictGSize; i++) {
@@ -1109,16 +1280,12 @@ public final class ArrowTestUtils {
             StructVector structVector = (StructVector)vector;
             int length = complexData.length();
 
-            BigIntVector vectorA = structVector.addOrGet("a",
-                FieldType.nullable(new ArrowType.Int(64, true)), BigIntVector.class);
-            IntVector vectorB = structVector.addOrGet("b", new FieldType(true, new ArrowType.Int(32, true),
-                new DictionaryEncoding(complexData.dictionaryIdB, false, null)), IntVector.class);
-            ListVector vectorC = structVector.addOrGetList("c");
-            StructVector vectorD = structVector.addOrGetStruct("d");
-            IntVector vectorE = vectorD.addOrGet("e", new FieldType(true, new ArrowType.Int(32, true),
-                new DictionaryEncoding(complexData.dictionaryIdE, false, null)), IntVector.class);
-            BitVector vectorF =
-                vectorD.addOrGet("f", FieldType.nullable(new ArrowType.Bool()), BitVector.class);
+            BigIntVector vectorA = structVector.getChild("a", BigIntVector.class);
+            IntVector vectorB = structVector.getChild("b", IntVector.class);
+            ListVector vectorC = structVector.getChild("c", ListVector.class);
+            StructVector vectorD = structVector.getChild("d", StructVector.class);
+            IntVector vectorE = vectorD.getChild("e", IntVector.class);
+            BitVector vectorF = vectorD.getChild("f", BitVector.class);
 
             vectorA.allocateNew(length);
             vectorB.allocateNew(length);
@@ -1165,27 +1332,36 @@ public final class ArrowTestUtils {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
+        public DictionaryProvider createDictionaries(final NullableReadData data,
+            final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator) {
             if (!(data instanceof ComplexData)) {
                 return null;
             }
             ComplexData complexData = (ComplexData)data;
 
-            VarBinaryVector dictVectorG = new VarBinaryVector("dictG", null);
+            // Encodings
+            final DictionaryEncoding encodingB = encoding(dictionaryIdSupplier);
+            final DictionaryEncoding encodingE = encoding(dictionaryIdSupplier);
+            final DictionaryEncoding encodingG = encoding(dictionaryIdSupplier);
+
+            // Vectors
+
+            // Dictionary G
+            var dictVectorG = (VarBinaryVector)field("DictG", MinorType.VARBINARY).createVector(allocator);
             dictVectorG.allocateNew();
             List<byte[]> dictGValues = complexData.dictG_values;
             for (int i = 0; i < dictGValues.size(); i++) {
                 dictVectorG.set(i, dictGValues.get(i));
             }
             dictVectorG.setValueCount(dictGValues.size());
-            DictionaryEncoding encodingG = new DictionaryEncoding(complexData.dictionaryIdG, false, null);
             Dictionary dictionaryG = new Dictionary(dictVectorG, encodingG);
 
-            StructVector dictVectorB = new StructVector("dictB", null, null);
-            IntVector dictB_gIndices = dictVectorB.addOrGet("g", new FieldType(true, new ArrowType.Int(32, true),
-                new DictionaryEncoding(complexData.dictionaryIdG, false, null)), IntVector.class);
-            IntVector dictB_hValues =
-                dictVectorB.addOrGet("h", FieldType.nullable(new ArrowType.Int(32, true)), IntVector.class);
+            // Dictionary B
+            var dictVectorB =
+                (StructVector)field("DictB", MinorType.STRUCT, field("g", encodingG), field("h", MinorType.INT))
+                    .createVector(allocator);
+            IntVector dictB_gIndices = dictVectorB.getChild("g", IntVector.class);
+            IntVector dictB_hValues = dictVectorB.getChild("h", IntVector.class);
 
             dictB_gIndices.allocateNew(complexData.getDictBSize());
             dictB_hValues.allocateNew(complexData.getDictBSize());
@@ -1196,17 +1372,16 @@ public final class ArrowTestUtils {
             dictB_gIndices.setValueCount(complexData.getDictBSize());
             dictB_hValues.setValueCount(complexData.getDictBSize());
             dictVectorB.setValueCount(complexData.getDictBSize());
-            DictionaryEncoding encodingB = new DictionaryEncoding(complexData.dictionaryIdB, false, null);
             Dictionary dictionaryB = new Dictionary(dictVectorB, encodingB);
 
-            VarBinaryVector dictVectorE = new VarBinaryVector("dictE", null);
+            // Dictionary E
+            var dictVectorE = (VarBinaryVector)field("DictE", MinorType.VARBINARY).createVector(allocator);
             dictVectorE.allocateNew();
             List<byte[]> dictEValues = complexData.dictE_values;
             for (int i = 0; i < dictEValues.size(); i++) {
                 dictVectorE.set(i, dictEValues.get(i));
             }
             dictVectorE.setValueCount(dictEValues.size());
-            DictionaryEncoding encodingE = new DictionaryEncoding(complexData.dictionaryIdE, false, null);
             Dictionary dictionaryE = new Dictionary(dictVectorE, encodingE);
 
             return new MapDictionaryProvider(dictionaryB, dictionaryE, dictionaryG);
@@ -1222,5 +1397,4 @@ public final class ArrowTestUtils {
             return 8 + 4 + 4 + 1 + 1;
         }
     }
-
 }
