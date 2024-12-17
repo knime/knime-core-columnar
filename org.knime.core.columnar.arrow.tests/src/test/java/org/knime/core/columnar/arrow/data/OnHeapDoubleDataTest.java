@@ -52,6 +52,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleReadData;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleWriteData;
 import org.knime.core.columnar.arrow.data.old.ArrowDoubleData;
@@ -66,7 +67,7 @@ public class OnHeapDoubleDataTest extends AbstractArrowDataTest<OnHeapDoubleWrit
 
     /** Create the test for {@link OnHeapDoubleData} */
     public OnHeapDoubleDataTest() {
-        super(OnHeapDoubleData.FACTORY);
+        super(OnHeapDoubleDataFactory.INSTANCE);
     }
 
     @Override

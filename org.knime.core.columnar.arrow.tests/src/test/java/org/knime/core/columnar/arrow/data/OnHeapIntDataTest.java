@@ -53,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntReadData;
 import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntWriteData;
 
@@ -66,7 +67,7 @@ public class OnHeapIntDataTest extends AbstractArrowDataTest<OnHeapIntWriteData,
 
     /** Create the test for {@link OnHeapIntData} */
     public OnHeapIntDataTest() {
-        super(OnHeapIntData.FACTORY);
+        super(OnHeapIntDataFactory.INSTANCE);
     }
 
     @Override

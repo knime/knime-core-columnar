@@ -73,10 +73,6 @@ import org.knime.core.columnar.data.StructData.StructWriteData;
  */
 public final class OnHeapStructData {
 
-    public static OnHeapStructDataFactory factory(final ArrowColumnDataFactory... inner) {
-        return new OnHeapStructDataFactory(inner);
-    }
-
     private OnHeapStructData() {
     }
 
@@ -234,7 +230,7 @@ public final class OnHeapStructData {
          */
         private static final int V0 = 0;
 
-        private OnHeapStructDataFactory(final ArrowColumnDataFactory... inner) {
+        public OnHeapStructDataFactory(final ArrowColumnDataFactory... inner) {
             super(CURRENT_VERSION, inner);
         }
 

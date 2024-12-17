@@ -68,8 +68,6 @@ import org.knime.core.columnar.data.VoidData.VoidWriteData;
 public final class OnHeapVoidData extends AbstractReferencedData
     implements VoidReadData, VoidWriteData, ArrowReadData, ArrowWriteData {
 
-    public static final OnHeapVoidDataFactory FACTORY = new OnHeapVoidDataFactory();
-
     private int m_capacity;
 
     private OnHeapVoidData(final int capacity) {
@@ -133,6 +131,8 @@ public final class OnHeapVoidData extends AbstractReferencedData
 
     // TODO extract common functionallity
     public static final class OnHeapVoidDataFactory extends AbstractArrowColumnDataFactory {
+
+        public static final OnHeapVoidDataFactory INSTANCE = new OnHeapVoidDataFactory();
 
         private OnHeapVoidDataFactory() {
             super(0);

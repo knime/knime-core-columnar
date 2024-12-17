@@ -65,8 +65,6 @@ import org.knime.core.columnar.data.NullableReadData;
  */
 public final class OnHeapLongData {
 
-    public static final OnHeapLongDataFactory FACTORY = new OnHeapLongDataFactory();
-
     private OnHeapLongData() {
     }
 
@@ -172,6 +170,8 @@ public final class OnHeapLongData {
     }
 
     public static final class OnHeapLongDataFactory extends AbstractArrowColumnDataFactory {
+
+        public static final OnHeapLongDataFactory INSTANCE = new OnHeapLongDataFactory();
 
         /**
          * Also supports reading longs from DurationVectors and TimeNanoVectors. This is necessary for backwards

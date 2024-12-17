@@ -67,8 +67,6 @@ import org.knime.core.columnar.data.NullableReadData;
  */
 public final class OnHeapBooleanData {
 
-    public static final OnHeapBooleanDataFactory FACTORY = new OnHeapBooleanDataFactory();
-
     private OnHeapBooleanData() {
     }
 
@@ -178,6 +176,8 @@ public final class OnHeapBooleanData {
     }
 
     public static final class OnHeapBooleanDataFactory extends AbstractArrowColumnDataFactory {
+
+        public static final OnHeapBooleanDataFactory INSTANCE = new OnHeapBooleanDataFactory();
 
         private OnHeapBooleanDataFactory() {
             super(0);

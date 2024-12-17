@@ -73,10 +73,6 @@ import org.knime.core.columnar.data.NullableWriteData;
  */
 public final class OnHeapListData {
 
-    public static ArrowColumnDataFactory factory(final ArrowColumnDataFactory inner) {
-        return new OnHeapListDataFactory(inner);
-    }
-
     private OnHeapListData() {
     }
 
@@ -221,7 +217,7 @@ public final class OnHeapListData {
 
         private static final int CURRENT_VERSION = 0;
 
-        protected OnHeapListDataFactory(final ArrowColumnDataFactory inner) {
+        public OnHeapListDataFactory(final ArrowColumnDataFactory inner) {
             super(CURRENT_VERSION, inner);
         }
 

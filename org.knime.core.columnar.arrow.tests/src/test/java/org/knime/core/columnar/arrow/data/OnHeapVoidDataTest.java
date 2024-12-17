@@ -52,6 +52,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.OnHeapVoidData.OnHeapVoidDataFactory;
 
 /**
  * Test {@link OnHeapVoidData}.
@@ -62,7 +63,7 @@ public class OnHeapVoidDataTest extends AbstractArrowDataTest<OnHeapVoidData, On
 
     /** Create the test for the {@link OnHeapVoidData}. */
     public OnHeapVoidDataTest() {
-        super(OnHeapVoidData.FACTORY);
+        super(OnHeapVoidDataFactory.INSTANCE);
     }
 
     @Override

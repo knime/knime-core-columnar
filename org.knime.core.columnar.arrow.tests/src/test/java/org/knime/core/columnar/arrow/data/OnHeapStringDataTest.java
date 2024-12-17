@@ -58,6 +58,7 @@ import java.util.Random;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.OnHeapStringData.OnHeapStringDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapStringData.OnHeapStringReadData;
 import org.knime.core.columnar.arrow.data.OnHeapStringData.OnHeapStringWriteData;
 
@@ -80,7 +81,7 @@ public class OnHeapStringDataTest extends AbstractArrowDataTest<OnHeapStringWrit
 
     /** Create the test for {@link OnHeapStringData} */
     public OnHeapStringDataTest() {
-        super(OnHeapStringData.FACTORY);
+        super(OnHeapStringDataFactory.INSTANCE);
     }
 
     @Override
