@@ -194,7 +194,8 @@ class ArrowBatchWriter implements BatchWriter {
         // TODO do we need th later mapping of dictionary ids?
         // TODO should we move the dictionary id supplier here?
         // TODO are these kind of dictionaries used at all anymore? (maybe for backward compatibility?)
-        final var dictionaryIdSupplier = ArrowColumnDataFactory.newDictionaryIdSupplier();
+        final var dictionaryIdsForField = ArrowColumnDataFactory.newDictionaryIdSupplier();
+        final var dictionaryIdsForVectors = ArrowColumnDataFactory.newDictionaryIdSupplier();
 
         // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
@@ -205,7 +206,7 @@ class ArrowBatchWriter implements BatchWriter {
 
             // Create the field including the extension type
             var field = ExtensionTypes
-                .wrapInExtensionTypeIfNecessary(factory.getField(String.valueOf(i), dictionaryIdSupplier), traits);
+                .wrapInExtensionTypeIfNecessary(factory.getField(String.valueOf(i), dictionaryIdsForField), traits);
 
             // Note: We create a Vector here and therefore transfer the data to off-heap
             // The compression requires the data to be off-heap
@@ -215,10 +216,10 @@ class ArrowBatchWriter implements BatchWriter {
             var vector = field.createVector(m_allocator);
             factory.copyToVector(data, vector);
 
-            // TODO Remove dictionary handling from here
-            // It is not used anymore (see implementations of getDictionaries)
-            // It is only used in the ArrowDictEncodedLegacyDateTimeVarBinaryReadData but this can only be read, not written
-            final DictionaryProvider dictionaries = factory.getDictionaries(data);
+            // This is not used anymore but still in the code to test reading of dictionaries for backward compatibility
+            @SuppressWarnings("deprecation")
+            final DictionaryProvider dictionaries =
+                factory.createDictionaries(data, dictionaryIdsForVectors, m_allocator);
 
             if (m_firstWrite) {
                 // Get the field for the schema and collect dictionaries
@@ -247,6 +248,7 @@ class ArrowBatchWriter implements BatchWriter {
         writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
 
         vectors.forEach(FieldVector::close);
+        allDictionaries.forEach(FieldVector::close);
 
         // Remember batch boundary for footer
         var previousBatchEnd = m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);

@@ -166,12 +166,13 @@ abstract class AbstractArrowBatchReader {
                 }
             });
         } finally {
-            // TODO we also need to close the dictionaries (or the createRead method should do that?)
-            // Note that dictionaries are only used for reading ArrowDictEncodedLegacyDateTimeVarBinaryReadData
             for (FieldVectorAndNullCount vector : vectors) {
                 if (vector != null) {
                     vector.m_vector.close();
                 }
+            }
+            for (long id : m_dictionaryDescriptions.keySet()) {
+                dictionaries.lookup(id).getVector().close();
             }
         }
     }

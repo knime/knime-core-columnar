@@ -62,7 +62,6 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.NestedDictionaryProvider;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
@@ -315,25 +314,6 @@ public final class OnHeapStructData {
             }
 
             sv.setValueCount(d.length());
-        }
-
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            OnHeapStructReadData d = (OnHeapStructReadData)data;
-            List<DictionaryProvider> providers = new ArrayList<>();
-            for (int i = 0; i < m_children.length; i++) {
-                DictionaryProvider p = m_children[i].getDictionaries(d.getReadDataAt(i));
-                if (p != null) {
-                    providers.add(p);
-                }
-            }
-            if (providers.isEmpty()) {
-                return null;
-            } else if (providers.size() == 1) {
-                return providers.get(0);
-            } else {
-                return new NestedDictionaryProvider(providers);
-            }
         }
 
         private static String childNameAtIndex(final int index) {

@@ -352,11 +352,6 @@ public final class AbstractOnHeapDictEncodedData {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return m_children[0].getDictionaries(getDelegateData(data));
-        }
-
-        @Override
         public int initialNumBytesPerElement() {
             return m_children[0].initialNumBytesPerElement();
         }
