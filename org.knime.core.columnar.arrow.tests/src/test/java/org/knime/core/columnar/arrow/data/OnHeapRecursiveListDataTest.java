@@ -46,59 +46,55 @@
  * History
  *   Oct 22, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data.old;
+package org.knime.core.columnar.arrow.data;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
-import org.knime.core.columnar.arrow.data.old.ArrowListData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowIntData.ArrowIntWriteData;
-import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListReadData;
-import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntReadData;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListReadData;
+import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListWriteData;
 
 /**
- * Test {@link ArrowListData} with a recursive lists.
+ * Test {@link OnHeapListData} with a recursive lists.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListWriteData, ArrowListReadData> {
+public class OnHeapRecursiveListDataTest extends AbstractArrowDataTest<OnHeapListWriteData, OnHeapListReadData> {
 
     private static final int MAX_LENGTH_1 = 5;
 
     private static final int MAX_LENGTH_2 = 5;
 
-    /** Create the test for {@link ArrowListData} */
-    public ArrowRecursiveListDataTest() {
+    /** Create the test for {@link OnHeapListData} */
+    public OnHeapRecursiveListDataTest() {
         super(createFactory());
     }
 
-    private static ArrowListDataFactory createFactory() {
-        return new ArrowListDataFactory(
-            new ArrowListDataFactory(ArrowIntDataFactory.INSTANCE));
+    private static OnHeapListDataFactory createFactory() {
+        return new OnHeapListDataFactory(new OnHeapListDataFactory(OnHeapIntDataFactory.INSTANCE));
     }
 
     @Override
-    protected ArrowListWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowListWriteData);
-        return (ArrowListWriteData)o;
+    protected OnHeapListWriteData castW(final Object o) {
+        assertTrue(o instanceof OnHeapListWriteData);
+        return (OnHeapListWriteData)o;
     }
 
     @Override
-    protected ArrowListReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowListReadData);
-        return (ArrowListReadData)o;
+    protected OnHeapListReadData castR(final Object o) {
+        assertTrue(o instanceof OnHeapListReadData);
+        return (OnHeapListReadData)o;
     }
 
     @Override
-    protected void setValue(final ArrowListWriteData data, final int index, final int seed) {
+    protected void setValue(final OnHeapListWriteData data, final int index, final int seed) {
         if (seed == 1) {
             // Test the special case with an empty list
             data.createWriteData(index, 0);
@@ -108,9 +104,9 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
         final Random random = new Random(seed);
         final int size1 = random.nextInt(MAX_LENGTH_1);
         final int[] size2 = getInnerSizes(random, size1);
-        final ArrowListWriteData inner1 = data.createWriteData(index, size1);
+        final OnHeapListWriteData inner1 = data.createWriteData(index, size1);
         for (int i = 0; i < size1; i++) {
-            final ArrowIntWriteData inner2 = inner1.createWriteData(i, size2[i]);
+            final OnHeapIntWriteData inner2 = inner1.createWriteData(i, size2[i]);
             for (int j = 0; j < size2[i]; j++) {
                 inner2.setInt(j, random.nextInt());
             }
@@ -118,8 +114,8 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
     }
 
     @Override
-    protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
-        final ArrowListReadData inner1 = data.createReadData(index);
+    protected void checkValue(final OnHeapListReadData data, final int index, final int seed) {
+        final OnHeapListReadData inner1 = data.createReadData(index);
         if (seed == 1) {
             assertEquals(0, inner1.length());
             return;
@@ -131,7 +127,7 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
         assertEquals(size1, inner1.length());
 
         for (int i = 0; i < size1; i++) {
-            final ArrowIntReadData inner2 = inner1.createReadData(i);
+            final OnHeapIntReadData inner2 = inner1.createReadData(i);
             assertEquals(size2[i], inner2.length());
             for (int j = 0; j < size2[i]; j++) {
                 assertEquals(random.nextInt(), inner2.getInt(j));
@@ -140,27 +136,13 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
     }
 
     @Override
-    protected boolean isReleasedW(final ArrowListWriteData data) {
-        return data.m_vector == null;
-        // TODO(benjamin) check inner data
+    protected boolean isReleasedW(final OnHeapListWriteData data) {
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
-    protected boolean isReleasedR(final ArrowListReadData data) {
-        final ArrowListReadData d1 = castR(data);
-        final ArrowListReadData d2 = (ArrowListReadData)d1.m_data;
-        final ListVector listVector1 = d1.m_vector;
-        final ListVector listVector2 = d2.m_vector;
-        final IntVector intVector = ((ArrowIntReadData)d2.m_data).m_vector;
-
-        final boolean list1Released = listVector1.getOffsetBuffer().capacity() == 0 //
-            && listVector1.getValidityBuffer().capacity() == 0;
-        final boolean list2Released = listVector2.getOffsetBuffer().capacity() == 0 //
-            && listVector2.getValidityBuffer().capacity() == 0;
-        final boolean intReleased = intVector.getDataBuffer().capacity() == 0 //
-            && intVector.getValidityBuffer().capacity() == 0;
-        return list1Released && list2Released && intReleased;
+    protected boolean isReleasedR(final OnHeapListReadData data) {
+        return false;
     }
 
     @Override
