@@ -55,6 +55,7 @@ import org.knime.core.columnar.arrow.data.OnHeapByteData;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData;
+import org.knime.core.columnar.arrow.data.OnHeapFloatData;
 import org.knime.core.columnar.arrow.data.OnHeapIntData;
 import org.knime.core.columnar.arrow.data.OnHeapListData;
 import org.knime.core.columnar.arrow.data.OnHeapLongData;
@@ -81,7 +82,6 @@ import org.knime.core.table.schema.VoidDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.ListDataTraits;
-import org.knime.core.table.schema.traits.LogicalTypeTrait;
 import org.knime.core.table.schema.traits.StructDataTraits;
 
 /**
@@ -96,12 +96,12 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     private static final ArrowSchemaMapper INSTANCE = new ArrowSchemaMapper();
 
-    private record FactoryWithTraitsKey(ArrowColumnDataFactory factory, DataTraits traits) {
+    private record SpecWithTraitsKey(DataSpec spec, DataTraits traits) {
     }
 
     // There will ever only be a rather limited set of different factories used, so in case of many
     // columns we cache and reuse the factories for other columns
-    private final Map<FactoryWithTraitsKey, ArrowColumnDataFactory> m_usedFactories = new ConcurrentHashMap<>();
+    private final Map<SpecWithTraitsKey, ArrowColumnDataFactory> m_usedFactories = new ConcurrentHashMap<>();
 
     private ArrowSchemaMapper() {
         // Singleton and the instance is only used in #map
@@ -116,7 +116,8 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
      */
     static ArrowColumnDataFactory[] map(final ColumnarSchema schema) {
         return IntStream.range(0, schema.numColumns()) //
-            .mapToObj(i -> map(schema.getSpec(i), schema.getTraits(i))).toArray(ArrowColumnDataFactory[]::new);
+            .mapToObj(i -> map(schema.getSpec(i), schema.getTraits(i))) //
+            .toArray(ArrowColumnDataFactory[]::new);
     }
 
     /**
@@ -132,83 +133,89 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapBooleanData.FACTORY, traits);
+        return OnHeapBooleanData.FACTORY;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapByteData.FACTORY, traits);
+        return OnHeapByteData.FACTORY;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapDoubleData.FACTORY, traits);
+        return OnHeapDoubleData.FACTORY;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
-        throw new UnsupportedOperationException("nyi");
+        return OnHeapFloatData.FACTORY;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapIntData.FACTORY, traits);
+        return OnHeapIntData.FACTORY;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapLongData.FACTORY, traits);
+        return OnHeapLongData.FACTORY;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return wrapCached(OnHeapDictEncodedVarBinaryData.factory(traits), traits);
+            return m_usedFactories.computeIfAbsent(new SpecWithTraitsKey(spec, traits),
+                key -> OnHeapDictEncodedVarBinaryData.factory(traits));
         } else {
-            return wrapCached(OnHeapVarBinaryData.FACTORY, traits);
+            return OnHeapVarBinaryData.FACTORY;
         }
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapVoidData.FACTORY, traits);
+        return OnHeapVoidData.FACTORY;
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
-        final var innerFactories = new ArrowColumnDataFactory[spec.size()];
-        Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
-        return wrapCached(OnHeapStructData.factory(innerFactories), traits);
+        var key = new SpecWithTraitsKey(spec, traits);
+        if (m_usedFactories.containsKey(key)) {
+            return m_usedFactories.get(key);
+        } else {
+            // Create the factory
+            // Note: We cannot use computeIfAbsent here to prevent recursive update by the inner factories
+            // If another thread added the same factory this is not an issue because they are equal
+            var innerFactories = new ArrowColumnDataFactory[spec.size()];
+            Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
+            var factory = OnHeapStructData.factory(innerFactories);
+            m_usedFactories.put(key, factory);
+            return factory;
+        }
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
-        final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
-        return wrapCached(OnHeapListData.factory(inner), traits);
+        var key = new SpecWithTraitsKey(listDataSpec, traits);
+        if (m_usedFactories.containsKey(key)) {
+            return m_usedFactories.get(key);
+        } else {
+            // Create the factory
+            // Note: We cannot use computeIfAbsent here to prevent recursive update by the inner factory
+            // If another thread added the same factory this is not an issue because they are equal
+            var innerFactory = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
+            var factory = OnHeapListData.factory(innerFactory);
+            m_usedFactories.put(key, factory);
+            return factory;
+        }
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return wrapCached(OnHeapDictEncodedStringData.factory(traits), traits);
+            return m_usedFactories.computeIfAbsent(new SpecWithTraitsKey(spec, traits),
+                key -> OnHeapDictEncodedStringData.factory(traits));
+        } else {
+            return OnHeapStringData5000.FACTORY;
         }
-        // TODO the caching does not work like that
-        return wrapCached(OnHeapStringData5000.FACTORY, traits);
-    }
-
-    ArrowColumnDataFactory wrapCached(final ArrowColumnDataFactory factory, final DataTraits traits) {
-        return m_usedFactories.computeIfAbsent(new FactoryWithTraitsKey(factory, traits), key -> {
-            if (key.traits.hasTrait(LogicalTypeTrait.class) || key.traits.hasTrait(DictEncodingTrait.class)) {
-                // TODO add extension type
-                return factory;
-                //                return new ExtensionArrowColumnDataFactory(key.factory, key.traits);
-            }
-
-            return factory;
-        });
-    }
-
-    static ArrowColumnDataFactory wrap(final ArrowColumnDataFactory factory, final DataTraits traits) {
-        return INSTANCE.wrapCached(factory, traits);
     }
 }
