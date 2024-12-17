@@ -253,11 +253,6 @@ public final class OnHeapStringData {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return null;
-        }
-
-        @Override
         public int initialNumBytesPerElement() {
             // TODO
             return 1;

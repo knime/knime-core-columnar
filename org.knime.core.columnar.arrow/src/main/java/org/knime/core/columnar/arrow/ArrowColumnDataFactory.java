@@ -50,6 +50,7 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -124,10 +125,22 @@ public interface ArrowColumnDataFactory {
     void copyToVector(NullableReadData data, FieldVector vector);
 
     /**
+     * Get the dictionaries that should be written to disk.
+     *
      * @param data a column data holding some values
+     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
+     *            from this supplier. Other ids might be used already in the parent data object. Also take as many
+     *            dictionary ids from the supplier as in {@link #getField(String, LongSupplier)}.
+     * @param allocator the allocator to use for creating the dictionaries
      * @return dictionaries which should be written to disk
+     * @deprecated use struct-based dictionaries instead. This method is only available to create dictionaries for
+     *             testing reading of dictionaries which is supported for backward compatibility.
      */
-    DictionaryProvider getDictionaries(NullableReadData data);
+    @Deprecated
+    default DictionaryProvider createDictionaries(final NullableReadData data, final LongSupplier dictionaryIdSupplier,
+        final BufferAllocator allocator) {
+        return null;
+    }
 
     /**
      * @return the current version used for getting the vectors and dictionaries. Not allowed to contain ','.
