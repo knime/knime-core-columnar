@@ -51,7 +51,6 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.util.MemoryUtil;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.TinyIntVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -68,8 +67,6 @@ import org.knime.core.columnar.data.NullableReadData;
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 public final class OnHeapByteData {
-
-    public static final OnHeayByteDataFactory FACTORY = new OnHeayByteDataFactory();
 
     private OnHeapByteData() {
     }
@@ -175,13 +172,13 @@ public final class OnHeapByteData {
         }
     }
 
-    public static final class OnHeayByteDataFactory extends AbstractArrowColumnDataFactory {
+    public static final class OnHeapByteDataFactory extends AbstractArrowColumnDataFactory {
 
-        private OnHeayByteDataFactory() {
+        public static final OnHeapByteDataFactory INSTANCE = new OnHeapByteDataFactory();
+
+        private OnHeapByteDataFactory() {
             super(0);
         }
-
-        private static final int BYTE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(byte[].class);
 
         @Override
         public OnHeapByteReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,

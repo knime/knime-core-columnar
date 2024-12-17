@@ -60,6 +60,7 @@ import org.knime.core.columnar.arrow.data.AbstractOnHeapDictEncodedData.Abstract
 import org.knime.core.columnar.arrow.data.AbstractOnHeapDictEncodedData.AbstractOnHeapDictEncodedWriteData;
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructReadData;
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryDataFactory;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedVarBinaryReadData;
@@ -77,10 +78,6 @@ import org.knime.core.table.schema.traits.DataTraits;
  */
 public final class OnHeapDictEncodedVarBinaryData {
     private OnHeapDictEncodedVarBinaryData() {
-    }
-
-    public static ArrowColumnDataFactory factory(final DataTraits traits) {
-        return new OnHeapDictEncodedVarBinaryDataFactory(traits);
     }
 
     /**
@@ -193,8 +190,8 @@ public final class OnHeapDictEncodedVarBinaryData {
          *
          * @param traits containing the KeyType to use for dict encoding
          */
-        private OnHeapDictEncodedVarBinaryDataFactory(final DataTraits traits) {
-            super(traits, OnHeapVarBinaryData.FACTORY, CURRENT_VERSION);
+        public OnHeapDictEncodedVarBinaryDataFactory(final DataTraits traits) {
+            super(traits, OnHeapVarBinaryDataFactory.INSTANCE, CURRENT_VERSION);
         }
 
         @Override

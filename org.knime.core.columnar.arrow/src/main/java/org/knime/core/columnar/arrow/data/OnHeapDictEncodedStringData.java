@@ -58,6 +58,7 @@ import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.AbstractOnHeapDictEncodedData.AbstractOnHeapDictEncodedDataFactory;
 import org.knime.core.columnar.arrow.data.AbstractOnHeapDictEncodedData.AbstractOnHeapDictEncodedReadData;
 import org.knime.core.columnar.arrow.data.AbstractOnHeapDictEncodedData.AbstractOnHeapDictEncodedWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapStringData.OnHeapStringDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructReadData;
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
@@ -175,7 +176,8 @@ public final class OnHeapDictEncodedStringData {
          * @throws IllegalArgumentException if traits don't contain {@link DictEncodingTrait}
          */
         public OnHeapDictEncodedStringDataFactory(final DataTraits traits) {
-            super(traits, OnHeapStringData.FACTORY, CURRENT_VERSION);
+            // TODO use StringData5000
+            super(traits, OnHeapStringDataFactory.INSTANCE, CURRENT_VERSION);
         }
 
         @Override

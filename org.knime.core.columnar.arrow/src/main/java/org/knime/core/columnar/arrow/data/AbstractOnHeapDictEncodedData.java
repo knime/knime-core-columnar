@@ -58,6 +58,10 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.OnHeapByteData.OnHeapByteDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapLongData.OnHeapLongDataFactory;
+import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructReadData;
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructWriteData;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
@@ -326,7 +330,7 @@ public final class AbstractOnHeapDictEncodedData {
 
         private AbstractOnHeapDictEncodedDataFactory(final KeyType keyType, final ArrowColumnDataFactory valueFactory,
             final int version) {
-            super(version, OnHeapStructData.factory(createKeyDataFactory(keyType), valueFactory));
+            super(version, new OnHeapStructDataFactory(createKeyDataFactory(keyType), valueFactory));
             m_keyType = keyType;
         }
 
@@ -364,9 +368,9 @@ public final class AbstractOnHeapDictEncodedData {
         private static ArrowColumnDataFactory createKeyDataFactory(final KeyType keyType) {
             // TODO use unsigned vectors (see AbstractArrowDictEncodedData)
             return switch (keyType) {
-                case BYTE_KEY -> OnHeapByteData.FACTORY;
-                case INT_KEY -> OnHeapIntData.FACTORY;
-                case LONG_KEY -> OnHeapLongData.FACTORY;
+                case BYTE_KEY -> OnHeapByteDataFactory.INSTANCE;
+                case INT_KEY -> OnHeapIntDataFactory.INSTANCE;
+                case LONG_KEY -> OnHeapLongDataFactory.INSTANCE;
             };
         }
 

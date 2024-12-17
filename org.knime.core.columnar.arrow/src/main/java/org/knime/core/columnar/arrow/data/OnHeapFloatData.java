@@ -67,8 +67,6 @@ import org.knime.core.columnar.data.NullableReadData;
  */
 public final class OnHeapFloatData {
 
-    public static final OnHeapFloatDataFactory FACTORY = new OnHeapFloatDataFactory();
-
     private OnHeapFloatData() {
     }
 
@@ -176,6 +174,8 @@ public final class OnHeapFloatData {
 
     // TODO extract common functionality
     public static final class OnHeapFloatDataFactory extends AbstractArrowColumnDataFactory {
+
+        public static final OnHeapFloatDataFactory INSTANCE = new OnHeapFloatDataFactory();
 
         private OnHeapFloatDataFactory() {
             super(0);

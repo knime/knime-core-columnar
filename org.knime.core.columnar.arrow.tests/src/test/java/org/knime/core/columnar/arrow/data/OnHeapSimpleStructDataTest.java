@@ -52,10 +52,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
+import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleReadData;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntReadData;
 import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntWriteData;
+import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructReadData;
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructWriteData;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
@@ -72,7 +75,7 @@ public class OnHeapSimpleStructDataTest extends AbstractArrowDataTest<OnHeapStru
 
     /** Create the test for {@link OnHeapStructData} */
     public OnHeapSimpleStructDataTest() {
-        super(OnHeapStructData.factory(OnHeapDoubleData.FACTORY, OnHeapIntData.FACTORY));
+        super(new OnHeapStructDataFactory(OnHeapDoubleDataFactory.INSTANCE, OnHeapIntDataFactory.INSTANCE));
     }
 
     @Override
