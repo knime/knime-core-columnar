@@ -400,7 +400,8 @@ public final class OffsetsBuffer5000 {
          * @throws IndexOutOfBoundsException if the index is out of range
          */
         public long getStartIndex(final int index) {
-            Objects.checkIndex(index, m_lastIndexAdded + 1);
+            // Valid up to one more than the last index added
+            Objects.checkIndex(index, m_lastIndexAdded + 2);
             return m_offsets[index];
         }
 
