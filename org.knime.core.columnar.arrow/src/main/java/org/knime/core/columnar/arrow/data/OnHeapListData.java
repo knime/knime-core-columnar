@@ -234,7 +234,7 @@ public final class OnHeapListData {
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (m_version.equals(version)) {
+            if (version.getVersion() == CURRENT_VERSION) {
                 var valueCount = vector.getValueCount();
                 var listVector = (ListVector)vector;
                 var dataVector = listVector.getDataVector();
