@@ -73,8 +73,7 @@ public final class ArrowBatchStore extends AbstractArrowBatchReadable implements
         final BufferAllocator allocator) {
         super(schema, fileSupplier, allocator);
         m_factories = ArrowSchemaMapper.map(schema);
-        m_writer = new ArrowBatchWriter(fileSupplier, m_factories, ArrowBatchWriter.getTraits(schema), compression,
-            m_allocator);
+        m_writer = new ArrowBatchWriter(fileSupplier, m_factories, compression, m_allocator);
     }
 
     @Override

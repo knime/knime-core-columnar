@@ -76,8 +76,6 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
-import org.knime.core.table.schema.traits.DataTraits;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Abstract test for simple Arrow {@link NullableReadData}, {@link NullableWriteData} implementations.
@@ -567,9 +565,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         final var tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final var factories = new ArrowColumnDataFactory[]{m_factory};
-        final var traits = new DataTraits[]{DefaultDataTraits.EMPTY};
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(tmp, factories, traits, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -614,9 +610,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         var tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         var factories = new ArrowColumnDataFactory[]{m_factory};
-        var traits = new DataTraits[]{DefaultDataTraits.EMPTY};
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(tmp, factories, traits, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -662,9 +656,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Write
         var tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         var factories = new ArrowColumnDataFactory[]{m_factory};
-        var traits = new DataTraits[]{DefaultDataTraits.EMPTY};
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(tmp, factories, traits, COMPRESSION_CONFIG, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }

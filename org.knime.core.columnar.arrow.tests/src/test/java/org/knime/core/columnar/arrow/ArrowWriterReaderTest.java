@@ -59,7 +59,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
@@ -80,8 +79,6 @@ import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.filter.FilteredColumnSelection;
 import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.table.schema.traits.DataTraits;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Test the ArrowBatchWriter and ArrowBatchReader.
@@ -295,8 +292,7 @@ public class ArrowWriterReaderTest {
         final ReadBatch batch2 = new DefaultReadBatch(new NullableReadData[]{data2});
 
         // Write the data to a file
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(m_path, factories, emptyTraits(factories.length), ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             writer.write(batch1);
             writer.write(batch2);
         }
@@ -351,8 +347,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(m_path, factories, emptyTraits(numColumns), ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -402,7 +397,7 @@ public class ArrowWriterReaderTest {
         //
         //        // Write the data to a file
         //        try (final ArrowBatchWriter writer =
-        //            new ArrowBatchWriter(m_path, factories, emptyTraits(factories.length), ARROW_NO_COMPRESSION, m_alloc)) {
+        //            new ArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
         //            for (ReadBatch b : batches) {
         //                writer.write(b);
         //            }
@@ -479,8 +474,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(m_path, factories, emptyTraits(factories.length), ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -538,8 +532,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(m_path, factories, emptyTraits(factories.length), ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -655,8 +648,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(m_path, factories, emptyTraits(factories.length), ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -706,8 +698,7 @@ public class ArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final ArrowBatchWriter writer =
-            new ArrowBatchWriter(m_path, factories, emptyTraits(factories.length), compression, m_alloc)) {
+        try (final ArrowBatchWriter writer = new ArrowBatchWriter(m_path, factories, compression, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -732,21 +723,10 @@ public class ArrowWriterReaderTest {
     }
 
     /** Create a {@link NullableWriteData} with the given factory */
-    @SuppressWarnings({"unchecked", "resource"})
-    private final <T extends NullableWriteData> T createWrite(final ArrowColumnDataFactory factory,
+    @SuppressWarnings({"unchecked"})
+    private static final <T extends NullableWriteData> T createWrite(final ArrowColumnDataFactory factory,
         final int numValues) {
         return (T)factory.createWrite(numValues);
-        //        
-        //        final long firstdictid = new random().nextint(1000);
-        //        final atomiclong dictid1 = new atomiclong(firstdictid);
-        //        final atomiclong dictid2 = new atomiclong(firstdictid);
-        //        final Field field = factory.getField("0", dictId1::getAndIncrement);
-        //        final FieldVector vector = field.createVector(m_alloc);
-        //        return (T)factory.createWrite(vector, dictId2::getAndIncrement, m_alloc, numValues);
-    }
-
-    private static DataTraits[] emptyTraits(final int numColumns) {
-        return Stream.generate(() -> DefaultDataTraits.EMPTY).limit(numColumns).toArray(DataTraits[]::new);
     }
 
     /**
