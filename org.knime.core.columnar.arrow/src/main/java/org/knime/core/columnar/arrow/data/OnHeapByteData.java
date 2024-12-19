@@ -52,7 +52,7 @@ import java.io.IOException;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.TinyIntVector;
+import org.apache.arrow.vector.FixedWidthVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -174,10 +174,26 @@ public final class OnHeapByteData {
 
     public static final class OnHeapByteDataFactory extends AbstractArrowColumnDataFactory {
 
-        public static final OnHeapByteDataFactory INSTANCE = new OnHeapByteDataFactory();
+        public static final OnHeapByteDataFactory INSTANCE = new OnHeapByteDataFactory(true);
 
-        private OnHeapByteDataFactory() {
+        public static final OnHeapByteDataFactory INSTANCE_UNSIGNED = new OnHeapByteDataFactory(false);
+
+        private final boolean m_signed;
+
+        private OnHeapByteDataFactory(final boolean signed) {
             super(0);
+            m_signed = signed;
+        }
+
+        @Override
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            if (m_signed) {
+                return Field.nullable(name, MinorType.TINYINT.getType());
+            } else {
+                // Note we just use an unsigned type for the vector but the rest of the code is the same
+                // because Java has no unsigned bytes
+                return Field.nullable(name, MinorType.UINT1.getType());
+            }
         }
 
         @Override
@@ -203,16 +219,10 @@ public final class OnHeapByteData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.TINYINT.getType());
-        }
-
-        @Override
-        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
             var d = (OnHeapByteReadData)data; // TODO generic?
-            var vector = (TinyIntVector)fieldVector;
 
-            vector.allocateNew(d.length());
+            ((FixedWidthVector)vector).allocateNew(d.length());
 
             // Copy the data
             vector.getDataBuffer().setBytes(0, d.m_data);
