@@ -368,9 +368,9 @@ public final class AbstractOnHeapDictEncodedData {
         private static ArrowColumnDataFactory createKeyDataFactory(final KeyType keyType) {
             // TODO use unsigned vectors (see AbstractArrowDictEncodedData)
             return switch (keyType) {
-                case BYTE_KEY -> OnHeapByteDataFactory.INSTANCE;
-                case INT_KEY -> OnHeapIntDataFactory.INSTANCE;
-                case LONG_KEY -> OnHeapLongDataFactory.INSTANCE;
+                case BYTE_KEY -> OnHeapByteDataFactory.INSTANCE_UNSIGNED;
+                case INT_KEY -> OnHeapIntDataFactory.INSTANCE_UNSIGNED;
+                case LONG_KEY -> OnHeapLongDataFactory.INSTANCE_UNSIGNED;
             };
         }
 

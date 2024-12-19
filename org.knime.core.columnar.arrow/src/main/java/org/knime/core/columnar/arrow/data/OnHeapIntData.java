@@ -51,9 +51,8 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.util.MemoryUtil;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.FixedWidthVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -173,13 +172,32 @@ public final class OnHeapIntData {
 
     public static final class OnHeapIntDataFactory extends AbstractArrowColumnDataFactory {
 
-        public static final OnHeapIntDataFactory INSTANCE = new OnHeapIntDataFactory();
+        public static final OnHeapIntDataFactory INSTANCE = new OnHeapIntDataFactory(true);
 
-        private OnHeapIntDataFactory() {
+        public static final OnHeapIntDataFactory INSTANCE_UNSIGNED = new OnHeapIntDataFactory(false);
+
+        private final boolean m_signed;
+
+        private OnHeapIntDataFactory(final boolean signed) {
             super(0);
+            m_signed = signed;
         }
 
-        private static final int INT_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(int[].class);
+        @Override
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            if (m_signed) {
+                return Field.nullable(name, MinorType.INT.getType());
+            } else {
+                // Note we just use an unsigned type for the vector but the rest of the code is the same
+                // because Java has no unsigned integers
+                return Field.nullable(name, MinorType.UINT4.getType());
+            }
+        }
+
+        @Override
+        public OnHeapIntWriteData createWrite(final int capacity) {
+            return new OnHeapIntWriteData(capacity);
+        }
 
         @Override
         public OnHeapIntReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
@@ -199,21 +217,10 @@ public final class OnHeapIntData {
         }
 
         @Override
-        public OnHeapIntWriteData createWrite(final int capacity) {
-            return new OnHeapIntWriteData(capacity);
-        }
-
-        @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.INT.getType());
-        }
-
-        @Override
-        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
             var d = (OnHeapIntReadData)data; // TODO generic?
-            var vector = (IntVector)fieldVector;
 
-            vector.allocateNew(d.length());
+            ((FixedWidthVector)vector).allocateNew(d.length());
 
             // Copy the data
             MemoryCopyUtils.copy(d.m_data, vector.getDataBufferAddress());

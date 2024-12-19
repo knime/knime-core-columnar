@@ -48,8 +48,8 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.FixedWidthVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -171,7 +171,9 @@ public final class OnHeapLongData {
 
     public static final class OnHeapLongDataFactory extends AbstractArrowColumnDataFactory {
 
-        public static final OnHeapLongDataFactory INSTANCE = new OnHeapLongDataFactory();
+        public static final OnHeapLongDataFactory INSTANCE = new OnHeapLongDataFactory(true);
+
+        public static final OnHeapLongDataFactory INSTANCE_UNSIGNED = new OnHeapLongDataFactory(false);
 
         /**
          * Also supports reading longs from DurationVectors and TimeNanoVectors. This is necessary for backwards
@@ -179,8 +181,22 @@ public final class OnHeapLongData {
          */
         private static final ArrowColumnDataFactoryVersion V0 = ArrowColumnDataFactoryVersion.version(0);
 
-        private OnHeapLongDataFactory() {
+        private final boolean m_signed;
+
+        private OnHeapLongDataFactory(final boolean signed) {
             super(1);
+            m_signed = signed;
+        }
+
+        @Override
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            if (m_signed) {
+                return Field.nullable(name, MinorType.BIGINT.getType());
+            } else {
+                // Note we just use an unsigned type for the vector but the rest of the code is the same
+                // because Java has no unsigned longs
+                return Field.nullable(name, MinorType.UINT8.getType());
+            }
         }
 
         @Override
@@ -211,16 +227,10 @@ public final class OnHeapLongData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.BIGINT.getType());
-        }
-
-        @Override
-        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
             var d = (OnHeapLongReadData)data;
-            var vector = (BigIntVector)fieldVector;
 
-            vector.allocateNew(d.length());
+            ((FixedWidthVector)vector).allocateNew(d.length());
 
             // Copy the data
             MemoryCopyUtils.copy(d.m_data, vector.getDataBufferAddress());
