@@ -45,11 +45,20 @@
  */
 package org.knime.core.columnar.arrow;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.knime.core.columnar.arrow.data.ArrowReadData;
+import org.knime.core.columnar.arrow.data.ArrowWriteData;
 import org.knime.core.columnar.arrow.data.OnHeapBooleanData.OnHeapBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapByteData.OnHeapByteDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData;
@@ -63,6 +72,7 @@ import org.knime.core.columnar.arrow.data.OnHeapStringData5000.OnHeapStringDataF
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapVoidData.OnHeapVoidDataFactory;
+import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.table.schema.BooleanDataSpec;
@@ -82,6 +92,7 @@ import org.knime.core.table.schema.VoidDataSpec;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.ListDataTraits;
+import org.knime.core.table.schema.traits.LogicalTypeTrait;
 import org.knime.core.table.schema.traits.StructDataTraits;
 
 /**
@@ -96,12 +107,12 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     private static final ArrowSchemaMapper INSTANCE = new ArrowSchemaMapper();
 
-    private record SpecWithTraitsKey(DataSpec spec, DataTraits traits) {
+    private record FactoryWithTraitsKey(ArrowColumnDataFactory factory, DataTraits traits) {
     }
 
     // There will ever only be a rather limited set of different factories used, so in case of many
     // columns we cache and reuse the factories for other columns
-    private final Map<SpecWithTraitsKey, ArrowColumnDataFactory> m_usedFactories = new ConcurrentHashMap<>();
+    private final Map<FactoryWithTraitsKey, ArrowColumnDataFactory> m_usedFactories = new ConcurrentHashMap<>();
 
     private ArrowSchemaMapper() {
         // Singleton and the instance is only used in #map
@@ -133,89 +144,162 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
-        return OnHeapBooleanDataFactory.INSTANCE;
+        return wrapCached(OnHeapBooleanDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
-        return OnHeapByteDataFactory.INSTANCE;
+        return wrapCached(OnHeapByteDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
-        return OnHeapDoubleDataFactory.INSTANCE;
+        return wrapCached(OnHeapDoubleDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
-        return OnHeapFloatDataFactory.INSTANCE;
+        return wrapCached(OnHeapFloatDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
-        return OnHeapIntDataFactory.INSTANCE;
+        return wrapCached(OnHeapIntDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
-        return OnHeapLongDataFactory.INSTANCE;
+        return wrapCached(OnHeapLongDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return m_usedFactories.computeIfAbsent(new SpecWithTraitsKey(spec, traits),
-                key -> new OnHeapDictEncodedVarBinaryDataFactory(traits));
+            return wrapCached(new OnHeapDictEncodedVarBinaryDataFactory(traits), traits);
         } else {
-            return OnHeapVarBinaryDataFactory.INSTANCE;
+            return wrapCached(OnHeapVarBinaryDataFactory.INSTANCE, traits);
         }
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
-        return OnHeapVoidDataFactory.INSTANCE;
+        return wrapCached(OnHeapVoidDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
-        var key = new SpecWithTraitsKey(spec, traits);
-        if (m_usedFactories.containsKey(key)) {
-            return m_usedFactories.get(key);
-        } else {
-            // Create the factory
-            // Note: We cannot use computeIfAbsent here to prevent recursive update by the inner factories
-            // If another thread added the same factory this is not an issue because they are equal
-            var innerFactories = new ArrowColumnDataFactory[spec.size()];
-            Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
-            var factory = new OnHeapStructDataFactory(innerFactories);
-            m_usedFactories.put(key, factory);
-            return factory;
-        }
+        final var innerFactories = new ArrowColumnDataFactory[spec.size()];
+        Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
+        return wrapCached(new OnHeapStructDataFactory(innerFactories), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
-        var key = new SpecWithTraitsKey(listDataSpec, traits);
-        if (m_usedFactories.containsKey(key)) {
-            return m_usedFactories.get(key);
-        } else {
-            // Create the factory
-            // Note: We cannot use computeIfAbsent here to prevent recursive update by the inner factory
-            // If another thread added the same factory this is not an issue because they are equal
-            var innerFactory = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
-            var factory = new OnHeapListDataFactory(innerFactory);
-            m_usedFactories.put(key, factory);
-            return factory;
-        }
+        final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
+        return wrapCached(new OnHeapListDataFactory(inner), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return m_usedFactories.computeIfAbsent(new SpecWithTraitsKey(spec, traits),
-                key -> OnHeapDictEncodedStringData.factory(traits));
-        } else {
-            return OnHeapStringDataFactory.INSTANCE;
+            return wrapCached(new OnHeapDictEncodedStringData.OnHeapDictEncodedStringDataFactory(traits), traits);
+        }
+        return wrapCached(OnHeapStringDataFactory.INSTANCE, traits);
+    }
+
+    ArrowColumnDataFactory wrapCached(final ArrowColumnDataFactory factory, final DataTraits traits) {
+        return m_usedFactories.computeIfAbsent(new FactoryWithTraitsKey(factory, traits), key -> {
+            if (key.traits.hasTrait(LogicalTypeTrait.class) || key.traits.hasTrait(DictEncodingTrait.class)) {
+                return new ExtensionArrowColumnDataFactory(key.factory, key.traits);
+            }
+
+            return factory;
+        });
+    }
+
+    static ArrowColumnDataFactory wrap(final ArrowColumnDataFactory factory, final DataTraits traits) {
+        return INSTANCE.wrapCached(factory, traits);
+    }
+
+    static final class ExtensionArrowColumnDataFactory implements ArrowColumnDataFactory {
+
+        private final ArrowColumnDataFactory m_delegate;
+
+        private final DataTraits m_traits;
+
+        private final ArrowColumnDataFactoryVersion m_version;
+
+        private static final int CURRENT_VERSION = 0;
+
+        ExtensionArrowColumnDataFactory(final ArrowColumnDataFactory delegate, final DataTraits traits) {
+            m_delegate = delegate;
+            m_traits = traits;
+            m_version = ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, m_delegate.getVersion());
+        }
+
+        ArrowColumnDataFactory getDelegate() {
+            return m_delegate;
+        }
+
+        @Override
+        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+            var storageField = m_delegate.getField(name, dictionaryIdSupplier);
+            return ExtensionTypes.wrapInExtensionTypeIfNecessary(storageField, m_traits);
+        }
+
+        @Override
+        public ArrowWriteData createWrite(final int capacity) {
+            return m_delegate.createWrite(capacity);
+        }
+
+        @Override
+        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+            return m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0));
+        }
+
+        @Override
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
+            m_delegate.copyToVector(data, vector);
+        }
+
+        @Override
+        @Deprecated
+        public DictionaryProvider createDictionaries(final NullableReadData data,
+            final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator) {
+            return m_delegate.createDictionaries(data, dictionaryIdSupplier, allocator);
+        }
+
+        @Override
+        public ArrowColumnDataFactoryVersion getVersion() {
+            return m_version;
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (obj == this) {
+                return true;
+            }
+            if (obj instanceof ExtensionArrowColumnDataFactory) {
+                var other = (ExtensionArrowColumnDataFactory)obj;
+                return m_traits.equals(other.m_traits) && m_delegate.equals(other.m_delegate);
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(m_traits, m_delegate, m_version);
+        }
+
+        @Override
+        public String toString() {
+            return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + m_delegate + "]";
+        }
+
+        @Override
+        public int initialNumBytesPerElement() {
+            return m_delegate.initialNumBytesPerElement();
         }
     }
 }

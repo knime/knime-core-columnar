@@ -61,7 +61,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
@@ -87,15 +86,12 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
-import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.table.schema.ColumnarSchema;
-import org.knime.core.table.schema.traits.DataTraits;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,8 +109,6 @@ class ArrowBatchWriter implements BatchWriter {
 
     /** Factories used to get the vectors and dicts from the columns */
     private final ArrowColumnDataFactory[] m_factories;
-
-    private final DataTraits[] m_traits;
 
     private final ArrowCompression m_compression;
 
@@ -139,22 +133,14 @@ class ArrowBatchWriter implements BatchWriter {
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
      */
-    ArrowBatchWriter(final FileHandle file, final ArrowColumnDataFactory[] factories, final DataTraits[] traits,
+    ArrowBatchWriter(final FileHandle file, final ArrowColumnDataFactory[] factories,
         final ArrowCompression compression, final BufferAllocator allocator) {
         m_fileHandle = file;
         m_factories = factories;
-        m_traits = traits;
         m_compression = compression;
         m_allocator = allocator;
         m_firstWrite = true;
         m_closed = false;
-    }
-
-    /** Utility to get the traits for a schema. */
-    static DataTraits[] getTraits(final ColumnarSchema schema) {
-        return IntStream.range(0, schema.numColumns()) //
-            .mapToObj(schema::getTraits) //
-            .toArray(DataTraits[]::new);
     }
 
     @Override
@@ -202,11 +188,9 @@ class ArrowBatchWriter implements BatchWriter {
 
             final var data = batch.get(i);
             final var factory = m_factories[i];
-            final var traits = m_traits[i];
 
-            // Create the field including the extension type
-            var field = ExtensionTypes
-                .wrapInExtensionTypeIfNecessary(factory.getField(String.valueOf(i), dictionaryIdsForField), traits);
+            // Create the field including the extension type (if using the ExtensionArrowColumnDataFactory)
+            var field = factory.getField(String.valueOf(i), dictionaryIdsForField);
 
             // Note: We create a Vector here and therefore transfer the data to off-heap
             // The compression requires the data to be off-heap

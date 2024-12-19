@@ -57,6 +57,7 @@ import static org.knime.core.table.schema.DataSpecs.VARBINARY;
 import java.util.Arrays;
 
 import org.junit.Test;
+import org.knime.core.columnar.arrow.ArrowSchemaMapper.ExtensionArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapBooleanData.OnHeapBooleanDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapByteData.OnHeapByteDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData.OnHeapDictEncodedStringDataFactory;
@@ -258,10 +259,10 @@ public class ArrowSchemaMapperTest {
         final ColumnarSchema schema = new DefaultColumnarSchema(specs, traits);
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(4, factories.length);
-        assertSame(OnHeapDoubleDataFactory.INSTANCE, factories[0]);
-        assertSame(OnHeapLongDataFactory.INSTANCE, factories[1]);
-        assertSame(OnHeapDoubleDataFactory.INSTANCE, factories[2]);
-        assertSame(OnHeapIntDataFactory.INSTANCE, factories[3]);
+        assertSame(OnHeapDoubleDataFactory.INSTANCE, unwrap(factories[0]));
+        assertSame(OnHeapLongDataFactory.INSTANCE, unwrap(factories[1]));
+        assertSame(OnHeapDoubleDataFactory.INSTANCE, unwrap(factories[2]));
+        assertSame(OnHeapIntDataFactory.INSTANCE, unwrap(factories[3]));
     }
 
     /** Test mapping a single column of the given spec. */
@@ -275,7 +276,7 @@ public class ArrowSchemaMapperTest {
         final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
         var factory = factories[0];
-        assertEquals(expectedFactory, factory);
+        assertEquals(expectedFactory, unwrap(factory));
     }
 
     private static DataTraits createEmptyTraitsForSpec(final DataSpec spec) {
@@ -293,5 +294,12 @@ public class ArrowSchemaMapperTest {
 
     private static DataTraits createDictEncodingTraits(final KeyType keyType) {
         return new DefaultDataTraits(new DataTrait.DictEncodingTrait(keyType));
+    }
+
+    private static ArrowColumnDataFactory unwrap(final ArrowColumnDataFactory factory) {
+        if (factory instanceof ExtensionArrowColumnDataFactory) {
+            return ((ExtensionArrowColumnDataFactory)factory).getDelegate();
+        }
+        return factory;
     }
 }
