@@ -8,7 +8,7 @@ Bundle-RequiredExecutionEnvironment: JavaSE-17
 Bundle-ActivationPolicy: lazy
 Require-Bundle: 
  com.google.guava;bundle-version="[19.0.0,20.0.0)",
- org.knime.core.table;bundle-version="[5.4.0,6.0.0)",
+ org.knime.core.table;bundle-version="[5.5.0,6.0.0)",
  slf4j.api;bundle-version="[2.0.12,3.0.0)"
 Export-Package: org.knime.core.columnar,
  org.knime.core.columnar.access,
