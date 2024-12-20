@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -89,29 +90,55 @@ public final class OffsetsBuffer {
      * @param end end index of the data element (exclusive)
      */
     public record IntDataIndex(int start, int end) {
+
+        /**
+         * @return the length of the data element (<code>end - start</code>)
+         */
+        public int length() {
+            return end - start;
+        }
     }
 
     /**
-     * Class for writing to an int-based offsets buffer, allowing the addition of elements with specified lengths.
+     * A write buffer for int-based offsets. The buffer is used to write offsets for data elements to an Arrow buffer.
      */
-    public static final class IntOffsetsWriteBuffer {
+    public static final class IntOffsetsBuffer {
 
         private int[] m_offsets;
 
-        private int m_numElements;
+        private int m_lastIndexAdded;
 
-        private int m_lastIndexAdded = -1;
-
-        private int m_currentOffset = 0;
-
-        private IntOffsetsWriteBuffer(final int initialNumElements) {
+        /**
+         * Creates a new int-based write buffer with the specified initial number of elements.
+         *
+         * @param initialNumElements the initial number of elements in the buffer
+         * @throws IllegalArgumentException if {@code initialNumElements} is negative
+         */
+        public IntOffsetsBuffer(final int initialNumElements) {
             if (initialNumElements < 0) {
                 throw new IllegalArgumentException("initialNumElements cannot be negative");
             }
-            this.m_numElements = initialNumElements;
-            // Offsets array has length numElements + 1
-            this.m_offsets = new int[m_numElements + 1];
-            this.m_offsets[0] = 0; // Initial offset
+            m_offsets = new int[initialNumElements + 1];
+            m_lastIndexAdded = -1;
+        }
+
+        private IntOffsetsBuffer(final int[] offsets) {
+            m_offsets = offsets;
+            m_lastIndexAdded = offsets.length - 2;
+        }
+
+        /**
+         * @return the last index that was successfully added
+         */
+        public int lastWrittenIndex() {
+            return m_lastIndexAdded;
+        }
+
+        /**
+         * @return the number of elements that can be stored in this offsets buffer
+         */
+        public int numElements() {
+            return m_offsets.length - 1;
         }
 
         /**
@@ -121,69 +148,41 @@ public final class OffsetsBuffer {
          * @param index the index at which to add the element
          * @param elementLength the length of the element
          * @return a {@code IntDataIndex} representing the start and end indices of the added element
-         * @throws IndexOutOfBoundsException if the index is less than the last index added
+         * @throws IndexOutOfBoundsException if the index is less than the last index added or greater than the capacity
          */
         public IntDataIndex add(final int index, final int elementLength) {
             if (index < m_lastIndexAdded) {
                 throw new IndexOutOfBoundsException("Index cannot be less than the last index added");
             }
-            if (index >= m_numElements) {
-                setNumElements(index + 1);
-            }
+            Objects.checkIndex(index, numElements());
 
             // Fill any holes with zero-length elements
-            for (int i = m_lastIndexAdded + 1; i < index; i++) {
-                m_offsets[i + 1] = m_currentOffset; // Zero-length element
-            }
+            fillWithZeroLength(index);
 
             // Add the element
-            m_currentOffset += elementLength;
-            m_offsets[index + 1] = m_currentOffset;
+            m_offsets[index + 1] = m_offsets[index] + elementLength;
             m_lastIndexAdded = index;
 
             return new IntDataIndex(m_offsets[index], m_offsets[index + 1]);
         }
 
         /**
-         * Sets the number of elements in the offsets buffer, expanding or shrinking it as necessary. Fills up the
-         * remaining elements with zero-length elements if the last element is not at the end of the buffer.
+         * Sets the element length of all elements before <code>toIdx</code> to 0.
          *
-         * @param numElements the new number of elements
-         * @throws IllegalArgumentException if {@code numElements} is negative
+         * @param toIdx the index up to which to set the element length to 0 (exclusive)
          */
-        public void setNumElements(final int numElements) {
-            if (numElements < 0) {
-                throw new IllegalArgumentException("numElements cannot be negative");
+        private void fillWithZeroLength(final int toIdx) {
+            for (int i = m_lastIndexAdded + 1; i < toIdx; i++) {
+                m_offsets[i + 1] = m_offsets[i]; // Zero-length element
             }
-            if (numElements != this.m_numElements) {
-                int[] newOffsets = new int[numElements + 1];
-                int copyLength = Math.min(this.m_numElements + 1, numElements + 1);
-                System.arraycopy(this.m_offsets, 0, newOffsets, 0, copyLength);
-
-                // If expanding, initialize new elements
-                if (numElements > this.m_numElements) {
-                    int lastOffset = m_offsets[this.m_numElements];
-                    for (int i = this.m_numElements + 1; i <= numElements; i++) {
-                        newOffsets[i] = lastOffset;
-                    }
-                }
-
-                this.m_offsets = newOffsets;
-                this.m_numElements = numElements;
-            }
+            m_lastIndexAdded = toIdx - 1;
         }
 
         /**
-         * Closes the write buffer and returns a read buffer for accessing the offsets.
-         *
-         * @return an {@code IntOffsetsReadBuffer} for reading the offsets
+         * Sets the element length of all elements after the last added element to 0.
          */
-        public IntOffsetsReadBuffer close() {
-            // Fill any remaining elements with zero-length elements
-            for (int i = m_lastIndexAdded + 1; i < m_numElements; i++) {
-                m_offsets[i + 1] = m_currentOffset; // Zero-length
-            }
-            return new IntOffsetsReadBuffer(m_offsets, m_numElements);
+        public void fillWithZeroLength() {
+            fillWithZeroLength(numElements());
         }
 
         /**
@@ -205,35 +204,6 @@ public final class OffsetsBuffer {
             var idx = Math.min(numElements - 1, m_lastIndexAdded);
             return m_offsets[idx + 1]; // end index
         }
-    }
-
-    /**
-     * Class for reading from an int-based offsets buffer, providing access to the start and end indices of elements.
-     */
-    public static final class IntOffsetsReadBuffer {
-
-        private final int[] m_offsets;
-
-        private final int m_numElements;
-
-        /** Constructor for internal use (from write buffer) */
-        private IntOffsetsReadBuffer(final int[] offsets, final int numElements) {
-            this.m_offsets = offsets;
-            this.m_numElements = numElements;
-        }
-
-        /** Constructor for creating from ArrowBuf */
-        @SuppressWarnings("resource")
-        private IntOffsetsReadBuffer(final ArrowBuf buffer, final int numElements) {
-            Objects.requireNonNull(buffer, "buffer cannot be null");
-            if (numElements < 0) {
-                throw new IllegalArgumentException("numElements cannot be negative");
-            }
-            this.m_numElements = numElements;
-            this.m_offsets = new int[numElements + 1];
-            // Copy data from ArrowBuf to offsets array
-            MemoryCopyUtils.copy(buffer, m_offsets);
-        }
 
         /**
          * Retrieves the start and end indices for the element at the specified index.
@@ -243,10 +213,28 @@ public final class OffsetsBuffer {
          * @throws IndexOutOfBoundsException if the index is out of bounds
          */
         public IntDataIndex get(final int index) {
-            Objects.checkIndex(index, m_numElements);
+            Objects.checkIndex(index, m_lastIndexAdded + 1);
             int start = m_offsets[index];
             int end = m_offsets[index + 1];
             return new IntDataIndex(start, end);
+        }
+
+        /**
+         * Expand or shrink the data to the given size. Keeps the existing data up to the new size.
+         *
+         * @param numElements the new size of the data
+         */
+        public void setNumElements(final int numElements) {
+            if (numElements < 0) {
+                throw new IllegalArgumentException("numElements cannot be negative");
+            }
+            if (numElements != numElements()) {
+                var newOffsets = new int[numElements + 1];
+                var copyLength = Math.min(newOffsets.length, m_lastIndexAdded + 2);
+                System.arraycopy(m_offsets, 0, newOffsets, 0, copyLength);
+                m_offsets = newOffsets;
+                m_lastIndexAdded = Math.min(m_lastIndexAdded, numElements - 1);
+            }
         }
 
         /**
@@ -260,17 +248,12 @@ public final class OffsetsBuffer {
             Objects.requireNonNull(buffer, "buffer cannot be null");
             MemoryCopyUtils.copy(m_offsets, buffer);
         }
-    }
 
-    /**
-     * Creates a new int-based write buffer with the specified initial number of elements.
-     *
-     * @param initialNumElements the initial number of elements in the buffer
-     * @return an {@code IntOffsetsWriteBuffer} for writing int-based offsets
-     * @throws IllegalArgumentException if {@code initialNumElements} is negative
-     */
-    public static IntOffsetsWriteBuffer createIntWriteBuffer(final int initialNumElements) {
-        return new IntOffsetsWriteBuffer(initialNumElements);
+        @Override
+        public String toString() {
+            return "IntOffsetsBuffer{" + "m_offsets=" + Arrays.toString(m_offsets) + ", m_lastIndexAdded="
+                + m_lastIndexAdded + '}';
+        }
     }
 
     /**
@@ -278,11 +261,18 @@ public final class OffsetsBuffer {
      *
      * @param buffer the {@code ArrowBuf} containing offsets data
      * @param numElements the number of elements in the buffer
-     * @return an {@code IntOffsetsReadBuffer} for reading int-based offsets
+     * @return an {@code IntOffsetsBuffer} for reading int-based offsets
      * @throws NullPointerException if {@code buffer} is null
+     * @throws IllegalArgumentException if {@code numElements} is negative
      */
-    public static IntOffsetsReadBuffer createIntReadBuffer(final ArrowBuf buffer, final int numElements) {
-        return new IntOffsetsReadBuffer(buffer, numElements);
+    public static IntOffsetsBuffer createIntBuffer(final ArrowBuf buffer, final int numElements) {
+        Objects.requireNonNull(buffer, "buffer cannot be null");
+        if (numElements < 0) {
+            throw new IllegalArgumentException("numElements cannot be negative");
+        }
+        var offsets = new int[numElements + 1];
+        MemoryCopyUtils.copy(buffer, offsets);
+        return new IntOffsetsBuffer(offsets);
     }
 
     /**
@@ -308,29 +298,54 @@ public final class OffsetsBuffer {
      * @param end end index of the data element (exclusive)
      */
     public record LongDataIndex(long start, long end) {
+        /**
+         * @return the length of the data element (<code>end - start</code>)
+         */
+        public long length() {
+            return end - start;
+        }
     }
 
     /**
-     * Class for writing to a long-based offsets buffer, allowing the addition of elements with specified lengths.
+     * A write buffer for long-based offsets. Similar to {@link IntOffsetsBuffer}, but uses longs to store offsets.
      */
-    public static final class LongOffsetsWriteBuffer {
+    public static final class LongOffsetsBuffer {
 
         private long[] m_offsets;
 
-        private int m_numElements;
+        private int m_lastIndexAdded;
 
-        private int m_lastIndexAdded = -1;
-
-        private long m_currentOffset = 0;
-
-        private LongOffsetsWriteBuffer(final int initialNumElements) {
+        /**
+         * Creates a new long-based write buffer with the specified initial number of elements.
+         *
+         * @param initialNumElements the initial number of elements in the buffer
+         * @throws IllegalArgumentException if {@code initialNumElements} is negative
+         */
+        public LongOffsetsBuffer(final int initialNumElements) {
             if (initialNumElements < 0) {
                 throw new IllegalArgumentException("initialNumElements cannot be negative");
             }
-            this.m_numElements = initialNumElements;
-            // Offsets array has length numElements + 1
-            this.m_offsets = new long[m_numElements + 1];
-            this.m_offsets[0] = 0L; // Initial offset
+            m_offsets = new long[initialNumElements + 1];
+            m_lastIndexAdded = -1;
+        }
+
+        private LongOffsetsBuffer(final long[] offsets) {
+            m_offsets = offsets;
+            m_lastIndexAdded = offsets.length - 2;
+        }
+
+        /**
+         * @return the last index that was successfully added
+         */
+        public int lastWrittenIndex() {
+            return m_lastIndexAdded;
+        }
+
+        /**
+         * @return the number of elements that can be stored in this offsets buffer
+         */
+        public int numElements() {
+            return m_offsets.length - 1;
         }
 
         /**
@@ -340,69 +355,41 @@ public final class OffsetsBuffer {
          * @param index the index at which to add the element
          * @param elementLength the length of the element
          * @return a {@code LongDataIndex} representing the start and end indices of the added element
-         * @throws IndexOutOfBoundsException if the index is less than the last index added
+         * @throws IndexOutOfBoundsException if the index is less than the last index added or greater than the capacity
          */
         public LongDataIndex add(final int index, final long elementLength) {
             if (index < m_lastIndexAdded) {
                 throw new IndexOutOfBoundsException("Index cannot be less than the last index added");
             }
-            if (index >= m_numElements) {
-                setNumElements(index + 1);
-            }
+            Objects.checkIndex(index, numElements());
 
             // Fill any holes with zero-length elements
-            for (int i = m_lastIndexAdded + 1; i < index; i++) {
-                m_offsets[i + 1] = m_currentOffset; // Zero-length element
-            }
+            fillWithZeroLength(index);
 
             // Add the element
-            m_currentOffset += elementLength;
-            m_offsets[index + 1] = m_currentOffset;
+            m_offsets[index + 1] = m_offsets[index] + elementLength;
             m_lastIndexAdded = index;
 
             return new LongDataIndex(m_offsets[index], m_offsets[index + 1]);
         }
 
         /**
-         * Sets the number of elements in the offsets buffer, expanding or shrinking it as necessary. Fills up the
-         * remaining elements with zero-length elements if the last element is not at the end of the buffer.
+         * Sets the element length of all elements before <code>toIdx</code> to 0.
          *
-         * @param numElements the new number of elements
-         * @throws IllegalArgumentException if {@code numElements} is negative
+         * @param toIdx the index up to which to set the element length to 0 (exclusive)
          */
-        public void setNumElements(final int numElements) {
-            if (numElements < 0) {
-                throw new IllegalArgumentException("numElements cannot be negative");
+        private void fillWithZeroLength(final int toIdx) {
+            for (int i = m_lastIndexAdded + 1; i < toIdx; i++) {
+                m_offsets[i + 1] = m_offsets[i]; // Zero-length element
             }
-            if (numElements != this.m_numElements) {
-                long[] newOffsets = new long[numElements + 1];
-                int copyLength = Math.min(this.m_numElements + 1, numElements + 1);
-                System.arraycopy(this.m_offsets, 0, newOffsets, 0, copyLength);
-
-                // If expanding, initialize new elements
-                if (numElements > this.m_numElements) {
-                    long lastOffset = m_offsets[this.m_numElements];
-                    for (int i = this.m_numElements + 1; i <= numElements; i++) {
-                        newOffsets[i] = lastOffset;
-                    }
-                }
-
-                this.m_offsets = newOffsets;
-                this.m_numElements = numElements;
-            }
+            m_lastIndexAdded = toIdx - 1;
         }
 
         /**
-         * Closes the write buffer and returns a read buffer for accessing the offsets.
-         *
-         * @return a {@code LongOffsetsReadBuffer} for reading the offsets
+         * Sets the element length of all elements after the last added element to 0.
          */
-        public LongOffsetsReadBuffer close() {
-            // Fill any remaining elements with zero-length elements
-            for (int i = m_lastIndexAdded + 1; i < m_numElements; i++) {
-                m_offsets[i + 1] = m_currentOffset; // Zero-length
-            }
-            return new LongOffsetsReadBuffer(m_offsets, m_numElements);
+        public void fillWithZeroLength() {
+            fillWithZeroLength(numElements());
         }
 
         /**
@@ -410,39 +397,21 @@ public final class OffsetsBuffer {
          *
          * @param index the index of the element
          * @return the start index of the element
+         * @throws IndexOutOfBoundsException if the index is out of range
          */
         public long getStartIndex(final int index) {
-            // TODO this is strange logic
-            var idx = Math.max(Math.min(index, m_lastIndexAdded + 1), 0);
-            return m_offsets[idx];
-        }
-    }
-
-    /**
-     * Class for reading from a long-based offsets buffer, providing access to the start and end indices of elements.
-     */
-    public static final class LongOffsetsReadBuffer {
-
-        private final long[] m_offsets;
-
-        private final int m_numElements;
-
-        /** Constructor for internal use (from write buffer) */
-        private LongOffsetsReadBuffer(final long[] offsets, final int numElements) {
-            this.m_offsets = offsets;
-            this.m_numElements = numElements;
+            // Valid up to one more than the last index added
+            Objects.checkIndex(index, m_lastIndexAdded + 2);
+            return m_offsets[index];
         }
 
-        /** Constructor for creating from ArrowBuf */
-        @SuppressWarnings("resource")
-        private LongOffsetsReadBuffer(final ArrowBuf buffer, final int numElements) {
-            Objects.requireNonNull(buffer, "buffer cannot be null");
-            if (numElements < 0) {
-                throw new IllegalArgumentException("numElements cannot be negative");
-            }
-            this.m_numElements = numElements;
-            this.m_offsets = new long[numElements + 1];
-            MemoryCopyUtils.copy(buffer, m_offsets);
+        /**
+         * @param numElements the number of elements
+         * @return the end index of all data if the number of elements is numElements
+         */
+        public long getNumData(final int numElements) {
+            var idx = Math.min(numElements - 1, m_lastIndexAdded);
+            return m_offsets[idx + 1]; // end index
         }
 
         /**
@@ -453,10 +422,29 @@ public final class OffsetsBuffer {
          * @throws IndexOutOfBoundsException if the index is out of bounds
          */
         public LongDataIndex get(final int index) {
-            Objects.checkIndex(index, m_numElements);
+            Objects.checkIndex(index, m_lastIndexAdded + 1);
             long start = m_offsets[index];
             long end = m_offsets[index + 1];
             return new LongDataIndex(start, end);
+        }
+
+        /**
+         * Expand or shrink the data to the given size. Keeps the existing data up to the new size.
+         *
+         * @param numElements the new size of the data
+         * @throws IllegalArgumentException if {@code numElements} is negative
+         */
+        public void setNumElements(final int numElements) {
+            if (numElements < 0) {
+                throw new IllegalArgumentException("numElements cannot be negative");
+            }
+            if (numElements != numElements()) {
+                var newOffsets = new long[numElements + 1];
+                var copyLength = Math.min(newOffsets.length, m_lastIndexAdded + 2);
+                System.arraycopy(m_offsets, 0, newOffsets, 0, copyLength);
+                m_offsets = newOffsets;
+                m_lastIndexAdded = Math.min(m_lastIndexAdded, numElements - 1);
+            }
         }
 
         /**
@@ -470,17 +458,12 @@ public final class OffsetsBuffer {
             Objects.requireNonNull(buffer, "buffer cannot be null");
             MemoryCopyUtils.copy(m_offsets, buffer);
         }
-    }
 
-    /**
-     * Creates a new long-based write buffer with the specified initial number of elements.
-     *
-     * @param initialNumElements the initial number of elements in the buffer
-     * @return a {@code LongOffsetsWriteBuffer} for writing long-based offsets
-     * @throws IllegalArgumentException if {@code initialNumElements} is negative
-     */
-    public static LongOffsetsWriteBuffer createLongWriteBuffer(final int initialNumElements) {
-        return new LongOffsetsWriteBuffer(initialNumElements);
+        @Override
+        public String toString() {
+            return "LongOffsetsBuffer{" + "m_offsets=" + Arrays.toString(m_offsets) + ", m_lastIndexAdded="
+                + m_lastIndexAdded + '}';
+        }
     }
 
     /**
@@ -488,11 +471,18 @@ public final class OffsetsBuffer {
      *
      * @param buffer the {@code ArrowBuf} containing offsets data
      * @param numElements the number of elements in the buffer
-     * @return a {@code LongOffsetsReadBuffer} for reading long-based offsets
+     * @return a {@code LongOffsetsBuffer} for reading long-based offsets
      * @throws NullPointerException if {@code buffer} is null
+     * @throws IllegalArgumentException if {@code numElements} is negative
      */
-    public static LongOffsetsReadBuffer createLongReadBuffer(final ArrowBuf buffer, final int numElements) {
-        return new LongOffsetsReadBuffer(buffer, numElements);
+    public static LongOffsetsBuffer createLongBuffer(final ArrowBuf buffer, final int numElements) {
+        Objects.requireNonNull(buffer, "buffer cannot be null");
+        if (numElements < 0) {
+            throw new IllegalArgumentException("numElements cannot be negative");
+        }
+        var offsets = new long[numElements + 1];
+        MemoryCopyUtils.copy(buffer, offsets);
+        return new LongOffsetsBuffer(offsets);
     }
 
     /**

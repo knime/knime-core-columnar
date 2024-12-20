@@ -52,7 +52,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BaseVariableWidthVector;
-import org.knime.core.columnar.arrow.data.OffsetsBuffer5000.IntOffsetsBuffer;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.IntOffsetsBuffer;
 import org.knime.core.table.util.StringEncoder;
 
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
@@ -206,7 +206,7 @@ public class LazyEncodedStringList {
 
     public static LazyEncodedStringList createFrom(final ArrowBuf dataBuffer, final ArrowBuf offsetsBuffer,
         final int numElements) {
-        var offsets = OffsetsBuffer5000.createIntBuffer(offsetsBuffer, numElements);
+        var offsets = OffsetsBuffer.createIntBuffer(offsetsBuffer, numElements);
         var dataBytes = new byte[offsets.getNumData(numElements)];
         dataBuffer.getBytes(0, dataBytes);
         return new LazyEncodedStringList(new String[numElements], new ByteArrayList(dataBytes), offsets);

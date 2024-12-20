@@ -55,7 +55,7 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.ArrowType.LargeBinary;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.OffsetsBuffer5000.LongOffsetsBuffer;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.LongOffsetsBuffer;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
@@ -88,7 +88,7 @@ public final class OnHeapVarBinaryData {
         private OnHeapVarBinaryWriteData(final int capacity) {
             super(capacity);
             m_capacity = capacity;
-            m_offsets = new OffsetsBuffer5000.LongOffsetsBuffer(capacity);
+            m_offsets = new OffsetsBuffer.LongOffsetsBuffer(capacity);
             m_data = new ByteBigArrayBigList(capacity * 32); // initial estimate
         }
 
@@ -350,7 +350,7 @@ public final class OnHeapVarBinaryData {
 
             int valueCount = vector.getValueCount();
             var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
-            var offsets = OffsetsBuffer5000.createLongBuffer(vector.getOffsetBuffer(), valueCount);
+            var offsets = OffsetsBuffer.createLongBuffer(vector.getOffsetBuffer(), valueCount);
 
             // TODO use last offset instead of capacity?
             var data = ByteBigArrays.newBigArray(vector.getDataBuffer().capacity());
