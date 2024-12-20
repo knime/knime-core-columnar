@@ -60,7 +60,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.OffsetsBuffer5000.IntOffsetsBuffer;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.IntOffsetsBuffer;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -87,7 +87,7 @@ public final class OnHeapListData {
             super(capacity);
             m_capacity = capacity;
             m_data = data;
-            m_offsets = new OffsetsBuffer5000.IntOffsetsBuffer(capacity);
+            m_offsets = new OffsetsBuffer.IntOffsetsBuffer(capacity);
         }
 
         private OnHeapListWriteData(final int offset, final ArrowWriteData data, final IntOffsetsBuffer offsets,
@@ -238,7 +238,7 @@ public final class OnHeapListData {
                 var valueCount = vector.getValueCount();
                 var listVector = (ListVector)vector;
                 var dataVector = listVector.getDataVector();
-                var offsets = OffsetsBuffer5000.createIntBuffer(vector.getOffsetBuffer(), valueCount);
+                var offsets = OffsetsBuffer.createIntBuffer(vector.getOffsetBuffer(), valueCount);
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
                 var data =
