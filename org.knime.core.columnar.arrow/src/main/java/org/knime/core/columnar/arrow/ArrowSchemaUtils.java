@@ -52,6 +52,7 @@ import java.nio.file.Path;
 
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.ArrowType.Binary;
+import org.apache.arrow.vector.types.pojo.ArrowType.BinaryView;
 import org.apache.arrow.vector.types.pojo.ArrowType.Bool;
 import org.apache.arrow.vector.types.pojo.ArrowType.Date;
 import org.apache.arrow.vector.types.pojo.ArrowType.Decimal;
@@ -67,6 +68,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType.PrimitiveTypeVisitor;
 import org.apache.arrow.vector.types.pojo.ArrowType.Time;
 import org.apache.arrow.vector.types.pojo.ArrowType.Timestamp;
 import org.apache.arrow.vector.types.pojo.ArrowType.Utf8;
+import org.apache.arrow.vector.types.pojo.ArrowType.Utf8View;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.extensiontypes.LogicalTypeExtensionType;
@@ -307,6 +309,16 @@ public final class ArrowSchemaUtils {
         @Override
         public DataSpecWithTraits visit(final Duration type) {
             return DataSpecs.LONG;
+        }
+
+        @Override
+        public DataSpecWithTraits visit(final Utf8View type) {
+            throw unsupported("Utf8View");
+        }
+
+        @Override
+        public DataSpecWithTraits visit(final BinaryView type) {
+            throw unsupported("BinaryView");
         }
 
         private static UnsupportedOperationException unsupported(final String type) {
