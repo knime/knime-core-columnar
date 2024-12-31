@@ -73,6 +73,7 @@ import org.knime.core.columnar.store.FileHandle;
 import org.knime.core.data.columnar.domain.DomainWritable;
 import org.knime.core.data.columnar.domain.DomainWritableConfig;
 import org.knime.core.data.columnar.domain.DuplicateCheckWritable;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
@@ -327,8 +328,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             return;
         }
 
-        m_heapBadger = new HeapBadger(m_writable, m_readable, heapCache);
-
+        m_heapBadger = new HeapBadger(m_writable, m_readable, heapCache,
+            ColumnarPreferenceUtils.getHeapBadgerSerializationExecutor());
         m_readable = m_heapBadger.getHeapCache();
         m_writable = null; // FIXME
 

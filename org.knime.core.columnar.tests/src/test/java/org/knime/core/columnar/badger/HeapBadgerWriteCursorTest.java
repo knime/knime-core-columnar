@@ -320,7 +320,8 @@ class HeapBadgerWriteCursorTest {
     ) throws IOException {
         try (TestBatchStore batchStore = createTestStore(testData)) {
             var cache = new MockSharedObjectCache();
-            var badger = new HeapBadger(batchStore, batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes, cache);
+            var badger = new HeapBadger(batchStore, batchStore, maxNumRowsPerBatch, maxBatchSizeInBytes, cache,
+                null);
             if (!writeToHeapBadger(badger, testData, numRows, rowCallback)) {
                 return;
             }

@@ -51,6 +51,10 @@ package org.knime.core.columnar.badger;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -97,6 +101,12 @@ public class HeapBadger {
     /** max size of a batch */
     private static final int DEFAULT_MAX_BATCH_SIZE_IN_BYTES = 1 << 26;
 
+    /**
+     * The executor service used if none is provided, used for benchmarks and tests. In regular AP execution the service
+     * is set by core, respecting a node's <code>NodeContext</code>.
+     */
+    private static final ExecutorService FALLBACK_EXECUTOR_SERVICE = Executors.newCachedThreadPool();
+
     private final BadgerWriteCursor m_writeCursor;
 
     private final Badger m_badger;
@@ -105,7 +115,7 @@ public class HeapBadger {
 
     private final BatchWritable m_writeDelegate;
 
-    private final Thread m_serializationThread;
+    private final Future<Void> m_serilizationFuture;
 
     /**
      * Constructor
@@ -115,9 +125,11 @@ public class HeapBadger {
      * @param maxNumRowsPerBatch
      * @param maxBatchSizeInBytes
      * @param cache
+     * @param execService ... or null to use to use a fallback executor service
      */
-    public HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable,
-        final int maxNumRowsPerBatch, final int maxBatchSizeInBytes, final SharedObjectCache cache) {
+    HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable,
+        final int maxNumRowsPerBatch, final int maxBatchSizeInBytes, final SharedObjectCache cache,
+        final ExecutorService execService) {
         ColumnarSchema schema = writable.getSchema();
 
         @SuppressWarnings("resource")
@@ -125,17 +137,17 @@ public class HeapBadger {
             Math.min(maxBatchSizeInBytes / writable.getWriter().initialNumBytesPerElement(), maxNumRowsPerBatch);
 
         int bufferSize = Math.min(20, newBatchSize);
+        @SuppressWarnings("resource") // closed in Badger.close()
         final SerializationQueue async = new AsyncQueue(bufferSize);
         //        final SerializationQueue async = new SyncQueue();
         m_writeCursor = new BadgerWriteCursor(schema, async);
         m_badger = new Badger(writable, m_writeCursor.m_buffers, maxNumRowsPerBatch, maxBatchSizeInBytes);
         m_heapCache = new HeapCache(readable, cache);
         m_writeDelegate = writable;
-
-        m_serializationThread = new Thread(() -> {
+        m_serilizationFuture = Objects.requireNonNullElse(execService, FALLBACK_EXECUTOR_SERVICE).submit(() -> {
             async.serializeLoop(m_badger);
-        }, "HeapBadger-SerializationLoop");
-        m_serializationThread.start();
+            return null;
+        });
     }
 
     /**
@@ -143,19 +155,9 @@ public class HeapBadger {
      *
      * @param store
      */
-    public HeapBadger(final BatchStore store) {
+    HeapBadger(final BatchStore store) {
         this(store, store, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES,
-            new SoftReferencedObjectCache());
-    }
-
-    /**
-     * Constructor
-     *
-     * @param store
-     * @param cache
-     */
-    public HeapBadger(final BatchStore store, final SharedObjectCache cache) {
-        this(store, store, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES, cache);
+            new SoftReferencedObjectCache(), null);
     }
 
     /**
@@ -164,14 +166,11 @@ public class HeapBadger {
      * @param writable
      * @param readable
      * @param cache
+     * @param execService
      */
     public HeapBadger(final BatchWritable writable, final RandomAccessBatchReadable readable,
-        final SharedObjectCache cache) {
-        this(writable, readable, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES, cache);
-    }
-
-    HeapBadger(final BatchStore store, final int maxNumRowsPerBatch, final int maxBatchSizeInBytes) {
-        this(store, store, maxNumRowsPerBatch, maxBatchSizeInBytes, new SoftReferencedObjectCache());
+        final SharedObjectCache cache, final ExecutorService execService) {
+        this(writable, readable, DEFAULT_MAX_NUM_ROWS_PER_BATCH, DEFAULT_MAX_BATCH_SIZE_IN_BYTES, cache, execService);
     }
 
     /**
@@ -897,7 +896,7 @@ public class HeapBadger {
             }
 
             m_closed = true;
-            m_serializationThread.interrupt();
+            m_serilizationFuture.cancel(true);
             m_queue.close();
             debug("[c:" + this + "] --- Closing the Badger Write Cursor ");
         }

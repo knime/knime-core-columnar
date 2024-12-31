@@ -55,6 +55,7 @@ import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryType;
 import java.lang.management.MemoryUsage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -124,6 +125,11 @@ public final class ColumnarPreferenceUtils {
 
     // lazily initialized
     private static ExecutorService persistExecutor;
+
+    private static final AtomicLong HEAP_BADGER_SERIALIZATION_THREAD_COUNT = new AtomicLong();
+
+    // lazily initialized
+    private static ExecutorService heapBadgerSerializationExecutor;
 
     private ColumnarPreferenceUtils() {
     }
@@ -252,6 +258,19 @@ public final class ColumnarPreferenceUtils {
             persistExecutor = createExecutorService("KNIME-ColumnStoreWriter-", PERSIST_THREAD_COUNT);
         }
         return persistExecutor;
+    }
+
+    /**
+     * @return execution service for heap badger serialization
+     */
+    public static synchronized ExecutorService getHeapBadgerSerializationExecutor() {
+        if (heapBadgerSerializationExecutor == null) {
+            // unbounded, create threads as needed
+            heapBadgerSerializationExecutor =
+                ThreadUtils.executorServiceWithContext(Executors.newCachedThreadPool(r -> new Thread(r,
+                    "KNIME-HeapBadgerSerialization-" + HEAP_BADGER_SERIALIZATION_THREAD_COUNT.incrementAndGet())));
+        }
+        return heapBadgerSerializationExecutor;
     }
 
     /**
