@@ -48,41 +48,33 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 
-import org.apache.arrow.vector.UInt8Vector;
-import org.apache.arrow.vector.VarCharVector;
-import org.apache.arrow.vector.complex.StructVector;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
-import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringReadData;
-import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringWriteData;
-import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
-import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongReadData;
-import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
-
-import com.google.common.base.Utf8;
 
 /**
  * Test {@link ArrowDictEncodedStringData}
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowDictEncodedStringWriteData<Long>, ArrowDictEncodedStringReadData<Long>> {
+public class ArrowDictEncodedStringDataTest
+    extends AbstractArrowDataTest<ArrowDictEncodedStringWriteData<Long>, ArrowDictEncodedStringReadData<Long>> {
 
     private static final int MAX_LENGTH = 100;
 
@@ -128,36 +120,33 @@ public class ArrowDictEncodedStringDataTest extends AbstractArrowDataTest<ArrowD
 
     @Override
     protected boolean isReleasedW(final ArrowDictEncodedStringWriteData<Long> data) {
-        return data.m_delegate.m_vector == null &&
-                ((ArrowUnsignedLongWriteData)data.m_delegate.getWriteDataAt(0)).m_vector == null &&
-                ((ArrowStringWriteData)data.m_delegate.getWriteDataAt(1)).m_vector == null;
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource") // Resources handled by vector
     protected boolean isReleasedR(final ArrowDictEncodedStringReadData<Long> data) {
-        final ArrowStructReadData d = data.m_delegate;
-        final UInt8Vector keyVector = ((ArrowUnsignedLongReadData)d.getReadDataAt(0)).m_vector;
-        final VarCharVector valueVector = ((ArrowStringReadData)d.getReadDataAt(1)).m_vector;
-        final StructVector vector = d.m_vector;
-
-        boolean keysReleased = keyVector.getDataBuffer().capacity() == 0 //
-            && keyVector.getValidityBuffer().capacity() == 0;
-        boolean valuesReleased = valueVector.getDataBuffer().capacity() == 0 //
-            && valueVector.getValidityBuffer().capacity() == 0;
-        return vector.getValidityBuffer().capacity() == 0 && keysReleased && valuesReleased;
+        return false;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
+        var countedStrings = new HashSet<String>(NUM_DIFFERENT_STRINGS);
         long numBytes = 0;
-        assertFalse(VALUES.isEmpty());
-        for (var value : VALUES.values()) {
-            numBytes += Utf8.encodedLength(value);
+        for (int i = 0; i < valueCount; i++) {
+            var value = valueFor(i);
+            if (countedStrings.add(value)) {
+                numBytes += value.length() * 2; // UTF-16
+            }
         }
-        return numBytes + 4 * capacity // value data buffer with offset
+        return numBytes // value data buffer
             + capacity * 8 // key data buffer
             + 3 * (long)Math.ceil(capacity / 8.0); // validity buffers of struct, key, value
+    }
+
+    @Override
+    protected long getMinSizeW(final int valueCount, final int capacity) {
+        return getMinSize(valueCount, capacity) //
+            + 8 * capacity; // size tracking buffer
     }
 
     private static String valueFor(final int seed) {

@@ -50,9 +50,7 @@ package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
@@ -163,6 +161,8 @@ public final class ArrowDictEncodedStringData {
      */
     public static final class ArrowDictEncodedStringDataFactory extends AbstractArrowDictEncodedDataFactory {
 
+        // TODO key type generic? (to remove cast in StructDictEncodingTest)
+
         private static final int CURRENT_VERSION = 0;
 
         /**
@@ -172,27 +172,26 @@ public final class ArrowDictEncodedStringData {
          * @throws IllegalArgumentException if traits don't contain {@link DictEncodingTrait}
          */
         public ArrowDictEncodedStringDataFactory(final DataTraits traits) {
+            // TODO use StringData5000
             super(traits, ArrowStringDataFactory.INSTANCE, CURRENT_VERSION);
         }
 
         @Override
-        public ArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            return new ArrowDictEncodedStringWriteData<>(
-                m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity), m_keyType);
+        public ArrowDictEncodedStringWriteData<?> createWrite(final int capacity) {
+            return new ArrowDictEncodedStringWriteData<>(createWriteDelegate(capacity), m_keyType);
         }
 
         @Override
-        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
-            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            return new ArrowDictEncodedStringReadData<>(
-                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)), m_keyType);
+        public ArrowDictEncodedStringReadData<?> createRead(final FieldVector vector,
+            final ArrowVectorNullCount nullCount, final DictionaryProvider provider,
+            final ArrowColumnDataFactoryVersion version) throws IOException {
+            if (version.getVersion() == CURRENT_VERSION) {
+                return new ArrowDictEncodedStringReadData<>(createReadDelegate(vector, nullCount, provider, version),
+                    m_keyType);
+            } else {
+                throw new IOException("Cannot read ArrowDictEncodedStringData with version " + version
+                    + ". Current version: " + CURRENT_VERSION + ".");
+            }
         }
-
-        @Override
-        public String toString() {
-            return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + m_delegate + "]";
-        }
-
     }
 }

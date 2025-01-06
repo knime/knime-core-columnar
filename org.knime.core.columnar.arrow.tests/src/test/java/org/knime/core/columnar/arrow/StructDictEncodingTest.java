@@ -48,13 +48,10 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
@@ -63,32 +60,25 @@ import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
 
-@SuppressWarnings("javadoc")
-public class StructDictEncodingTest {
-
-    private BufferAllocator m_alloc;
-
-    @Before
-    public void before() {
-        m_alloc = new RootAllocator();
-    }
-
-    @After
-    public void after() {
-        m_alloc.close();
-    }
+/**
+ * Tests for struct based dictionary encoding.
+ *
+ * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ */
+@SuppressWarnings("static-method")
+final class StructDictEncodingTest {
 
     private static ArrowDictEncodedStringDataFactory createFactory(final KeyType keyType) {
         return new ArrowDictEncodedStringDataFactory(new DefaultDataTraits(new DictEncodingTrait(keyType)));
     }
 
     @Test
-    public void testSimpleDictCreation() {
+    void testSimpleDictCreation() {
         final int numRows = 10;
         final var factory = createFactory(KeyType.LONG_KEY);
         @SuppressWarnings("unchecked")
-        final var data = (ArrowDictEncodedStringWriteData<Long>)ArrowColumnDataFactory.createWrite(factory, "0",
-            m_alloc, numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Long>)factory.createWrite(numRows);
         data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.LONG_KEY));
 
         data.setString(0, "foo");
@@ -100,23 +90,22 @@ public class StructDictEncodingTest {
         data.setString(2, "foo");
         // [<0, "foo">, <1, "bar">, <0, null>]
         ArrowDictEncodedStringReadData<Long> dataR = data.close(3);
-        assertEquals(0, (long)dataR.getDictKey(0));
-        assertEquals(1, (long)dataR.getDictKey(1));
-        assertEquals(0, (long)dataR.getDictKey(2));
+        assertEquals(0, (long)dataR.getDictKey(0), "Unexpected dict key at index 0");
+        assertEquals(1, (long)dataR.getDictKey(1), "Unexpected dict key at index 1");
+        assertEquals(0, (long)dataR.getDictKey(2), "Unexpected dict key at index 2");
 
-        assertEquals("foo", dataR.getString(0));
-        assertEquals("bar", dataR.getString(1));
-        assertEquals("foo", dataR.getString(2));
+        assertEquals("foo", dataR.getString(0), "Unexpected string value at index 0");
+        assertEquals("bar", dataR.getString(1), "Unexpected string value at index 1");
+        assertEquals("foo", dataR.getString(2), "Unexpected string value at index 2");
         dataR.release();
     }
 
     @Test
-    public void testRandomAccessRead() {
+    void testRandomAccessRead() {
         final int numRows = 10;
         final var factory = createFactory(KeyType.BYTE_KEY);
         @SuppressWarnings("unchecked")
-        final var data = (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0",
-            m_alloc, numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Byte>)factory.createWrite(numRows);
         data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY));
 
         data.setString(0, "foo");
@@ -124,35 +113,38 @@ public class StructDictEncodingTest {
         data.setString(2, "foo");
 
         ArrowDictEncodedStringReadData<Byte> dataR = data.close(3);
-        assertEquals("foo", dataR.getString(2)); // we need to look up the value stored at index 0 for this!
-        assertEquals("foo", dataR.getString(0));
-        assertEquals("bar", dataR.getString(1));
+        // we need to look up the value stored at index 0 for this!
+        assertEquals("foo", dataR.getString(2), "Unexpected string value at index 2");
+        assertEquals("foo", dataR.getString(0), "Unexpected string value at index 0");
+        assertEquals("bar", dataR.getString(1), "Unexpected string value at index 1");
         dataR.release();
     }
 
-    @Test(expected = IllegalStateException.class)
-    public void testKeyOverflow(){
+    @Test
+    void testKeyOverflow() {
         final int numRows = Byte.MAX_VALUE * 3;
         final var factory = createFactory(KeyType.BYTE_KEY);
         @SuppressWarnings("unchecked")
-        final var data = (ArrowDictEncodedStringWriteData<Byte>)ArrowColumnDataFactory.createWrite(factory, "0",
-            m_alloc, numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Byte>)factory.createWrite(numRows);
         data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY));
         int lastWrittenIndex = 0;
 
-        try {
-            for (int r = 0; r < numRows; r++) {
+        for (int r = 0; r < numRows; r++) {
+            if (r < 256) {
                 data.setString(r, String.valueOf(r));
                 lastWrittenIndex++;
+            } else {
+                var row = r;
+                assertThrows(IllegalStateException.class, () -> data.setString(row, String.valueOf(row)),
+                    "Expected IllegalStateException when writing beyond the maximum key range.");
+                break;
             }
-        } finally {
-            ArrowDictEncodedStringReadData<Byte> dataR = data.close(lastWrittenIndex);
-
-            for (int r = 0; r < Byte.MAX_VALUE; r++) {
-                assertEquals(String.valueOf(r), dataR.getString(r));
-            }
-
-            dataR.release();
         }
+
+        var dataR = data.close(lastWrittenIndex + 1);
+        for (int r = 0; r < lastWrittenIndex; r++) {
+            assertEquals(String.valueOf(r), dataR.getString(r), "Unexpected string value at index " + r);
+        }
+        dataR.release();
     }
 }

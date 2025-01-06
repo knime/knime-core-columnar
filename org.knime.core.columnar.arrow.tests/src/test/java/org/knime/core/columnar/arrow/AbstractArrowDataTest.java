@@ -158,6 +158,17 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
      */
     protected abstract long getMinSize(int valueCount, int capacity);
 
+    /**
+     * Overwrite, to provide a different minimum size (from {@link #getMinSize(int, int)}) for the write data object.
+     *
+     * @param valueCount the count of values added to the data (with seeds 0..(valueCount-1))
+     * @param capacity the total capacity of the data
+     * @return the minimum size that should be allocated by the write data object to store the data
+     */
+    protected long getMinSizeW(final int valueCount, final int capacity) {
+        return getMinSize(valueCount, capacity);
+    }
+
     /** Initialize the root allocator before running a test */
     @Before
     public void before() {
@@ -512,11 +523,11 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     public void testSizeOf() {
         final int numValues = 8213;
         final W wd = createWrite(numValues);
-        long minSize = getMinSize(0, numValues);
+        long minSize = getMinSizeW(0, numValues);
         assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
         for (int i = 0; i < numValues; i++) {
             setValue(wd, i, i);
-            minSize = getMinSize(i, numValues);
+            minSize = getMinSizeW(i, numValues);
             assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
         }
         final R rd = castR(wd.close(numValues));

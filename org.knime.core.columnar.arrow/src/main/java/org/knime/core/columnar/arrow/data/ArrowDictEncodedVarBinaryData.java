@@ -50,9 +50,7 @@ package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
@@ -196,22 +194,21 @@ public final class ArrowDictEncodedVarBinaryData {
         }
 
         @Override
-        public ArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            return new ArrowDictEncodedVarBinaryWriteData<>(
-                m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity), m_keyType);
+        public ArrowWriteData createWrite(final int capacity) {
+            return new ArrowDictEncodedVarBinaryWriteData<>(createWriteDelegate(capacity), m_keyType);
         }
 
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            return new ArrowDictEncodedVarBinaryReadData<>(
-                m_delegate.createRead(vector, nullCount, provider, version.getChildVersion(0)), m_keyType);
-        }
+            if (version.getVersion() == CURRENT_VERSION) {
+                return new ArrowDictEncodedVarBinaryReadData<>(createReadDelegate(vector, nullCount, provider, version),
+                    m_keyType);
+            } else {
+                throw new IOException("Cannot read ArrowDictEncodedVarBinaryData with version " + version
+                    + ". Current version: " + CURRENT_VERSION + ".");
+            }
 
-        @Override
-        public String toString() {
-            return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + m_delegate + "]";
         }
     }
 }

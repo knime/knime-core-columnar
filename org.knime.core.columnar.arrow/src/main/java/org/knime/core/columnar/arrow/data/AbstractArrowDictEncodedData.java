@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
@@ -58,12 +58,12 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
-import org.knime.core.columnar.arrow.data.ArrowUnsignedByteData.ArrowUnsignedByteDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowUnsignedIntData.ArrowUnsignedIntDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowUnsignedLongData.ArrowUnsignedLongDataFactory;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
@@ -273,6 +273,11 @@ public final class AbstractArrowDictEncodedData {
         }
 
         @Override
+        public ValidityBuffer getValidityBuffer() {
+            return m_delegate.getValidityBuffer();
+        }
+
+        @Override
         public String toString() {
             return "[" + "references=" + m_delegate.getReadDataAt(DICT_KEY_DATA_INDEX).toString()
                 + ", dictionaryEntries=" + m_delegate.getReadDataAt(DICT_ENTRY_DATA_INDEX).toString() + "]";
@@ -312,82 +317,63 @@ public final class AbstractArrowDictEncodedData {
      * Base implementation for dict encoded {@link ArrowColumnDataFactory}.
      *
      * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
+     * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
      */
-    abstract static class AbstractArrowDictEncodedDataFactory implements ArrowColumnDataFactory {
-
-        protected final ArrowStructDataFactory m_delegate;
+    abstract static class AbstractArrowDictEncodedDataFactory extends AbstractArrowColumnDataFactory {
 
         protected final KeyType m_keyType;
 
-        private final int m_version;
-
         protected AbstractArrowDictEncodedDataFactory(final DataTraits traits,
             final ArrowColumnDataFactory valueFactory, final int version) {
-            Preconditions.checkArgument(DictEncodingTrait.isEnabled(traits), "The column is not dictionary encoded.");
-            m_keyType = DictEncodingTrait.keyType(traits);
-            m_delegate = new ArrowStructDataFactory(createKeyDataFactory(), valueFactory);
-            m_version = version;
+            this(keyType(traits), valueFactory, version);
         }
 
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return ArrowColumnDataFactoryVersion.version(m_version, m_delegate.m_version);
+        private AbstractArrowDictEncodedDataFactory(final KeyType keyType, final ArrowColumnDataFactory valueFactory,
+            final int version) {
+            super(version, new ArrowStructDataFactory(createKeyDataFactory(keyType), valueFactory));
+            m_keyType = keyType;
+        }
+
+        protected ArrowStructWriteData createWriteDelegate(final int capacity) {
+            return (ArrowStructWriteData)m_children[0].createWrite(capacity);
+        }
+
+        protected ArrowStructReadData createReadDelegate(final FieldVector vector, final ArrowVectorNullCount nullCount,
+            final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+            return (ArrowStructReadData)m_children[0].createRead(vector, nullCount, provider,
+                version.getChildVersion(0));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return m_delegate.getField(name, dictionaryIdSupplier);
-        }
-
-        @SuppressWarnings("rawtypes")
-        @Override
-        public FieldVector getVector(final NullableReadData data) {
-            return m_delegate.getVector(((AbstractArrowDictEncodedReadData)data).m_delegate);
-        }
-
-        @SuppressWarnings("rawtypes")
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return m_delegate.getDictionaries(((AbstractArrowDictEncodedReadData)data).m_delegate);
-        }
-
-        private ArrowColumnDataFactory createKeyDataFactory() {
-            if (m_keyType == KeyType.BYTE_KEY) {
-                return ArrowUnsignedByteDataFactory.INSTANCE;
-            } else if (m_keyType == KeyType.INT_KEY) {
-                return ArrowUnsignedIntDataFactory.INSTANCE;
-            } else if (m_keyType == KeyType.LONG_KEY) {
-                return ArrowUnsignedLongDataFactory.INSTANCE;
-            }
-
-            throw new IllegalArgumentException("Unsupported key type " + m_keyType);
+            return m_children[0].getField(name, dictionaryIdSupplier);
         }
 
         @Override
-        public int hashCode() {
-            return Objects.hash(m_version, m_keyType, m_delegate);
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            var other = (AbstractArrowDictEncodedDataFactory)obj;
-            return m_keyType == other.m_keyType //
-                && m_version == other.m_version && m_delegate.equals(other.m_delegate); //
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
+            m_children[0].copyToVector(getDelegateData(data), vector);
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return m_delegate.initialNumBytesPerElement();
+            return m_children[0].initialNumBytesPerElement();
         }
 
+        private static KeyType keyType(final DataTraits traits) {
+            Preconditions.checkArgument(DictEncodingTrait.isEnabled(traits), "The column is not dictionary encoded.");
+            return DictEncodingTrait.keyType(traits);
+        }
+
+        private static ArrowColumnDataFactory createKeyDataFactory(final KeyType keyType) {
+            return switch (keyType) {
+                case BYTE_KEY -> ArrowByteDataFactory.INSTANCE_UNSIGNED;
+                case INT_KEY -> ArrowIntDataFactory.INSTANCE_UNSIGNED;
+                case LONG_KEY -> ArrowLongDataFactory.INSTANCE_UNSIGNED;
+            };
+        }
+
+        private static NullableReadData getDelegateData(final NullableReadData data) {
+            return ((AbstractArrowDictEncodedReadData<?, ?>)data).m_delegate;
+        }
     }
 }
