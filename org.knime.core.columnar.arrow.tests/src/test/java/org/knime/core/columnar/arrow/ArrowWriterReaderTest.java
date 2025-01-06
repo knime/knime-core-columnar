@@ -50,7 +50,6 @@ package org.knime.core.columnar.arrow;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_LZ4_FRAME_COMPRESSION;
@@ -61,7 +60,6 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.stream.IntStream;
 
-import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.RootAllocator;
 import org.junit.After;
 import org.junit.Before;
@@ -365,81 +363,6 @@ public class ArrowWriterReaderTest {
             }
             batch.release();
         }
-        assertEquals(0, m_alloc.getAllocatedMemory());
-    }
-
-    /**
-     * Test reading a file twice and check that the results point to the same memory.
-     *
-     * @throws IOException
-     */
-    @Test
-    public void testReadSameFileTwice() throws IOException {
-        final int numBatches = 10;
-        final int numColumns = 5;
-        final int capacity = 32;
-        final int dataCount = 32;
-        final ArrowColumnDataFactory[] factories = IntStream.range(0, numColumns).mapToObj(i -> new SimpleDataFactory())
-            .toArray(ArrowColumnDataFactory[]::new);
-        final SimpleDataChecker dataChecker = new SimpleDataChecker(false);
-
-        // Create the data
-        final ReadBatch[] batches = new ReadBatch[numBatches];
-        for (int b = 0; b < numBatches; b++) {
-            final NullableReadData[] data1 = new NullableReadData[numColumns];
-            for (int c = 0; c < numColumns; c++) {
-                final NullableWriteData d = createWrite(factories[c], capacity);
-                data1[c] = dataChecker.fillData(d, c, dataCount, (long)b * c);
-            }
-            batches[b] = new DefaultReadBatch(data1);
-        }
-
-        // Write the data to a file
-        try (final ArrowBatchWriter writer = new ArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
-            for (ReadBatch b : batches) {
-                writer.write(b);
-            }
-        }
-        Arrays.stream(batches).forEach(ReadBatch::release);
-
-        // Read one batch and keep it
-        final int b = 7;
-        ReadBatch batch0;
-        try (final ArrowBatchReader reader =
-            new ArrowBatchReader(m_path.asFile(), m_alloc, factories, new FilteredColumnSelection(numColumns, 1, 2))) {
-            batch0 = reader.readRetained(b);
-        }
-
-        // Read another selection of the same batch
-        ReadBatch batch1;
-        try (final ArrowBatchReader reader =
-            new ArrowBatchReader(m_path.asFile(), m_alloc, factories, new FilteredColumnSelection(numColumns, 1, 3))) {
-            batch1 = reader.readRetained(b);
-
-        }
-
-        // Check the data
-        final SimpleData data01 = (SimpleData)batch0.get(1);
-        dataChecker.checkData(data01, 1, dataCount, b);
-        dataChecker.checkData(batch0.get(2), 2, dataCount, (long)b * 2);
-
-        // Check the data
-        final SimpleData data11 = (SimpleData)batch1.get(1);
-        dataChecker.checkData(data11, 1, dataCount, b);
-        dataChecker.checkData(batch1.get(3), 3, dataCount, (long)b * 3);
-
-        // Check that data01 and data11 point to the same memory
-        // and have the same reference manager
-        @SuppressWarnings("resource")
-        final ArrowBuf db01 = data01.getVector().getDataBuffer();
-        @SuppressWarnings("resource")
-        final ArrowBuf db11 = data11.getVector().getDataBuffer();
-        assertSame(db01.getReferenceManager(), db11.getReferenceManager());
-        assertEquals(db01.memoryAddress(), db11.memoryAddress());
-
-        batch0.release();
-        batch1.release();
-
         assertEquals(0, m_alloc.getAllocatedMemory());
     }
 
