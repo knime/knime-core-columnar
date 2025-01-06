@@ -282,6 +282,7 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
             }
             if (obj instanceof ExtensionArrowColumnDataFactory) {
                 var other = (ExtensionArrowColumnDataFactory)obj;
+                // Note that we do not need to compare the version because it is derived from the delegate's version
                 return m_traits.equals(other.m_traits) && m_delegate.equals(other.m_delegate);
             }
             return false;
@@ -289,7 +290,8 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
         @Override
         public int hashCode() {
-            return Objects.hash(m_traits, m_delegate, m_version);
+            // Note that we do not need to include the version because it is derived from the delegate's version
+            return Objects.hash(m_traits, m_delegate);
         }
 
         @Override
