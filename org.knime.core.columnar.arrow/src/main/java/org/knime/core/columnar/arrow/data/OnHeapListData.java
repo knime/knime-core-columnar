@@ -118,7 +118,7 @@ public final class OnHeapListData {
 
         @Override
         public long sizeOf() {
-            return usedSizeFor(m_capacity);
+            return m_validity.sizeOf() + OffsetsBuffer.usedIntSizeFor(m_capacity) + m_data.sizeOf();
         }
 
         @Override
@@ -215,6 +215,8 @@ public final class OnHeapListData {
 
         private static final int CURRENT_VERSION = 0;
 
+        private static final int INITIAL_VALUES_PER_LIST = 10;
+
         public OnHeapListDataFactory(final ArrowColumnDataFactory inner) {
             super(CURRENT_VERSION, inner);
         }
@@ -228,7 +230,7 @@ public final class OnHeapListData {
 
         @Override
         public ArrowWriteData createWrite(final int capacity) {
-            return new OnHeapListWriteData(capacity, m_children[0].createWrite(capacity));
+            return new OnHeapListWriteData(capacity, m_children[0].createWrite(capacity * INITIAL_VALUES_PER_LIST));
         }
 
         @Override
@@ -272,8 +274,9 @@ public final class OnHeapListData {
 
         @Override
         public int initialNumBytesPerElement() {
-            // TODO Auto-generated method stub
-            return 0;
+            return m_children[0].initialNumBytesPerElement() * INITIAL_VALUES_PER_LIST // data buffer
+                + Integer.BYTES // offset buffer
+                + 1; // validity bit
         }
     }
 }

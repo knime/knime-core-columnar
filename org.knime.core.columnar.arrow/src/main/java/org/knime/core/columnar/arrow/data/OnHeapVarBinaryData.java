@@ -73,6 +73,9 @@ import it.unimi.dsi.fastutil.bytes.ByteBigArrays;
  */
 public final class OnHeapVarBinaryData {
 
+    /** The initial number of bytes allocated for each element. More memory is allocated when needed. */
+    private static final int INITAL_BYTES_PER_ELEMENT = 32;
+
     private OnHeapVarBinaryData() {
     }
 
@@ -89,7 +92,7 @@ public final class OnHeapVarBinaryData {
             super(capacity);
             m_capacity = capacity;
             m_offsets = new OffsetsBuffer.LongOffsetsBuffer(capacity);
-            m_data = new ByteBigArrayBigList(capacity * 32); // initial estimate
+            m_data = new ByteBigArrayBigList(capacity * (long)INITAL_BYTES_PER_ELEMENT);
         }
 
         private OnHeapVarBinaryWriteData(final int offset, final ByteBigArrayBigList data,
@@ -149,13 +152,14 @@ public final class OnHeapVarBinaryData {
 
         @Override
         public long usedSizeFor(final int numElements) {
-            return m_data.size64() + OffsetsBuffer.usedLongSizeFor(numElements + 1)
-                + ValidityBuffer.usedSizeFor(numElements);
+            return ValidityBuffer.usedSizeFor(numElements) //
+                + OffsetsBuffer.usedIntSizeFor(numElements) //
+                + m_offsets.getNumData(numElements);
         }
 
         @Override
         public long sizeOf() {
-            return usedSizeFor(m_capacity);
+            return m_validity.sizeOf() + OffsetsBuffer.usedIntSizeFor(m_capacity) + BigArrays.length(m_data.elements());
         }
 
         @Override
@@ -377,8 +381,9 @@ public final class OnHeapVarBinaryData {
 
         @Override
         public int initialNumBytesPerElement() {
-            // TODO, what about the offset and validity buffer?
-            return 32;
+            return INITAL_BYTES_PER_ELEMENT // data buffer
+                + Long.BYTES // offset buffer
+                + 1; // validity bit
         }
     }
 }
