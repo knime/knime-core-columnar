@@ -202,8 +202,14 @@ public final class OnHeapDictEncodedVarBinaryData {
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            return new OnHeapDictEncodedVarBinaryReadData<>(createReadDelegate(vector, nullCount, provider, version),
-                m_keyType);
+            if (version.getVersion() == CURRENT_VERSION) {
+                return new OnHeapDictEncodedVarBinaryReadData<>(
+                    createReadDelegate(vector, nullCount, provider, version), m_keyType);
+            } else {
+                throw new IOException("Cannot read ArrowDictEncodedVarBinaryData with version " + version
+                    + ". Current version: " + CURRENT_VERSION + ".");
+            }
+
         }
     }
 }

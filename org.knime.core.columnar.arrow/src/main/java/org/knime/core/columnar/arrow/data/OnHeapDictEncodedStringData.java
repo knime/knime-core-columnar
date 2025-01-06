@@ -185,8 +185,13 @@ public final class OnHeapDictEncodedStringData {
         public OnHeapDictEncodedStringReadData<?> createRead(final FieldVector vector,
             final ArrowVectorNullCount nullCount, final DictionaryProvider provider,
             final ArrowColumnDataFactoryVersion version) throws IOException {
-            return new OnHeapDictEncodedStringReadData<>(createReadDelegate(vector, nullCount, provider, version),
-                m_keyType);
+            if (version.getVersion() == CURRENT_VERSION) {
+                return new OnHeapDictEncodedStringReadData<>(createReadDelegate(vector, nullCount, provider, version),
+                    m_keyType);
+            } else {
+                throw new IOException("Cannot read ArrowDictEncodedStringData with version " + version
+                    + ". Current version: " + CURRENT_VERSION + ".");
+            }
         }
     }
 }
