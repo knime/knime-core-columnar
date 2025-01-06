@@ -71,9 +71,6 @@ import org.knime.core.columnar.arrow.data.OnHeapStringData5000.OnHeapStringDataF
 import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapVoidData.OnHeapVoidDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowDoubleData.ArrowDoubleDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowListData.ArrowListDataFactory;
-import org.knime.core.columnar.arrow.data.old.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
@@ -95,7 +92,7 @@ import org.knime.core.table.schema.traits.LogicalTypeTrait;
  */
 public class ArrowSchemaMapperTest {
 
-    /** Test mapping double specs to a {@link ArrowDoubleDataFactory} */
+    /** Test mapping double specs to a {@link OnHeapDoubleDataFactory} */
     @Test
     public void testMapDoubleSpec() {
         testMapSingleSpec(DataSpec.doubleSpec(), OnHeapDoubleDataFactory.INSTANCE);
@@ -205,7 +202,7 @@ public class ArrowSchemaMapperTest {
         testMapSingleSpec(DataSpec.stringSpec(), OnHeapStringDataFactory.INSTANCE);
     }
 
-    /** Test mapping void specs to a {@link ArrowStructDataFactory} */
+    /** Test mapping void specs to a {@link OnHeapStructDataFactory} */
     @Test
     public void testMapStructSpec() {
         // Simple
@@ -224,7 +221,7 @@ public class ArrowSchemaMapperTest {
                 OnHeapLongDataFactory.INSTANCE)));
     }
 
-    /** Test mapping list specs to a {@link ArrowListDataFactory} */
+    /** Test mapping list specs to a {@link OnHeapListDataFactory} */
     @Test
     public void testMapListSpec() {
         // Simple

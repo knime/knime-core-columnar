@@ -63,7 +63,6 @@ import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryReadData;
 import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryWriteData;
-import org.knime.core.columnar.arrow.data.old.ArrowVarBinaryData;
 import org.knime.core.columnar.data.dictencoding.DictKeys;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
@@ -83,7 +82,7 @@ public class OnHeapDictEncodedVarBinaryDataTest
 
     private static final int NUM_DIFFERENT_VALUES = 20;
 
-    /** Create the test for {@link ArrowVarBinaryData} */
+    /** Create the test for {@link OnHeapDictEncodedVarBinaryData} */
     public OnHeapDictEncodedVarBinaryDataTest() {
         super(
             new OnHeapDictEncodedVarBinaryDataFactory(new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY))));

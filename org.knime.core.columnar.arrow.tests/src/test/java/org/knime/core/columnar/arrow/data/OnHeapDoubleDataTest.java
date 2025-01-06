@@ -55,10 +55,9 @@ import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleReadData;
 import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleWriteData;
-import org.knime.core.columnar.arrow.data.old.ArrowDoubleData;
 
 /**
- * Test {@link ArrowDoubleData}
+ * Test {@link OnHeapDoubleData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
