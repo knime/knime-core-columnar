@@ -59,19 +59,19 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
 import org.knime.core.columnar.arrow.data.ArrowWriteData;
-import org.knime.core.columnar.arrow.data.OnHeapBooleanData.OnHeapBooleanDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapByteData.OnHeapByteDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData;
-import org.knime.core.columnar.arrow.data.OnHeapDictEncodedVarBinaryData.OnHeapDictEncodedVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapDoubleData.OnHeapDoubleDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapFloatData.OnHeapFloatDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapIntData.OnHeapIntDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapListData.OnHeapListDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapLongData.OnHeapLongDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapStringData5000.OnHeapStringDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapStructData.OnHeapStructDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapVarBinaryData.OnHeapVarBinaryDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapVoidData.OnHeapVoidDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowByteData.ArrowByteDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStringData5000.ArrowStringDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowVoidData.ArrowVoidDataFactory;
 import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -144,67 +144,67 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
 
     @Override
     public ArrowColumnDataFactory visit(final BooleanDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapBooleanDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowBooleanDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ByteDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapByteDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowByteDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final DoubleDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapDoubleDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowDoubleDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final FloatDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapFloatDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowFloatDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final IntDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapIntDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowIntDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final LongDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapLongDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowLongDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return wrapCached(new OnHeapDictEncodedVarBinaryDataFactory(traits), traits);
+            return wrapCached(new ArrowDictEncodedVarBinaryDataFactory(traits), traits);
         } else {
-            return wrapCached(OnHeapVarBinaryDataFactory.INSTANCE, traits);
+            return wrapCached(ArrowVarBinaryDataFactory.INSTANCE, traits);
         }
     }
 
     @Override
     public ArrowColumnDataFactory visit(final VoidDataSpec spec, final DataTraits traits) {
-        return wrapCached(OnHeapVoidDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowVoidDataFactory.INSTANCE, traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StructDataSpec spec, final StructDataTraits traits) {
         final var innerFactories = new ArrowColumnDataFactory[spec.size()];
         Arrays.setAll(innerFactories, i -> map(spec.getDataSpec(i), traits.getDataTraits(i)));
-        return wrapCached(new OnHeapStructDataFactory(innerFactories), traits);
+        return wrapCached(new ArrowStructDataFactory(innerFactories), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final ListDataSpec listDataSpec, final ListDataTraits traits) {
         final ArrowColumnDataFactory inner = ArrowSchemaMapper.map(listDataSpec.getInner(), traits.getInner());
-        return wrapCached(new OnHeapListDataFactory(inner), traits);
+        return wrapCached(new ArrowListDataFactory(inner), traits);
     }
 
     @Override
     public ArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return wrapCached(new OnHeapDictEncodedStringData.OnHeapDictEncodedStringDataFactory(traits), traits);
+            return wrapCached(new ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory(traits), traits);
         }
-        return wrapCached(OnHeapStringDataFactory.INSTANCE, traits);
+        return wrapCached(ArrowStringDataFactory.INSTANCE, traits);
     }
 
     ArrowColumnDataFactory wrapCached(final ArrowColumnDataFactory factory, final DataTraits traits) {

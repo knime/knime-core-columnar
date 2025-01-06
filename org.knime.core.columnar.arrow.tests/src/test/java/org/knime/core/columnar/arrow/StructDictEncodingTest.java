@@ -52,9 +52,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
-import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData.OnHeapDictEncodedStringDataFactory;
-import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData.OnHeapDictEncodedStringReadData;
-import org.knime.core.columnar.arrow.data.OnHeapDictEncodedStringData.OnHeapDictEncodedStringWriteData;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
+import org.knime.core.columnar.arrow.data.ArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
@@ -69,8 +69,8 @@ import org.knime.core.table.schema.traits.DefaultDataTraits;
 @SuppressWarnings("static-method")
 final class StructDictEncodingTest {
 
-    private static OnHeapDictEncodedStringDataFactory createFactory(final KeyType keyType) {
-        return new OnHeapDictEncodedStringDataFactory(new DefaultDataTraits(new DictEncodingTrait(keyType)));
+    private static ArrowDictEncodedStringDataFactory createFactory(final KeyType keyType) {
+        return new ArrowDictEncodedStringDataFactory(new DefaultDataTraits(new DictEncodingTrait(keyType)));
     }
 
     @Test
@@ -78,7 +78,7 @@ final class StructDictEncodingTest {
         final int numRows = 10;
         final var factory = createFactory(KeyType.LONG_KEY);
         @SuppressWarnings("unchecked")
-        final var data = (OnHeapDictEncodedStringWriteData<Long>)factory.createWrite(numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Long>)factory.createWrite(numRows);
         data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.LONG_KEY));
 
         data.setString(0, "foo");
@@ -89,7 +89,7 @@ final class StructDictEncodingTest {
 
         data.setString(2, "foo");
         // [<0, "foo">, <1, "bar">, <0, null>]
-        OnHeapDictEncodedStringReadData<Long> dataR = data.close(3);
+        ArrowDictEncodedStringReadData<Long> dataR = data.close(3);
         assertEquals(0, (long)dataR.getDictKey(0), "Unexpected dict key at index 0");
         assertEquals(1, (long)dataR.getDictKey(1), "Unexpected dict key at index 1");
         assertEquals(0, (long)dataR.getDictKey(2), "Unexpected dict key at index 2");
@@ -105,14 +105,14 @@ final class StructDictEncodingTest {
         final int numRows = 10;
         final var factory = createFactory(KeyType.BYTE_KEY);
         @SuppressWarnings("unchecked")
-        final var data = (OnHeapDictEncodedStringWriteData<Byte>)factory.createWrite(numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Byte>)factory.createWrite(numRows);
         data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY));
 
         data.setString(0, "foo");
         data.setString(1, "bar");
         data.setString(2, "foo");
 
-        OnHeapDictEncodedStringReadData<Byte> dataR = data.close(3);
+        ArrowDictEncodedStringReadData<Byte> dataR = data.close(3);
         // we need to look up the value stored at index 0 for this!
         assertEquals("foo", dataR.getString(2), "Unexpected string value at index 2");
         assertEquals("foo", dataR.getString(0), "Unexpected string value at index 0");
@@ -125,7 +125,7 @@ final class StructDictEncodingTest {
         final int numRows = Byte.MAX_VALUE * 3;
         final var factory = createFactory(KeyType.BYTE_KEY);
         @SuppressWarnings("unchecked")
-        final var data = (OnHeapDictEncodedStringWriteData<Byte>)factory.createWrite(numRows);
+        final var data = (ArrowDictEncodedStringWriteData<Byte>)factory.createWrite(numRows);
         data.setKeyGenerator(DictKeys.createAscendingKeyGenerator(KeyType.BYTE_KEY));
         int lastWrittenIndex = 0;
 
