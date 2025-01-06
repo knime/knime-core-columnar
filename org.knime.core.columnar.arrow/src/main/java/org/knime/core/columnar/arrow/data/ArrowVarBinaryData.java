@@ -48,10 +48,7 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BaseLargeVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.LargeVarBinaryVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
@@ -59,13 +56,18 @@ import org.apache.arrow.vector.types.pojo.ArrowType.LargeBinary;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.LongOffsetsBuffer;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryReadData;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 
 import com.google.common.base.Preconditions;
+
+import it.unimi.dsi.fastutil.BigArrays;
+import it.unimi.dsi.fastutil.bytes.ByteBigArrayBigList;
+import it.unimi.dsi.fastutil.bytes.ByteBigArrays;
 
 /**
  * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
@@ -75,87 +77,180 @@ import com.google.common.base.Preconditions;
  */
 public final class ArrowVarBinaryData {
 
-    /**
-     * The initial number of bytes allocated for each element. 32 is a good estimate for UTF-8 encoded Strings and more
-     * memory is allocated when needed.
-     */
-    private static final long INITAL_BYTES_PER_ELEMENT = 32;
+    /** The initial number of bytes allocated for each element. More memory is allocated when needed. */
+    private static final int INITAL_BYTES_PER_ELEMENT = 32;
 
     private ArrowVarBinaryData() {
     }
 
     /** Arrow implementation of {@link VarBinaryWriteData}. */
-    public static final class ArrowVarBinaryWriteData extends AbstractArrowWriteData<LargeVarBinaryVector>
-        implements VarBinaryWriteData {
+    public static final class ArrowVarBinaryWriteData extends AbstractArrowWriteData implements VarBinaryWriteData {
 
-        private ArrowVarBinaryWriteData(final LargeVarBinaryVector vector) {
-            super(vector);
+        private ByteBigArrayBigList m_data;
+
+        private LongOffsetsBuffer m_offsets;
+
+        private int m_capacity;
+
+        private ArrowVarBinaryWriteData(final int capacity) {
+            super(capacity);
+            m_capacity = capacity;
+            m_offsets = new OffsetsBuffer.LongOffsetsBuffer(capacity);
+            m_data = new ByteBigArrayBigList(capacity * (long)INITAL_BYTES_PER_ELEMENT);
         }
 
-        private ArrowVarBinaryWriteData(final LargeVarBinaryVector vector, final int offset) {
-            super(vector, offset);
+        private ArrowVarBinaryWriteData(final int offset, final ByteBigArrayBigList data,
+            final LongOffsetsBuffer offsets, final ValidityBuffer validity, final int capacity) {
+            super(offset, validity);
+            m_data = data;
+            m_offsets = offsets;
+            m_capacity = capacity;
         }
 
         @Override
         public void setBytes(final int index, final byte[] val) {
-            m_vector.setSafe(m_offset + index, val);
+            var dataIndex = m_offsets.add(m_offset + index, val.length);
+
+            // Copy val into data array
+            var bigVal = BigArrays.wrap(val); // Note that this wraps the array if it fits the segment size
+            m_data.addElements(m_data.size64(), bigVal);
+
+            // Set validity bit
+            setValid(m_offset + index);
         }
 
         @Override
         public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
-            ArrowBufIO.serialize(m_offset + index, value, m_vector, serializer);
+            // Start after all data that has been written so far
+            long startIndex = m_offsets.getNumData(m_offset + index);
+
+            // Create a custom DataOutput that writes directly into m_data
+            var dataOutput = new ByteBigListDataOutput(m_data, startIndex);
+
+            try {
+                serializer.serialize(dataOutput, value);
+            } catch (IOException e) {
+                throw new RuntimeException("Error serializing object", e);
+            }
+
+            // Add offset to offsets buffer
+            var elementLength = dataOutput.getPosition() - startIndex;
+            m_offsets.add(m_offset + index, elementLength);
+
+            // Set validity bit
+            setValid(m_offset + index);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowVarBinaryWriteData(m_vector, m_offset + start);
+            return new ArrowVarBinaryWriteData(m_offset + start, m_data, m_offsets, m_validity, m_capacity - start);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            if (minimumCapacity > m_capacity) {
+                setNumElements(minimumCapacity);
+                m_capacity = minimumCapacity;
+            }
+        }
+
+        @Override
+        public int capacity() {
+            return m_capacity;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return ValidityBuffer.usedSizeFor(numElements) //
+                + OffsetsBuffer.usedIntSizeFor(numElements) //
+                + m_offsets.getNumData(numElements);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+            return m_validity.sizeOf() + OffsetsBuffer.usedIntSizeFor(m_capacity) + BigArrays.length(m_data.elements());
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowVarBinaryReadData close(final int length) {
-            final LargeVarBinaryVector vector = closeWithLength(length);
-            return new ArrowVarBinaryReadData(vector,
-                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+            setNumElements(length);
+            m_offsets.fillWithZeroLength();
+
+            // Trim the data array to the actual data length
+            var data = BigArrays.trim(m_data.elements(), m_offsets.getNumData(length));
+            return new ArrowVarBinaryReadData(data, m_offsets, m_validity, length);
+        }
+
+        @Override
+        protected void closeResources() {
+            // Nothing to do
+        }
+
+        private void setNumElements(final int numElements) {
+            m_validity.setNumElements(numElements);
+            m_offsets.setNumElements(numElements);
         }
     }
 
     /** Arrow implementation of {@link VarBinaryReadData}. */
-    public static final class ArrowVarBinaryReadData extends AbstractArrowReadData<LargeVarBinaryVector>
-        implements VarBinaryReadData {
+    public static final class ArrowVarBinaryReadData extends AbstractArrowReadData implements VarBinaryReadData {
 
-        private ArrowVarBinaryReadData(final LargeVarBinaryVector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
+        private final byte[][] m_data;
+
+        private final LongOffsetsBuffer m_offsets;
+
+        private ArrowVarBinaryReadData(final byte[][] data, final LongOffsetsBuffer offsets,
+            final ValidityBuffer validity, final int length) {
+            super(validity, length);
+            m_data = data;
+            m_offsets = offsets;
         }
 
-        private ArrowVarBinaryReadData(final LargeVarBinaryVector vector, final MissingValues missingValues,
-            final int offset, final int length) {
-            super(vector, missingValues, offset, length);
+        private ArrowVarBinaryReadData(final byte[][] data, final LongOffsetsBuffer offsets,
+            final ValidityBuffer validity, final int offset, final int length) {
+            super(validity, offset, length);
+            m_data = data;
+            m_offsets = offsets;
         }
 
         @Override
         public byte[] getBytes(final int index) {
-            return m_vector.get(m_offset + index);
+            var dataIndex = m_offsets.get(m_offset + index);
+            long length = dataIndex.end() - dataIndex.start();
+            if (length > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Data length exceeds maximum integer value");
+            }
+            byte[] val = new byte[(int)length];
+            BigArrays.copyFromBig(m_data, dataIndex.start(), val, 0, (int)length);
+            return val;
         }
 
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-            return ArrowBufIO.deserialize(m_offset + index, m_vector, deserializer);
+            int idx = m_offset + index;
+            var dataIndex = m_offsets.get(idx);
+            var dataInput = new ByteBigArrayDataInput(m_data, dataIndex.start(), dataIndex.end());
+
+            try {
+                return deserializer.deserialize(dataInput);
+            } catch (IOException e) {
+                throw new RuntimeException("Error deserializing object", e);
+            }
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowVarBinaryReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowVarBinaryReadData(m_data, m_offsets, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+            return BigArrays.length(m_data) + OffsetsBuffer.usedLongSizeFor(m_length) + m_validity.sizeOf();
+        }
+
+        @Override
+        protected void closeResources() {
+            // Nothing to do
         }
     }
 
@@ -165,51 +260,47 @@ public final class ArrowVarBinaryData {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    static final class ArrowDictEncodedLegacyDateTimeVarBinaryReadData extends AbstractArrowReadData<IntVector>
+    static final class ArrowDictEncodedLegacyDateTimeVarBinaryReadData extends AbstractArrowReadData
         implements VarBinaryReadData {
 
-        private final LargeVarBinaryVector m_dict;
+        private final int[] m_indices;
 
-        private ArrowDictEncodedLegacyDateTimeVarBinaryReadData(final IntVector vector, final LargeVarBinaryVector dict,
-            final MissingValues missingValues) {
-            super(vector, missingValues);
-            m_dict = dict;
+        private final ArrowVarBinaryReadData m_dictionary;
+
+        private ArrowDictEncodedLegacyDateTimeVarBinaryReadData(final int[] indices,
+            final ArrowVarBinaryReadData dictionary, final ValidityBuffer validity) {
+            super(validity, indices.length);
+            m_indices = indices;
+            m_dictionary = dictionary;
         }
 
-        private ArrowDictEncodedLegacyDateTimeVarBinaryReadData(final IntVector vector, final LargeVarBinaryVector dict,
-            final MissingValues missingValues, final int offset, final int length) {
-            super(vector, missingValues, offset, length);
-            m_dict = dict;
+        private ArrowDictEncodedLegacyDateTimeVarBinaryReadData(final int[] indices,
+            final ArrowVarBinaryReadData dictionary, final ValidityBuffer validity, final int offset,
+            final int length) {
+            super(validity, offset, length);
+            m_indices = indices;
+            m_dictionary = dictionary;
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector) + ArrowSizeUtils.sizeOfVariableWidth(m_dict);
+            return m_validity.sizeOf() + m_indices.length * Integer.BYTES + m_dictionary.sizeOf();
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowDictEncodedLegacyDateTimeVarBinaryReadData(m_vector, m_dict, m_missingValues, m_offset + start, length);
+            return new ArrowDictEncodedLegacyDateTimeVarBinaryReadData(m_indices, m_dictionary, m_validity,
+                m_offset + start, length);
         }
 
         @Override
         public byte[] getBytes(final int index) {
-            return m_dict.get(getDictIdx(index));
+            return m_dictionary.getBytes(m_indices[m_offset + index]);
         }
 
         @Override
         public <T> T getObject(final int index, final ObjectDeserializer<T> deserializer) {
-            return ArrowBufIO.deserialize(getDictIdx(index), m_dict, deserializer);
-        }
-
-        private int getDictIdx(final int index) {
-            return m_vector.get(m_offset + index);
-        }
-
-        @Override
-        protected void closeResources() {
-            super.closeResources();
-            m_dict.close();
+            return m_dictionary.getObject(m_indices[m_offset + index], deserializer);
         }
 
     }
@@ -217,19 +308,22 @@ public final class ArrowVarBinaryData {
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVarBinaryData} */
     public static final class ArrowVarBinaryDataFactory extends AbstractArrowColumnDataFactory {
 
+        /** Singleton instance of {@link ArrowVarBinaryDataFactory} */
+        public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
+
         /**
          * In version 0 we implemented dict encoding in order to load ZonedDateTime data in a backwards compatible way.
          * Newer versions don't support dict encoding because they should use our own struct dict encoding.
          */
         private static final ArrowColumnDataFactoryVersion V0 = ArrowColumnDataFactoryVersion.version(0);
 
-        /**
-         * Singleton instance.
-         */
-        public static final ArrowVarBinaryDataFactory INSTANCE = new ArrowVarBinaryDataFactory();
-
         private ArrowVarBinaryDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(1));
+            super(1);
+        }
+
+        @Override
+        public ArrowWriteData createWrite(final int capacity) {
+            return new ArrowVarBinaryWriteData(capacity);
         }
 
         @Override
@@ -238,45 +332,68 @@ public final class ArrowVarBinaryData {
         }
 
         @Override
-        public ArrowVarBinaryWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final LargeVarBinaryVector v = (LargeVarBinaryVector)vector;
-            v.allocateNew(capacity * INITAL_BYTES_PER_ELEMENT, capacity);
-            return new ArrowVarBinaryWriteData(v);
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
+            var d = (ArrowVarBinaryReadData)data;
+            var v = (LargeVarBinaryVector)vector;
+
+            // Make sure the buffers are allocated with the correct size
+            v.allocateNew(BigArrays.length(d.m_data), d.length());
+
+            MemoryCopyUtils.copy(d.m_data, v.getDataBuffer());
+            d.m_offsets.copyTo(v.getOffsetBuffer());
+            d.m_validity.copyTo(v.getValidityBuffer());
+
+            v.setLastSet(d.length() - 1);
+            v.setValueCount(d.length());
         }
 
         @Override
         public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            final var missingValues = MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount());
             if (V0.equals(version)) {
-                // in case of ZonedDateTime data we stored the version id as dict encoded var binary
                 var dictionaryEncoding = vector.getField().getDictionary();
                 if (dictionaryEncoding != null) {
                     var dict = provider.lookup(dictionaryEncoding.getId());
                     Preconditions.checkArgument(dict.getVectorType().equals(MinorType.LARGEVARBINARY.getType()),
                         "Encountered dictionary vector of type '%s' but expected a LargeVarBinaryVector.");
-                    @SuppressWarnings("resource")
-                    LargeVarBinaryVector dictVector = (LargeVarBinaryVector)dict.getVector();
-                    return new ArrowDictEncodedLegacyDateTimeVarBinaryReadData((IntVector)vector, dictVector,
-                        missingValues);
+
+                    var dictionary = readFromVector(dict.getVector());
+
+                    // Read indices
+                    var valueCount = vector.getValueCount();
+                    var indices = new int[valueCount];
+                    MemoryCopyUtils.copy(vector.getDataBufferAddress(), indices);
+                    var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+                    return new ArrowDictEncodedLegacyDateTimeVarBinaryReadData(indices, dictionary, validity);
                 } else {
-                    return new ArrowVarBinaryReadData((LargeVarBinaryVector)vector,
-                        missingValues);
+                    return readFromVector(vector);
                 }
             } else if (m_version.equals(version)) {
-                return new ArrowVarBinaryReadData((LargeVarBinaryVector)vector,
-                    missingValues);
+                return readFromVector(vector);
             } else {
                 throw new IOException(
                     "Cannot read ArrowVarBinaryData with version " + version + ". Current version: " + m_version + ".");
             }
         }
 
+        private static ArrowVarBinaryReadData readFromVector(final FieldVector vector) {
+
+            int valueCount = vector.getValueCount();
+            var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+            var offsets = OffsetsBuffer.createLongBuffer(vector.getOffsetBuffer(), valueCount);
+
+            // TODO use last offset instead of capacity?
+            var data = ByteBigArrays.newBigArray(vector.getDataBuffer().capacity());
+            MemoryCopyUtils.copy(vector.getDataBuffer(), data);
+
+            return new ArrowVarBinaryReadData(data, offsets, validity, valueCount);
+        }
+
         @Override
         public int initialNumBytesPerElement() {
-            return (int)INITAL_BYTES_PER_ELEMENT // data buffer
-                + BaseLargeVariableWidthVector.OFFSET_WIDTH // offset buffer
+            return INITAL_BYTES_PER_ELEMENT // data buffer
+                + Long.BYTES // offset buffer
                 + 1; // validity bit
         }
     }

@@ -156,14 +156,25 @@ abstract class AbstractArrowBatchReader {
         final DictionaryProvider dictionaries = readDictionaries(index);
 
         // Create the ColumnData
-        return m_columnSelection.createBatch(i -> {
-            try {
-                return m_factories[i].createRead(vectors[i].m_vector, vectors[i].m_nullCount, dictionaries,
-                    m_factoryVersions[i]);
-            } catch (IOException e) {
-                throw new IllegalStateException("Exception while reading column data.", e);
+        try {
+            return m_columnSelection.createBatch(i -> {
+                try {
+                    return m_factories[i].createRead(vectors[i].m_vector, vectors[i].m_nullCount, dictionaries,
+                        m_factoryVersions[i]);
+                } catch (IOException e) {
+                    throw new IllegalStateException("Exception while reading column data.", e);
+                }
+            });
+        } finally {
+            for (FieldVectorAndNullCount vector : vectors) {
+                if (vector != null) {
+                    vector.m_vector.close();
+                }
             }
-        });
+            for (long id : m_dictionaryDescriptions.keySet()) {
+                dictionaries.lookup(id).getVector().close();
+            }
+        }
     }
 
     /** Read the vectors at the given batch index using the reader */

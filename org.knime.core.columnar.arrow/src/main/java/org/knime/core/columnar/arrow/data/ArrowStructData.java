@@ -50,25 +50,18 @@ package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.stream.Stream;
 
-import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.apache.arrow.vector.types.pojo.ArrowType.Struct;
+import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.NestedDictionaryProvider;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.data.StructData.StructReadData;
@@ -85,181 +78,151 @@ public final class ArrowStructData {
     }
 
     /** Arrow implementation of {@link StructWriteData}. */
-    public static final class ArrowStructWriteData extends AbstractArrowWriteData<StructVector>
-        implements StructWriteData {
+    public static final class ArrowStructWriteData extends AbstractArrowWriteData implements StructWriteData {
 
         private final ArrowWriteData[] m_children;
 
-        private ArrowStructWriteData(final StructVector vector, final ArrowWriteData... children) {
-            super(vector);
+        private int m_capacity;
+
+        private ArrowStructWriteData(final int capacity, final ArrowWriteData[] children) {
+            super(capacity);
+            m_capacity = capacity;
             m_children = children;
         }
 
-        private ArrowStructWriteData(final StructVector vector, final int offset, final ArrowWriteData... children) {
-            super(vector, offset);
+        private ArrowStructWriteData(final int offset, final ValidityBuffer validity, final ArrowWriteData[] children,
+            final int capacity) {
+            super(offset, validity);
+            m_capacity = capacity;
             m_children = children;
-        }
-
-        @Override
-        public void setMissing(final int index) {
-            // NB: We don't need to call m_vector.setNull because it is always null until #close
-            // Set all children to missing
-            for (final NullableWriteData child : m_children) {
-                // children have their own offset (see slice)
-                child.setMissing(index);
-            }
-        }
-
-        @Override
-        public long sizeOf() {
-            return ArrowStructData.sizeOf(m_vector, m_children);
         }
 
         @Override
         public <C extends NullableWriteData> C getWriteDataAt(final int index) {
             @SuppressWarnings("unchecked")
-            final C cast = (C)m_children[index];
-            return cast;
+            C result = (C)m_children[index];
+            return result;
         }
 
         @Override
         public ArrowStructWriteData slice(final int start) {
-            final ArrowWriteData[] slicedChildren = new ArrowWriteData[m_children.length];
+            // Create sliced children
+            ArrowWriteData[] slicedChildren = new ArrowWriteData[m_children.length];
             for (int i = 0; i < m_children.length; i++) {
                 slicedChildren[i] = m_children[i].slice(start);
             }
-            return new ArrowStructWriteData(m_vector, m_offset + start, slicedChildren);
+            return new ArrowStructWriteData(m_offset + start, m_validity, slicedChildren, m_capacity - start);
         }
 
         @Override
-        @SuppressWarnings("resource") // Validity buffer and child vectors closed by m_vector, vector closed by ReadData
-        public ArrowStructReadData close(final int length) {
-            final int numChildren = m_children.length;
-
-            // Close the children
-            final ArrowReadData[] readChildren = new ArrowReadData[numChildren];
-            for (int i = 0; i < numChildren; i++) {
-                readChildren[i] = m_children[i].close(length);
-            }
-
-            // Set the validity buffer
-            final ArrowBuf validityBuffer = m_vector.getValidityBuffer();
-
-            // Get the validity buffers of the children
-            final List<FieldVector> childVectors = m_vector.getChildrenFromFields();
-            final ArrowBuf[] childValidtiyBuffers = new ArrowBuf[childVectors.size()];
-            for (int i = 0; i < childVectors.size(); i++) {
-                final FieldVector child = childVectors.get(i);
-                childValidtiyBuffers[i] = child.getValidityBuffer();
-            }
-
-            setValidityFromChildren(validityBuffer, childValidtiyBuffers, length);
-
-            return new ArrowStructReadData(closeWithLength(length),
-                MissingValues.forValidityBuffer(validityBuffer, length), readChildren);
+        public int capacity() {
+            return m_capacity;
         }
 
         @Override
-        protected void closeResources() {
-            ArrowStructData.closeResources(m_vector, m_children);
-        }
-
-        /**
-         * Set the validity buffer from the validity buffers of the children. If at least one child is set, the parent
-         * is set.
-         */
-        private static void setValidityFromChildren(final ArrowBuf buf, final ArrowBuf[] childBufs, final int length) {
-            final int bytesToSet = (int)Math.ceil(length / 8.0);
-            int bufferPosition = 0;
-
-            // TODO check if there is a performance improvement by using int
-            // The idea is:
-            // * Less loop iterations are needed
-            // * Java promotes bitwise operators to int anyway
-
-            // Using int (4 bytes at a time)
-            while (bufferPosition + 4 <= bytesToSet) {
-                int validity = 0;
-                // NB: if validity is -1 all bits are set and we do not need to check the other buffers
-                for (int i = 0; i < childBufs.length && validity != -1; i++) {
-                    validity |= childBufs[i].getInt(bufferPosition);
+        public void expand(final int minimumCapacity) {
+            if (minimumCapacity > m_capacity) {
+                m_validity.setNumElements(minimumCapacity);
+                for (NullableWriteData child : m_children) {
+                    child.expand(minimumCapacity);
                 }
-                buf.setInt(bufferPosition, validity);
-                bufferPosition += 4;
-            }
-
-            // Using bytes (1 byte at a time)
-            while (bufferPosition < bytesToSet) {
-                byte validity = 0;
-                // NB: if validity is -1 all bits are set and we do not need to check the other buffers
-                for (int i = 0; i < childBufs.length && validity != -1; i++) {
-                    validity |= childBufs[i].getByte(bufferPosition);
-                }
-                buf.setByte(bufferPosition, validity);
-                bufferPosition += 1;
+                m_capacity = minimumCapacity;
             }
         }
-    }
 
-    /** Arrow implementation of {@link StructReadData}. */
-    public static final class ArrowStructReadData extends AbstractArrowReadData<StructVector>
-        implements StructReadData {
-
-        private final ArrowReadData[] m_children;
-
-        private ArrowStructReadData(final StructVector vector, final MissingValues missingValues,
-            final ArrowReadData... children) {
-            super(vector, missingValues);
-            m_children = children;
+        @Override
+        public void setMissing(final int index) {
+            m_validity.set(m_offset + index, false);
+            // Also set all children to missing
+            for (NullableWriteData child : m_children) {
+                child.setMissing(index);
+            }
         }
 
-        private ArrowStructReadData(final StructVector vector, final MissingValues missingValues, final int offset,
-            final int length, final ArrowReadData... children) {
-            super(vector, missingValues, offset, length);
-            m_children = children;
+        @Override
+        public long usedSizeFor(final int numElements) {
+            long size = ValidityBuffer.usedSizeFor(numElements);
+            for (var child : m_children) {
+                size += child.usedSizeFor(numElements);
+            }
+            return size;
         }
 
         @Override
         public long sizeOf() {
-            return ArrowStructData.sizeOf(m_vector, m_children);
+            long size = m_validity.sizeOf();
+            for (var child : m_children) {
+                size += child.sizeOf();
+            }
+            return size;
+        }
+
+        @Override
+        public ArrowStructReadData close(final int length) {
+            // Close children and create read children
+            var readChildren = new ArrowReadData[m_children.length];
+            var validityBuffers = new ValidityBuffer[m_children.length];
+            for (int i = 0; i < m_children.length; i++) {
+                readChildren[i] = m_children[i].close(length);
+                validityBuffers[i] = readChildren[i].getValidityBuffer();
+            }
+
+            m_validity.setNumElements(length);
+            m_validity.setFrom(validityBuffers);
+
+            return new ArrowStructReadData(readChildren, m_validity, length);
+        }
+
+        @Override
+        protected void closeResources() {
+            // No extra resources
+        }
+    }
+
+    /** Arrow implementation of {@link StructReadData}. */
+    public static final class ArrowStructReadData extends AbstractArrowReadData implements StructReadData {
+
+        private final ArrowReadData[] m_children;
+
+        private ArrowStructReadData(final ArrowReadData[] children, final ValidityBuffer validity, final int length) {
+            super(validity, length);
+            m_children = children;
+        }
+
+        private ArrowStructReadData(final ArrowReadData[] children, final ValidityBuffer validity, final int offset,
+            final int length) {
+            super(validity, offset, length);
+            m_children = children;
         }
 
         @Override
         public <C extends NullableReadData> C getReadDataAt(final int index) {
             @SuppressWarnings("unchecked")
-            final C cast = (C)m_children[index];
-            return cast;
+            C result = (C)m_children[index];
+            return result;
         }
 
         @Override
-        public ArrowStructReadData slice(final int start, final int length) {
-            final ArrowReadData[] slicedChildren = new ArrowReadData[m_children.length];
+        public ArrowReadData slice(final int start, final int length) {
+            var slicedChildren = new ArrowReadData[m_children.length];
             for (int i = 0; i < m_children.length; i++) {
                 slicedChildren[i] = m_children[i].slice(start, length);
             }
-            return new ArrowStructReadData(m_vector, m_missingValues, m_offset + start, length, slicedChildren);
+            return new ArrowStructReadData(slicedChildren, m_validity, m_offset + start, length);
+        }
+
+        @Override
+        public long sizeOf() {
+            long size = m_validity.sizeOf();
+            for (var child : m_children) {
+                size += child.sizeOf();
+            }
+            return size;
         }
 
         @Override
         protected void closeResources() {
-            ArrowStructData.closeResources(m_vector, m_children);
-        }
-    }
-
-    private static long sizeOf(final StructVector vector, final ReferencedData[] children) {
-        long size = ArrowSizeUtils.sizeOfStruct(vector);
-        for (final ReferencedData c : children) {
-            size += c.sizeOf();
-        }
-        return size;
-    }
-
-    private static void closeResources(final StructVector vector, final ReferencedData[] children) {
-        if (vector != null) {
-            vector.close();
-            for (final ReferencedData c : children) {
-                c.release();
-            }
+            // No extra resources
         }
     }
 
@@ -276,150 +239,95 @@ public final class ArrowStructData {
          */
         private static final int V0 = 0;
 
-        private final ArrowColumnDataFactory[] m_inner;
-
-        private static ArrowColumnDataFactoryVersion[] getVersions(final ArrowColumnDataFactory[] factories) {
-            return Stream.of(factories)//
-                    .map(ArrowColumnDataFactory::getVersion)//
-                    .toArray(ArrowColumnDataFactoryVersion[]::new);
-        }
-
         /**
          * Create a new factory for Arrow struct data.
          *
          * @param inner factories to create the inner types
          */
         public ArrowStructDataFactory(final ArrowColumnDataFactory... inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, getVersions(inner)));
-            m_inner = inner;
+            super(CURRENT_VERSION, inner);
+        }
+
+        @Override
+        public ArrowStructWriteData createWrite(final int capacity) {
+            var children = new ArrowWriteData[m_children.length];
+            for (int i = 0; i < m_children.length; i++) {
+                children[i] = m_children[i].createWrite(capacity);
+            }
+            return new ArrowStructWriteData(capacity, children);
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            final List<Field> children = new ArrayList<>(m_inner.length);
-            for (int i = 0; i < m_inner.length; i++) { //NOSONAR
-                children.add(m_inner[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
+            List<Field> children = new ArrayList<>(m_children.length);
+            for (int i = 0; i < m_children.length; i++) {
+                children.add(m_children[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
             }
-            return new Field(name, new FieldType(true, Struct.INSTANCE, null), children);
+            return new Field(name, new FieldType(true, MinorType.STRUCT.getType(), null), children);
         }
 
         @Override
-        public ArrowStructWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final StructVector v = (StructVector)vector;
-            // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
-            // the child vector
-            v.setInitialCapacity(capacity);
-            v.allocateNew();
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
+            ArrowStructReadData d = (ArrowStructReadData)data;
+            StructVector sv = (StructVector)vector;
 
-            // Children
-            final ArrowWriteData[] children = new ArrowWriteData[m_inner.length];
-            for (int i = 0; i < children.length; i++) {
-                @SuppressWarnings("resource") // Child vector closed with struct vector
-                final FieldVector childVector = v.getChild(childNameAtIndex(i));
-                children[i] = m_inner[i].createWrite(childVector, dictionaryIdSupplier, allocator, capacity);
+            sv.setInitialCapacity(d.length());
+            sv.allocateNew();
+
+            d.m_validity.copyTo(sv.getValidityBuffer());
+
+            for (int i = 0; i < m_children.length; i++) {
+                var childVector = (FieldVector)sv.getChildByOrdinal(i);
+                m_children[i].copyToVector(d.getReadDataAt(i), childVector);
             }
-            return new ArrowStructWriteData(v, children);
+
+            sv.setValueCount(d.length());
         }
 
         @Override
         public ArrowStructReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            final var resolvedVersion = getVersion(version);
-            final StructVector v = (StructVector)vector;
-            // Children
-            final var children = new ArrowReadData[m_inner.length];
-            for (int i = 0; i < children.length; i++) {//NOSONAR
-                @SuppressWarnings("resource") // Child vector closed with struct vector
-                // TODO is this safe?
-                final FieldVector childVector = (FieldVector)v.getChildByOrdinal(i);
-                children[i] = m_inner[i].createRead(childVector, nullCount.getChild(i), provider,
-                    resolvedVersion.getChildVersion(i));
-            }
 
-            return new ArrowStructReadData(v, MissingValues.forNullCount(nullCount.getNullCount(), v.getValueCount()),
-                children);
-        }
-
-        private ArrowColumnDataFactoryVersion getVersion(final ArrowColumnDataFactoryVersion version)
-            throws IOException {
-            if (version.getVersion() == CURRENT_VERSION) {
-                return version;
-            } else if (version.getVersion() == V0) {
-                if (hasVersionForChildren(version)) {
-                    return version;
-                } else {
+            var childVersions = version.getChildVersions();
+            if (version.getVersion() == V0) {
+                if (childVersions.length == 0) {
                     // in case of legacy date&time data we used Arrow structs directly and hence there are no versions
                     // for the children, however, we know that all versions were 0 (and that there was no more nesting)
-                    return ArrowColumnDataFactoryVersion.version(V0, //
-                        Stream.generate(() -> ArrowColumnDataFactoryVersion.version(0))//
-                            .limit(m_inner.length)//
-                            .toArray(ArrowColumnDataFactoryVersion[]::new));
+                    childVersions = Stream.generate(() -> ArrowColumnDataFactoryVersion.version(0)) //
+                        .limit(m_children.length) //
+                        .toArray(ArrowColumnDataFactoryVersion[]::new);
                 }
-            } else {
+            } else if (version.getVersion() != CURRENT_VERSION) {
                 throw new IOException("Cannot read ArrowStructData with version " + version.getVersion()
                     + ". Current version: " + CURRENT_VERSION + ".");
             }
-        }
 
-        private boolean hasVersionForChildren(final ArrowColumnDataFactoryVersion version) {
-            try {
-                version.getChildVersion(m_inner.length - 1);
-                return true;
-            } catch (IndexOutOfBoundsException ex) {//NOSONAR
-                // can be the case for legacy date&time data where we used arrow structs directly
-                return false;
+            // NOTE: This code is valid for V0 and V1 (CURRENT_VERSION)
+            // (they only differ for the saved child versions which is handled above)
+            StructVector v = (StructVector)vector;
+            int valueCount = v.getValueCount();
+            ValidityBuffer validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+            var children = new ArrowReadData[m_children.length];
+            for (int i = 0; i < m_children.length; i++) {
+                var childVector = (FieldVector)v.getChildByOrdinal(i);
+                children[i] = m_children[i].createRead(childVector, nullCount.getChild(i), provider, childVersions[i]);
             }
-        }
 
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            final ArrowStructReadData d = (ArrowStructReadData)data;
-            final List<DictionaryProvider> providers = new ArrayList<>();
-            for (int i = 0; i < m_inner.length; i++) {
-                final DictionaryProvider p = m_inner[i].getDictionaries(d.getReadDataAt(i));
-                if (p != null) {
-                    providers.add(p);
-                }
-            }
-            return new NestedDictionaryProvider(providers);
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            if (!super.equals(obj)) {
-                return false;
-            }
-            final ArrowStructDataFactory o = (ArrowStructDataFactory)obj;
-            return Arrays.equals(m_inner, o.m_inner);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(m_version, Arrays.deepHashCode(m_inner));
-        }
-
-        private static final String childNameAtIndex(final int index) {
-            return String.valueOf(index);
-        }
-
-        @Override
-        public String toString() {
-            return new StringBuilder(getClass().getSimpleName())//
-                .append(".v")//
-                .append(CURRENT_VERSION)//
-                .append(" ")//
-                .append(Arrays.toString(m_inner))//
-                .toString();
+            return new ArrowStructReadData(children, validity, valueCount);
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            int initialNumBytes = 0;
-            for (int i = 0; i < m_inner.length; i++) {
-                initialNumBytes += m_inner[i].initialNumBytesPerElement();
+            int sum = 0;
+            for (var f : m_children) {
+                sum += f.initialNumBytesPerElement();
             }
-            return initialNumBytes;
+            return sum;
+        }
+
+        private static String childNameAtIndex(final int index) {
+            return String.valueOf(index);
         }
     }
 }

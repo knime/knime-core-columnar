@@ -75,7 +75,7 @@ public class ArrowStringDataTest extends AbstractArrowDataTest<ArrowStringWriteD
 
     private static final Map<Integer, String> VALUES = new HashMap<>();
 
-    // Because generating random Strings takes to much time
+    // Because generating random Strings takes too much time
     private static final String DEFAULT_STRING = "foobar";
 
     /** Create the test for {@link ArrowStringData} */
@@ -107,13 +107,14 @@ public class ArrowStringDataTest extends AbstractArrowDataTest<ArrowStringWriteD
 
     @Override
     protected boolean isReleasedW(final ArrowStringWriteData data) {
-        return data.m_vector == null;
+        // On-heap data does not have resources that need explicit release
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowStringReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+        // On-heap data does not have resources that need explicit release
+        return false;
     }
 
     @Override
@@ -124,7 +125,7 @@ public class ArrowStringDataTest extends AbstractArrowDataTest<ArrowStringWriteD
         }
 
         return numBytes // data
-            + 4L * (capacity + 1) // 4 byte per value for offset buffer
+            + 4L * (capacity + 1) // 4 bytes per value for offset buffer
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 

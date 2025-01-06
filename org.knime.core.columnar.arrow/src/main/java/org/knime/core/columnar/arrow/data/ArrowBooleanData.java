@@ -48,7 +48,6 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -56,9 +55,9 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.BooleanData.BooleanReadData;
 import org.knime.core.columnar.data.BooleanData.BooleanWriteData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
  * Arrow implementation of {@link BooleanWriteData} and {@link BooleanReadData}.
@@ -72,66 +71,108 @@ public final class ArrowBooleanData {
     }
 
     /** Arrow implementation of {@link BooleanWriteData}. */
-    public static final class ArrowBooleanWriteData extends AbstractArrowWriteData<BitVector>
-        implements BooleanWriteData {
+    public static final class ArrowBooleanWriteData extends AbstractArrowWriteData implements BooleanWriteData {
 
-        private ArrowBooleanWriteData(final BitVector vector) {
-            super(vector);
+        private int m_capacity;
+
+        private ValidityBuffer m_data;
+
+        private ArrowBooleanWriteData(final int capacity) {
+            super(capacity);
+            m_data = new ValidityBuffer(capacity);
+            m_capacity = capacity;
         }
 
-        private ArrowBooleanWriteData(final BitVector vector, final int offset) {
-            super(vector, offset);
+        private ArrowBooleanWriteData(final int offset, final ValidityBuffer data, final ValidityBuffer validity,
+            final int capacity) {
+            super(offset, validity);
+            m_data = data;
+            m_capacity = capacity;
         }
 
         @Override
         public void setBoolean(final int index, final boolean val) {
-            m_vector.set(m_offset + index, val ? 1 : 0);
+            m_data.set(index + m_offset, val);
+            setValid(index + m_offset);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowBooleanWriteData(m_vector, m_offset + start);
+            return new ArrowBooleanWriteData(m_offset + start, m_data, m_validity, m_capacity);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+            m_capacity = minimumCapacity;
+        }
+
+        @Override
+        public int capacity() {
+            return m_capacity;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return ValidityBuffer.usedSizeFor(numElements) * 2;
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return usedSizeFor(m_capacity);
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
+        protected void closeResources() {
+            // No resources to close for on-heap data
+        }
+
+        @Override
         public ArrowBooleanReadData close(final int length) {
-            final BitVector vector = closeWithLength(length);
-            return new ArrowBooleanReadData(vector,
-                MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+            setNumElements(length);
+            return new ArrowBooleanReadData(m_data, m_validity, length);
+        }
+
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            m_validity.setNumElements(numElements);
+            m_data.setNumElements(numElements);
         }
     }
 
     /** Arrow implementation of {@link BooleanReadData}. */
-    public static final class ArrowBooleanReadData extends AbstractArrowReadData<BitVector> implements BooleanReadData {
+    public static final class ArrowBooleanReadData extends AbstractArrowReadData implements BooleanReadData {
 
-        private ArrowBooleanReadData(final BitVector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
+        private final ValidityBuffer m_data;
+
+        private ArrowBooleanReadData(final ValidityBuffer data, final ValidityBuffer validity, final int length) {
+            super(validity, length);
+            m_data = data;
         }
 
-        private ArrowBooleanReadData(final BitVector vector, final MissingValues missingValues, final int offset,
+        private ArrowBooleanReadData(final ValidityBuffer data, final ValidityBuffer validity, final int offset,
             final int length) {
-            super(vector, missingValues, offset, length);
+            super(validity, offset, length);
+            m_data = data;
         }
 
         @Override
         public boolean getBoolean(final int index) {
-            return m_vector.get(m_offset + index) != 0;
+            return m_data.isSet(index + m_offset);
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowBooleanReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowBooleanReadData(m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return ValidityBuffer.usedSizeFor(m_length) * 2;
         }
     }
 
@@ -142,7 +183,7 @@ public final class ArrowBooleanData {
         public static final ArrowBooleanDataFactory INSTANCE = new ArrowBooleanDataFactory();
 
         private ArrowBooleanDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
         }
 
         @Override
@@ -151,28 +192,45 @@ public final class ArrowBooleanData {
         }
 
         @Override
-        public ArrowBooleanWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final BitVector v = (BitVector)vector;
-            v.allocateNew(capacity);
-            return new ArrowBooleanWriteData(v);
+        public ArrowBooleanWriteData createWrite(final int capacity) {
+            return new ArrowBooleanWriteData(capacity);
+        }
+
+        @Override
+        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+            var d = (ArrowBooleanReadData)data; // TODO generic?
+            var vector = (BitVector)fieldVector;
+
+            vector.allocateNew(d.length());
+
+            // Copy the data
+            d.m_data.copyTo(vector.getDataBuffer());
+
+            // Copy the validity
+            d.m_validity.copyTo(vector.getValidityBuffer());
+
+            // Set the value count
+            vector.setValueCount(d.length());
         }
 
         @Override
         public ArrowBooleanReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+
             if (m_version.equals(version)) {
-                return new ArrowBooleanReadData((BitVector)vector,
-                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
+                var valueCount = vector.getValueCount();
+                var data = ValidityBuffer.createFrom(vector.getDataBuffer(), valueCount);
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+                return new ArrowBooleanReadData(data, validity, valueCount);
             } else {
                 throw new IOException(
-                    "Cannot read ArrowBooleanData with version " + version + ". Current version: " + m_version + ".");
+                    "Cannot read ArrowIntData with version " + version + ". Current version: " + m_version + ".");
             }
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return 1; // one bit validity, one bit value is less than a byte, but it's a good estimate
+            return 1;
         }
     }
 }

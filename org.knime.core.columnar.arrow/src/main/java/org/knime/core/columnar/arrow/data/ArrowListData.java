@@ -50,13 +50,9 @@ package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Objects;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.complex.BaseRepeatedValueVector;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
@@ -64,7 +60,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.IntOffsetsBuffer;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -81,116 +77,140 @@ public final class ArrowListData {
     }
 
     /** Arrow implementation of {@link ListWriteData}. */
-    public static final class ArrowListWriteData extends AbstractArrowWriteData<ListVector> implements ListWriteData {
+    public static final class ArrowListWriteData extends AbstractArrowWriteData implements ListWriteData {
 
-        // Package private for testing only
-        final ArrowWriteData m_data;
+        private int m_capacity;
 
-        private ArrowListWriteData(final ListVector vector, final ArrowWriteData data) {
-            super(vector);
+        private ArrowWriteData m_data;
+
+        private IntOffsetsBuffer m_offsets;
+
+        private ArrowListWriteData(final int capacity, final ArrowWriteData data) {
+            super(capacity);
+            m_capacity = capacity;
             m_data = data;
+            m_offsets = new OffsetsBuffer.IntOffsetsBuffer(capacity);
         }
 
-        private ArrowListWriteData(final ListVector vector, final ArrowWriteData data, final int offset) {
-            super(vector, offset);
+        private ArrowListWriteData(final int offset, final ArrowWriteData data, final IntOffsetsBuffer offsets,
+            final ValidityBuffer validity, final int capacity) {
+            super(offset, validity);
+            m_capacity = capacity;
             m_data = data;
+            m_offsets = offsets;
         }
 
         @Override
         public <C extends NullableWriteData> C createWriteData(final int index, final int size) {
-            // Set the offset and validity buffer
-            final int offset = m_vector.startNewValue(m_offset + index);
-            m_vector.endValue(m_offset + index, size);
+            var dataIndex = m_offsets.add(index + m_offset, size);
 
-            // Make sure the value data is big enough
-            final int lastIndex = offset + size;
-            if (m_data.capacity() < lastIndex) {
-                m_data.expand(lastIndex);
-            }
+            // Set the validity bit
+            setValid(index + m_offset);
 
-            // Set the slice in the value data
+            // TODO be smarter here and do not copy on each new list
+            m_data.expand(dataIndex.end());
+
             @SuppressWarnings("unchecked")
-            final C data = (C)m_data.slice(offset);
+            var data = (C)m_data.slice(dataIndex.start());
             return data;
         }
 
         @Override
+        public ArrowWriteData slice(final int start) {
+            return new ArrowListWriteData(m_offset + start, m_data, m_offsets, m_validity, m_capacity);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+            m_capacity = minimumCapacity;
+        }
+
+        @Override
+        public int capacity() {
+            return m_capacity;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return ValidityBuffer.usedSizeFor(numElements) //
+                + OffsetsBuffer.usedIntSizeFor(numElements) //
+                + m_data.usedSizeFor(m_offsets.getNumData(numElements));
+        }
+
+        @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfList(m_vector) + m_data.sizeOf();
+            return m_validity.sizeOf() + OffsetsBuffer.usedIntSizeFor(m_capacity) + m_data.sizeOf();
         }
 
         @Override
-        public ArrowListWriteData slice(final int start) {
-            return new ArrowListWriteData(m_vector, m_data, m_offset + start);
-        }
-
-        @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
         public ArrowListReadData close(final int length) {
-            final ArrowBuf offsetBuffer = m_vector.getOffsetBuffer();
-            final long nextToSet = m_vector.getLastSet() + 1L;
-
-            // Fill to the end
-            final int dataLength = offsetBuffer.getInt(nextToSet * BaseRepeatedValueVector.OFFSET_WIDTH);
-            for (long i = nextToSet + 1; i < length - 1; i++) {
-                offsetBuffer.setInt(i * BaseRepeatedValueVector.OFFSET_WIDTH, dataLength);
-            }
-
-            final ArrowReadData readData = m_data.close(dataLength);
-            final ListVector vector = closeWithLength(length);
-            return new ArrowListReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length),
-                readData);
+            // NOTE: setNumElements also shrinks the offsets buffer if necessary
+            setNumElements(length);
+            m_offsets.fillWithZeroLength();
+            return new ArrowListReadData(m_data.close(m_offsets.getNumData(length)), m_offsets, m_validity, length);
         }
 
         @Override
         protected void closeResources() {
-            super.closeResources();
-            m_data.release();
+            // TODO not needed for on-heap, right?
+        }
+
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            // Note: m_data is expanded when setting the elements inside the list
+            m_validity.setNumElements(numElements);
+            m_offsets.setNumElements(numElements);
         }
     }
 
     /** Arrow implementation of {@link ListReadData}. */
-    public static final class ArrowListReadData extends AbstractArrowReadData<ListVector> implements ListReadData {
+    public static final class ArrowListReadData extends AbstractArrowReadData implements ListReadData {
 
-        // Package private for testing only
-        final ArrowReadData m_data;
+        private final ArrowReadData m_data;
 
-        private ArrowListReadData(final ListVector vector, final MissingValues missingValues,
-            final ArrowReadData data) {
-            super(vector, missingValues);
+        private final IntOffsetsBuffer m_offsets;
+
+        private ArrowListReadData(final ArrowReadData data, final IntOffsetsBuffer offsets,
+            final ValidityBuffer validity, final int length) {
+            super(validity, length);
             m_data = data;
+            m_offsets = offsets;
         }
 
-        private ArrowListReadData(final ListVector vector, final MissingValues missingValues, final ArrowReadData data,
-            final int offset, final int length) {
-            super(vector, missingValues, offset, length);
+        private ArrowListReadData(final ArrowReadData data, final IntOffsetsBuffer offsets,
+            final ValidityBuffer validity, final int offset, final int length) {
+            super(validity, offset, length);
             m_data = data;
-        }
-
-        @Override
-        public long sizeOf() {
-            return ArrowSizeUtils.sizeOfList(m_vector) + m_data.sizeOf();
-        }
-
-        @Override
-        public ArrowListReadData slice(final int start, final int length) {
-            return new ArrowListReadData(m_vector, m_missingValues, m_data, m_offset + start, length);
+            m_offsets = offsets;
         }
 
         @Override
         public <C extends NullableReadData> C createReadData(final int index) {
             // Slice the data
-            final int start = m_vector.getElementStartIndex(m_offset + index);
-            final int length = m_vector.getElementEndIndex(m_offset + index) - start;
+            var dataIndex = m_offsets.get(index + m_offset);
             @SuppressWarnings("unchecked")
-            final C data = (C)m_data.slice(start, length);
+            final C data = (C)m_data.slice(dataIndex.start(), dataIndex.end() - dataIndex.start());
             return data;
         }
 
         @Override
+        public ArrowReadData slice(final int start, final int length) {
+            return new ArrowListReadData(m_data, m_offsets, m_validity, m_offset + start, length);
+        }
+
+        @Override
+        public long sizeOf() {
+            return m_validity.sizeOf() + OffsetsBuffer.usedIntSizeFor(m_length) + m_data.sizeOf();
+        }
+
+        @Override
         protected void closeResources() {
-            super.closeResources();
-            m_data.release();
+            // TODO not needed for on-heap, right?
         }
     }
 
@@ -203,92 +223,70 @@ public final class ArrowListData {
 
         private static final int INITIAL_VALUES_PER_LIST = 10;
 
-        private final ArrowColumnDataFactory m_inner;
-
         /**
          * Create a new factory for Arrow list data.
          *
          * @param inner the factory to create the type of the list elements
          */
         public ArrowListDataFactory(final ArrowColumnDataFactory inner) {
-            super(ArrowColumnDataFactoryVersion.version(CURRENT_VERSION, inner.getVersion()));
-            m_inner = inner;
+            super(CURRENT_VERSION, inner);
+        }
+
+        @Override
+        public ArrowWriteData createWrite(final int capacity) {
+            return new ArrowListWriteData(capacity, m_children[0].createWrite(capacity * INITIAL_VALUES_PER_LIST));
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            final Field data = m_inner.getField("listData", dictionaryIdSupplier);
+            final Field data = m_children[0].getField("listData", dictionaryIdSupplier);
             return new Field(name, new FieldType(true, MinorType.LIST.getType(), null),
                 Collections.singletonList(data));
         }
 
         @Override
-        @SuppressWarnings("resource") // Data vector closed with list vector
-        public ArrowListWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final ListVector v = (ListVector)vector;
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
+            var d = (ArrowListReadData)data;
+            var v = (ListVector)vector;
+
+            // TODO is this comment still valid?
             // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
             // the child vector
-            v.setInitialCapacity(capacity);
+            v.setInitialCapacity(d.length());
             v.allocateNew();
 
-            // Data vector
-            final FieldVector dataVector = v.getDataVector();
-            final ArrowWriteData data =
-                m_inner.createWrite(dataVector, dictionaryIdSupplier, allocator, capacity * INITIAL_VALUES_PER_LIST);
-            return new ArrowListWriteData(v, data);
+            m_children[0].copyToVector(d.m_data, v.getDataVector());
+
+            d.m_validity.copyTo(vector.getValidityBuffer());
+            d.m_offsets.copyTo(vector.getOffsetBuffer());
+
+            v.setLastSet(d.length() - 1);
+            v.setValueCount(d.length());
         }
 
         @Override
-        @SuppressWarnings("resource") // Data vector closed with list vector
-        public ArrowListReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
             if (version.getVersion() == CURRENT_VERSION) {
-                final ListVector v = (ListVector)vector;
+                var valueCount = vector.getValueCount();
+                var listVector = (ListVector)vector;
+                var dataVector = listVector.getDataVector();
+                var offsets = OffsetsBuffer.createIntBuffer(vector.getOffsetBuffer(), valueCount);
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
 
-                // Data vector
-                final FieldVector dataVector = v.getDataVector();
-                final ArrowReadData data =
-                    m_inner.createRead(dataVector, nullCount.getChild(0), provider, version.getChildVersion(0));
-
-                return new ArrowListReadData(v, MissingValues.forNullCount(nullCount.getNullCount(), v.getValueCount()),
-                    data);
+                var data =
+                    m_children[0].createRead(dataVector, nullCount.getChild(0), provider, version.getChildVersion(0));
+                return new ArrowListReadData(data, offsets, validity, valueCount);
             } else {
-                throw new IOException("Cannot read ArrowListData with version " + version.getVersion()
-                    + ". Current version: " + CURRENT_VERSION + ".");
+                throw new IOException(
+                    "Cannot read ArrowListData with version " + version + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            final ArrowListReadData d = (ArrowListReadData)data;
-            return m_inner.getDictionaries(d.m_data);
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-
-            if (!super.equals(obj)) {
-                return false;
-            }
-            final ArrowListDataFactory o = (ArrowListDataFactory)obj;
-            return Objects.equals(m_inner, o.m_inner);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(m_version, m_inner);
-        }
-
-        @Override
-        public String toString() {
-            return this.getClass().getSimpleName() + ".v" + CURRENT_VERSION + "[" + m_inner + "]";
         }
 
         @Override
         public int initialNumBytesPerElement() {
-            return m_inner.initialNumBytesPerElement() * INITIAL_VALUES_PER_LIST // data buffer
-                + BaseRepeatedValueVector.OFFSET_WIDTH // offset buffer
+            return m_children[0].initialNumBytesPerElement() * INITIAL_VALUES_PER_LIST // data buffer
+                + Integer.BYTES // offset buffer
                 + 1; // validity bit
         }
     }

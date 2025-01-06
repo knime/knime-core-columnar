@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -57,7 +57,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowVarBinaryData.ArrowVarBinaryReadData;
@@ -83,13 +83,13 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
 
     @Override
     protected ArrowVarBinaryWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowVarBinaryWriteData);
+        assertTrue(o instanceof ArrowVarBinaryWriteData, "Object is not an instance of ArrowVarBinaryWriteData");
         return (ArrowVarBinaryWriteData)o;
     }
 
     @Override
     protected ArrowVarBinaryReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowVarBinaryReadData);
+        assertTrue(o instanceof ArrowVarBinaryReadData, "Object is not an instance of ArrowVarBinaryReadData");
         return (ArrowVarBinaryReadData)o;
     }
 
@@ -100,18 +100,20 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
 
     @Override
     protected void checkValue(final ArrowVarBinaryReadData data, final int index, final int seed) {
-        assertArrayEquals(valueFor(seed), data.getBytes(index));
+        assertArrayEquals(valueFor(seed), data.getBytes(index),
+            "Byte array at index " + index + " does not match expected value for seed " + seed);
     }
 
     @Override
     protected boolean isReleasedW(final ArrowVarBinaryWriteData data) {
-        return data.m_vector == null;
+        // On-heap data does not have resources that need explicit release
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource") // Resources handled by vector
     protected boolean isReleasedR(final ArrowVarBinaryReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+        // On-heap data does not have resources that need explicit release
+        return false;
     }
 
     @Override
@@ -121,7 +123,7 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
             numBytes += new Random(i).nextInt(MAX_LENGTH);
         }
         return numBytes // data buffer
-            + 4 * capacity // offset buffer
+            + 4L * (capacity + 1) // offset buffer (one extra for the last offset)
             + (long)Math.ceil(capacity / 8.0); // validity buffer
     }
 
@@ -133,38 +135,41 @@ public class ArrowVarBinaryDataTest extends AbstractArrowDataTest<ArrowVarBinary
     }
 
     /**
-     * Test three different ways to serialize and deserialize bytes: 1. using the setBytes()/getBytes() methods, 2.
-     * using setObject/getObject with simple serializers, and 3. by serializing from/to a byte buffer and writing those
-     * bytes to the ArrowVarBinaryWriteData.
+     * Test three different ways to serialize and deserialize bytes:
+     * <ol>
+     * <li>using the setBytes()/getBytes() methods,</li>
+     * <li>using setObject/getObject with simple serializers,</li>
+     * <li>by serializing from/to a byte buffer and writing those bytes to the ArrowVarBinaryWriteData.</li>
+     * </ol>
      *
-     * @throws IOException
+     * @throws IOException if an I/O error occurs
      */
     @Test
     public void testByteArraySerialization() throws IOException {
         final int numValues = 3;
         ArrowVarBinaryWriteData data = createWrite(numValues);
-        byte[] blob = "TestData".getBytes();
+        byte[][] blobs = new byte[][]{"TestData".getBytes(), "Foo".getBytes(), "Bar".getBytes()};
 
         ObjectSerializer<byte[]> serializer = (out, v) -> out.write(v);
         ObjectDeserializer<byte[]> deserializer = (in) -> in.readBytes();
 
-        data.setBytes(0, blob);
-        data.setObject(1, blob, serializer);
+        data.setBytes(0, blobs[0]);
+        data.setObject(1, blobs[1], serializer);
         var outStream = new ByteArrayOutputStream();
-        serializer.serialize(new DataOutputStream(outStream), blob);
+        serializer.serialize(new DataOutputStream(outStream), blobs[2]);
         data.setBytes(2, outStream.toByteArray());
 
         ArrowVarBinaryReadData readData = data.close(numValues);
-        try {
-            for (int i = 0; i < numValues; i++) {
-                assertArrayEquals(blob, readData.getBytes(i));
-                assertArrayEquals(blob, readData.getObject(i, deserializer));
-                byte[] deserializedFromBytes = deserializer
-                    .deserialize(new ReadableDataInputStream(new ByteArrayInputStream(readData.getBytes(i))));
-                assertArrayEquals(blob, deserializedFromBytes);
-            }
-        } finally {
-            readData.release();
+
+        for (int i = 0; i < numValues; i++) {
+            assertArrayEquals(blobs[i], readData.getBytes(i),
+                "Byte array at index " + i + " does not match expected blob");
+            assertArrayEquals(blobs[i], readData.getObject(i, deserializer),
+                "Deserialized object at index " + i + " does not match expected blob");
+            byte[] deserializedFromBytes =
+                deserializer.deserialize(new ReadableDataInputStream(new ByteArrayInputStream(readData.getBytes(i))));
+            assertArrayEquals(blobs[i], deserializedFromBytes,
+                "Deserialized from bytes at index " + i + " does not match expected blob");
         }
     }
 }

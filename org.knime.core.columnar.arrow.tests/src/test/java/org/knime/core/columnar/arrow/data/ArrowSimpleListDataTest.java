@@ -48,13 +48,11 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
@@ -79,13 +77,13 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
 
     @Override
     protected ArrowListWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowListWriteData);
+        assertTrue(o instanceof ArrowListWriteData, "Object is not an instance of ArrowListWriteData");
         return (ArrowListWriteData)o;
     }
 
     @Override
     protected ArrowListReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowListReadData);
+        assertTrue(o instanceof ArrowListReadData, "Object is not an instance of ArrowListReadData");
         return (ArrowListReadData)o;
     }
 
@@ -109,45 +107,39 @@ public class ArrowSimpleListDataTest extends AbstractArrowDataTest<ArrowListWrit
     protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
         final ArrowIntReadData element = data.createReadData(index);
         if (seed == 1) {
-            assertEquals(0, element.length());
+            assertEquals(0, element.length(), "List length should be 0 for seed 1");
             return;
         }
 
         final Random random = new Random(seed);
         final int size = random.nextInt(MAX_LENGTH);
-        assertEquals(size, element.length());
+        assertEquals(size, element.length(), "List length does not match expected size for seed " + seed);
 
         for (int i = 0; i < size; i++) {
-            assertEquals(random.nextInt(), element.getInt(i));
+            assertEquals(random.nextInt(), element.getInt(i),
+                "List element at index " + i + " does not match expected value for seed " + seed);
         }
     }
 
     @Override
     protected boolean isReleasedW(final ArrowListWriteData data) {
-        return data.m_vector == null;
+        // On-heap data does not have resources that need explicit release
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowListReadData data) {
-        final ArrowListReadData d = castR(data);
-        final ListVector listVector = d.m_vector;
-        final IntVector intVector = ((ArrowIntReadData)d.m_data).m_vector;
-
-        final boolean intReleased = intVector.getDataBuffer().capacity() == 0 //
-            && intVector.getValidityBuffer().capacity() == 0;
-        return listVector.getOffsetBuffer().capacity() == 0 //
-            && listVector.getValidityBuffer().capacity() == 0 //
-            && intReleased;
+        // On-heap data does not have resources that need explicit release
+        return false;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
         final long innerValueCount = getInnerValueCount(valueCount);
-        return (long)Math.ceil(capacity / 8.0) // Validity buffer
-            + (long)Math.ceil(innerValueCount / 8.0) // Inner: validity buffer
-            + (capacity + 1) * 4 // Offset buffer
-            + innerValueCount * 4; // Inner: data buffer
+        return capacity * Integer.BYTES // size of m_offsets
+            + innerValueCount * Integer.BYTES // size of m_data
+            + (long)Math.ceil(capacity / 8.0) // Validity buffer
+            + (long)Math.ceil(innerValueCount / 8.0); // Inner: validity buffer
     }
 
     private static long getInnerValueCount(final int valueCount) {

@@ -59,14 +59,10 @@ import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.types.pojo.Field;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -725,15 +721,10 @@ public class ArrowWriterReaderTest {
     }
 
     /** Create a {@link NullableWriteData} with the given factory */
-    @SuppressWarnings({"unchecked", "resource"})
-    private final <T extends NullableWriteData> T createWrite(final ArrowColumnDataFactory factory,
+    @SuppressWarnings({"unchecked"})
+    private static final <T extends NullableWriteData> T createWrite(final ArrowColumnDataFactory factory,
         final int numValues) {
-        final long firstDictId = new Random().nextInt(1000);
-        final AtomicLong dictId1 = new AtomicLong(firstDictId);
-        final AtomicLong dictId2 = new AtomicLong(firstDictId);
-        final Field field = factory.getField("0", dictId1::getAndIncrement);
-        final FieldVector vector = field.createVector(m_alloc);
-        return (T)factory.createWrite(vector, dictId2::getAndIncrement, m_alloc, numValues);
+        return (T)factory.createWrite(numValues);
     }
 
     /**

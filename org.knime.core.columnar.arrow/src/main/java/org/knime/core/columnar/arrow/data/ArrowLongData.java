@@ -48,19 +48,16 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BigIntVector;
-import org.apache.arrow.vector.DurationVector;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.TimeNanoVector;
+import org.apache.arrow.vector.FixedWidthVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.LongData.LongReadData;
 import org.knime.core.columnar.data.LongData.LongWriteData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
  * Arrow implementation of {@link LongWriteData} and {@link LongReadData}.
@@ -74,140 +71,116 @@ public final class ArrowLongData {
     }
 
     /** Arrow implementation of {@link LongWriteData}. */
-    public static final class ArrowLongWriteData extends AbstractArrowWriteData<BigIntVector> implements LongWriteData {
+    public static final class ArrowLongWriteData extends AbstractArrowWriteData implements LongWriteData {
 
-        private ArrowLongWriteData(final BigIntVector vector) {
-            super(vector);
+        private long[] m_data;
+
+        private ArrowLongWriteData(final int capacity) {
+            super(capacity);
+            m_data = new long[capacity];
         }
 
-        private ArrowLongWriteData(final BigIntVector vector, final int offset) {
-            super(vector, offset);
+        private ArrowLongWriteData(final int offset, final long[] data, final ValidityBuffer validity) {
+            super(offset, validity);
+            m_data = data;
         }
 
         @Override
         public void setLong(final int index, final long val) {
-            m_vector.set(m_offset + index, val);
+            m_data[index + m_offset] = val;
+            setValid(index + m_offset);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowLongWriteData(m_vector, m_offset + start);
+            return new ArrowLongWriteData(m_offset + start, m_data, m_validity);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_data.length;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return numElements * Long.BYTES + ValidityBuffer.usedSizeFor(numElements);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return m_data.length * Long.BYTES + m_validity.sizeOf();
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
+        protected void closeResources() {
+            // No resources to close for on-heap data
+        }
+
+        @Override
         public ArrowLongReadData close(final int length) {
-            final BigIntVector vector = closeWithLength(length);
-            return new ArrowLongReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
-        }
-    }
-
-    /**
-     * For reading longs from a DurationVector. This is a class introduced for backwards compatibility with data stored
-     * prior to the removal of the Date&Time dataspecs (i.e. anything before KNIME Analytics Platform 4.5).
-     *
-     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-     */
-    static final class ArrowDurationLongReadData extends AbstractArrowReadData<DurationVector> implements LongReadData {
-
-        private ArrowDurationLongReadData(final DurationVector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
+            setNumElements(length);
+            return new ArrowLongReadData(m_data, m_validity);
         }
 
-        private ArrowDurationLongReadData(final DurationVector vector, final MissingValues missingValues,
-            final int offset, final int length) {
-            super(vector, missingValues, offset, length);
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            m_validity.setNumElements(numElements);
+
+            var newData = new long[numElements];
+            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+            m_data = newData;
         }
-
-        @Override
-        public ArrowReadData slice(final int start, final int length) {
-            return new ArrowDurationLongReadData(m_vector, m_missingValues, m_offset + start, length);
-        }
-
-        @Override
-        public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
-        }
-
-        @Override
-        public long getLong(final int index) {
-            // NB: DurationVector does not have a #get(int): long
-            @SuppressWarnings("resource") // not ours to close
-            final long value = DurationVector.get(m_vector.getDataBuffer(), m_offset + index);
-            return value;
-        }
-
-    }
-
-    /**
-     * For reading longs from a TimeNanoVector. This is a class introduced for backwards compatibility with data stored
-     * prior to the removal of the Date&Time dataspecs (i.e. anything before KNIME Analytics Platform 4.5).
-     *
-     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-     */
-    static final class ArrowTimeNanoLongReadData extends AbstractArrowReadData<TimeNanoVector> implements LongReadData {
-
-        private ArrowTimeNanoLongReadData(final TimeNanoVector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
-        }
-
-        private ArrowTimeNanoLongReadData(final TimeNanoVector vector, final MissingValues missingValues,
-            final int offset, final int length) {
-            super(vector, missingValues, offset, length);
-        }
-
-        @Override
-        public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
-        }
-
-        @Override
-        public ArrowReadData slice(final int start, final int length) {
-            return new ArrowTimeNanoLongReadData(m_vector, m_missingValues, m_offset + start, length);
-        }
-
-        @Override
-        public long getLong(final int index) {
-            return m_vector.get(m_offset + index);
-        }
-
     }
 
     /** Arrow implementation of {@link LongReadData}. */
-    public static final class ArrowLongReadData extends AbstractArrowReadData<BigIntVector> implements LongReadData {
+    public static final class ArrowLongReadData extends AbstractArrowReadData implements LongReadData {
 
-        private ArrowLongReadData(final BigIntVector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
+        private final long[] m_data;
+
+        private ArrowLongReadData(final long[] data, final ValidityBuffer validity) {
+            super(validity, data.length);
+            m_data = data;
         }
 
-        private ArrowLongReadData(final BigIntVector vector, final MissingValues missingValues, final int offset,
+        private ArrowLongReadData(final long[] data, final ValidityBuffer validity, final int offset,
             final int length) {
-            super(vector, missingValues, offset, length);
+            super(validity, offset, length);
+            m_data = data;
         }
 
         @Override
         public long getLong(final int index) {
-            return m_vector.get(m_offset + index);
+            return m_data[index + m_offset];
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowLongReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowLongReadData(m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return m_data.length * Long.BYTES + m_validity.sizeOf();
         }
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowLongData} */
     public static final class ArrowLongDataFactory extends AbstractArrowColumnDataFactory {
+
+        /** Singleton instance of {@link ArrowLongDataFactory} */
+        public static final ArrowLongDataFactory INSTANCE = new ArrowLongDataFactory(true);
+
+        /** Singleton instance of {@link ArrowLongDataFactory} using an unsigned vector */
+        public static final ArrowLongDataFactory INSTANCE_UNSIGNED = new ArrowLongDataFactory(false);
 
         /**
          * Also supports reading longs from DurationVectors and TimeNanoVectors. This is necessary for backwards
@@ -215,42 +188,61 @@ public final class ArrowLongData {
          */
         private static final ArrowColumnDataFactoryVersion V0 = ArrowColumnDataFactoryVersion.version(0);
 
-        /** Singleton instance of {@link ArrowLongDataFactory} */
-        public static final ArrowLongDataFactory INSTANCE = new ArrowLongDataFactory();
+        private final boolean m_signed;
 
-        private ArrowLongDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(1));
+        private ArrowLongDataFactory(final boolean signed) {
+            super(1);
+            m_signed = signed;
+        }
+
+        @Override
+        public ArrowLongWriteData createWrite(final int capacity) {
+            return new ArrowLongWriteData(capacity);
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.BIGINT.getType());
+            if (m_signed) {
+                return Field.nullable(name, MinorType.BIGINT.getType());
+            } else {
+                // Note we just use an unsigned type for the vector but the rest of the code is the same
+                // because Java has no unsigned longs
+                return Field.nullable(name, MinorType.UINT8.getType());
+            }
         }
 
         @Override
-        public ArrowLongWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final BigIntVector v = (BigIntVector)vector;
-            v.allocateNew(capacity);
-            return new ArrowLongWriteData(v);
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
+            var d = (ArrowLongReadData)data;
+
+            ((FixedWidthVector)vector).allocateNew(d.length());
+
+            // Copy the data
+            MemoryCopyUtils.copy(d.m_data, vector.getDataBufferAddress());
+
+            // Copy the validity
+            d.m_validity.copyTo(vector.getValidityBuffer());
+
+            // Set the value count
+            vector.setValueCount(d.length());
         }
 
         @Override
-        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowLongReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
 
-            final var missingValues = MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount());
-            if (V0.equals(version)) {
-                if (vector instanceof DurationVector) {
-                    return new ArrowDurationLongReadData((DurationVector)vector, missingValues);
-                } else if (vector instanceof TimeNanoVector) {
-                    return new ArrowTimeNanoLongReadData((TimeNanoVector)vector, missingValues);
-                } else {
-                    return new ArrowLongReadData((BigIntVector)vector,
-                        missingValues);
-                }
-            } else if (m_version.equals(version)) {
-                return new ArrowLongReadData((BigIntVector)vector, missingValues);
+            // NOTE:
+            // V1 was introduced for backward compatibility with old date&time types. Previously, (V0) we had separate
+            // data implementations for them that used DurationVector and TimeNanoVector. For backward compatibility, we
+            // read these vectors into LongData as well. They require no special handling here because they are just
+            // signed 64-bit integers.
+            if (V0.equals(version) || m_version.equals(version)) {
+                var valueCount = vector.getValueCount();
+                var data = new long[valueCount];
+                MemoryCopyUtils.copy(vector.getDataBufferAddress(), data);
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+                return new ArrowLongReadData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowLongData with version " + version + ". Current version: " + m_version + ".");
@@ -259,7 +251,7 @@ public final class ArrowLongData {
 
         @Override
         public int initialNumBytesPerElement() {
-            return BigIntVector.TYPE_WIDTH + 1; // +1 for validity
+            return Long.BYTES + 1; // +1 for validity
         }
     }
 }

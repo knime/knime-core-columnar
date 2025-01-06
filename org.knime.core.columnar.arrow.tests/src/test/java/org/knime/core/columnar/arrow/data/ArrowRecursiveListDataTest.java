@@ -53,8 +53,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
@@ -80,8 +78,7 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
     }
 
     private static ArrowListDataFactory createFactory() {
-        return new ArrowListDataFactory(
-            new ArrowListDataFactory(ArrowIntDataFactory.INSTANCE));
+        return new ArrowListDataFactory(new ArrowListDataFactory(ArrowIntDataFactory.INSTANCE));
     }
 
     @Override
@@ -140,26 +137,12 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
 
     @Override
     protected boolean isReleasedW(final ArrowListWriteData data) {
-        return data.m_vector == null;
-        // TODO(benjamin) check inner data
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowListReadData data) {
-        final ArrowListReadData d1 = castR(data);
-        final ArrowListReadData d2 = (ArrowListReadData)d1.m_data;
-        final ListVector listVector1 = d1.m_vector;
-        final ListVector listVector2 = d2.m_vector;
-        final IntVector intVector = ((ArrowIntReadData)d2.m_data).m_vector;
-
-        final boolean list1Released = listVector1.getOffsetBuffer().capacity() == 0 //
-            && listVector1.getValidityBuffer().capacity() == 0;
-        final boolean list2Released = listVector2.getOffsetBuffer().capacity() == 0 //
-            && listVector2.getValidityBuffer().capacity() == 0;
-        final boolean intReleased = intVector.getDataBuffer().capacity() == 0 //
-            && intVector.getValidityBuffer().capacity() == 0;
-        return list1Released && list2Released && intReleased;
+        return false;
     }
 
     @Override

@@ -180,7 +180,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
      * @return the {@link NullableWriteData}
      */
     protected W createWrite(final int numValues) {
-        return castW(ArrowColumnDataFactory.createWrite(m_factory, "0", m_alloc, numValues));
+        return castW(m_factory.createWrite(numValues));
     }
 
     /** Test allocating some memory and setting and getting some values */

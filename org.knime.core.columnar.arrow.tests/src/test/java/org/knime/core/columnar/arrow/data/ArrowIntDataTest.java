@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
@@ -71,40 +71,44 @@ public class ArrowIntDataTest extends AbstractArrowDataTest<ArrowIntWriteData, A
 
     @Override
     protected ArrowIntWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowIntWriteData);
+        assertTrue(o instanceof ArrowIntWriteData, "Object is not an instance of ArrowIntWriteData");
         return (ArrowIntWriteData)o;
     }
 
     @Override
     protected ArrowIntReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowIntReadData);
+        assertTrue(o instanceof ArrowIntReadData, "Object is not an instance of ArrowIntReadData");
         return (ArrowIntReadData)o;
+    }
+
+    private static int valueFor(final int seed) {
+        return seed * 2;
     }
 
     @Override
     protected void setValue(final ArrowIntWriteData data, final int index, final int seed) {
-        data.setInt(index, seed);
+        data.setInt(index, valueFor(seed));
     }
 
     @Override
     protected void checkValue(final ArrowIntReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getInt(index));
+        assertEquals(valueFor(seed), data.getInt(index),
+            "Value at index " + index + " does not match expected value for seed " + seed);
     }
 
     @Override
     protected boolean isReleasedW(final ArrowIntWriteData data) {
-        return data.m_vector == null;
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowIntReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+        return false;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 4 * capacity // 4 bytes per value for data
+        return 4L * capacity // 4 bytes per value for data
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }

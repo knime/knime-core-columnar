@@ -51,9 +51,7 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.NullVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -70,24 +68,13 @@ import org.knime.core.columnar.data.VoidData.VoidWriteData;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidReadData, ArrowReadData {
+public final class ArrowVoidData extends AbstractReferencedData
+    implements VoidReadData, VoidWriteData, ArrowReadData, ArrowWriteData {
 
     private int m_capacity;
 
-    private final NullVector m_vector;
-
-    private final int m_length;
-
-    private ArrowVoidData(final NullVector vector, final int capacity) {
-        m_vector = vector;
+    private ArrowVoidData(final int capacity) {
         m_capacity = capacity;
-        m_length = vector.getValueCount();
-    }
-
-    private ArrowVoidData(final NullVector vector, final int capacity, final int length) {
-        m_vector = vector;
-        m_capacity = capacity;
-        m_length = length;
     }
 
     @Override
@@ -118,45 +105,48 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
         if (length > capacity()) {
             throw new IllegalArgumentException("Length must not be larger than capacity.");
         }
-        m_vector.setValueCount(length);
-        return new ArrowVoidData(m_vector, m_capacity);
+        m_capacity = length;
+        return this;
     }
 
     @Override
     public int length() {
-        return m_length;
-    }
-
-    @Override
-    public void release() {
-        // Nothing to release
-    }
-
-    @Override
-    public void retain() {
-        // Nothing to retain
+        return m_capacity;
     }
 
     @Override
     public ArrowWriteData slice(final int start) {
-        return new ArrowVoidData(m_vector, m_capacity);
+        return new ArrowVoidData(m_capacity);
     }
 
     @Override
     public ArrowVoidData slice(final int start, final int length) {
-        return new ArrowVoidData(m_vector, m_capacity, length);
+        return new ArrowVoidData(length);
+    }
+
+    @Override
+    public ValidityBuffer getValidityBuffer() {
+        return null;
+    }
+
+    @Override
+    protected void closeResources() {
+        m_capacity = 0;
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowVoidData} */
-    public static final class ArrowVoidDataFactory implements ArrowColumnDataFactory {
-
-        private static final ArrowColumnDataFactoryVersion CURRENT_VERSION = ArrowColumnDataFactoryVersion.version(0);
+    public static final class ArrowVoidDataFactory extends AbstractArrowColumnDataFactory {
 
         /** Singleton instance of {@link ArrowVoidDataFactory} */
         public static final ArrowVoidDataFactory INSTANCE = new ArrowVoidDataFactory();
 
         private ArrowVoidDataFactory() {
-            // Singleton
+            super(0);
+        }
+
+        @Override
+        public ArrowVoidData createWrite(final int capacity) {
+            return new ArrowVoidData(capacity);
         }
 
         @Override
@@ -165,35 +155,19 @@ public final class ArrowVoidData implements VoidWriteData, ArrowWriteData, VoidR
         }
 
         @Override
-        public ArrowVoidData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            return new ArrowVoidData((NullVector)vector, capacity);
+        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+            fieldVector.setValueCount(data.length());
         }
 
         @Override
-        public ArrowVoidData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
+        public ArrowReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-            if (CURRENT_VERSION.equals(version)) {
-                return new ArrowVoidData((NullVector)vector, vector.getValueCapacity());
+            if (m_version.equals(version)) {
+                return new ArrowVoidData(vector.getValueCount());
             } else {
-                throw new IOException("Cannot read ArrowVoidData with version " + version + ". Current version: "
-                    + CURRENT_VERSION + ".");
+                throw new IOException(
+                    "Cannot read ArrowVoidData with version " + version + ". Current version: " + m_version + ".");
             }
-        }
-
-        @Override
-        public FieldVector getVector(final NullableReadData data) {
-            return ((ArrowVoidData)data).m_vector;
-        }
-
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return null;
-        }
-
-        @Override
-        public ArrowColumnDataFactoryVersion getVersion() {
-            return CURRENT_VERSION;
         }
 
         @Override

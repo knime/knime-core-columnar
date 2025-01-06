@@ -48,25 +48,17 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.vector.BitVectorHelper;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.util.ValueVectorUtility;
-
 /**
- * Abstract implementation of {@link ArrowReadData}. Holds a {@link FieldVector} of type F in {@link #m_vector} and an
- * offset ({@link #m_offset}) and length ({@link #m_length}) for the indices to use in this vector.
+ * Abstract implementation of {@link ArrowReadData}. Holds a the {@link #m_validity validity buffer}, the
+ * {@link #m_offset offset}, and the {@link #m_length length} of the data.
  *
- * Overwrite {@link #closeResources()} to close additional resources (make sure to call the super method).
- *
- * @param <F> the type of the {@link FieldVector}
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-abstract class AbstractArrowReadData<F extends FieldVector> extends AbstractReferencedData implements ArrowReadData {
+abstract class AbstractArrowReadData extends AbstractReferencedData implements ArrowReadData {
 
-    /** The vector. Use {@link #m_offset} when accessing vector data. */
-    protected final F m_vector;
+    /** The validity buffer of this data object. */
+    protected final ValidityBuffer m_validity;
 
     /** An offset describing where the values of this object start in the vector. */
     protected final int m_offset;
@@ -74,96 +66,33 @@ abstract class AbstractArrowReadData<F extends FieldVector> extends AbstractRefe
     /** The length of the data */
     protected final int m_length;
 
-    protected final MissingValues m_missingValues;
-
-    /**
-     * Notes if all, no, or some values are missing. If unknown, {@link #SOME_MISSING} can be used.
-     */
-    public enum MissingValues {
-            /** All values are missing */
-            ALL_MISSING,
-            /** No values are missing */
-            NO_MISSING,
-            /** Some values are missing */
-            SOME_MISSING;
-
-        /**
-         * Find if all, no or some values are missing by checking the given validity buffer.
-         *
-         * @param buffer the validity buffer
-         * @param valueCount the number of values of the vector
-         * @return {@link #ALL_MISSING} if all values are missing, {@link #NO_MISSING} if no values are missing, and
-         *         {@link #SOME_MISSING} if some values are missing
-         */
-        public static MissingValues forValidityBuffer(final ArrowBuf buffer, final int valueCount) {
-            // NB: We never loop twice over the validity buffer
-            // If ALL_MISSING the first check will return false after the first bits read
-            // If SOME_MISSING at least one check will return false after the first bits read
-            if (BitVectorHelper.checkAllBitsEqualTo(buffer, valueCount, true)) {
-                return NO_MISSING;
-            } else if (BitVectorHelper.checkAllBitsEqualTo(buffer, valueCount, false)) {
-                return ALL_MISSING;
-            } else {
-                return SOME_MISSING;
-            }
-        }
-
-        /**
-         * Find if all, no or some values are missing by comparing the null count to the value count.
-         *
-         * @param nullCount the number of missing values
-         * @param valueCount the number of values of the vector
-         * @return {@link #ALL_MISSING} if all values are missing, {@link #NO_MISSING} if no values are missing, and
-         *         {@link #SOME_MISSING} if some values are missing
-         */
-        public static MissingValues forNullCount(final int nullCount, final int valueCount) {
-            if (nullCount == 0) {
-                return NO_MISSING;
-            } else if (nullCount >= valueCount) {
-                return ALL_MISSING;
-            } else {
-                return SOME_MISSING;
-            }
-        }
-    }
-
     /**
      * Create an abstract {@link ArrowReadData} with the given vector, an offset of 0 and the length of the vector.
      *
      * @param vector the vector
      * @param missingValues if all, no or some values are missing
      */
-    public AbstractArrowReadData(final F vector, final MissingValues missingValues) {
-        this(vector, missingValues, 0, vector.getValueCount());
+    public AbstractArrowReadData(final ValidityBuffer validity, final int length) {
+        this(validity, 0, length);
     }
 
     /**
      * Create an abstract {@link ArrowReadData} with the given vector.
-     *
      *
      * @param vector the vector
      * @param missingValues if all, no or some values are missing
      * @param offset the offset
      * @param length the length of this data
      */
-    public AbstractArrowReadData(final F vector, final MissingValues missingValues, final int offset,
-        final int length) {
-        m_vector = vector;
+    public AbstractArrowReadData(final ValidityBuffer validity, final int offset, final int length) {
+        m_validity = validity;
         m_offset = offset;
         m_length = length;
-        m_missingValues = missingValues;
     }
 
     @Override
     public final boolean isMissing(final int index) {
-        switch (m_missingValues) {
-            case NO_MISSING:
-                return false;
-            case ALL_MISSING:
-                return true;
-            default:
-                return m_vector.isNull(m_offset + index);
-        }
+        return !m_validity.isSet(index + m_offset);
     }
 
     @Override
@@ -173,11 +102,13 @@ abstract class AbstractArrowReadData<F extends FieldVector> extends AbstractRefe
 
     @Override
     protected void closeResources() {
-        m_vector.close();
+        // TODO nothing to do?
     }
 
     @Override
-    public String toString() {
-        return ValueVectorUtility.getToString(m_vector, m_offset, m_offset + m_length);
+    public ValidityBuffer getValidityBuffer() {
+        return m_validity;
     }
+
+    // TODO overwrite toString
 }

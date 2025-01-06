@@ -51,9 +51,6 @@ package org.knime.core.columnar.arrow.data;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import org.apache.arrow.vector.Float8Vector;
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.complex.StructVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleReadData;
@@ -115,23 +112,12 @@ public class ArrowSimpleStructDataTest extends AbstractArrowDataTest<ArrowStruct
 
     @Override
     protected boolean isReleasedW(final ArrowStructWriteData data) {
-        return data.m_vector == null;
-        // TODO(benjamin) check inner data
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowStructReadData data) {
-        final ArrowStructReadData d = castR(data);
-        final Float8Vector doubleVector = ((ArrowDoubleReadData)d.getReadDataAt(0)).m_vector;
-        final IntVector intVector = ((ArrowIntReadData)d.getReadDataAt(1)).m_vector;
-        final StructVector vector = d.m_vector;
-
-        boolean doubleReleased = doubleVector.getDataBuffer().capacity() == 0 //
-            && doubleVector.getValidityBuffer().capacity() == 0;
-        boolean intReleased = intVector.getDataBuffer().capacity() == 0 //
-            && intVector.getValidityBuffer().capacity() == 0;
-        return vector.getValidityBuffer().capacity() == 0 && doubleReleased && intReleased;
+        return false;
     }
 
     @Override

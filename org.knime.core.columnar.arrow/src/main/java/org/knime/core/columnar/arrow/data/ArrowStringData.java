@@ -49,19 +49,15 @@
 package org.knime.core.columnar.arrow.data;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BaseVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.table.util.StringEncoder;
@@ -83,71 +79,106 @@ public final class ArrowStringData {
     }
 
     /** Arrow implementation of {@link StringReadData}. */
-    public static final class ArrowStringWriteData extends AbstractArrowWriteData<VarCharVector>
-        implements StringWriteData {
+    public static final class ArrowStringWriteData extends AbstractArrowWriteData implements StringWriteData {
 
-        private StringEncoder m_encoder = new StringEncoder();
+        private String[] m_data;
 
-        private ArrowStringWriteData(final VarCharVector vector) {
-            super(vector);
+        private ArrowStringWriteData(final int capacity) {
+            super(capacity);
+            m_data = new String[capacity];
         }
 
-        private ArrowStringWriteData(final VarCharVector vector, final int offset) {
-            super(vector, offset);
+        private ArrowStringWriteData(final int offset, final String[] data, final ValidityBuffer validity) {
+            super(offset, validity);
+            m_data = data;
         }
 
         @Override
         public void setString(final int index, final String val) {
-            final ByteBuffer encoded = m_encoder.encode(val);
-            m_vector.setSafe(m_offset + index, encoded, 0, encoded.limit());
+            m_data[index + m_offset] = val;
+            setValid(index + m_offset);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowStringWriteData(m_vector, m_offset + start);
+            return new ArrowStringWriteData(m_offset + start, m_data, m_validity);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_data.length;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+            return m_data.length * Integer.BYTES + m_validity.sizeOf();
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
+        protected void closeResources() {
+            // No resources to close for on-heap data
+        }
+
+        @Override
         public ArrowStringReadData close(final int length) {
-            final VarCharVector vector = closeWithLength(length);
-            return new ArrowStringReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+            setNumElements(length);
+            return new ArrowStringReadData(m_data, m_validity);
+        }
+
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            m_validity.setNumElements(numElements);
+
+            var newData = new String[numElements];
+            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+            m_data = newData;
         }
     }
 
     /** Arrow implementation of {@link StringReadData}. */
-    public static final class ArrowStringReadData extends AbstractArrowReadData<VarCharVector>
-        implements StringReadData {
+    public static final class ArrowStringReadData extends AbstractArrowReadData implements StringReadData {
 
-        private final StringEncoder m_decoder = new StringEncoder();
+        private final String[] m_data;
 
-        private ArrowStringReadData(final VarCharVector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
+        private ArrowStringReadData(final String[] data, final ValidityBuffer validity) {
+            super(validity, data.length);
+            m_data = data;
         }
 
-        private ArrowStringReadData(final VarCharVector vector, final MissingValues missingValues, final int offset,
+        private ArrowStringReadData(final String[] data, final ValidityBuffer validity, final int offset,
             final int length) {
-            super(vector, missingValues, offset, length);
+            super(validity, offset, length);
+            m_data = data;
         }
 
         @Override
         public String getString(final int index) {
-            return m_decoder.decode(m_vector.get(m_offset + index));
+            return m_data[index + m_offset];
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowStringReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowStringReadData(m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfVariableWidth(m_vector);
+            // TODO size of the strings
+            return m_data.length * Integer.BYTES + m_validity.sizeOf();
         }
     }
 
@@ -158,7 +189,12 @@ public final class ArrowStringData {
         public static final ArrowStringDataFactory INSTANCE = new ArrowStringDataFactory();
 
         private ArrowStringDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
+        }
+
+        @Override
+        public ArrowStringWriteData createWrite(final int capacity) {
+            return new ArrowStringWriteData(capacity);
         }
 
         @Override
@@ -167,19 +203,60 @@ public final class ArrowStringData {
         }
 
         @Override
-        public ArrowStringWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final VarCharVector v = (VarCharVector)vector;
-            v.allocateNew(INITAL_BYTES_PER_ELEMENT * capacity, capacity);
-            return new ArrowStringWriteData(v);
+        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+            var d = (ArrowStringReadData)data; // TODO generic?
+            var vector = (VarCharVector)fieldVector;
+
+            vector.allocateNew(d.length());
+
+            // Copy the data
+            var encoder = new StringEncoder();
+            // TODO we serialize here????? Can this be right???
+            for (int i = 0; i < d.length(); i++) {
+                if (!d.isMissing(i)) {
+                    var val = d.getString(i);
+                    if (val != null) {
+                        var encoded = encoder.encode(val);
+                        vector.setSafe(i, encoded, 0, encoded.limit());
+                    } else {
+                        vector.setNull(i);
+                    }
+                } else {
+                    vector.setNull(i);
+                }
+            }
+
+            // Copy the validity
+            d.m_validity.copyTo(vector.getValidityBuffer());
+
+            vector.setValueCount(d.length());
         }
 
         @Override
         public ArrowStringReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+        
+            // TODO what is the null count for???
+        
             if (m_version.equals(version)) {
-                return new ArrowStringReadData((VarCharVector)vector,
-                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
+        
+                var decoder = new StringEncoder();
+                var valueCount = vector.getValueCount();
+                var v = (VarCharVector)vector;
+        
+                var data = new String[valueCount];
+        
+                for (int i = 0; i < valueCount; i++) {
+                    if (!v.isNull(i)) {
+                        var val = v.get(i);
+                        if (val != null) {
+                            data[i] = decoder.decode(val);
+                        }
+                    }
+                }
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+        
+                return new ArrowStringReadData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowStringData with version " + version + ". Current version: " + m_version + ".");
@@ -188,9 +265,8 @@ public final class ArrowStringData {
 
         @Override
         public int initialNumBytesPerElement() {
-            return (int)INITAL_BYTES_PER_ELEMENT // data buffer
-                + BaseVariableWidthVector.OFFSET_WIDTH // offset buffer
-                + 1; // validity bit
+            // TODO
+            return 1;
         }
     }
 }

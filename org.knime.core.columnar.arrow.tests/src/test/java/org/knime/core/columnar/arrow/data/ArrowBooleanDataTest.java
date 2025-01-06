@@ -92,13 +92,12 @@ public class ArrowBooleanDataTest extends AbstractArrowDataTest<ArrowBooleanWrit
 
     @Override
     protected boolean isReleasedW(final ArrowBooleanWriteData data) {
-        return data.m_vector == null;
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource") // Resources handled by vector
     protected boolean isReleasedR(final ArrowBooleanReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+        return false;
     }
 
     @Override

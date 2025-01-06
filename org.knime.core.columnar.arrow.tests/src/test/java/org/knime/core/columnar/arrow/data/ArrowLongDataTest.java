@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowLongData.ArrowLongDataFactory;
@@ -71,40 +71,47 @@ public class ArrowLongDataTest extends AbstractArrowDataTest<ArrowLongWriteData,
 
     @Override
     protected ArrowLongWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowLongWriteData);
+        assertTrue(o instanceof ArrowLongWriteData, "Object is not an instance of ArrowLongWriteData");
         return (ArrowLongWriteData)o;
     }
 
     @Override
     protected ArrowLongReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowLongReadData);
+        assertTrue(o instanceof ArrowLongReadData, "Object is not an instance of ArrowLongReadData");
         return (ArrowLongReadData)o;
+    }
+
+    private static long valueFor(final int seed) {
+        // For demonstration, just return seed * 10 as a long value.
+        return seed * 10L;
     }
 
     @Override
     protected void setValue(final ArrowLongWriteData data, final int index, final int seed) {
-        data.setLong(index, seed);
+        data.setLong(index, valueFor(seed));
     }
 
     @Override
     protected void checkValue(final ArrowLongReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getLong(index), 0);
+        assertEquals(valueFor(seed), data.getLong(index),
+            "Value at index " + index + " does not match expected value for seed " + seed);
     }
 
     @Override
     protected boolean isReleasedW(final ArrowLongWriteData data) {
-        return data.m_vector == null;
+        // On-heap data does not allocate off-heap resources that need explicit releasing
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowLongReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+        // On-heap data does not allocate off-heap resources that need explicit releasing
+        return false;
     }
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 8 * capacity // 8 bytes per value for data
+        return 8L * capacity // 8 bytes per value for a long
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }

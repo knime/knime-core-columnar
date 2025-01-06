@@ -48,7 +48,7 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.util.MemoryUtil;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -56,9 +56,9 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
  * Arrow implementation of {@link DoubleWriteData} and {@link DoubleReadData}.
@@ -72,67 +72,108 @@ public final class ArrowDoubleData {
     }
 
     /** Arrow implementation of {@link DoubleWriteData}. */
-    public static final class ArrowDoubleWriteData extends AbstractArrowWriteData<Float8Vector>
-        implements DoubleWriteData {
+    public static final class ArrowDoubleWriteData extends AbstractArrowWriteData implements DoubleWriteData {
 
-        private ArrowDoubleWriteData(final Float8Vector vector) {
-            super(vector);
+        private double[] m_data;
+
+        private ArrowDoubleWriteData(final int capacity) {
+            super(capacity);
+            m_data = new double[capacity];
         }
 
-        private ArrowDoubleWriteData(final Float8Vector vector, final int offset) {
-            super(vector, offset);
+        private ArrowDoubleWriteData(final int offset, final double[] data, final ValidityBuffer validity) {
+            super(offset, validity);
+            m_data = data;
         }
 
         @Override
         public void setDouble(final int index, final double val) {
-            m_vector.set(m_offset + index, val);
+            m_data[index + m_offset] = val;
+            setValid(index + m_offset);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowDoubleWriteData(m_vector, m_offset + start);
+            return new ArrowDoubleWriteData(m_offset + start, m_data, m_validity);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_data.length; // TODO - offset??
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return numElements * Double.BYTES + ValidityBuffer.usedSizeFor(numElements);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return m_data.length * Double.BYTES + m_validity.sizeOf();
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
+        protected void closeResources() {
+            // TODO not needed for on-heap, right?
+        }
+
+        @Override
         public ArrowDoubleReadData close(final int length) {
-            final Float8Vector vector = closeWithLength(length);
-            return new ArrowDoubleReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+            setNumElements(length);
+            return new ArrowDoubleReadData(m_data, m_validity);
+        }
+
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            // TODO we copy each time. Only copy if necessary! (implement for all data types)
+            m_validity.setNumElements(numElements);
+
+            var newData = new double[numElements];
+            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+            m_data = newData;
         }
     }
 
     /** Arrow implementation of {@link DoubleReadData}. */
-    public static final class ArrowDoubleReadData extends AbstractArrowReadData<Float8Vector>
-        implements DoubleReadData {
+    public static final class ArrowDoubleReadData extends AbstractArrowReadData implements DoubleReadData {
 
-        private ArrowDoubleReadData(final Float8Vector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
+        private final double[] m_data;
+
+        private ArrowDoubleReadData(final double[] data, final ValidityBuffer validity) {
+            super(validity, data.length);
+            m_data = data;
         }
 
-        private ArrowDoubleReadData(final Float8Vector vector, final MissingValues missingValues, final int offset,
+        private ArrowDoubleReadData(final double[] data, final ValidityBuffer validity, final int offset,
             final int length) {
-            super(vector, missingValues, offset, length);
+            super(validity, offset, length);
+            m_data = data;
         }
 
         @Override
         public double getDouble(final int index) {
-            return m_vector.get(m_offset + index);
+            return m_data[index + m_offset];
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowDoubleReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowDoubleReadData(m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return m_data.length * Double.BYTES + m_validity.sizeOf();
         }
+
     }
 
     /** Implementation of {@link ArrowColumnDataFactory} for {@link ArrowDoubleData} */
@@ -142,7 +183,14 @@ public final class ArrowDoubleData {
         public static final ArrowDoubleDataFactory INSTANCE = new ArrowDoubleDataFactory();
 
         private ArrowDoubleDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
+        }
+
+        private static final int DOUBLE_ARRAY_BASE_OFFSET = MemoryUtil.UNSAFE.arrayBaseOffset(double[].class);
+
+        @Override
+        public ArrowDoubleWriteData createWrite(final int capacity) {
+            return new ArrowDoubleWriteData(capacity);
         }
 
         @Override
@@ -151,19 +199,48 @@ public final class ArrowDoubleData {
         }
 
         @Override
-        public ArrowDoubleWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final Float8Vector v = (Float8Vector)vector;
-            v.allocateNew(capacity);
-            return new ArrowDoubleWriteData(v);
+        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+            var d = (ArrowDoubleReadData)data; // TODO generic?
+            var vector = (Float8Vector)fieldVector;
+
+            vector.allocateNew(d.length());
+
+            // Copy the data
+            // Or should we rather use ByteBuffer for `m_data` and use vector.getDataBuffer().setBytes()
+            MemoryUtil.UNSAFE.copyMemory(//
+                d.m_data, //
+                DOUBLE_ARRAY_BASE_OFFSET, //
+                null, //
+                vector.getDataBufferAddress(), //
+                d.m_data.length * vector.getTypeWidth() //
+            );
+
+            // Copy the validity
+            d.m_validity.copyTo(vector.getValidityBuffer());
+
+            // Set the value count
+            vector.setValueCount(d.length());
         }
 
         @Override
         public ArrowDoubleReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+
+            // TODO what is the null count for???
+
             if (m_version.equals(version)) {
-                return new ArrowDoubleReadData((Float8Vector)vector,
-                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
+                var valueCount = vector.getValueCount();
+                var data = new double[valueCount];
+                MemoryUtil.UNSAFE.copyMemory(//
+                    null, //
+                    vector.getDataBufferAddress(), //
+                    data, //
+                    DOUBLE_ARRAY_BASE_OFFSET, //
+                    data.length * Double.BYTES //
+                );
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+                return new ArrowDoubleReadData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowDoubleData with version " + version + ". Current version: " + m_version + ".");
@@ -172,7 +249,7 @@ public final class ArrowDoubleData {
 
         @Override
         public int initialNumBytesPerElement() {
-            return Float8Vector.TYPE_WIDTH + 1; // +1 for validity
+            return Double.BYTES + 1; // +1 for validity
         }
     }
 }

@@ -54,8 +54,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.LargeVarBinaryVector;
-import org.apache.arrow.vector.complex.StructVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleReadData;
@@ -63,9 +61,9 @@ import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleWriteData;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntReadData;
 import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntWriteData;
-import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringReadData;
-import org.knime.core.columnar.arrow.data.ArrowStringData.ArrowStringWriteData;
+import org.knime.core.columnar.arrow.data.ArrowSmartStringData.ArrowStringDataFactory;
+import org.knime.core.columnar.arrow.data.ArrowSmartStringData.ArrowStringReadData;
+import org.knime.core.columnar.arrow.data.ArrowSmartStringData.ArrowStringWriteData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.data.ArrowStructData.ArrowStructWriteData;
@@ -93,10 +91,9 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
     private static final int MAX_LENGTH = 100;
 
     private static ArrowStructDataFactory createFactory() {
-        final ArrowStringDataFactory child1 = ArrowStringDataFactory.INSTANCE;
-        final ArrowIntDataFactory child2 = ArrowIntDataFactory.INSTANCE;
-        final ArrowStructDataFactory child3 =
-            new ArrowStructDataFactory(ArrowVarBinaryDataFactory.INSTANCE, ArrowDoubleDataFactory.INSTANCE);
+        var child1 = ArrowStringDataFactory.INSTANCE;
+        var child2 = ArrowIntDataFactory.INSTANCE;
+        var child3 = new ArrowStructDataFactory(ArrowVarBinaryDataFactory.INSTANCE, ArrowDoubleDataFactory.INSTANCE);
         return new ArrowStructDataFactory(child1, child2, child3);
     }
 
@@ -157,24 +154,12 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
 
     @Override
     protected boolean isReleasedW(final ArrowStructWriteData data) {
-        return data.m_vector == null;
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowStructReadData data) {
-        final ArrowStructReadData d = castR(data);
-        final ArrowStructReadData d2 = d.getReadDataAt(2);
-        final ArrowVarBinaryReadData d20 = d2.getReadDataAt(0);
-
-        // We just check the validity buffer of this data, of the inner struct
-        // and of the 2nd level object data
-        final StructVector vector = d.m_vector;
-        final StructVector vector2 = d2.m_vector;
-        final LargeVarBinaryVector vector20 = d20.m_vector;
-
-        return vector.getValidityBuffer().capacity() == 0 && vector2.getValidityBuffer().capacity() == 0
-            && vector20.getValidityBuffer().capacity() == 0;
+        return false;
     }
 
     @Override

@@ -93,13 +93,12 @@ public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatWriteDat
 
     @Override
     protected boolean isReleasedW(final ArrowFloatWriteData data) {
-        return data.m_vector == null;
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource") // Resources handled by vector
     protected boolean isReleasedR(final ArrowFloatReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+        return false;
     }
 
     @Override

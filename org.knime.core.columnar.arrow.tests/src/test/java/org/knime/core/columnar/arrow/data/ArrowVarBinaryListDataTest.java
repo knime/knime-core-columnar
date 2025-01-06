@@ -54,8 +54,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
 
-import org.apache.arrow.vector.LargeVarBinaryVector;
-import org.apache.arrow.vector.complex.ListVector;
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListDataFactory;
 import org.knime.core.columnar.arrow.data.ArrowListData.ArrowListReadData;
@@ -129,22 +127,12 @@ public class ArrowVarBinaryListDataTest extends AbstractArrowDataTest<ArrowListW
 
     @Override
     protected boolean isReleasedW(final ArrowListWriteData data) {
-        return data.m_vector == null;
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource")
     protected boolean isReleasedR(final ArrowListReadData data) {
-        final ArrowListReadData d = castR(data);
-        final ListVector listVector = d.m_vector;
-        final LargeVarBinaryVector bVector = ((ArrowVarBinaryReadData)d.m_data).m_vector;
-
-        final boolean bReleased = bVector.getDataBuffer().capacity() == 0 //
-            && bVector.getValidityBuffer().capacity() == 0 //
-            && bVector.getOffsetBuffer().capacity() == 0;
-        return listVector.getOffsetBuffer().capacity() == 0 //
-            && listVector.getValidityBuffer().capacity() == 0 //
-            && bReleased;
+        return false;
     }
 
     @Override

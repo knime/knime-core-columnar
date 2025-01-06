@@ -48,7 +48,6 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float4Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -56,9 +55,9 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.FloatData.FloatReadData;
 import org.knime.core.columnar.data.FloatData.FloatWriteData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
  * Arrow implementation of {@link FloatWriteData} and {@link FloatReadData}.
@@ -72,65 +71,106 @@ public final class ArrowFloatData {
     }
 
     /** Arrow implementation of {@link FloatWriteData}. */
-    public static final class ArrowFloatWriteData extends AbstractArrowWriteData<Float4Vector>
-        implements FloatWriteData {
+    public static final class ArrowFloatWriteData extends AbstractArrowWriteData implements FloatWriteData {
 
-        private ArrowFloatWriteData(final Float4Vector vector) {
-            super(vector);
+        private float[] m_data;
+
+        private ArrowFloatWriteData(final int capacity) {
+            super(capacity);
+            m_data = new float[capacity];
         }
 
-        private ArrowFloatWriteData(final Float4Vector vector, final int offset) {
-            super(vector, offset);
+        private ArrowFloatWriteData(final int offset, final float[] data, final ValidityBuffer validity) {
+            super(offset, validity);
+            m_data = data;
         }
 
         @Override
         public void setFloat(final int index, final float val) {
-            m_vector.set(m_offset + index, val);
+            m_data[index + m_offset] = val;
+            setValid(index + m_offset);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowFloatWriteData(m_vector, m_offset + start);
+            return new ArrowFloatWriteData(m_offset + start, m_data, m_validity);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_data.length; // TODO - offset??
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return numElements * Float.BYTES + ValidityBuffer.usedSizeFor(numElements);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return m_data.length * Float.BYTES + m_validity.sizeOf();
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
+        protected void closeResources() {
+            // TODO not needed for on-heap, right?
+        }
+
+        @Override
         public ArrowFloatReadData close(final int length) {
-            final Float4Vector vector = closeWithLength(length);
-            return new ArrowFloatReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+            setNumElements(length);
+            return new ArrowFloatReadData(m_data, m_validity);
+        }
+
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            // TODO we copy each time. Only copy if necessary! (implement for all data types)
+            m_validity.setNumElements(numElements);
+
+            var newData = new float[numElements];
+            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+            m_data = newData;
         }
     }
 
     /** Arrow implementation of {@link FloatReadData}. */
-    public static final class ArrowFloatReadData extends AbstractArrowReadData<Float4Vector> implements FloatReadData {
+    public static final class ArrowFloatReadData extends AbstractArrowReadData implements FloatReadData {
 
-        private ArrowFloatReadData(final Float4Vector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
+        private final float[] m_data;
+
+        private ArrowFloatReadData(final float[] data, final ValidityBuffer validity) {
+            super(validity, data.length);
+            m_data = data;
         }
 
-        private ArrowFloatReadData(final Float4Vector vector, final MissingValues missingValues, final int offset,
+        private ArrowFloatReadData(final float[] data, final ValidityBuffer validity, final int offset,
             final int length) {
-            super(vector, missingValues, offset, length);
+            super(validity, offset, length);
+            m_data = data;
         }
 
         @Override
         public float getFloat(final int index) {
-            return m_vector.get(m_offset + index);
+            return m_data[index + m_offset];
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowFloatReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowFloatReadData(m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return m_data.length * Float.BYTES + m_validity.sizeOf();
         }
     }
 
@@ -141,7 +181,12 @@ public final class ArrowFloatData {
         public static final ArrowFloatDataFactory INSTANCE = new ArrowFloatDataFactory();
 
         private ArrowFloatDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+            super(0);
+        }
+
+        @Override
+        public ArrowFloatWriteData createWrite(final int capacity) {
+            return new ArrowFloatWriteData(capacity);
         }
 
         @Override
@@ -150,19 +195,35 @@ public final class ArrowFloatData {
         }
 
         @Override
-        public ArrowFloatWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final Float4Vector v = (Float4Vector)vector;
-            v.allocateNew(capacity);
-            return new ArrowFloatWriteData(v);
+        public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+            var d = (ArrowFloatReadData)data; // TODO generic?
+            var vector = (Float4Vector)fieldVector;
+
+            vector.allocateNew(d.length());
+
+            // Copy the data
+            MemoryCopyUtils.copy(d.m_data, vector.getDataBuffer());
+
+            // Copy the validity
+            d.m_validity.copyTo(vector.getValidityBuffer());
+
+            // Set the value count
+            vector.setValueCount(d.length());
         }
 
         @Override
         public ArrowFloatReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+
+            // TODO what is the null count for???
+
             if (m_version.equals(version)) {
-                return new ArrowFloatReadData((Float4Vector)vector,
-                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
+                var valueCount = vector.getValueCount();
+                var data = new float[valueCount];
+                MemoryCopyUtils.copy(vector.getDataBuffer(), data);
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+                return new ArrowFloatReadData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowFloatData with version " + version + ". Current version: " + m_version + ".");
@@ -171,7 +232,7 @@ public final class ArrowFloatData {
 
         @Override
         public int initialNumBytesPerElement() {
-            return Float4Vector.TYPE_WIDTH + 1; // +1 for validity
+            return Float.BYTES + 1; // +1 for validity
         }
     }
 }

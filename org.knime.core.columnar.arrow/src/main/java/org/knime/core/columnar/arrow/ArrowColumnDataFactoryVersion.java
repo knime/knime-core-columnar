@@ -209,6 +209,13 @@ public final class ArrowColumnDataFactoryVersion {
         return m_childrenVersions[index];
     }
 
+    /**
+     * @return all child versions as an array
+     */
+    public ArrowColumnDataFactoryVersion[] getChildVersions() {
+        return m_childrenVersions;
+    }
+
     /*
      * Grammar for the version Strings:
      * childrenStart ::= '['

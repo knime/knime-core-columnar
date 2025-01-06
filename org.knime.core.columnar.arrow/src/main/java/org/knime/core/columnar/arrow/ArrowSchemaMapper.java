@@ -127,7 +127,8 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
      */
     static ArrowColumnDataFactory[] map(final ColumnarSchema schema) {
         return IntStream.range(0, schema.numColumns()) //
-            .mapToObj(i -> map(schema.getSpec(i), schema.getTraits(i))).toArray(ArrowColumnDataFactory[]::new);
+            .mapToObj(i -> map(schema.getSpec(i), schema.getTraits(i))) //
+            .toArray(ArrowColumnDataFactory[]::new);
     }
 
     /**
@@ -247,9 +248,8 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         }
 
         @Override
-        public ArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            return m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity);
+        public ArrowWriteData createWrite(final int capacity) {
+            return m_delegate.createWrite(capacity);
         }
 
         @Override
@@ -259,13 +259,15 @@ final class ArrowSchemaMapper implements MapperWithTraits<ArrowColumnDataFactory
         }
 
         @Override
-        public FieldVector getVector(final NullableReadData data) {
-            return m_delegate.getVector(data);
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
+            m_delegate.copyToVector(data, vector);
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return m_delegate.getDictionaries(data);
+        @Deprecated
+        public DictionaryProvider createDictionaries(final NullableReadData data,
+            final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator) {
+            return m_delegate.createDictionaries(data, dictionaryIdSupplier, allocator);
         }
 
         @Override

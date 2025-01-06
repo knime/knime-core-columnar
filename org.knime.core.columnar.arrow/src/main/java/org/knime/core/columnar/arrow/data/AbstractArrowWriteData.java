@@ -48,110 +48,50 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.vector.BitVectorHelper;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.util.ValueVectorUtility;
-import org.knime.core.columnar.WriteData;
-
 /**
- * Abstract implementation of {@link ArrowWriteData}. Holds a {@link FieldVector} of type F in {@link #m_vector} and an
- * offset for the indices in {@link #m_offset}. Takes care of reference counting and closes the vector when all
- * references are gone.
+ * Abstract implementation of {@link ArrowWriteData}. Holds a the {@link #m_validity validity buffer} and the
+ * {@link #m_offset offset} of the data.
  *
- * Call {@link #closeWithLength(int)} to close the {@link WriteData}.
- *
- * Overwrite {@link #closeResources()} to close additional resources (make sure to call the super method).
- *
- * @param <F> the type of the {@link FieldVector}
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-abstract class AbstractArrowWriteData<F extends FieldVector> extends AbstractReferencedData implements ArrowWriteData {
+abstract class AbstractArrowWriteData extends AbstractReferencedData implements ArrowWriteData {
 
-    /** The vector. Use {@link #m_offset} when accessing vector data. */
-    protected F m_vector;
+    /** The validity buffer of this data object. */
+    protected final ValidityBuffer m_validity;
 
     /** An offset describing where the values of this object start in the vector. */
     protected final int m_offset;
 
     /**
-     * Create an abstract {@link ArrowWriteData} with the given vector and an offset of 0.
+     * Create an abstract {@link ArrowWriteData} with the given capacity and an offset of 0.
      *
-     * @param vector the vector
+     * @param capacity the capacity of the data
      */
-    public AbstractArrowWriteData(final F vector) {
-        m_vector = vector;
+    public AbstractArrowWriteData(final int capacity) {
+        m_validity = new ValidityBuffer(capacity);
         m_offset = 0;
     }
 
     /**
-     * Create an abstract {@link ArrowWriteData} with the given vector and offset.
+     * Create an abstract {@link ArrowWriteData} with the given offset and validity buffer.
      *
-     * @param vector the vector
      * @param offset the offset
+     * @param validity the validity buffer
      */
-    public AbstractArrowWriteData(final F vector, final int offset) {
-        m_vector = vector;
+    public AbstractArrowWriteData(final int offset, final ValidityBuffer validity) {
+        m_validity = validity;
         m_offset = offset;
-    }
-
-    /**
-     * Closes the {@link WriteData}. Sets the value count of the vector, checks the reference count of this object, sets
-     * {@link #m_vector} to <code>null</code> and returns the vector.
-     *
-     * @param length the value count
-     * @return the vector with the set value count
-     */
-    protected F closeWithLength(final int length) {
-        m_vector.setValueCount(length);
-        final F vector = m_vector;
-        m_vector = null;
-        if (getReferenceCount() != 1) {
-            throw new IllegalStateException("Closed with outstanding references");
-        }
-        return vector;
     }
 
     @Override
     public void setMissing(final int index) {
-        @SuppressWarnings("resource") // Validity buffer handled by vector
-        final ArrowBuf validityBuffer = m_vector.getValidityBuffer();
-        BitVectorHelper.unsetBit(validityBuffer, m_offset + index);
+        m_validity.set(index, false);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * This method is not thread-safe. Do not call it concurrently from multiple threads, and do not call it
-     * concurrently with set operations or size queries.
-     */
-    @Override
-    public void expand(final int minimumCapacity) {
-        while (m_vector.getValueCapacity() < minimumCapacity) {
-            m_vector.reAlloc();
-        }
+    protected void setValid(final int index) {
+        m_validity.set(index, true);
     }
 
-    @Override
-    public int capacity() {
-        return m_vector.getValueCapacity();
-    }
-
-    @Override
-    protected void closeResources() {
-        if (m_vector != null) {
-            m_vector.close();
-        }
-    }
-
-    @Override
-    public String toString() {
-        return ValueVectorUtility.getToString(m_vector, m_offset, m_vector.getValueCount());
-    }
-
-    @Override
-    public long usedSizeFor(final int numElements) {
-        return m_vector.getBufferSizeFor(numElements);
-    }
+    // TODO overwrite toString
 }

@@ -60,6 +60,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -90,7 +92,6 @@ import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.DefaultWriteBatch;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.store.FileHandle;
 import org.slf4j.Logger;
@@ -152,7 +153,7 @@ class ArrowBatchWriter implements BatchWriter {
             // here because we are creating so many small objects when we have tables with lots (100_000s) of columns.
             // The row based backend behaves better in that scenario, unfortunately. It can handle 4x more columns with
             // the same amount of heap memory.
-            chunk[i] = ArrowColumnDataFactory.createWrite(m_factories[i], String.valueOf(i), m_allocator, capacity);
+            chunk[i] = m_factories[i].createWrite(capacity);
         }
         return new DefaultWriteBatch(chunk);
     }
@@ -176,14 +177,30 @@ class ArrowBatchWriter implements BatchWriter {
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
 
+        final var dictionaryIdsForField = newDictionaryIdSupplier();
+        final var dictionaryIdsForVectors = newDictionaryIdSupplier();
+
         // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
-            final NullableReadData data = batch.get(i);
-            final ArrowColumnDataFactory factory = m_factories[i];
-            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-            final FieldVector vector = factory.getVector(data);
-            final DictionaryProvider dictionaries = factory.getDictionaries(data);
-            final Field field = vector.getField();
+
+            final var data = batch.get(i);
+            final var factory = m_factories[i];
+
+            // Create the field including the extension type (if using the ExtensionArrowColumnDataFactory)
+            var field = factory.getField(String.valueOf(i), dictionaryIdsForField);
+
+            // Note: We create a Vector here and therefore transfer the data to off-heap
+            // The compression requires the data to be off-heap
+            // If we could compress from on-heap to off-heap (or to whereever), we would save a copy but would need to
+            // change the writer significantly
+            @SuppressWarnings("resource") // Vectors are closed later all at once
+            var vector = field.createVector(m_allocator);
+            factory.copyToVector(data, vector);
+
+            // This is not used anymore but still in the code to test reading of dictionaries for backward compatibility
+            @SuppressWarnings("deprecation")
+            final DictionaryProvider dictionaries =
+                factory.createDictionaries(data, dictionaryIdsForVectors, m_allocator);
 
             if (m_firstWrite) {
                 // Get the field for the schema and collect dictionaries
@@ -210,6 +227,9 @@ class ArrowBatchWriter implements BatchWriter {
 
         // Write the vectors
         writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
+
+        vectors.forEach(FieldVector::close);
+        allDictionaries.forEach(FieldVector::close);
 
         // Remember batch boundary for footer
         var previousBatchEnd = m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
@@ -270,7 +290,6 @@ class ArrowBatchWriter implements BatchWriter {
         return m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
     }
 
-
     @Override
     public synchronized void close() throws IOException {
         if (!m_closed) {
@@ -308,6 +327,14 @@ class ArrowBatchWriter implements BatchWriter {
         metadata.put(ARROW_FACTORY_VERSIONS_KEY, factoryVersions);
 
         return metadata;
+    }
+
+    /**
+     * @return a new {@link LongSupplier} counting upwards and starting with 0
+     */
+    private static LongSupplier newDictionaryIdSupplier() {
+        final AtomicLong id = new AtomicLong(0);
+        return id::getAndIncrement;
     }
 
     /** Map the dictionary ids in the given field to new unique ids and convert the type to the message format type */

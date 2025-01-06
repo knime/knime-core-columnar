@@ -48,17 +48,16 @@ package org.knime.core.columnar.arrow.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.TinyIntVector;
+import org.apache.arrow.vector.FixedWidthVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.data.AbstractArrowReadData.MissingValues;
 import org.knime.core.columnar.data.ByteData.ByteReadData;
 import org.knime.core.columnar.data.ByteData.ByteWriteData;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
  * Arrow implementation of {@link ByteWriteData} and {@link ByteReadData}.
@@ -72,65 +71,105 @@ public final class ArrowByteData {
     }
 
     /** Arrow implementation of {@link ByteWriteData}. */
-    public static final class ArrowByteWriteData extends AbstractArrowWriteData<TinyIntVector>
-        implements ByteWriteData {
+    public static final class ArrowByteWriteData extends AbstractArrowWriteData implements ByteWriteData {
 
-        private ArrowByteWriteData(final TinyIntVector vector) {
-            super(vector);
+        private byte[] m_data;
+
+        private ArrowByteWriteData(final int capacity) {
+            super(capacity);
+            m_data = new byte[capacity];
         }
 
-        private ArrowByteWriteData(final TinyIntVector vector, final int offset) {
-            super(vector, offset);
+        private ArrowByteWriteData(final int offset, final byte[] data, final ValidityBuffer validity) {
+            super(offset, validity);
+            m_data = data;
         }
 
         @Override
         public void setByte(final int index, final byte val) {
-            m_vector.set(m_offset + index, val);
+            m_data[index + m_offset] = val;
+            setValid(index + m_offset);
         }
 
         @Override
         public ArrowWriteData slice(final int start) {
-            return new ArrowByteWriteData(m_vector, m_offset + start);
+            return new ArrowByteWriteData(m_offset + start, m_data, m_validity);
+        }
+
+        @Override
+        public void expand(final int minimumCapacity) {
+            setNumElements(minimumCapacity);
+        }
+
+        @Override
+        public int capacity() {
+            return m_data.length;
+        }
+
+        @Override
+        public long usedSizeFor(final int numElements) {
+            return numElements + ValidityBuffer.usedSizeFor(numElements);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return m_data.length + m_validity.sizeOf();
         }
 
         @Override
-        @SuppressWarnings("resource") // Resource closed by ReadData
+        protected void closeResources() {
+            // No resources to close for on-heap data
+        }
+
+        @Override
         public ArrowByteReadData close(final int length) {
-            final TinyIntVector vector = closeWithLength(length);
-            return new ArrowByteReadData(vector, MissingValues.forValidityBuffer(vector.getValidityBuffer(), length));
+            setNumElements(length);
+            return new ArrowByteReadData(m_data, m_validity);
+        }
+
+        /**
+         * Expand or shrink the data to the given size.
+         *
+         * @param numElements the new size of the data
+         */
+        private void setNumElements(final int numElements) {
+            m_validity.setNumElements(numElements);
+
+            var newData = new byte[numElements];
+            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+            m_data = newData;
         }
     }
 
     /** Arrow implementation of {@link ByteReadData}. */
-    public static final class ArrowByteReadData extends AbstractArrowReadData<TinyIntVector> implements ByteReadData {
+    public static final class ArrowByteReadData extends AbstractArrowReadData implements ByteReadData {
 
-        private ArrowByteReadData(final TinyIntVector vector, final MissingValues missingValues) {
-            super(vector, missingValues);
+        private final byte[] m_data;
+
+        private ArrowByteReadData(final byte[] data, final ValidityBuffer validity) {
+            super(validity, data.length);
+            m_data = data;
         }
 
-        private ArrowByteReadData(final TinyIntVector vector, final MissingValues missingValues, final int offset,
+        private ArrowByteReadData(final byte[] data, final ValidityBuffer validity, final int offset,
             final int length) {
-            super(vector, missingValues, offset, length);
+            super(validity, offset, length);
+            m_data = data;
         }
 
         @Override
         public byte getByte(final int index) {
-            return m_vector.get(m_offset + index);
+            return m_data[index + m_offset];
         }
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowByteReadData(m_vector, m_missingValues, m_offset + start, length);
+            return new ArrowByteReadData(m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return ArrowSizeUtils.sizeOfFixedWidth(m_vector);
+            return m_data.length + m_validity.sizeOf();
         }
     }
 
@@ -138,31 +177,61 @@ public final class ArrowByteData {
     public static final class ArrowByteDataFactory extends AbstractArrowColumnDataFactory {
 
         /** Singleton instance of {@link ArrowByteDataFactory} */
-        public static final ArrowByteDataFactory INSTANCE = new ArrowByteDataFactory();
+        public static final ArrowByteDataFactory INSTANCE = new ArrowByteDataFactory(true);
 
-        private ArrowByteDataFactory() {
-            super(ArrowColumnDataFactoryVersion.version(0));
+        /** Singleton instance of {@link ArrowByteDataFactory} using an unsigned arrow vector */
+        public static final ArrowByteDataFactory INSTANCE_UNSIGNED = new ArrowByteDataFactory(false);
+
+        private final boolean m_signed;
+
+        private ArrowByteDataFactory(final boolean signed) {
+            super(0);
+            m_signed = signed;
+        }
+
+        @Override
+        public ArrowByteWriteData createWrite(final int capacity) {
+            return new ArrowByteWriteData(capacity);
         }
 
         @Override
         public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return Field.nullable(name, MinorType.TINYINT.getType());
+            if (m_signed) {
+                return Field.nullable(name, MinorType.TINYINT.getType());
+            } else {
+                // Note we just use an unsigned type for the vector but the rest of the code is the same
+                // because Java has no unsigned bytes
+                return Field.nullable(name, MinorType.UINT1.getType());
+            }
         }
 
         @Override
-        public ArrowByteWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            final TinyIntVector v = (TinyIntVector)vector;
-            v.allocateNew(capacity);
-            return new ArrowByteWriteData(v);
+        public void copyToVector(final NullableReadData data, final FieldVector vector) {
+            var d = (ArrowByteReadData)data; // TODO generic?
+
+            ((FixedWidthVector)vector).allocateNew(d.length());
+
+            // Copy the data
+            vector.getDataBuffer().setBytes(0, d.m_data);
+
+            // Copy the validity
+            d.m_validity.copyTo(vector.getValidityBuffer());
+
+            // Set the value count
+            vector.setValueCount(d.length());
         }
 
         @Override
         public ArrowByteReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
+
             if (m_version.equals(version)) {
-                return new ArrowByteReadData((TinyIntVector)vector,
-                    MissingValues.forNullCount(nullCount.getNullCount(), vector.getValueCount()));
+                var valueCount = vector.getValueCount();
+                var data = new byte[valueCount];
+                vector.getDataBuffer().getBytes(0, data);
+                var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+
+                return new ArrowByteReadData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowByteData with version " + version + ". Current version: " + m_version + ".");
@@ -171,7 +240,7 @@ public final class ArrowByteData {
 
         @Override
         public int initialNumBytesPerElement() {
-            return TinyIntVector.TYPE_WIDTH + 1; // +1 for validity
+            return Byte.BYTES + 1; // +1 for validity
         }
     }
 }

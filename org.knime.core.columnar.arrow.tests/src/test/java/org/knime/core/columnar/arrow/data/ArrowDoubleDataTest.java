@@ -81,25 +81,29 @@ public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleWriteD
         return (ArrowDoubleReadData)o;
     }
 
+    private static double valueFor(final int seed) {
+        return seed * 1.2;
+    }
+
     @Override
     protected void setValue(final ArrowDoubleWriteData data, final int index, final int seed) {
-        data.setDouble(index, seed);
+        data.setDouble(index, valueFor(seed));
+
     }
 
     @Override
     protected void checkValue(final ArrowDoubleReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getDouble(index), 0);
+        assertEquals(valueFor(seed), data.getDouble(index), 0);
     }
 
     @Override
     protected boolean isReleasedW(final ArrowDoubleWriteData data) {
-        return data.m_vector == null;
+        return false;
     }
 
     @Override
-    @SuppressWarnings("resource") // Resources handled by vector
     protected boolean isReleasedR(final ArrowDoubleReadData data) {
-        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+        return false;
     }
 
     @Override
