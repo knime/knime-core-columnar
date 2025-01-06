@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowFloatData.ArrowFloatDataFactory;
@@ -71,13 +71,13 @@ public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatWriteDat
 
     @Override
     protected ArrowFloatWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowFloatWriteData);
+        assertTrue(o instanceof ArrowFloatWriteData, "Object is not an instance of ArrowFloatWriteData");
         return (ArrowFloatWriteData)o;
     }
 
     @Override
     protected ArrowFloatReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowFloatReadData);
+        assertTrue(o instanceof ArrowFloatReadData, "Object is not an instance of ArrowFloatReadData");
         return (ArrowFloatReadData)o;
     }
 
@@ -88,7 +88,7 @@ public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatWriteDat
 
     @Override
     protected void checkValue(final ArrowFloatReadData data, final int index, final int seed) {
-        assertEquals(seed, data.getFloat(index), 0);
+        assertEquals(seed, data.getFloat(index), 0, "Float value does not match expected value at index " + index);
     }
 
     @Override
@@ -103,7 +103,7 @@ public class ArrowFloatDataTest extends AbstractArrowDataTest<ArrowFloatWriteDat
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 4 * capacity // 4 bytes per value for data
+        return 4L * capacity // 4 bytes per value for data
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }

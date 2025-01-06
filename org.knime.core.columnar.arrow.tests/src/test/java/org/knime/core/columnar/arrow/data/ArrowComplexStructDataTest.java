@@ -48,9 +48,9 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 
@@ -104,28 +104,28 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
 
     @Override
     protected ArrowStructWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowStructWriteData);
+        assertTrue(o instanceof ArrowStructWriteData, "Object is not an instance of ArrowStructWriteData");
         return (ArrowStructWriteData)o;
     }
 
     @Override
     protected ArrowStructReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowStructReadData);
+        assertTrue(o instanceof ArrowStructReadData, "Object is not an instance of ArrowStructReadData");
         return (ArrowStructReadData)o;
     }
 
     @Override
     protected void setValue(final ArrowStructWriteData data, final int index, final int seed) {
         final StringWriteData data0 = data.getWriteDataAt(0);
-        assertTrue(data0 instanceof ArrowStringWriteData);
+        assertTrue(data0 instanceof ArrowStringWriteData, "Object is not an instance of ArrowStringWriteData");
         final IntWriteData data1 = data.getWriteDataAt(1);
-        assertTrue(data1 instanceof ArrowIntWriteData);
+        assertTrue(data1 instanceof ArrowIntWriteData, "Object is not an instance of ArrowIntWriteData");
         final StructWriteData data2 = data.getWriteDataAt(2);
-        assertTrue(data2 instanceof ArrowStructWriteData);
+        assertTrue(data2 instanceof ArrowStructWriteData, "Object is not an instance of ArrowStructWriteData");
         final VarBinaryWriteData data20 = data2.getWriteDataAt(0);
-        assertTrue(data20 instanceof ArrowVarBinaryWriteData);
+        assertTrue(data20 instanceof ArrowVarBinaryWriteData, "Object is not an instance of ArrowVarBinaryWriteData");
         final DoubleWriteData data21 = data2.getWriteDataAt(1);
-        assertTrue(data21 instanceof ArrowDoubleWriteData);
+        assertTrue(data21 instanceof ArrowDoubleWriteData, "Object is not an instance of ArrowDoubleWriteData");
 
         data0.setString(index, Integer.toString(seed));
         data1.setInt(index, seed);
@@ -136,20 +136,23 @@ public class ArrowComplexStructDataTest extends AbstractArrowDataTest<ArrowStruc
     @Override
     protected void checkValue(final ArrowStructReadData data, final int index, final int seed) {
         final StringReadData data0 = data.getReadDataAt(0);
-        assertTrue(data0 instanceof ArrowStringReadData);
+        assertTrue(data0 instanceof ArrowStringReadData, "Object is not an instance of ArrowStringReadData");
         final IntReadData data1 = data.getReadDataAt(1);
-        assertTrue(data1 instanceof ArrowIntReadData);
+        assertTrue(data1 instanceof ArrowIntReadData, "Object is not an instance of ArrowIntReadData");
         final StructReadData data2 = data.getReadDataAt(2);
-        assertTrue(data2 instanceof ArrowStructReadData);
+        assertTrue(data2 instanceof ArrowStructReadData, "Object is not an instance of ArrowStructReadData");
         final VarBinaryReadData data20 = data2.getReadDataAt(0);
-        assertTrue(data20 instanceof ArrowVarBinaryReadData);
+        assertTrue(data20 instanceof ArrowVarBinaryReadData, "Object is not an instance of ArrowVarBinaryReadData");
         final DoubleReadData data21 = data2.getReadDataAt(1);
-        assertTrue(data21 instanceof ArrowDoubleReadData);
+        assertTrue(data21 instanceof ArrowDoubleReadData, "Object is not an instance of ArrowDoubleReadData");
 
-        assertEquals(Integer.toString(seed), data0.getString(index));
-        assertEquals(seed, data1.getInt(index));
-        assertArrayEquals(valueFor20(seed), data20.getBytes(index));
-        assertEquals(seed, data21.getDouble(index), 1e-5);
+        assertEquals(Integer.toString(seed), data0.getString(index),
+            "String value does not match expected value at index " + index);
+        assertEquals(seed, data1.getInt(index), "Int value does not match expected value at index " + index);
+        assertArrayEquals(valueFor20(seed), data20.getBytes(index),
+            "Byte array value does not match expected value at index " + index);
+        assertEquals(seed, data21.getDouble(index), 1e-5,
+            "Double value does not match expected value at index " + index);
     }
 
     @Override

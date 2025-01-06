@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
@@ -80,22 +80,22 @@ public class ArrowSimpleStructDataTest extends AbstractArrowDataTest<ArrowStruct
 
     @Override
     protected ArrowStructWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowStructWriteData);
+        assertTrue(o instanceof ArrowStructWriteData, "Object is not an instance of ArrowStructWriteData");
         return (ArrowStructWriteData)o;
     }
 
     @Override
     protected ArrowStructReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowStructReadData);
+        assertTrue(o instanceof ArrowStructReadData, "Object is not an instance of ArrowStructReadData");
         return (ArrowStructReadData)o;
     }
 
     @Override
     protected void setValue(final ArrowStructWriteData data, final int index, final int seed) {
         final DoubleWriteData doubleData = data.getWriteDataAt(0);
-        assertTrue(doubleData instanceof ArrowDoubleWriteData);
+        assertTrue(doubleData instanceof ArrowDoubleWriteData, "Object is not an instance of ArrowDoubleWriteData");
         final IntWriteData intData = data.getWriteDataAt(1);
-        assertTrue(intData instanceof ArrowIntWriteData);
+        assertTrue(intData instanceof ArrowIntWriteData, "Object is not an instance of ArrowIntWriteData");
         doubleData.setDouble(index, seed / 2.0);
         intData.setInt(index, seed * 2);
     }
@@ -103,11 +103,12 @@ public class ArrowSimpleStructDataTest extends AbstractArrowDataTest<ArrowStruct
     @Override
     protected void checkValue(final ArrowStructReadData data, final int index, final int seed) {
         final DoubleReadData doubleData = data.getReadDataAt(0);
-        assertTrue(doubleData instanceof ArrowDoubleReadData);
+        assertTrue(doubleData instanceof ArrowDoubleReadData, "Object is not an instance of ArrowDoubleReadData");
         final IntReadData intData = data.getReadDataAt(1);
-        assertTrue(intData instanceof ArrowIntReadData);
-        assertEquals(seed / 2.0, doubleData.getDouble(index), 0);
-        assertEquals(seed * 2, intData.getInt(index));
+        assertTrue(intData instanceof ArrowIntReadData, "Object is not an instance of ArrowIntReadData");
+        assertEquals(seed / 2.0, doubleData.getDouble(index), 0,
+            "Double value does not match expected value at index " + index);
+        assertEquals(seed * 2, intData.getInt(index), "Integer value does not match expected value at index " + index);
     }
 
     @Override
@@ -122,8 +123,8 @@ public class ArrowSimpleStructDataTest extends AbstractArrowDataTest<ArrowStruct
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 3 * (long)Math.ceil(capacity / 8.0) // Validity buffers of Stuct, Double and Integer
-            + capacity * 8 // Double: Data buffer
-            + capacity * 4; // Integer: Data buffer
+        return 3 * (long)Math.ceil(capacity / 8.0) // Validity buffers of Struct, Double, and Integer
+            + capacity * 8L // Double: Data buffer
+            + capacity * 4L; // Integer: Data buffer
     }
 }

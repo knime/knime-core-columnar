@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowBooleanData.ArrowBooleanDataFactory;
@@ -70,13 +70,13 @@ public class ArrowBooleanDataTest extends AbstractArrowDataTest<ArrowBooleanWrit
 
     @Override
     protected ArrowBooleanWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowBooleanWriteData);
+        assertTrue(o instanceof ArrowBooleanWriteData, "Object is not an instance of ArrowBooleanWriteData");
         return (ArrowBooleanWriteData)o;
     }
 
     @Override
     protected ArrowBooleanReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowBooleanReadData);
+        assertTrue(o instanceof ArrowBooleanReadData, "Object is not an instance of ArrowBooleanReadData");
         return (ArrowBooleanReadData)o;
     }
 
@@ -87,7 +87,7 @@ public class ArrowBooleanDataTest extends AbstractArrowDataTest<ArrowBooleanWrit
 
     @Override
     protected void checkValue(final ArrowBooleanReadData data, final int index, final int seed) {
-        assertEquals(seed % 3 == 0, data.getBoolean(index));
+        assertEquals(seed % 3 == 0, data.getBoolean(index), "Boolean value does not match for index " + index);
     }
 
     @Override

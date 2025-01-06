@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 
@@ -75,13 +75,13 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowVarBinaryWri
 
     @Override
     protected ArrowVarBinaryWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowVarBinaryWriteData);
+        assertTrue(o instanceof ArrowVarBinaryWriteData, "Object is not an instance of ArrowVarBinaryWriteData");
         return (ArrowVarBinaryWriteData)o;
     }
 
     @Override
     protected ArrowVarBinaryReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowVarBinaryReadData);
+        assertTrue(o instanceof ArrowVarBinaryReadData, "Object is not an instance of ArrowVarBinaryReadData");
         return (ArrowVarBinaryReadData)o;
     }
 
@@ -100,7 +100,7 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowVarBinaryWri
             input.readFully(object);
             return object;
         });
-        assertArrayEquals(valueFor(seed), read);
+        assertArrayEquals(valueFor(seed), read, "Byte array does not match expected value at index " + index);
     }
 
     @Override
@@ -120,7 +120,7 @@ public class ArrowObjectDataTest extends AbstractArrowDataTest<ArrowVarBinaryWri
             numBytes += new Random(i).nextInt(MAX_LENGTH);
         }
         return numBytes // data buffer
-            + 4 * capacity // offset buffer
+            + 4L * capacity // offset buffer
             + (long)Math.ceil(capacity / 8.0); // validity buffer
     }
 

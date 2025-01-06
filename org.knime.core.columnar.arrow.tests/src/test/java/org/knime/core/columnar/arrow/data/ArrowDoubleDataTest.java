@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.knime.core.columnar.arrow.AbstractArrowDataTest;
 import org.knime.core.columnar.arrow.data.ArrowDoubleData.ArrowDoubleDataFactory;
@@ -71,13 +71,13 @@ public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleWriteD
 
     @Override
     protected ArrowDoubleWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowDoubleWriteData);
+        assertTrue(o instanceof ArrowDoubleWriteData, "Object is not an instance of ArrowDoubleWriteData");
         return (ArrowDoubleWriteData)o;
     }
 
     @Override
     protected ArrowDoubleReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowDoubleReadData);
+        assertTrue(o instanceof ArrowDoubleReadData, "Object is not an instance of ArrowDoubleReadData");
         return (ArrowDoubleReadData)o;
     }
 
@@ -88,12 +88,12 @@ public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleWriteD
     @Override
     protected void setValue(final ArrowDoubleWriteData data, final int index, final int seed) {
         data.setDouble(index, valueFor(seed));
-
     }
 
     @Override
     protected void checkValue(final ArrowDoubleReadData data, final int index, final int seed) {
-        assertEquals(valueFor(seed), data.getDouble(index), 0);
+        assertEquals(valueFor(seed), data.getDouble(index), 0,
+            "Double value does not match expected value at index " + index);
     }
 
     @Override
@@ -108,7 +108,7 @@ public class ArrowDoubleDataTest extends AbstractArrowDataTest<ArrowDoubleWriteD
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        return 8 * capacity // 8 bytes per value for data
+        return 8L * capacity // 8 bytes per value for data
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }

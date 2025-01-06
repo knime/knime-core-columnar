@@ -48,8 +48,8 @@
  */
 package org.knime.core.columnar.arrow.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 
@@ -83,13 +83,13 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
 
     @Override
     protected ArrowListWriteData castW(final Object o) {
-        assertTrue(o instanceof ArrowListWriteData);
+        assertTrue(o instanceof ArrowListWriteData, "Object is not an instance of ArrowListWriteData");
         return (ArrowListWriteData)o;
     }
 
     @Override
     protected ArrowListReadData castR(final Object o) {
-        assertTrue(o instanceof ArrowListReadData);
+        assertTrue(o instanceof ArrowListReadData, "Object is not an instance of ArrowListReadData");
         return (ArrowListReadData)o;
     }
 
@@ -117,20 +117,23 @@ public class ArrowRecursiveListDataTest extends AbstractArrowDataTest<ArrowListW
     protected void checkValue(final ArrowListReadData data, final int index, final int seed) {
         final ArrowListReadData inner1 = data.createReadData(index);
         if (seed == 1) {
-            assertEquals(0, inner1.length());
+            assertEquals(0, inner1.length(),
+                "Expected empty list (length 0) for seed = " + seed + " but got " + inner1.length());
             return;
         }
 
         final Random random = new Random(seed);
         final int size1 = random.nextInt(MAX_LENGTH_1);
         final int[] size2 = getInnerSizes(random, size1);
-        assertEquals(size1, inner1.length());
+        assertEquals(size1, inner1.length(), "Outer list length does not match expected value for seed = " + seed);
 
         for (int i = 0; i < size1; i++) {
             final ArrowIntReadData inner2 = inner1.createReadData(i);
-            assertEquals(size2[i], inner2.length());
+            assertEquals(size2[i], inner2.length(),
+                "Inner list length does not match expected value at index " + i + " for seed = " + seed);
             for (int j = 0; j < size2[i]; j++) {
-                assertEquals(random.nextInt(), inner2.getInt(j));
+                assertEquals(random.nextInt(), inner2.getInt(j),
+                    "Integer value does not match expected value at index " + j + " (seed = " + seed + ")");
             }
         }
     }

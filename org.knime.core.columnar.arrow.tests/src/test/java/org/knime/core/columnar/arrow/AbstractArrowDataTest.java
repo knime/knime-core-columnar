@@ -45,10 +45,10 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -62,9 +62,10 @@ import java.util.stream.IntStream;
 
 import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.RootAllocator;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.data.ArrowReadData;
@@ -75,7 +76,6 @@ import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
-import org.knime.core.columnar.store.FileHandle;
 
 /**
  * Abstract test for simple Arrow {@link NullableReadData}, {@link NullableWriteData} implementations.
@@ -105,7 +105,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     }
 
     /**
-     * Check if the object is of class W an cast.
+     * Check if the object is of class W and cast.
      *
      * @param o an object
      * @return the cast object
@@ -113,7 +113,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     protected abstract W castW(Object o);
 
     /**
-     * Check if the object is of class R an cast.
+     * Check if the object is of class R and cast.
      *
      * @param o an object
      * @return the cast object
@@ -130,8 +130,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     protected abstract void setValue(W data, int index, int seed);
 
     /**
-     * Check the value at the given index using the seed. Should be the same as set in
-     * {@link #setValue(ArrowWriteData, int, int)}.
+     * Check the value at the given index using the seed.
      *
      * @param data the data object
      * @param index the index
@@ -170,7 +169,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     }
 
     /** Initialize the root allocator before running a test */
-    @Before
+    @BeforeEach
     public void before() {
         final int segmentSize = 1;
         m_alloc = new RootAllocator(AllocationListener.NOOP, Long.MAX_VALUE,
@@ -178,7 +177,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     }
 
     /** Close the root allocator after running a test */
-    @After
+    @AfterEach
     public void after() {
         MappedMessageSerializerTestUtil.assertAllClosed();
         m_alloc.close();
@@ -213,15 +212,15 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     @Test
     public void testCapacity() {
         W data = createWrite(12);
-        assertTrue(data.capacity() >= 12);
+        assertTrue(data.capacity() >= 12, "Expected capacity to be at least 12, but was " + data.capacity());
         data.release();
 
         data = createWrite(16000);
-        assertTrue(data.capacity() >= 16000);
+        assertTrue(data.capacity() >= 16000, "Expected capacity to be at least 16000, but was " + data.capacity());
         data.release();
 
         data = createWrite(68);
-        assertTrue(data.capacity() >= 68);
+        assertTrue(data.capacity() >= 68, "Expected capacity to be at least 68, but was " + data.capacity());
         data.release();
     }
 
@@ -233,7 +232,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
 
         // Allocate
         W data = createWrite(size1);
-        assertTrue(data.capacity() >= size1);
+        assertTrue(data.capacity() >= size1,
+            "Initial capacity should be at least " + size1 + ", but was " + data.capacity());
 
         // Write some data
         for (int i = 0; i < size1; i++) {
@@ -242,7 +242,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
 
         // Expand
         data.expand(size2);
-        assertTrue(data.capacity() >= size2);
+        assertTrue(data.capacity() >= size2,
+            "Capacity after expand should be at least " + size2 + ", but was " + data.capacity());
 
         // Write some more data
         for (int i = size1; i < size2; i++) {
@@ -276,19 +277,20 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         for (int i = 0; i < numValues; i++) {
             if (i >= sliceStart && i < sliceStart + sliceLength) {
                 // Inside the written slice
-                assertFalse(readData.isMissing(i));
+                assertFalse(readData.isMissing(i), "Value at index " + i + " should not be missing");
                 checkValue(readData, i, i - sliceStart);
             } else {
                 // Outside the written slice
-                assertTrue(readData.isMissing(i));
+                assertTrue(readData.isMissing(i), "Value at index " + i + " should be missing");
             }
         }
 
         // Read only the slice
         final R slicedRead = castR(readData.slice(sliceStart, sliceLength));
-        assertEquals(sliceLength, slicedRead.length());
+        assertEquals(sliceLength, slicedRead.length(),
+            "Sliced read length should be " + sliceLength + ", but was " + slicedRead.length());
         for (int i = 0; i < sliceLength; i++) {
-            assertFalse(slicedRead.isMissing(i));
+            assertFalse(slicedRead.isMissing(i), "Value at index " + i + " in sliced read should not be missing");
             checkValue(slicedRead, i, i);
         }
 
@@ -318,9 +320,9 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         final R slicedRead = castR(readData.slice(sliceStart, sliceLength));
         for (int i = 0; i < sliceLength; i++) {
             if (i % 2 == 0) {
-                assertFalse(slicedRead.isMissing(i));
+                assertFalse(slicedRead.isMissing(i), "Value at index " + i + " should not be missing");
             } else {
-                assertTrue(slicedRead.isMissing(i));
+                assertTrue(slicedRead.isMissing(i), "Value at index " + i + " should be missing");
             }
         }
 
@@ -349,20 +351,21 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         for (int i = 0; i < numValues; i++) {
             if (i >= slice1Start + slice2Start && i < slice1Start + slice2Start + sliceLength) {
                 // Inside the written slice
-                assertFalse(readData.isMissing(i));
+                assertFalse(readData.isMissing(i), "Value at index " + i + " should not be missing");
                 checkValue(readData, i, i - slice1Start - slice2Start);
             } else {
                 // Outside the written slice
-                assertTrue(readData.isMissing(i));
+                assertTrue(readData.isMissing(i), "Value at index " + i + " should be missing");
             }
         }
 
         // Read only the slice
         final R slicedRead1 = castR(readData.slice(slice1Start, 10));
         final R slicedRead2 = castR(slicedRead1.slice(slice2Start, sliceLength));
-        assertEquals(sliceLength, slicedRead2.length());
+        assertEquals(sliceLength, slicedRead2.length(),
+            "Sliced read length should be " + sliceLength + ", but was " + slicedRead2.length());
         for (int i = 0; i < sliceLength; i++) {
-            assertFalse(slicedRead2.isMissing(i));
+            assertFalse(slicedRead2.isMissing(i), "Value at index " + i + " in sliced read should not be missing");
             checkValue(slicedRead2, i, i);
         }
 
@@ -423,6 +426,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     }
 
     /** Test #retain() and #release() for W and R */
+    @Disabled("TODO the new data do not support retain/release. They do not need it because the GC will take care of it.")
     @Test
     public void testReferenceCounting() {
         int numValues = 8;
@@ -431,36 +435,36 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             setValue(wd, i, i);
         }
         // wd: Reference count should be 1
-        assertFalse(isReleasedW(wd));
+        assertFalse(isReleasedW(wd), "Write data should not be released after setting values");
 
         wd.retain();
         // wd: Reference count should be 2
-        assertFalse(isReleasedW(wd));
+        assertFalse(isReleasedW(wd), "Write data should not be released after retain");
 
         wd.release();
         // wd: Reference count should be 1
-        assertFalse(isReleasedW(wd));
+        assertFalse(isReleasedW(wd), "Write data should not be released after release");
 
         final R rd = castR(wd.close(numValues));
         // wd: Should be released now because close passes the resources to rd
-        assertTrue(isReleasedW(wd));
+        assertTrue(isReleasedW(wd), "Write data should be released after close");
 
         // NB: Releasing wd again should have no effect on rd
         wd.release();
         // rd: Reference count should be 1
-        assertFalse(isReleasedR(rd));
+        assertFalse(isReleasedR(rd), "Read data should not be released after closing write data");
 
         rd.retain();
         // rd: Reference count should be 2
-        assertFalse(isReleasedR(rd));
+        assertFalse(isReleasedR(rd), "Read data should not be released after retain");
 
         rd.release();
         // rd: Reference count should be 1
-        assertFalse(isReleasedR(rd));
+        assertFalse(isReleasedR(rd), "Read data should not be released after release");
 
         rd.release();
         // rd: should be released
-        assertTrue(isReleasedR(rd));
+        assertTrue(isReleasedR(rd), "Read data should be released after final release");
     }
 
     /** Test {@link W#toString()} and {@link R#toString()} */
@@ -468,13 +472,13 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     public void testToString() {
         final W wd = createWrite(1);
         final String ws = wd.toString();
-        assertNotNull(ws);
-        assertFalse(ws.isEmpty());
+        assertNotNull(ws, "Write data toString() should not return null");
+        assertFalse(ws.isEmpty(), "Write data toString() should not return empty string");
 
         final R rd = castR(wd.close(1));
         final String rs = rd.toString();
-        assertNotNull(rs);
-        assertFalse(rs.isEmpty());
+        assertNotNull(rs, "Read data toString() should not return null");
+        assertFalse(rs.isEmpty(), "Read data toString() should not return empty string");
 
         rd.release();
     }
@@ -494,9 +498,9 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         final R readData = castR(writeData.close(numValues));
         for (int i = 0; i < numValues; i++) {
             if (i % 13 == 0) {
-                assertTrue(readData.isMissing(i));
+                assertTrue(readData.isMissing(i), "Value at index " + i + " should be missing");
             } else {
-                assertFalse(readData.isMissing(i));
+                assertFalse(readData.isMissing(i), "Value at index " + i + " should not be missing");
                 checkValue(readData, i, i);
             }
         }
@@ -513,7 +517,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         }
         final R readData = castR(writeData.close(numValues));
         for (int i = 0; i < numValues; i++) {
-            assertTrue(readData.isMissing(i));
+            assertTrue(readData.isMissing(i), "Value at index " + i + " should be missing");
         }
         readData.release();
     }
@@ -524,15 +528,16 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         final int numValues = 8213;
         final W wd = createWrite(numValues);
         long minSize = getMinSizeW(0, numValues);
-        assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
+        assertTrue(wd.sizeOf() >= minSize, "Size too small. Got " + wd.sizeOf() + ", expected >= " + minSize);
         for (int i = 0; i < numValues; i++) {
             setValue(wd, i, i);
             minSize = getMinSizeW(i, numValues);
-            assertTrue("Size to small. Got " + wd.sizeOf() + ", expected >= " + minSize, wd.sizeOf() >= minSize);
+            assertTrue(wd.sizeOf() >= minSize,
+                "Size too small after adding " + i + " elements. Got " + wd.sizeOf() + ", expected >= " + minSize);
         }
         final R rd = castR(wd.close(numValues));
         minSize = getMinSize(numValues, numValues);
-        assertTrue("Size to small. Got " + rd.sizeOf() + ", expected >= " + minSize, rd.sizeOf() >= minSize);
+        assertTrue(rd.sizeOf() >= minSize, "Size too small. Got " + rd.sizeOf() + ", expected >= " + minSize);
         rd.release();
     }
 
@@ -542,13 +547,13 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         // Test with length = capacity
         W writeData = createWrite(13);
         R readData = castR(writeData.close(13));
-        assertEquals(13, readData.length());
+        assertEquals(13, readData.length(), "Read data length should be 13");
         readData.release();
 
         // Test with length != capacity
         writeData = createWrite(64);
         readData = castR(writeData.close(7));
-        assertEquals(7, readData.length());
+        assertEquals(7, readData.length(), "Read data length should be 7");
         readData.release();
     }
 
@@ -569,8 +574,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
-        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
+        final var tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
+        final var factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
@@ -581,8 +586,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             new ArrowBatchReader(tmp.asFile(), m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
-            assertEquals(numValues, batch.length());
-            assertEquals(numValues, batch.get(0).length());
+            assertEquals(numValues, batch.length(), "Batch length should be " + numValues);
+            assertEquals(numValues, batch.get(0).length(), "First data length should be " + numValues);
             d = castR(batch.get(0));
 
             for (int i = 0; i < numValues; i++) {
@@ -614,8 +619,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
-        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
+        var tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
+        var factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
@@ -626,15 +631,15 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             new ArrowBatchReader(tmp.asFile(), m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
-            assertEquals(numValues, batch.length());
-            assertEquals(numValues, batch.get(0).length());
+            assertEquals(numValues, batch.length(), "Batch length should be " + numValues);
+            assertEquals(numValues, batch.get(0).length(), "First data length should be " + numValues);
             d = castR(batch.get(0));
 
             for (int i = 0; i < numValues; i++) {
                 if (i % 13 == 0) {
-                    assertTrue(d.isMissing(i));
+                    assertTrue(d.isMissing(i), "Value at index " + i + " should be missing");
                 } else {
-                    assertFalse(d.isMissing(i));
+                    assertFalse(d.isMissing(i), "Value at index " + i + " should not be missing");
                     checkValue(d, i, i);
                 }
             }
@@ -660,8 +665,8 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
         ReadBatch batch = new DefaultReadBatch(new NullableReadData[]{d});
 
         // Write
-        final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
-        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{m_factory};
+        var tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
+        var factories = new ArrowColumnDataFactory[]{m_factory};
         try (final ArrowBatchWriter writer = new ArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
@@ -672,12 +677,12 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             new ArrowBatchReader(tmp.asFile(), m_alloc, factories, new DefaultColumnSelection(1))) {
 
             batch = reader.readRetained(0);
-            assertEquals(numValues, batch.length());
-            assertEquals(numValues, batch.get(0).length());
+            assertEquals(numValues, batch.length(), "Batch length should be " + numValues);
+            assertEquals(numValues, batch.get(0).length(), "First data length should be " + numValues);
             d = castR(batch.get(0));
 
             for (int i = 0; i < numValues; i++) {
-                assertTrue(d.isMissing(i));
+                assertTrue(d.isMissing(i), "Value at index " + i + " should be missing");
             }
             batch.release();
         }
@@ -691,7 +696,7 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
     @Test
     public void testInitialNumBytesPerElement() {
         var initialNumBytes = m_factory.initialNumBytesPerElement();
-        assertTrue("Initial num bytes per element should be greater than zero", initialNumBytes > 0);
+        assertTrue(initialNumBytes > 0, "Initial num bytes per element should be greater than zero");
 
         checkInitialNumBytesPerElementFor(4);
         checkInitialNumBytesPerElementFor(200);
@@ -704,17 +709,19 @@ public abstract class AbstractArrowDataTest<W extends ArrowWriteData, R extends 
             var expectedSize = m_factory.initialNumBytesPerElement() * num_values;
 
             // Make sure we are not under-estimating the size by much
-            // (for small data types and few elements we might under-estimate but sill end up with 16 bytes)
+            // (for small data types and few elements we might under-estimate but still end up with 16 bytes)
             var upperLimit = Math.max((int)(expectedSize * 1.2), 16);
-            assertTrue("Initial size for %d elements was %d bytes, expected: %d bytes (max %d bytes)"
-                .formatted(num_values, size, expectedSize, upperLimit), size <= upperLimit);
+            assertTrue(size <= upperLimit,
+                "Initial size for %d elements was %d bytes, expected: %d bytes (max %d bytes)".formatted(num_values,
+                    size, expectedSize, upperLimit));
 
-            // Make sure we are not over estimating the size by much
+            // Make sure we are not over-estimating the size by much
             // (exclude boolean because it only uses 1 bit per element but we estimate 1 byte per element)
             if (expectedSize > num_values) {
                 var lowerLimit = (int)(expectedSize * 0.5);
-                assertTrue("Initial size for %d elements was %d bytes, expected: %d bytes (at least %d bytes)"
-                    .formatted(num_values, size, expectedSize, lowerLimit), size >= lowerLimit);
+                assertTrue(size >= lowerLimit,
+                    "Initial size for %d elements was %d bytes, expected: %d bytes (at least %d bytes)"
+                        .formatted(num_values, size, expectedSize, lowerLimit));
             }
         } finally {
             data.close(num_values).release();
