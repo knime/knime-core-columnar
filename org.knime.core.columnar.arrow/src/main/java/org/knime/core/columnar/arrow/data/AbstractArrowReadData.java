@@ -66,6 +66,7 @@ abstract class AbstractArrowReadData extends AbstractReferencedData implements A
     /** The length of the data */
     protected final int m_length;
 
+    // TODO missing values optimization (ALL_MISSING, SOME_MISSING, NO_MISSING)
     /**
      * Create an abstract {@link ArrowReadData} with the given vector, an offset of 0 and the length of the vector.
      *
