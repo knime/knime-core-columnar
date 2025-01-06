@@ -173,6 +173,8 @@ class ArrowBatchWriter implements BatchWriter {
             throw new IllegalStateException("Cannot write batch after closing the writer.");
         }
 
+        // TODO create sub-allocator and release it after writing the batch
+
         final List<Field> fields = new ArrayList<>(m_factories.length);
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
