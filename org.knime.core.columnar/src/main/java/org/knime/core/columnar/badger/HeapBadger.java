@@ -896,8 +896,8 @@ public class HeapBadger {
             }
 
             m_closed = true;
-            m_serilizationFuture.cancel(true);
             m_queue.close();
+            m_serilizationFuture.cancel(true);
             debug("[c:" + this + "] --- Closing the Badger Write Cursor ");
         }
 
