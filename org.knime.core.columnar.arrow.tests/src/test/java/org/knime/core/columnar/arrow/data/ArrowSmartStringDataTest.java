@@ -62,8 +62,6 @@ import org.knime.core.columnar.arrow.data.ArrowSmartStringData.ArrowStringDataFa
 import org.knime.core.columnar.arrow.data.ArrowSmartStringData.ArrowStringReadData;
 import org.knime.core.columnar.arrow.data.ArrowSmartStringData.ArrowStringWriteData;
 
-import com.google.common.base.Utf8;
-
 /**
  * Test {@link ArrowStringData}
  *
@@ -120,14 +118,20 @@ public class ArrowSmartStringDataTest extends AbstractArrowDataTest<ArrowStringW
 
     @Override
     protected long getMinSize(final int valueCount, final int capacity) {
-        long numBytes = 0;
+        long numDataBytes = 0;
         for (int i = 0; i < valueCount; i++) {
-            numBytes += Utf8.encodedLength(valueFor(i));
+            numDataBytes += valueFor(i).length() * 2; // UTF-16
         }
 
-        return numBytes // data
-            + 4L * (capacity + 1) // 4 bytes per value for offset buffer
+        return numDataBytes // data
+            + 4L * (capacity + 1) // 4 bytes per value for bytes offset buffer
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
+
+    @Override
+    protected long getMinSizeW(final int valueCount, final int capacity) {
+        return getMinSize(valueCount, capacity) //
+            + 8L * (capacity + 1); // 8 bytes per value for the size tracking buffer
     }
 
     private static String valueFor(final int seed) {

@@ -59,6 +59,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.data.OffsetsBuffer.IntOffsetsBuffer;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.LongOffsetsBuffer;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
@@ -86,6 +87,9 @@ public final class ArrowSmartStringData {
         byte[] getStringBytesNullable(int index);
     }
 
+    // TODO to make state handling of this object simpler, we could split it into two classes:
+    // one for writing and one for reading. A superclass could hold the data structure and the subclasses could limit
+    // the access to the data structure to either writing or reading.
     /**
      * Holds the data of a string column in a combination of a string array and a byte array.
      *
@@ -110,14 +114,21 @@ public final class ArrowSmartStringData {
 
         private String[] m_data;
 
-        private ByteArrayList m_dataBytes;
+        private final ByteArrayList m_dataBytes;
 
-        private IntOffsetsBuffer m_offsets;
+        private final IntOffsetsBuffer m_offsets;
+
+        // Size of m_data in bytes
+        private long m_totalDataSizeInBytes = 0;
+
+        // Note that this might be `null`. In this case, this object only allows reading and not writing
+        private LongOffsetsBuffer m_accumulatedDataSizeInBytes;
 
         public LazyEncodedStringList(final int capacity) {
             m_data = new String[capacity];
             m_dataBytes = new ByteArrayList();
             m_offsets = new IntOffsetsBuffer(capacity);
+            m_accumulatedDataSizeInBytes = new LongOffsetsBuffer(capacity);
         }
 
         private LazyEncodedStringList(final String[] data, final ByteArrayList byteArrayList,
@@ -162,6 +173,9 @@ public final class ArrowSmartStringData {
 
         public void setString(final int index, final String value) {
             m_data[index] = value;
+            var memorySize = StringSizeUtils.memorySize(value);
+            m_accumulatedDataSizeInBytes.add(index, memorySize);
+            m_totalDataSizeInBytes += memorySize;
         }
 
         public void setNumElements(final int numElements) {
@@ -169,6 +183,8 @@ public final class ArrowSmartStringData {
             System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
             m_data = newData;
             m_offsets.setNumElements(numElements);
+            m_accumulatedDataSizeInBytes.setNumElements(numElements);
+            m_totalDataSizeInBytes = m_accumulatedDataSizeInBytes.getNumData(numElements);
         }
 
         // TODO this also allocates the buffers which is kind of strange
@@ -198,6 +214,9 @@ public final class ArrowSmartStringData {
             // Note that this can be null if the data was just read and not yet decoded. In this case, the
             // bytes will be set and the string will be decoded on access
             m_data[targetIndex] = sourceList.m_data[sourceIndex];
+            var memorySize = StringSizeUtils.memorySize(m_data[targetIndex]);
+            m_accumulatedDataSizeInBytes.add(targetIndex, memorySize);
+            m_totalDataSizeInBytes += memorySize;
 
             // Copy the bytes if they are present (must be present if the string is null)
             if (sourceList.m_offsets.lastWrittenIndex() >= sourceIndex) {
@@ -221,6 +240,10 @@ public final class ArrowSmartStringData {
                 var val = m_encoder.decode(bytes);
 
                 m_data[index] = val;
+                // Note: we do not update the accumulated size here because we would need to re-compute the accumulated
+                // size for all following indices. This is not a problem, because we are not using the accumulated size
+                // anymore, because we are done writing and only reading now.
+                m_totalDataSizeInBytes += StringSizeUtils.memorySize(val);
             }
 
             return m_data[index];
@@ -314,14 +337,19 @@ public final class ArrowSmartStringData {
 
         @Override
         public long usedSizeFor(final int numElements) {
-            // TODO das ist doch quatsch, oder?
-            return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
+            return m_data.m_accumulatedDataSizeInBytes.getNumData(numElements) // m_data.m_data
+                + m_data.m_dataBytes.size() // m_data.m_dataBytes
+                + OffsetsBuffer.usedIntSizeFor(m_data.size()) // m_data.m_offsets
+                + m_validity.sizeOf();
         }
 
         @Override
         public long sizeOf() {
-            // TODO das ist doch quatsch, oder?
-            return m_data.size() * Integer.BYTES + m_validity.sizeOf();
+            return m_data.m_totalDataSizeInBytes // m_data.m_data
+                + m_data.m_dataBytes.size() // m_data.m_dataBytes
+                + OffsetsBuffer.usedIntSizeFor(m_data.size()) // m_data.m_offsets
+                + OffsetsBuffer.usedLongSizeFor(m_data.size()) // m_data.m_accumulatedDataSizeInBytes
+                + m_validity.sizeOf();
         }
 
         @Override
@@ -332,6 +360,7 @@ public final class ArrowSmartStringData {
         @Override
         public ArrowStringReadData close(final int length) {
             setNumElements(length);
+            m_data.m_accumulatedDataSizeInBytes = null;
             // note the offsets reflect the current state of the dataBytes (not necessarily all strings of this data)
             return new ArrowStringReadData(m_data, m_validity);
         }
@@ -385,8 +414,10 @@ public final class ArrowSmartStringData {
 
         @Override
         public long sizeOf() {
-            // TODO size of the strings
-            return m_data.size() * Integer.BYTES + m_validity.sizeOf();
+            return m_data.m_totalDataSizeInBytes // m_data.m_data
+                + m_data.m_dataBytes.size() // m_data.m_dataBytes
+                + OffsetsBuffer.usedIntSizeFor(m_data.size()) // m_data.m_offsets
+                + m_validity.sizeOf();
         }
     }
 
@@ -445,8 +476,10 @@ public final class ArrowSmartStringData {
 
         @Override
         public int initialNumBytesPerElement() {
-            // TODO
-            return 1;
+            return Long.BYTES // accumulated data size
+                + Integer.BYTES // offsets
+                + Integer.BYTES // Compressed OOPs in the data String[]
+                + Byte.BYTES; // validity
         }
     }
 }

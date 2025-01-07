@@ -56,7 +56,9 @@ import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.data.OffsetsBuffer.LongOffsetsBuffer;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
@@ -69,33 +71,71 @@ import org.knime.core.table.util.StringEncoder;
  */
 public final class ArrowStringData {
 
-    /**
-     * The initial number of bytes allocated for each element. 32 is a good estimate for UTF-8 encoded Strings and more
-     * memory is allocated when needed.
-     */
-    private static final long INITAL_BYTES_PER_ELEMENT = 32;
-
     private ArrowStringData() {
+    }
+
+    /** A list of strings that keeps track of the size of the data. */
+    private static final class SizeAwareStringList {
+
+        private String[] m_data;
+
+        /**
+         * The memory usage of the data in bytes. Remembers the accumulated size at each position of the array. Note
+         * that we use 32-bit offsets when writing the data. However, we might consume more memory than the written
+         * UTF-8 representation because Java Strings use UTF-16 encoding internally.
+         */
+        private LongOffsetsBuffer m_accumulatedDataSizeInBytes;
+
+        SizeAwareStringList(final int capacity) {
+            m_data = new String[capacity];
+            // TODO consider the object header size of array class?
+            m_accumulatedDataSizeInBytes = new LongOffsetsBuffer(capacity);
+        }
+
+        void set(final int index, final String val) {
+            m_data[index] = val;
+            m_accumulatedDataSizeInBytes.add(index, StringSizeUtils.memorySize(val));
+        }
+
+        long dataMemoryUsageInBytes(final int numElements) {
+            return m_accumulatedDataSizeInBytes.getNumData(numElements);
+        }
+
+        long memoryUsageInBytes(final int numElements) {
+            return dataMemoryUsageInBytes(numElements) // m_data
+                + OffsetsBuffer.usedLongSizeFor(numElements); // m_accumulatedEncodedSizeInBytes
+        }
+
+        int capacity() {
+            return m_data.length;
+        }
+
+        public void setNumElements(final int numElements) {
+            var newData = new String[numElements];
+            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
+            m_data = newData;
+            m_accumulatedDataSizeInBytes.setNumElements(numElements);
+        }
     }
 
     /** Arrow implementation of {@link StringReadData}. */
     public static final class ArrowStringWriteData extends AbstractArrowWriteData implements StringWriteData {
 
-        private String[] m_data;
+        private final SizeAwareStringList m_data;
 
         private ArrowStringWriteData(final int capacity) {
             super(capacity);
-            m_data = new String[capacity];
+            m_data = new SizeAwareStringList(capacity);
         }
 
-        private ArrowStringWriteData(final int offset, final String[] data, final ValidityBuffer validity) {
+        private ArrowStringWriteData(final int offset, final SizeAwareStringList data, final ValidityBuffer validity) {
             super(offset, validity);
             m_data = data;
         }
 
         @Override
         public void setString(final int index, final String val) {
-            m_data[index + m_offset] = val;
+            m_data.set(index + m_offset, val);
             setValid(index + m_offset);
         }
 
@@ -111,17 +151,18 @@ public final class ArrowStringData {
 
         @Override
         public int capacity() {
-            return m_data.length;
+            return m_data.capacity();
         }
 
         @Override
         public long usedSizeFor(final int numElements) {
-            return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
+            return m_data.dataMemoryUsageInBytes(numElements) // m_data String[]
+                + ValidityBuffer.usedSizeFor(numElements); // validity buffer
         }
 
         @Override
         public long sizeOf() {
-            return m_data.length * Integer.BYTES + m_validity.sizeOf();
+            return m_data.memoryUsageInBytes(capacity()) + m_validity.sizeOf();
         }
 
         @Override
@@ -132,7 +173,7 @@ public final class ArrowStringData {
         @Override
         public ArrowStringReadData close(final int length) {
             setNumElements(length);
-            return new ArrowStringReadData(m_data, m_validity);
+            return new ArrowStringReadData(m_data.dataMemoryUsageInBytes(length), m_data.m_data, m_validity);
         }
 
         /**
@@ -142,26 +183,27 @@ public final class ArrowStringData {
          */
         private void setNumElements(final int numElements) {
             m_validity.setNumElements(numElements);
-
-            var newData = new String[numElements];
-            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
-            m_data = newData;
+            m_data.setNumElements(numElements);
         }
     }
 
     /** Arrow implementation of {@link StringReadData}. */
     public static final class ArrowStringReadData extends AbstractArrowReadData implements StringReadData {
 
+        private final long m_dataSizeInBytes;
+
         private final String[] m_data;
 
-        private ArrowStringReadData(final String[] data, final ValidityBuffer validity) {
+        private ArrowStringReadData(final long dataSizeInBytes, final String[] data, final ValidityBuffer validity) {
             super(validity, data.length);
+            m_dataSizeInBytes = dataSizeInBytes;
             m_data = data;
         }
 
-        private ArrowStringReadData(final String[] data, final ValidityBuffer validity, final int offset,
-            final int length) {
+        private ArrowStringReadData(final long dataSizeInBytes, final String[] data, final ValidityBuffer validity,
+            final int offset, final int length) {
             super(validity, offset, length);
+            m_dataSizeInBytes = dataSizeInBytes;
             m_data = data;
         }
 
@@ -172,13 +214,12 @@ public final class ArrowStringData {
 
         @Override
         public ArrowReadData slice(final int start, final int length) {
-            return new ArrowStringReadData(m_data, m_validity, m_offset + start, length);
+            return new ArrowStringReadData(m_dataSizeInBytes, m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            // TODO size of the strings
-            return m_data.length * Integer.BYTES + m_validity.sizeOf();
+            return m_dataSizeInBytes + m_validity.sizeOf();
         }
     }
 
@@ -235,28 +276,30 @@ public final class ArrowStringData {
         @Override
         public ArrowStringReadData createRead(final FieldVector vector, final ArrowVectorNullCount nullCount,
             final DictionaryProvider provider, final ArrowColumnDataFactoryVersion version) throws IOException {
-        
+
             // TODO what is the null count for???
-        
+
             if (m_version.equals(version)) {
-        
+
                 var decoder = new StringEncoder();
                 var valueCount = vector.getValueCount();
                 var v = (VarCharVector)vector;
-        
+
+                long dataSizeInBytes = 0;
                 var data = new String[valueCount];
-        
+
                 for (int i = 0; i < valueCount; i++) {
                     if (!v.isNull(i)) {
                         var val = v.get(i);
                         if (val != null) {
                             data[i] = decoder.decode(val);
+                            dataSizeInBytes += data[i].length() * 2L;
                         }
                     }
                 }
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
-        
-                return new ArrowStringReadData(data, validity);
+
+                return new ArrowStringReadData(dataSizeInBytes, data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowStringData with version " + version + ". Current version: " + m_version + ".");
@@ -265,8 +308,8 @@ public final class ArrowStringData {
 
         @Override
         public int initialNumBytesPerElement() {
-            // TODO
-            return 1;
+            return Long.BYTES // Long offsets for counting the accumulated size
+                + Integer.BYTES; // Compressed OOPs in the data String[]
         }
     }
 }
