@@ -52,6 +52,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -76,6 +77,7 @@ import org.knime.core.table.access.BufferedAccesses;
 import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
+import org.slf4j.LoggerFactory;
 
 /**
  * The {@link HeapBadger} takes care of creating batches of roughly the same size, while offering a write cursor to the
@@ -144,10 +146,21 @@ public class HeapBadger {
         m_badger = new Badger(writable, m_writeCursor.m_buffers, maxNumRowsPerBatch, maxBatchSizeInBytes);
         m_heapCache = new HeapCache(readable, cache);
         m_writeDelegate = writable;
+        var serializationLoopStarted = new CountDownLatch(1);
         m_serilizationFuture = Objects.requireNonNullElse(execService, FALLBACK_EXECUTOR_SERVICE).submit(() -> {
+            serializationLoopStarted.countDown();
             async.serializeLoop(m_badger);
             return null;
         });
+        try {
+            // NB: We wait for the serialization loop to start before returning from the constructor. The closing logic
+            // depends on the serialization loop to be running.
+            serializationLoopStarted.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LoggerFactory.getLogger(HeapBadger.class)
+                .error("Waiting for serialization loop to start was interrupted. This is a coding error.", e);
+        }
     }
 
     /**
@@ -896,8 +909,11 @@ public class HeapBadger {
             }
 
             m_closed = true;
-            m_queue.close();
+            // Note that we have to cause the serialization loop to be interrupted before calling `m_queue.close()`.
+            // Otherwise the serialization loop can get stuck in `m_notEmpty.await()` while `m_queue.close()` is waiting
+            // on the `m_closed` condition.
             m_serilizationFuture.cancel(true);
+            m_queue.close();
             debug("[c:" + this + "] --- Closing the Badger Write Cursor ");
         }
 

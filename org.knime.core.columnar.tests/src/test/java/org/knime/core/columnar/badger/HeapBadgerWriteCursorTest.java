@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -183,6 +184,40 @@ class HeapBadgerWriteCursorTest {
                         cursor.flush();
                     } catch (IOException ex) {
                         fail("Flushing should not fail");
+                    }
+                }
+                return true;
+            }, TestDataImpl.INT, TestDataImpl.STRING // test data
+        );
+    }
+
+    @Test
+    @DisplayName("close while serialization is waiting")
+    @Timeout(60)
+    void testCloseWithoutFlushDuringSerializationWait() throws IOException {
+        runFillAndCheckHeapBadgerTest( //
+            25, // num rows
+            24, // max num rows per batch
+            Integer.MAX_VALUE, // max batch size in bytes
+            new int[]{24, 1}, // expected num rows
+            new int[][]{new int[]{}, //no ints cached
+                new int[]{0} //one string batch cached
+            }, // expected cache indices
+            (row, cursor) -> {
+                if (row == 10) {
+                    try {
+                        try {
+                            // This causes the AsyncQueue to finish all pending serialization and wait in
+                            // `m_notEmpty.await();` - we should still be able to close the cursor
+                            Thread.sleep(100);
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            Assertions.fail("Waiting for the serialization loop to catch up was interrupted.", ex);
+                        }
+                        cursor.close();
+                        return false;
+                    } catch (IOException ex) {
+                        fail("Closing should not fail");
                     }
                 }
                 return true;
