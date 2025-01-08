@@ -51,7 +51,6 @@ package org.knime.core.columnar.cache.writable;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.cache.EvictingCache;
 import org.knime.core.columnar.cache.SizeBoundLruCache;
-import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,16 +85,6 @@ public final class SharedBatchWritableCache {
         m_sizeThreshold = sizeThreshold;
         m_cache = new SizeBoundLruCache<>(cacheSize, concurrencyLevel);
         m_cacheSize = cacheSize;
-
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(() -> {
-            if (m_cache.size() > 0) {
-                LOGGER.debug("Received off-heap memory alert. Clearing cache.");
-                m_cache.invalidateAll();
-                return true;
-            }
-            LOGGER.debug("Received off-heap memory alert. Doing nothing because cache is empty.");
-            return false;
-        });
     }
 
     /**
@@ -103,6 +92,15 @@ public final class SharedBatchWritableCache {
      */
     public final long getCacheSize() {
         return m_cacheSize;
+    }
+
+    /** Clears the cache by invalidating all entries. */
+    public void clear() {
+        var numEntries = m_cache.size();
+        if (numEntries > 0) {
+            LOGGER.info("Received memory alert. Clearing approximatly %d entries.", numEntries);
+            m_cache.invalidateAll();
+        }
     }
 
     int size() {
@@ -116,5 +114,4 @@ public final class SharedBatchWritableCache {
     EvictingCache<BatchWritableCache, ReadBatches> getCache() {
         return m_cache;
     }
-
 }

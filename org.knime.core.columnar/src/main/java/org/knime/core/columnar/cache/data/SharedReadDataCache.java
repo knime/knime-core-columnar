@@ -52,7 +52,6 @@ import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.cache.EvictingCache;
 import org.knime.core.columnar.cache.SizeBoundLruCache;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,16 +76,6 @@ public final class SharedReadDataCache {
     public SharedReadDataCache(final long cacheSizeBytes, final int concurrencyLevel) {
         m_cache = new SizeBoundLruCache<>(cacheSizeBytes, concurrencyLevel);
         m_cacheSizeBytes = cacheSizeBytes;
-
-        ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(() -> {
-            if (m_cache.size() > 0) {
-                LOGGER.debug("Received off-heap memory alert. Clearing cache.");
-                m_cache.invalidateAll();
-                return true;
-            }
-            LOGGER.debug("Received off-heap memory alert. Doing nothing because cache is empty.");
-            return false;
-        });
     }
 
     /**
@@ -96,6 +85,15 @@ public final class SharedReadDataCache {
         return m_cacheSizeBytes;
     }
 
+    /** Clears the cache by invalidating all entries. */
+    public void clear() {
+        var numEntries = m_cache.size();
+        if (numEntries > 0) {
+            LOGGER.info("Received memory alert. Clearing approximatly %d entries.", numEntries);
+            m_cache.invalidateAll();
+        }
+    }
+
     int size() {
         return m_cache.size();
     }
@@ -103,5 +101,4 @@ public final class SharedReadDataCache {
     EvictingCache<ColumnDataUniqueId, NullableReadData> getCache() {
         return m_cache;
     }
-
 }

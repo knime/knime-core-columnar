@@ -213,8 +213,8 @@ public final class ColumnarPreferenceUtils {
     }
 
     /**
-     * Factoring creating a new {@link ThreadPoolExecutor} with core pool size = 0 and max pool
-     * size = {@link #getNumThreads()}. Thread names are governed by the method arguments.
+     * Factoring creating a new {@link ThreadPoolExecutor} with core pool size = 0 and max pool size =
+     * {@link #getNumThreads()}. Thread names are governed by the method arguments.
      */
     private static ExecutorService createExecutorService(final String namePrefix, final AtomicLong threadCounter) {
         final ExecutorService executor = new ThreadPoolExecutor(0, getNumThreads(), 60, TimeUnit.SECONDS,
@@ -233,6 +233,14 @@ public final class ColumnarPreferenceUtils {
             var smallTableThreshold = 1 << 20; // 1 MB
             LOGGER.infoWithFormat("Small Table Cache size is %d MB", smallTableCacheSize >> 20);
             smallTableCache = new SharedBatchWritableCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
+
+            MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
+                @Override
+                protected boolean memoryAlert(final MemoryAlert alert) {
+                    smallTableCache.clear();
+                    return false;
+                }
+            });
         }
         return smallTableCache;
     }
@@ -245,10 +253,17 @@ public final class ColumnarPreferenceUtils {
             var columnDataCacheSize = (long)(getOffHeapMemoryLimit() * 0.8); // 80% of off-heap limit
             LOGGER.infoWithFormat("Column Data Cache size is %d MB.", columnDataCacheSize >> 20);
             columnDataCache = new SharedReadDataCache(columnDataCacheSize, getNumThreads());
+
+            MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
+                @Override
+                protected boolean memoryAlert(final MemoryAlert alert) {
+                    columnDataCache.clear();
+                    return false;
+                }
+            });
         }
         return columnDataCache;
     }
-
 
     /**
      * @return the executor for persisting data from memory to disk
