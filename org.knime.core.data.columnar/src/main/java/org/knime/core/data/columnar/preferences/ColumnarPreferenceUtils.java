@@ -255,7 +255,12 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized SharedReadDataCache getColumnDataCache() {
         if (columnDataCache == null) {
-            var columnDataCacheSize = (long)(getOffHeapMemoryLimit() * 0.8); // 80% of off-heap limit
+            long columnDataCacheSize;
+            if (UseOnHeapColumnStoreProperty.useOnHeapColumnStore()) {
+                columnDataCacheSize = getMaxHeapSize() / 2; // 50% of Xmx
+            } else {
+                columnDataCacheSize = (long)(getOffHeapMemoryLimit() * 0.8); // 80% of off-heap
+            }
             LOGGER.infoWithFormat("Column Data Cache size is %d MB.", columnDataCacheSize >> 20);
             var cache = new SharedReadDataCache(columnDataCacheSize, getNumThreads());
 
