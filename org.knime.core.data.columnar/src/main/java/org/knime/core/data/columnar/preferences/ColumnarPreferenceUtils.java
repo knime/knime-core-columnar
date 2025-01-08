@@ -250,7 +250,7 @@ public final class ColumnarPreferenceUtils {
      */
     public static synchronized SharedReadDataCache getColumnDataCache() {
         if (columnDataCache == null) {
-            var columnDataCacheSize = (long)(getOffHeapMemoryLimit() * 0.8); // 80% of off-heap limit
+            var columnDataCacheSize = getMaxHeapSize() / 2; // 50% of Xmx
             LOGGER.infoWithFormat("Column Data Cache size is %d MB.", columnDataCacheSize >> 20);
             columnDataCache = new SharedReadDataCache(columnDataCacheSize, getNumThreads());
 
