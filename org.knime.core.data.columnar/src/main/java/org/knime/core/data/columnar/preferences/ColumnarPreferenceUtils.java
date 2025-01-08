@@ -75,6 +75,7 @@ import org.knime.core.columnar.cache.data.SharedReadDataCache;
 import org.knime.core.columnar.cache.object.shared.SharedObjectCache;
 import org.knime.core.columnar.cache.object.shared.SoftReferencedObjectCache;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
+import org.knime.core.columnar.store.UseOnHeapColumnStoreProperty;
 import org.knime.core.data.columnar.ColumnarTableBackend;
 import org.knime.core.data.util.memory.MemoryAlert;
 import org.knime.core.data.util.memory.MemoryAlertListener;
@@ -108,7 +109,7 @@ public final class ColumnarPreferenceUtils {
     private static ExecutorService domainCalcExecutor;
 
     // lazily initialized
-    private static SharedObjectCache heapCache;
+    private static SoftReferencedObjectCache heapCache;
 
     private static final AtomicLong SERIALIZE_THREAD_COUNT = new AtomicLong();
 
@@ -194,7 +195,7 @@ public final class ColumnarPreferenceUtils {
                 @Override
                 protected boolean memoryAlert(final MemoryAlert alert) {
                     cache.invalidate();
-                    return false;
+                    return cache != heapCache; // remove if cache was reset (does not happen in production)
                 }
             });
             heapCache = cache;
@@ -232,7 +233,19 @@ public final class ColumnarPreferenceUtils {
             var smallTableCacheSize = 32l << 20; // 32 MB
             var smallTableThreshold = 1 << 20; // 1 MB
             LOGGER.infoWithFormat("Small Table Cache size is %d MB", smallTableCacheSize >> 20);
-            smallTableCache = new SharedBatchWritableCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
+            var cache = new SharedBatchWritableCache(smallTableThreshold, smallTableCacheSize, getNumThreads());
+
+            if (UseOnHeapColumnStoreProperty.useOnHeapColumnStore()) {
+                MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
+                    @Override
+                    protected boolean memoryAlert(final MemoryAlert alert) {
+                        cache.clear();
+                        return cache != smallTableCache; // remove if cache was reset (does not happen in production)
+                    }
+                });
+            }
+
+            smallTableCache = cache;
         }
         return smallTableCache;
     }
@@ -244,11 +257,22 @@ public final class ColumnarPreferenceUtils {
         if (columnDataCache == null) {
             var columnDataCacheSize = (long)(getOffHeapMemoryLimit() * 0.8); // 80% of off-heap limit
             LOGGER.infoWithFormat("Column Data Cache size is %d MB.", columnDataCacheSize >> 20);
-            columnDataCache = new SharedReadDataCache(columnDataCacheSize, getNumThreads());
+            var cache = new SharedReadDataCache(columnDataCacheSize, getNumThreads());
+
+            if (UseOnHeapColumnStoreProperty.useOnHeapColumnStore()) {
+                MemoryAlertSystem.getInstanceUncollected().addListener(new MemoryAlertListener() {
+                    @Override
+                    protected boolean memoryAlert(final MemoryAlert alert) {
+                        cache.clear();
+                        return cache != columnDataCache; // remove if cache was reset (does not happen in production)
+                    }
+                });
+            }
+
+            columnDataCache = cache;
         }
         return columnDataCache;
     }
-
 
     /**
      * @return the executor for persisting data from memory to disk
@@ -285,5 +309,25 @@ public final class ColumnarPreferenceUtils {
      */
     public static long getOffHeapMemoryLimit() {
         return (long)getOffHeapMemoryLimitMB() << 20;
+    }
+
+    /**
+     * Reset all caches for testing or benchmarking purposes. Do not use in production code.
+     */
+    public static synchronized void resetCachesForTests() {
+        if (heapCache != null) {
+            heapCache.invalidate();
+            heapCache = null;
+        }
+
+        if (smallTableCache != null) {
+            smallTableCache.clear();
+            smallTableCache = null;
+        }
+
+        if (columnDataCache != null) {
+            columnDataCache.clear();
+            columnDataCache = null;
+        }
     }
 }
