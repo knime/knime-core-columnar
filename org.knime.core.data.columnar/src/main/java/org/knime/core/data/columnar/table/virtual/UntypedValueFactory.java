@@ -59,7 +59,7 @@ import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
 
 /**
- * Helper class that hides the generics of {@link ValueFactory} from clients that can't possibly no them. Requires
+ * Helper class that hides the generics of {@link ValueFactory} from clients that can't possibly know them. Requires
  * unsafe casts to create the {@link ReadValue Read-} and {@link WriteValue WriteValues}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
