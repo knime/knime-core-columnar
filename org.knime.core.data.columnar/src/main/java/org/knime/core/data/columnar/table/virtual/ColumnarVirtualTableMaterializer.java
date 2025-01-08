@@ -73,7 +73,6 @@ import org.knime.core.table.access.StringAccess;
 import org.knime.core.table.row.RowAccessible;
 import org.knime.core.table.row.RowWriteAccessible;
 import org.knime.core.table.virtual.exec.GraphVirtualTableExecutor;
-import org.knime.core.table.virtual.spec.ObserverTransformUtils.ObserverWithRowIndexFactory;
 
 /**
  * Helper for materializing a {@link ColumnarVirtualTable}. Use the staged builder returned by {@link #materializer()}.
@@ -130,13 +129,6 @@ public final class ColumnarVirtualTableMaterializer {
      */
     public ReferenceTable materialize(final ColumnarVirtualTable tableToMaterialize)
         throws CanceledExecutionException, VirtualTableIncompatibleException {
-
-        ObserverWithRowIndexFactory progressListenerFactory = inputs -> {
-            RowKeyValue rowKey = ((StringAccess.StringReadAccess)inputs[0])::getStringValue;
-            // use 1 based indexing
-            return rowIndex -> m_progress.update(rowIndex + 1, rowKey);
-        };
-
 
         try (var writable = createContainer(createContainerSchema(tableToMaterialize.getSchema()));
                 var writeCursor = ((RowWriteAccessible)writable).getWriteCursor();

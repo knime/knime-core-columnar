@@ -231,9 +231,6 @@ public final class ColumnarRearranger {
     private ReferenceTable createAppendTable(final ReferenceTable table, final List<RearrangedColumn> newColumns,
         final ExecutionMonitor monitor, final long size)
         throws VirtualTableIncompatibleException, CanceledExecutionException {
-        var schema = table.getSchema();
-        var inputValueFactories = new UntypedValueFactory[schema.numColumns()];
-        Arrays.setAll(inputValueFactories, i -> new UntypedValueFactory(schema.getValueFactory(i)));
         var sourceTable = table.getVirtualTable();
 
         // columns produced by DataCellTypeConverters
