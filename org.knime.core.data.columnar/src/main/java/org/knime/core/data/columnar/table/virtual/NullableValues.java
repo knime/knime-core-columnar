@@ -52,6 +52,7 @@ import org.knime.core.data.DataCell;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.MissingCell;
 import org.knime.core.data.v2.ReadValue;
+import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.WriteAccess;
@@ -96,6 +97,28 @@ final class NullableValues {
             }
         }
 
+    }
+
+    @SuppressWarnings("unchecked")
+    static <R extends ReadAccess, V extends ReadValue> V createReadValue(final ValueFactory<R, ?> valueFactory,
+        final ReadAccess readAccess) {
+        return (V)valueFactory.createReadValue((R)readAccess);
+    }
+
+    @SuppressWarnings("unchecked")
+    static <W extends WriteAccess, V extends WriteValue<?>> V createWriteValue(final ValueFactory<?, W> valueFactory,
+        final WriteAccess writeAccess) {
+        return (V)valueFactory.createWriteValue((W)writeAccess);
+    }
+
+    static NullableReadValue createNullableReadValue(final ValueFactory<?, ?> valueFactory,
+        final ReadAccess readAccess) {
+        return new NullableReadValue(createReadValue(valueFactory, readAccess), readAccess);
+    }
+
+    static NullableWriteValue createNullableWriteValue(final ValueFactory<?, ?> valueFactory,
+        final WriteAccess writeAccess) {
+        return new NullableWriteValue(createWriteValue(valueFactory, writeAccess), writeAccess);
     }
 
     static final class NullableReadValue {
