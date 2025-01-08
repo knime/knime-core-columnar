@@ -79,6 +79,7 @@ public class BenchmarkRunner {
                 .result("target/surefire-reports/benchmark-results.json")//
                 .resultFormat(ResultFormatType.JSON)//
                 .shouldDoGC(true)//
+                .shouldFailOnError(true)//
                 .build() //
         ).run();
     }
