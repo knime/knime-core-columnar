@@ -9,6 +9,7 @@ Bundle-RequiredExecutionEnvironment: JavaSE-17
 Bundle-ActivationPolicy: lazy
 Export-Package: org.knime.core.data.columnar,
  org.knime.core.data.columnar.domain,
+ org.knime.core.data.columnar.preferences,
  org.knime.core.data.columnar.table,
  org.knime.core.data.columnar.table.virtual;x-internal:=true,
  org.knime.core.data.columnar.table.virtual.reference;x-internal:=true
