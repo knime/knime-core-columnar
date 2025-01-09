@@ -150,6 +150,14 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
     @Override
     public void invalidateAll() {
         m_clearingCache = true;
+        try {
+            /**
+             * TODO - this is just here to reproduce a race condition. Imagine one thread is exactly at this point (or
+             * blocked before it can invalidate the cache because some other thread is working with the cache).
+             */
+            Thread.sleep(100);
+        } catch (InterruptedException ex) {
+        }
         m_cache.invalidateAll();
         m_cache.cleanUp();
         m_clearingCache = false;

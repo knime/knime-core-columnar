@@ -69,6 +69,7 @@ import java.util.concurrent.Future;
 import org.junit.Test;
 import org.knime.core.columnar.TestBatchStoreUtils.TestDataTable;
 import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestBatchStore;
@@ -351,4 +352,36 @@ public class BatchWritableCacheTest extends ColumnarTest {
         }
     }
 
+    /*
+     * Reproduce the following race condition:
+     *
+     * - Thread 1 is running `invalidateAll` because of a memory alert.
+     *   - It just set `m_clearingCache` to true but did not get to `m_cache.invalidateAll()`.
+     * - Thread 2 closes a `BatchWritableCache` instance (store) which calls `removeRetained` on the shared cache.
+     *   - This cache removal will be handled as it was because of the memory alert and will therefore release the data
+     *      (see `removalListener` in `SizeBoundLruCache`).
+     */
+    @Test
+    public void testInvalidateAllRunningDuringClose() throws IOException, InterruptedException {
+        final SharedBatchWritableCache sharedCache = generateCache();
+        try (final TestBatchStore delegate = createDefaultTestColumnStore();
+                final BatchWritableCache store = generateDefaultSmallColumnStore(delegate, sharedCache);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
+
+            writeTable(store, table);
+
+            // Force the sharedCache to run `invalidateAll`
+            new Thread(() -> {
+                try {
+                    ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+                } catch (InterruptedException ex) {
+                }
+            }).start();
+
+            // Wait until we are running `invalidateAll`. Because of of the sleep there, we will not be finished yet.
+            Thread.sleep(20);
+
+            // Call close on the `store` (while the sharedCache is running `invalidateAll`)
+        }
+    }
 }
