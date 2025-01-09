@@ -57,9 +57,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.function.IntSupplier;
@@ -79,6 +78,7 @@ import org.knime.core.data.RowKey;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.table.VirtualTableExtensionTable;
 import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTableMaterializer.Progress;
 import org.knime.core.data.columnar.table.virtual.NullableValues.NullableReadValue;
@@ -153,8 +153,7 @@ public final class ColumnarRearranger {
         var existingColumns = rearrangedColumns.stream()//
             .filter(Predicate.not(ColumnarRearranger::isAppendedColumn))//
             // ensure that the existing columns are in the order they are in the input table
-            .sorted(Comparator.comparing(RearrangedColumn::getOriginalIndex))
-            .toList();
+            .sorted(Comparator.comparing(RearrangedColumn::getOriginalIndex)).toList();
 
         // keep only RowID and included columns in their original order
         var tableToRearrange = asFragmentSource(refTable).selectColumns(//
@@ -180,8 +179,8 @@ public final class ColumnarRearranger {
         // the RearrangeColumnsTable removes the table name and table properties, so we do the same
         rearrangedTable = dropOldSpecNameAndProperties(rearrangedTable);
 
-        return new VirtualTableExtensionTable(refTables.toArray(ReferenceTable[]::new),
-            rearrangedTable, table.size(), m_tableIdSupplier.getAsInt());
+        return new VirtualTableExtensionTable(refTables.toArray(ReferenceTable[]::new), rearrangedTable, table.size(),
+            m_tableIdSupplier.getAsInt());
 
     }
 
@@ -224,7 +223,7 @@ public final class ColumnarRearranger {
      * Creates a new table consisting of the new columns. New columns are either produced by
      * {@link DataCellTypeConverter converters} or by {@link CellFactory cellFactories}.
      *
-     * @param table the unfiltered input table
+     * @param inputTable the input table
      * @param newColumns columns that need to be created
      * @param monitor for progress updates
      * @param size of the input table
@@ -232,53 +231,62 @@ public final class ColumnarRearranger {
      * @throws VirtualTableIncompatibleException
      * @throws CanceledExecutionException
      */
-    private ReferenceTable createAppendTable(final ReferenceTable table, final List<RearrangedColumn> newColumns,
+    private ReferenceTable createAppendTable(final ReferenceTable inputTable, final List<RearrangedColumn> newColumns,
         final ExecutionMonitor monitor, final long size)
         throws VirtualTableIncompatibleException, CanceledExecutionException {
-        var sourceTable = table.getVirtualTable();
+        var table = inputTable.getVirtualTable();
 
+        // the column indices we will select for materializing after replacing/appending new columns.
+        final int[] selection = new int[newColumns.size() + 1];
+        int nextSelectionIndex = 0;
+
+        // always select the rowKey column
+        selection[nextSelectionIndex] = 0;
+        nextSelectionIndex++;
+
+        // --------------------------------------------------------------------
         // columns produced by DataCellTypeConverters
         var columnsToConvert = newColumns.stream()//
             .filter(RearrangedColumn::isConvertedColumn)//
             .toList();
-        var mappedColumns = new LinkedHashMap<RearrangedColumn, ColumnarVirtualTable>();
         // conversion has to happen before the CellFactories are applied
         if (!columnsToConvert.isEmpty()) {
-            var conversionResult = convertColumns(sourceTable, columnsToConvert);
-            sourceTable = conversionResult.tableWithConvertedColumns();
-            mappedColumns.putAll(conversionResult.convertedColumns());
+            for (var columnToConvert : columnsToConvert) {
+                final int colIndex = columnToConvert.getConverterIndex() + 1;
+                table = replaceConvert(table, columnToConvert.getConverter(), colIndex);
+                selection[nextSelectionIndex] = colIndex;
+                nextSelectionIndex++;
+            }
         }
 
+        // --------------------------------------------------------------------
         // columns produced by CellFactories
         var columnsToCreate = newColumns.stream()//
             .filter(RearrangedColumn::isNewColumn)//
             .toList();
+        if (!columnsToCreate.isEmpty()) {
+            table = createColumns(newColumns, table, selection, nextSelectionIndex);
+        }
 
-        Progress progress;
+        // --------------------------------------------------------------------
+        // materialize
+        var uniqueCellFactories = columnsToCreate.stream()//
+            .map(RearrangedColumn::getCellFactory)//
+            .collect(Collectors.toSet());
+
+        final Progress progress;
         if (columnsToCreate.isEmpty()) {
             progress = new SimpleProgress(monitor, size);
         } else {
-            mappedColumns.putAll(createColumns(columnsToCreate, sourceTable));
+            // TODO (AP-23838) Is it desired to only set progress on the column 0 CellFactory?
             progress = new CellFactoryProgress(monitor, size, columnsToCreate.get(0).getCellFactory());
         }
 
-        var mappedColumnList = mappedColumns.entrySet().stream()//
-            .sorted(Comparator.comparingInt(e -> e.getKey().getNewColIndex()))
-            .map(Map.Entry::getValue)//
-            .toList();
-
-        ColumnarVirtualTable appendedColumns =
-            mappedColumnList.get(0).append(mappedColumnList.subList(1, mappedColumnList.size()));
-
-        var uniqueCellFactories = columnsToCreate.stream()//
-                .map(RearrangedColumn::getCellFactory)//
-                .collect(Collectors.toSet());
-
         ColumnRearrangerUtils.initProcessing(uniqueCellFactories, m_context);
         try {
-            var appendTable = sourceTable.selectColumns(0).append(appendedColumns); // use RowID from sourceTable
+            var appendTable = table.selectColumns(selection);
             return ColumnarVirtualTableMaterializer.materializer() //
-                .sources(table.getSources()) //
+                .sources(inputTable.getSources()) //
                 .materializeRowKey(false) //
                 .progress(progress) //
                 .executionContext(m_context) //
@@ -291,26 +299,96 @@ public final class ColumnarRearranger {
 
     /**
      * Sets up the creation of new columns via CellFactories.
+     * <p>
+     * Writes indices of appended columns into the given {@code int[] selection} array, starting at
+     * {@code selection[nextSelectionIndex]}. The columns are appended to selection in the order they appear in
+     * {@code columnsToCreate}. (This may be different than the order of appended columns in the result table.)
      *
      * @param columnsToCreate the new columns to create
      * @param table input table with potentially converted columns
-     * @return a map from the RearrangedColumns to their respective ColumnarVirtualTable
+     * @param selection column indices of columns to materialize. New columns created by this method will be appended
+     *            starting at {@code nextSelectionIndex}.
+     * @param nextSelectionIndex where to start appending column indices of {@code columnsToCreate} to {@code selection}
+     * @return a {@link ColumnarVirtualTable} with new columns appended
      */
-    private Map<RearrangedColumn, ColumnarVirtualTable> createColumns(final List<RearrangedColumn> columnsToCreate,
-        final ColumnarVirtualTable table) {
-        var mapBuilder = new MapBuilder(table);
-        var cellFactoryTables = new HashMap<CellFactory, ColumnarVirtualTable>();
-        var createdColumns = new LinkedHashMap<RearrangedColumn, ColumnarVirtualTable>();
+    private ColumnarVirtualTable createColumns(final List<RearrangedColumn> columnsToCreate, ColumnarVirtualTable table,
+        final int[] selection, int nextSelectionIndex) {
+
+        int numColumns = table.getSchema().numColumns();
+        final int[] inputColumnIndices = IntStream.range(0, numColumns).toArray();
+        final ValueFactory<?, ?>[] inputValueFactories = inputValueFactories(table);
+
+        // maps CellFactory to the index of the first appended column created by that CellFactory
+        final var cellFactoryToFirstColumnIndex = new HashMap<CellFactory, Integer>();
+
         for (var col : columnsToCreate) {
-            // one cell factory can create multiple columns, therefore only the first column per CellFactory creates
-            // the ColumnarVirtualTable containing all of its columns
-            var cellFactoryTable = cellFactoryTables.computeIfAbsent(col.getCellFactory(), mapBuilder::map);
-            // select the current column from the cellFactoryTable to establish the mapping from RearrangeColumn
-            // to their ColumnarVirtualTable slice
-            var createdCol = cellFactoryTable.selectColumns(col.getIndexInFactory());
-            createdColumns.put(col, createdCol);
+            // one cell factory can create multiple columns,
+            // therefore only the first column per CellFactory creates the ColumnarVirtualTable containing all of its columns
+            final CellFactory cellFactory = col.getCellFactory();
+            final Integer existingStartIndex = cellFactoryToFirstColumnIndex.putIfAbsent(cellFactory, numColumns);
+            final int startIndex = Optional.ofNullable(existingStartIndex).orElse(numColumns);
+            if (existingStartIndex == null) {
+                table = appendMap(table, cellFactory, inputColumnIndices, inputValueFactories);
+                numColumns += cellFactory.getColumnSpecs().length;
+            }
+            selection[nextSelectionIndex] = col.getIndexInFactory() + startIndex;
+            nextSelectionIndex++;
         }
-        return createdColumns;
+        return table;
+    }
+
+    private static ValueFactory<?, ?>[] inputValueFactories(final ColumnarVirtualTable table) {
+        final var schema = table.getSchema();
+        final var factories = new ValueFactory[schema.numColumns()];
+        Arrays.setAll(factories, schema::getValueFactory);
+        return factories;
+    }
+
+    /**
+     * Append columns created by the the given {@code cellFactory} to the input {@code table}.
+     *
+     * @param table input table
+     * @param cellFactory for creating new columns
+     * @param inputIndices columns in {@code table} to provide to the {@code cellFactory}
+     * @param inputValueFactories ValueFactories for the input columns
+     * @return a ColumnarVirtualTable that appends columns created by {@code cellFactory} to {@code table}
+     */
+    private ColumnarVirtualTable appendMap(final ColumnarVirtualTable table, final CellFactory cellFactory,
+        final int[] inputIndices, final ValueFactory<?, ?>[] inputValueFactories) {
+        var outputSpecs = cellFactory.getColumnSpecs();
+        var valueFactories = Stream.of(outputSpecs)//
+            .map(DataColumnSpec::getType)//
+            .map(this::getValueFactory)//
+            .toArray(ValueFactory[]::new);
+        var cellFactoryMap = new CellFactoryMap(inputValueFactories, valueFactories, cellFactory);
+        return table.appendMap(cellFactoryMap, inputIndices);
+    }
+
+    private ValueFactory<?, ?> getValueFactory(final DataType type) {
+        return ValueFactoryUtils.getValueFactory(type, m_fsHandler);
+    }
+
+    /**
+     * Creates a ColumnarVirtualTable where the given column is replaced using {@code converter}.
+     *
+     * @param table input table
+     * @param converter converter to use for conversion
+     * @param colIndexIncludingRowID index of the column to be converted
+     * @return
+     */
+    private ColumnarVirtualTable replaceConvert(final ColumnarVirtualTable table, final DataCellTypeConverter converter,
+        final int colIndexIncludingRowID) {
+        final ValueSchema schema = table.getSchema();
+        final DataTableSpec sourceSpec = schema.getSourceSpec();
+        final DataType outputType = converter.getOutputType();
+        final ValueFactory<?, ?> inputValueFactory = schema.getValueFactory(colIndexIncludingRowID);
+        final ValueFactory<?, ?> outputValueFactory = ValueFactoryUtils.getValueFactory(outputType, m_fsHandler);
+        final var colSpecCreator = new DataColumnSpecCreator(sourceSpec.getColumnSpec(colIndexIncludingRowID - 1));
+        colSpecCreator.setType(outputType);
+        final DataColumnSpec outputColSpec = colSpecCreator.createSpec();
+        final var converterFactory =
+            new ConverterFactory(converter, inputValueFactory, outputValueFactory, outputColSpec);
+        return table.replaceMap(converterFactory, colIndexIncludingRowID);
     }
 
     private abstract static class AbstractProgress implements Progress {
@@ -360,111 +438,7 @@ public final class ColumnarRearranger {
         }
     }
 
-    /**
-     * Converts the columnsToConvert in the input table.
-     *
-     * @param table containing the columns to convert
-     * @param columnsToConvert the columns to convert
-     * @return ConversionResult consisting of the converted table and a map of the individual converted columns
-     */
-    private ConversionResult convertColumns(final ColumnarVirtualTable table,
-        final List<RearrangedColumn> columnsToConvert) {
-        var convertedTable = table;
-        var convertedColumns = new LinkedHashMap<RearrangedColumn, ColumnarVirtualTable>();
-        int numColumns = table.getSchema().numColumns();
-        var mapBuilder = new MapBuilder(convertedTable);
-        for (var columnToConvert : columnsToConvert) {
-            int colIdxIncludingRowID = columnToConvert.getConverterIndex() + 1;
-            var convertedColumn = mapBuilder.convert(columnToConvert.getConverter(), colIdxIncludingRowID);
-            convertedColumns.put(columnToConvert, convertedColumn);
-
-            var insertPermutation = IntStream.range(0, numColumns)//
-                    .map(i -> {
-                        if (i < colIdxIncludingRowID) {
-                            return i;
-                        } else if (i == colIdxIncludingRowID) {
-                            return numColumns - 1;
-                        } else {
-                            return i - 1;
-                        }
-                    }).toArray();
-            convertedTable = convertedTable.dropColumns(colIdxIncludingRowID)//
-                .append(convertedColumn)//
-                .selectColumns(insertPermutation);
-        }
-        return new ConversionResult(convertedTable, convertedColumns);
-    }
-
-    private record ConversionResult(ColumnarVirtualTable tableWithConvertedColumns,
-        Map<RearrangedColumn, ColumnarVirtualTable> convertedColumns) {
-    }
-
-    /**
-     * Helper class for creating new columns via
-     * {@link ColumnarVirtualTable#map(ColumnarMapperWithRowIndexFactory, int...)}.
-     * Always assumes the presence of a RowID column.
-     *
-     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
-     */
-    private final class MapBuilder {
-
-        private final ValueFactory<?, ?>[] m_inputValueFactories;
-
-        // currently includes all columns
-        private final int[] m_inputIndices;
-
-        private final ColumnarVirtualTable m_sourceTable;
-
-        MapBuilder(final ColumnarVirtualTable sourceTable) {
-            m_sourceTable = sourceTable;
-            var schema = m_sourceTable.getSchema();
-            m_inputValueFactories = new ValueFactory[schema.numColumns()];
-            Arrays.setAll(m_inputValueFactories, i -> schema.getValueFactory(i));
-            m_inputIndices = IntStream.range(0, m_inputValueFactories.length).toArray();
-        }
-
-        /**
-         * Creates a single column ColumnarVirtualTable containing the column converted by converter.
-         *
-         * @param converter to use for conversion
-         * @param colIndexIncludingRowID the index of the column. The first column has index 1 because of the RowID
-         * @return a single column ColumnarVirtualTable defining the converted column
-         */
-        ColumnarVirtualTable convert(final DataCellTypeConverter converter, final int colIndexIncludingRowID) {
-            var inputValueFactory = m_inputValueFactories[colIndexIncludingRowID];
-            var outputType = converter.getOutputType();
-            var outputValueFactory = getValueFactory(outputType);
-            var colSpecCreator = new DataColumnSpecCreator(
-                m_sourceTable.getSchema().getSourceSpec().getColumnSpec(colIndexIncludingRowID - 1));
-            colSpecCreator.setType(outputType);
-            var converterFactory =
-                new ConverterFactory(converter, inputValueFactory, outputValueFactory, colSpecCreator.createSpec());
-            return m_sourceTable.map(converterFactory, colIndexIncludingRowID);
-        }
-
-        /**
-         * Creates a ColumnarVirtualTable by applying the CellFactory. The returned table has as many columns as the
-         * CellFactory produces.
-         *
-         * @param cellFactory for creating new columns
-         * @return the ColumnarVirtualTable defining the creation of columns via the provided CellFactory
-         */
-        ColumnarVirtualTable map(final CellFactory cellFactory) {
-            var outputSpecs = cellFactory.getColumnSpecs();
-            var valueFactories = Stream.of(outputSpecs)//
-                .map(DataColumnSpec::getType)//
-                .map(this::getValueFactory)//
-                .toArray(ValueFactory[]::new);
-            var cellFactoryMap = new CellFactoryMap(m_inputValueFactories, valueFactories, cellFactory);
-            return m_sourceTable.map(cellFactoryMap, m_inputIndices);
-        }
-
-        private ValueFactory<?, ?> getValueFactory(final DataType type) {
-            return ValueFactoryUtils.getValueFactory(type, m_fsHandler);
-        }
-    }
-
-    private static final class ConverterFactory implements ColumnarMapperWithRowIndexFactory {
+    private static class ConverterFactory implements ColumnarMapperFactory {
         private final DataCellTypeConverter m_converter;
 
         private final ValueSchema m_outputSchema;
@@ -477,7 +451,8 @@ public final class ColumnarRearranger {
             final ValueFactory<?, ?> outputValueFactory, final DataColumnSpec convertedSpec) {
             m_inputValueFactory = inputValueFactory;
             m_outputValueFactory = outputValueFactory;
-            m_outputSchema = ValueSchemaUtils.create(new DataTableSpec(convertedSpec), outputValueFactory);
+            m_outputSchema = ValueSchemaUtils.create(new DataTableSpec(convertedSpec),
+                new ValueFactory<?, ?>[]{m_outputValueFactory});
             m_converter = converter;
         }
 
@@ -487,21 +462,21 @@ public final class ColumnarRearranger {
         }
 
         @Override
-        public Mapper createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
+        public Runnable createMapper(final ReadAccess[] inputs, final WriteAccess[] outputs) {
             var inputAccess = inputs[0];
             var inputValue = createNullableReadValue(m_inputValueFactory, inputAccess);
             var outputAccess = outputs[0];
             var outputValue = createNullableWriteValue(m_outputValueFactory, outputAccess);
-            return r -> outputValue.setDataCell(m_converter.callConvert(inputValue.getDataCell()));
+            return () -> outputValue.setDataCell(m_converter.callConvert(inputValue.getDataCell()));
         }
 
     }
 
     private static class CellFactoryMap implements ColumnarMapperWithRowIndexFactory {
 
-        private final ValueFactory<?,?>[] m_readValueFactories;
+        private final ValueFactory<?, ?>[] m_readValueFactories;
 
-        private final ValueFactory<?,?>[] m_writeValueFactories;
+        private final ValueFactory<?, ?>[] m_writeValueFactories;
 
         private final CellFactory m_cellFactory;
 
@@ -573,8 +548,8 @@ public final class ColumnarRearranger {
         @Override
         public Iterator<DataCell> iterator() {
             return Stream.of(m_columns)//
-                    .map(NullableReadValue::getDataCell)//
-                    .iterator();
+                .map(NullableReadValue::getDataCell)//
+                .iterator();
         }
 
         @Override
@@ -591,8 +566,5 @@ public final class ColumnarRearranger {
         public DataCell getCell(final int index) {
             return m_columns[index].getDataCell();
         }
-
-
     }
-
 }

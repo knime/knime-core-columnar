@@ -508,6 +508,15 @@ public final class ColumnarVirtualTable {
         return appendRowIndex(tmpUniqueRowIndexColumnName()).appendMap(factory, columns);
     }
 
+    public ColumnarVirtualTable replaceMap(final ColumnarMapperFactory mapperFactory, final int columnIndex) {
+        if (mapperFactory.getOutputSchema().numColumns() != 1) {
+            throw new IllegalArgumentException("ColumnarMapperFactory must produce exactly 1 column");
+        }
+        final int[] selection = IntStream.range(0, m_valueSchema.numColumns()).toArray();
+        selection[columnIndex] = selection.length;
+        return appendMap(mapperFactory, columnIndex).selectColumns(selection);
+    }
+
     public ColumnarVirtualTable observe(final ObserverFactory observerFactory, final int... columnIndices) {
         final ObserverTransformSpec transformSpec = new ObserverTransformSpec(columnIndices, observerFactory);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
