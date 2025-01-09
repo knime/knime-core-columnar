@@ -102,6 +102,10 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
                 || (m_clearingCache && removalNotification.getCause() == RemovalCause.EXPLICIT)) {
                 final DataWithEvictor<K, D> evicted = removalNotification.getValue();
                 evicted.m_evictor.evict(removalNotification.getKey(), evicted.m_data);
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ex) {
+                }
                 evicted.m_data.release();
             }
         };

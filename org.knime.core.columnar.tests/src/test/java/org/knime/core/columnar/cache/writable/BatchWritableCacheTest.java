@@ -69,6 +69,7 @@ import java.util.concurrent.Future;
 import org.junit.Test;
 import org.knime.core.columnar.TestBatchStoreUtils.TestDataTable;
 import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.testing.ColumnarTest;
 import org.knime.core.columnar.testing.TestBatchStore;
@@ -351,4 +352,42 @@ public class BatchWritableCacheTest extends ColumnarTest {
         }
     }
 
+    /*
+     * Reproduce the following race condition:
+     *
+     * - Thread 1 is running `invalidateAll` because of a memory alert.
+     *   - It runs the removal listener but did not release the data yet
+     * - Thread 2 closes a `BatchWritableCache` instance (store)
+     *   - It does not get the `removed` ReadBatches from the cache because the `invalidateAll` already removed them
+     *   - It closes the delegate but the data is still not being released
+     */
+    @Test
+    public void testInvalidateAllRunningDuringClose() throws IOException, InterruptedException {
+        Thread memoryAlertThread;
+        final SharedBatchWritableCache sharedCache = generateCache();
+        try (final TestBatchStore delegate = createDefaultTestColumnStore();
+                final BatchWritableCache store = generateDefaultSmallColumnStore(delegate, sharedCache);
+                final TestDataTable table = createDefaultTestTable(delegate)) {
+
+            writeTable(store, table);
+
+            // Force the sharedCache to run `invalidateAll`
+            memoryAlertThread = new Thread(() -> {
+                // TODO catch errors here
+                try {
+                    ColumnarOffHeapMemoryAlertSystem.INSTANCE.sendMemoryAlert();
+                } catch (InterruptedException ex) {
+                }
+            });
+            memoryAlertThread.start();
+
+            // Wait until we are running `invalidateAll`. Because of of the sleep in the removal listener it is still
+            // running afterwards
+            Thread.sleep(20);
+
+            // Call close on the `store` (while the sharedCache is running `invalidateAll`)
+        }
+
+        memoryAlertThread.join();
+    }
 }
