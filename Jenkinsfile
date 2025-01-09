@@ -135,31 +135,33 @@ try {
     if (params["RUN_BENCHMARKS"]) {
         node('maven && java17 && ubuntu22.04 && workflow-tests') {
             stage('Run benchmarks') {
-                env.lastStage = env.STAGE_NAME
+                withEnv(["MALLOC_ARENA_MAX=1"]) {
+                    env.lastStage = env.STAGE_NAME
 
-                // Checkout source code
-                checkout scm
+                    // Checkout source code
+                    checkout scm
 
-                // Run benchmarks
-                withMaven(mavenOpts: '-Xmx10G') {
-                    withCredentials([
-                        usernamePassword(credentialsId: 'ARTIFACTORY_CREDENTIALS',
-                        passwordVariable: 'ARTIFACTORY_PASSWORD',
-                        usernameVariable: 'ARTIFACTORY_LOGIN'),
-                    ]) {
-                        sh '''
-                            mvn -e -Dmaven.test.failure.ignore=true -Dtycho.localArtifacts=ignore -Dknime.p2.repo=${P2_REPO} clean verify -Pbenchmark
-                        '''
+                    // Run benchmarks
+                    withMaven(mavenOpts: '-Xmx10G') {
+                        withCredentials([
+                            usernamePassword(credentialsId: 'ARTIFACTORY_CREDENTIALS',
+                            passwordVariable: 'ARTIFACTORY_PASSWORD',
+                            usernameVariable: 'ARTIFACTORY_LOGIN'),
+                        ]) {
+                            sh '''
+                                mvn -e -Dmaven.test.failure.ignore=true -Dtycho.localArtifacts=ignore -Dknime.p2.repo=${P2_REPO} clean verify -Pbenchmark
+                            '''
+                        }
                     }
-                }
 
-                // Archive results
-                resultFile = "target/benchmark-results.json"
-                sh """
-                    jq -s add \$(find . -path "*/target/surefire-reports/benchmark-results.json") > ${WORKSPACE}/${resultFile}
-                """
-                archiveArtifacts artifacts: resultFile
-                jmhReport resultFile
+                    // Archive results
+                    resultFile = "target/benchmark-results.json"
+                    sh """
+                        jq -s add \$(find . -path "*/target/surefire-reports/benchmark-results.json") > ${WORKSPACE}/${resultFile}
+                    """
+                    archiveArtifacts artifacts: resultFile
+                    jmhReport resultFile
+                }
             }
         }
     }
