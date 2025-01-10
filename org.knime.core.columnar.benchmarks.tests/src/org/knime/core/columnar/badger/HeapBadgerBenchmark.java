@@ -283,6 +283,12 @@ public class HeapBadgerBenchmark {
                 addShortLongStringData(state.m_numRows, state.m_numCols, state.m_missingValues, cursor, rowAccess);
             }
         } else {
+            // TODO(AP-23348) when we remove the legacy batching, we won't have to benchmark it anymore
+            if (state.m_numCols >= 100 && state.m_numRows >= 10000) {
+                // These parameters break the legacy batching implementation. Therefore, we skip the benchmark
+                return;
+            }
+
             try (var cursor = ColumnarWriteCursorFactory.createWriteCursor(state.m_objectCache)) {
                 var rowAccess = cursor.access();
                 addShortLongStringData(state.m_numRows, state.m_numCols, state.m_missingValues, cursor, rowAccess);
