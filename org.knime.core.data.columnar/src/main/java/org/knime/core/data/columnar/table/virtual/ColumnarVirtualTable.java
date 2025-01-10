@@ -63,6 +63,7 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
@@ -184,6 +185,29 @@ public final class ColumnarVirtualTable {
      */
     public ColumnarVirtualTable renameToRandomColumnNames() {
         return new ColumnarVirtualTable(m_transform, ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema));
+    }
+
+    /**
+     * Assign new random column names to the specified columns.
+     *
+     * @param columnIndices columns to rename (note that indices are including RowKey at 0)
+     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
+     */
+    public ColumnarVirtualTable renameToRandomColumnNames(final int... columnIndices) {
+        return new ColumnarVirtualTable(m_transform,
+            ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema, columnIndices));
+    }
+
+    /**
+     * Assign the specified column names to the specified columns.
+     *
+     * @param columnIndices columns to rename (note that indices are including RowKey at 0)
+     * @param columnNames new names to assign
+     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with renamed column.
+     */
+    public ColumnarVirtualTable renameColumns(final int[] columnIndices, final String[] columnNames) {
+        return new ColumnarVirtualTable(m_transform,
+            ValueSchemaUtils.renameColumns(m_valueSchema, columnIndices, columnNames));
     }
 
     private static ValueSchema selectColumns(final ValueSchema schema, final int... columnIndices) {
@@ -514,7 +538,7 @@ public final class ColumnarVirtualTable {
         }
         final int[] selection = IntStream.range(0, m_valueSchema.numColumns()).toArray();
         selection[columnIndex] = selection.length;
-        return appendMap(mapperFactory, columnIndex).selectColumns(selection);
+        return renameToRandomColumnNames(columnIndex).appendMap(mapperFactory, columnIndex).selectColumns(selection);
     }
 
     public ColumnarVirtualTable observe(final ObserverFactory observerFactory, final int... columnIndices) {

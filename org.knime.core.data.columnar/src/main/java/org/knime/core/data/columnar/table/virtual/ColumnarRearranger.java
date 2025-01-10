@@ -234,7 +234,7 @@ public final class ColumnarRearranger {
     private ReferenceTable createAppendTable(final ReferenceTable inputTable, final List<RearrangedColumn> newColumns,
         final ExecutionMonitor monitor, final long size)
         throws VirtualTableIncompatibleException, CanceledExecutionException {
-        var table = inputTable.getVirtualTable();
+        var table = inputTable.getVirtualTable().renameToRandomColumnNames();
 
         // the column indices we will select for materializing after replacing/appending new columns.
         final int[] selection = new int[newColumns.size() + 1];
@@ -265,8 +265,16 @@ public final class ColumnarRearranger {
             .filter(RearrangedColumn::isNewColumn)//
             .toList();
         if (!columnsToCreate.isEmpty()) {
-            table = createColumns(newColumns, table, selection, nextSelectionIndex);
+            table = createColumns(columnsToCreate, table, selection, nextSelectionIndex);
         }
+
+        // --------------------------------------------------------------------
+        // rename converted columns to the original names from inputTable
+        final DataTableSpec inputSpec = inputTable.getSchema().getSourceSpec();
+        final int[] columnsToRename = Arrays.copyOfRange(selection, 1, columnsToConvert.size() + 1);
+        final String[] names = new String[columnsToConvert.size()];
+        Arrays.setAll(names, i -> inputSpec.getColumnSpec(selection[i + 1] - 1).getName());
+        table = table.renameColumns(columnsToRename, names);
 
         // --------------------------------------------------------------------
         // materialize
