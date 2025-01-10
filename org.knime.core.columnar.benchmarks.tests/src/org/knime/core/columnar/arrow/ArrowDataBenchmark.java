@@ -209,8 +209,19 @@ public class ArrowDataBenchmark {
         void useData(final BatchProvider reader, final int numBatches, final Blackhole bh) throws IOException;
     }
 
-    private static String[] STRING_TEST_DATA =
+    private static final String[] STRING_TEST_DATA =
         IntStream.range(0, 100_000).mapToObj(i -> "Test String " + i).toArray(String[]::new);
+
+    private static byte[] byteTestData(final int length) {
+        var data = new byte[length];
+        for (int i = 0; i < length; i++) {
+            data[i] = (byte)i;
+        }
+        return data;
+    }
+
+    private static final byte[][] OBJECT_TEST_DATA =
+        IntStream.range(0, 100).mapToObj(ArrowDataBenchmark::byteTestData).toArray(byte[][]::new);
 
     public static enum DataSets implements DataFiller, DataUser {
             MANY_ROWS( //
@@ -294,6 +305,56 @@ public class ArrowDataBenchmark {
                         batch.release();
                     }
                 }), //
+
+        //            DICT_ENCODED_OBJECTS( //
+        //                new DefaultColumnarSchema( //
+        //                    new DataSpec[]{DataSpec.varBinarySpec()}, //
+        //                    new DataTraits[]{new DefaultDataTraits(new DictEncodingTrait())} //
+        //                ),
+        //
+        //                (writer) -> {
+        //                    // 1 Mio Rows with 100 different objects
+        //                    var numRowsPerBatch = 100_000;
+        //                    var numCols = 1;
+        //                    var numBatches = 10;
+        //
+        //                    // Benchmark with a very efficient serializer (otherwise the performance is dominated by the
+        //                    // serialization)
+        //                    ObjectSerializer<byte[]> serializer = (output, object) -> {
+        //                        output.write(object);
+        //                    };
+        //
+        //                    var data = new ReadBatch[numBatches];
+        //                    for (int i = 0; i < numBatches; i++) {
+        //                        var writeBatch = writer.create(numRowsPerBatch);
+        //
+        //                        for (int c = 0; c < numCols; c++) {
+        //                            var col = writeBatch.get(c);
+        //                            for (int r = 0; r < numRowsPerBatch; r++) {
+        //                                ((VarBinaryWriteData)col).setObject(r, OBJECT_TEST_DATA[i % OBJECT_TEST_DATA.length],
+        //                                    serializer);
+        //                            }
+        //                        }
+        //
+        //                        data[i] = writeBatch.close(numRowsPerBatch);
+        //                    }
+        //                    return data;
+        //                },
+        //
+        //                (reader, numBatches, bh) -> {
+        //                    ObjectDeserializer<byte[]> deserializer = (input) -> input.readBytes();
+        //
+        //                    for (int i = 0; i < numBatches; i++) {
+        //                        var batch = reader.get(i);
+        //                        for (int c = 0; c < batch.numData(); c++) {
+        //                            var col = batch.get(c);
+        //                            for (int r = 0; r < col.length(); r++) {
+        //                                bh.consume(((VarBinaryReadData)col).getObject(r, deserializer));
+        //                            }
+        //                        }
+        //                        batch.release();
+        //                    }
+        //                }), //
         ;
 
         private ColumnarSchema m_schema;
