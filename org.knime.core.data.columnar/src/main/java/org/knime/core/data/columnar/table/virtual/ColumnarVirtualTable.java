@@ -527,9 +527,12 @@ public final class ColumnarVirtualTable {
 
     public ColumnarVirtualTable appendMap(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
         final int[] columns = Arrays.copyOf(columnIndices, columnIndices.length + 1);
-        columns[columns.length - 1] = m_valueSchema.numColumns();
+        final int rowIndexColumn = m_valueSchema.numColumns();
+        columns[columns.length - 1] = rowIndexColumn;
         final ColumnarMapperFactory factory = new WrappedColumnarMapperWithRowIndexFactory(mapperFactory);
-        return appendRowIndex(tmpUniqueRowIndexColumnName()).appendMap(factory, columns);
+        return appendRowIndex(tmpUniqueRowIndexColumnName()) //
+            .appendMap(factory, columns) //
+            .dropColumns(rowIndexColumn);
     }
 
     public ColumnarVirtualTable replaceMap(final ColumnarMapperFactory mapperFactory, final int columnIndex) {
