@@ -45,6 +45,8 @@
  */
 package org.knime.core.columnar.arrow;
 
+import static org.knime.core.columnar.store.UseOnHeapColumnStoreProperty.useOnHeapColumnStore;
+
 import java.nio.file.Path;
 
 import org.apache.arrow.memory.AllocationListener;
@@ -61,6 +63,9 @@ import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
 import org.knime.core.columnar.arrow.offheap.OffHeapArrowBatchReadStore;
 import org.knime.core.columnar.arrow.offheap.OffHeapArrowBatchStore;
 import org.knime.core.columnar.arrow.offheap.OffHeapArrowPartialFileBatchReadable;
+import org.knime.core.columnar.arrow.onheap.OnHeapArrowBatchReadStore;
+import org.knime.core.columnar.arrow.onheap.OnHeapArrowBatchStore;
+import org.knime.core.columnar.arrow.onheap.OnHeapArrowPartialFileBatchReadable;
 import org.knime.core.columnar.batch.SequentialBatchReadable;
 import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -129,7 +134,8 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
             @Override
             public void onAllocation(final long size) {
-                if (m_allocator.getAllocatedMemory() > memoryLimit * MEMORY_ALERT_THRESHOLD) {
+                if (!useOnHeapColumnStore()
+                    && m_allocator.getAllocatedMemory() > memoryLimit * MEMORY_ALERT_THRESHOLD) {
                     LOGGER.debug("Memory over {}%. Calling memory alert.", (int)(100 * MEMORY_ALERT_THRESHOLD));
                     memoryAlert();
                 }
@@ -137,8 +143,12 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
             @Override
             public boolean onFailedAllocation(final long size, final AllocationOutcome outcome) {
-                LOGGER.debug("Allocation of {} bytes failed. Calling memory alert.", size);
-                return memoryAlert();
+                if (useOnHeapColumnStore()) {
+                    return false;
+                } else {
+                    LOGGER.debug("Allocation of {} bytes failed. Calling memory alert.", size);
+                    return memoryAlert();
+                }
             }
 
         }, DISABLE_HARD_MEMORY_LIMIT ? Long.MAX_VALUE : memoryLimit);
@@ -148,13 +158,23 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
     public ArrowBatchStore createStore(final ColumnarSchema schema, final FileHandle fileSupplier) {
-        return new OffHeapArrowBatchStore(schema, fileSupplier, m_compression, newChildAllocator("ArrowColumnStore"));
+        var childAllocator = newChildAllocator("ArrowColumnStore");
+        if (useOnHeapColumnStore()) {
+            return new OnHeapArrowBatchStore(schema, fileSupplier, m_compression, childAllocator);
+        } else {
+            return new OffHeapArrowBatchStore(schema, fileSupplier, m_compression, childAllocator);
+        }
     }
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
     public ArrowBatchReadStore createReadStore(final Path path) {
-        return new OffHeapArrowBatchReadStore(path, newChildAllocator("ArrowColumnReadStore"));
+        var childAllocator = newChildAllocator("ArrowColumnReadStore");
+        if (useOnHeapColumnStore()) {
+            return new OnHeapArrowBatchReadStore(path, childAllocator);
+        } else {
+            return new OffHeapArrowBatchReadStore(path, childAllocator);
+        }
     }
 
     /**
@@ -169,8 +189,12 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
      */
     @SuppressWarnings("resource") // Allocator closed by store
     public SequentialBatchReadable createPartialFileReadable(final Path path, final OffsetProvider offsetProvider) {
-        return new OffHeapArrowPartialFileBatchReadable(path, offsetProvider,
-            newChildAllocator("ArrowPartialFileBatchReadStore"));
+        var childAllocator = newChildAllocator("ArrowPartialFileBatchReadStore");
+        if (useOnHeapColumnStore()) {
+            return new OnHeapArrowPartialFileBatchReadable(path, offsetProvider, childAllocator);
+        } else {
+            return new OffHeapArrowPartialFileBatchReadable(path, offsetProvider, childAllocator);
+        }
     }
 
     private BufferAllocator newChildAllocator(final String name) {
