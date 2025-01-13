@@ -42,24 +42,38 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap.data;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * Arrow implementation of {@link NullableWriteData}. Can be sliced with {@link #slice(int)}.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * The API of ArrowWriteData is NOT thread safe, especially expand and set should not be
+ * called at the same time from different threads!
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+public interface OffHeapArrowWriteData extends NullableWriteData {
 
     /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
+     * Slice the this object to the given start. Note that this only affects what data is returned when accessing the
+     * data with an index. This does not effect {@link #capacity()} and {@link #expand(int)}.
+     *
+     * @param start the first index of the slice
+     * @return the sliced data
      */
-    boolean isUseLZ4BlockCompression();
+    OffHeapArrowWriteData slice(int start);
+
+    /**
+     * {@inheritDoc}
+     *
+     * Note: The returned {@link OffHeapArrowReadData} is not sliced.
+     */
+    @Override
+    OffHeapArrowReadData close(int length);
 }

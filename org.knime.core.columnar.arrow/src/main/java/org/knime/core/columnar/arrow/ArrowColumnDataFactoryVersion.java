@@ -57,8 +57,8 @@ import java.util.Objects;
 import java.util.Queue;
 
 /**
- * A class describing the version of a {@link ArrowColumnDataFactory}. The version consists of an integer number and a
- * list of versions for eventual children of the factory.
+ * A class describing the version of a ArrowColumnDataFactory. The version consists of an integer number and a list of
+ * versions for eventual children of the factory.
  * </p>
  * A factory version can be represented as a String and parsed from a String.
  * </p>
@@ -207,6 +207,13 @@ public final class ArrowColumnDataFactoryVersion {
      */
     public ArrowColumnDataFactoryVersion getChildVersion(final int index) {
         return m_childrenVersions[index];
+    }
+
+    /**
+     * @return all child versions as an array
+     */
+    public ArrowColumnDataFactoryVersion[] getChildVersions() {
+        return m_childrenVersions;
     }
 
     /*
