@@ -44,23 +44,64 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Jul 14, 2021 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import java.io.IOException;
+import java.nio.file.Path;
+
+import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.arrow.ArrowIpcFileStore;
+import org.knime.core.columnar.batch.BatchReadable;
+import org.knime.core.columnar.store.FileHandle;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Abstract implementation of a {@link BatchReadable} for Arrow IPC files. Holds the {@link ColumnarSchema schema},
+ * {@link Path path} and {@link BufferAllocator allocator}. On #close() the allocator is closed but an
+ * {@link IOException} is thrown if there is still memory allocated by the allocator.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+abstract class AbstractOnHeapArrowBatchReadable implements BatchReadable, ArrowIpcFileStore {
+
+    protected final ColumnarSchema m_schema;
+
+    protected final FileHandle m_fileHandle;
+
+    protected final BufferAllocator m_allocator;
+
+    AbstractOnHeapArrowBatchReadable(final ColumnarSchema schema, final FileHandle file, final BufferAllocator allocator) {
+        m_schema = schema;
+        m_fileHandle = file;
+        m_allocator = allocator;
+    }
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * @return the fileHandle
      */
-    OffsetProvider getOffsetProvider();
+    @Override
+    public FileHandle getFileHandle() {
+        return m_fileHandle;
+    }
+
+    @Override
+    public ColumnarSchema getSchema() {
+        return m_schema;
+    }
+
+    protected BufferAllocator getAllocator() {
+        return m_allocator;
+    }
+
+    @Override
+    public void close() throws IOException {
+        final long allocated = m_allocator.getAllocatedMemory();
+        m_allocator.close();
+        if (allocated > 0) {
+            throw new IOException(
+                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
+        }
+    }
 }

@@ -44,23 +44,65 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.knime.core.columnar.arrow.onheap.AbstractOnHeapArrowDataTest;
+import org.knime.core.columnar.arrow.onheap.data.ArrowBooleanData.ArrowBooleanDataFactory;
+import org.knime.core.columnar.arrow.onheap.data.ArrowBooleanData.ArrowBooleanReadData;
+import org.knime.core.columnar.arrow.onheap.data.ArrowBooleanData.ArrowBooleanWriteData;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Test {@link ArrowBooleanData}
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public class OnHeapArrowBooleanDataTest extends AbstractOnHeapArrowDataTest<ArrowBooleanWriteData, ArrowBooleanReadData> {
 
-    /**
-     * @return a provider of offsets of the batches in the file
-     */
-    OffsetProvider getOffsetProvider();
+    /** Create the test for {@link ArrowBooleanData} */
+    public OnHeapArrowBooleanDataTest() {
+        super(ArrowBooleanDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowBooleanWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowBooleanWriteData, "Object is not an instance of ArrowBooleanWriteData");
+        return (ArrowBooleanWriteData)o;
+    }
+
+    @Override
+    protected ArrowBooleanReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowBooleanReadData, "Object is not an instance of ArrowBooleanReadData");
+        return (ArrowBooleanReadData)o;
+    }
+
+    @Override
+    protected void setValue(final ArrowBooleanWriteData data, final int index, final int seed) {
+        data.setBoolean(index, seed % 3 == 0);
+    }
+
+    @Override
+    protected void checkValue(final ArrowBooleanReadData data, final int index, final int seed) {
+        assertEquals(seed % 3 == 0, data.getBoolean(index), "Boolean value does not match for index " + index);
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowBooleanWriteData data) {
+        return false;
+    }
+
+    @Override
+    protected boolean isReleasedR(final ArrowBooleanReadData data) {
+        return false;
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return (long)(Math.ceil(capacity / 8.0) // 1 bit per value for data
+            + Math.ceil(capacity / 8.0)); // 1 bit per value for validity buffer
+    }
 }

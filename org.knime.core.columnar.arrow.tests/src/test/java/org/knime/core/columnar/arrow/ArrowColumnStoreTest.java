@@ -72,6 +72,11 @@ import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
 import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
+import org.knime.core.columnar.arrow.onheap.OnHeapArrowBatchStore;
+import org.knime.core.columnar.arrow.onheap.ArrowBatchWriter;
+import org.knime.core.columnar.arrow.onheap.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.onheap.OnHeapArrowPartialFileBatchReadable;
+import org.knime.core.columnar.arrow.onheap.ArrowPartialFileBatchReader;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -187,7 +192,7 @@ public class ArrowColumnStoreTest {
 
         // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator();
-                final BatchStore store = new ArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
+                final BatchStore store = new OnHeapArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
             assertEquals(0, store.numBatches());
 
             @SuppressWarnings("resource")
@@ -271,7 +276,7 @@ public class ArrowColumnStoreTest {
 
         // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator();
-                final BatchStore store = new ArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
+                final BatchStore store = new OnHeapArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
             assertEquals(0, store.numBatches());
 
             final BatchWriter writer = store.getWriter();
@@ -413,7 +418,7 @@ public class ArrowColumnStoreTest {
 
             // Create the partial readable
             @SuppressWarnings("resource")
-            final ArrowPartialFileBatchReadable readable =
+            final OnHeapArrowPartialFileBatchReadable readable =
                 factory.createPartialFileReadable(writePath.asPath(), writeStore.getOffsetProvider());
             @SuppressWarnings("resource")
             final SequentialBatchReader reader = readable.createSequentialReader();

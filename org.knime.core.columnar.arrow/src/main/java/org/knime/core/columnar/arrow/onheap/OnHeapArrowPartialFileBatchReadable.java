@@ -44,23 +44,46 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Apr 14, 2021 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap;
 
+import java.nio.file.Path;
+
+import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.arrow.ArrowSchemaUtils;
+import org.knime.core.columnar.arrow.PathBackedFileHandle;
+import org.knime.core.columnar.batch.SequentialBatchReadable;
+import org.knime.core.columnar.batch.SequentialBatchReader;
+import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * A {@link SequentialBatchReadable} that can read from partially written Arrow IPC files.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public class OnHeapArrowPartialFileBatchReadable extends AbstractOnHeapArrowBatchReadable implements SequentialBatchReadable {
+
+    private final OffsetProvider m_offsetProvider;
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * Creates a new {@link OnHeapArrowPartialFileBatchReadable}.
+     *
+     * @param path
+     * @param offsetProvider
+     * @param allocator
      */
-    OffsetProvider getOffsetProvider();
+    public OnHeapArrowPartialFileBatchReadable(final Path path, final OffsetProvider offsetProvider,
+        final BufferAllocator allocator) {
+        super(ArrowSchemaUtils.readSchema(path), new PathBackedFileHandle(path), allocator);
+        m_offsetProvider = offsetProvider;
+    }
+
+    @Override
+    public SequentialBatchReader createSequentialReader(final ColumnSelection selection) {
+        final OnHeapArrowColumnDataFactory[] factories = OnHeapArrowSchemaMapper.map(m_schema);
+        return new OnHeapArrowPartialFileBatchReader(m_fileHandle.asFile(), m_allocator, factories, selection,
+            m_offsetProvider);
+    }
 }

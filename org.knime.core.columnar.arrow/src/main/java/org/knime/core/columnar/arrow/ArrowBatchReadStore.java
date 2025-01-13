@@ -42,86 +42,27 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jan 13, 2025 (benjamin): created
  */
 package org.knime.core.columnar.arrow;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 
 /**
- * A {@link BatchReadStore} implementation for Arrow.
+ * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
+ * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
+ * the backing file.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class ArrowBatchReadStore extends AbstractArrowBatchReadable implements BatchReadStore {
-
-    private AtomicInteger m_numBatches;
-
-    private long[] m_batchBoundaries;
-
-    private Boolean m_useLZ4BlockCompression;
-
-    ArrowBatchReadStore(final Path path, final BufferAllocator allocator) {
-        this(path, allocator, null);
-    }
-
-    ArrowBatchReadStore(final Path path, final BufferAllocator allocator, final AtomicInteger numBatches) {
-        super(ArrowSchemaUtils.readSchema(path), new PathBackedFileHandle(path), allocator);
-        m_numBatches = numBatches;
-    }
-
-    @Override
-    public ArrowBatchReader createRandomAccessReader(final ColumnSelection config) {
-        final ArrowColumnDataFactory[] factories = ArrowSchemaMapper.map(m_schema);
-        return new ArrowBatchReader(m_fileHandle.asFile(), m_allocator, factories, config);
-    }
-
-    private final void initMetadata() {
-        try (final ArrowBatchReader reader =
-            createRandomAccessReader(new DefaultColumnSelection(m_schema.numColumns()))) {
-            m_numBatches = new AtomicInteger(reader.numBatches());
-            m_useLZ4BlockCompression =
-                reader.getMetadata().containsKey(ArrowReaderWriterUtils.ARROW_LZ4_BLOCK_FEATURE_KEY);
-            m_batchBoundaries = ArrowReaderWriterUtils
-                .stringToLongArray(reader.getMetadata().get(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY));
-        } catch (final IOException e) {
-            throw new IllegalStateException("Error when reading footer.", e);
-        }
-    }
-
-    @Override
-    public int numBatches() {
-        if (m_numBatches == null) {
-            initMetadata();
-        }
-        return m_numBatches.get();
-    }
+public interface ArrowBatchReadStore extends BatchReadStore {
 
     /**
      * @return Whether the store's data was persisted using the deprecated
      *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
      */
-    public boolean isUseLZ4BlockCompression() {
-        if (m_useLZ4BlockCompression == null) {
-            initMetadata();
-        }
-        return m_useLZ4BlockCompression;
-    }
-
-    @Override
-    public long[] getBatchBoundaries() {
-        if (m_batchBoundaries == null) {
-            initMetadata();
-        }
-        return m_batchBoundaries;
-    }
-
+    boolean isUseLZ4BlockCompression();
 }

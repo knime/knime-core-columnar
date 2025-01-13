@@ -71,6 +71,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.arrow.onheap.OnHeapArrowBatchStore;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.data.VarBinaryData.VarBinaryWriteData;
 import org.knime.core.columnar.store.FileHandle;
@@ -210,7 +211,7 @@ public class ArrowConcurrentReallocTest {
                 final FileHandle path = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
                 long cachedDataSize = 0;
 
-                try (final ArrowBatchStore store = storeFactory.createStore(schema, path);
+                try (final OnHeapArrowBatchStore store = storeFactory.createStore(schema, path);
                         final BatchWriter writer = store.getWriter()) {
                     final var writeBatch = writer.create(numValues);
                     final var data = (VarBinaryWriteData)writeBatch.get(0);

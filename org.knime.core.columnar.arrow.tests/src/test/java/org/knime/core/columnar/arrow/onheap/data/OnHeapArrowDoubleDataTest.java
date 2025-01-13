@@ -44,23 +44,71 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.knime.core.columnar.arrow.onheap.AbstractOnHeapArrowDataTest;
+import org.knime.core.columnar.arrow.onheap.data.ArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.onheap.data.ArrowDoubleData.ArrowDoubleReadData;
+import org.knime.core.columnar.arrow.onheap.data.ArrowDoubleData.ArrowDoubleWriteData;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Test {@link ArrowDoubleData}
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public class OnHeapArrowDoubleDataTest extends AbstractOnHeapArrowDataTest<ArrowDoubleWriteData, ArrowDoubleReadData> {
 
-    /**
-     * @return a provider of offsets of the batches in the file
-     */
-    OffsetProvider getOffsetProvider();
+    /** Create the test for {@link ArrowDoubleData} */
+    public OnHeapArrowDoubleDataTest() {
+        super(ArrowDoubleDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowDoubleWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowDoubleWriteData, "Object is not an instance of ArrowDoubleWriteData");
+        return (ArrowDoubleWriteData)o;
+    }
+
+    @Override
+    protected ArrowDoubleReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowDoubleReadData, "Object is not an instance of ArrowDoubleReadData");
+        return (ArrowDoubleReadData)o;
+    }
+
+    private static double valueFor(final int seed) {
+        return seed * 1.2;
+    }
+
+    @Override
+    protected void setValue(final ArrowDoubleWriteData data, final int index, final int seed) {
+        data.setDouble(index, valueFor(seed));
+    }
+
+    @Override
+    protected void checkValue(final ArrowDoubleReadData data, final int index, final int seed) {
+        assertEquals(valueFor(seed), data.getDouble(index), 0,
+            "Double value does not match expected value at index " + index);
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowDoubleWriteData data) {
+        return false;
+    }
+
+    @Override
+    protected boolean isReleasedR(final ArrowDoubleReadData data) {
+        return false;
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return 8L * capacity // 8 bytes per value for data
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
 }

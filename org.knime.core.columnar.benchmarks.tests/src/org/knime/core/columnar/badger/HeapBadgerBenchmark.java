@@ -57,9 +57,9 @@ import java.util.stream.IntStream;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.knime.core.columnar.BenchmarkUtils.MissingValues;
-import org.knime.core.columnar.arrow.ArrowBatchStore;
 import org.knime.core.columnar.arrow.ArrowColumnStoreFactory;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.arrow.onheap.OnHeapArrowBatchStore;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.params.BatchingParam;
@@ -113,7 +113,7 @@ public class HeapBadgerBenchmark {
 
         ArrowColumnStoreFactory m_storeFactory;
 
-        ArrowBatchStore m_store;
+        OnHeapArrowBatchStore m_store;
 
         WritableObjectCacheTestStore m_objectCache;
 

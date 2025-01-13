@@ -42,25 +42,89 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   Jan 13, 2025 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap;
 
+import java.io.IOException;
+
+import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.arrow.ArrowBatchStore;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.store.FileHandle;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * A {@link BatchStore} implementation for Arrow.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public final class OnHeapArrowBatchStore extends AbstractOnHeapArrowBatchReadable implements ArrowBatchStore {
+
+    private final OnHeapArrowColumnDataFactory[] m_factories;
+
+    private final OnHeapArrowBatchWriter m_writer;
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * Creates a new {@link OnHeapArrowBatchStore}.
+     *
+     * @param schema
+     * @param fileSupplier
+     * @param compression
+     * @param allocator
      */
-    OffsetProvider getOffsetProvider();
+    public OnHeapArrowBatchStore(final ColumnarSchema schema, final FileHandle fileSupplier,
+        final ArrowCompression compression, final BufferAllocator allocator) {
+        super(schema, fileSupplier, allocator);
+        m_factories = OnHeapArrowSchemaMapper.map(schema);
+        m_writer = new OnHeapArrowBatchWriter(fileSupplier, m_factories, compression, m_allocator);
+    }
+
+    @Override
+    public BatchWriter getWriter() {
+
+        return m_writer;
+    }
+
+    @Override
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
+        return new OnHeapArrowBatchReader(getFileHandle().asFile(), m_allocator, m_factories, config);
+    }
+
+    @Override
+    public int numBatches() {
+        return m_writer.numBatches();
+    }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_writer.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_writer.numRows();
+    }
+
+    /**
+     * @return an object that can provide the offsets of record batches and dictionary batches in an Arrow IPC file. If
+     *         new batches are written to the file after this method was called, the object will also provide offsets to
+     *         the newly written batches.
+     */
+    @Override
+    public OffsetProvider getOffsetProvider() {
+        return m_writer.getOffsetProvider();
+    }
+
+    @Override
+    public void close() throws IOException {
+        m_writer.close();
+        super.close();
+    }
+
 }

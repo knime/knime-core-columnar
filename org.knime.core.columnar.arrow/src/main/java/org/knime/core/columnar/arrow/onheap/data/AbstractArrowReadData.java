@@ -44,23 +44,72 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Nov 4, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
-
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+package org.knime.core.columnar.arrow.onheap.data;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Abstract implementation of {@link ArrowReadData}. Holds a the {@link #m_validity validity buffer}, the
+ * {@link #m_offset offset}, and the {@link #m_length length} of the data.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+@SuppressWarnings("javadoc")
+abstract class AbstractArrowReadData extends AbstractReferencedData implements ArrowReadData {
+
+    /** The validity buffer of this data object. */
+    protected final ValidityBuffer m_validity;
+
+    /** An offset describing where the values of this object start in the vector. */
+    protected final int m_offset;
+
+    /** The length of the data */
+    protected final int m_length;
+
+    // TODO missing values optimization (ALL_MISSING, SOME_MISSING, NO_MISSING)
+    /**
+     * Create an abstract {@link ArrowReadData} with the given vector, an offset of 0 and the length of the vector.
+     *
+     * @param vector the vector
+     * @param missingValues if all, no or some values are missing
+     */
+    public AbstractArrowReadData(final ValidityBuffer validity, final int length) {
+        this(validity, 0, length);
+    }
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * Create an abstract {@link ArrowReadData} with the given vector.
+     *
+     * @param vector the vector
+     * @param missingValues if all, no or some values are missing
+     * @param offset the offset
+     * @param length the length of this data
      */
-    OffsetProvider getOffsetProvider();
+    public AbstractArrowReadData(final ValidityBuffer validity, final int offset, final int length) {
+        m_validity = validity;
+        m_offset = offset;
+        m_length = length;
+    }
+
+    @Override
+    public final boolean isMissing(final int index) {
+        return !m_validity.isSet(index + m_offset);
+    }
+
+    @Override
+    public int length() {
+        return m_length;
+    }
+
+    @Override
+    protected void closeResources() {
+        // TODO nothing to do?
+    }
+
+    @Override
+    public ValidityBuffer getValidityBuffer() {
+        return m_validity;
+    }
+
+    // TODO overwrite toString
 }

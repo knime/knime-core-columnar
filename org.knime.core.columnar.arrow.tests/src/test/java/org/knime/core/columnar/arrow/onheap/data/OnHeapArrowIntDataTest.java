@@ -44,23 +44,71 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.knime.core.columnar.arrow.onheap.AbstractOnHeapArrowDataTest;
+import org.knime.core.columnar.arrow.onheap.data.ArrowIntData.ArrowIntDataFactory;
+import org.knime.core.columnar.arrow.onheap.data.ArrowIntData.ArrowIntReadData;
+import org.knime.core.columnar.arrow.onheap.data.ArrowIntData.ArrowIntWriteData;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Test {@link ArrowIntData}
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public class OnHeapArrowIntDataTest extends AbstractOnHeapArrowDataTest<ArrowIntWriteData, ArrowIntReadData> {
 
-    /**
-     * @return a provider of offsets of the batches in the file
-     */
-    OffsetProvider getOffsetProvider();
+    /** Create the test for {@link ArrowIntData} */
+    public OnHeapArrowIntDataTest() {
+        super(ArrowIntDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowIntWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowIntWriteData, "Object is not an instance of ArrowIntWriteData");
+        return (ArrowIntWriteData)o;
+    }
+
+    @Override
+    protected ArrowIntReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowIntReadData, "Object is not an instance of ArrowIntReadData");
+        return (ArrowIntReadData)o;
+    }
+
+    private static int valueFor(final int seed) {
+        return seed * 2;
+    }
+
+    @Override
+    protected void setValue(final ArrowIntWriteData data, final int index, final int seed) {
+        data.setInt(index, valueFor(seed));
+    }
+
+    @Override
+    protected void checkValue(final ArrowIntReadData data, final int index, final int seed) {
+        assertEquals(valueFor(seed), data.getInt(index),
+            "Value at index " + index + " does not match expected value for seed " + seed);
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowIntWriteData data) {
+        return false;
+    }
+
+    @Override
+    protected boolean isReleasedR(final ArrowIntReadData data) {
+        return false;
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return 4L * capacity // 4 bytes per value for data
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
 }

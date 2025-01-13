@@ -44,85 +44,74 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 24, 2024 (benjamin): created
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.badger;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.knime.core.columnar.arrow.onheap.OnHeapArrowBatchStore;
-import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.cache.object.ObjectCache;
-import org.knime.core.columnar.cache.object.shared.SoftReferencedObjectCache;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.table.schema.ColumnarSchema;
+import org.knime.core.columnar.arrow.onheap.AbstractOnHeapArrowDataTest;
+import org.knime.core.columnar.arrow.onheap.data.ArrowLongData.ArrowLongDataFactory;
+import org.knime.core.columnar.arrow.onheap.data.ArrowLongData.ArrowLongReadData;
+import org.knime.core.columnar.arrow.onheap.data.ArrowLongData.ArrowLongWriteData;
 
 /**
- * A test implementation of a {@link BatchStore} wrapping an {@link ObjectCache} for writing into it.
+ * Test {@link ArrowLongData}
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-final class WritableObjectCacheTestStore implements BatchStore {
+public class OnHeapArrowLongDataTest extends AbstractOnHeapArrowDataTest<ArrowLongWriteData, ArrowLongReadData> {
 
-    private final ExecutorService m_persistExecutor;
-
-    private final ExecutorService m_serializeExecutor;
-
-    private final SoftReferencedObjectCache m_heapCache;
-
-    private final ObjectCache m_objectCache;
-
-    WritableObjectCacheTestStore(final OnHeapArrowBatchStore store) {
-        m_persistExecutor = Executors.newFixedThreadPool(4);
-        m_serializeExecutor = Executors.newFixedThreadPool(4);
-        m_heapCache = new SoftReferencedObjectCache(); // TODO in reality it is connected to the memory alert system
-        m_objectCache = new ObjectCache(store, store, m_heapCache, m_persistExecutor, m_serializeExecutor);
+    /** Create the test for {@link ArrowLongData} */
+    public OnHeapArrowLongDataTest() {
+        super(ArrowLongDataFactory.INSTANCE);
     }
 
     @Override
-    public BatchWriter getWriter() {
-        return m_objectCache.getWriter();
+    protected ArrowLongWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowLongWriteData, "Object is not an instance of ArrowLongWriteData");
+        return (ArrowLongWriteData)o;
     }
 
     @Override
-    public ColumnarSchema getSchema() {
-        return m_objectCache.getSchema();
+    protected ArrowLongReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowLongReadData, "Object is not an instance of ArrowLongReadData");
+        return (ArrowLongReadData)o;
+    }
+
+    private static long valueFor(final int seed) {
+        // For demonstration, just return seed * 10 as a long value.
+        return seed * 10L;
     }
 
     @Override
-    public int numBatches() {
-        throw new UnsupportedOperationException();
+    protected void setValue(final ArrowLongWriteData data, final int index, final int seed) {
+        data.setLong(index, valueFor(seed));
     }
 
     @Override
-    public FileHandle getFileHandle() {
-        throw new UnsupportedOperationException();
+    protected void checkValue(final ArrowLongReadData data, final int index, final int seed) {
+        assertEquals(valueFor(seed), data.getLong(index),
+            "Value at index " + index + " does not match expected value for seed " + seed);
     }
 
     @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        throw new UnsupportedOperationException();
-    }
-
-    public void flush() throws IOException {
-        m_objectCache.flush();
+    protected boolean isReleasedW(final ArrowLongWriteData data) {
+        // On-heap data does not allocate off-heap resources that need explicit releasing
+        return false;
     }
 
     @Override
-    public void close() throws IOException {
-        m_objectCache.close();
-        m_persistExecutor.shutdownNow();
-        m_serializeExecutor.shutdownNow();
-        m_heapCache.invalidate();
+    protected boolean isReleasedR(final ArrowLongReadData data) {
+        // On-heap data does not allocate off-heap resources that need explicit releasing
+        return false;
     }
 
     @Override
-    public long[] getBatchBoundaries() {
-        return m_objectCache.getBatchBoundaries();
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return 8L * capacity // 8 bytes per value for a long
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 }

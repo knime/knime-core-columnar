@@ -55,6 +55,7 @@ import java.util.stream.IntStream;
 import org.apache.arrow.memory.RootAllocator;
 import org.knime.core.columnar.BenchmarkUtils;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
+import org.knime.core.columnar.arrow.onheap.OnHeapArrowBatchStore;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
@@ -103,7 +104,7 @@ public class ArrowDataBenchmark {
 
         FileHandle file;
 
-        ArrowBatchStore batchStore;
+        OnHeapArrowBatchStore batchStore;
 
         BatchWriter writer;
 

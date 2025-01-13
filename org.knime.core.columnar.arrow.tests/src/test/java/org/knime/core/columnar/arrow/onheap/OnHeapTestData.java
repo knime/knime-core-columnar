@@ -44,23 +44,20 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 8, 2020 (benjamin): created
+ *   Jan 13, 2025 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Random;
-import java.util.UUID;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -79,49 +76,20 @@ import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.knime.core.columnar.arrow.onheap.ArrowColumnDataFactory;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.onheap.data.ArrowReadData;
 import org.knime.core.columnar.arrow.onheap.data.ArrowWriteData;
 import org.knime.core.columnar.arrow.onheap.data.ValidityBuffer;
 import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.store.FileHandle;
 
 /**
- * A static class with utility methods for arrow tests.
+ * Arrow data implementations for tests.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class ArrowTestUtils {
+public final class OnHeapTestData {
 
-    private ArrowTestUtils() {
-        // Utility class
-    }
-
-    /**
-     * Create a temporary file which is deleted on exit.
-     *
-     * @return the file
-     * @throws IOException if the file could not be created
-     */
-    public static Path createTmpKNIMEArrowPath() throws IOException {
-        final Path path = Files.createTempFile("KNIME-" + UUID.randomUUID().toString(), ".knarrow");
-        path.toFile().deleteOnExit();
-        return path;
-    }
-
-    /**
-     * Create a FileSupplier that is backed by a temporary file which is deleted on exit.
-     *
-     * @return the fileSupplier
-     * @throws IOException if the file backing the FileSupplier could not be created
-     */
-    public static FileHandle createTmpKNIMEArrowFileSupplier() throws IOException {
-        return new TestFileSupplier(createTmpKNIMEArrowPath());
-    }
-
-    public static FileHandle createFileSupplier(final Path path) {
-        return new TestFileSupplier(path);
+    private OnHeapTestData() {
     }
 
     /**
@@ -485,7 +453,7 @@ public final class ArrowTestUtils {
     }
 
     /** A factory for creating, reading and writing {@link SimpleData}. */
-    public static final class SimpleDataFactory implements ArrowColumnDataFactory {
+    public static final class SimpleDataFactory implements OnHeapArrowColumnDataFactory {
 
         private final ArrowColumnDataFactoryVersion m_version;
 
@@ -690,7 +658,7 @@ public final class ArrowTestUtils {
     }
 
     /** A factory for creating, reading and writing {@link DictionaryEncodedData}. */
-    public static final class DictionaryEncodedDataFactory implements ArrowColumnDataFactory {
+    public static final class DictionaryEncodedDataFactory implements OnHeapArrowColumnDataFactory {
 
         private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
             return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);
@@ -1043,7 +1011,7 @@ public final class ArrowTestUtils {
         }
     }
 
-    public static final class ComplexDataFactory implements ArrowColumnDataFactory {
+    public static final class ComplexDataFactory implements OnHeapArrowColumnDataFactory {
 
         private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
             return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);

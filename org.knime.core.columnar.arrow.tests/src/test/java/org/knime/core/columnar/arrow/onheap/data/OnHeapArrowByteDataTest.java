@@ -44,23 +44,67 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.knime.core.columnar.arrow.onheap.AbstractOnHeapArrowDataTest;
+import org.knime.core.columnar.arrow.onheap.data.ArrowByteData.ArrowByteDataFactory;
+import org.knime.core.columnar.arrow.onheap.data.ArrowByteData.ArrowByteReadData;
+import org.knime.core.columnar.arrow.onheap.data.ArrowByteData.ArrowByteWriteData;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Test {@link ArrowByteData}
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public class OnHeapArrowByteDataTest extends AbstractOnHeapArrowDataTest<ArrowByteWriteData, ArrowByteReadData> {
 
-    /**
-     * @return a provider of offsets of the batches in the file
-     */
-    OffsetProvider getOffsetProvider();
+    /** Creates the test instance for {@link ArrowByteData}. */
+    public OnHeapArrowByteDataTest() {
+        super(ArrowByteDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowByteWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowByteWriteData, "Object is not an instance of ArrowByteWriteData");
+        return (ArrowByteWriteData)o;
+    }
+
+    @Override
+    protected ArrowByteReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowByteReadData, "Object is not an instance of ArrowByteReadData");
+        return (ArrowByteReadData)o;
+    }
+
+    @Override
+    protected void setValue(final ArrowByteWriteData data, final int index, final int seed) {
+        data.setByte(index, (byte)seed);
+    }
+
+    @Override
+    protected void checkValue(final ArrowByteReadData data, final int index, final int seed) {
+        assertEquals((byte)seed, data.getByte(index), "Byte value does not match expected value at index " + index);
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowByteWriteData data) {
+        // ArrowByteWriteData manages resources internally; no explicit release mechanism
+        return false;
+    }
+
+    @Override
+    protected boolean isReleasedR(final ArrowByteReadData data) {
+        // ArrowByteReadData manages resources internally; no explicit release mechanism
+        return false;
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return capacity // 1 byte per value for data
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
 }

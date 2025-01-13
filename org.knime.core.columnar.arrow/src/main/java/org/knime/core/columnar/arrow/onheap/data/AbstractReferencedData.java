@@ -44,23 +44,48 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Sep 25, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.knime.core.columnar.ReferencedData;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Abstract implementation of {@link ReferencedData} which counts the references in an {@link AtomicInteger} and calls
+ * the a {@link Runnable} if all references have been released.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+abstract class AbstractReferencedData implements ReferencedData {
+
+    private final AtomicInteger m_refCounter = new AtomicInteger(1);
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * @return the current amount of references
      */
-    OffsetProvider getOffsetProvider();
+    protected int getReferenceCount() {
+        return m_refCounter.get();
+    }
+
+    @Override
+    public void release() {
+        // NB: This is thread safe because this will only be 0 for 1 thread
+        if (m_refCounter.decrementAndGet() == 0) {
+            closeResources();
+        }
+    }
+
+    @Override
+    public void retain() {
+        if (m_refCounter.getAndUpdate(x -> x > 0 ? x + 1 : x) <= 0) {
+            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
+        }
+    }
+
+    /**
+     * Called when all references have been released. Close all resources.
+     */
+    protected abstract void closeResources();
 }

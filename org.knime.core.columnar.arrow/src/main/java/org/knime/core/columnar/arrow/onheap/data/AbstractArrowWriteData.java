@@ -44,23 +44,54 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Nov 4, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
-
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+package org.knime.core.columnar.arrow.onheap.data;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Abstract implementation of {@link ArrowWriteData}. Holds a the {@link #m_validity validity buffer} and the
+ * {@link #m_offset offset} of the data.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+@SuppressWarnings("javadoc")
+abstract class AbstractArrowWriteData extends AbstractReferencedData implements ArrowWriteData {
+
+    /** The validity buffer of this data object. */
+    protected final ValidityBuffer m_validity;
+
+    /** An offset describing where the values of this object start in the vector. */
+    protected final int m_offset;
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * Create an abstract {@link ArrowWriteData} with the given capacity and an offset of 0.
+     *
+     * @param capacity the capacity of the data
      */
-    OffsetProvider getOffsetProvider();
+    public AbstractArrowWriteData(final int capacity) {
+        m_validity = new ValidityBuffer(capacity);
+        m_offset = 0;
+    }
+
+    /**
+     * Create an abstract {@link ArrowWriteData} with the given offset and validity buffer.
+     *
+     * @param offset the offset
+     * @param validity the validity buffer
+     */
+    public AbstractArrowWriteData(final int offset, final ValidityBuffer validity) {
+        m_validity = validity;
+        m_offset = offset;
+    }
+
+    @Override
+    public void setMissing(final int index) {
+        m_validity.set(index, false);
+    }
+
+    protected void setValid(final int index) {
+        m_validity.set(index, true);
+    }
+
+    // TODO overwrite toString
 }

@@ -44,23 +44,66 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.knime.core.columnar.arrow.onheap.AbstractOnHeapArrowDataTest;
+import org.knime.core.columnar.arrow.onheap.data.ArrowFloatData.ArrowFloatDataFactory;
+import org.knime.core.columnar.arrow.onheap.data.ArrowFloatData.ArrowFloatReadData;
+import org.knime.core.columnar.arrow.onheap.data.ArrowFloatData.ArrowFloatWriteData;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Test {@link ArrowFloatData}.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public class OnHeapArrowFloatDataTest extends AbstractOnHeapArrowDataTest<ArrowFloatWriteData, ArrowFloatReadData> {
 
-    /**
-     * @return a provider of offsets of the batches in the file
-     */
-    OffsetProvider getOffsetProvider();
+    /** Create the test for {@link ArrowFloatData} */
+    public OnHeapArrowFloatDataTest() {
+        super(ArrowFloatDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowFloatWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowFloatWriteData, "Object is not an instance of ArrowFloatWriteData");
+        return (ArrowFloatWriteData)o;
+    }
+
+    @Override
+    protected ArrowFloatReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowFloatReadData, "Object is not an instance of ArrowFloatReadData");
+        return (ArrowFloatReadData)o;
+    }
+
+    @Override
+    protected void setValue(final ArrowFloatWriteData data, final int index, final int seed) {
+        data.setFloat(index, seed);
+    }
+
+    @Override
+    protected void checkValue(final ArrowFloatReadData data, final int index, final int seed) {
+        assertEquals(seed, data.getFloat(index), 0, "Float value does not match expected value at index " + index);
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowFloatWriteData data) {
+        return false;
+    }
+
+    @Override
+    protected boolean isReleasedR(final ArrowFloatReadData data) {
+        return false;
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return 4L * capacity // 4 bytes per value for data
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
 }

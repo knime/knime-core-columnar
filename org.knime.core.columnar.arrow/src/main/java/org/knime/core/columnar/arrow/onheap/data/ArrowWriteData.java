@@ -44,23 +44,36 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Oct 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Arrow implementation of {@link NullableWriteData}. Can be sliced with {@link #slice(int)}.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * The API of ArrowWriteData is NOT thread safe, especially expand and set should not be
+ * called at the same time from different threads!
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public interface ArrowWriteData extends NullableWriteData {
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * Slice the this object to the given start. Note that this only affects what data is returned when accessing the
+     * data with an index. This does not effect {@link #capacity()} and {@link #expand(int)}.
+     *
+     * @param start the first index of the slice
+     * @return the sliced data
      */
-    OffsetProvider getOffsetProvider();
+    ArrowWriteData slice(int start);
+
+    /**
+     * {@inheritDoc}
+     *
+     * Note: The returned {@link ArrowReadData} is not sliced.
+     */
+    @Override
+    ArrowReadData close(int length);
 }

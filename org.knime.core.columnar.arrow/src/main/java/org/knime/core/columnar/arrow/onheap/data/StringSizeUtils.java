@@ -44,23 +44,35 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Jan 7, 2025 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
-
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+package org.knime.core.columnar.arrow.onheap.data;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Utilities for calculating the size of a string in memory.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public final class StringSizeUtils {
+
+    private StringSizeUtils() {
+    }
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * Compute the memory size of the the given string.
+     *
+     * @param str the string to compute the memory size of
+     * @return the memory size of the given string
      */
-    OffsetProvider getOffsetProvider();
+    public static final long memorySize(final String str) {
+        /*
+         * Note that this is a pessimistic estimate. Java Strings are either using Latin-1 (one byte per character)
+         * or UTF-16 (two bytes per character) encoding. This calculation assumes UTF-16 encoding. (note that
+         * `length` returns the number of 16-bit code units, not the number characters if the string contains
+         * surrogate pairs)
+         */
+        // TODO consider constant object header and other field sizes?
+        // TODO use reflection to access the `coder` field for a correct size estimate?
+        return str.length() * 2L;
+    }
 }

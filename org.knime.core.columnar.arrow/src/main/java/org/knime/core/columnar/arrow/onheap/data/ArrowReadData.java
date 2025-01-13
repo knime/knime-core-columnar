@@ -44,23 +44,32 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Jan 13, 2025 (benjamin): created
+ *   Oct 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.onheap.data;
 
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.data.VoidData.VoidReadData;
 
 /**
- * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
- * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
+ * Arrow implementation of {@link NullableReadData}. Can be sliced with {@link #slice(int, int)}.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchStore extends BatchStore {
+public interface ArrowReadData extends NullableReadData {
 
     /**
-     * @return a provider of offsets of the batches in the file
+     * Slice the this object to the given start and length.
+     *
+     * @param start the first index of the slice
+     * @param length the length of the slice
+     * @return the sliced data
      */
-    OffsetProvider getOffsetProvider();
+    ArrowReadData slice(int start, int length);
+
+    /**
+     * @return the validity buffer used from this data or {@code null} if the data is {@link VoidReadData} and therefore
+     *         always missing.
+     */
+    ValidityBuffer getValidityBuffer();
 }
