@@ -42,24 +42,61 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 4, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap.data;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.complex.ListVector;
+import org.apache.arrow.vector.complex.StructVector;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * Utility class for calculating the size of vectors in memory.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+final class OffHeapArrowSizeUtils {
+
+    private OffHeapArrowSizeUtils() {
+        // Utility class
+    }
 
     /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
+     * @param vector with fixed width data (Having a data buffer and a validity buffer)
+     * @return size of the vector in memory
      */
-    boolean isUseLZ4BlockCompression();
+    @SuppressWarnings("resource")
+    static long sizeOfFixedWidth(final FieldVector vector) {
+        return vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity();
+    }
+
+    /**
+     * @param vector with variable width data (Having a data buffer, a validity buffer, and an offset buffer)
+     * @return size of the vector in memory
+     */
+    @SuppressWarnings("resource")
+    static long sizeOfVariableWidth(final FieldVector vector) {
+        return vector.getDataBuffer().capacity() + vector.getValidityBuffer().capacity()
+            + vector.getOffsetBuffer().capacity();
+    }
+
+    /**
+     * @param vector a list vector
+     * @return size of the vector in memory (not including children)
+     */
+    @SuppressWarnings("resource")
+    static long sizeOfList(final ListVector vector) {
+        return vector.getValidityBuffer().capacity() + vector.getOffsetBuffer().capacity();
+    }
+
+    /**
+     * @param vector a struct vector
+     * @return size of the vector in memory (not including children)
+     */
+    @SuppressWarnings("resource")
+    static long sizeOfStruct(final StructVector vector) {
+        return vector.getValidityBuffer().capacity();
+    }
 }

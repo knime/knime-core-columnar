@@ -42,24 +42,69 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap.data;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.knime.core.columnar.arrow.offheap.AbstractOffHeapArrowDataTest;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowDoubleData.ArrowDoubleDataFactory;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowDoubleData.ArrowDoubleReadData;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowDoubleData.ArrowDoubleWriteData;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * Test {@link OffHeapArrowDoubleData}
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+public class OffHeapArrowDoubleDataTest extends AbstractOffHeapArrowDataTest<ArrowDoubleWriteData, ArrowDoubleReadData> {
 
-    /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
-     */
-    boolean isUseLZ4BlockCompression();
+    /** Create the test for {@link OffHeapArrowDoubleData} */
+    public OffHeapArrowDoubleDataTest() {
+        super(ArrowDoubleDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowDoubleWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowDoubleWriteData);
+        return (ArrowDoubleWriteData)o;
+    }
+
+    @Override
+    protected ArrowDoubleReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowDoubleReadData);
+        return (ArrowDoubleReadData)o;
+    }
+
+    @Override
+    protected void setValue(final ArrowDoubleWriteData data, final int index, final int seed) {
+        data.setDouble(index, seed);
+    }
+
+    @Override
+    protected void checkValue(final ArrowDoubleReadData data, final int index, final int seed) {
+        assertEquals(seed, data.getDouble(index), 0);
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowDoubleWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
+    @SuppressWarnings("resource") // Resources handled by vector
+    protected boolean isReleasedR(final ArrowDoubleReadData data) {
+        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return 8 * capacity // 8 bytes per value for data
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
 }

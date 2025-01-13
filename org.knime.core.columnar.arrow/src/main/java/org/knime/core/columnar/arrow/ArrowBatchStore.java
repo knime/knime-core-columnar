@@ -45,76 +45,19 @@
  */
 package org.knime.core.columnar.arrow;
 
-import java.io.IOException;
-
-import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
-import org.knime.core.columnar.arrow.compress.ArrowCompression;
-import org.knime.core.columnar.batch.BatchWriter;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchStore;
-import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * A {@link BatchStore} implementation for Arrow.
+ * {@link BatchStore} implementation for Arrow files. Extends the {@link BatchStore} interface by adding the
+ * {@link OffsetProvider} to the interface for quick access to the batch offsets in the backing file.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class ArrowBatchStore extends AbstractArrowBatchReadable implements BatchStore {
-
-    private final ArrowColumnDataFactory[] m_factories;
-
-    private final ArrowBatchWriter m_writer;
-
-    ArrowBatchStore(final ColumnarSchema schema, final FileHandle fileSupplier, final ArrowCompression compression,
-        final BufferAllocator allocator) {
-        super(schema, fileSupplier, allocator);
-        m_factories = ArrowSchemaMapper.map(schema);
-        m_writer = new ArrowBatchWriter(fileSupplier, m_factories, compression, m_allocator);
-    }
-
-    @Override
-    public BatchWriter getWriter() {
-
-        return m_writer;
-    }
-
-    @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
-        return new ArrowBatchReader(getFileHandle().asFile(), m_allocator, m_factories, config);
-    }
-
-    @Override
-    public int numBatches() {
-        return m_writer.numBatches();
-    }
-
-    @Override
-    public long[] getBatchBoundaries() {
-        return m_writer.getBatchBoundaries();
-    }
-
-    @Override
-    public long numRows() {
-        return m_writer.numRows();
-    }
+public interface ArrowBatchStore extends BatchStore {
 
     /**
-     * @return an object that can provide the offsets of record batches and dictionary batches in an Arrow IPC file. If
-     *         new batches are written to the file after this method was called, the object will also provide offsets to
-     *         the newly written batches.
+     * @return a provider of offsets of the batches in the file
      */
-    public OffsetProvider getOffsetProvider() {
-        return m_writer.getOffsetProvider();
-    }
-
-    @Override
-    public void close() throws IOException {
-        m_writer.close();
-        super.close();
-    }
-
+    OffsetProvider getOffsetProvider();
 }

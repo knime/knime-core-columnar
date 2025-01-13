@@ -50,6 +50,7 @@ package org.knime.core.columnar.arrow;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -63,9 +64,9 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.compression.CompressionCodec;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.ipc.SeekableReadChannel;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.knime.core.columnar.arrow.AbstractArrowBatchReader.ArrowReader;
 import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
 
 /**
@@ -80,10 +81,10 @@ public final class ArrowReaderWriterUtils {
     }
 
     /** The Arrow magic number. These are the first and last bytes of each arrow file */
-    static final byte[] ARROW_MAGIC_BYTES = "ARROW1".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] ARROW_MAGIC_BYTES = "ARROW1".getBytes(StandardCharsets.UTF_8);
 
     /** The length of the Arrow magic number */
-    static final int ARROW_MAGIC_LENGTH = ARROW_MAGIC_BYTES.length;
+    public static final int ARROW_MAGIC_LENGTH = ARROW_MAGIC_BYTES.length;
 
     /**
      * Key for the metadata element holding the chunk size
@@ -91,20 +92,20 @@ public final class ArrowReaderWriterUtils {
      * @deprecated since 5.3
      * */
     @Deprecated
-    static final String ARROW_CHUNK_SIZE_KEY = "KNIME:basic:chunkSize";
+    public static final String ARROW_CHUNK_SIZE_KEY = "KNIME:basic:chunkSize";
 
     /**
      * Key for footer metadata containing the indices of batch lengths
      *
      * @since 5.3
      */
-    static final String ARROW_BATCH_BOUNDARIES_KEY = "KNIME:basic:batchBoundaries";
+    public static final String ARROW_BATCH_BOUNDARIES_KEY = "KNIME:basic:batchBoundaries";
 
     /** Key for the metadata element holding the factory versions */
-    static final String ARROW_FACTORY_VERSIONS_KEY = "KNIME:basic:factoryVersions";
+    public static final String ARROW_FACTORY_VERSIONS_KEY = "KNIME:basic:factoryVersions";
 
     /** Key for the metadata element holding the factory versions */
-    static final String ARROW_LZ4_BLOCK_FEATURE_KEY = "KNIME:basic:usingLz4Block";
+    public static final String ARROW_LZ4_BLOCK_FEATURE_KEY = "KNIME:basic:usingLz4Block";
 
     /**
      * Reads the Arrow {@link Schema} from an Arrow file.
@@ -114,13 +115,47 @@ public final class ArrowReaderWriterUtils {
      */
     public static Schema readSchema(final File file) {
         try (var in = new MappableReadChannel(file, "r")) {
-            ArrowReader.checkFileSize(in);
-            ArrowReader.checkArrowMagic(in, false);
+            checkFileSize(in);
+            checkArrowMagic(in, false);
             // Magic number (6 bytes) + empty padding to 8 byte boundary
             in.setPosition(8);
             return MessageSerializer.deserializeSchema(in);
         } catch (IOException ex) {
             throw new IllegalArgumentException(String.format("Failed to read the schema from '%s'.", file), ex);
+        }
+    }
+
+    /**
+     * Check if the Arrow file has a valid length. Throws an exception if not.
+     *
+     * @param in the channel on the file
+     * @throws IOException if the channel is too small
+     */
+    public static void checkFileSize(final SeekableReadChannel in) throws IOException {
+        if (in.size() <= ARROW_MAGIC_LENGTH * 2 + 4) {
+            throw new IOException("Arrow file invalid: File is too small: " + in.size());
+        }
+    }
+
+    /**
+     * Check if the Arrow has the arrow magic bytes at the beginning or the end. Throws an exception if not.
+     *
+     * @param in the channel on the file
+     * @param end if true, checks if the magic number is at the end of the channel. If false, checks if the magic number
+     *            is at the beginning of the channel
+     * @throws IOException if the magic number is not at the expected location
+     */
+    public static void checkArrowMagic(final SeekableReadChannel in, final boolean end) throws IOException {
+        final ByteBuffer buffer = ByteBuffer.allocate(ARROW_MAGIC_LENGTH);
+        if (end) {
+            in.setPosition(in.size() - buffer.remaining());
+        } else {
+            in.setPosition(0);
+        }
+        in.readFully(buffer);
+        buffer.flip();
+        if (!Arrays.equals(buffer.array(), ARROW_MAGIC_BYTES)) {
+            throw new IOException("Arrow file invalid: Magic number missing.");
         }
     }
 
