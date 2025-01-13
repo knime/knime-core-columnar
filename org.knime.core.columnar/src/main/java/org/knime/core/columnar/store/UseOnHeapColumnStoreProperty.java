@@ -44,73 +44,34 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Sep 8, 2020 (benjamin): created
+ *   Jan 13, 2025 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.UUID;
-
-import org.knime.core.columnar.store.FileHandle;
-import org.knime.core.columnar.store.UseOnHeapColumnStoreProperty;
+package org.knime.core.columnar.store;
 
 /**
- * A static class with utility methods for arrow tests.
+ * {@link #useOnHeapColumnStore} defines if the on-heap column store implementation should be used in the current
+ * runtime.
  *
- * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
-public final class ArrowTestUtils {
+public final class UseOnHeapColumnStoreProperty {
 
-    private ArrowTestUtils() {
-        // Utility class
-    }
+    private static boolean useOnHeapColumnStoreValue =
+        Boolean.getBoolean("org.knime.core.columnar.store.useOnHeapColumnStore");
 
     /**
-     * An enum that can be used to specify whether the on-heap or off-heap Arrow implementation should be used. Use as a
-     * parameter for tests.
+     * @return <code>true</code> if the on-heap implementation of the column store should be used in the current runtime
      */
-    public enum OffHeapOrOnHeap {
-            /** use on-heap Arrow implementation */
-            ON_HEAP,
-
-            /** use off-heap Arrow implementation */
-            OFF_HEAP;
-
-        /**
-         * Set the property to the specified value such that the specified implementation will be used by the
-         * {@link ArrowColumnStoreFactory}.
-         */
-        public void setProperty() {
-            UseOnHeapColumnStoreProperty.setUseOnHeapColumnStoreForTests(this == ON_HEAP);
-        }
+    public static boolean useOnHeapColumnStore() {
+        return useOnHeapColumnStoreValue;
     }
 
     /**
-     * Create a temporary file which is deleted on exit.
+     * Set the property to use the on-heap column store implementation for tests. Do not use this method in production.
      *
-     * @return the file
-     * @throws IOException if the file could not be created
+     * @param value <code>true</code> if the on-heap implementation of the column store should be used
      */
-    public static Path createTmpKNIMEArrowPath() throws IOException {
-        final Path path = Files.createTempFile("KNIME-" + UUID.randomUUID().toString(), ".knarrow");
-        path.toFile().deleteOnExit();
-        return path;
-    }
-
-    /**
-     * Create a FileSupplier that is backed by a temporary file which is deleted on exit.
-     *
-     * @return the fileSupplier
-     * @throws IOException if the file backing the FileSupplier could not be created
-     */
-    public static FileHandle createTmpKNIMEArrowFileSupplier() throws IOException {
-        return new TestFileSupplier(createTmpKNIMEArrowPath());
-    }
-
-    public static FileHandle createFileSupplier(final Path path) {
-        return new TestFileSupplier(path);
+    public static void setUseOnHeapColumnStoreForTests(final boolean value) {
+        useOnHeapColumnStoreValue = value;
     }
 }
