@@ -42,24 +42,66 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Jul 14, 2021 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import java.io.IOException;
+import java.nio.file.Path;
+
+import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.arrow.ArrowIpcFileStore;
+import org.knime.core.columnar.batch.BatchReadable;
+import org.knime.core.columnar.store.FileHandle;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * Abstract implementation of a {@link BatchReadable} for Arrow IPC files. Holds the {@link ColumnarSchema schema},
+ * {@link Path path} and {@link BufferAllocator allocator}. On #close() the allocator is closed but an
+ * {@link IOException} is thrown if there is still memory allocated by the allocator.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+abstract class AbstractOffHeapArrowBatchReadable implements BatchReadable, ArrowIpcFileStore {
+
+    protected final ColumnarSchema m_schema;
+
+    protected final FileHandle m_fileHandle;
+
+    protected final BufferAllocator m_allocator;
+
+    AbstractOffHeapArrowBatchReadable(final ColumnarSchema schema, final FileHandle file, final BufferAllocator allocator) {
+        m_schema = schema;
+        m_fileHandle = file;
+        m_allocator = allocator;
+    }
 
     /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
+     * @return the fileHandle
      */
-    boolean isUseLZ4BlockCompression();
+    @Override
+    public FileHandle getFileHandle() {
+        return m_fileHandle;
+    }
+
+    @Override
+    public ColumnarSchema getSchema() {
+        return m_schema;
+    }
+
+    protected BufferAllocator getAllocator() {
+        return m_allocator;
+    }
+
+    @Override
+    public void close() throws IOException {
+        final long allocated = m_allocator.getAllocatedMemory();
+        m_allocator.close();
+        if (allocated > 0) {
+            throw new IOException(
+                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
+        }
+    }
 }

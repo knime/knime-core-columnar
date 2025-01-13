@@ -48,10 +48,10 @@
  */
 package org.knime.core.columnar.arrow;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.knime.core.columnar.arrow.compress.ArrowCompressionUtil.ARROW_NO_COMPRESSION;
 
 import java.io.IOException;
@@ -64,24 +64,24 @@ import org.apache.arrow.memory.AllocationListener;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.OutOfMemoryException;
 import org.apache.arrow.memory.RootAllocator;
-import org.junit.After;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.knime.core.columnar.arrow.ArrowColumnStoreFactory.ArrowColumnStoreFactoryCreator;
-import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedData;
-import org.knime.core.columnar.arrow.ArrowTestUtils.DictionaryEncodedDataFactory;
+import org.knime.core.columnar.arrow.ArrowTestUtils.OffHeapOrOnHeap;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializerTestUtil;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.batch.SequentialBatchReadable;
 import org.knime.core.columnar.batch.SequentialBatchReader;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.data.DoubleData.DoubleReadData;
 import org.knime.core.columnar.data.DoubleData.DoubleWriteData;
 import org.knime.core.columnar.data.IntData.IntReadData;
 import org.knime.core.columnar.data.IntData.IntWriteData;
-import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
@@ -108,7 +108,7 @@ public class ArrowColumnStoreTest {
      *
      * @throws IOException
      */
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() throws IOException {
         writePath = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         readPath = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
@@ -119,7 +119,7 @@ public class ArrowColumnStoreTest {
      *
      * @throws IOException
      */
-    @After
+    @AfterEach
     public void after() throws IOException {
         writePath.delete();
         readPath.delete();
@@ -132,8 +132,10 @@ public class ArrowColumnStoreTest {
      *
      * @throws IOException
      */
-    @Test
-    public void testCreateWriterReader() throws IOException {
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
+    void testCreateWriterReader(final OffHeapOrOnHeap impl) throws IOException {
+        impl.setProperty();
         testCreateWriterReader(createStoreFactory(10000));
     }
 
@@ -141,8 +143,10 @@ public class ArrowColumnStoreTest {
      * Test the {@link ArrowColumnStoreFactory} with an allocator with a very small limit which is not enough for
      * allocating the data.
      */
-    @Test
-    public void testCreateWriterReaderMemoryLimit() {
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
+    void testCreateWriterReaderMemoryLimit(final OffHeapOrOnHeap impl) {
+        impl.setProperty();
         final var factory = createStoreFactory(10);
         assertThrows(OutOfMemoryException.class, () -> testCreateWriterReader(factory));
     }
@@ -154,9 +158,11 @@ public class ArrowColumnStoreTest {
      *
      * @throws IOException
      */
-    @Test
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
     @SuppressWarnings("resource")
-    public void testCreateWriterReaderChildAllocators() throws IOException {
+    void testCreateWriterReaderChildAllocators(final OffHeapOrOnHeap impl) throws IOException {
+        impl.setProperty();
         final List<BufferAllocator> childAllocators = new ArrayList<>();
         final AllocationListener allocationListener = new AllocationListener() {
 
@@ -180,14 +186,17 @@ public class ArrowColumnStoreTest {
      *
      * @throws IOException
      */
-    @Test
-    public void testRandomAccessReadAfterWrite() throws IOException {
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
+    void testRandomAccessReadAfterWrite(final OffHeapOrOnHeap impl) throws IOException {
+        impl.setProperty();
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
 
         // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator();
-                final BatchStore store = new ArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
+                final BatchStore store =
+                    (new ArrowColumnStoreFactory(allocator, ARROW_NO_COMPRESSION).createStore(schema, writePath))) {
             assertEquals(0, store.numBatches());
 
             @SuppressWarnings("resource")
@@ -258,20 +267,22 @@ public class ArrowColumnStoreTest {
     }
 
     /**
-     * Test that reading from an Arrow file before it is completely written using the
-     * RandomAccess reader will fail.
+     * Test that reading from an Arrow file before it is completely written using the RandomAccess reader will fail.
      *
      * @throws IOException
      */
     @SuppressWarnings("resource")
-    @Test(expected = IOException.class)
-    public void testRandomAccessReadBeforeCloseThrows() throws IOException {
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
+    void testRandomAccessReadBeforeCloseThrows(final OffHeapOrOnHeap impl) throws IOException {
+        impl.setProperty();
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
 
         // Use the write store to write some data
         try (final RootAllocator allocator = new RootAllocator();
-                final BatchStore store = new ArrowBatchStore(schema, writePath, ARROW_NO_COMPRESSION, allocator)) {
+                final BatchStore store =
+                    (new ArrowColumnStoreFactory(allocator, ARROW_NO_COMPRESSION)).createStore(schema, writePath)) {
             assertEquals(0, store.numBatches());
 
             final BatchWriter writer = store.getWriter();
@@ -291,87 +302,7 @@ public class ArrowColumnStoreTest {
 
             // This should throw because the writer is not closed
             var reader = store.createRandomAccessReader(); // NOSONAR
-            reader.readRetained(0);
-        }
-    }
-
-    /**
-     * Test reading from an Arrow file before it is completely written (including dictionaries).
-     *
-     * @throws IOException
-     */
-    @Test
-    public void testReadBeforeFullyWrittenDictionary() throws IOException {
-        // NOTE:
-        // There is no data that makes use of dictionaries except the test data.
-        // Therefore we cannot use the store.
-        final int chunkSize = 64;
-        final ArrowColumnDataFactory[] factories = new ArrowColumnDataFactory[]{new DictionaryEncodedDataFactory()};
-
-        // Use the write store to write some data
-        try (final RootAllocator allocator = new RootAllocator()) {
-
-            @SuppressWarnings("resource")
-            final ArrowBatchWriter writer = new ArrowBatchWriter(writePath, factories, ARROW_NO_COMPRESSION, allocator);
-            ReadBatch batch;
-
-            // Write batch 0
-            batch = fillBatchDict(writer.create(chunkSize), chunkSize, 0);
-            writer.write(batch);
-            batch.release();
-
-            // Write batch 1
-            batch = fillBatchDict(writer.create(chunkSize), chunkSize, 1);
-            writer.write(batch);
-            batch.release();
-
-            @SuppressWarnings("resource")
-            final SequentialBatchReader reader = new ArrowPartialFileBatchReader(writePath.asFile(), allocator,
-                factories, new DefaultColumnSelection(1), writer.getOffsetProvider());
-
-            // Read back batch 0
-            batch = reader.forward();
-            assertBatchDataDict(batch, chunkSize, 0);
-            batch.release();
-
-            // Read back batch 1
-            batch = reader.forward();
-            assertBatchDataDict(batch, chunkSize, 1);
-            batch.release();
-
-            // Write batch 2
-            batch = fillBatchDict(writer.create(chunkSize), chunkSize, 2);
-            writer.write(batch);
-            batch.release();
-
-            // Write batch 3
-            batch = fillBatchDict(writer.create(chunkSize), chunkSize, 3);
-            writer.write(batch);
-            batch.release();
-
-            // Ignore batch 2
-            reader.forward().release();
-
-            // Read back batch 3
-            batch = reader.forward();
-            assertBatchDataDict(batch, chunkSize, 3);
-            batch.release();
-
-            // Write batch 4
-            batch = fillBatchDict(writer.create(chunkSize), chunkSize, 4);
-            writer.write(batch);
-            batch.release();
-
-            // Close the writer
-            writer.close();
-
-            // Read back batch 4
-            batch = reader.forward();
-            assertBatchDataDict(batch, chunkSize, 4);
-            batch.release();
-
-            // Close the reader
-            reader.close();
+            assertThrows(IOException.class, () -> reader.readRetained(0));
         }
     }
 
@@ -380,8 +311,10 @@ public class ArrowColumnStoreTest {
      *
      * @throws IOException
      */
-    @Test
-    public void testPartialFileBatchReadable() throws IOException {
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
+    void testPartialFileBatchReadable(final OffHeapOrOnHeap impl) throws IOException {
+        impl.setProperty();
         final int chunkSize = 64;
         final ColumnarSchema schema = new DefaultColumnarSchema(DataSpec.intSpec(), DefaultDataTraits.EMPTY);
 
@@ -413,7 +346,7 @@ public class ArrowColumnStoreTest {
 
             // Create the partial readable
             @SuppressWarnings("resource")
-            final ArrowPartialFileBatchReadable readable =
+            final SequentialBatchReadable readable =
                 factory.createPartialFileReadable(writePath.asPath(), writeStore.getOffsetProvider());
             @SuppressWarnings("resource")
             final SequentialBatchReader reader = readable.createSequentialReader();
@@ -550,21 +483,6 @@ public class ArrowColumnStoreTest {
         for (int i = 0; i < chunkSize; i++) {
             assertEquals(random.nextInt(), data.getInt(i));
         }
-    }
-
-    /** Fill the given batch (consisting of one dict encoded column) with some random data */
-    private static ReadBatch fillBatchDict(final WriteBatch batch, final int chunkSize, final long seed) {
-        final DictionaryEncodedData data = (DictionaryEncodedData)batch.get(0);
-        ArrowTestUtils.fillData(data, chunkSize, seed);
-        return batch.close(chunkSize);
-    }
-
-    /**
-     * Assert that the batch contains data written by {@link #fillBatchDict(WriteBatch, int, long)} with the same seed.
-     */
-    private static void assertBatchDataDict(final ReadBatch batch, final int chunkSize, final long seed) {
-        final DictionaryEncodedData data = (DictionaryEncodedData)batch.get(0);
-        ArrowTestUtils.checkData(data, chunkSize, seed);
     }
 
     /** Create an {@link ArrowColumnStoreFactory} and set the memory limit */

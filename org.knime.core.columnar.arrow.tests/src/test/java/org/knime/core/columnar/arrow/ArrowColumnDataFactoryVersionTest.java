@@ -52,13 +52,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 import static org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion.version;
-import static org.knime.core.table.schema.DataSpecs.INT;
-import static org.knime.core.table.schema.DataSpecs.LOGICAL_TYPE;
 
 import org.junit.Test;
-import org.knime.core.columnar.arrow.ArrowSchemaMapper.ExtensionArrowColumnDataFactory;
-import org.knime.core.columnar.arrow.data.ArrowIntData.ArrowIntDataFactory;
-import org.knime.core.table.schema.ColumnarSchema;
 
 /**
  * Test the {@link ArrowColumnDataFactoryVersion}.
@@ -121,17 +116,5 @@ public class ArrowColumnDataFactoryVersionTest {
         final String textAfterChildrenEnd = "1[2;4]2";
         assertThrows(IllegalArgumentException.class, () -> ArrowColumnDataFactoryVersion.version(textAfterChildrenEnd));
 
-    }
-
-    /** Test ExtensionArrowColumnDataFactory wraps version of child factory **/
-    @Test
-    public void testExtensionArrowColumnDataFactoryVersion() {
-        final var factory = ArrowIntDataFactory.INSTANCE;
-        final var traits = ColumnarSchema.of(INT(LOGICAL_TYPE("foo"))).getTraits(0);
-        final var expectedFactory = new ExtensionArrowColumnDataFactory(factory, traits);
-        final var wrappedFactory = ArrowSchemaMapper.wrap(factory, traits);
-
-        assertEquals(expectedFactory.getVersion(), wrappedFactory.getVersion());
-        assertEquals(factory.getVersion(), wrappedFactory.getVersion().getChildVersion(0));
     }
 }

@@ -42,24 +42,49 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Apr 14, 2021 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import java.nio.file.Path;
+
+import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
+import org.knime.core.columnar.arrow.ArrowSchemaUtils;
+import org.knime.core.columnar.arrow.PathBackedFileHandle;
+import org.knime.core.columnar.batch.SequentialBatchReadable;
+import org.knime.core.columnar.batch.SequentialBatchReader;
+import org.knime.core.columnar.filter.ColumnSelection;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * A {@link SequentialBatchReadable} that can read from partially written Arrow IPC files.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+public class OffHeapArrowPartialFileBatchReadable extends AbstractOffHeapArrowBatchReadable
+    implements SequentialBatchReadable {
+
+    private final OffsetProvider m_offsetProvider;
 
     /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
+     * Creates a new {@link OffHeapArrowPartialFileBatchReadable}.
+     *
+     * @param path
+     * @param offsetProvider
+     * @param allocator
      */
-    boolean isUseLZ4BlockCompression();
+    public OffHeapArrowPartialFileBatchReadable(final Path path, final OffsetProvider offsetProvider,
+        final BufferAllocator allocator) {
+        super(ArrowSchemaUtils.readSchema(path), new PathBackedFileHandle(path), allocator);
+        m_offsetProvider = offsetProvider;
+    }
+
+    @Override
+    public SequentialBatchReader createSequentialReader(final ColumnSelection selection) {
+        final OffHeapArrowColumnDataFactory[] factories = OffHeapArrowSchemaMapper.map(m_schema);
+        return new OffHeapArrowPartialFileBatchReader(m_fileHandle.asFile(), m_allocator, factories, selection,
+            m_offsetProvider);
+    }
 }

@@ -42,24 +42,69 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap.data;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.knime.core.columnar.arrow.offheap.AbstractOffHeapArrowDataTest;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowFloatData.ArrowFloatDataFactory;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowFloatData.ArrowFloatReadData;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowFloatData.ArrowFloatWriteData;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * Test {@link OffHeapArrowFloatData}.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+public class OffHeapArrowFloatDataTest extends AbstractOffHeapArrowDataTest<ArrowFloatWriteData, ArrowFloatReadData> {
 
-    /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
-     */
-    boolean isUseLZ4BlockCompression();
+    /** Create the test for {@link OffHeapArrowFloatData} */
+    public OffHeapArrowFloatDataTest() {
+        super(ArrowFloatDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowFloatWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowFloatWriteData);
+        return (ArrowFloatWriteData)o;
+    }
+
+    @Override
+    protected ArrowFloatReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowFloatReadData);
+        return (ArrowFloatReadData)o;
+    }
+
+    @Override
+    protected void setValue(final ArrowFloatWriteData data, final int index, final int seed) {
+        data.setFloat(index, seed);
+    }
+
+    @Override
+    protected void checkValue(final ArrowFloatReadData data, final int index, final int seed) {
+        assertEquals(seed, data.getFloat(index), 0);
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowFloatWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
+    @SuppressWarnings("resource") // Resources handled by vector
+    protected boolean isReleasedR(final ArrowFloatReadData data) {
+        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return 4 * capacity // 4 bytes per value for data
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
 }

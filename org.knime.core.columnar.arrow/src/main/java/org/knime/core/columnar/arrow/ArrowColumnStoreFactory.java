@@ -58,7 +58,10 @@ import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
 import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.arrow.extensiontypes.ExtensionTypes;
-import org.knime.core.columnar.batch.RandomAccessBatchReadable;
+import org.knime.core.columnar.arrow.offheap.OffHeapArrowBatchReadStore;
+import org.knime.core.columnar.arrow.offheap.OffHeapArrowBatchStore;
+import org.knime.core.columnar.arrow.offheap.OffHeapArrowPartialFileBatchReadable;
+import org.knime.core.columnar.batch.SequentialBatchReadable;
 import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.columnar.store.ColumnStoreFactoryCreator;
@@ -79,7 +82,8 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArrowColumnStoreFactory.class);
 
-    private static final boolean DISABLE_HARD_MEMORY_LIMIT = Boolean.getBoolean("knime.columnar.disablehardmemorylimit");
+    private static final boolean DISABLE_HARD_MEMORY_LIMIT =
+        Boolean.getBoolean("knime.columnar.disablehardmemorylimit");
 
     private static final boolean DISABLE_MEMORY_ALERT = Boolean.getBoolean("knime.columnar.disablememoryalert");
 
@@ -144,17 +148,17 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
     public ArrowBatchStore createStore(final ColumnarSchema schema, final FileHandle fileSupplier) {
-        return new ArrowBatchStore(schema, fileSupplier, m_compression, newChildAllocator("ArrowColumnStore"));
+        return new OffHeapArrowBatchStore(schema, fileSupplier, m_compression, newChildAllocator("ArrowColumnStore"));
     }
 
     @Override
     @SuppressWarnings("resource") // Allocator closed by store
     public ArrowBatchReadStore createReadStore(final Path path) {
-        return new ArrowBatchReadStore(path, newChildAllocator("ArrowColumnReadStore"));
+        return new OffHeapArrowBatchReadStore(path, newChildAllocator("ArrowColumnReadStore"));
     }
 
     /**
-     * Create a new {@link RandomAccessBatchReadable}, reading data from the provided Arrow IPC file that has not been
+     * Create a new {@link SequentialBatchReadable}, reading data from the provided Arrow IPC file that has not been
      * written completely. The offsets to the record batches and dictionary batches in the file must be provided via a
      * {@link OffsetProvider}.
      *
@@ -164,9 +168,8 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
      * @return a newly created readable
      */
     @SuppressWarnings("resource") // Allocator closed by store
-    public ArrowPartialFileBatchReadable createPartialFileReadable(final Path path,
-        final OffsetProvider offsetProvider) {
-        return new ArrowPartialFileBatchReadable(path, offsetProvider,
+    public SequentialBatchReadable createPartialFileReadable(final Path path, final OffsetProvider offsetProvider) {
+        return new OffHeapArrowPartialFileBatchReadable(path, offsetProvider,
             newChildAllocator("ArrowPartialFileBatchReadStore"));
     }
 

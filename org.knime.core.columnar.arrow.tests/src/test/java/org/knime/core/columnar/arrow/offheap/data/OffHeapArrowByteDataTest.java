@@ -42,24 +42,68 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Sep 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap.data;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.knime.core.columnar.arrow.offheap.AbstractOffHeapArrowDataTest;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowByteData.ArrowByteDataFactory;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowByteData.ArrowByteReadData;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowByteData.ArrowByteWriteData;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * Test {@link OffHeapArrowByteData}
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+public class OffHeapArrowByteDataTest extends AbstractOffHeapArrowDataTest<ArrowByteWriteData, ArrowByteReadData> {
 
-    /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
-     */
-    boolean isUseLZ4BlockCompression();
+    /** Create the test for {@link OffHeapArrowByteData} */
+    public OffHeapArrowByteDataTest() {
+        super(ArrowByteDataFactory.INSTANCE);
+    }
+
+    @Override
+    protected ArrowByteWriteData castW(final Object o) {
+        assertTrue(o instanceof ArrowByteWriteData);
+        return (ArrowByteWriteData)o;
+    }
+
+    @Override
+    protected ArrowByteReadData castR(final Object o) {
+        assertTrue(o instanceof ArrowByteReadData);
+        return (ArrowByteReadData)o;
+    }
+
+    @Override
+    protected void setValue(final ArrowByteWriteData data, final int index, final int seed) {
+        data.setByte(index, (byte)seed);
+    }
+
+    @Override
+    protected void checkValue(final ArrowByteReadData data, final int index, final int seed) {
+        assertEquals((byte)seed, data.getByte(index), 0);
+    }
+
+    @Override
+    protected boolean isReleasedW(final ArrowByteWriteData data) {
+        return data.m_vector == null;
+    }
+
+    @Override
+    @SuppressWarnings("resource") // Resources handled by vector
+    protected boolean isReleasedR(final ArrowByteReadData data) {
+        return data.m_vector.getDataBuffer().capacity() == 0 && data.m_vector.getValidityBuffer().capacity() == 0;
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return capacity // 1 byte per value for data
+            + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
+    }
 }

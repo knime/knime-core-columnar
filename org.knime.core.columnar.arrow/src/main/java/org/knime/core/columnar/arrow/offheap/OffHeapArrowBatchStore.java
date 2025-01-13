@@ -42,50 +42,89 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   Sep 25, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow.data;
+package org.knime.core.columnar.arrow.offheap;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.io.IOException;
 
-import org.knime.core.columnar.ReferencedData;
+import org.apache.arrow.memory.BufferAllocator;
+import org.knime.core.columnar.arrow.ArrowBatchStore;
+import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
+import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.batch.BatchWriter;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.store.BatchStore;
+import org.knime.core.columnar.store.FileHandle;
+import org.knime.core.table.schema.ColumnarSchema;
 
 /**
- * Abstract implementation of {@link ReferencedData} which counts the references in an {@link AtomicInteger} and calls
- * the a {@link Runnable} if all references have been released.
+ * A {@link BatchStore} implementation for Arrow.
  *
+ * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public abstract class AbstractReferencedData implements ReferencedData {
+public final class OffHeapArrowBatchStore extends AbstractOffHeapArrowBatchReadable implements ArrowBatchStore {
 
-    private final AtomicInteger m_refCounter = new AtomicInteger(1);
+    private final OffHeapArrowColumnDataFactory[] m_factories;
+
+    private final OffHeapArrowBatchWriter m_writer;
 
     /**
-     * @return the current amount of references
+     * Creates a new {@link OffHeapArrowBatchStore}.
+     *
+     * @param schema
+     * @param fileSupplier
+     * @param compression
+     * @param allocator
      */
-    protected int getReferenceCount() {
-        return m_refCounter.get();
+    public OffHeapArrowBatchStore(final ColumnarSchema schema, final FileHandle fileSupplier,
+        final ArrowCompression compression, final BufferAllocator allocator) {
+        super(schema, fileSupplier, allocator);
+        m_factories = OffHeapArrowSchemaMapper.map(schema);
+        m_writer = new OffHeapArrowBatchWriter(fileSupplier, m_factories, compression, m_allocator);
     }
 
     @Override
-    public void release() {
-        // NB: This is thread safe because this will only be 0 for 1 thread
-        if (m_refCounter.decrementAndGet() == 0) {
-            closeResources();
-        }
+    public BatchWriter getWriter() {
+
+        return m_writer;
     }
 
     @Override
-    public void retain() {
-        if (m_refCounter.getAndUpdate(x -> x > 0 ? x + 1 : x) <= 0) {
-            throw new IllegalStateException("Reference count of data at or below 0. Data is no longer available.");
-        }
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection config) {
+        return new OffHeapArrowBatchReader(getFileHandle().asFile(), m_allocator, m_factories, config);
+    }
+
+    @Override
+    public int numBatches() {
+        return m_writer.numBatches();
+    }
+
+    @Override
+    public long[] getBatchBoundaries() {
+        return m_writer.getBatchBoundaries();
+    }
+
+    @Override
+    public long numRows() {
+        return m_writer.numRows();
     }
 
     /**
-     * Called when all references have been released. Close all resources.
+     * @return an object that can provide the offsets of record batches and dictionary batches in an Arrow IPC file. If
+     *         new batches are written to the file after this method was called, the object will also provide offsets to
+     *         the newly written batches.
      */
-    protected abstract void closeResources();
+    @Override
+    public OffsetProvider getOffsetProvider() {
+        return m_writer.getOffsetProvider();
+    }
+
+    @Override
+    public void close() throws IOException {
+        m_writer.close();
+        super.close();
+    }
+
 }

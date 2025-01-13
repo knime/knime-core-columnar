@@ -42,24 +42,27 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 30, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap.data;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * Arrow implementation of {@link NullableReadData}. Can be sliced with {@link #slice(int, int)}.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+public interface OffHeapArrowReadData extends NullableReadData {
 
     /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
+     * Slice the this object to the given start and length.
+     *
+     * @param start the first index of the slice
+     * @param length the length of the slice
+     * @return the sliced data
      */
-    boolean isUseLZ4BlockCompression();
+    OffHeapArrowReadData slice(int start, int length);
 }

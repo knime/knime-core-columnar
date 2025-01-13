@@ -42,24 +42,81 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
+ *
+ * History
+ *   Nov 4, 2020 (benjamin): created
  */
-package org.knime.core.columnar.arrow;
+package org.knime.core.columnar.arrow.offheap.data;
 
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
-import org.knime.core.columnar.store.BatchReadStore;
+import java.util.Objects;
+
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
+import org.knime.core.columnar.arrow.offheap.OffHeapArrowColumnDataFactory;
+import org.knime.core.columnar.data.NullableReadData;
 
 /**
- * {@link BatchReadStore} implementation for Arrow files. Extends the {@link BatchReadStore} interface by adding the
- * {@link ArrowBatchReadStore#isUseLZ4BlockCompression()} method to the interface for checking the compression type of
- * the backing file.
+ * Abstract implementation of {@link OffHeapArrowColumnDataFactory} for {@link OffHeapArrowReadData} which extend
+ * {@link AbstractOffHeapArrowReadData}. Holds the current version.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
+ * Overwrite {@link #getDictionaries(NullableReadData)} if the data object contains dictionaries.
+ *
+ * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
-public interface ArrowBatchReadStore extends BatchReadStore {
+@SuppressWarnings("javadoc")
+abstract class AbstractOffHeapArrowColumnDataFactory implements OffHeapArrowColumnDataFactory {
+
+    /** The current version */
+    protected final ArrowColumnDataFactoryVersion m_version;
 
     /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
+     * Create a new abstract {@link OffHeapArrowColumnDataFactory}.
+     *
+     * @param version the current version
      */
-    boolean isUseLZ4BlockCompression();
+    protected AbstractOffHeapArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
+        m_version = version;
+    }
+
+    @Override
+    public FieldVector getVector(final NullableReadData data) {
+        return ((AbstractOffHeapArrowReadData<?>)data).m_vector;
+    }
+
+    @Override
+    public DictionaryProvider getDictionaries(final NullableReadData data) {
+        return null;
+    }
+
+    @Override
+    public ArrowColumnDataFactoryVersion getVersion() {
+        return m_version;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_version);
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        AbstractOffHeapArrowColumnDataFactory other = (AbstractOffHeapArrowColumnDataFactory)obj;
+        return m_version.equals(other.m_version);
+    }
+
+    @Override
+    public String toString() {
+        return this.getClass().getSimpleName() + ".v" + m_version.getVersion();
+    }
+
 }
