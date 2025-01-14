@@ -51,9 +51,11 @@ package org.knime.core.columnar.workflow;
 import java.util.concurrent.TimeUnit;
 
 import org.knime.core.columnar.params.BatchingParam;
+import org.knime.core.columnar.params.OnHeapParam;
 import org.knime.core.columnar.params.ReadTableCachesParam;
 import org.knime.core.columnar.params.TableBackendParam;
 import org.knime.core.columnar.params.WriteTableCachesParam;
+import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.node.workflow.WorkflowManager;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -86,39 +88,79 @@ public class SimpleLinearWorkflowBenchmark {
 
     public enum Params {
             /** Row-based backend - other parameters have no effect */
-            ROW_BASED(TableBackendParam.BUFFERED_TABLE, null, null, null),
+            ROW_BASED(TableBackendParam.BUFFERED_TABLE, null, null, null, null),
 
-            /** Columnar backend with heap badger batching, read cache disabled, write cache disabled */
-            COLUMNAR__HEAP_BATCH__RC_OFF__WC_OFF(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
-                ReadTableCachesParam.DISABLED, WriteTableCachesParam.DISABLED),
+            /** Columnar backend with heap badger batching, read cache disabled, write cache disabled, off-heap */
+            COLUMNAR__HEAP_BATCH__RC_OFF__WC_OFF__OFF_HEAP(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
+                ReadTableCachesParam.DISABLED, WriteTableCachesParam.DISABLED, OnHeapParam.OFF_HEAP),
 
-            /** Columnar backend with heap badger batching, read cache disabled, write cache enabled */
-            COLUMNAR__HEAP_BATCH__RC_OFF__WC_ON(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
-                ReadTableCachesParam.DISABLED, WriteTableCachesParam.ENABLED),
+            /** Columnar backend with heap badger batching, read cache disabled, write cache enabled, off-heap */
+            COLUMNAR__HEAP_BATCH__RC_OFF__WC_ON__OFF_HEAP(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
+                ReadTableCachesParam.DISABLED, WriteTableCachesParam.ENABLED, OnHeapParam.OFF_HEAP),
 
-            /** Columnar backend with heap badger batching, read cache enabled, write cache disabled */
-            COLUMNAR__HEAP_BATCH__RC_ON__WC_OFF(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
-                ReadTableCachesParam.ENABLED, WriteTableCachesParam.DISABLED),
+            /** Columnar backend with heap badger batching, read cache enabled, write cache disabled, off-heap */
+            COLUMNAR__HEAP_BATCH__RC_ON__WC_OFF__OFF_HEAP(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
+                ReadTableCachesParam.ENABLED, WriteTableCachesParam.DISABLED, OnHeapParam.OFF_HEAP),
 
-            /** Columnar backend with heap badger batching, read cache enabled, write cache enabled */
-            COLUMNAR__HEAP_BATCH__RC_ON__WC_ON(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
-                ReadTableCachesParam.ENABLED, WriteTableCachesParam.ENABLED),
+            /** Columnar backend with heap badger batching, read cache enabled, write cache enabled, off-heap */
+            COLUMNAR__HEAP_BATCH__RC_ON__WC_ON__OFF_HEAP(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
+                ReadTableCachesParam.ENABLED, WriteTableCachesParam.ENABLED, OnHeapParam.OFF_HEAP),
 
-            /** Columnar backend with legacy batching, read cache disabled, write cache disabled */
-            COLUMNAR__LEGACY_BATCH__RC_OFF__WC_OFF(TableBackendParam.COLUMNAR_TABLE, BatchingParam.LEGACY_BATCHING,
-                ReadTableCachesParam.DISABLED, WriteTableCachesParam.DISABLED),
+            /** Columnar backend with legacy batching, read cache disabled, write cache disabled, off-heap */
+            COLUMNAR__LEGACY_BATCH__RC_OFF__WC_OFF__OFF_HEAP(TableBackendParam.COLUMNAR_TABLE,
+                BatchingParam.LEGACY_BATCHING, ReadTableCachesParam.DISABLED, WriteTableCachesParam.DISABLED,
+                OnHeapParam.OFF_HEAP),
 
-            /** Columnar backend with legacy batching, read cache disabled, write cache enabled */
-            COLUMNAR__LEGACY_BATCH__RC_OFF__WC_ON(TableBackendParam.COLUMNAR_TABLE, BatchingParam.LEGACY_BATCHING,
-                ReadTableCachesParam.DISABLED, WriteTableCachesParam.ENABLED),
+            /** Columnar backend with legacy batching, read cache disabled, write cache enabled, off-heap */
+            COLUMNAR__LEGACY_BATCH__RC_OFF__WC_ON__OFF_HEAP(TableBackendParam.COLUMNAR_TABLE,
+                BatchingParam.LEGACY_BATCHING, ReadTableCachesParam.DISABLED, WriteTableCachesParam.ENABLED,
+                OnHeapParam.OFF_HEAP),
 
-            /** Columnar backend with legacy batching, read cache enabled, write cache disabled */
-            COLUMNAR__LEGACY_BATCH__RC_ON__WC_OFF(TableBackendParam.COLUMNAR_TABLE, BatchingParam.LEGACY_BATCHING,
-                ReadTableCachesParam.ENABLED, WriteTableCachesParam.DISABLED),
+            /** Columnar backend with legacy batching, read cache enabled, write cache disabled, off-heap */
+            COLUMNAR__LEGACY_BATCH__RC_ON__WC_OFF__OFF_HEAP(TableBackendParam.COLUMNAR_TABLE,
+                BatchingParam.LEGACY_BATCHING, ReadTableCachesParam.ENABLED, WriteTableCachesParam.DISABLED,
+                OnHeapParam.OFF_HEAP),
 
-            /** Columnar backend with legacy batching, read cache enabled, write cache enabled */
-            COLUMNAR__LEGACY_BATCH__RC_ON__WC_ON(TableBackendParam.COLUMNAR_TABLE, BatchingParam.LEGACY_BATCHING,
-                ReadTableCachesParam.ENABLED, WriteTableCachesParam.ENABLED),
+            /** Columnar backend with legacy batching, read cache enabled, write cache enabled, off-heap */
+            COLUMNAR__LEGACY_BATCH__RC_ON__WC_ON__OFF_HEAP(TableBackendParam.COLUMNAR_TABLE,
+                BatchingParam.LEGACY_BATCHING, ReadTableCachesParam.ENABLED, WriteTableCachesParam.ENABLED,
+                OnHeapParam.OFF_HEAP),
+
+            /** Columnar backend with heap badger batching, read cache disabled, write cache disabled, on-heap */
+            COLUMNAR__HEAP_BATCH__RC_OFF__WC_OFF__ON_HEAP(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
+                ReadTableCachesParam.DISABLED, WriteTableCachesParam.DISABLED, OnHeapParam.ON_HEAP),
+
+            /** Columnar backend with heap badger batching, read cache disabled, write cache enabled, on-heap */
+            COLUMNAR__HEAP_BATCH__RC_OFF__WC_ON__ON_HEAP(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
+                ReadTableCachesParam.DISABLED, WriteTableCachesParam.ENABLED, OnHeapParam.ON_HEAP),
+
+            /** Columnar backend with heap badger batching, read cache enabled, write cache disabled, on-heap */
+            COLUMNAR__HEAP_BATCH__RC_ON__WC_OFF__ON_HEAP(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
+                ReadTableCachesParam.ENABLED, WriteTableCachesParam.DISABLED, OnHeapParam.ON_HEAP),
+
+            /** Columnar backend with heap badger batching, read cache enabled, write cache enabled, on-heap */
+            COLUMNAR__HEAP_BATCH__RC_ON__WC_ON__ON_HEAP(TableBackendParam.COLUMNAR_TABLE, BatchingParam.HEAP_BADGER,
+                ReadTableCachesParam.ENABLED, WriteTableCachesParam.ENABLED, OnHeapParam.ON_HEAP),
+
+            /** Columnar backend with legacy batching, read cache disabled, write cache disabled, on-heap */
+            COLUMNAR__LEGACY_BATCH__RC_OFF__WC_OFF__ON_HEAP(TableBackendParam.COLUMNAR_TABLE,
+                BatchingParam.LEGACY_BATCHING, ReadTableCachesParam.DISABLED, WriteTableCachesParam.DISABLED,
+                OnHeapParam.ON_HEAP),
+
+            /** Columnar backend with legacy batching, read cache disabled, write cache enabled, on-heap */
+            COLUMNAR__LEGACY_BATCH__RC_OFF__WC_ON__ON_HEAP(TableBackendParam.COLUMNAR_TABLE,
+                BatchingParam.LEGACY_BATCHING, ReadTableCachesParam.DISABLED, WriteTableCachesParam.ENABLED,
+                OnHeapParam.ON_HEAP),
+
+            /** Columnar backend with legacy batching, read cache enabled, write cache disabled, on-heap */
+            COLUMNAR__LEGACY_BATCH__RC_ON__WC_OFF__ON_HEAP(TableBackendParam.COLUMNAR_TABLE,
+                BatchingParam.LEGACY_BATCHING, ReadTableCachesParam.ENABLED, WriteTableCachesParam.DISABLED,
+                OnHeapParam.ON_HEAP),
+
+            /** Columnar backend with legacy batching, read cache enabled, write cache enabled, on-heap */
+            COLUMNAR__LEGACY_BATCH__RC_ON__WC_ON__ON_HEAP(TableBackendParam.COLUMNAR_TABLE,
+                BatchingParam.LEGACY_BATCHING, ReadTableCachesParam.ENABLED, WriteTableCachesParam.ENABLED,
+                OnHeapParam.ON_HEAP),
 
         ;
 
@@ -130,12 +172,15 @@ public class SimpleLinearWorkflowBenchmark {
 
         private final WriteTableCachesParam m_writeCache;
 
+        private final OnHeapParam m_onHeap;
+
         Params(final TableBackendParam backend, final BatchingParam batching, final ReadTableCachesParam readCache,
-            final WriteTableCachesParam writeCache) {
+            final WriteTableCachesParam writeCache, final OnHeapParam onHeap) {
             m_backend = backend;
             m_batching = batching;
             m_readCache = readCache;
             m_writeCache = writeCache;
+            m_onHeap = onHeap;
         }
 
         public void apply(final WorkflowManager wfm) {
@@ -148,6 +193,9 @@ public class SimpleLinearWorkflowBenchmark {
             }
             if (m_writeCache != null) {
                 m_writeCache.apply();
+            }
+            if (m_onHeap != null) {
+                m_onHeap.apply();
             }
         }
     }
@@ -174,6 +222,7 @@ public class SimpleLinearWorkflowBenchmark {
     @TearDown(Level.Iteration)
     public void tearDown() throws Exception {
         m_workflow.tearDown();
+        ColumnarPreferenceUtils.resetCachesForTests();
     }
 
     @Setup(Level.Invocation)
