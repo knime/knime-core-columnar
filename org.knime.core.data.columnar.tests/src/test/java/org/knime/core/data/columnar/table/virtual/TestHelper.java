@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.stream.Stream;
 
+import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
@@ -170,9 +171,9 @@ public class TestHelper {
 
         private final ValueFactory<?, ?>[] m_valueFactories;
 
-        private final DataSpec[] m_dataSpecs;
-
         private final DataTableSpec m_sourceSpec;
+
+        private final DataSpec[] m_dataSpecs;
 
         private final DataTraits[] m_dataTraits;
 
@@ -202,6 +203,11 @@ public class TestHelper {
         @Override
         public DataTableSpec getSourceSpec() {
             return m_sourceSpec;
+        }
+
+        @Override
+        public DataColumnSpec getDataColumnSpec(final int index) {
+            return index == 0 ? null : m_sourceSpec.getColumnSpec(index - 1);
         }
 
         @Override
