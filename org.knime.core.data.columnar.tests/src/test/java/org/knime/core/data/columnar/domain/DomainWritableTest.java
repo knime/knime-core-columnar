@@ -79,8 +79,8 @@ import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.data.v2.schema.ValueSchemaUtils;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -94,7 +94,7 @@ public class DomainWritableTest extends ColumnarTest {
     static {
         final DataTableSpec spec = createSpec();
         final ValueSchema valueSchema =
-            ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
+            DataTableValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         SCHEMA = valueSchema;
     }
 

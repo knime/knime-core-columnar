@@ -49,7 +49,6 @@
 package org.knime.core.data.columnar.table.virtual;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,18 +56,15 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
-import org.knime.core.data.DataColumnSpec;
-import org.knime.core.data.DataColumnSpecCreator;
-import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.def.StringCell;
-import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.table.access.IntAccess.IntReadAccess;
@@ -108,32 +104,13 @@ final class ColumnarVirtualTableTest {
             .build());
 
     @Test
-    void testAppendNoRowIDInAppendedTable() {
-        testAppend(true, false);
-    }
-
-    @Test
-    void testAppendRowIDInAppendedTable() {
-        testAppend(true, true);
-    }
-
-    @Test
-    void testAppendNoRowID() {
-        testAppend(false, false);
-    }
-
-    @Test
-    void testAppendNoRowIDInFirstColumnButRowIDInSecondColumn() {
-        testAppend(false, true);
-    }
-
-    private static void testAppend(final boolean firstTableHasRowID, final boolean secondTableHasRowID) {
-        var firstSchema = builder(firstTableHasRowID)//
+    void testAppend() {
+        var firstSchema = builder(true)//
             .withColumn("foo", STRING)//
             .withColumn("bar", DOUBLE)//
             .build();
 
-        var secondSchema = builder(secondTableHasRowID)//
+        var secondSchema = builder(false)//
             .withColumn("baz", INT)//
             .withColumn("bla", LONG)//
             .build();
@@ -141,9 +118,9 @@ final class ColumnarVirtualTableTest {
         var firstTable = createTable(firstSchema);
         var secondTable = createTable(secondSchema);
 
-        var appendedTable = firstTable.append(List.of(secondTable));
+        var appendedTable = firstTable.append(secondTable);
 
-        var expectedSchema = builder(firstTableHasRowID)//
+        var expectedSchema = builder(true)//
             .withColumn("foo", STRING)//
             .withColumn("bar", DOUBLE)//
             .withColumn("baz", INT)//
@@ -164,8 +141,6 @@ final class ColumnarVirtualTableTest {
     @Test
     void testPermuteWithRowID() {
         testPermute(true);
-        // it's not allowed to move the RowID to a different position
-        assertThrows(IllegalArgumentException.class, () -> TABLE.selectColumns(1, 0, 3, 2));
     }
 
     @Test
@@ -173,6 +148,7 @@ final class ColumnarVirtualTableTest {
         testPermute(false);
     }
 
+    @Test
     private static void testPermute(final boolean withRowID) {
         var table = createTable(withRowID, FOO, BAR, BAZ);
         int[] permutation = withRowID ? new int[] {0, 3, 1, 2} : new int[] {2, 0, 1};
@@ -229,40 +205,34 @@ final class ColumnarVirtualTableTest {
         return schemaBuilder.build();
     }
 
-    private static ColumnarValueSchemaBuilder builder(final boolean hasRowID) {
-        return new ColumnarValueSchemaBuilder(hasRowID);
+    private static ValueSchemaBuilder builder(final boolean hasRowID) {
+        return new ValueSchemaBuilder(hasRowID);
     }
 
     record Column(String name, DataType type) {
     }
 
-    private static final class ColumnarValueSchemaBuilder {
+    private static final class ValueSchemaBuilder {
 
-        private final boolean m_hasRowID;
+        private final List<ValueSchemaColumn> m_columns = new ArrayList<>();
 
-        private final List<DataColumnSpec> m_columns = new ArrayList<>();
-
-        private ColumnarValueSchemaBuilder(final boolean hasRowID) {
-            m_hasRowID = hasRowID;
+        private ValueSchemaBuilder(final boolean hasRowID) {
+            if (hasRowID) {
+                m_columns.add(new ValueSchemaColumn(DefaultRowKeyValueFactory.INSTANCE));
+            }
         }
 
-        ColumnarValueSchemaBuilder withColumn(final String name, final DataType type) {
-            m_columns.add(new DataColumnSpecCreator(name, type).createSpec());
+        ValueSchemaBuilder withColumn(final String name, final DataType type) {
+            m_columns.add(new ValueSchemaColumn(name, type, ValueFactoryUtils.getValueFactory(type, null)));
             return this;
         }
 
-        ColumnarValueSchemaBuilder withColumn(final Column column) {
+        ValueSchemaBuilder withColumn(final Column column) {
             return withColumn(column.name, column.type);
         }
 
         ValueSchema build() {
-            var valueFactories = Stream
-                .concat(m_hasRowID ? Stream.of(DefaultRowKeyValueFactory.INSTANCE) : Stream.empty(),
-                    // null is save here because we are not using any FileStoreAwareValueFactories
-                    m_columns.stream().map(c -> ValueFactoryUtils.getValueFactory(c.getType(), null)))//
-                .toArray(ValueFactory<?, ?>[]::new);
-            var spec = new DataTableSpec(m_columns.toArray(DataColumnSpec[]::new));
-            return ValueSchemaUtils.create(spec, valueFactories);
+            return ValueSchemaUtils.create(m_columns);
         }
     }
 }

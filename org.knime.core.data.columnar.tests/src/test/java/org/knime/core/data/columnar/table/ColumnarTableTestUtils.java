@@ -66,8 +66,8 @@ import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler
 import org.knime.core.data.v2.RowBuffer;
 import org.knime.core.data.v2.RowKeyType;
 import org.knime.core.data.v2.RowWrite;
-import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.data.v2.schema.ValueSchemaUtils;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.value.ValueInterfaces.IntWriteValue;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.table.schema.ColumnarSchema;
@@ -92,16 +92,16 @@ final class ColumnarTableTestUtils {
         }
     }
 
-    static ValueSchema createSchema(final int nCols) {
+    static DataTableValueSchema createSchema(final int nCols) {
         return createSchema(nCols, IntCell.TYPE);
     }
 
-    static ValueSchema createSchema(final int nCols, final DataType type) {
+    static DataTableValueSchema createSchema(final int nCols, final DataType type) {
         final DataTableSpec spec = new DataTableSpec(
             IntStream.range(0, nCols).mapToObj(i -> new DataColumnSpecCreator(Integer.toString(i), type).createSpec())
                 .toArray(DataColumnSpec[]::new));
-        final ValueSchema valueSchema =
-            ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
+        final DataTableValueSchema valueSchema =
+            DataTableValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         return valueSchema;
     }
 
