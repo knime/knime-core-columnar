@@ -48,9 +48,12 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
+import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.ReadAccessRowRead;
 import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.cursor.Cursor;
@@ -89,9 +92,17 @@ public final class VirtualTableUtils {
      * @return a {@link RowAccessible} that is backed by the provided table
      */
     public static RowAccessible createRowAccessible(final ValueSchema schema, final BufferedDataTable table) {
-        CheckUtils.checkArgument(schema.getSourceSpec().equals(table.getDataTableSpec()),
+        CheckUtils.checkArgument(getDataTableSpec(schema).equals(table.getDataTableSpec()),
             "The schema must match the table.");
         return new BufferedDataTableRowAccessible(table, schema);
+    }
+
+    private static DataTableSpec getDataTableSpec(final ValueSchema schema) {
+        if (schema instanceof DataTableValueSchema s) {
+            return s.getSourceSpec();
+        } else {
+            return ValueSchemaUtils.createDataTableSpec(schema);
+        }
     }
 
     private VirtualTableUtils() {

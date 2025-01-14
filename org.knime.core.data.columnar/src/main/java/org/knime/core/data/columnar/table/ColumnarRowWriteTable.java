@@ -209,7 +209,7 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
                     domains.put(i, m_nullableDomainWritable.getDomain(i));
                     metadata.put(i, m_nullableDomainWritable.getMetadata(i));
                 }
-                schema = ValueSchemaUtils.updateDataTableSpec(m_schema, domains, metadata);
+                schema = ValueSchemaUtils.updateDataColumnSpecs(m_schema, domains, metadata);
             } else {
                 schema = m_schema;
             }

@@ -54,6 +54,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.IntSupplier;
+import java.util.stream.IntStream;
 
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
@@ -66,8 +67,9 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.Node;
@@ -97,7 +99,7 @@ public final class ColumnarSpecReplacer {
 
     /**
      * Replaces the spec of the input table. For each column the output type must be related to the input type, i.e. the
-     * output type must be a supertype of the input type or vise-versa.
+     * output type must be a supertype of the input type or vice-versa.
      *
      * @param table to replace the spec of
      * @param outputSpec the new spec
@@ -112,20 +114,18 @@ public final class ColumnarSpecReplacer {
             "Table specs have different lengths: %s vs. %s", inputSpec.getNumColumns(), outputSpec.getNumColumns());
         var referenceTable = ReferenceTables.createReferenceTable(table);
 
-        var outputSchema = ValueSchemaUtils.create(outputSpec, RowKeyType.CUSTOM, m_fsHandler);
 
         var inputSchema = referenceTable.getSchema();
+        var outputSchema = DataTableValueSchemaUtils.create(outputSpec, RowKeyType.CUSTOM, m_fsHandler);
         var casts = determineCasts(inputSchema, outputSchema);
-        var sourceFragment = new ColumnarVirtualTable(referenceTable.getId(), inputSchema, true);
-        ColumnarVirtualTable outputTable;
-        if (casts.isEmpty()) {
-            outputTable = sourceFragment.replaceSchema(outputSchema);
-        } else {
-            outputTable = cast(sourceFragment, casts, m_fsHandler);
-        }
 
-        return new VirtualTableExtensionTable(new ReferenceTable[]{referenceTable}, outputTable, table.size(),
-            m_tableIDSupplier.getAsInt());
+        var sourceFragment = new ColumnarVirtualTable(referenceTable.getId(), inputSchema, true); // TODO (TP): why not just referenceTable.getVirtualTable() ???
+        var outputTable = casts.isEmpty() ? sourceFragment : cast(sourceFragment, casts, m_fsHandler);
+
+        return new VirtualTableExtensionTable(new ReferenceTable[]{referenceTable},
+            outputTable.updateSchema(outputSpec),
+            outputSpec,
+            table.size(), m_tableIDSupplier.getAsInt());
     }
 
     /**
@@ -136,51 +136,24 @@ public final class ColumnarSpecReplacer {
      */
     static ColumnarVirtualTable cast(final ColumnarVirtualTable table, final List<ColumnCast> casts,
         final IWriteFileStoreHandler fsHandler) {
-        var inputSchema = table.getSchema();
-        var indexFilters = createIndexFilters(casts, inputSchema.numColumns());
-        var castedColumns =
-            table.map(new TableCasterFactory(casts.stream().map(ColumnCast::createCasterFactory).toList(),
-                fsHandler.getDataRepository()), indexFilters.castedColumns());
-        return table.selectColumns(indexFilters.unCastedColumns())//
-            .append(List.of(castedColumns))//
-            .selectColumns(indexFilters.mergePermutation());
+
+        final int numColumns = table.getSchema().numColumns();
+        final int[] selection = IntStream.range(0, numColumns).toArray();
+        final int[] castedColumns = casts.stream().mapToInt(ColumnCast::columnIndex).toArray();
+        for (int i = 0; i < castedColumns.length; i++) {
+            selection[castedColumns[i]] = numColumns + i;
+        }
+
+        final var columnCasterFactories = casts.stream().map(ColumnCast::createCasterFactory).toList();
+        final var mapperFactory = new TableCasterFactory(columnCasterFactories, fsHandler.getDataRepository());
+        return table.appendMap(mapperFactory, castedColumns).selectColumns(selection);
     }
 
-    record ColumnCast(int columnIndex, DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
-        UntypedValueFactory outputValueFactory, CastOperation castOperation) {
+    record ColumnCast(int columnIndex, DataColumnSpec outputSpec, ValueFactory<?, ?> inputValueFactory,
+        ValueFactory<?, ?> outputValueFactory, CastOperation castOperation) {
         ColumnCasterFactory createCasterFactory() {
             return new ColumnCasterFactory(outputSpec, inputValueFactory, outputValueFactory, castOperation);
         }
-    }
-
-    private static IndexFilters createIndexFilters(final List<ColumnCast> mappings, final int numColumns) {
-        var castedColumns = new int[mappings.size()];
-        var numCasted = numColumns - mappings.size();
-        var unCastedColumns = new int[numCasted];
-        var mergePermutation = new int[numColumns];
-        int castedIndex = 0;
-        int unCastedIndex = 0;
-        var castedIterator = mappings.iterator();
-        int currentCastedIndex = -1;
-        for (int i = 0; i < numColumns; i++) {
-            if (currentCastedIndex < i && castedIterator.hasNext()) {
-                currentCastedIndex = castedIterator.next().columnIndex();
-            }
-            if (currentCastedIndex == i) {
-                castedColumns[castedIndex] = i;
-                mergePermutation[i] = numCasted + castedIndex;
-                castedIndex++;
-            } else {
-                unCastedColumns[unCastedIndex] = i;
-                mergePermutation[i] = unCastedIndex;
-                unCastedIndex++;
-            }
-        }
-        return new IndexFilters(castedColumns, unCastedColumns, mergePermutation);
-
-    }
-
-    record IndexFilters(int[] castedColumns, int[] unCastedColumns, int[] mergePermutation) {
     }
 
     private static List<ColumnCast> determineCasts(final ValueSchema inputSchema,
@@ -189,16 +162,15 @@ public final class ColumnarSpecReplacer {
         CheckUtils.checkArgument(areEqual(inputSchema.getValueFactory(0), outputSchema.getValueFactory(0)),
             "The RowID ValueFactories must match.");
         for (int i = 1; i < inputSchema.numColumns(); i++) {
-            var columnIndex = i - 1; // because of the RowID
-            var inputColumn = inputSchema.getSourceSpec().getColumnSpec(columnIndex);
+            var inputColumn = inputSchema.getDataColumnSpec(i);
             var inputType = inputColumn.getType();
-            var outputColumn = outputSchema.getSourceSpec().getColumnSpec(columnIndex);
+            var outputColumn = outputSchema.getDataColumnSpec(i);
             var outputType = outputColumn.getType();
             var inputValueFactory = inputSchema.getValueFactory(i);
             var outputValueFactory = outputSchema.getValueFactory(i);
             final int finalI = i;
-            determineCastType(inputType, outputType).ifPresent(c -> casts.add(new ColumnCast(finalI, outputColumn,
-                new UntypedValueFactory(inputValueFactory), new UntypedValueFactory(outputValueFactory), c)));
+            determineCastType(inputType, outputType).ifPresent(
+                c -> casts.add(new ColumnCast(finalI, outputColumn, inputValueFactory, outputValueFactory, c)));
         }
         return casts;
     }
