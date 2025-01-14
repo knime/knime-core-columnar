@@ -52,6 +52,7 @@ import static java.util.stream.Collectors.toUnmodifiableMap;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -66,6 +67,7 @@ import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperFactory;
@@ -76,6 +78,7 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
@@ -440,14 +443,14 @@ public final class TableTransformNodeSettingsPersistor {
             APPEND_MISSING(//
                 AppendMissingValuesTransformSpec.class, //
                 (s, c) -> {
-                    return new AppendMissingValuesTransformSpec(loadColumnarValueSchema(s, c.getDataRepository()));
+                    return new AppendMissingValuesTransformSpec(loadMissingColumnsSchema(s, c.getDataRepository()));
                 }, (t, s) -> {
                     var schema = t.getAppendedSchema();
                     if (schema instanceof ValueSchema valueSchema) {
                         saveMissingColumnsSchema(valueSchema, s);
                     } else {
                         throw new UnsupportedOperationException(
-                            "Append missing transforms can only be persisted if they use a ColumnarValueSchema");
+                            "Append missing transforms can only be persisted if they use a ValueSchema");
                     }
                 });
 
@@ -488,11 +491,16 @@ public final class TableTransformNodeSettingsPersistor {
     private static void saveMissingColumnsSchema(final ValueSchema schema, final NodeSettingsWO settings) {
         CheckUtils.checkArgument(!ValueSchemaUtils.hasRowID(schema),
             "A schema used for appending missing values must not have a RowID column because RowIDs can't be missing.");
-        saveColumnarValueSchema(schema, settings);
-    }
 
-    private static void saveColumnarValueSchema(final ValueSchema schema, final NodeSettingsWO settings) {
-        schema.getSourceSpec().save(settings.addNodeSettings("data_table_spec"));
+        // NB: This is a "fake" DataTableSpec corresponding to the data columns
+        //     in schema. We cannot use the standard methods for creating the
+        //     DataTableSpec because schema does not have a RowID column, and
+        //     therefore has no corresponding DataTableSpec.
+        var spec = new DataTableSpec(Arrays.stream(schema.getColumns()) //
+            .map(ValueSchemaColumn::dataColumnSpec) //
+            .toArray(DataColumnSpec[]::new));
+        spec.save(settings.addNodeSettings("data_table_spec"));
+
         var valueFactorySettings = settings.addNodeSettings("value_factories");
         for (int i = 0; i < schema.numColumns(); i++) {
             ValueFactoryUtils.saveValueFactory(schema.getValueFactory(i),
@@ -500,17 +508,21 @@ public final class TableTransformNodeSettingsPersistor {
         }
     }
 
-    private static ValueSchema loadColumnarValueSchema(final NodeSettingsRO settings,
+    private static ValueSchema loadMissingColumnsSchema(final NodeSettingsRO settings,
         final IDataRepository dataRepository) throws InvalidSettingsException {
-        var tableSpec = DataTableSpec.load(settings.getNodeSettings("data_table_spec"));
-        // the schema contains no RowID
-        var valueFactories = new ValueFactory<?, ?>[tableSpec.getNumColumns()];
-        var valueFactorySettings = settings.getNodeSettings("value_factories");
-        for (int i = 0; i < valueFactories.length; i++) {//NOSONAR
-            valueFactories[i] = ValueFactoryUtils
+
+        // NB: This is a "fake" DataTableSpec corresponding to the data columns
+        //     in schema. The schema contains no RowID.
+        final var tableSpec = DataTableSpec.load(settings.getNodeSettings("data_table_spec"));
+        final var columns = new ValueSchemaColumn[tableSpec.getNumColumns()];
+        final var valueFactorySettings = settings.getNodeSettings("value_factories");
+        for (int i = 0; i < columns.length; i++) {//NOSONAR
+            final DataColumnSpec columnSpec = tableSpec.getColumnSpec(i);
+            final ValueFactory<?, ?> valueFactory = ValueFactoryUtils
                 .loadValueFactory(valueFactorySettings.getNodeSettings(Integer.toString(i)), dataRepository);
+            columns[i] = new ValueSchemaColumn(columnSpec, valueFactory);
         }
-        return ValueSchemaUtils.create(tableSpec, valueFactories);
+        return ValueSchemaUtils.create(columns);
     }
 
 }

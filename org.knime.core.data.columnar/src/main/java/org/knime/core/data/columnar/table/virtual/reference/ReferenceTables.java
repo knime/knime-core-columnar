@@ -94,11 +94,9 @@ public final class ReferenceTables {
     public static ReferenceTable createReferenceTable(final UUID id, final BufferedDataTable table)
         throws VirtualTableIncompatibleException {
         final var extensionTable = extractExtensionTable(table);
-        if (extensionTable instanceof VirtualTableExtensionTable) {
-            final VirtualTableExtensionTable virtualExtensionTable = (VirtualTableExtensionTable)extensionTable;
-            return new VirtualReferenceTable(table, id, virtualExtensionTable);
-        } else if (extensionTable instanceof AbstractColumnarContainerTable) {
-            final AbstractColumnarContainerTable columnarTable = (AbstractColumnarContainerTable)extensionTable;
+        if (extensionTable instanceof VirtualTableExtensionTable virtualTable) {
+            return new VirtualReferenceTable(table, id, virtualTable);
+        } else if (extensionTable instanceof AbstractColumnarContainerTable columnarTable) {
             return new ColumnarContainerReferenceTable(table, id, columnarTable, false);
         } else {
             // we end up here if the reference tables are not extension tables (e.g. RearrangeColumnsTable)

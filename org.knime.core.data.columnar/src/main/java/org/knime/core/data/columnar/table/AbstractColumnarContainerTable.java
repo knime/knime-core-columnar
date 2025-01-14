@@ -64,8 +64,8 @@ import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelea
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.data.v2.schema.ValueSchemaUtils;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -114,6 +114,8 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
     private final long m_tableId;
 
+    private final DataTableValueSchema m_schema;
+
     private final ColumnarRowReadTable m_columnarTable;
 
     private final RandomRowAccessible m_rowAccessibleView = new ColumnarContainerRowAccessible();
@@ -143,12 +145,14 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         }
 
         final BatchReadStore readStore = factory.createReadStore(tempDataPath);
-        var schema = ValueSchemaUtils.load(readStore.getSchema(), context);
-        m_columnarTable = new ColumnarRowReadTable(schema, factory, readStore, size);
+        m_schema = DataTableValueSchemaUtils.load(readStore.getSchema(), context);
+        m_columnarTable = new ColumnarRowReadTable(m_schema, factory, readStore, size);
     }
 
-    AbstractColumnarContainerTable(final int tableId, final ColumnarRowReadTable columnarTable) {
+    AbstractColumnarContainerTable(final int tableId, final DataTableValueSchema schema,
+        final ColumnarRowReadTable columnarTable) {
         m_tableId = tableId;
+        m_schema = schema;
         m_columnarTable = columnarTable;
     }
 
@@ -162,7 +166,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         throws IOException, CanceledExecutionException {
         settings.addLong(CFG_TABLE_SIZE, m_columnarTable.size());
         settings.addString(CFG_FACTORY_TYPE, m_columnarTable.getStoreFactory().getClass().getName());
-        ValueSchemaUtils.save(m_columnarTable.getSchema(), settings);
+        DataTableValueSchemaUtils.save(m_schema, settings);
         @SuppressWarnings("resource") // Store's life cycle is handled by super class.
         final var store = getStore();
         hardLinkOrCopy(store.getFileHandle().asPath(), f.toPath());
@@ -170,12 +174,12 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
     @Override
     public DataTableSpec getDataTableSpec() {
-        return m_columnarTable.getSchema().getSourceSpec();
+        return m_schema.getSourceSpec();
     }
 
     @Override
-    public ValueSchema getSchema() {
-        return m_columnarTable.getSchema();
+    public DataTableValueSchema getSchema() {
+        return m_schema;
     }
 
     @Override
@@ -281,7 +285,7 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
         @Override
         public ColumnarSchema getSchema() {
-            return m_columnarTable.getSchema();
+            return m_schema;
         }
 
         @Override
