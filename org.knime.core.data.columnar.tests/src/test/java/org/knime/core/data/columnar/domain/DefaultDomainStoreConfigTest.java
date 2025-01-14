@@ -75,8 +75,8 @@ import org.knime.core.data.def.LongCell;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
-import org.knime.core.data.v2.schema.ValueSchemaUtils;
 
 /**
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
@@ -117,7 +117,7 @@ public class DefaultDomainStoreConfigTest {
     private static ValueSchema createSchema(final DataColumnSpec... specs) {
         final DataTableSpec spec = new DataTableSpec(specs);
         final ValueSchema valueSchema =
-            ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
+            DataTableValueSchemaUtils.create(spec, RowKeyType.CUSTOM, NotInWorkflowWriteFileStoreHandler.create());
         return valueSchema;
     }
 

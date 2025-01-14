@@ -51,8 +51,13 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.v2.RowContainer;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExtensionTable;
@@ -67,24 +72,28 @@ import org.knime.core.table.row.WriteAccessRow;
 final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
 
     @SuppressWarnings("resource") // Columnar table will be closed along with row container.
-    static ColumnarRowContainer create(final ExecutionContext context, final int id, final ValueSchema schema,
+    static ColumnarRowContainer create(final ExecutionContext context, final int id, final DataTableValueSchema schema,
         final ColumnStoreFactory storeFactory, final ColumnarRowWriteTableSettings settings) throws IOException {
         // TODO: turn this into a constructor?
-        return new ColumnarRowContainer(context, id, new ColumnarRowWriteTable(schema, storeFactory, settings));
+        return new ColumnarRowContainer(context, id, schema, new ColumnarRowWriteTable(schema, storeFactory, settings));
     }
 
     private final ExecutionContext m_context;
 
     private final int m_id;
 
+    private final DataTableValueSchema m_schema;
+
     private final ColumnarRowWriteTable m_columnarTable;
 
     private ExtensionTable m_finishedTable;
 
     private ColumnarRowContainer(final ExecutionContext context, final int id,
+        final DataTableValueSchema schema,
         final ColumnarRowWriteTable columnarTable) {
         m_context = context;
         m_id = id;
+        m_schema = schema;
         m_columnarTable = columnarTable;
     }
 
@@ -121,8 +130,16 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
         if (m_finishedTable == null) {
             @SuppressWarnings("resource") // Will be closed along with the container table.
             final ColumnarRowReadTable finishedColumnarTable = m_columnarTable.finish();
-            m_finishedTable =
-                UnsavedColumnarContainerTable.create(m_id, finishedColumnarTable, m_columnarTable.getStoreFlusher());
+            final ValueSchema schema = finishedColumnarTable.getSchema();
+
+            // update m_schema with the DataColumnSpecs of the finishedColumnarTable (which have updated domains etc.)
+            final DataTableSpec updatedSpec = new DataTableSpecCreator(m_schema.getSourceSpec()).dropAllColumns()
+                .addColumns(ValueSchemaUtils.dataColumnSpecs(schema)).createSpec();
+            final DataTableValueSchema updatedSchema =
+                DataTableValueSchemaUtils.create(updatedSpec, schema.getColumns());
+
+            m_finishedTable = UnsavedColumnarContainerTable.create(m_id, updatedSchema, finishedColumnarTable,
+                m_columnarTable.getStoreFlusher());
         }
         return m_finishedTable;
     }

@@ -49,11 +49,11 @@
 package org.knime.core.data.columnar.table;
 
 import java.io.IOException;
-import java.util.Optional;
 
 import org.knime.core.columnar.cursor.ColumnarCursorFactory;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.columnar.filter.TableFilterUtils;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
 import org.knime.core.data.columnar.table.DefaultColumnarBatchReadStore.ColumnarBatchReadStoreBuilder;
 import org.knime.core.data.container.filter.TableFilter;
@@ -180,6 +180,11 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
     /**
      * @return A newly constructed cursor that allows to read this table's data.
      */
+    // TODO (TP): This method probably shouldn't be here but in AbstractColumnarContainerTable!
+    //            (which is the only place it's called).
+    //            I guess it is here because of the Cursor tracking?
+    //            Maybe that is even unnecessary because we could (and do) track the underlying RandomAccessCursor<ReadAccessRow>?
+    //            Either that, or the m_rowCursorTracker should move to AbstractColumnarContainerTable as well.
     public RowCursor createRowCursor() {
         return m_rowCursorTracker.createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size));
     }
@@ -189,21 +194,40 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
      *            cursor.
      * @return A newly constructed cursor that allows to read this table's data.
      */
+    // TODO (TP): This method probably shouldn't be here but in AbstractColumnarContainerTable!
+    //            (which is the only place it's called).
+    //            I guess it is here because of the Cursor tracking?
+    //            Maybe that is even unnecessary because we could (and do) track the underlying RandomAccessCursor<ReadAccessRow>?
+    //            Either that, or the m_rowCursorTracker should move to AbstractColumnarContainerTable as well.
     public RowCursor createRowCursor(final TableFilter filter) {
         if (filter != null) {
-            filter.validate(m_schema.getSourceSpec(), m_size);
-            //  For some reason, the "from" index is not validated by the method above. So we do it ourselves.
-            final Optional<Long> fromRowIndexOpt = filter.getFromRowIndex();
-            if (fromRowIndexOpt.isPresent()) {
-                final long fromRowIndex = fromRowIndexOpt.get();
-                if (fromRowIndex >= m_size) {
-                    throw new IndexOutOfBoundsException(
-                        String.format("From row index %d too large for table of size %d.", fromRowIndex, m_size));
-                }
-            }
+            selection_validate(TableFilterUtils.toSelection(filter, m_size), m_schema.numColumns(), m_size);
         }
         return m_rowCursorTracker
             .createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size, filter));
+    }
+
+    /**
+     * Validates a {@code Selection} against table extents.
+     *
+     * @param selection the selection to validate
+     * @param numCols number of columns of the table that is to be filtered
+     * @param numRows number of rows of the table that is to be filtered
+     * @throws IndexOutOfBoundsException when any index is out of bounds
+     */
+    private static void selection_validate(final Selection selection, final int numCols, final long numRows) {
+        if (!selection.columns().allSelected()) {
+            final int[] cols = selection.columns().getSelected();
+            if (cols.length > 0 && cols[cols.length - 1] >= numCols) {
+                throw new IndexOutOfBoundsException(
+                    "Selecting column at index " + cols[cols.length - 1] + " in a table with " + numCols + " columns");
+            }
+        }
+
+        if (!selection.rows().allSelected() && selection.rows().toIndex() > numRows) {
+            throw new IndexOutOfBoundsException(
+                "Selecting to row index " + selection.rows().toIndex() + " in a table with " + numRows + " rows");
+        }
     }
 
     @Override

@@ -53,7 +53,7 @@ import java.io.Flushable;
 import java.io.IOException;
 
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeSettingsWO;
@@ -72,14 +72,16 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      * Creates an {@link UnsavedColumnarContainerTable} wrapping the given table.
      *
      * @param tableId The table id.
+     * @param schema The schema of this table.
      * @param columnarTable The underlying table.
-     * @param storeFlusher The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to disk
-     *            in case the created table is permanently saved to disk. Must not be {@code null} but can be a no-op.
+     * @param storeFlusher The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to
+     *            disk in case the created table is permanently saved to disk. Must not be {@code null} but can be a
+     *            no-op.
      * @return The newly created table.
      */
-    public static UnsavedColumnarContainerTable create(final int tableId, final ColumnarRowReadTable columnarTable,
-        final Flushable storeFlusher) {
-        final var table = new UnsavedColumnarContainerTable(tableId, columnarTable, storeFlusher);
+    public static UnsavedColumnarContainerTable create(final int tableId, final DataTableValueSchema schema,
+        final ColumnarRowReadTable columnarTable, final Flushable storeFlusher) {
+        final var table = new UnsavedColumnarContainerTable(tableId, schema, columnarTable, storeFlusher);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
         table.initStoreCloser();
@@ -100,9 +102,9 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      */
     @SuppressWarnings("resource") // Columnar table will be closed along with the container table.
     public static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
-        final ValueSchema schema, final ColumnarBatchReadStore store, final Flushable storeFlusher,
+        final DataTableValueSchema schema, final ColumnarBatchReadStore store, final Flushable storeFlusher,
         final long size) {
-        final var table = new UnsavedColumnarContainerTable(tableId,
+        final var table = new UnsavedColumnarContainerTable(tableId, schema,
             new ColumnarRowReadTable(schema, factory, store, size), storeFlusher);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
@@ -110,9 +112,9 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
         return table;
     }
 
-    private UnsavedColumnarContainerTable(final int tableId, final ColumnarRowReadTable columnarTable,
-        final Flushable storeFlusher) {
-        super(tableId, columnarTable);
+    private UnsavedColumnarContainerTable(final int tableId, final DataTableValueSchema schema,
+        final ColumnarRowReadTable columnarTable, final Flushable storeFlusher) {
+        super(tableId, schema, columnarTable);
         m_storeFlusher = storeFlusher;
     }
 

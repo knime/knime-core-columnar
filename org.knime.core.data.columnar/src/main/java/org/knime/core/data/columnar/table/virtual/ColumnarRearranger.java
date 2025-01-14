@@ -93,6 +93,7 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
@@ -177,19 +178,10 @@ public final class ColumnarRearranger {
         var rearrangedTable = rearrange(newColumns, existingColumns, tableToRearrange);
 
         // the RearrangeColumnsTable removes the table name and table properties, so we do the same
-        rearrangedTable = dropOldSpecNameAndProperties(rearrangedTable);
+        DataTableSpec rearrangedTableSpec = ValueSchemaUtils.createDataTableSpec(rearrangedTable.getSchema());
 
-        return new VirtualTableExtensionTable(refTables.toArray(ReferenceTable[]::new), rearrangedTable, table.size(),
-            m_tableIdSupplier.getAsInt());
-
-    }
-
-    private static ColumnarVirtualTable dropOldSpecNameAndProperties(final ColumnarVirtualTable rearrangedTable) {
-        var rearrangedSchema = rearrangedTable.getSchema();
-        var rearrangedSpec = rearrangedSchema.getSourceSpec();
-        var columns = rearrangedSpec.stream().toArray(DataColumnSpec[]::new);
-        return rearrangedTable
-            .replaceSchema(ValueSchemaUtils.updateDataTableSpec(rearrangedSchema, new DataTableSpec(columns)));
+        return new VirtualTableExtensionTable(refTables.toArray(ReferenceTable[]::new), rearrangedTable,
+            rearrangedTableSpec, table.size(), m_tableIdSupplier.getAsInt());
     }
 
     private static ColumnarVirtualTable rearrange(final List<RearrangedColumn> newColumns,
@@ -234,7 +226,7 @@ public final class ColumnarRearranger {
     private ReferenceTable createAppendTable(final ReferenceTable inputTable, final List<RearrangedColumn> newColumns,
         final ExecutionMonitor monitor, final long size)
         throws VirtualTableIncompatibleException, CanceledExecutionException {
-        var table = inputTable.getVirtualTable().renameToRandomColumnNames();
+        var table = inputTable.getVirtualTable();
 
         // the column indices we will select for materializing after replacing/appending new columns.
         final int[] selection = new int[newColumns.size() + 1];
@@ -267,19 +259,11 @@ public final class ColumnarRearranger {
         if (!columnsToCreate.isEmpty()) {
             table = createColumns(columnsToCreate, table, selection, nextSelectionIndex);
             // N.B. createColumns fills selection[] starting from nextSelectionIndex (to the end),
-            // but nextSelectionIndex cannot not modified. That is, nextSelectionIndex is incorrect
-            // afterwards, however It is not used any further below.
+            // but nextSelectionIndex cannot be updated inside createColumns. That is,
+            // nextSelectionIndex is incorrect afterwards. However it is not used any further below.
             // To prevent potential future coding errors, we set it to the updated value anyway...
             nextSelectionIndex = selection.length;
         }
-
-        // --------------------------------------------------------------------
-        // rename converted columns to the original names from inputTable
-        final DataTableSpec inputSpec = inputTable.getSchema().getSourceSpec();
-        final int[] columnsToRename = Arrays.copyOfRange(selection, 1, columnsToConvert.size() + 1);
-        final String[] names = new String[columnsToConvert.size()];
-        Arrays.setAll(names, i -> inputSpec.getColumnSpec(selection[i + 1] - 1).getName());
-        table = table.renameColumns(columnsToRename, names);
 
         // --------------------------------------------------------------------
         // materialize
@@ -368,12 +352,10 @@ public final class ColumnarRearranger {
      */
     private ColumnarVirtualTable appendMap(final ColumnarVirtualTable table, final CellFactory cellFactory,
         final int[] inputIndices, final ValueFactory<?, ?>[] inputValueFactories) {
-        var outputSpecs = cellFactory.getColumnSpecs();
-        var valueFactories = Stream.of(outputSpecs)//
-            .map(DataColumnSpec::getType)//
-            .map(this::getValueFactory)//
-            .toArray(ValueFactory[]::new);
-        var cellFactoryMap = new CellFactoryMap(inputValueFactories, valueFactories, cellFactory);
+        var outputColumns = Stream.of(cellFactory.getColumnSpecs())//
+            .map(spec -> new ValueSchemaColumn(spec, getValueFactory(spec.getType())))
+            .toArray(ValueSchemaColumn[]::new);
+        var cellFactoryMap = new CellFactoryMap(inputValueFactories, outputColumns, cellFactory);
         return table.appendMap(cellFactoryMap, inputIndices);
     }
 
@@ -392,11 +374,10 @@ public final class ColumnarRearranger {
     private ColumnarVirtualTable replaceConvert(final ColumnarVirtualTable table, final DataCellTypeConverter converter,
         final int colIndexIncludingRowID) {
         final ValueSchema schema = table.getSchema();
-        final DataTableSpec sourceSpec = schema.getSourceSpec();
         final DataType outputType = converter.getOutputType();
         final ValueFactory<?, ?> inputValueFactory = schema.getValueFactory(colIndexIncludingRowID);
         final ValueFactory<?, ?> outputValueFactory = ValueFactoryUtils.getValueFactory(outputType, m_fsHandler);
-        final var colSpecCreator = new DataColumnSpecCreator(sourceSpec.getColumnSpec(colIndexIncludingRowID - 1));
+        final var colSpecCreator = new DataColumnSpecCreator(schema.getDataColumnSpec(colIndexIncludingRowID));
         colSpecCreator.setType(outputType);
         final DataColumnSpec outputColSpec = colSpecCreator.createSpec();
         final var converterFactory =
@@ -464,7 +445,7 @@ public final class ColumnarRearranger {
             final ValueFactory<?, ?> outputValueFactory, final DataColumnSpec convertedSpec) {
             m_inputValueFactory = inputValueFactory;
             m_outputValueFactory = outputValueFactory;
-            m_outputSchema = ValueSchemaUtils.create(new DataTableSpec(convertedSpec), m_outputValueFactory);
+            m_outputSchema = ValueSchemaUtils.create(new ValueSchemaColumn(convertedSpec, m_outputValueFactory));
             m_converter = converter;
         }
 
@@ -494,14 +475,13 @@ public final class ColumnarRearranger {
 
         private final ValueSchema m_schema;
 
-        CellFactoryMap(final ValueFactory<?, ?>[] inputValueFactories, final ValueFactory<?, ?>[] outputValueFactories,
+        CellFactoryMap(final ValueFactory<?, ?>[] inputValueFactories, final ValueSchemaColumn[] outputColumns,
             final CellFactory cellFactory) {
             m_readValueFactories = inputValueFactories;
-            m_writeValueFactories = outputValueFactories;
+            m_writeValueFactories =
+                Stream.of(outputColumns).map(ValueSchemaColumn::valueFactory).toArray(ValueFactory[]::new);
             m_cellFactory = cellFactory;
-            m_schema = ValueSchemaUtils.create(//
-                new DataTableSpec(cellFactory.getColumnSpecs()), //
-                outputValueFactories);
+            m_schema = ValueSchemaUtils.create(outputColumns);
         }
 
         @Override

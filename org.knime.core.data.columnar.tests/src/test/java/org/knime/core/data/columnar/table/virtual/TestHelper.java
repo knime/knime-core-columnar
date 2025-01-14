@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.stream.Stream;
 
+import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
@@ -63,6 +64,7 @@ import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.value.BooleanValueFactory;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
@@ -166,15 +168,17 @@ public class TestHelper {
         when(m_readAccessRow.getAccess(3)).thenReturn(m_doubleReadAccess);
     }
 
-    private static class TestColumnarValueSchema implements ValueSchema {
+    private static class TestColumnarValueSchema implements DataTableValueSchema {
 
         private final ValueFactory<?, ?>[] m_valueFactories;
 
-        private final DataSpec[] m_dataSpecs;
-
         private final DataTableSpec m_sourceSpec;
 
+        private final DataSpec[] m_dataSpecs;
+
         private final DataTraits[] m_dataTraits;
+
+        private final DataColumnSpec[] m_columnSpecs;
 
         TestColumnarValueSchema(final ValueFactory<?, ?>[] valueFactories, final DataSpec[] dataSpecs,
             final DataTraits[] dataTraits, final DataTableSpec sourceSpec) {
@@ -182,6 +186,8 @@ public class TestHelper {
             m_dataSpecs = dataSpecs;
             m_sourceSpec = sourceSpec;
             m_dataTraits = dataTraits;
+            m_columnSpecs = new DataColumnSpec[valueFactories.length];
+            Arrays.setAll(m_columnSpecs, i -> i == 0 ? null : sourceSpec.getColumnSpec(i - 1));
         }
 
         @Override
@@ -205,6 +211,11 @@ public class TestHelper {
         }
 
         @Override
+        public DataColumnSpec getDataColumnSpec(final int index) {
+            return index == 0 ? null : m_sourceSpec.getColumnSpec(index - 1);
+        }
+
+        @Override
         public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
             return (ValueFactory<R, W>)m_valueFactories[index];
         }
@@ -220,10 +231,9 @@ public class TestHelper {
         }
 
         @Override
-        public int numFactories() {
-            return m_valueFactories.length;
+        public ValueSchemaColumn getColumn(final int index) {
+            return new ValueSchemaColumn(m_columnSpecs[index], m_valueFactories[index], m_dataTraits[index]);
         }
-
     }
 
 }

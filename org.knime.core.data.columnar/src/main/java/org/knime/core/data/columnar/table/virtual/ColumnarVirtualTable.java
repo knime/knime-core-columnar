@@ -53,6 +53,7 @@ import static org.knime.core.table.virtual.spec.SelectColumnsTransformSpec.indic
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -61,15 +62,17 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
+import org.knime.core.data.DataColumnSpecCreator.MergeOptions;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.DataTableSpecCreator;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
-import org.knime.core.data.container.ConcatenateTable;
+import org.knime.core.data.DataType;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
+import org.knime.core.data.v2.value.LongValueFactory;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.access.LongAccess;
 import org.knime.core.table.access.ReadAccess;
@@ -86,6 +89,7 @@ import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory.Mapper;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverFactory;
 import org.knime.core.table.virtual.spec.ObserverTransformUtils;
@@ -103,8 +107,7 @@ import org.knime.core.table.virtual.spec.TableTransformSpec;
 import com.google.common.collect.Collections2;
 
 /**
- * Equivalent to {@link VirtualTable} with the difference that {@link #getSchema()} returns a
- * {@link ColumnarValueSchema}.
+ * Equivalent to {@link VirtualTable} with the difference that {@link #getSchema()} returns a {@link ValueSchema}.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
@@ -174,63 +177,8 @@ public final class ColumnarVirtualTable {
      */
     public ColumnarVirtualTable selectColumns(final int... columnIndices) {
         final TableTransformSpec transformSpec = new SelectColumnsTransformSpec(columnIndices);
-        final ValueSchema schema = selectColumns(m_valueSchema, columnIndices);
+        final ValueSchema schema = ValueSchemaUtils.selectColumns(m_valueSchema, columnIndices);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), schema);
-    }
-
-    /**
-     * Assign new random column names.
-     *
-     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
-     */
-    public ColumnarVirtualTable renameToRandomColumnNames() {
-        return new ColumnarVirtualTable(m_transform, ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema));
-    }
-
-    /**
-     * Assign new random column names to the specified columns.
-     *
-     * @param columnIndices columns to rename (note that indices are including RowKey at 0)
-     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
-     */
-    public ColumnarVirtualTable renameToRandomColumnNames(final int... columnIndices) {
-        return new ColumnarVirtualTable(m_transform,
-            ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema, columnIndices));
-    }
-
-    /**
-     * Assign the specified column names to the specified columns.
-     *
-     * @param columnIndices columns to rename (note that indices are including RowKey at 0)
-     * @param columnNames new names to assign
-     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with renamed column.
-     */
-    public ColumnarVirtualTable renameColumns(final int[] columnIndices, final String[] columnNames) {
-        return new ColumnarVirtualTable(m_transform,
-            ValueSchemaUtils.renameColumns(m_valueSchema, columnIndices, columnNames));
-    }
-
-    private static ValueSchema selectColumns(final ValueSchema schema, final int... columnIndices) {
-        var hasRowID = ValueSchemaUtils.hasRowID(schema);
-        if (hasRowID && Arrays.stream(columnIndices).skip(1).anyMatch(i -> i == 0)) {
-            // If schema has a RowID, then the RowID column (in this table) is at index 0.
-            // It must either be dropped or remain at index 0.
-            throw new IllegalArgumentException("RowID must either be dropped or remain at index 0");
-        }
-        var valueFactories = IntStream.of(columnIndices)//
-            .mapToObj(schema::getValueFactory)//
-            .toArray(ValueFactory<?, ?>[]::new);
-        var originalSpec = schema.getSourceSpec();
-        var specCreator = new DataTableSpecCreator(originalSpec);
-        specCreator.dropAllColumns();
-        var permutationStream = IntStream.of(columnIndices);
-        if (hasRowID) {
-            // The RowID is not part of the DataTableSpec.
-            permutationStream = permutationStream.filter(i -> i > 0) // skip if present
-                .map(i -> i - 1); // translate "indices including RowID" to "indices without RowID"
-        }
-        specCreator.addColumns(permutationStream.mapToObj(originalSpec::getColumnSpec).toArray(DataColumnSpec[]::new));
-        return createColumnarValueSchema(valueFactories, specCreator.createSpec());
     }
 
     /**
@@ -266,13 +214,26 @@ public final class ColumnarVirtualTable {
     }
 
     /**
-     * Appends the provided table to this table.
+     * Appends the provided tables to this table.
      *
-     * @param table to append
+     * @param tables to append
      * @return the appended table
      */
-    public ColumnarVirtualTable append(final ColumnarVirtualTable table) {
-        return append(List.of(table));
+    public ColumnarVirtualTable append(final List<ColumnarVirtualTable> tables) {
+        var transformSpec = new AppendTransformSpec();
+        var transforms = collectTransforms(tables);
+        var schema = appendSchemas(collectSchemas(tables));
+        return new ColumnarVirtualTable(new TableTransform(transforms, transformSpec), schema);
+    }
+
+    /**
+     * Appends the provided tables to this table.
+     *
+     * @param tables to append
+     * @return the appended table
+     */
+    public ColumnarVirtualTable append(final ColumnarVirtualTable... tables) {
+        return append(Arrays.asList(tables));
     }
 
     /**
@@ -295,34 +256,10 @@ public final class ColumnarVirtualTable {
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
 
-    /**
-     * If the appended {@code tables} have RowID columns, these are dropped. Only the RowID of {@code this} table is
-     * kept (if present).
-     */
-    ColumnarVirtualTable append(final List<ColumnarVirtualTable> tables) {
-        var tablesWithoutRowIDs = tables.stream()//
-            .map(ColumnarVirtualTable::filterRowID)//
-            .toList();
-        var transformSpec = new AppendTransformSpec();
-        var schema = appendSchemas(collectSchemas(tablesWithoutRowIDs));
-        var transforms = collectTransforms(tablesWithoutRowIDs);
-        return new ColumnarVirtualTable(new TableTransform(transforms, transformSpec), schema);
-    }
-
-    public ColumnarVirtualTable appendMissingValueColumns(final ValueSchema missing) {
-        var missingSchema = dropRowID(missing);
-        var newSchema = appendSchemas(List.of(m_valueSchema, missingSchema));
-        var transformSpec = new AppendMissingValuesTransformSpec(missingSchema);
-        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), newSchema);
-    }
-
-    private static ValueSchema dropRowID(final ValueSchema schema) {
-        if (ValueSchemaUtils.hasRowID(schema)) {
-            return ValueSchemaUtils.create(schema.getSourceSpec(), IntStream.range(1, schema.numColumns())//
-                .mapToObj(schema::getValueFactory)//
-                .toArray(ValueFactory<?, ?>[]::new));
-        }
-        return schema;
+    public ColumnarVirtualTable appendMissingValueColumns(final ValueSchema schema) {
+        var transformSpec = new AppendMissingValuesTransformSpec(schema);
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec),
+            appendSchemas(m_valueSchema, schema));
     }
 
     ColumnarVirtualTable replaceSchema(final ValueSchema schema) {
@@ -337,7 +274,7 @@ public final class ColumnarVirtualTable {
     }
 
     /**
-     * A {@link MapperFactory} whose {@link #getOutputSchema()} method returns a {@link ColumnarValueSchema}.
+     * A {@link MapperFactory} whose {@link #getOutputSchema()} method returns a {@link ValueSchema}.
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
@@ -347,8 +284,7 @@ public final class ColumnarVirtualTable {
     }
 
     /**
-     * A {@link MapperWithRowIndexFactory} whose {@link #getOutputSchema()} method returns a
-     * {@link ColumnarValueSchema}.
+     * A {@link MapperWithRowIndexFactory} whose {@link #getOutputSchema()} method returns a {@link ValueSchema}.
      */
     public interface ColumnarMapperWithRowIndexFactory extends MapperWithRowIndexFactory {
         @Override
@@ -361,7 +297,7 @@ public final class ColumnarVirtualTable {
      * Mappers created by this factory have one additional {@code LongReadAccess} input wrt mappers created by the
      * wrapped {@code MapperWithRowIndexFactory}. This additional input represents the row index. When the mapper is
      * {@code run()}, this input is stripped off and passed as the rowIndex argument to the wrapped
-     * {@link ColumnarMapperWithRowIndexFactory.Mapper#map(long)}.
+     * {@link Mapper#map(long) Mapper.map(long)}.
      */
     public static class WrappedColumnarMapperWithRowIndexFactory implements ColumnarMapperFactory {
 
@@ -410,27 +346,40 @@ public final class ColumnarVirtualTable {
         var incomingTransforms = collectTransforms(tables);
 
         return new ColumnarVirtualTable(new TableTransform(incomingTransforms, new ConcatenateTransformSpec()),
-            concatenateDomainAndMetaData(tables.stream().map(ColumnarVirtualTable::getSchema)));
+            concatenateDomainAndMetaData(
+                tables.stream().map(ColumnarVirtualTable::getSchema).toArray(ValueSchema[]::new)));
     }
 
-    private ValueSchema concatenateDomainAndMetaData(final Stream<ValueSchema> schemas) {
-        var mergedSpec = ConcatenateTable.createSpec(//
-            Stream.concat(Stream.of(m_valueSchema), schemas)//
-                .map(ValueSchema::getSourceSpec)//
-                .toArray(DataTableSpec[]::new)//
-        );
-        return ValueSchemaUtils.updateDataTableSpec(m_valueSchema, mergedSpec);
+    private ValueSchema concatenateDomainAndMetaData(final ValueSchema... schemas) {
+        final var columns = new ValueSchemaColumn[m_valueSchema.numColumns()];
+        Arrays.setAll(columns, i -> concatenateDomainAndMetaData(//
+            m_valueSchema.getColumn(i), //
+            Arrays.stream(schemas).map(schema -> schema.getColumn(i))));
+        return ValueSchemaUtils.create(columns);
+    }
+
+    /**
+     * The options {@link DataColumnSpecCreator#merge(DataColumnSpec, java.util.Set)} is called with. This is the same
+     * as in AppendedRowsTable
+     */
+    private static final EnumSet<MergeOptions> MERGE_OPTIONS =
+        EnumSet.of(MergeOptions.ALLOW_VARYING_TYPES, MergeOptions.ALLOW_VARYING_ELEMENT_NAMES);
+
+    private static ValueSchemaColumn concatenateDomainAndMetaData(final ValueSchemaColumn column,
+        final Stream<ValueSchemaColumn> columns) {
+        if (column.dataColumnSpec() == null) {
+            return column;
+        }
+        final var specCreator = new DataColumnSpecCreator(column.dataColumnSpec());
+        columns.map(ValueSchemaColumn::dataColumnSpec).forEach(colSpec -> specCreator.merge(colSpec, MERGE_OPTIONS));
+        final var spec = specCreator.createSpec();
+        return new ValueSchemaColumn(spec, column.valueFactory());
     }
 
     private boolean isConcatenateCompatible(final ValueSchema schema) {
         return m_valueSchema.numColumns() == schema.numColumns()//
-            && m_valueSchema.getSourceSpec().equalStructure(schema.getSourceSpec())//
             && IntStream.range(0, m_valueSchema.numColumns())
-                .allMatch(i -> ValueFactoryUtils.areEqual(m_valueSchema.getValueFactory(i), schema.getValueFactory(i)));
-    }
-
-    private static ColumnarVirtualTable filterRowID(final ColumnarVirtualTable table) {
-        return ValueSchemaUtils.hasRowID(table.getSchema()) ? table.dropColumns(0) : table;
+                .allMatch(i -> m_valueSchema.getColumn(i).equalStructure(schema.getColumn(i)));
     }
 
     private static ValueSchema appendSchemas(final ValueSchema... schemas) {
@@ -438,34 +387,16 @@ public final class ColumnarVirtualTable {
     }
 
     private static ValueSchema appendSchemas(final List<ValueSchema> schemas) {
-        var valueFactories = schemas.stream()//
-            .flatMap(ColumnarVirtualTable::valueFactoryStream)//
-            .toArray(ValueFactory<?, ?>[]::new);
-        var spec = new DataTableSpec(//
-            schemas.stream()//
-                .map(ValueSchema::getSourceSpec)//
-                .flatMap(DataTableSpec::stream)//
-                .toArray(DataColumnSpec[]::new)//
-        );
-        return ValueSchemaUtils.create(spec, valueFactories);
+        var columns = schemas.stream()//
+            .flatMap(schema -> Stream.of(schema.getColumns()))//
+            .toList();
+        return ValueSchemaUtils.create(columns);
     }
 
     private static ValueSchema appendRowIndex(final ValueSchema schema, final String columnName) {
-        final int numColumns = schema.numColumns();
-        var valueFactories = new ValueFactory<?, ?>[numColumns + 1];
-        for (int i = 0; i < numColumns; i++) {
-            valueFactories[i] = schema.getValueFactory(i);
-        }
-        valueFactories[numColumns] = ValueFactoryUtils.getValueFactory(LongCell.TYPE, null);
-
-        final int numSpecColumns = schema.getSourceSpec().getNumColumns();
-        var colSpecs = new DataColumnSpec[numSpecColumns + 1];
-        for (int i = 0; i < numSpecColumns; i++) {
-            colSpecs[i] = schema.getSourceSpec().getColumnSpec(i);
-        }
-        colSpecs[numSpecColumns] = new DataColumnSpecCreator(columnName, LongCell.TYPE).createSpec();
-
-        return ValueSchemaUtils.create(new DataTableSpec(colSpecs), valueFactories);
+        var columns = Arrays.copyOf(schema.getColumns(), schema.numColumns() + 1);
+        columns[columns.length - 1] = new ValueSchemaColumn(columnName, LongCell.TYPE, LongValueFactory.INSTANCE);
+        return ValueSchemaUtils.create(columns);
     }
 
     private static String tmpUniqueRowIndexColumnName() {
@@ -477,15 +408,6 @@ public final class ColumnarVirtualTable {
         transforms.add(m_transform);
         transforms.addAll(Collections2.transform(tables, ColumnarVirtualTable::getProducingTransform));
         return transforms;
-    }
-
-    private static ValueSchema createColumnarValueSchema(final ValueFactory<?, ?>[] valueFactories,
-        final DataTableSpec spec) {
-        return ValueSchemaUtils.create(spec, valueFactories);
-    }
-
-    private static Stream<ValueFactory<?, ?>> valueFactoryStream(final ValueSchema schema) {
-        return IntStream.range(0, schema.numColumns()).mapToObj(schema::getValueFactory);
     }
 
     private List<ValueSchema> collectSchemas(final List<ColumnarVirtualTable> tables) {
@@ -587,7 +509,28 @@ public final class ColumnarVirtualTable {
         }
         final int[] selection = IntStream.range(0, m_valueSchema.numColumns()).toArray();
         selection[columnIndex] = selection.length;
-        return renameToRandomColumnNames(columnIndex).appendMap(mapperFactory, columnIndex).selectColumns(selection);
+        return appendMap(mapperFactory, columnIndex).selectColumns(selection);
+    }
+
+    /**
+     * Return a new {@code ColumnarVirtualTable} where the column at {@code columnIndex} is replaced with the column
+     * produced by {@code mapperFactory}. The mapper returned by the {@code mapperFactory} doesn't have to be
+     * thread-safe. (For multi-threaded computation, the {@code mapperFactory} will be asked to produce a mapper for
+     * every thread.) The mapper must have exactly one input and exactly one output column.
+     *
+     * @param mapperFactory produces a mapper that is run for every row in this table.
+     * @param columnIndices indices of columns used by the mapper.
+     * @return a new table with the specified columns replaced by the mapper column
+     */
+    public ColumnarVirtualTable replaceMap(final ColumnarMapperWithRowIndexFactory mapperFactory,
+        final int columnIndex) {
+        if (mapperFactory.getOutputSchema().numColumns() != 1) {
+            throw new IllegalArgumentException("ColumnarMapperFactory must produce exactly 1 column");
+        }
+        final int[] selection = IntStream.range(0, m_valueSchema.numColumns()).toArray();
+        selection[columnIndex] = selection.length;
+        return appendMap(mapperFactory, columnIndex).selectColumns(selection);
+
     }
 
     public ColumnarVirtualTable observe(final ObserverFactory observerFactory, final int... columnIndices) {
@@ -610,5 +553,41 @@ public final class ColumnarVirtualTable {
         return appendRowIndex(tmpUniqueRowIndexColumnName()) //
             .observe(factory, columns) //
             .dropColumns(rowIndexColumn);
+    }
+
+    /**
+     * Create a new table, where the {@link #getSchema() ValueSchema} has {@code DataColumnSpec}s replaced by those of
+     * the given {@code outputSpec}.
+     * <p>
+     * In the schema of this table, {@code columns[0]} must be the RowKey. The {@code DataType} of the columns of the
+     * schema must correspond to those of the {@code outputSpec} (except {@code columns[0]}, the RowKey, which is not
+     * part of {@code DataTableSpec}).
+     *
+     * @param outputSpec provides the DataColumnSpecs
+     * @return new table with the updated schema
+     * @throws IllegalArgumentException if the provided schema does not have RowKey at column 0 or DataTypes don't match
+     */
+    public ColumnarVirtualTable updateSchema(final DataTableSpec outputSpec) {
+        final int numCols = m_valueSchema.numColumns();
+        if (numCols < 1 || !m_valueSchema.getColumn(0).isRowKey()) {
+            throw new IllegalArgumentException("expected schema with RowKey at column 0");
+        }
+        final int numDataCols = numCols - 1;
+        if (outputSpec.getNumColumns() != numDataCols) {
+            throw new IllegalArgumentException("schema has " + numDataCols
+                + " data columns, but spec has " + outputSpec.getNumColumns());
+        }
+        for (int i = 0; i < numDataCols; ++i) {
+            final DataType colTypeSpec = outputSpec.getColumnSpec(i).getType();
+            final DataType colTypeSchema = m_valueSchema.getDataColumnSpec(i + 1).getType();
+            if (!colTypeSpec.equals(colTypeSchema)) {
+                throw new IllegalArgumentException("column type mismatch at column " + i + ": schema has "
+                    + colTypeSchema + ", spec has " + colTypeSpec);
+            }
+        }
+        final var valueFactories = new ValueFactory<?, ?>[numCols];
+        Arrays.setAll(valueFactories, m_valueSchema::getValueFactory);
+        final var updatedSchema = DataTableValueSchemaUtils.create(outputSpec, valueFactories);
+        return new ColumnarVirtualTable(m_transform, updatedSchema);
     }
 }

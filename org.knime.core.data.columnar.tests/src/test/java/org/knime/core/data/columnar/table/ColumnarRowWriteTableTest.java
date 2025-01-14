@@ -72,6 +72,8 @@ import org.knime.core.data.def.StringCell;
 import org.knime.core.data.def.StringCell.StringCellFactory;
 import org.knime.core.data.v2.RowBuffer;
 import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.ValueInterfaces.IntWriteValue;
@@ -90,7 +92,7 @@ public final class ColumnarRowWriteTableTest {
     public void testDomainInitializationNoDomainComputation() throws IOException {
         final ColumnarRowWriteTableSettings settings = createSettings(true, false);
 
-        final ValueSchema initialSchema = createTestTableSchemaWithDomains();
+        final DataTableValueSchema initialSchema = createTestTableSchemaWithDomains();
         final DataTableSpec resultingSpec = createAndFillTestTable(initialSchema, settings);
 
         assertEquals(initialSchema.getSourceSpec(), resultingSpec);
@@ -100,7 +102,7 @@ public final class ColumnarRowWriteTableTest {
     public void testNoDomainInitializationDomainComputation() throws IOException {
         final ColumnarRowWriteTableSettings settings = createSettings(false, true);
 
-        final ValueSchema initialSchema = createTestTableSchemaWithDomains();
+        final DataTableValueSchema initialSchema = createTestTableSchemaWithDomains();
         final DataTableSpec resultingSpec = createAndFillTestTable(initialSchema, settings);
 
         assertTrue(initialSchema.getSourceSpec().equalStructure(resultingSpec));
@@ -111,7 +113,7 @@ public final class ColumnarRowWriteTableTest {
     public void testDomainInitializationDomainComputation() throws IOException {
         final ColumnarRowWriteTableSettings settings = createSettings(true, true);
 
-        final ValueSchema initialSchema = createTestTableSchemaWithDomains();
+        final DataTableValueSchema initialSchema = createTestTableSchemaWithDomains();
         final DataTableSpec resultingSpec = createAndFillTestTable(initialSchema, settings);
 
         assertTrue(initialSchema.getSourceSpec().equalStructure(resultingSpec));
@@ -133,7 +135,7 @@ public final class ColumnarRowWriteTableTest {
         return new ColumnarRowWriteTableSettings(initializeDomains, calculateDomains, 60, true, true, false, 100, 4);
     }
 
-    private static ValueSchema createTestTableSchemaWithDomains() {
+    private static DataTableValueSchema createTestTableSchemaWithDomains() {
         final var intColumnSpecCreator = new DataColumnSpecCreator("My int column", IntCell.TYPE);
         intColumnSpecCreator.setDomain(
             new DataColumnDomainCreator(IntCellFactory.create(-123), IntCellFactory.create(42)).createDomain());
@@ -146,7 +148,7 @@ public final class ColumnarRowWriteTableTest {
         final DataColumnSpec stringColumnSpec = stringColumnSpecCreator.createSpec();
 
         final var tableSpec = new DataTableSpec(intColumnSpec, stringColumnSpec);
-        return ValueSchemaUtils.create(tableSpec, RowKeyType.CUSTOM, null);
+        return DataTableValueSchemaUtils.create(tableSpec, RowKeyType.CUSTOM, null);
     }
 
     private static DataTableSpec createAndFillTestTable(final ValueSchema schema,
@@ -159,7 +161,7 @@ public final class ColumnarRowWriteTableTest {
             }
         }
         try (readTable) {
-            return readTable.getSchema().getSourceSpec();
+            return ValueSchemaUtils.createDataTableSpec(readTable.getSchema());
         }
     }
 

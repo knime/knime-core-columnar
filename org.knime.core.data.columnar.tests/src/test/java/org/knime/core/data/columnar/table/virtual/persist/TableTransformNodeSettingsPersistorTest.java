@@ -64,9 +64,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
-import org.knime.core.data.DataColumnSpecCreator;
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.DataType;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
@@ -76,9 +73,10 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.filestore.internal.NotInWorkflowDataRepository;
-import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
+import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.data.v2.value.DoubleValueFactory;
 import org.knime.core.data.v2.value.IntValueFactory;
 import org.knime.core.node.BufferedDataTable;
@@ -295,9 +293,10 @@ final class TableTransformNodeSettingsPersistorTest {
     void testSaveMap() throws Exception {
         var id = UUID.randomUUID();
         var mapperFactory = new TestMapperFactory(3);
-        var schema = ValueSchemaUtils.create(
-            new DataTableSpec(new String[]{"1", "2"}, new DataType[]{IntCell.TYPE, DoubleCell.TYPE}),
-            new ValueFactory<?, ?>[]{new IntValueFactory(), new DoubleValueFactory()});
+        var schema = ValueSchemaUtils.create(//
+            new ValueSchemaColumn(new DefaultRowKeyValueFactory()), //
+            new ValueSchemaColumn("1", IntCell.TYPE, new IntValueFactory()), //
+            new ValueSchemaColumn("2", DoubleCell.TYPE, new DoubleValueFactory()));
         var table = new ColumnarVirtualTable(id, schema, CursorType.BASIC).map(mapperFactory, 1);
         var settings = rootSettings();
         TableTransformNodeSettingsPersistor.save(table.getProducingTransform(), settings);
@@ -305,7 +304,7 @@ final class TableTransformNodeSettingsPersistorTest {
         checkSize(transformSettings, 3);
         checkSourceSettings(getSubSettings(transformSettings, 0), id);
         checkMapSettings(getSubSettings(transformSettings, 2), mapperFactory::checkSettings, TestMapperFactory.class, 1,
-            2);
+            3);
         var connectionSettings = getConnectionSettings(settings);
         checkSize(connectionSettings, 2);
         checkConnection(getSubSettings(connectionSettings, 0), 0, 1, 0);
@@ -412,9 +411,7 @@ final class TableTransformNodeSettingsPersistorTest {
 
         @Override
         public ValueSchema getOutputSchema() {
-            return ValueSchemaUtils.create(
-                new DataTableSpec(new DataColumnSpecCreator("foo", IntCell.TYPE).createSpec()),
-                new ValueFactory<?, ?>[]{new IntValueFactory()});
+            return ValueSchemaUtils.create(new ValueSchemaColumn("foo", IntCell.TYPE, new IntValueFactory()));
         }
 
         @Override

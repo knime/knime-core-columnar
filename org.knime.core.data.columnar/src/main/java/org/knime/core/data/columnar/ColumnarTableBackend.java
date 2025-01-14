@@ -55,6 +55,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.IDataRepository;
 import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.preferences.ColumnarPreferenceUtils;
@@ -67,6 +68,7 @@ import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarConcatenater;
 import org.knime.core.data.columnar.table.virtual.ColumnarRearranger;
 import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.BufferedTableBackend;
@@ -79,7 +81,8 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyType;
-import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
@@ -89,7 +92,7 @@ import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.Node;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.row.Selection;
-import org.knime.core.table.virtual.VirtualTable;
+import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 
 /**
  * Columnar {@link TableBackend} implementation.
@@ -114,8 +117,8 @@ public final class ColumnarTableBackend implements TableBackend {
         final IDataRepository repository, final ILocalDataRepository localRepository,
         final IWriteFileStoreHandler fileStoreHandler) {
         final boolean isEnableRowKeys = settings.isEnableRowKeys();
-        final ValueSchema schema = ValueSchemaUtils.create(spec, isEnableRowKeys ? RowKeyType.CUSTOM : RowKeyType.NOKEY,
-            initFileStoreHandler(fileStoreHandler, repository));
+        final DataTableValueSchema schema = DataTableValueSchemaUtils.create(spec,
+            isEnableRowKeys ? RowKeyType.CUSTOM : RowKeyType.NOKEY, initFileStoreHandler(fileStoreHandler, repository));
         try {
             final ColumnarRowWriteTableSettings cursorSettings =
                 new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.isEnableDomainUpdate(),
@@ -131,8 +134,8 @@ public final class ColumnarTableBackend implements TableBackend {
     public RowContainer create(final ExecutionContext context, final DataTableSpec spec,
         final DataContainerSettings settings, final IDataRepository repository, final IWriteFileStoreHandler handler) {
         try {
-            final ValueSchema schema =
-                ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
+            final DataTableValueSchema schema =
+                DataTableValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
             final boolean isDuplicateCheck = settings.isEnableRowKeys() && settings.isCheckDuplicateRowKeys();
             final ColumnarRowWriteTableSettings containerSettings =
                 new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.isEnableDomainUpdate(),
@@ -235,13 +238,14 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
 
-    private static KnowsRowCountTable appendWithRowIDFromTable(
-        final IntSupplier tableIdSupplier, final int tableIndex, final BufferedDataTable[] tables)
-        throws VirtualTableIncompatibleException {
-        var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
-        var refTables = createReferenceTables(tables);
-        return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables, tableIndex),
-            appendedSchema, tables[0].size(), tableIdSupplier.getAsInt());
+    private static KnowsRowCountTable appendWithRowIDFromTable(final IntSupplier tableIdSupplier, final int tableIndex,
+        final BufferedDataTable[] tables) throws VirtualTableIncompatibleException {
+        final var appendedSpec = VirtualTableSchemaUtils.appendDataTableSpecs(tables);
+        final var refTables = createReferenceTables(tables);
+        final var appendedTable =
+            TableTransformUtils.appendTables(refTables, tableIndex);
+        return new VirtualTableExtensionTable(refTables, appendedTable, appendedSpec, tables[0].size(),
+            tableIdSupplier.getAsInt());
     }
 
     @Override
@@ -250,12 +254,13 @@ public final class ColumnarTableBackend implements TableBackend {
         throws CanceledExecutionException {
         final BufferedDataTable[] tables = {preprocessTable(left, exec), preprocessTable(right, exec)};//NOSONAR
         try {
-            var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
             TableTransformUtils.checkRowKeysMatch(progress, tables);
+            final var appendedSpec = VirtualTableSchemaUtils.appendDataTableSpecs(tables);
             final long appendSize = TableTransformUtils.appendSize(tables);
-            var refTables = createReferenceTables(tables);
-            return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables, 0),
-                appendedSchema, appendSize, tableIdSupplier.getAsInt());
+            final var refTables = createReferenceTables(tables);
+            final var appendedTable = TableTransformUtils.appendTables(refTables, 0);
+            return new VirtualTableExtensionTable(refTables, appendedTable, appendedSpec, appendSize,
+                tableIdSupplier.getAsInt());
         } catch (VirtualTableIncompatibleException ex) {// NOSONAR don't spam the log
             logFallback();
             return OLD_BACKEND.append(exec, progress, tableIdSupplier, left, right);
@@ -296,21 +301,18 @@ public final class ColumnarTableBackend implements TableBackend {
 
     private static KnowsRowCountTable slice(final ExecutionContext exec, final BufferedDataTable table,
         final Selection slice, final IntSupplier tableIdSupplier) throws VirtualTableIncompatibleException {
-        var spec = table.getDataTableSpec();
         var refTable = ReferenceTables.createReferenceTable(UUID.randomUUID(), table);
-        var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
+        var virtualTable = new ColumnarVirtualTable(refTable.getId(), refTable.getSchema(), CursorType.BASIC);
         var cols = slice.columns();
-        var rearranger = new ColumnRearranger(spec);
         if (!cols.allSelected()) {
             var colIndices = cols.getSelected();
-            virtualTable = virtualTable.filterColumns(//
+            virtualTable = virtualTable.selectColumns(//
                 IntStream.concat(//
                     IntStream.of(0), // the row key is always part of the table
                     IntStream.of(colIndices)//
                         .map(i -> i + 1))// the slice does not account for the row key column
                     .toArray()//
             );
-            rearranger.keepOnly(colIndices);
         }
 
         var rows = slice.rows();
@@ -322,10 +324,12 @@ public final class ColumnarTableBackend implements TableBackend {
             size = toRow - fromRow;
         }
 
-        var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(table, rearranger);
-
-        var slicedTable = new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, virtualTable, rearrangedSchema,
-            size, tableIdSupplier.getAsInt());
+        var slicedSpec = new DataTableSpecCreator(table.getDataTableSpec()) //
+            .dropAllColumns() //
+            .addColumns(ValueSchemaUtils.dataColumnSpecs(virtualTable.getSchema())) //
+            .createSpec();
+        var slicedTable = new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, virtualTable,
+            slicedSpec, size, tableIdSupplier.getAsInt());
         exec.setProgress(1);
         return slicedTable;
     }
@@ -363,10 +367,10 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
     private static boolean isColumnarCompatible(final BufferedDataTable table) {
-        return getSchemaIfColumnar(table).filter(not(ValueSchemaUtils::storesDataCellSerializersSeparately))
+        return getSchemaIfColumnar(table).filter(not(DataTableValueSchemaUtils::storesDataCellSerializersSeparately))
             .isPresent();
     }
-    private static Optional<ValueSchema> getSchemaIfColumnar(final BufferedDataTable table) {
+    private static Optional<DataTableValueSchema> getSchemaIfColumnar(final BufferedDataTable table) {
         var delegate = unwrap(table);
         if (delegate instanceof AbstractColumnarContainerTable columnarTable) {
             return Optional.of(columnarTable.getSchema());

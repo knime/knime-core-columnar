@@ -48,6 +48,9 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
+import static org.knime.core.data.columnar.table.virtual.NullableValues.createNullableReadValue;
+import static org.knime.core.data.columnar.table.virtual.NullableValues.createNullableWriteValue;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -66,6 +69,7 @@ import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
@@ -85,6 +89,10 @@ final class TableCasterFactory implements ColumnarMapperFactory {
     private final List<ColumnCasterFactory> m_casts;
 
     private final IDataRepository m_dataRepo;
+
+    private final DataTableSpec m_outputTableSpec;
+
+    private final ValueSchema m_outputSchema;
 
     enum CastOperation {
         /**
@@ -109,19 +117,28 @@ final class TableCasterFactory implements ColumnarMapperFactory {
         }
     }
 
-    record ColumnCasterFactory(DataColumnSpec outputSpec, UntypedValueFactory inputValueFactory,
-        UntypedValueFactory outputValueFactory, CastOperation castOperation) {
+    record ColumnCasterFactory(DataColumnSpec outputSpec, ValueFactory<?, ?> inputValueFactory,
+        ValueFactory<?, ?> outputValueFactory, CastOperation castOperation) {
         Runnable createCaster(final ReadAccess readAccess, final WriteAccess writeAccess) {
-            var readValue = inputValueFactory.createNullableReadValue(readAccess);
-            var writeValue = outputValueFactory.createNullableWriteValue(writeAccess);
+            var readValue = createNullableReadValue(inputValueFactory, readAccess);
+            var writeValue = createNullableWriteValue(outputValueFactory, writeAccess);
             return castOperation.createCaster(readValue, writeValue);
+        }
+        ValueSchemaColumn column() {
+            return new ValueSchemaColumn(outputSpec, outputValueFactory);
         }
     }
 
     TableCasterFactory(final List<ColumnCasterFactory> casts, final IDataRepository dataRepo) {
         m_casts = casts;
         m_dataRepo = dataRepo;
+        var colspecs = casts.stream().map(ColumnCasterFactory::outputSpec).toArray(DataColumnSpec[]::new);
+        m_outputTableSpec = new DataTableSpec(colspecs);
+        var columns = casts.stream().map(ColumnCasterFactory::column).toArray(ValueSchemaColumn[]::new);
+        m_outputSchema = ValueSchemaUtils.create(columns);
     }
+
+
 
 
     @Override
@@ -136,22 +153,18 @@ final class TableCasterFactory implements ColumnarMapperFactory {
     private void initOutputValueFactoriesForWriting() {
         var fsHandler = getFsHandler();
         for (var cast : m_casts) {
-            cast.outputValueFactory().initFsHandler(fsHandler);
+            ValueFactoryUtils.initializeForWriting(cast.outputValueFactory(), fsHandler);
         }
+    }
+
+    DataTableSpec getOutputTableSpec() {
+        return m_outputTableSpec;
     }
 
     @Override
     public ValueSchema getOutputSchema() {
-        var spec = new DataTableSpec(//
-            m_casts.stream()//
-                .map(ColumnCasterFactory::outputSpec)//
-                .toArray(DataColumnSpec[]::new)//
-        );
-        var valueFactories = m_casts.stream()//
-            .map(ColumnCasterFactory::outputValueFactory)//
-            .map(UntypedValueFactory::getValueFactory)//
-            .toArray(ValueFactory<?, ?>[]::new);
-        return ValueSchemaUtils.create(spec, valueFactories);
+        return m_outputSchema;
+
     }
 
     /**
@@ -182,16 +195,15 @@ final class TableCasterFactory implements ColumnarMapperFactory {
             var dataRepository = ctx.getDataRepository();
             for (int i = 0; i < outputSpec.getNumColumns(); i++) {
                 var key = Integer.toString(i);
-                var inputValueFactory = ValueFactoryUtils
-                    .loadValueFactory(inputValueFactorySettings.getNodeSettings(key), dataRepository);
+                var inputValueFactory =
+                    ValueFactoryUtils.loadValueFactory(inputValueFactorySettings.getNodeSettings(key), dataRepository);
                 // during load we don't have access to a IWriteFileStoreHandler, therefore we only initialize the
                 // output ValueFactories during #createMapper where we might be able to obtain a filestore handler
                 // from the NodeContext
-                var outputValueFactory = ValueFactoryUtils
-                    .loadValueFactory(outputValueFactorySettings.getNodeSettings(key), dataRepository);
-                var cast =
-                    new ColumnCasterFactory(outputSpec.getColumnSpec(i), new UntypedValueFactory(inputValueFactory),
-                        new UntypedValueFactory(outputValueFactory), castOperations[i]);
+                var outputValueFactory =
+                    ValueFactoryUtils.loadValueFactory(outputValueFactorySettings.getNodeSettings(key), dataRepository);
+                var cast = new ColumnCasterFactory(outputSpec.getColumnSpec(i), inputValueFactory, outputValueFactory,
+                    castOperations[i]);
                 casts.add(cast);
             }
             return new TableCasterFactory(casts, dataRepository);
@@ -202,12 +214,12 @@ final class TableCasterFactory implements ColumnarMapperFactory {
             var inputValueFactorySettings = settings.addNodeSettings(CFG_INPUT_VALUE_FACTORIES);
             var outputValueFactorySettings = settings.addNodeSettings(CFG_OUTPUT_VALUE_FACTORIES);
             int i = 0;
-            factory.getOutputSchema().getSourceSpec().save(settings.addNodeSettings(CFG_OUTPUT_SPEC));
+            factory.getOutputTableSpec().save(settings.addNodeSettings(CFG_OUTPUT_SPEC));
             for (var mapping : factory.m_casts) {
                 String key = Integer.toString(i);
-                ValueFactoryUtils.saveValueFactory(mapping.inputValueFactory().getValueFactory(),
+                ValueFactoryUtils.saveValueFactory(mapping.inputValueFactory(),
                     inputValueFactorySettings.addNodeSettings(key));
-                ValueFactoryUtils.saveValueFactory(mapping.outputValueFactory().getValueFactory(),
+                ValueFactoryUtils.saveValueFactory(mapping.outputValueFactory(),
                     outputValueFactorySettings.addNodeSettings(key));
                 i++;
             }

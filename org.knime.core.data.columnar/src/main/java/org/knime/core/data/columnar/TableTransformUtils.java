@@ -50,9 +50,10 @@ package org.knime.core.data.columnar;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.stream.IntStream;
+import java.util.List;
 import java.util.stream.LongStream;
 
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
@@ -60,7 +61,6 @@ import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.table.virtual.VirtualTable;
 import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 
 /**
@@ -80,15 +80,17 @@ public final class TableTransformUtils {
         return tables[0].size();
     }
 
-    static VirtualTable appendTables(final ReferenceTable[] tables, final int rowIDTable) {
-        var virtualTable = asSource(tables[0]);
-        var numColumnsInFirstTable = numColumns(virtualTable);
-        var appendedTables = new ArrayList<VirtualTable>(tables.length - 1);
+    static ColumnarVirtualTable appendTables(final ReferenceTable[] tables, final int rowIDTable) {
+        if (tables.length == 0) {
+            throw new IllegalArgumentException("need at least one source table to create appended table");
+        }
+
+        final List<ColumnarVirtualTable> appendedTables = new ArrayList<>(tables.length);
         int rowIDColumnIndex = 0;//NOSONAR
-        for (int i = 1; i < tables.length; i++) {//NOSONAR
+        for (int i = 0; i < tables.length; i++) {//NOSONAR
             var appendedTable = asSource(tables[i]);
             if (i != rowIDTable) {
-                appendedTable = filterRowKey(appendedTable);
+                appendedTable = appendedTable.dropColumns(0); // drop row key column
                 if (i < rowIDTable) {
                     rowIDColumnIndex += numColumns(appendedTable);
                 }
@@ -96,31 +98,23 @@ public final class TableTransformUtils {
             appendedTables.add(appendedTable);
         }
 
-        virtualTable = virtualTable.append(appendedTables);
-        if (rowIDTable > 0) {
-            virtualTable = filterRowKey(virtualTable);
-            rowIDColumnIndex += numColumnsInFirstTable - 1;
+        var virtualTable = appendedTables.remove(0).append(appendedTables);
+        if (rowIDColumnIndex != 0) {
+            final int[] columnIndices = new int[numColumns(virtualTable)];
             final int finalRowIDCol = rowIDColumnIndex;
-            virtualTable = virtualTable.selectColumns(//
-                IntStream.concat(//
-                    IntStream.of(rowIDColumnIndex), // move RowID column first
-                    IntStream.range(0, numColumns(virtualTable)) // fill in remaining columns
-                    .filter(i -> i != finalRowIDCol) // ignore rowID column index
-                ).toArray());
+            Arrays.setAll(columnIndices, i -> (i > finalRowIDCol) ? i : (i - 1));
+            columnIndices[0] = finalRowIDCol;
+            virtualTable = virtualTable.selectColumns(columnIndices);
         }
         return virtualTable;
     }
 
-    private static int numColumns(final VirtualTable virtualTable) {
+    private static int numColumns(final ColumnarVirtualTable virtualTable) {
         return virtualTable.getSchema().numColumns();
     }
 
-    private static VirtualTable filterRowKey(final VirtualTable table) {
-        return table.dropColumns(0);
-    }
-
-    private static VirtualTable asSource(final ReferenceTable table) {
-        return new VirtualTable(table.getId(), table.getSchema(), CursorType.LOOKAHEAD);
+    private static ColumnarVirtualTable asSource(final ReferenceTable table) {
+        return new ColumnarVirtualTable(table.getId(), table.getSchema(), CursorType.LOOKAHEAD);
     }
 
     static void checkRowKeysMatch(final ExecutionMonitor exec, final BufferedDataTable... tables)
