@@ -506,12 +506,30 @@ public final class ColumnarVirtualTable {
             appendRowIndex(m_valueSchema, columnName));
     }
 
+    /**
+     * Return a new {@code ColumnarVirtualTable} comprising (only) the columns produced by {@code mapperFactory}. The
+     * mapper returned by the {@code mapperFactory} doesn't have to be thread-safe. (For multi-threaded computation, the
+     * {@code mapperFactory} will be asked to produce a mapper for every thread.)
+     *
+     * @param mapperFactory produces a mapper that is run for every row in this virtual table.
+     * @param columnIndices indices of columns used by the mapper.
+     * @return a new table comprising the columns produced by the mapper
+     */
     public ColumnarVirtualTable map(final ColumnarMapperFactory mapperFactory, final int... columnIndices) {
         final TableTransformSpec transformSpec = new MapTransformSpec(columnIndices, mapperFactory);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec),
             mapperFactory.getOutputSchema());
     }
 
+    /**
+     * Return a new {@code ColumnarVirtualTable} comprising (only) the columns produced by {@code mapperFactory}. The
+     * mapper returned by the {@code mapperFactory} doesn't have to be thread-safe. (For multi-threaded computation, the
+     * {@code mapperFactory} will be asked to produce a mapper for every thread.)
+     *
+     * @param mapperFactory produces a mapper that is run for every row in this virtual table.
+     * @param columnIndices indices of columns used by the mapper.
+     * @return a new table comprising the columns produced by the mapper
+     */
     public ColumnarVirtualTable map(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
         final int[] columns = Arrays.copyOf(columnIndices, columnIndices.length + 1);
         columns[columns.length - 1] = m_valueSchema.numColumns();
@@ -519,12 +537,30 @@ public final class ColumnarVirtualTable {
         return appendRowIndex(tmpUniqueRowIndexColumnName()).map(factory, columns);
     }
 
+    /**
+     * Return a new {@code ColumnarVirtualTable} comprising the columns of this table and the columns produced by
+     * {@code mapperFactory}. The mapper returned by the {@code mapperFactory} doesn't have to be thread-safe. (For
+     * multi-threaded computation, the {@code mapperFactory} will be asked to produce a mapper for every thread.)
+     *
+     * @param mapperFactory produces a mapper that is run for every row in this table.
+     * @param columnIndices indices of columns used by the mapper.
+     * @return a new table appending the columns produced by the mapper to this table
+     */
     public ColumnarVirtualTable appendMap(final ColumnarMapperFactory mapperFactory, final int... columnIndices) {
         final TableTransformSpec transformSpec = new AppendMapTransformSpec(columnIndices, mapperFactory);
         final ValueSchema schema = appendSchemas(m_valueSchema, mapperFactory.getOutputSchema());
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), schema);
     }
 
+    /**
+     * Return a new {@code ColumnarVirtualTable} comprising the columns of this table and the columns produced by
+     * {@code mapperFactory}. The mapper returned by the {@code mapperFactory} doesn't have to be thread-safe. (For
+     * multi-threaded computation, the {@code mapperFactory} will be asked to produce a mapper for every thread.)
+     *
+     * @param mapperFactory produces a mapper that is run for every row in this table.
+     * @param columnIndices indices of columns used by the mapper.
+     * @return a new table appending the columns produced by the mapper to this table
+     */
     public ColumnarVirtualTable appendMap(final ColumnarMapperWithRowIndexFactory mapperFactory, final int... columnIndices) {
         final int[] columns = Arrays.copyOf(columnIndices, columnIndices.length + 1);
         final int rowIndexColumn = m_valueSchema.numColumns();
@@ -535,6 +571,16 @@ public final class ColumnarVirtualTable {
             .dropColumns(rowIndexColumn);
     }
 
+    /**
+     * Return a new {@code ColumnarVirtualTable} where the column at {@code columnIndex} is replaced with the column
+     * produced by {@code mapperFactory}. The mapper returned by the {@code mapperFactory} doesn't have to be
+     * thread-safe. (For multi-threaded computation, the {@code mapperFactory} will be asked to produce a mapper for
+     * every thread.) The mapper must have exactly one input and exactly one output column.
+     *
+     * @param mapperFactory produces a mapper that is run for every row in this table.
+     * @param columnIndices indices of columns used by the mapper.
+     * @return a new table with the specified columns replaced by the mapper column
+     */
     public ColumnarVirtualTable replaceMap(final ColumnarMapperFactory mapperFactory, final int columnIndex) {
         if (mapperFactory.getOutputSchema().numColumns() != 1) {
             throw new IllegalArgumentException("ColumnarMapperFactory must produce exactly 1 column");
