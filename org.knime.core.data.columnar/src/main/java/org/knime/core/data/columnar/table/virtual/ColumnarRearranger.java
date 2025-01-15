@@ -266,6 +266,11 @@ public final class ColumnarRearranger {
             .toList();
         if (!columnsToCreate.isEmpty()) {
             table = createColumns(columnsToCreate, table, selection, nextSelectionIndex);
+            // N.B. createColumns fills selection[] starting from nextSelectionIndex (to the end),
+            // but nextSelectionIndex cannot not modified. That is, nextSelectionIndex is incorrect
+            // afterwards, however It is not used any further below.
+            // To prevent potential future coding errors, we set it to the updated value anyway...
+            nextSelectionIndex = selection.length;
         }
 
         // --------------------------------------------------------------------
