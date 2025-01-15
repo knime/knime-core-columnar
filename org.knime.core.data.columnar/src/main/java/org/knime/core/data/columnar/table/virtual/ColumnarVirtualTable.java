@@ -441,31 +441,23 @@ public final class ColumnarVirtualTable {
         var valueFactories = schemas.stream()//
             .flatMap(ColumnarVirtualTable::valueFactoryStream)//
             .toArray(ValueFactory<?, ?>[]::new);
-        var spec = new DataTableSpec(//
-            schemas.stream()//
-                .map(ValueSchema::getSourceSpec)//
-                .flatMap(DataTableSpec::stream)//
-                .toArray(DataColumnSpec[]::new)//
-        );
-        return ValueSchemaUtils.create(spec, valueFactories);
+        var dataColumnSpecs = schemas.stream()//
+            .flatMap(ColumnarVirtualTable::dataColumnSpecStream)//
+            .toArray(DataColumnSpec[]::new);
+        return ValueSchemaUtils.create(dataColumnSpecs, valueFactories);
     }
 
     private static ValueSchema appendRowIndex(final ValueSchema schema, final String columnName) {
         final int numColumns = schema.numColumns();
         var valueFactories = new ValueFactory<?, ?>[numColumns + 1];
+        var colSpecs = new DataColumnSpec[numColumns + 1];
         for (int i = 0; i < numColumns; i++) {
             valueFactories[i] = schema.getValueFactory(i);
+            colSpecs[i] = schema.getDataColumnSpec(i);
         }
         valueFactories[numColumns] = ValueFactoryUtils.getValueFactory(LongCell.TYPE, null);
-
-        final int numSpecColumns = schema.getSourceSpec().getNumColumns();
-        var colSpecs = new DataColumnSpec[numSpecColumns + 1];
-        for (int i = 0; i < numSpecColumns; i++) {
-            colSpecs[i] = schema.getSourceSpec().getColumnSpec(i);
-        }
-        colSpecs[numSpecColumns] = new DataColumnSpecCreator(columnName, LongCell.TYPE).createSpec();
-
-        return ValueSchemaUtils.create(new DataTableSpec(colSpecs), valueFactories);
+        colSpecs[numColumns] = new DataColumnSpecCreator(columnName, LongCell.TYPE).createSpec();
+        return ValueSchemaUtils.create(colSpecs, valueFactories);
     }
 
     private static String tmpUniqueRowIndexColumnName() {
@@ -486,6 +478,10 @@ public final class ColumnarVirtualTable {
 
     private static Stream<ValueFactory<?, ?>> valueFactoryStream(final ValueSchema schema) {
         return IntStream.range(0, schema.numColumns()).mapToObj(schema::getValueFactory);
+    }
+
+    private static Stream<DataColumnSpec> dataColumnSpecStream(final ValueSchema schema) {
+        return IntStream.range(0, schema.numColumns()).mapToObj(schema::getDataColumnSpec);
     }
 
     private List<ValueSchema> collectSchemas(final List<ColumnarVirtualTable> tables) {
