@@ -393,11 +393,10 @@ public final class ColumnarRearranger {
     private ColumnarVirtualTable replaceConvert(final ColumnarVirtualTable table, final DataCellTypeConverter converter,
         final int colIndexIncludingRowID) {
         final ValueSchema schema = table.getSchema();
-        final DataTableSpec sourceSpec = schema.getSourceSpec();
         final DataType outputType = converter.getOutputType();
         final ValueFactory<?, ?> inputValueFactory = schema.getValueFactory(colIndexIncludingRowID);
         final ValueFactory<?, ?> outputValueFactory = ValueFactoryUtils.getValueFactory(outputType, m_fsHandler);
-        final var colSpecCreator = new DataColumnSpecCreator(sourceSpec.getColumnSpec(colIndexIncludingRowID - 1));
+        final var colSpecCreator = new DataColumnSpecCreator(schema.getDataColumnSpec(colIndexIncludingRowID));
         colSpecCreator.setType(outputType);
         final DataColumnSpec outputColSpec = colSpecCreator.createSpec();
         final var converterFactory =
