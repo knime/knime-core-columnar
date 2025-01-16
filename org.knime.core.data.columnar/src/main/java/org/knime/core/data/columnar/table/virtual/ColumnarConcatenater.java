@@ -87,7 +87,6 @@ import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
-import org.knime.core.data.v2.value.VoidRowKeyFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
@@ -298,19 +297,20 @@ public final class ColumnarConcatenater {
 
         private final Map<String, ValueFactory<?, ?>> m_valueFactoriesPerColumn;
 
-        private final DataTableSpec m_concatenatedSpec;
+        private final ValueSchema m_concatenatedSchema;
 
         private final RowIDUniquifier m_rowIDUniquifier;
 
         private final List<ReferenceTable> m_referenceTables = new ArrayList<>();
 
         TablePrepper(final ValueSchema concatenatedSchema) {
-            m_concatenatedSpec = concatenatedSchema.getSourceSpec();
+            m_concatenatedSchema = concatenatedSchema;
             m_valueFactoriesPerColumn = new HashMap<>();
-            for (int c = 0; c < m_concatenatedSpec.getNumColumns(); c++) {
-                // +1 because DataTableSpec doesn't have the RowID as dedicated column
-                m_valueFactoriesPerColumn.put(m_concatenatedSpec.getColumnSpec(c).getName(),
-                    concatenatedSchema.getValueFactory(c + 1));
+            // loop starts from 1, because column 0 is RowKey
+            for (int c = 1; c < concatenatedSchema.numColumns(); c++) {
+                m_valueFactoriesPerColumn.put( //
+                    concatenatedSchema.getDataColumnSpec(c).getName(), //
+                    concatenatedSchema.getValueFactory(c));
             }
             m_rowIDUniquifier = !m_checkForDuplicateIDs && m_rowIDSuffix != null ? new RowIDUniquifier() : null;
         }
@@ -325,10 +325,9 @@ public final class ColumnarConcatenater {
             // we start a new fragment here
             var virtualTable = new ColumnarVirtualTable(table.getId(), table.getSchema(), true);
             var schema = table.getSchema();
-            var spec = schema.getSourceSpec();
             virtualTable = castColumns(virtualTable);
             virtualTable = adjustRowIDs(table, progress, virtualTable);
-            virtualTable = insertMissingColumns(spec, virtualTable);
+            virtualTable = insertMissingColumns(schema, virtualTable);
             progress.setProgress(1);
             return virtualTable;
         }
@@ -358,8 +357,7 @@ public final class ColumnarConcatenater {
                 var concatenateValueFactory = m_valueFactoriesPerColumn.get(colSpec.getName());
                 ValueFactory<ReadAccess, WriteAccess> valueFactory = schema.getValueFactory(c);
                 if (!ValueFactoryUtils.areEqual(concatenateValueFactory, valueFactory)) {
-                    var outputColSpec = m_concatenatedSpec.getColumnSpec(colSpec.getName());
-                    // in concatenate we always perform an upcast, so MapPath.DATA_VALUE is appropriate here
+                    var outputColSpec = m_concatenatedSchema.getColumnSpec(colSpec.getName());
                     casts.add(new ColumnCast(c, outputColSpec, new UntypedValueFactory(valueFactory),
                         new UntypedValueFactory(concatenateValueFactory), CastOperation.UPCAST));
                 }
@@ -370,35 +368,35 @@ public final class ColumnarConcatenater {
             return virtualTable;
         }
 
-        private ColumnarVirtualTable insertMissingColumns(final DataTableSpec spec, ColumnarVirtualTable virtualTable) {
+        private ColumnarVirtualTable insertMissingColumns(final ValueSchema schema, ColumnarVirtualTable virtualTable) {
             // append any missing columns and put them into the correct location
             var missingColumnSpecs = new ArrayList<DataColumnSpec>();
             var missingValueFactories = new ArrayList<ValueFactory<?, ?>>();
-            var permutation = new int[m_concatenatedSpec.getNumColumns() + 1]; // +1 for the row key
-            for (var c = 0; c < m_concatenatedSpec.getNumColumns(); c++) {
-                var columnSpec = m_concatenatedSpec.getColumnSpec(c);
+            final int[] permutation = new int[m_concatenatedSchema.numColumns()];
+            permutation[0] = 0; // the RowKey stays at column 0
+            // loop starts from 1, because column 0 is RowKey
+            for (int c = 1; c < m_concatenatedSchema.numColumns(); c++) {
+                var columnSpec = m_concatenatedSchema.getDataColumnSpec(c);
                 var columnName = columnSpec.getName();
-                if (spec.containsName(columnName)) {
-                    // The column exists. Put it in the correct location (+1 for the row key)
-                    permutation[c + 1] = spec.findColumnIndex(columnName) + 1;
+                int columnIndex = schema.findColumnIndex(columnName);
+                if (columnIndex != -1) {
+                    // The column exists. Put it in the correct location
+                    permutation[c] = columnIndex;
                 } else {
-                    // The missing column will be appended after the existing columns in spec
-                    // and after all other missing columns already found (+1 for the row key)
-                    permutation[c + 1] = spec.getNumColumns() + missingColumnSpecs.size() + 1;
+                    // The missing column will be appended after the existing columns in schema
+                    // and after all other missing columns already found
+                    permutation[c] = schema.numColumns() + missingColumnSpecs.size();
                     missingColumnSpecs.add(columnSpec);
                     missingValueFactories.add(m_valueFactoriesPerColumn.get(columnName));
                 }
             }
             if (!missingColumnSpecs.isEmpty()) {
                 var missingSchema = ValueSchemaUtils.create(
-                    new DataTableSpec(missingColumnSpecs.toArray(DataColumnSpec[]::new)),
-                    Stream.concat(Stream.of(VoidRowKeyFactory.INSTANCE), missingValueFactories.stream())
-                        .toArray(ValueFactory[]::new));
+                    missingColumnSpecs.toArray(DataColumnSpec[]::new),
+                    missingValueFactories.stream().toArray(ValueFactory[]::new));
                 virtualTable = virtualTable.appendMissingValueColumns(missingSchema).selectColumns(permutation);
-            } else if (IntStream.range(0, permutation.length).anyMatch(i -> i != permutation[i])) {
-                virtualTable = virtualTable.selectColumns(permutation);
             }
-            return virtualTable;
+            return virtualTable.selectColumns(permutation);
         }
     }
 
