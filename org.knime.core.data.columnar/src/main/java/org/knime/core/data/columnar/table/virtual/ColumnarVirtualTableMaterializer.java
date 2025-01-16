@@ -48,12 +48,12 @@
  */
 package org.knime.core.data.columnar.table.virtual;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.IntSupplier;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
+import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
@@ -157,15 +157,13 @@ public final class ColumnarVirtualTableMaterializer {
     }
 
     private ValueSchema createContainerSchema(final ValueSchema virtualTableSchema) {
-        var rowIDValueFactory = m_materializeRowKey ? DefaultRowKeyValueFactory.INSTANCE : VoidRowKeyFactory.INSTANCE;
-
         assert ValueSchemaUtils.hasRowID(virtualTableSchema) : "The ColumnarValueSchema should have a RowID";
-        var valueFactories = Stream.concat( //
-            Stream.of(rowIDValueFactory), //
-            IntStream.range(1, virtualTableSchema.numColumns()).mapToObj(virtualTableSchema::getValueFactory) //
-        ).toArray(ValueFactory<?, ?>[]::new);
-        return ValueSchemaUtils.create(virtualTableSchema.getSourceSpec(), valueFactories);
-
+        final var dataColumnSpecs = new DataColumnSpec[virtualTableSchema.numColumns()];
+        Arrays.setAll(dataColumnSpecs, virtualTableSchema::getDataColumnSpec);
+        final var valueFactories = new ValueFactory<?, ?>[virtualTableSchema.numColumns()];
+        Arrays.setAll(valueFactories, virtualTableSchema::getValueFactory);
+        valueFactories[0] = m_materializeRowKey ? DefaultRowKeyValueFactory.INSTANCE : VoidRowKeyFactory.INSTANCE;
+        return ValueSchemaUtils.create(dataColumnSpecs, valueFactories);
     }
 
     private RowContainer createContainer(final ValueSchema schema) throws Exception {
