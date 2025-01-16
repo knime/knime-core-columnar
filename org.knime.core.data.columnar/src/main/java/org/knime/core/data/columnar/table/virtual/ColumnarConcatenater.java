@@ -351,16 +351,16 @@ public final class ColumnarConcatenater {
 
         private ColumnarVirtualTable castColumns(ColumnarVirtualTable virtualTable) {
             var schema = virtualTable.getSchema();
-            var spec = schema.getSourceSpec();
             var casts = new ArrayList<ColumnCast>();
-            for (int c = 0; c < spec.getNumColumns(); c++) {
-                var colSpec = spec.getColumnSpec(c);
+            // loop starts from 1, because column 0 is RowKey
+            for (int c = 1; c < schema.numColumns(); c++) {
+                var colSpec = schema.getDataColumnSpec(c);
                 var concatenateValueFactory = m_valueFactoriesPerColumn.get(colSpec.getName());
-                ValueFactory<ReadAccess, WriteAccess> valueFactory = schema.getValueFactory(c + 1);
+                ValueFactory<ReadAccess, WriteAccess> valueFactory = schema.getValueFactory(c);
                 if (!ValueFactoryUtils.areEqual(concatenateValueFactory, valueFactory)) {
                     var outputColSpec = m_concatenatedSpec.getColumnSpec(colSpec.getName());
                     // in concatenate we always perform an upcast, so MapPath.DATA_VALUE is appropriate here
-                    casts.add(new ColumnCast(c + 1, outputColSpec, new UntypedValueFactory(valueFactory),
+                    casts.add(new ColumnCast(c, outputColSpec, new UntypedValueFactory(valueFactory),
                         new UntypedValueFactory(concatenateValueFactory), CastOperation.UPCAST));
                 }
             }
