@@ -48,20 +48,16 @@
  */
 package org.knime.core.columnar.arrow.mmap;
 
-import java.lang.reflect.Field;
 import java.nio.MappedByteBuffer;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.OwnershipTransferResult;
 import org.apache.arrow.memory.ReferenceManager;
+import org.knime.core.columnar.arrow.unsafe.UnsafeUtil;
 
 import com.google.common.base.Preconditions;
-
-import sun.misc.Unsafe;
 
 /**
  * A {@link ReferenceManager} for a memory-mapped buffer. Keeps track of a reference count and closes the resources when
@@ -76,42 +72,6 @@ import sun.misc.Unsafe;
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 final class MappedReferenceManager implements ReferenceManager {
-
-    private static final Unsafe UNSAFE;
-
-    // copied from org.apache.arrow.memory.MemoryUtil (their UNSAFE field was made private in 18.0)
-    static {
-        try {
-            // try to get the unsafe object
-            final Object maybeUnsafe = AccessController.doPrivileged(new PrivilegedAction<Object>() {
-                @Override
-                public Object run() {
-                    try {
-                        final Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-                        unsafeField.setAccessible(true);
-                        return unsafeField.get(null);
-                    } catch (Throwable e) {
-                        return e;
-                    }
-                }
-            });
-
-            if (maybeUnsafe instanceof Throwable) {
-                throw (Throwable)maybeUnsafe;
-            }
-
-            UNSAFE = (Unsafe)maybeUnsafe;
-        } catch (Throwable e) {
-            // This exception will get swallowed, but it's necessary for the static analysis that ensures
-            // the static fields above get initialized
-            final RuntimeException failure =
-                new RuntimeException("Failed to initialize MemoryUtil. You must start Java with "
-                    + "`--add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED` "
-                    + "(See https://arrow.apache.org/docs/java/install.html)", e);
-            failure.printStackTrace();
-            throw failure;
-        }
-    }
 
     private final AtomicInteger m_refCount;
 
@@ -163,7 +123,7 @@ final class MappedReferenceManager implements ReferenceManager {
                     MappedMessageSerializer.removeBatch(this);
 
                     // Close the mapping explicitly by calling the cleaner of the buffer
-                    UNSAFE.invokeCleaner(m_mappedBuffer);
+                    UnsafeUtil.invokeCleaner(m_mappedBuffer);
                     m_mappedBuffer = null;
                     return true;
             }
