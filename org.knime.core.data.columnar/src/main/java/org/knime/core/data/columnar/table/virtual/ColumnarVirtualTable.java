@@ -62,8 +62,6 @@ import java.util.stream.Stream;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.DataTableSpecCreator;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
@@ -187,16 +185,16 @@ public final class ColumnarVirtualTable {
         return new ColumnarVirtualTable(m_transform, ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema));
     }
 
-    /**
-     * Assign new random column names to the specified columns.
-     *
-     * @param columnIndices columns to rename (note that indices are including RowKey at 0)
-     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
-     */
-    public ColumnarVirtualTable renameToRandomColumnNames(final int... columnIndices) {
-        return new ColumnarVirtualTable(m_transform,
-            ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema, columnIndices));
-    }
+    //    /**
+    //     * Assign new random column names to the specified columns.
+    //     *
+    //     * @param columnIndices columns to rename (note that indices are including RowKey at 0)
+    //     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
+    //     */
+    //    public ColumnarVirtualTable renameToRandomColumnNames(final int... columnIndices) {
+    //        return new ColumnarVirtualTable(m_transform,
+    //            ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema, columnIndices));
+    //    }
 
     /**
      * Assign the specified column names to the specified columns.
@@ -215,11 +213,18 @@ public final class ColumnarVirtualTable {
         if (hasRowID && Arrays.stream(columnIndices).skip(1).anyMatch(i -> i == 0)) {
             // If schema has a RowID, then the RowID column (in this table) is at index 0.
             // It must either be dropped or remain at index 0.
+            // TODO (TP): should we drop this constraint? Probably it is best to let ValueSchema do stuff freely until someone requests a DataTableSpec.
             throw new IllegalArgumentException("RowID must either be dropped or remain at index 0");
         }
-        var valueFactories = IntStream.of(columnIndices)//
-            .mapToObj(schema::getValueFactory)//
-            .toArray(ValueFactory<?, ?>[]::new);
+        final var dataColumnSpecs = new DataColumnSpec[columnIndices.length];
+        final var valueFactories = new ValueFactory<?, ?>[columnIndices.length];
+        Arrays.setAll(dataColumnSpecs, i -> schema.getDataColumnSpec(columnIndices[i]));
+        Arrays.setAll(valueFactories, i -> schema.getValueFactory(columnIndices[i]));
+
+        // TODO (TP): Keep the originalSpec properties (name, properties, ColorHandler)
+        //            To do that, we must add them to ValueSchema.
+        //            Probably they should be encapsulated into a class that is similar to DataTableSpec but with less constraints.
+        /*
         var originalSpec = schema.getSourceSpec();
         var specCreator = new DataTableSpecCreator(originalSpec);
         specCreator.dropAllColumns();
@@ -231,6 +236,9 @@ public final class ColumnarVirtualTable {
         }
         specCreator.addColumns(permutationStream.mapToObj(originalSpec::getColumnSpec).toArray(DataColumnSpec[]::new));
         return createColumnarValueSchema(valueFactories, specCreator.createSpec());
+        */
+
+        return ValueSchemaUtils.create(dataColumnSpecs, valueFactories);
     }
 
     /**
@@ -473,11 +481,6 @@ public final class ColumnarVirtualTable {
         return transforms;
     }
 
-    private static ValueSchema createColumnarValueSchema(final ValueFactory<?, ?>[] valueFactories,
-        final DataTableSpec spec) {
-        return ValueSchemaUtils.create(spec, valueFactories);
-    }
-
     private static Stream<ValueFactory<?, ?>> valueFactoryStream(final ValueSchema schema) {
         return IntStream.range(0, schema.numColumns()).mapToObj(schema::getValueFactory);
     }
@@ -585,7 +588,8 @@ public final class ColumnarVirtualTable {
         }
         final int[] selection = IntStream.range(0, m_valueSchema.numColumns()).toArray();
         selection[columnIndex] = selection.length;
-        return renameToRandomColumnNames(columnIndex).appendMap(mapperFactory, columnIndex).selectColumns(selection);
+        return appendMap(mapperFactory, columnIndex).selectColumns(selection);
+        //        return renameToRandomColumnNames(columnIndex).appendMap(mapperFactory, columnIndex).selectColumns(selection);
     }
 
     public ColumnarVirtualTable observe(final ObserverFactory observerFactory, final int... columnIndices) {
