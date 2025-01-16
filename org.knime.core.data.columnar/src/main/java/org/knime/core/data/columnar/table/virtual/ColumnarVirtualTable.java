@@ -318,9 +318,11 @@ public final class ColumnarVirtualTable {
 
     private static ValueSchema dropRowID(final ValueSchema schema) {
         if (ValueSchemaUtils.hasRowID(schema)) {
-            return ValueSchemaUtils.create(schema.getSourceSpec(), IntStream.range(1, schema.numColumns())//
-                .mapToObj(schema::getValueFactory)//
-                .toArray(ValueFactory<?, ?>[]::new));
+            final var dataColumnSpecs = new DataColumnSpec[schema.numColumns() - 1];
+            final var valueFactories = new ValueFactory<?, ?>[schema.numColumns() - 1];
+            Arrays.setAll(dataColumnSpecs, i -> schema.getDataColumnSpec(i + 1));
+            Arrays.setAll(valueFactories, i -> schema.getValueFactory(i + 1));
+            return ValueSchemaUtils.create(dataColumnSpecs, valueFactories);
         }
         return schema;
     }
