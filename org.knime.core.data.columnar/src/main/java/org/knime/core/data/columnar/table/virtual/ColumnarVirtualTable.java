@@ -208,6 +208,7 @@ public final class ColumnarVirtualTable {
             ValueSchemaUtils.renameColumns(m_valueSchema, columnIndices, columnNames));
     }
 
+    // TODO (TP): Do we need this method at all? There is ValueSchemaUtils.selectColumns(...) which does exactly the same thing, except the hasRowID check
     private static ValueSchema selectColumns(final ValueSchema schema, final int... columnIndices) {
         var hasRowID = ValueSchemaUtils.hasRowID(schema);
         if (hasRowID && Arrays.stream(columnIndices).skip(1).anyMatch(i -> i == 0)) {
