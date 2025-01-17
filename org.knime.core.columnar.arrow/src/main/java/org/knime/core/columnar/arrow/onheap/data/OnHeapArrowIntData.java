@@ -46,6 +46,7 @@
 package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -72,14 +73,15 @@ public final class OnHeapArrowIntData {
     }
 
     /** Arrow implementation of {@link IntWriteData}. */
-    public static final class ArrowIntWriteData extends AbstractOnHeapArrowWriteData<int[]> implements IntWriteData {
+    public static final class ArrowIntWriteData extends AbstractOnHeapArrowWriteData<int[], ArrowIntReadData>
+        implements IntWriteData {
 
         private ArrowIntWriteData(final int capacity) {
             super(new int[capacity], capacity);
         }
 
         private ArrowIntWriteData(final int[] data, final ValidityBuffer validity, final int offset) {
-            super(data, validity, offset);
+            super(data, validity, offset, data.length);
         }
 
         @Override
@@ -94,16 +96,6 @@ public final class OnHeapArrowIntData {
         }
 
         @Override
-        public void expand(final int minimumCapacity) {
-            setNumElements(minimumCapacity);
-        }
-
-        @Override
-        public int capacity() {
-            return m_data.length;
-        }
-
-        @Override
         public long usedSizeFor(final int numElements) {
             return numElements * Integer.BYTES + ValidityBuffer.usedSizeFor(numElements);
         }
@@ -114,24 +106,14 @@ public final class OnHeapArrowIntData {
         }
 
         @Override
-        public ArrowIntReadData close(final int length) {
-            setNumElements(length);
-            var readData = new ArrowIntReadData(m_data, m_validity);
-            closeResources();
-            return readData;
+        protected ArrowIntReadData createReadData(final int length) {
+            return new ArrowIntReadData(m_data, m_validity);
         }
 
-        /**
-         * Expand or shrink the data to the given size.
-         *
-         * @param numElements the new size of the data
-         */
-        private void setNumElements(final int numElements) {
+        @Override
+        protected void setNumElements(final int numElements) {
             m_validity.setNumElements(numElements);
-
-            var newData = new int[numElements];
-            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
-            m_data = newData;
+            m_data = Arrays.copyOf(m_data, numElements);
         }
     }
 

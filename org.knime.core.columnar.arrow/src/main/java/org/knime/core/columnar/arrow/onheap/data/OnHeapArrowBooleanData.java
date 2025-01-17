@@ -72,20 +72,16 @@ public final class OnHeapArrowBooleanData {
     }
 
     /** Arrow implementation of {@link BooleanWriteData}. */
-    public static final class ArrowBooleanWriteData extends AbstractOnHeapArrowWriteData<ValidityBuffer>
-        implements BooleanWriteData {
-
-        private int m_capacity;
+    public static final class ArrowBooleanWriteData
+        extends AbstractOnHeapArrowWriteData<ValidityBuffer, ArrowBooleanReadData> implements BooleanWriteData {
 
         private ArrowBooleanWriteData(final int capacity) {
             super(new ValidityBuffer(capacity), capacity);
-            m_capacity = capacity;
         }
 
         private ArrowBooleanWriteData(final ValidityBuffer data, final ValidityBuffer validity, final int offset,
             final int capacity) {
-            super(data, validity, offset);
-            m_capacity = capacity;
+            super(data, validity, offset, capacity);
         }
 
         @Override
@@ -100,17 +96,6 @@ public final class OnHeapArrowBooleanData {
         }
 
         @Override
-        public void expand(final int minimumCapacity) {
-            setNumElements(minimumCapacity);
-            m_capacity = minimumCapacity;
-        }
-
-        @Override
-        public int capacity() {
-            return m_capacity;
-        }
-
-        @Override
         public long usedSizeFor(final int numElements) {
             return ValidityBuffer.usedSizeFor(numElements) * 2;
         }
@@ -121,19 +106,12 @@ public final class OnHeapArrowBooleanData {
         }
 
         @Override
-        public ArrowBooleanReadData close(final int length) {
-            setNumElements(length);
-            var readData = new ArrowBooleanReadData(m_data, m_validity, length);
-            closeResources();
-            return readData;
+        protected ArrowBooleanReadData createReadData(final int length) {
+            return new ArrowBooleanReadData(m_data, m_validity, length);
         }
 
-        /**
-         * Expand or shrink the data to the given size.
-         *
-         * @param numElements the new size of the data
-         */
-        private void setNumElements(final int numElements) {
+        @Override
+        protected void setNumElements(final int numElements) {
             m_validity.setNumElements(numElements);
             m_data.setNumElements(numElements);
         }

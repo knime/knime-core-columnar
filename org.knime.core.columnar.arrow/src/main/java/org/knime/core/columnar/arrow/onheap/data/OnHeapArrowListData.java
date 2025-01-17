@@ -77,10 +77,8 @@ public final class OnHeapArrowListData {
     }
 
     /** Arrow implementation of {@link ListWriteData}. */
-    public static final class ArrowListWriteData extends AbstractOnHeapArrowWriteData<OnHeapArrowWriteData>
-        implements ListWriteData {
-
-        private int m_capacity;
+    public static final class ArrowListWriteData
+        extends AbstractOnHeapArrowWriteData<OnHeapArrowWriteData, ArrowListReadData> implements ListWriteData {
 
         private OffsetBuffer m_offsets;
 
@@ -92,8 +90,7 @@ public final class OnHeapArrowListData {
 
         private ArrowListWriteData(final OnHeapArrowWriteData data, final OffsetBuffer offsets,
             final ValidityBuffer validity, final int offset, final int capacity) {
-            super(data, validity, offset);
-            m_capacity = capacity;
+            super(data, validity, offset, capacity);
             m_offsets = offsets;
         }
 
@@ -118,17 +115,6 @@ public final class OnHeapArrowListData {
         }
 
         @Override
-        public void expand(final int minimumCapacity) {
-            setNumElements(minimumCapacity);
-            m_capacity = minimumCapacity;
-        }
-
-        @Override
-        public int capacity() {
-            return m_capacity;
-        }
-
-        @Override
         public long usedSizeFor(final int numElements) {
             return ValidityBuffer.usedSizeFor(numElements) //
                 + OffsetBuffer.usedSizeFor(numElements) //
@@ -141,14 +127,9 @@ public final class OnHeapArrowListData {
         }
 
         @Override
-        public ArrowListReadData close(final int length) {
-            // NOTE: setNumElements also shrinks the offsets buffer if necessary
-            setNumElements(length);
+        protected ArrowListReadData createReadData(final int length) {
             m_offsets.fillWithZeroLength();
-            var readData =
-                new ArrowListReadData(m_data.close(m_offsets.getNumData(length)), m_offsets, m_validity, length);
-            closeResources();
-            return readData;
+            return new ArrowListReadData(m_data.close(m_offsets.getNumData(length)), m_offsets, m_validity, length);
         }
 
         @Override
@@ -160,12 +141,8 @@ public final class OnHeapArrowListData {
             m_offsets = null;
         }
 
-        /**
-         * Expand or shrink the data to the given size.
-         *
-         * @param numElements the new size of the data
-         */
-        private void setNumElements(final int numElements) {
+        @Override
+        protected void setNumElements(final int numElements) {
             // Note: m_data is expanded when setting the elements inside the list
             m_validity.setNumElements(numElements);
             m_offsets.setNumElements(numElements);

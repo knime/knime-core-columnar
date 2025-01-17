@@ -84,24 +84,20 @@ public final class OnHeapArrowVarBinaryData {
     }
 
     /** Arrow implementation of {@link VarBinaryWriteData}. */
-    public static final class ArrowVarBinaryWriteData extends AbstractOnHeapArrowWriteData<ByteBigArrayBigList>
-        implements VarBinaryWriteData {
+    public static final class ArrowVarBinaryWriteData extends
+        AbstractOnHeapArrowWriteData<ByteBigArrayBigList, ArrowVarBinaryReadData> implements VarBinaryWriteData {
 
         private LargeOffsetBuffer m_offsets;
 
-        private int m_capacity;
-
         private ArrowVarBinaryWriteData(final int capacity) {
             super(new ByteBigArrayBigList(capacity * (long)INITAL_BYTES_PER_ELEMENT), capacity);
-            m_capacity = capacity;
             m_offsets = new LargeOffsetBuffer(capacity);
         }
 
         private ArrowVarBinaryWriteData(final ByteBigArrayBigList data, final LargeOffsetBuffer offsets,
             final ValidityBuffer validity, final int offset, final int capacity) {
-            super(data, validity, offset);
+            super(data, validity, offset, capacity);
             m_offsets = offsets;
-            m_capacity = capacity;
         }
 
         @Override
@@ -144,19 +140,6 @@ public final class OnHeapArrowVarBinaryData {
         }
 
         @Override
-        public void expand(final int minimumCapacity) {
-            if (minimumCapacity > m_capacity) {
-                setNumElements(minimumCapacity);
-                m_capacity = minimumCapacity;
-            }
-        }
-
-        @Override
-        public int capacity() {
-            return m_capacity;
-        }
-
-        @Override
         public long usedSizeFor(final int numElements) {
             return ValidityBuffer.usedSizeFor(numElements) //
                 + OffsetBuffer.usedSizeFor(numElements) //
@@ -169,15 +152,12 @@ public final class OnHeapArrowVarBinaryData {
         }
 
         @Override
-        public ArrowVarBinaryReadData close(final int length) {
-            setNumElements(length);
+        protected ArrowVarBinaryReadData createReadData(final int length) {
             m_offsets.fillWithZeroLength();
 
             // Trim the data array to the actual data length
             var data = BigArrays.trim(m_data.elements(), m_offsets.getNumData(length));
-            var readData = new ArrowVarBinaryReadData(data, m_offsets, m_validity, length);
-            closeResources();
-            return readData;
+            return new ArrowVarBinaryReadData(data, m_offsets, m_validity, length);
         }
 
         @Override
@@ -186,7 +166,8 @@ public final class OnHeapArrowVarBinaryData {
             m_offsets = null;
         }
 
-        private void setNumElements(final int numElements) {
+        @Override
+        protected void setNumElements(final int numElements) {
             m_validity.setNumElements(numElements);
             m_offsets.setNumElements(numElements);
         }

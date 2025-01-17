@@ -46,6 +46,7 @@
 package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -72,7 +73,7 @@ public final class OnHeapArrowDoubleData {
     }
 
     /** Arrow implementation of {@link DoubleWriteData}. */
-    public static final class ArrowDoubleWriteData extends AbstractOnHeapArrowWriteData<double[]>
+    public static final class ArrowDoubleWriteData extends AbstractOnHeapArrowWriteData<double[], ArrowDoubleReadData>
         implements DoubleWriteData {
 
         private ArrowDoubleWriteData(final int capacity) {
@@ -80,7 +81,7 @@ public final class OnHeapArrowDoubleData {
         }
 
         private ArrowDoubleWriteData(final double[] data, final ValidityBuffer validity, final int offset) {
-            super(data, validity, offset);
+            super(data, validity, offset, data.length);
         }
 
         @Override
@@ -95,16 +96,6 @@ public final class OnHeapArrowDoubleData {
         }
 
         @Override
-        public void expand(final int minimumCapacity) {
-            setNumElements(minimumCapacity);
-        }
-
-        @Override
-        public int capacity() {
-            return m_data.length;
-        }
-
-        @Override
         public long usedSizeFor(final int numElements) {
             return numElements * Double.BYTES + ValidityBuffer.usedSizeFor(numElements);
         }
@@ -115,25 +106,14 @@ public final class OnHeapArrowDoubleData {
         }
 
         @Override
-        public ArrowDoubleReadData close(final int length) {
-            setNumElements(length);
-            var readData = new ArrowDoubleReadData(m_data, m_validity);
-            closeResources();
-            return readData;
+        protected ArrowDoubleReadData createReadData(final int length) {
+            return new ArrowDoubleReadData(m_data, m_validity);
         }
 
-        /**
-         * Expand or shrink the data to the given size.
-         *
-         * @param numElements the new size of the data
-         */
-        private void setNumElements(final int numElements) {
-            // TODO we copy each time. Only copy if necessary! (implement for all data types)
+        @Override
+        protected void setNumElements(final int numElements) {
             m_validity.setNumElements(numElements);
-
-            var newData = new double[numElements];
-            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
-            m_data = newData;
+            m_data = Arrays.copyOf(m_data, numElements);
         }
     }
 
