@@ -67,9 +67,7 @@ import org.knime.core.columnar.data.StringData.StringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
-import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Dictionary encoded string data implementation using Arrow as back end.
@@ -165,18 +163,33 @@ public final class OnHeapArrowDictEncodedStringData {
      */
     public static final class ArrowDictEncodedStringDataFactory extends AbstractArrowDictEncodedDataFactory {
 
-        // TODO key type generic? (to remove cast in StructDictEncodingTest)
+        private static final ArrowDictEncodedStringDataFactory INSTANCE_LONG_KEYS =
+            new ArrowDictEncodedStringDataFactory(KeyType.LONG_KEY);
+
+        private static final ArrowDictEncodedStringDataFactory INSTANCE_INT_KEYS =
+            new ArrowDictEncodedStringDataFactory(KeyType.INT_KEY);
+
+        private static final ArrowDictEncodedStringDataFactory INSTANCE_BYTE_KEYS =
+            new ArrowDictEncodedStringDataFactory(KeyType.BYTE_KEY);
+
+        /**
+         * Get the instance for the given key type.
+         *
+         * @param keyType the key type
+         * @return the factory instance
+         */
+        public static ArrowDictEncodedStringDataFactory getInstance(final KeyType keyType) {
+            return switch (keyType) {
+                case LONG_KEY -> INSTANCE_LONG_KEYS;
+                case INT_KEY -> INSTANCE_INT_KEYS;
+                case BYTE_KEY -> INSTANCE_BYTE_KEYS;
+            };
+        }
 
         private static final int CURRENT_VERSION = 0;
 
-        /**
-         * Constructor.
-         *
-         * @param traits of the data
-         * @throws IllegalArgumentException if traits don't contain {@link DictEncodingTrait}
-         */
-        public ArrowDictEncodedStringDataFactory(final DataTraits traits) {
-            super(traits, ArrowStringDataFactory.INSTANCE, CURRENT_VERSION);
+        private ArrowDictEncodedStringDataFactory(final KeyType keyType) {
+            super(keyType, ArrowStringDataFactory.INSTANCE, CURRENT_VERSION);
         }
 
         @Override

@@ -65,17 +65,15 @@ import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowDictEncodedVarBinary
 import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryReadData;
 import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowDictEncodedVarBinaryData.ArrowDictEncodedVarBinaryWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys;
-import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Test {@link OnHeapArrowDictEncodedVarBinaryData}
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-public class OnHeapArrowDictEncodedVarBinaryDataTest
-    extends AbstractOnHeapArrowDataTest<ArrowDictEncodedVarBinaryWriteData<Byte>, ArrowDictEncodedVarBinaryReadData<Byte>> {
+public class OnHeapArrowDictEncodedVarBinaryDataTest extends
+    AbstractOnHeapArrowDataTest<ArrowDictEncodedVarBinaryWriteData<Byte>, ArrowDictEncodedVarBinaryReadData<Byte>> {
 
     private static final int MAX_LENGTH = 100;
 
@@ -85,7 +83,7 @@ public class OnHeapArrowDictEncodedVarBinaryDataTest
 
     /** Create the test for {@link OnHeapArrowDictEncodedVarBinaryData} */
     public OnHeapArrowDictEncodedVarBinaryDataTest() {
-        super(new ArrowDictEncodedVarBinaryDataFactory(new DefaultDataTraits(new DictEncodingTrait(KeyType.BYTE_KEY))));
+        super(ArrowDictEncodedVarBinaryDataFactory.getInstance(KeyType.BYTE_KEY));
     }
 
     @Override
