@@ -57,10 +57,12 @@ import org.knime.core.columnar.arrow.data.AbstractReferencedData;
  * <code>super.closeResources()</code> to clean up additional resources.
  *
  * @param <T> the type of the data
+ * @param <R> the type of the read data returned by {@link #close(int)}
  * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("javadoc")
-abstract class AbstractOnHeapArrowWriteData<T> extends AbstractReferencedData implements OnHeapArrowWriteData {
+abstract class AbstractOnHeapArrowWriteData<T, R extends OnHeapArrowReadData> extends AbstractReferencedData
+    implements OnHeapArrowWriteData {
 
     /** The data of this object. */
     protected T m_data;
@@ -70,6 +72,8 @@ abstract class AbstractOnHeapArrowWriteData<T> extends AbstractReferencedData im
 
     /** An offset describing where the values of this object start in the vector. */
     protected final int m_offset;
+
+    protected int m_capacity;
 
     /**
      * Create an abstract {@link OnHeapArrowWriteData} with the given capacity and an offset of 0.
@@ -81,19 +85,40 @@ abstract class AbstractOnHeapArrowWriteData<T> extends AbstractReferencedData im
         m_data = data;
         m_validity = new ValidityBuffer(capacity);
         m_offset = 0;
+        m_capacity = capacity;
     }
 
     /**
      * Create an abstract {@link OnHeapArrowWriteData} with the given offset, data object, and validity buffer.
+     *
      * @param data the data object
      * @param validity the validity buffer
      * @param offset the offset
      */
-    public AbstractOnHeapArrowWriteData(final T data, final ValidityBuffer validity, final int offset) {
+    public AbstractOnHeapArrowWriteData(final T data, final ValidityBuffer validity, final int offset,
+        final int capacity) {
         m_data = data;
         m_validity = validity;
         m_offset = offset;
+        m_capacity = capacity;
     }
+
+    /**
+     * Move the data to a new read data object with the given length. This method is called by {@link #close(int)} after
+     * {@link #setNumElements(int)} was called with the appropriate length. Afterwards the resources are released with
+     * {@link #closeResources()}.
+     *
+     * @param length the length of the data
+     * @return the read data
+     */
+    protected abstract R createReadData(final int length);
+
+    /**
+     * Expand or shrink the data to the given size.
+     *
+     * @param numElements the new size of the data
+     */
+    protected abstract void setNumElements(final int numElements);
 
     @Override
     public void setMissing(final int index) {
@@ -102,6 +127,29 @@ abstract class AbstractOnHeapArrowWriteData<T> extends AbstractReferencedData im
 
     protected void setValid(final int index) {
         m_validity.set(index, true);
+    }
+
+    @Override
+    public int capacity() {
+        return m_capacity;
+    }
+
+    @Override
+    public void expand(final int minimumCapacity) {
+        if (minimumCapacity > m_capacity) {
+            setNumElements(minimumCapacity);
+            m_capacity = minimumCapacity;
+        }
+    }
+
+    @Override
+    public R close(final int length) {
+        if (m_capacity != length) {
+            setNumElements(length);
+        }
+        var readData = createReadData(length);
+        closeResources();
+        return readData;
     }
 
     @Override

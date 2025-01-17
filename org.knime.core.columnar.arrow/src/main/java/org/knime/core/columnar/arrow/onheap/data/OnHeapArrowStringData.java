@@ -50,6 +50,7 @@ package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
@@ -112,23 +113,21 @@ public final class OnHeapArrowStringData {
         }
 
         public void setNumElements(final int numElements) {
-            var newData = new String[numElements];
-            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
-            m_data = newData;
+            m_data = Arrays.copyOf(m_data, numElements);
             m_accumulatedDataSizeInBytes.setNumElements(numElements);
         }
     }
 
     /** Arrow implementation of {@link StringReadData}. */
-    public static final class ArrowStringWriteData extends AbstractOnHeapArrowWriteData<SizeAwareStringList>
-        implements StringWriteData {
+    public static final class ArrowStringWriteData
+        extends AbstractOnHeapArrowWriteData<SizeAwareStringList, ArrowStringReadData> implements StringWriteData {
 
         private ArrowStringWriteData(final int capacity) {
             super(new SizeAwareStringList(capacity), capacity);
         }
 
         private ArrowStringWriteData(final SizeAwareStringList data, final ValidityBuffer validity, final int offset) {
-            super(data, validity, offset);
+            super(data, validity, offset, data.capacity());
         }
 
         @Override
@@ -143,16 +142,6 @@ public final class OnHeapArrowStringData {
         }
 
         @Override
-        public void expand(final int minimumCapacity) {
-            setNumElements(minimumCapacity);
-        }
-
-        @Override
-        public int capacity() {
-            return m_data.capacity();
-        }
-
-        @Override
         public long usedSizeFor(final int numElements) {
             return m_data.usedSizeFor(numElements) // m_data String[]
                 + ValidityBuffer.usedSizeFor(numElements); // validity buffer
@@ -164,19 +153,12 @@ public final class OnHeapArrowStringData {
         }
 
         @Override
-        public ArrowStringReadData close(final int length) {
-            setNumElements(length);
-            var readData = new ArrowStringReadData(m_data.usedSizeFor(length), m_data.m_data, m_validity);
-            closeResources();
-            return readData;
+        protected ArrowStringReadData createReadData(final int length) {
+            return new ArrowStringReadData(m_data.usedSizeFor(length), m_data.m_data, m_validity);
         }
 
-        /**
-         * Expand or shrink the data to the given size.
-         *
-         * @param numElements the new size of the data
-         */
-        private void setNumElements(final int numElements) {
+        @Override
+        protected void setNumElements(final int numElements) {
             m_validity.setNumElements(numElements);
             m_data.setNumElements(numElements);
         }

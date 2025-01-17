@@ -47,6 +47,7 @@ package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -167,9 +168,7 @@ public final class OnHeapArrowSmartStringData {
         }
 
         public void setNumElements(final int numElements) {
-            var newData = new String[numElements];
-            System.arraycopy(m_data, 0, newData, 0, Math.min(m_data.length, numElements));
-            m_data = newData;
+            m_data = Arrays.copyOf(m_data, numElements);
             m_offsets.setNumElements(numElements);
             m_accumulatedDataSizeInBytes.setNumElements(numElements);
             m_totalDataSizeInBytes = m_accumulatedDataSizeInBytes.getNumData(numElements);
@@ -263,8 +262,8 @@ public final class OnHeapArrowSmartStringData {
     /**
      * Holds the data of a string column in a combination of a string array and a byte array. Encoding is done lazily.
      */
-    public static final class ArrowStringWriteData extends AbstractOnHeapArrowWriteData<LazyEncodedStringList>
-        implements CopyableStringWriteData {
+    public static final class ArrowStringWriteData extends
+        AbstractOnHeapArrowWriteData<LazyEncodedStringList, ArrowStringReadData> implements CopyableStringWriteData {
 
         private ArrowStringWriteData(final int capacity) {
             super(new LazyEncodedStringList(capacity), capacity);
@@ -272,7 +271,7 @@ public final class OnHeapArrowSmartStringData {
 
         private ArrowStringWriteData(final LazyEncodedStringList data, final ValidityBuffer validity,
             final int offset) {
-            super(data, validity, offset);
+            super(data, validity, offset, data.capacity());
         }
 
         @Override
@@ -308,16 +307,6 @@ public final class OnHeapArrowSmartStringData {
         }
 
         @Override
-        public void expand(final int minimumCapacity) {
-            setNumElements(minimumCapacity);
-        }
-
-        @Override
-        public int capacity() {
-            return m_data.capacity();
-        }
-
-        @Override
         public long usedSizeFor(final int numElements) {
             return m_data.m_accumulatedDataSizeInBytes.getNumData(numElements) // m_data.m_data
                 + m_data.m_dataBytes.size() // m_data.m_dataBytes
@@ -335,21 +324,14 @@ public final class OnHeapArrowSmartStringData {
         }
 
         @Override
-        public ArrowStringReadData close(final int length) {
-            setNumElements(length);
+        protected ArrowStringReadData createReadData(final int length) {
             m_data.m_accumulatedDataSizeInBytes = null;
             // note the offsets reflect the current state of the dataBytes (not necessarily all strings of this data)
-            var readData = new ArrowStringReadData(m_data, m_validity);
-            closeResources();
-            return readData;
+            return new ArrowStringReadData(m_data, m_validity);
         }
 
-        /**
-         * Expand or shrink the data to the given size.
-         *
-         * @param numElements the new size of the data
-         */
-        private void setNumElements(final int numElements) {
+        @Override
+        protected void setNumElements(final int numElements) {
             m_validity.setNumElements(numElements);
             m_data.setNumElements(numElements);
         }
