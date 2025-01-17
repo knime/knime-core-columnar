@@ -70,7 +70,6 @@ import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectDeserializer;
 import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
-import org.knime.core.table.schema.traits.DataTraits;
 
 /**
  * Arrow implementation of {@link DictEncodedVarBinaryWriteData} and {@link DictEncodedVarBinaryReadData}
@@ -189,15 +188,33 @@ public final class OnHeapArrowDictEncodedVarBinaryData {
      */
     public static final class ArrowDictEncodedVarBinaryDataFactory extends AbstractArrowDictEncodedDataFactory {
 
-        private static final int CURRENT_VERSION = 0;
+        private static final ArrowDictEncodedVarBinaryDataFactory INSTANCE_LONG_KEYS =
+            new ArrowDictEncodedVarBinaryDataFactory(KeyType.LONG_KEY);
+
+        private static final ArrowDictEncodedVarBinaryDataFactory INSTANCE_INT_KEYS =
+            new ArrowDictEncodedVarBinaryDataFactory(KeyType.INT_KEY);
+
+        private static final ArrowDictEncodedVarBinaryDataFactory INSTANCE_BYTE_KEYS =
+            new ArrowDictEncodedVarBinaryDataFactory(KeyType.BYTE_KEY);
 
         /**
-         * Constructor.
+         * Get the instance for the given key type.
          *
-         * @param traits containing the KeyType to use for dict encoding
+         * @param keyType the key type
+         * @return the factory instance
          */
-        public ArrowDictEncodedVarBinaryDataFactory(final DataTraits traits) {
-            super(traits, ArrowVarBinaryDataFactory.INSTANCE, CURRENT_VERSION);
+        public static ArrowDictEncodedVarBinaryDataFactory getInstance(final KeyType keyType) {
+            return switch (keyType) {
+                case LONG_KEY -> INSTANCE_LONG_KEYS;
+                case INT_KEY -> INSTANCE_INT_KEYS;
+                case BYTE_KEY -> INSTANCE_BYTE_KEYS;
+            };
+        }
+
+        private static final int CURRENT_VERSION = 0;
+
+        private ArrowDictEncodedVarBinaryDataFactory(final KeyType keyType) {
+            super(keyType, ArrowVarBinaryDataFactory.INSTANCE, CURRENT_VERSION);
         }
 
         @Override
@@ -215,7 +232,6 @@ public final class OnHeapArrowDictEncodedVarBinaryData {
                 throw new IOException("Cannot read ArrowDictEncodedVarBinaryData with version " + version
                     + ". Current version: " + CURRENT_VERSION + ".");
             }
-
         }
     }
 }

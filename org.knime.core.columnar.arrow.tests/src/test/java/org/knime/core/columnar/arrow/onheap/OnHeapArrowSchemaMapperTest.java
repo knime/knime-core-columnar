@@ -63,8 +63,6 @@ import static org.knime.core.table.schema.DataSpecs.VARBINARY;
 import java.util.Arrays;
 
 import org.junit.Test;
-import org.knime.core.columnar.arrow.onheap.OnHeapArrowColumnDataFactory;
-import org.knime.core.columnar.arrow.onheap.OnHeapArrowSchemaMapper;
 import org.knime.core.columnar.arrow.onheap.OnHeapArrowSchemaMapper.ExtensionArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowBooleanData.ArrowBooleanDataFactory;
 import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowByteData.ArrowByteDataFactory;
@@ -84,7 +82,6 @@ import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StructDataSpec;
-import org.knime.core.table.schema.traits.DataTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
 import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
@@ -152,56 +149,56 @@ public class OnHeapArrowSchemaMapperTest {
     @Test
     public void testMapDictEncodedStringDataSpec() {
         testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING)),
-            new ArrowDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
+            ArrowDictEncodedStringDataFactory.getInstance(KeyType.LONG_KEY));
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
     @Test
     public void testMapDictEncodedStringDataSpec_ByteKey() {
         testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.BYTE_KEY))),
-            new ArrowDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.BYTE_KEY)));
+            ArrowDictEncodedStringDataFactory.getInstance(KeyType.BYTE_KEY));
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
     @Test
     public void testMapDictEncodedStringDataSpec_IntKey() {
         testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.INT_KEY))),
-            new ArrowDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.INT_KEY)));
+            ArrowDictEncodedStringDataFactory.getInstance(KeyType.INT_KEY));
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedStringDataFactory} */
     @Test
     public void testMapDictEncodedStringDataSpec_LongKey() {
         testMapSchema(ColumnarSchema.of(STRING(DICT_ENCODING(KeyType.LONG_KEY))),
-            new ArrowDictEncodedStringDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
+            ArrowDictEncodedStringDataFactory.getInstance(KeyType.LONG_KEY));
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec() {
         testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING)),
-            new ArrowDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
+            ArrowDictEncodedVarBinaryDataFactory.getInstance(KeyType.LONG_KEY));
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec_ByteKey() {
         testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.BYTE_KEY))),
-            new ArrowDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.BYTE_KEY)));
+            ArrowDictEncodedVarBinaryDataFactory.getInstance(KeyType.BYTE_KEY));
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec_IntKey() {
         testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.INT_KEY))),
-            new ArrowDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.INT_KEY)));
+            ArrowDictEncodedVarBinaryDataFactory.getInstance(KeyType.INT_KEY));
     }
 
     /** Test mapping DictEncodedStringData specs to a {@link ArrowDictEncodedVarBinaryDataFactory} */
     @Test
     public void testMapDictEncodedVarBinaryDataSpec_LongKey() {
         testMapSchema(ColumnarSchema.of(VARBINARY(DICT_ENCODING(KeyType.LONG_KEY))),
-            new ArrowDictEncodedVarBinaryDataFactory(createDictEncodingTraits(KeyType.LONG_KEY)));
+            ArrowDictEncodedVarBinaryDataFactory.getInstance(KeyType.LONG_KEY));
     }
 
     /** Test mapping String specs to a {@link ArrowStringDataFactory} */
@@ -253,9 +250,9 @@ public class OnHeapArrowSchemaMapperTest {
     }
 
     /**
-     * Test that wrapping factories with empty traits returns the identical factory,
-     * and that even internal traits in nested columns do not change the type of the outer factory
-     * **/
+     * Test that wrapping factories with empty traits returns the identical factory, and that even internal traits in
+     * nested columns do not change the type of the outer factory
+     **/
     @Test
     public void testWrapEmptyTraits() {
         final var factory = ArrowIntDataFactory.INSTANCE;
@@ -275,7 +272,8 @@ public class OnHeapArrowSchemaMapperTest {
     public void testWrapTraits() {
         final var factory = ArrowIntDataFactory.INSTANCE;
         final var traits = ColumnarSchema.of(INT(LOGICAL_TYPE("foo"))).getTraits(0);
-        assertEquals(new ExtensionArrowColumnDataFactory(factory, traits), OnHeapArrowSchemaMapper.wrap(factory, traits));
+        assertEquals(new ExtensionArrowColumnDataFactory(factory, traits),
+            OnHeapArrowSchemaMapper.wrap(factory, traits));
 
         final var nestedFactory = new ArrowStructDataFactory(factory);
         final var nestedTraits = ColumnarSchema.of(STRUCT(LOGICAL_TYPE("foo")).of(INT)).getTraits(0);
@@ -351,7 +349,8 @@ public class OnHeapArrowSchemaMapperTest {
         assertEquals(expectedFactory, unwrap(factory));
     }
 
-    private static void testMapSchemaWrapped(final ColumnarSchema schema, final OnHeapArrowColumnDataFactory expectedFactory) {
+    private static void testMapSchemaWrapped(final ColumnarSchema schema,
+        final OnHeapArrowColumnDataFactory expectedFactory) {
         final OnHeapArrowColumnDataFactory[] factories = OnHeapArrowSchemaMapper.map(schema);
         assertEquals(1, factories.length);
         var factory = factories[0];
@@ -369,9 +368,5 @@ public class OnHeapArrowSchemaMapperTest {
             return new DefaultListDataTraits(innerTraits);
         }
         return DefaultDataTraits.EMPTY;
-    }
-
-    private static DataTraits createDictEncodingTraits(final KeyType keyType) {
-        return new DefaultDataTraits(new DataTrait.DictEncodingTrait(keyType));
     }
 }

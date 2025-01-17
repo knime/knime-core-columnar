@@ -64,9 +64,7 @@ import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowDictEncodedStringDat
 import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowDictEncodedStringData.ArrowDictEncodedStringReadData;
 import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowDictEncodedStringData.ArrowDictEncodedStringWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys;
-import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
-import org.knime.core.table.schema.traits.DefaultDataTraits;
 
 /**
  * Test {@link OnHeapArrowDictEncodedStringData}
@@ -84,7 +82,7 @@ public class OnHeapArrowDictEncodedStringDataTest
 
     /** Create the test for {@link OnHeapArrowDictEncodedStringData} */
     public OnHeapArrowDictEncodedStringDataTest() {
-        super(new ArrowDictEncodedStringDataFactory(new DefaultDataTraits(new DictEncodingTrait(KeyType.LONG_KEY))));
+        super(ArrowDictEncodedStringDataFactory.getInstance(KeyType.LONG_KEY));
     }
 
     @Override
