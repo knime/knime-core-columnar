@@ -76,11 +76,7 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedReadData;
 import org.knime.core.columnar.data.dictencoding.DictEncodedData.DictEncodedWriteData;
 import org.knime.core.columnar.data.dictencoding.DictKeys.DictKeyGenerator;
-import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait;
 import org.knime.core.table.schema.traits.DataTrait.DictEncodingTrait.KeyType;
-import org.knime.core.table.schema.traits.DataTraits;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Base implementations for dictionary encoded data using the Arrow back-end
@@ -327,12 +323,7 @@ public final class AbstractOnHeapArrowDictEncodedData {
 
         protected final KeyType m_keyType;
 
-        protected AbstractArrowDictEncodedDataFactory(final DataTraits traits,
-            final OnHeapArrowColumnDataFactory valueFactory, final int version) {
-            this(keyType(traits), valueFactory, version);
-        }
-
-        private AbstractArrowDictEncodedDataFactory(final KeyType keyType,
+        protected AbstractArrowDictEncodedDataFactory(final KeyType keyType,
             final OnHeapArrowColumnDataFactory valueFactory, final int version) {
             super(version, new ArrowStructDataFactory(createKeyDataFactory(keyType), valueFactory));
             m_keyType = keyType;
@@ -361,11 +352,6 @@ public final class AbstractOnHeapArrowDictEncodedData {
         @Override
         public int initialNumBytesPerElement() {
             return m_children[0].initialNumBytesPerElement();
-        }
-
-        private static KeyType keyType(final DataTraits traits) {
-            Preconditions.checkArgument(DictEncodingTrait.isEnabled(traits), "The column is not dictionary encoded.");
-            return DictEncodingTrait.keyType(traits);
         }
 
         private static OnHeapArrowColumnDataFactory createKeyDataFactory(final KeyType keyType) {

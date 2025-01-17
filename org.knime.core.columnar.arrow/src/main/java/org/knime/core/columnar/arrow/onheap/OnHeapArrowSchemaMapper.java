@@ -177,7 +177,8 @@ final class OnHeapArrowSchemaMapper implements MapperWithTraits<OnHeapArrowColum
     @Override
     public OnHeapArrowColumnDataFactory visit(final VarBinaryDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return wrapCached(new ArrowDictEncodedVarBinaryDataFactory(traits), traits);
+            return wrapCached(ArrowDictEncodedVarBinaryDataFactory.getInstance(DictEncodingTrait.keyType(traits)),
+                traits);
         } else {
             return wrapCached(ArrowVarBinaryDataFactory.INSTANCE, traits);
         }
@@ -205,7 +206,7 @@ final class OnHeapArrowSchemaMapper implements MapperWithTraits<OnHeapArrowColum
     @Override
     public OnHeapArrowColumnDataFactory visit(final StringDataSpec spec, final DataTraits traits) {
         if (DictEncodingTrait.isEnabled(traits)) {
-            return wrapCached(new ArrowDictEncodedStringDataFactory(traits), traits);
+            return wrapCached(ArrowDictEncodedStringDataFactory.getInstance(DictEncodingTrait.keyType(traits)), traits);
         }
         return wrapCached(ArrowStringDataFactory.INSTANCE, traits);
     }
