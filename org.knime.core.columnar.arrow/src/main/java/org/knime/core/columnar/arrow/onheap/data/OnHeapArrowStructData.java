@@ -79,10 +79,8 @@ public final class OnHeapArrowStructData {
     }
 
     /** Arrow implementation of {@link StructWriteData}. */
-    public static final class ArrowStructWriteData extends AbstractOnHeapArrowWriteData<OnHeapArrowWriteData[]>
-        implements StructWriteData {
-
-        private int m_capacity;
+    public static final class ArrowStructWriteData
+        extends AbstractOnHeapArrowWriteData<OnHeapArrowWriteData[], ArrowStructReadData> implements StructWriteData {
 
         private ArrowStructWriteData(final int capacity, final OnHeapArrowWriteData[] data) {
             super(data, capacity);
@@ -91,7 +89,7 @@ public final class OnHeapArrowStructData {
 
         private ArrowStructWriteData(final OnHeapArrowWriteData[] data, final ValidityBuffer validity, final int offset,
             final int capacity) {
-            super(data, validity, offset);
+            super(data, validity, offset, capacity);
             m_capacity = capacity;
         }
 
@@ -110,22 +108,6 @@ public final class OnHeapArrowStructData {
                 slicedChildren[i] = m_data[i].slice(start);
             }
             return new ArrowStructWriteData(slicedChildren, m_validity, m_offset + start, m_capacity - start);
-        }
-
-        @Override
-        public int capacity() {
-            return m_capacity;
-        }
-
-        @Override
-        public void expand(final int minimumCapacity) {
-            if (minimumCapacity > m_capacity) {
-                m_validity.setNumElements(minimumCapacity);
-                for (NullableWriteData child : m_data) {
-                    child.expand(minimumCapacity);
-                }
-                m_capacity = minimumCapacity;
-            }
         }
 
         @Override
@@ -167,6 +149,15 @@ public final class OnHeapArrowStructData {
 
         @Override
         public ArrowStructReadData close(final int length) {
+            // Note that we do not need to set the length of the children, as they are set in the close method
+            m_validity.setNumElements(length);
+            var readData = createReadData(length);
+            closeResources();
+            return readData;
+        }
+
+        @Override
+        protected ArrowStructReadData createReadData(final int length) {
             // Close children and create read children
             var readChildren = new OnHeapArrowReadData[m_data.length];
             var validityBuffers = new ValidityBuffer[m_data.length];
@@ -175,12 +166,18 @@ public final class OnHeapArrowStructData {
                 validityBuffers[i] = readChildren[i].getValidityBuffer();
             }
 
-            m_validity.setNumElements(length);
             m_validity.setFrom(validityBuffers);
 
-            var readData = new ArrowStructReadData(readChildren, m_validity, length);
-            closeResources();
-            return readData;
+            return new ArrowStructReadData(readChildren, m_validity, length);
+        }
+
+        @Override
+        protected void setNumElements(final int numElements) {
+            m_validity.setNumElements(numElements);
+            for (NullableWriteData child : m_data) {
+                child.expand(numElements);
+            }
+            m_capacity = numElements;
         }
     }
 
