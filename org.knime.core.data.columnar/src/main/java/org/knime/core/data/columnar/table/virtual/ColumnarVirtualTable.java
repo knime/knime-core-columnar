@@ -61,12 +61,12 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
-import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.container.ConcatenateTable;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.access.LongAccess;
@@ -421,23 +421,34 @@ public final class ColumnarVirtualTable {
         var incomingTransforms = collectTransforms(tables);
 
         return new ColumnarVirtualTable(new TableTransform(incomingTransforms, new ConcatenateTransformSpec()),
-            concatenateDomainAndMetaData(tables.stream().map(ColumnarVirtualTable::getSchema)));
+            concatenateDomainAndMetaData(
+                tables.stream().map(ColumnarVirtualTable::getSchema).toArray(ValueSchema[]::new)));
     }
 
-    private ValueSchema concatenateDomainAndMetaData(final Stream<ValueSchema> schemas) {
-        var mergedSpec = ConcatenateTable.createSpec(//
-            Stream.concat(Stream.of(m_valueSchema), schemas)//
-                .map(ValueSchema::getSourceSpec)//
-                .toArray(DataTableSpec[]::new)//
-        );
-        return ValueSchemaUtils.updateDataTableSpec(m_valueSchema, mergedSpec);
+    private ValueSchema concatenateDomainAndMetaData(final ValueSchema... schemas) {
+        final var columns = new ValueSchemaColumn[m_valueSchema.numColumns()];
+        Arrays.setAll(columns, i -> concatenateDomainAndMetaData(//
+            m_valueSchema.getColumn(i), //
+            Arrays.stream(schemas).map(schema -> schema.getColumn(i))));
+        return ValueSchemaUtils.create(columns);
+    }
+
+    private static ValueSchemaColumn concatenateDomainAndMetaData(final ValueSchemaColumn column,
+        final Stream<ValueSchemaColumn> columns) {
+        if (column.dataColumnSpec() == null) {
+            return column;
+        }
+        final var specCreator = new DataColumnSpecCreator(column.dataColumnSpec());
+        columns.map(ValueSchemaColumn::dataColumnSpec).forEach(specCreator::merge);
+        final var spec = specCreator.createSpec();
+        return new ValueSchemaColumn(spec, column.valueFactory(), column.dataSpec(), column.dataTraits());
     }
 
     private boolean isConcatenateCompatible(final ValueSchema schema) {
+        // TODO (TP): move to ValueSchema.equalStructure(ValueSchema) if required more often
         return m_valueSchema.numColumns() == schema.numColumns()//
-            && m_valueSchema.getSourceSpec().equalStructure(schema.getSourceSpec())//
             && IntStream.range(0, m_valueSchema.numColumns())
-                .allMatch(i -> ValueFactoryUtils.areEqual(m_valueSchema.getValueFactory(i), schema.getValueFactory(i)));
+                .allMatch(i -> m_valueSchema.getColumn(i).equalStructure(schema.getColumn(i)));
     }
 
     private static ColumnarVirtualTable filterRowID(final ColumnarVirtualTable table) {
