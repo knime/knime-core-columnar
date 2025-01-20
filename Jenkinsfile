@@ -21,9 +21,24 @@ properties([
                 name: "KNIME_BASE_WORKFLOW_TESTS",
             ),
             booleanParam(
+                defaultValue: true,
+                description: "Use legacy Object Cache and batching instead of the HeapBadger",
+                name: "USE_LEGACY_BATCHING",
+            ),
+            booleanParam(
                 defaultValue: false,
                 description: "Use the HeapBadger instead of the Object Cache",
                 name: "USE_HEAP_BADGER",
+            ),
+            booleanParam(
+                defaultValue: true,
+                description: "Use off-heap Arrow implementation",
+                name: "USE_OFF_HEAP",
+            ),
+            booleanParam(
+                defaultValue: false,
+                description: "Use on-heap Arrow implementation",
+                name: "USE_ON_HEAP",
             ),
             booleanParam(
                 defaultValue: BRANCH_NAME == 'master',
@@ -36,98 +51,138 @@ properties([
     disableConcurrentBuilds()
 ])
 
-try {
-    knimetools.defaultTychoBuild('org.knime.update.core.columnar')
+@NonCPS
+Map<String, String> getTestflowConfigs() {
+    def heapBadgerProperty = 'knime.columnar.heapbadger.enable'
+    def onHeapProperty = 'org.knime.core.columnar.store.useOnHeapColumnStore'
+    Map<String, String> testflowConfigs = [:]
 
-    stage("knime-core-columnar workflow tests") {
+    if (params["USE_LEGACY_BATCHING"] && params["USE_OFF_HEAP"]) {
+        testflowConfigs["LEGACY-BATCH OFF-HEAP"] = "-D${heapBadgerProperty}=false\n-D${onHeapProperty}=false"
+    }
+    if (params["USE_LEGACY_BATCHING"] && params["USE_ON_HEAP"]) {
+        testflowConfigs["LEGACY-BATCH ON-HEAP"] = "-D${heapBadgerProperty}=false\n-D${onHeapProperty}=true"
+    }
+    if (params["USE_HEAP_BADGER"] && params["USE_OFF_HEAP"]) {
+        testflowConfigs["HEAP-BADGER OFF-HEAP"] = "-D${heapBadgerProperty}=true\n-D${onHeapProperty}=false"
+    }
+    if (params["USE_HEAP_BADGER"] && params["USE_ON_HEAP"]) {
+        testflowConfigs["HEAP-BADGER ON-HEAP"] = "-D${heapBadgerProperty}=true\n-D${onHeapProperty}=true"
+    }
+
+    return testflowConfigs
+}
+
+def runCoreColumnarWorkflowTests(String vmArgs) {
+    workflowTests.runTests(
+        additionalVmArguments: vmArgs,
+        dependencies: [
+            repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep', 'knime-ensembles', 'knime-xml', 'knime-distance']
+        ]
+    )
+}
+
+def runBaseWorkflowTests(String vmArgs, String testflowsDir, String testflowsRegex) {
+    withEnv(["MALLOC_ARENA_MAX=1"]) {
         workflowTests.runTests(
+            testflowsDir: testflowsDir,
+            testflowsRegex: testflowsRegex,
+            additionalVmArguments: vmArgs,
             dependencies: [
-                repositories: ['knime-core-columnar', 'knime-datageneration', 'knime-jep', 'knime-ensembles', 'knime-xml', 'knime-distance']
+                repositories:  [
+                    "knime-aws",
+                    "knime-base",
+                    "knime-bigdata",
+                    "knime-bigdata-externals",
+                    "knime-birt",
+                    "knime-chemistry",
+                    "knime-cloud",
+                    "knime-conda",
+                    "knime-core",
+                    "knime-core-ui",
+                    "knime-credentials-base",
+                    "knime-database",
+                    "knime-database-proprietary",
+                    "knime-datageneration",
+                    "knime-distance",
+                    "knime-ensembles",
+                    "knime-excel",
+                    "knime-expressions",
+                    "knime-exttool",
+                    "knime-filehandling",
+                    "knime-gateway",
+                    "knime-h2o",
+                    "knime-jep",
+                    "knime-jfreechart",
+                    "knime-js-base",
+                    "knime-js-core",
+                    "knime-js-labs",
+                    "knime-kerberos",
+                    "knime-office365",
+                    "knime-optimization",
+                    "knime-parquet",
+                    "knime-pmml",
+                    "knime-pmml-compilation",
+                    "knime-pmml-translation",
+                    "knime-python",
+                    "knime-python",
+                    "knime-python-legacy",
+                    "knime-r",
+                    "knime-scripting-editor",
+                    "knime-stats",
+                    "knime-streaming",
+                    "knime-svg",
+                    "knime-svm",
+                    "knime-testing-internal",
+                    "knime-textprocessing",
+                    "knime-timeseries",
+                    "knime-weka",
+                    "knime-wide-data",
+                    "knime-xml",
+                ],
+                ius: ["org.knime.features.chem.types.feature.group"],
+            ],
+            sidecarContainers: [
+                [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
             ]
         )
     }
+}
+
+try {
+    knimetools.defaultTychoBuild('org.knime.update.core.columnar')
+
+    def testflowConfigs = getTestflowConfigs()
+
+    stage("knime-core-columnar workflow tests") {
+        def parallelConfigs = [:]
+        testflowConfigs.each { name, vmArgs ->
+            parallelConfigs[name] = {
+                runCoreColumnarWorkflowTests(vmArgs)
+            }
+        }
+        parallel(parallelConfigs)
+    }
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
-        vmArgs = ''
-        if (params["USE_HEAP_BADGER"]) {
-            vmArgs = '-Dknime.columnar.heapbadger.enable=true'
-        }
+        stage("knime-base workflow tests") {
+            def testflowsDir = "Testflows (${baseBranch})/knime-base"
+            def excludedTestflows = [
+                "\\\\QDate&Time/test_AP-6112_DateTimeDifference\\\\E",
+                "\\\\QDate&Time/test_AP-6963_StringToDurationPeriod\\\\E",
+                "\\\\QTransformation/test_CollectionCreator3\\\\E",
+                "\\\\QFlow Control/test_endModelCase\\\\E", // TODO AP-20719 - fix this test
+            ].join('|')
+            def testflowsRegex =
+            "/\\\\Q${testflowsDir}\\\\E/(?:(?!OS|\\\\QFile Handling v2\\\\E|Staging|${excludedTestflows})|OS/__KNIME_OS__/|\\\\QStaging/${BRANCH_NAME}\\\\E).+"
 
-        stage("knime-base workflow tests (${vmArgs})") {
-            withEnv(["MALLOC_ARENA_MAX=1"]) {
-                def testflowsDir = "Testflows (${baseBranch})/knime-base"
-                def excludedTestflows = [
-                    "\\\\QDate&Time/test_AP-6112_DateTimeDifference\\\\E",
-                    "\\\\QDate&Time/test_AP-6963_StringToDurationPeriod\\\\E",
-                    "\\\\QTransformation/test_CollectionCreator3\\\\E",
-                    "\\\\QFlow Control/test_endModelCase\\\\E", // TODO AP-20719 - fix this test
-                ].join('|')
-                def testflowsRegex =
-                "/\\\\Q${testflowsDir}\\\\E/(?:(?!OS|\\\\QFile Handling v2\\\\E|Staging|${excludedTestflows})|OS/__KNIME_OS__/|\\\\QStaging/${BRANCH_NAME}\\\\E).+"
-
-                workflowTests.runTests(
-                    testflowsDir: testflowsDir,
-                    testflowsRegex: testflowsRegex,
-                    additionalVmArguments: vmArgs,
-                    dependencies: [
-                        repositories:  [
-                            "knime-aws",
-                            "knime-base",
-                            "knime-bigdata",
-                            "knime-bigdata-externals",
-                            "knime-birt",
-                            "knime-chemistry",
-                            "knime-cloud",
-                            "knime-conda",
-                            "knime-core",
-                            "knime-core-ui",
-                            "knime-credentials-base",
-                            "knime-database",
-                            "knime-database-proprietary",
-                            "knime-datageneration",
-                            "knime-distance",
-                            "knime-ensembles",
-                            "knime-excel",
-                            "knime-expressions",
-                            "knime-exttool",
-                            "knime-filehandling",
-                            "knime-gateway",
-                            "knime-h2o",
-                            "knime-jep",
-                            "knime-jfreechart",
-                            "knime-js-base",
-                            "knime-js-core",
-                            "knime-js-labs",
-                            "knime-kerberos",
-                            "knime-office365",
-                            "knime-optimization",
-                            "knime-parquet",
-                            "knime-pmml",
-                            "knime-pmml-compilation",
-                            "knime-pmml-translation",
-                            "knime-python",
-                            "knime-python",
-                            "knime-python-legacy",
-                            "knime-r",
-                            "knime-scripting-editor",
-                            "knime-stats",
-                            "knime-streaming",
-                            "knime-svg",
-                            "knime-svm",
-                            "knime-testing-internal",
-                            "knime-textprocessing",
-                            "knime-timeseries",
-                            "knime-weka",
-                            "knime-wide-data",
-                            "knime-xml",
-                        ],
-                        ius: ["org.knime.features.chem.types.feature.group"],
-                    ],
-                    sidecarContainers: [
-                        [ image: "${dockerTools.ECR}/knime/sshd:alpine3.11", namePrefix: "SSHD", port: 22 ]
-                    ]
-                )
+            def parallelConfigs = [:]
+            testflowConfigs.each { name, vmArgs ->
+                parallelConfigs[name] = {
+                    runBaseWorkflowTests(vmArgs, testflowsDir, testflowsRegex)
+                }
             }
+            parallel(parallelConfigs)
         }
     }
 
