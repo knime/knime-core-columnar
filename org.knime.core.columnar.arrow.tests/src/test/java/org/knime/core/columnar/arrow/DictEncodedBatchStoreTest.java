@@ -58,10 +58,11 @@ import static org.knime.core.table.schema.DataSpecs.VARBINARY;
 
 import java.io.IOException;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.knime.core.columnar.arrow.ArrowColumnStoreFactory.ArrowColumnStoreFactoryCreator;
+import org.knime.core.columnar.arrow.ArrowTestUtils.OffHeapOrOnHeap;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.data.ListData.ListReadData;
 import org.knime.core.columnar.data.ListData.ListWriteData;
@@ -86,23 +87,24 @@ import org.knime.core.table.schema.VarBinaryDataSpec.ObjectSerializer;
  *
  * @author Carsten Haubold, KNIME GmbH, Konstanz, Germany
  */
-@SuppressWarnings("javadoc")
-public class DictEncodedBatchStoreTest {
+class DictEncodedBatchStoreTest {
 
     private FileHandle m_tempPath;
 
-    @Before
-    public void before() throws IOException {
+    @BeforeEach
+    void before() throws IOException {
         m_tempPath = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
     }
 
-    @After
-    public void after() throws IOException {
+    @BeforeEach
+    void after() throws IOException {
         m_tempPath.delete();
     }
 
-    @Test
-    public void testListOfDictEncodedString() throws IOException {
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
+    void testListOfDictEncodedString(final OffHeapOrOnHeap impl) throws IOException {
+        impl.setProperty();
         var columnarSchema = ColumnarSchema.of(LIST.of(STRING(DICT_ENCODING)), STRING);
         var cache = new DictElementCache();
         final ColumnStoreFactory factory = createStoreFactory();
@@ -147,8 +149,10 @@ public class DictEncodedBatchStoreTest {
         }
     }
 
-    @Test
-    public void testListOfDictEncodedVarBinary() throws IOException {
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
+    void testListOfDictEncodedVarBinary(final OffHeapOrOnHeap impl) throws IOException {
+        impl.setProperty();
         var columnarSchema = ColumnarSchema.of(LIST.of(VARBINARY(DICT_ENCODING)), STRING);
         var cache = new DictElementCache();
         final ColumnStoreFactory factory = createStoreFactory();
@@ -197,8 +201,10 @@ public class DictEncodedBatchStoreTest {
         }
     }
 
-    @Test
-    public void testStructOfDictEncodedString() throws IOException {
+    @ParameterizedTest
+    @EnumSource(OffHeapOrOnHeap.class)
+    void testStructOfDictEncodedString(final OffHeapOrOnHeap impl) throws IOException {
+        impl.setProperty();
         var columnarSchema = ColumnarSchema.of(STRUCT.of(STRING(DICT_ENCODING), STRING));
         var cache = new DictElementCache();
         final ColumnStoreFactory factory = createStoreFactory();
