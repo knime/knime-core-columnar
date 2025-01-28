@@ -92,9 +92,13 @@ public final class LargeOffsetBuffer {
      * @return a {@code LongOffsetsBuffer} for reading long-based offsets
      */
     public static LargeOffsetBuffer createFrom(final ArrowBuf buffer, final int numElements) {
-        var offsets = new long[numElements + 1];
-        MemoryCopyUtils.copy(buffer, offsets);
-        return new LargeOffsetBuffer(offsets);
+        if (numElements == 0) {
+            return new LargeOffsetBuffer(0);
+        } else {
+            var offsets = new long[numElements + 1];
+            MemoryCopyUtils.copy(buffer, offsets);
+            return new LargeOffsetBuffer(offsets);
+        }
     }
 
     /**

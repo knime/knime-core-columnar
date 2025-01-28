@@ -286,6 +286,16 @@ class OffsetBufferTest {
 
     @ParameterizedTest
     @EnumSource(BufferType.class)
+    void testCreateFromArrowBufWithZeroElements(final BufferType bufferType) {
+        try (ArrowBuf arrowBuf = allocator.buffer(0)) {
+            var buffer = bufferType.createFrom(arrowBuf, 0);
+            assertEquals(0, buffer.getNumData(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buffer.get(0));
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(BufferType.class)
     void testGetNumData(final BufferType bufferType) {
         var buffer = bufferType.construct(5);
 
