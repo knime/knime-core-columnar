@@ -105,9 +105,15 @@ public final class OffsetBuffer {
      * @throws IllegalArgumentException if {@code numElements} is negative
      */
     public static OffsetBuffer createFrom(final ArrowBuf buffer, final int numElements) {
-        var offsets = new int[numElements + 1];
-        MemoryCopyUtils.copy(buffer, offsets);
-        return new OffsetBuffer(offsets);
+        if (numElements == 0) {
+            // Note: For zero elements, Arrow saves an empty buffer.
+            // The logic in the else case would still try to read one value from the offsets buffer.
+            return new OffsetBuffer(0);
+        } else {
+            var offsets = new int[numElements + 1];
+            MemoryCopyUtils.copy(buffer, offsets);
+            return new OffsetBuffer(offsets);
+        }
     }
 
     /**
