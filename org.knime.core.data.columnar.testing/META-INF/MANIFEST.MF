@@ -3,7 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: KNIME Core Data Plugin - Testing
 Bundle-SymbolicName: org.knime.core.data.columnar.testing;singleton:=true
 Automatic-Module-Name: org.knime.core.data.columnar.testing
-Bundle-Version: 5.4.0.qualifier
+Bundle-Version: 5.4.1.qualifier
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-RequiredExecutionEnvironment: JavaSE-17
 Bundle-ActivationPolicy: lazy
