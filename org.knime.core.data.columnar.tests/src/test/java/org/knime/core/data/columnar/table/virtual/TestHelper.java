@@ -177,12 +177,16 @@ public class TestHelper {
 
         private final DataTraits[] m_dataTraits;
 
+        private final DataColumnSpec[] m_columnSpecs;
+
         TestColumnarValueSchema(final ValueFactory<?, ?>[] valueFactories, final DataSpec[] dataSpecs,
             final DataTraits[] dataTraits, final DataTableSpec sourceSpec) {
             m_valueFactories = valueFactories;
             m_dataSpecs = dataSpecs;
             m_sourceSpec = sourceSpec;
             m_dataTraits = dataTraits;
+            m_columnSpecs = new DataColumnSpec[valueFactories.length];
+            Arrays.setAll(m_columnSpecs, i -> i == 0 ? null : sourceSpec.getColumnSpec(i - 1));
         }
 
         @Override
@@ -230,6 +234,11 @@ public class TestHelper {
             return m_valueFactories.length;
         }
 
+        @Override
+        public ValueSchemaColumn getColumn(final int index) {
+            return new ValueSchemaColumn(m_columnSpecs[index], m_valueFactories[index], m_dataSpecs[index],
+                m_dataTraits[index]);
+        }
     }
 
 }
