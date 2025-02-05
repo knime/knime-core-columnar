@@ -235,13 +235,14 @@ public final class ColumnarTableBackend implements TableBackend {
         }
     }
 
-    private static KnowsRowCountTable appendWithRowIDFromTable(
-        final IntSupplier tableIdSupplier, final int tableIndex, final BufferedDataTable[] tables)
-        throws VirtualTableIncompatibleException {
-        var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
-        var refTables = createReferenceTables(tables);
-        return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables, tableIndex),
-            appendedSchema, tables[0].size(), tableIdSupplier.getAsInt());
+    private static KnowsRowCountTable appendWithRowIDFromTable(final IntSupplier tableIdSupplier, final int tableIndex,
+        final BufferedDataTable[] tables) throws VirtualTableIncompatibleException {
+        final var appendedSpec = VirtualTableSchemaUtils.appendDataTableSpecs(tables);
+        final var refTables = createReferenceTables(tables);
+        final var appendedTable =
+            TableTransformUtils.appendTables(refTables, tableIndex);
+        return new VirtualTableExtensionTable(refTables, appendedTable, appendedSpec, tables[0].size(),
+            tableIdSupplier.getAsInt());
     }
 
     @Override
@@ -250,12 +251,13 @@ public final class ColumnarTableBackend implements TableBackend {
         throws CanceledExecutionException {
         final BufferedDataTable[] tables = {preprocessTable(left, exec), preprocessTable(right, exec)};//NOSONAR
         try {
-            var appendedSchema = VirtualTableSchemaUtils.appendSchemas(tables);
             TableTransformUtils.checkRowKeysMatch(progress, tables);
+            final var appendedSpec = VirtualTableSchemaUtils.appendDataTableSpecs(tables);
             final long appendSize = TableTransformUtils.appendSize(tables);
-            var refTables = createReferenceTables(tables);
-            return new VirtualTableExtensionTable(refTables, TableTransformUtils.appendTables(refTables, 0),
-                appendedSchema, appendSize, tableIdSupplier.getAsInt());
+            final var refTables = createReferenceTables(tables);
+            final var appendedTable = TableTransformUtils.appendTables(refTables, 0);
+            return new VirtualTableExtensionTable(refTables, appendedTable, appendedSpec, appendSize,
+                tableIdSupplier.getAsInt());
         } catch (VirtualTableIncompatibleException ex) {// NOSONAR don't spam the log
             logFallback();
             return OLD_BACKEND.append(exec, progress, tableIdSupplier, left, right);

@@ -183,6 +183,15 @@ public final class VirtualTableSchemaUtils {
         return createSchema(tableSpec, factories);
     }
 
+    public static DataTableSpec appendDataTableSpecs(final BufferedDataTable[] tables) {
+        DataTableSpec appended = null;
+        for (var table : tables) {//NOSONAR
+            final var spec = table.getDataTableSpec();
+            appended = (appended == null) ? spec : new DataTableSpec(appended, spec);
+        }
+        return appended;
+    }
+
     /**
      * Rearranges the ColumnarValueSchema of the provided BufferedDataTable according to the provided rearranger.
      *

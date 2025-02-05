@@ -145,7 +145,6 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     /**
      * The workflow's full VirtualTable up to this table. This is not saved but constructed using m_virtualTableFragment
      * and the m_referenceTables. Allows us to optimize the full VirtualTable for requests to this table's data.
-     *
      */
     private final TableTransform m_resolvedTableTransform;
 
@@ -275,7 +274,9 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         final ValueSchema transformedSchema, //
         final long size, //
         final int tableId) {
-        this(refs, virtualTableFragment.getProducingTransform(), transformedSchema, size, tableId);
+        this(refs, virtualTableFragment.getProducingTransform(), transformedSchema, transformedSchema.getSourceSpec(),
+            size,
+            tableId);
     }
 
     /**
@@ -291,12 +292,34 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         final ColumnarVirtualTable virtualTableFragment, //
         final long size, //
         final int tableId) {
-        this(refs, virtualTableFragment.getProducingTransform(), virtualTableFragment.getSchema(), size, tableId);
+        this(refs, virtualTableFragment.getProducingTransform(), virtualTableFragment.getSchema(),
+            virtualTableFragment.getSchema().getSourceSpec(), size, tableId);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param refs the reference tables
+     * @param virtualTableFragment the {@link VirtualTable} representing this table with the {@link ReferenceTable refs}
+     *            as sources
+     * @param dataTableSpec DataTableSpec of this table
+     * @param size number of rows in this table
+     * @param tableId the id with which this table is tracked
+     */
+    // TODO (TP) TEMPORARY
+    public VirtualTableExtensionTable(final ReferenceTable[] refs, //
+        final ColumnarVirtualTable virtualTableFragment, //
+        final DataTableSpec dataTableSpec,
+        final long size, //
+        final int tableId) {
+        this(refs, virtualTableFragment.getProducingTransform(), virtualTableFragment.withDataTableSpec(dataTableSpec).getSchema(), dataTableSpec, size,
+            tableId);
     }
 
     private VirtualTableExtensionTable(final ReferenceTable[] refs, //
         final TableTransform fragmentTableTransform, //
-        final ValueSchema transformedSchema, //
+        final ValueSchema schema, //
+        final DataTableSpec dataTableSpec,
         final long size, //
         final int tableId) {
         m_tableId = tableId;
@@ -306,13 +329,8 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             .map(ReferenceTable::getBufferedTable)//
             .toArray(BufferedDataTable[]::new);
         m_referenceTables = refs;
-        // TODO we could derive the schema from the reference tables but this entails running the computation graph
-        // NOTE: The computation graph does not perform I/O
-        // Any input table dependent checking would still have to happen outside of this constructor
-        // or the VirtualTableExecutor must somehow be configured to do the checking
-        // e.g. via a visitor for the different transformation types
-        m_schema = transformedSchema;
-        m_dataTableSpec = m_schema.getSourceSpec();
+        m_schema = schema;
+        m_dataTableSpec = dataTableSpec;
         m_size = size;
     }
 
