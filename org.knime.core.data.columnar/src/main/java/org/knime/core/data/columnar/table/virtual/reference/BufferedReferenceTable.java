@@ -48,6 +48,7 @@
  */
 package org.knime.core.data.columnar.table.virtual.reference;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
@@ -78,6 +79,7 @@ final class BufferedReferenceTable extends AbstractReferenceTable {
     @SuppressWarnings("resource")
     @Override
     public Map<UUID, RowAccessible> getSources() {
-        return Map.of(getId(), VirtualTableUtils.createRowAccessible(getSchema(), getBufferedTable()));
+        return Collections.singletonMap(getId(),
+            VirtualTableUtils.createRowAccessible(getSchema(), getBufferedTable()));
     }
 }
