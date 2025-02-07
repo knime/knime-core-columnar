@@ -141,7 +141,7 @@ final class ColumnarVirtualTableTest {
         var firstTable = createTable(firstSchema);
         var secondTable = createTable(secondSchema);
 
-        var appendedTable = firstTable.append(List.of(secondTable));
+        var appendedTable = firstTable.append_drop_RowIDs_for_appened_tables(List.of(secondTable));
 
         var expectedSchema = builder(firstTableHasRowID)//
             .withColumn("foo", STRING)//
