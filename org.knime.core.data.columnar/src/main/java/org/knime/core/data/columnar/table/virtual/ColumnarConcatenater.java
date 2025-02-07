@@ -59,7 +59,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.knime.core.data.DataColumnSpec;
@@ -340,9 +339,8 @@ public final class ColumnarConcatenater {
                     var rowIDRefTable = ReferenceTables.createReferenceTable(rowIDTable);
                     m_referenceTables.add(rowIDRefTable);
                     var rowIDSource = new ColumnarVirtualTable(rowIDRefTable.getId(), rowIDRefTable.getSchema(), true);
-                    var virtualTableWithoutRowID =
-                        virtualTable.selectColumns(IntStream.range(1, virtualTable.getSchema().numColumns()).toArray());
-                    virtualTable = rowIDSource.append_drop_RowIDs_for_appened_tables(List.of(virtualTableWithoutRowID));
+                    var virtualTableWithoutRowID = virtualTable.dropColumns(0);
+                    virtualTable = rowIDSource.append(virtualTableWithoutRowID);
                 }
             }
             return virtualTable;
