@@ -70,6 +70,7 @@ import org.knime.core.data.container.WrappedTable;
 import org.knime.core.data.v2.RowKeyValueFactory;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
@@ -217,9 +218,9 @@ public final class VirtualTableSchemaUtils {
      * @param schemas to extract the DataTableSpecs from
      * @return the extracted DataTableSpecs
      */
-    public static DataTableSpec[] extractSpecs(final ValueSchema[] schemas) {
+    public static DataTableSpec[] extractSpecs(final DataTableValueSchema[] schemas) {
         return Stream.of(schemas)//
-            .map(ValueSchema::getSourceSpec)//
+            .map(DataTableValueSchema::getSourceSpec)//
             .toArray(DataTableSpec[]::new);
     }
 
