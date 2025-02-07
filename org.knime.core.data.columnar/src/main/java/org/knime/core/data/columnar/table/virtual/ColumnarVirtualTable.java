@@ -636,7 +636,27 @@ public final class ColumnarVirtualTable {
         final int[] selection = IntStream.range(0, m_valueSchema.numColumns()).toArray();
         selection[columnIndex] = selection.length;
         return appendMap(mapperFactory, columnIndex).selectColumns(selection);
-        //        return renameToRandomColumnNames(columnIndex).appendMap(mapperFactory, columnIndex).selectColumns(selection);
+    }
+
+    /**
+     * Return a new {@code ColumnarVirtualTable} where the column at {@code columnIndex} is replaced with the column
+     * produced by {@code mapperFactory}. The mapper returned by the {@code mapperFactory} doesn't have to be
+     * thread-safe. (For multi-threaded computation, the {@code mapperFactory} will be asked to produce a mapper for
+     * every thread.) The mapper must have exactly one input and exactly one output column.
+     *
+     * @param mapperFactory produces a mapper that is run for every row in this table.
+     * @param columnIndices indices of columns used by the mapper.
+     * @return a new table with the specified columns replaced by the mapper column
+     */
+    public ColumnarVirtualTable replaceMap(final ColumnarMapperWithRowIndexFactory mapperFactory,
+        final int columnIndex) {
+        if (mapperFactory.getOutputSchema().numColumns() != 1) {
+            throw new IllegalArgumentException("ColumnarMapperFactory must produce exactly 1 column");
+        }
+        final int[] selection = IntStream.range(0, m_valueSchema.numColumns()).toArray();
+        selection[columnIndex] = selection.length;
+        return appendMap(mapperFactory, columnIndex).selectColumns(selection);
+
     }
 
     public ColumnarVirtualTable observe(final ObserverFactory observerFactory, final int... columnIndices) {
