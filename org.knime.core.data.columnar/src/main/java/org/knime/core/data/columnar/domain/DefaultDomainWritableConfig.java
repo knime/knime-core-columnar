@@ -56,7 +56,6 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.data.BoundedValue;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.DataColumnSpec;
-import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.DataValueComparatorDelegator;
 import org.knime.core.data.NominalValue;
@@ -136,16 +135,17 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
         createDomainCalculators() {
         if (m_domainCalculators == null) {
             m_domainCalculators = new ConcurrentHashMap<>();
-            final DataTableSpec spec = m_schema.getSourceSpec();
-            for (int i = 1; i < m_schema.numColumns(); i++) {
-                final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
-                final ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain> calculator =
-                    createDomainCalculator(colSpec, m_readValueFactories[i]);
-                if (calculator != null) {
-                    if (m_initDomains) { // NOSONAR
-                        calculator.update(colSpec.getDomain());
+            for (int i = 0; i < m_schema.numColumns(); i++) {
+                final DataColumnSpec colSpec = m_schema.getDataColumnSpec(i);
+                if (colSpec != null) {
+                    final ColumnarDomainCalculator<? extends NullableReadData, DataColumnDomain> calculator =
+                        createDomainCalculator(colSpec, m_readValueFactories[i]);
+                    if (calculator != null) {
+                        if (m_initDomains) { // NOSONAR
+                            calculator.update(colSpec.getDomain());
+                        }
+                        m_domainCalculators.put(i, calculator);
                     }
-                    m_domainCalculators.put(i, calculator);
                 }
             }
         }
@@ -188,18 +188,19 @@ public final class DefaultDomainWritableConfig implements DomainWritableConfig {
         createMetadataCalculators() {
         if (m_metadataCalculators == null) {
             m_metadataCalculators = new ConcurrentHashMap<>();
-            final DataTableSpec spec = m_schema.getSourceSpec();
-            for (int i = 1; i < m_schema.numColumns(); i++) {
-                final DataColumnSpec colSpec = spec.getColumnSpec(i - 1);
-                final Collection<DataColumnMetaDataCreator<?>> metadataCreators =
-                    DataColumnMetaDataRegistry.INSTANCE.getCreators(colSpec.getType());
-                if (!metadataCreators.isEmpty() && m_initDomains) {
-                    metadataCreators
-                        .forEach(m -> colSpec.getMetaDataOfType(m.getMetaDataClass()).ifPresent(o -> merge(m, o)));
-                    m_metadataCalculators.put(i,
-                        new ColumnarMetadataCalculator<>(
-                            metadataCreators.toArray(new DataColumnMetaDataCreator[metadataCreators.size()]),
-                            (ColumnarReadValueFactory<NullableReadData>)m_readValueFactories[i]));
+            for (int i = 0; i < m_schema.numColumns(); i++) {
+                final DataColumnSpec colSpec = m_schema.getDataColumnSpec(i);
+                if (colSpec != null) {
+                    final Collection<DataColumnMetaDataCreator<?>> metadataCreators =
+                        DataColumnMetaDataRegistry.INSTANCE.getCreators(colSpec.getType());
+                    if (!metadataCreators.isEmpty() && m_initDomains) {
+                        metadataCreators
+                            .forEach(m -> colSpec.getMetaDataOfType(m.getMetaDataClass()).ifPresent(o -> merge(m, o)));
+                        m_metadataCalculators.put(i,
+                            new ColumnarMetadataCalculator<>(
+                                metadataCreators.toArray(new DataColumnMetaDataCreator[metadataCreators.size()]),
+                                (ColumnarReadValueFactory<NullableReadData>)m_readValueFactories[i]));
+                    }
                 }
             }
         }
