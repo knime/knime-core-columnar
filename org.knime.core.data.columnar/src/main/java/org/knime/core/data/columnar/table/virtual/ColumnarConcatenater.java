@@ -161,19 +161,16 @@ public final class ColumnarConcatenater {
         var refTables = ReferenceTables.createReferenceTables(tables);
 
         var tablePrepper = new TablePrepper(concatenatedSchema);
-        progressMonitor.setMessage("Prepare first table");
-        var first = tablePrepper.prepare(refTables[0], progressMonitor.createSubProgress(1.0 / tables.length));
         List<ColumnarVirtualTable> preparedTables = new ArrayList<>(tables.length - 1);
-        for (int i = 1; i < refTables.length; i++) {
+        for (int i = 0; i < refTables.length; i++) {
             progressMonitor.setMessage("Prepare table nr %s.".formatted(i + 1));
             preparedTables
                 .add(tablePrepper.prepare(refTables[i], progressMonitor.createSubProgress(1.0 / tables.length)));
         }
-        var virtualTable = first.concatenate(preparedTables);
+        var virtualTable = preparedTables.remove(0).concatenate(preparedTables);
 
         if (m_generateNewRowIDs) {
-            var rowIDTable = virtualTable.map(new RowIDGenerator());
-            virtualTable = rowIDTable.append_drop_RowIDs_for_appened_tables(virtualTable);
+            virtualTable = virtualTable.replaceMap(new RowIDGenerator(), 0);
         }
 
         return new VirtualTableExtensionTable(tablePrepper.getReferenceTables(), virtualTable, concatenatedSize,
