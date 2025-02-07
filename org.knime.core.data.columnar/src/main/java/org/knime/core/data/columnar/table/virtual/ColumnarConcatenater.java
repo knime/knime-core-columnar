@@ -174,7 +174,7 @@ public final class ColumnarConcatenater {
 
         if (m_generateNewRowIDs) {
             var rowIDTable = virtualTable.map(new RowIDGenerator());
-            virtualTable = rowIDTable.append(virtualTable);
+            virtualTable = rowIDTable.append_drop_RowIDs_for_appened_tables(virtualTable);
         }
 
         return new VirtualTableExtensionTable(tablePrepper.getReferenceTables(), virtualTable, concatenatedSize,
@@ -342,7 +342,7 @@ public final class ColumnarConcatenater {
                     var rowIDSource = new ColumnarVirtualTable(rowIDRefTable.getId(), rowIDRefTable.getSchema(), true);
                     var virtualTableWithoutRowID =
                         virtualTable.selectColumns(IntStream.range(1, virtualTable.getSchema().numColumns()).toArray());
-                    virtualTable = rowIDSource.append(List.of(virtualTableWithoutRowID));
+                    virtualTable = rowIDSource.append_drop_RowIDs_for_appened_tables(List.of(virtualTableWithoutRowID));
                 }
             }
             return virtualTable;

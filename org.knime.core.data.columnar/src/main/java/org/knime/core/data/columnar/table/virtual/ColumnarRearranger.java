@@ -171,7 +171,7 @@ public final class ColumnarRearranger {
             var appendTable = createAppendTable(refTable, newColumns, progressMonitor, table.size());
             refTables.add(appendTable);
             var appendTableSource = asFragmentSource(appendTable).dropColumns(0); // filter out the void row key column
-            tableToRearrange = tableToRearrange.append(appendTableSource);
+            tableToRearrange = tableToRearrange.append_drop_RowIDs_for_appened_tables(appendTableSource);
         }
 
         var rearrangedTable = rearrange(newColumns, existingColumns, tableToRearrange);
