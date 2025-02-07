@@ -62,6 +62,7 @@ import java.util.stream.Stream;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
@@ -276,21 +277,14 @@ public final class ColumnarVirtualTable {
 
     /**
      * Appends the provided tables to this table.
-     * <p>
-     * If the appended {@code tables} have RowID columns, these are dropped. Only the RowID of {@code this} table is
-     * kept (if present).
      *
      * @param tables to append
      * @return the appended table
      */
-    // TODO (TP) Don't drop RowID columns here! This should be separate and ColumnarVirtualTable shouldn't care.
     public ColumnarVirtualTable append(final List<ColumnarVirtualTable> tables) {
-        var tablesWithoutRowIDs = tables.stream()//
-            .map(ColumnarVirtualTable::filterRowID)//
-            .toList();
         var transformSpec = new AppendTransformSpec();
-        var schema = appendSchemas(collectSchemas(tablesWithoutRowIDs));
-        var transforms = collectTransforms(tablesWithoutRowIDs);
+        var transforms = collectTransforms(tables);
+        var schema = appendSchemas(collectSchemas(tables));
         return new ColumnarVirtualTable(new TableTransform(transforms, transformSpec), schema);
     }
 
@@ -302,6 +296,41 @@ public final class ColumnarVirtualTable {
      */
     public ColumnarVirtualTable append(final ColumnarVirtualTable... tables) {
         return append(Arrays.asList(tables));
+    }
+
+    /**
+     * Appends the provided tables to this table.
+     * <p>
+     * If the appended {@code tables} have RowID columns, these are dropped. Only the RowID of {@code this} table is
+     * kept (if present).
+     *
+     * @param tables to append
+     * @return the appended table
+     */
+    // TODO (TP) Don't drop RowID columns here! This should be separate and ColumnarVirtualTable shouldn't care.
+    @Deprecated
+    public ColumnarVirtualTable append_drop_RowIDs_for_appened_tables(final List<ColumnarVirtualTable> tables) {
+        var tablesWithoutRowIDs = tables.stream()//
+            .map(ColumnarVirtualTable::filterRowID)//
+            .toList();
+        var transformSpec = new AppendTransformSpec();
+        var schema = appendSchemas(collectSchemas(tablesWithoutRowIDs));
+        var transforms = collectTransforms(tablesWithoutRowIDs);
+        return new ColumnarVirtualTable(new TableTransform(transforms, transformSpec), schema);
+    }
+
+    /**
+     * Appends the provided tables to this table.
+     * <p>
+     * If the appended {@code tables} have RowID columns, these are dropped. Only the RowID of {@code this} table is
+     * kept (if present).
+     *
+     * @param tables to append
+     * @return the appended table
+     */
+    @Deprecated
+    public ColumnarVirtualTable append_drop_RowIDs_for_appened_tables(final ColumnarVirtualTable... tables) {
+        return append_drop_RowIDs_for_appened_tables(Arrays.asList(tables));
     }
 
     /**
@@ -326,7 +355,7 @@ public final class ColumnarVirtualTable {
 
     public ColumnarVirtualTable appendMissingValueColumns(final ValueSchema missing) {
         var missingSchema = dropRowID(missing);
-        var newSchema = appendSchemas(List.of(m_valueSchema, missingSchema));
+        var newSchema = appendSchemas(m_valueSchema, missingSchema);
         var transformSpec = new AppendMissingValuesTransformSpec(missingSchema);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), newSchema);
     }
@@ -475,6 +504,14 @@ public final class ColumnarVirtualTable {
         return ValueSchemaUtils.create(dataColumnSpecs, valueFactories);
     }
 
+    private static Stream<ValueFactory<?, ?>> valueFactoryStream(final ValueSchema schema) {
+        return IntStream.range(0, schema.numColumns()).mapToObj(schema::getValueFactory);
+    }
+
+    private static Stream<DataColumnSpec> dataColumnSpecStream(final ValueSchema schema) {
+        return IntStream.range(0, schema.numColumns()).mapToObj(schema::getDataColumnSpec);
+    }
+
     private static ValueSchema appendRowIndex(final ValueSchema schema, final String columnName) {
         final int numColumns = schema.numColumns();
         var valueFactories = new ValueFactory<?, ?>[numColumns + 1];
@@ -497,14 +534,6 @@ public final class ColumnarVirtualTable {
         transforms.add(m_transform);
         transforms.addAll(Collections2.transform(tables, ColumnarVirtualTable::getProducingTransform));
         return transforms;
-    }
-
-    private static Stream<ValueFactory<?, ?>> valueFactoryStream(final ValueSchema schema) {
-        return IntStream.range(0, schema.numColumns()).mapToObj(schema::getValueFactory);
-    }
-
-    private static Stream<DataColumnSpec> dataColumnSpecStream(final ValueSchema schema) {
-        return IntStream.range(0, schema.numColumns()).mapToObj(schema::getDataColumnSpec);
     }
 
     private List<ValueSchema> collectSchemas(final List<ColumnarVirtualTable> tables) {

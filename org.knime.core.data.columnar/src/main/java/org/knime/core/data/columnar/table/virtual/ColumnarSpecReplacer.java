@@ -142,7 +142,7 @@ public final class ColumnarSpecReplacer {
             table.map(new TableCasterFactory(casts.stream().map(ColumnCast::createCasterFactory).toList(),
                 fsHandler.getDataRepository()), indexFilters.castedColumns());
         return table.selectColumns(indexFilters.unCastedColumns())//
-            .append(List.of(castedColumns))//
+            .append_drop_RowIDs_for_appened_tables(List.of(castedColumns))//
             .selectColumns(indexFilters.mergePermutation());
     }
 
