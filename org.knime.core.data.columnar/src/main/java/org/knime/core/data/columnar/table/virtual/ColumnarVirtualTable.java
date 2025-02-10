@@ -53,6 +53,7 @@ import static org.knime.core.table.virtual.spec.SelectColumnsTransformSpec.indic
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -61,6 +62,7 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
+import org.knime.core.data.DataColumnSpecCreator.MergeOptions;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.def.LongCell;
@@ -468,13 +470,20 @@ public final class ColumnarVirtualTable {
         return ValueSchemaUtils.create(columns);
     }
 
+    /**
+     * The options {@link DataColumnSpecCreator#merge(DataColumnSpec, java.util.Set)} is called with. This is the same
+     * as in AppendedRowsTable
+     */
+    private static final EnumSet<MergeOptions> MERGE_OPTIONS =
+        EnumSet.of(MergeOptions.ALLOW_VARYING_TYPES, MergeOptions.ALLOW_VARYING_ELEMENT_NAMES);
+
     private static ValueSchemaColumn concatenateDomainAndMetaData(final ValueSchemaColumn column,
         final Stream<ValueSchemaColumn> columns) {
         if (column.dataColumnSpec() == null) {
             return column;
         }
         final var specCreator = new DataColumnSpecCreator(column.dataColumnSpec());
-        columns.map(ValueSchemaColumn::dataColumnSpec).forEach(specCreator::merge);
+        columns.map(ValueSchemaColumn::dataColumnSpec).forEach(colSpec -> specCreator.merge(colSpec, MERGE_OPTIONS));
         final var spec = specCreator.createSpec();
         return new ValueSchemaColumn(spec, column.valueFactory(), column.dataSpec(), column.dataTraits());
     }
