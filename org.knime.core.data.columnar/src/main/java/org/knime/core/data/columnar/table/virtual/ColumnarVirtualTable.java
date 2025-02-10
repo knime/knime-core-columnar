@@ -68,6 +68,7 @@ import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarM
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
@@ -184,8 +185,10 @@ public final class ColumnarVirtualTable {
      *
      * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
      */
+    @Deprecated // TODO (TP) remove
     public ColumnarVirtualTable renameToRandomColumnNames() {
-        return new ColumnarVirtualTable(m_transform, ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema));
+        return new ColumnarVirtualTable(m_transform,
+            ValueSchemaUtils.renameToRandomColumnNames((DataTableValueSchema)m_valueSchema));
     }
 
     //    /**
@@ -206,9 +209,10 @@ public final class ColumnarVirtualTable {
      * @param columnNames new names to assign
      * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with renamed column.
      */
+    @Deprecated // TODO (TP) remove
     public ColumnarVirtualTable renameColumns(final int[] columnIndices, final String[] columnNames) {
         return new ColumnarVirtualTable(m_transform,
-            ValueSchemaUtils.renameColumns(m_valueSchema, columnIndices, columnNames));
+            ValueSchemaUtils.renameColumns((DataTableValueSchema)m_valueSchema, columnIndices, columnNames));
     }
 
     // TODO (TP): Do we need this method at all? There is ValueSchemaUtils.selectColumns(...) which does exactly the same thing, except the hasRowID check
