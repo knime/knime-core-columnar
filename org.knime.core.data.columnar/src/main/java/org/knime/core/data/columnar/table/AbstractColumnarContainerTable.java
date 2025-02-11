@@ -64,7 +64,7 @@ import org.knime.core.data.columnar.table.ResourceLeakDetector.ResourceWithRelea
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
@@ -114,6 +114,8 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
     private final long m_tableId;
 
+    private final DataTableValueSchema m_schema;
+
     private final ColumnarRowReadTable m_columnarTable;
 
     private final RandomRowAccessible m_rowAccessibleView = new ColumnarContainerRowAccessible();
@@ -143,12 +145,14 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
         }
 
         final BatchReadStore readStore = factory.createReadStore(tempDataPath);
-        var schema = ValueSchemaUtils.load(readStore.getSchema(), context);
-        m_columnarTable = new ColumnarRowReadTable(schema, factory, readStore, size);
+        m_schema = ValueSchemaUtils.load(readStore.getSchema(), context);
+        m_columnarTable = new ColumnarRowReadTable(m_schema, factory, readStore, size);
     }
 
-    AbstractColumnarContainerTable(final int tableId, final ColumnarRowReadTable columnarTable) {
+    AbstractColumnarContainerTable(final int tableId, final DataTableValueSchema schema,
+        final ColumnarRowReadTable columnarTable) {
         m_tableId = tableId;
+        m_schema = schema;
         m_columnarTable = columnarTable;
     }
 
@@ -170,12 +174,12 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
 
     @Override
     public DataTableSpec getDataTableSpec() {
-        return m_columnarTable.getSchema().getSourceSpec();
+        return m_schema.getSourceSpec();
     }
 
     @Override
-    public ValueSchema getSchema() {
-        return m_columnarTable.getSchema();
+    public DataTableValueSchema getSchema() {
+        return m_schema;
     }
 
     @Override

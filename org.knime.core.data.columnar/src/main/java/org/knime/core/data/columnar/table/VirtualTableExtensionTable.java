@@ -72,7 +72,7 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.CloseableRowIterator;
 import org.knime.core.data.container.filter.TableFilter;
 import org.knime.core.data.v2.RowCursor;
-import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.BufferedDataTable.KnowsRowCountTable;
@@ -125,9 +125,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private static final String CFG_TRANSFORMSPECS = "SPECS";
 
-    private final DataTableSpec m_dataTableSpec;
-
-    private final ValueSchema m_schema;
+    private final DataTableValueSchema m_schema;
 
     private final BufferedDataTable[] m_refTables;
 
@@ -261,26 +259,10 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     /**
      * Constructor.
-     *
-     * @param refs the reference tables
-     * @param virtualTableFragment the {@link VirtualTable} representing this table with the {@link ReferenceTable refs}
-     *            as sources
-     * @param transformedSchema the {@link ValueSchema} AFTER the transformations are applied
-     * @param size the size of the output table AFTER the transformations are applied
-     * @param tableId the id with which this table is tracked
-     */
-    public VirtualTableExtensionTable(final ReferenceTable[] refs, //
-        final VirtualTable virtualTableFragment, //
-        final ValueSchema transformedSchema, //
-        final long size, //
-        final int tableId) {
-        this(refs, virtualTableFragment.getProducingTransform(), transformedSchema, transformedSchema.getSourceSpec(),
-            size,
-            tableId);
-    }
-
-    /**
-     * Constructor.
+     * <p>
+     * For making an {@code ExtensionTable}, we need a {@code DataTableSpec}. This constructor creates a new
+     * {@code DataTableSpec} from the column specs in {@code virtualTableFragment}. Note that this means that
+     * {@code virtualTableFragment} must have a RowID column at index 0, and must not have duplicate column names.
      *
      * @param refs the reference tables
      * @param virtualTableFragment the {@link VirtualTable} representing this table with the {@link ReferenceTable refs}
@@ -292,12 +274,17 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         final ColumnarVirtualTable virtualTableFragment, //
         final long size, //
         final int tableId) {
-        this(refs, virtualTableFragment.getProducingTransform(), virtualTableFragment.getSchema(),
-            virtualTableFragment.getSchema().getSourceSpec(), size, tableId);
+        this(refs, virtualTableFragment, DataTableValueSchema.createDataTableSpec(virtualTableFragment.getSchema()),
+            size, tableId);
     }
 
     /**
      * Constructor.
+     * <p>
+     * For making an {@code ExtensionTable}, we need a {@code DataTableSpec}. This constructor uses the provided
+     * {@code dataTableSpec}. Note that this must be compatible with the column specs in {@code virtualTableFragment}.
+     * In particular, {@code virtualTableFragment} must have a RowID column at index 0, and column specs must match
+     * those of {@code dataTableSpec} (offset by {@code +1} to account for the RowID).
      *
      * @param refs the reference tables
      * @param virtualTableFragment the {@link VirtualTable} representing this table with the {@link ReferenceTable refs}
@@ -306,20 +293,19 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
      * @param size number of rows in this table
      * @param tableId the id with which this table is tracked
      */
-    // TODO (TP) TEMPORARY
     public VirtualTableExtensionTable(final ReferenceTable[] refs, //
         final ColumnarVirtualTable virtualTableFragment, //
-        final DataTableSpec dataTableSpec,
+        final DataTableSpec dataTableSpec, //
         final long size, //
         final int tableId) {
-        this(refs, virtualTableFragment.getProducingTransform(), virtualTableFragment.withDataTableSpec(dataTableSpec).getSchema(), dataTableSpec, size,
+        this(refs, virtualTableFragment.getProducingTransform(),
+            DataTableValueSchema.create(dataTableSpec, virtualTableFragment.getSchema()), size,
             tableId);
     }
 
     private VirtualTableExtensionTable(final ReferenceTable[] refs, //
         final TableTransform fragmentTableTransform, //
-        final ValueSchema schema, //
-        final DataTableSpec dataTableSpec,
+        final DataTableValueSchema schema, // TODO (TP) dataTableSpec should be taken from DataTableValueSchema
         final long size, //
         final int tableId) {
         m_tableId = tableId;
@@ -330,7 +316,6 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
             .toArray(BufferedDataTable[]::new);
         m_referenceTables = refs;
         m_schema = schema;
-        m_dataTableSpec = dataTableSpec;
         m_size = size;
     }
 
@@ -350,7 +335,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
     /**
      * @return the schema of the table
      */
-    public ValueSchema getSchema() {
+    public DataTableValueSchema getSchema() {
         return m_schema;
     }
 
@@ -381,7 +366,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     @Override
     public DataTableSpec getDataTableSpec() {
-        return m_dataTableSpec;
+        return m_schema.getSourceSpec();
     }
 
     @Deprecated

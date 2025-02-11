@@ -83,6 +83,7 @@ import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowCursor;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
@@ -161,7 +162,7 @@ public final class ColumnarConcatenater {
         var refTables = ReferenceTables.createReferenceTables(tables);
 
         var tablePrepper = new TablePrepper(concatenatedSchema);
-        List<ColumnarVirtualTable> preparedTables = new ArrayList<>(tables.length - 1);
+        List<ColumnarVirtualTable> preparedTables = new ArrayList<>(tables.length);
         for (int i = 0; i < refTables.length; i++) {
             progressMonitor.setMessage("Prepare table nr %s.".formatted(i + 1));
             preparedTables
@@ -173,8 +174,8 @@ public final class ColumnarConcatenater {
             virtualTable = virtualTable.replaceMap(new RowIDGenerator(), 0);
         }
 
-        return new VirtualTableExtensionTable(tablePrepper.getReferenceTables(), virtualTable, concatenatedSize,
-            m_tableIdSupplier.getAsInt());
+        return new VirtualTableExtensionTable(tablePrepper.getReferenceTables(), virtualTable,
+            concatenatedSchema.getSourceSpec(), concatenatedSize, m_tableIdSupplier.getAsInt());
     }
 
     private static final class RowIDGenerator implements ColumnarMapperWithRowIndexFactory {
@@ -209,7 +210,7 @@ public final class ColumnarConcatenater {
 
     }
 
-    private ValueSchema concatenate(final ValueSchema[] schemas) {
+    private DataTableValueSchema concatenate(final DataTableValueSchema[] schemas) {
         final var tableSpecs = VirtualTableSchemaUtils.extractSpecs(schemas);
         var unionSchemaCreators = new LinkedHashMap<String, ColCreator>();
         for (int t = 0; t < schemas.length; t++) {
@@ -353,8 +354,8 @@ public final class ColumnarConcatenater {
                 ValueFactory<ReadAccess, WriteAccess> valueFactory = schema.getValueFactory(c);
                 if (!ValueFactoryUtils.areEqual(concatenateValueFactory, valueFactory)) {
                     var outputColSpec = m_concatenatedSchema.getColumnSpec(colSpec.getName());
-                    casts.add(new ColumnCast(c, outputColSpec, new UntypedValueFactory(valueFactory),
-                        new UntypedValueFactory(concatenateValueFactory), CastOperation.UPCAST));
+                    casts.add(
+                        new ColumnCast(c, outputColSpec, valueFactory, concatenateValueFactory, CastOperation.UPCAST));
                 }
             }
             if (!casts.isEmpty()) {

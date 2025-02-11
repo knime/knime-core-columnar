@@ -203,6 +203,7 @@ public final class VirtualTableSchemaUtils {
      *             (including reference tables) are not compatible with virtual tables (created prior to 4.5.0 or
      *             concatenation with varying ValueFactories in any column)
      */
+    @Deprecated // TODO (TP) Remove
     public static ValueSchema rearrangeSchema(final BufferedDataTable table, final ColumnRearranger rearranger)
         throws VirtualTableIncompatibleException {
         if (!ColumnRearrangerUtils.addsNoNewColumns(rearranger)) {
@@ -229,16 +230,17 @@ public final class VirtualTableSchemaUtils {
      * @return the extracted schemas
      * @throws VirtualTableIncompatibleException if any of the tables is not compatible with columnar virtual tables
      */
-    public static ValueSchema[] extractSchemas(final BufferedDataTable[] tables)
+    public static DataTableValueSchema[] extractSchemas(final BufferedDataTable[] tables)
         throws VirtualTableIncompatibleException {
-        var schemas = new ValueSchema[tables.length];
+        var schemas = new DataTableValueSchema[tables.length];
         for (int i = 0; i < schemas.length; i++) {//NOSONAR
             schemas[i] = extractSchema(tables[i]);
         }
         return schemas;
     }
 
-    public static ValueSchema extractSchema(final BufferedDataTable table) throws VirtualTableIncompatibleException {
+    public static DataTableValueSchema extractSchema(final BufferedDataTable table)
+        throws VirtualTableIncompatibleException {
         var delegateTable = Node.invokeGetDelegate(table);
         var schema = extractSchema(delegateTable);
         if (ValueSchemaUtils.storesDataCellSerializersSeparately(schema)) {
@@ -248,12 +250,12 @@ public final class VirtualTableSchemaUtils {
         return schema;
     }
 
-    private static ValueSchema extractSchema(final KnowsRowCountTable table)//NOSONAR
+    private static DataTableValueSchema extractSchema(final KnowsRowCountTable table)//NOSONAR
         throws VirtualTableIncompatibleException {
-        if (table instanceof AbstractColumnarContainerTable) {
-            return ((AbstractColumnarContainerTable)table).getSchema();
-        } else if (table instanceof VirtualTableExtensionTable) {
-            return ((VirtualTableExtensionTable)table).getSchema();
+        if (table instanceof AbstractColumnarContainerTable t) {
+            return t.getSchema();
+        } else if (table instanceof VirtualTableExtensionTable t) {
+            return t.getSchema();
         } else if (table instanceof RearrangeColumnsTable) {
             return extractSchemaFromRearrangeTable((RearrangeColumnsTable)table);
         } else if (table instanceof JoinedTable) {
@@ -334,7 +336,7 @@ public final class VirtualTableSchemaUtils {
         return extractSchema(table.getReferenceTables()[0]);
     }
 
-    private static ValueSchema createSchema(final DataTableSpec sourceSpec,
+    private static DataTableValueSchema createSchema(final DataTableSpec sourceSpec,
         final Collection<ValueFactory<?, ?>> factories) {
         return ValueSchemaUtils.create(sourceSpec, factories.toArray(ValueFactory<?, ?>[]::new));
     }
