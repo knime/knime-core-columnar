@@ -56,18 +56,20 @@ import org.knime.core.data.columnar.table.VirtualTableIncompatibleException;
 import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
-import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.row.RowAccessible;
 
 final class BufferedReferenceTable extends AbstractReferenceTable {
 
+    private final DataTableValueSchema m_schema;
+
     private final ColumnarVirtualTable m_virtualTable;
 
     BufferedReferenceTable(final BufferedDataTable table, final UUID id) throws VirtualTableIncompatibleException {
         super(table, id);
-        ValueSchema schema = VirtualTableSchemaUtils.extractSchema(table);
-        m_virtualTable = new ColumnarVirtualTable(id, schema, true);
+        m_schema = VirtualTableSchemaUtils.extractSchema(table);
+        m_virtualTable = new ColumnarVirtualTable(id, m_schema, true);
     }
 
     @Override
@@ -75,11 +77,16 @@ final class BufferedReferenceTable extends AbstractReferenceTable {
         return m_virtualTable;
     }
 
+    @Override
+    public DataTableValueSchema getSchema() {
+        return m_schema;
+    }
+
     // the returned RowAccessible will be closed through the computation graph when we close m_cachedOutputs
     @SuppressWarnings("resource")
     @Override
     public Map<UUID, RowAccessible> getSources() {
         return Collections.singletonMap(getId(),
-            VirtualTableUtils.createRowAccessible(getSchema(), getBufferedTable()));
+            VirtualTableUtils.createRowAccessible(m_schema, getBufferedTable()));
     }
 }

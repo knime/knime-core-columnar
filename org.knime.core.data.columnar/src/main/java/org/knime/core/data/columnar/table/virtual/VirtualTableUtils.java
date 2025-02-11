@@ -50,6 +50,7 @@ package org.knime.core.data.columnar.table.virtual;
 
 import org.knime.core.data.v2.ReadAccessRowRead;
 import org.knime.core.data.v2.RowCursor;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.util.CheckUtils;
@@ -88,7 +89,7 @@ public final class VirtualTableUtils {
      * @param table
      * @return a {@link RowAccessible} that is backed by the provided table
      */
-    public static RowAccessible createRowAccessible(final ValueSchema schema, final BufferedDataTable table) {
+    public static RowAccessible createRowAccessible(final DataTableValueSchema schema, final BufferedDataTable table) {
         CheckUtils.checkArgument(schema.getSourceSpec().equals(table.getDataTableSpec()),
             "The schema must match the table.");
         return new BufferedDataTableRowAccessible(table, schema);

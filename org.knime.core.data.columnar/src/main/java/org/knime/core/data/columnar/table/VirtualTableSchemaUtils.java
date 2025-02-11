@@ -89,7 +89,7 @@ import org.knime.core.table.virtual.ColumnarSchemas;
  */
 public final class VirtualTableSchemaUtils {
 
-    private static final ValueSchema EMPTY =
+    private static final DataTableValueSchema EMPTY =
         ValueSchemaUtils.create(new DataTableSpec(), new ValueFactory<?, ?>[]{new DefaultRowKeyValueFactory()});
 
     /**
@@ -100,15 +100,17 @@ public final class VirtualTableSchemaUtils {
      * @throws VirtualTableIncompatibleException if any of the tables were created prior to 4.5.0 or the ValueFactory
      *             for any of the columns did not match between tables
      */
-    public static ValueSchema concatenateSchemas(final BufferedDataTable[] tables)
+    public static DataTableValueSchema concatenateSchemas(final BufferedDataTable[] tables)
         throws VirtualTableIncompatibleException {
+
         final var schemas = extractSchemas(tables);
-        final var tableSpecs = extractSpecs(schemas);
         try {
             ColumnarSchemas.concatenate(List.of(schemas));
         } catch (IllegalArgumentException ex) {
             throw new VirtualTableIncompatibleException("Schemas don't match exactly.", ex);
         }
+
+        final var tableSpecs = extractSpecs(schemas);
         final var outputSpec = AppendedRowsTable.generateDataTableSpec(tableSpecs);
         final Map<String, ValueFactory<?, ?>> factoriesByName = new LinkedHashMap<>(outputSpec.getNumColumns());
         factoriesByName.put("", getRowKeyValueFactory(schemas));
@@ -134,7 +136,7 @@ public final class VirtualTableSchemaUtils {
         return commonFactory;
     }
 
-    private static void checkFactoriesMatch(final String name, final ValueSchema schema,
+    private static void checkFactoriesMatch(final String name, final DataTableValueSchema schema,
         final Map<String, ValueFactory<?, ?>> factoriesByName) throws VirtualTableIncompatibleException {
         final var factory = getValueFactoryForName(schema, name);
         if (factory != null) {
@@ -146,7 +148,7 @@ public final class VirtualTableSchemaUtils {
         }
     }
 
-    private static ValueFactory<?, ?> getValueFactoryForName(final ValueSchema schema, final String name) {
+    private static ValueFactory<?, ?> getValueFactoryForName(final DataTableValueSchema schema, final String name) {
         final int colIdx = schema.getSourceSpec().findColumnIndex(name);
         if (colIdx > -1) {
             // +1 because of the RowKeyValueFactory
@@ -165,7 +167,7 @@ public final class VirtualTableSchemaUtils {
      *             compatible with virtual tables (created prior to 4.5.0 or concatenation with varying ValueFactories
      *             in any column)
      */
-    public static ValueSchema appendSchemas(final BufferedDataTable[] tables)
+    public static DataTableValueSchema appendSchemas(final BufferedDataTable[] tables)
         throws VirtualTableIncompatibleException {
         DataTableSpec tableSpec = null;
         final List<ValueFactory<?, ?>> factories = new ArrayList<>();
@@ -226,7 +228,7 @@ public final class VirtualTableSchemaUtils {
     }
 
     /**
-     * @param tables to extract the ColumnarValueSchemas from
+     * @param tables to extract the DataTableValueSchemas from
      * @return the extracted schemas
      * @throws VirtualTableIncompatibleException if any of the tables is not compatible with columnar virtual tables
      */
@@ -239,6 +241,11 @@ public final class VirtualTableSchemaUtils {
         return schemas;
     }
 
+    /**
+     * @param table to extract the DataTableValueSchema from
+     * @return the extracted schema
+     * @throws VirtualTableIncompatibleException if the table is not compatible with columnar virtual tables
+     */
     public static DataTableValueSchema extractSchema(final BufferedDataTable table)
         throws VirtualTableIncompatibleException {
         var delegateTable = Node.invokeGetDelegate(table);
@@ -256,34 +263,34 @@ public final class VirtualTableSchemaUtils {
             return t.getSchema();
         } else if (table instanceof VirtualTableExtensionTable t) {
             return t.getSchema();
-        } else if (table instanceof RearrangeColumnsTable) {
-            return extractSchemaFromRearrangeTable((RearrangeColumnsTable)table);
-        } else if (table instanceof JoinedTable) {
-            return extractSchemaFromJoinedTable((JoinedTable)table);
-        } else if (table instanceof TableSpecReplacerTable) {
-            return extractSchemaFromSpecReplacerTable((TableSpecReplacerTable)table);
-        } else if (table instanceof WrappedTable) {
-            return extractSchemaFromWrappedTable((WrappedTable)table);
-        } else if (table instanceof ConcatenateTable) {
-            return extractSchemaFromConcatenateTable((ConcatenateTable)table);
+        } else if (table instanceof RearrangeColumnsTable t) {
+            return extractSchemaFromRearrangeTable(t);
+        } else if (table instanceof JoinedTable t) {
+            return extractSchemaFromJoinedTable(t);
+        } else if (table instanceof TableSpecReplacerTable t) {
+            return extractSchemaFromSpecReplacerTable(t);
+        } else if (table instanceof WrappedTable t) {
+            return extractSchemaFromWrappedTable(t);
+        } else if (table instanceof ConcatenateTable t) {
+            return extractSchemaFromConcatenateTable(t);
         } else {
             throw new VirtualTableIncompatibleException(
                 String.format("The table type '%s' is not supported.", table.getClass()));
         }
     }
 
-    private static ValueSchema extractSchemaFromConcatenateTable(final ConcatenateTable table)
+    private static DataTableValueSchema extractSchemaFromConcatenateTable(final ConcatenateTable table)
         throws VirtualTableIncompatibleException {
         return concatenateSchemas(table.getReferenceTables());
     }
 
     @SuppressWarnings("resource")
-    private static ValueSchema extractSchemaFromRearrangeTable(final RearrangeColumnsTable table)
+    private static DataTableValueSchema extractSchemaFromRearrangeTable(final RearrangeColumnsTable table)
         throws VirtualTableIncompatibleException {
         final var referenceSchema = extractSchema(table.getReferenceTables()[0]);
 
         final var appendTable = table.getAppendTable();
-        final ValueSchema appendSchema;
+        final DataTableValueSchema appendSchema;
         if (appendTable == null) {
             appendSchema = EMPTY;
         } else if (appendTable instanceof AbstractColumnarContainerTable colAppendTable) {
@@ -298,8 +305,8 @@ public final class VirtualTableSchemaUtils {
         return rearrangeSchemas(referenceSchema, appendSchema, outputSpec, table::isFromReferenceTable);
     }
 
-    private static ValueSchema rearrangeSchemas(final ValueSchema referenceSchema,
-        final ValueSchema appendSchema, final DataTableSpec outputSpec, final IntPredicate isFromRef) {
+    private static DataTableValueSchema rearrangeSchemas(final DataTableValueSchema referenceSchema,
+        final DataTableValueSchema appendSchema, final DataTableSpec outputSpec, final IntPredicate isFromRef) {
         List<ValueFactory<?, ?>> factories = new ArrayList<>(outputSpec.getNumColumns() + 1);
         // add the RowKeyValueFactory
         var rowKeyValueFactory = referenceSchema.getValueFactory(0);
@@ -317,12 +324,12 @@ public final class VirtualTableSchemaUtils {
         return createSchema(outputSpec, factories);
     }
 
-    private static ValueSchema extractSchemaFromJoinedTable(final JoinedTable table)
+    private static DataTableValueSchema extractSchemaFromJoinedTable(final JoinedTable table)
         throws VirtualTableIncompatibleException {
         return appendSchemas(table.getReferenceTables());
     }
 
-    private static ValueSchema extractSchemaFromSpecReplacerTable(final TableSpecReplacerTable table)
+    private static DataTableValueSchema extractSchemaFromSpecReplacerTable(final TableSpecReplacerTable table)
         throws VirtualTableIncompatibleException {
         var refSchema = extractSchema(table.getReferenceTables()[0]);
         List<ValueFactory<?, ?>> factories = IntStream.range(0, refSchema.numColumns())//
@@ -331,7 +338,7 @@ public final class VirtualTableSchemaUtils {
         return createSchema(table.getDataTableSpec(), factories);
     }
 
-    private static ValueSchema extractSchemaFromWrappedTable(final WrappedTable table)
+    private static DataTableValueSchema extractSchemaFromWrappedTable(final WrappedTable table)
         throws VirtualTableIncompatibleException {
         return extractSchema(table.getReferenceTables()[0]);
     }
