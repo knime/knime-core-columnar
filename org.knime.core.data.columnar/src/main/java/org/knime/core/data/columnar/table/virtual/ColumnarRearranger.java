@@ -92,6 +92,7 @@ import org.knime.core.data.container.ColumnRearrangerUtils.RearrangedColumn;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
@@ -177,19 +178,10 @@ public final class ColumnarRearranger {
         var rearrangedTable = rearrange(newColumns, existingColumns, tableToRearrange);
 
         // the RearrangeColumnsTable removes the table name and table properties, so we do the same
-        rearrangedTable = dropOldSpecNameAndProperties(rearrangedTable);
+        DataTableSpec rearrangedTableSpec = DataTableValueSchema.createDataTableSpec(rearrangedTable.getSchema());
 
-        return new VirtualTableExtensionTable(refTables.toArray(ReferenceTable[]::new), rearrangedTable, table.size(),
-            m_tableIdSupplier.getAsInt());
-
-    }
-
-    private static ColumnarVirtualTable dropOldSpecNameAndProperties(final ColumnarVirtualTable rearrangedTable) {
-        var rearrangedSchema = rearrangedTable.getSchema();
-        var rearrangedSpec = rearrangedSchema.getSourceSpec();
-        var columns = rearrangedSpec.stream().toArray(DataColumnSpec[]::new);
-        return rearrangedTable
-            .replaceSchema(ValueSchemaUtils.updateDataTableSpec(rearrangedSchema, new DataTableSpec(columns)));
+        return new VirtualTableExtensionTable(refTables.toArray(ReferenceTable[]::new), rearrangedTable,
+            rearrangedTableSpec, table.size(), m_tableIdSupplier.getAsInt());
     }
 
     private static ColumnarVirtualTable rearrange(final List<RearrangedColumn> newColumns,
