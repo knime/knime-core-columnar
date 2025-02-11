@@ -116,8 +116,8 @@ public final class ColumnarTableBackend implements TableBackend {
         final IDataRepository repository, final ILocalDataRepository localRepository,
         final IWriteFileStoreHandler fileStoreHandler) {
         final boolean isEnableRowKeys = settings.isEnableRowKeys();
-        final ValueSchema schema = ValueSchemaUtils.create(spec, isEnableRowKeys ? RowKeyType.CUSTOM : RowKeyType.NOKEY,
-            initFileStoreHandler(fileStoreHandler, repository));
+        final DataTableValueSchema schema = ValueSchemaUtils.create(spec,
+            isEnableRowKeys ? RowKeyType.CUSTOM : RowKeyType.NOKEY, initFileStoreHandler(fileStoreHandler, repository));
         try {
             final ColumnarRowWriteTableSettings cursorSettings =
                 new ColumnarRowWriteTableSettings(settings.isInitializeDomain(), settings.isEnableDomainUpdate(),
@@ -133,7 +133,7 @@ public final class ColumnarTableBackend implements TableBackend {
     public RowContainer create(final ExecutionContext context, final DataTableSpec spec,
         final DataContainerSettings settings, final IDataRepository repository, final IWriteFileStoreHandler handler) {
         try {
-            final ValueSchema schema =
+            final DataTableValueSchema schema =
                 ValueSchemaUtils.create(spec, RowKeyType.CUSTOM, initFileStoreHandler(handler, repository));
             final boolean isDuplicateCheck = settings.isEnableRowKeys() && settings.isCheckDuplicateRowKeys();
             final ColumnarRowWriteTableSettings containerSettings =

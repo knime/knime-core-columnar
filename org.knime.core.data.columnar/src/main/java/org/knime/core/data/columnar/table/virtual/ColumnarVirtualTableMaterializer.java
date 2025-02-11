@@ -54,6 +54,7 @@ import java.util.UUID;
 import java.util.function.IntSupplier;
 
 import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.RowKeyValue;
 import org.knime.core.data.columnar.table.ColumnarRowContainerUtils;
 import org.knime.core.data.columnar.table.ColumnarRowWriteTableSettings;
@@ -63,6 +64,7 @@ import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.DataContainerSettings;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
@@ -156,17 +158,18 @@ public final class ColumnarVirtualTableMaterializer {
         }
     }
 
-    private ValueSchema createContainerSchema(final ValueSchema virtualTableSchema) {
+    private DataTableValueSchema createContainerSchema(final ValueSchema virtualTableSchema) {
         assert ValueSchemaUtils.hasRowID(virtualTableSchema) : "The ColumnarValueSchema should have a RowID";
-        final var dataColumnSpecs = new DataColumnSpec[virtualTableSchema.numColumns()];
-        Arrays.setAll(dataColumnSpecs, virtualTableSchema::getDataColumnSpec);
+        final var dataColumnSpecs = new DataColumnSpec[virtualTableSchema.numColumns() - 1];
+        Arrays.setAll(dataColumnSpecs, i -> virtualTableSchema.getDataColumnSpec(i + 1));
+        final var dataTableSpec = new DataTableSpec(dataColumnSpecs);
         final var valueFactories = new ValueFactory<?, ?>[virtualTableSchema.numColumns()];
         Arrays.setAll(valueFactories, virtualTableSchema::getValueFactory);
         valueFactories[0] = m_materializeRowKey ? DefaultRowKeyValueFactory.INSTANCE : VoidRowKeyFactory.INSTANCE;
-        return ValueSchemaUtils.create(dataColumnSpecs, valueFactories);
+        return ValueSchemaUtils.create(dataTableSpec, valueFactories);
     }
 
-    private RowContainer createContainer(final ValueSchema schema) throws Exception {
+    private RowContainer createContainer(final DataTableValueSchema schema) throws Exception {
         assert ValueSchemaUtils.hasRowID(schema) : "The ColumnarValueSchema should have a RowID";
         var dataContainerSettings = DataContainerSettings.getDefault();
         var columnarContainerSettings =

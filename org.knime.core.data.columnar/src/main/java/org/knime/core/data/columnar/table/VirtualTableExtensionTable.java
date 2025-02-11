@@ -163,7 +163,6 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
         // only relevant for newly created tables that are temporary i.e. not output tables of a node (see AP-15779)
         // If this table is loaded it means that it must be either an output of some node
         m_tableId = -1;
-        m_dataTableSpec = context.getTableSpec();
         int[] refIds = settings.getIntArray(CFG_REF_TABLES);
         m_refTables = new BufferedDataTable[refIds.length];
         m_size = settings.getLong(CFG_SIZE);
