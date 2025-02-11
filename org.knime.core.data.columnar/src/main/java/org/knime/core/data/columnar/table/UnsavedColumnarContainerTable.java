@@ -53,7 +53,7 @@ import java.io.Flushable;
 import java.io.IOException;
 
 import org.knime.core.columnar.store.ColumnStoreFactory;
-import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.NodeSettingsWO;
@@ -77,9 +77,10 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      *            in case the created table is permanently saved to disk. Must not be {@code null} but can be a no-op.
      * @return The newly created table.
      */
-    public static UnsavedColumnarContainerTable create(final int tableId, final ColumnarRowReadTable columnarTable,
+    public static UnsavedColumnarContainerTable create(final int tableId, final DataTableValueSchema schema,
+        final ColumnarRowReadTable columnarTable,
         final Flushable storeFlusher) {
-        final var table = new UnsavedColumnarContainerTable(tableId, columnarTable, storeFlusher);
+        final var table = new UnsavedColumnarContainerTable(tableId, schema, columnarTable, storeFlusher);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
         table.initStoreCloser();
@@ -100,9 +101,9 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      */
     @SuppressWarnings("resource") // Columnar table will be closed along with the container table.
     public static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
-        final ValueSchema schema, final ColumnarBatchReadStore store, final Flushable storeFlusher,
+        final DataTableValueSchema schema, final ColumnarBatchReadStore store, final Flushable storeFlusher,
         final long size) {
-        final var table = new UnsavedColumnarContainerTable(tableId,
+        final var table = new UnsavedColumnarContainerTable(tableId, schema,
             new ColumnarRowReadTable(schema, factory, store, size), storeFlusher);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
@@ -110,9 +111,9 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
         return table;
     }
 
-    private UnsavedColumnarContainerTable(final int tableId, final ColumnarRowReadTable columnarTable,
-        final Flushable storeFlusher) {
-        super(tableId, columnarTable);
+    private UnsavedColumnarContainerTable(final int tableId, final DataTableValueSchema schema,
+        final ColumnarRowReadTable columnarTable, final Flushable storeFlusher) {
+        super(tableId, schema, columnarTable);
         m_storeFlusher = storeFlusher;
     }
 

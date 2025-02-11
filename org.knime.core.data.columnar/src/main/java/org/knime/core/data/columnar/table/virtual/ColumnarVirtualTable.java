@@ -64,7 +64,6 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataColumnSpecCreator.MergeOptions;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
@@ -377,6 +376,7 @@ public final class ColumnarVirtualTable {
         return schema;
     }
 
+    @Deprecated // TODO (TP): remove?
     ColumnarVirtualTable replaceSchema(final ValueSchema schema) {
         CheckUtils.checkArgument(schema.numColumns() == m_valueSchema.numColumns(), "The number of columns must match");
         for (int i = 0; i < schema.numColumns(); i++) {//NOSONAR

@@ -67,6 +67,7 @@ import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarConcatenater;
 import org.knime.core.data.columnar.table.virtual.ColumnarRearranger;
 import org.knime.core.data.columnar.table.virtual.ColumnarSpecReplacer;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTable;
 import org.knime.core.data.columnar.table.virtual.reference.ReferenceTables;
 import org.knime.core.data.container.BufferedTableBackend;
@@ -79,6 +80,7 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.data.filestore.internal.NotInWorkflowWriteFileStoreHandler;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.RowKeyType;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
 import org.knime.core.node.BufferedDataTable;
@@ -89,7 +91,7 @@ import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.Node;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.table.row.Selection;
-import org.knime.core.table.virtual.VirtualTable;
+import org.knime.core.table.virtual.spec.SourceTableProperties.CursorType;
 
 /**
  * Columnar {@link TableBackend} implementation.
@@ -300,19 +302,17 @@ public final class ColumnarTableBackend implements TableBackend {
         final Selection slice, final IntSupplier tableIdSupplier) throws VirtualTableIncompatibleException {
         var spec = table.getDataTableSpec();
         var refTable = ReferenceTables.createReferenceTable(UUID.randomUUID(), table);
-        var virtualTable = new VirtualTable(refTable.getId(), refTable.getSchema());
+        var virtualTable = new ColumnarVirtualTable(refTable.getId(), refTable.getSchema(), CursorType.BASIC);
         var cols = slice.columns();
-        var rearranger = new ColumnRearranger(spec);
         if (!cols.allSelected()) {
             var colIndices = cols.getSelected();
-            virtualTable = virtualTable.filterColumns(//
+            virtualTable = virtualTable.selectColumns(//
                 IntStream.concat(//
                     IntStream.of(0), // the row key is always part of the table
                     IntStream.of(colIndices)//
                         .map(i -> i + 1))// the slice does not account for the row key column
                     .toArray()//
             );
-            rearranger.keepOnly(colIndices);
         }
 
         var rows = slice.rows();
@@ -324,9 +324,8 @@ public final class ColumnarTableBackend implements TableBackend {
             size = toRow - fromRow;
         }
 
-        var rearrangedSchema = VirtualTableSchemaUtils.rearrangeSchema(table, rearranger);
-
-        var slicedTable = new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, virtualTable, rearrangedSchema,
+        var slicedTable = new VirtualTableExtensionTable(new ReferenceTable[]{refTable}, virtualTable,
+            DataTableValueSchema.createDataTableSpecWithInheritedMetadata(spec, virtualTable.getSchema()),
             size, tableIdSupplier.getAsInt());
         exec.setProgress(1);
         return slicedTable;
