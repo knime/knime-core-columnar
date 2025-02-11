@@ -64,7 +64,9 @@ import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
 import org.knime.core.data.v2.ValueFactory;
+import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.value.BooleanValueFactory;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.data.v2.value.DoubleValueFactory;
@@ -167,7 +169,7 @@ public class TestHelper {
         when(m_readAccessRow.getAccess(3)).thenReturn(m_doubleReadAccess);
     }
 
-    private static class TestColumnarValueSchema implements ValueSchema {
+    private static class TestColumnarValueSchema implements DataTableValueSchema {
 
         private final ValueFactory<?, ?>[] m_valueFactories;
 
