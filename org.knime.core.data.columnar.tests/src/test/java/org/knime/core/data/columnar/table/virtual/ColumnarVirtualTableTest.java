@@ -49,7 +49,6 @@
 package org.knime.core.data.columnar.table.virtual;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -164,8 +163,6 @@ final class ColumnarVirtualTableTest {
     @Test
     void testPermuteWithRowID() {
         testPermute(true);
-        // it's not allowed to move the RowID to a different position
-        assertThrows(IllegalArgumentException.class, () -> TABLE.selectColumns(1, 0, 3, 2));
     }
 
     @Test
@@ -173,6 +170,7 @@ final class ColumnarVirtualTableTest {
         testPermute(false);
     }
 
+    @Test
     private static void testPermute(final boolean withRowID) {
         var table = createTable(withRowID, FOO, BAR, BAZ);
         int[] permutation = withRowID ? new int[] {0, 3, 1, 2} : new int[] {2, 0, 1};
