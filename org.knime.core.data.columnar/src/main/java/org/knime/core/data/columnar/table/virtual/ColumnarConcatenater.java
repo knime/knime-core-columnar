@@ -174,6 +174,8 @@ public final class ColumnarConcatenater {
             virtualTable = virtualTable.replaceMap(new RowIDGenerator(), 0);
         }
 
+        virtualTable = virtualTable.replaceSchema(concatenatedSchema);
+
         return new VirtualTableExtensionTable(tablePrepper.getReferenceTables(), virtualTable,
             concatenatedSchema.getSourceSpec(), concatenatedSize, m_tableIdSupplier.getAsInt());
     }
