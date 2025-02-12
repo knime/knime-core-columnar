@@ -392,7 +392,7 @@ public final class ColumnarConcatenater {
                 var missingSchema = ValueSchemaUtils.create(
                     missingColumnSpecs.toArray(DataColumnSpec[]::new),
                     missingValueFactories.stream().toArray(ValueFactory[]::new));
-                virtualTable = virtualTable.appendMissingValueColumns(missingSchema).selectColumns(permutation);
+                virtualTable = virtualTable.appendMissingValueColumns(missingSchema);
             }
             return virtualTable.selectColumns(permutation);
         }
