@@ -175,7 +175,7 @@ public final class ColumnarVirtualTable {
      */
     public ColumnarVirtualTable selectColumns(final int... columnIndices) {
         final TableTransformSpec transformSpec = new SelectColumnsTransformSpec(columnIndices);
-        final ValueSchema schema = selectColumns(m_valueSchema, columnIndices);
+        final ValueSchema schema = ValueSchemaUtils.selectColumns(m_valueSchema, columnIndices);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), schema);
     }
 
@@ -212,40 +212,6 @@ public final class ColumnarVirtualTable {
     public ColumnarVirtualTable renameColumns(final int[] columnIndices, final String[] columnNames) {
         return new ColumnarVirtualTable(m_transform,
             ValueSchemaUtils.renameColumns((DataTableValueSchema)m_valueSchema, columnIndices, columnNames));
-    }
-
-    // TODO (TP): Do we need this method at all? There is ValueSchemaUtils.selectColumns(...) which does exactly the same thing, except the hasRowID check
-    private static ValueSchema selectColumns(final ValueSchema schema, final int... columnIndices) {
-        var hasRowID = ValueSchemaUtils.hasRowID(schema);
-        if (hasRowID && Arrays.stream(columnIndices).skip(1).anyMatch(i -> i == 0)) {
-            // If schema has a RowID, then the RowID column (in this table) is at index 0.
-            // It must either be dropped or remain at index 0.
-            // TODO (TP): should we drop this constraint? Probably it is best to let ValueSchema do stuff freely until someone requests a DataTableSpec.
-            throw new IllegalArgumentException("RowID must either be dropped or remain at index 0");
-        }
-        final var dataColumnSpecs = new DataColumnSpec[columnIndices.length];
-        final var valueFactories = new ValueFactory<?, ?>[columnIndices.length];
-        Arrays.setAll(dataColumnSpecs, i -> schema.getDataColumnSpec(columnIndices[i]));
-        Arrays.setAll(valueFactories, i -> schema.getValueFactory(columnIndices[i]));
-
-        // TODO (TP): Keep the originalSpec properties (name, properties, ColorHandler)
-        //            To do that, we must add them to ValueSchema.
-        //            Probably they should be encapsulated into a class that is similar to DataTableSpec but with less constraints.
-        /*
-        var originalSpec = schema.getSourceSpec();
-        var specCreator = new DataTableSpecCreator(originalSpec);
-        specCreator.dropAllColumns();
-        var permutationStream = IntStream.of(columnIndices);
-        if (hasRowID) {
-            // The RowID is not part of the DataTableSpec.
-            permutationStream = permutationStream.filter(i -> i > 0) // skip if present
-                .map(i -> i - 1); // translate "indices including RowID" to "indices without RowID"
-        }
-        specCreator.addColumns(permutationStream.mapToObj(originalSpec::getColumnSpec).toArray(DataColumnSpec[]::new));
-        return createColumnarValueSchema(valueFactories, specCreator.createSpec());
-        */
-
-        return ValueSchemaUtils.create(dataColumnSpecs, valueFactories);
     }
 
     /**
