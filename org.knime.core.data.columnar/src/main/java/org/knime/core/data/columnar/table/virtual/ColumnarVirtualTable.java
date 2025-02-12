@@ -64,6 +64,8 @@ import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataColumnSpecCreator.MergeOptions;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataType;
+import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarMapperWithRowIndexFactory;
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
@@ -661,14 +663,32 @@ public final class ColumnarVirtualTable {
     }
 
     /**
-     * Modifies the schema of this table to report the given {@code dataTableSpec}.
+     * TODO (TP) javadoc
      *
-     * @param dataTableSpec
-     * @return table with modified schema
+     * @param outputSpec
+     * @return
      */
-    // TODO (TP) TEMPORARY
-    public ColumnarVirtualTable withDataTableSpec(final DataTableSpec dataTableSpec) {
-        return new ColumnarVirtualTable(m_transform,
-            ValueSchemaUtils.create(dataTableSpec, m_valueSchema.getColumns()));
+    public ColumnarVirtualTable updateSchema(final DataTableSpec outputSpec) {
+        final int numCols = m_valueSchema.numColumns();
+        if (numCols < 1 || !m_valueSchema.getColumn(0).isRowKey()) {
+            throw new IllegalArgumentException("expected schema with RowKey at column 0");
+        }
+        final int numDataCols = numCols - 1;
+        if (outputSpec.getNumColumns() != numDataCols) {
+            throw new IllegalArgumentException("schema has " + numDataCols
+                + " data columns, but spec has " + outputSpec.getNumColumns());
+        }
+        for (int i = 0; i < numDataCols; ++i) {
+            final DataType colTypeSpec = outputSpec.getColumnSpec(i).getType();
+            final DataType colTypeSchema = m_valueSchema.getDataColumnSpec(i + 1).getType();
+            if (!colTypeSpec.equals(colTypeSchema)) {
+                throw new IllegalArgumentException("column type mismatch at column " + i + ": schema has "
+                    + colTypeSchema + ", spec has " + colTypeSpec);
+            }
+        }
+        final var valueFactories = new ValueFactory<?, ?>[numCols];
+        Arrays.setAll(valueFactories, m_valueSchema::getValueFactory);
+        final var updatedSchema = ValueSchemaUtils.create(outputSpec, valueFactories);
+        return new ColumnarVirtualTable(m_transform, updatedSchema);
     }
 }

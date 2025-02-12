@@ -122,7 +122,9 @@ public final class ColumnarSpecReplacer {
         var sourceFragment = new ColumnarVirtualTable(referenceTable.getId(), inputSchema, true); // TODO (TP): why not just referenceTable.getVirtualTable() ???
         var outputTable = casts.isEmpty() ? sourceFragment : cast(sourceFragment, casts, m_fsHandler);
 
-        return new VirtualTableExtensionTable(new ReferenceTable[]{referenceTable}, outputTable, outputSpec,
+        return new VirtualTableExtensionTable(new ReferenceTable[]{referenceTable},
+            outputTable.updateSchema(outputSpec),
+            outputSpec,
             table.size(), m_tableIDSupplier.getAsInt());
     }
 
