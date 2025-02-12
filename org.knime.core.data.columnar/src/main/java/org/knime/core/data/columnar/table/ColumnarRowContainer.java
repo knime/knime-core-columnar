@@ -51,6 +51,7 @@ package org.knime.core.data.columnar.table;
 import java.io.IOException;
 
 import org.knime.core.columnar.store.ColumnStoreFactory;
+import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.v2.RowContainer;
 import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
@@ -126,8 +127,12 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
         if (m_finishedTable == null) {
             @SuppressWarnings("resource") // Will be closed along with the container table.
             final ColumnarRowReadTable finishedColumnarTable = m_columnarTable.finish();
+            final DataTableSpec updatedSpec = DataTableValueSchema
+                .createDataTableSpecWithInheritedMetadata(m_schema.getSourceSpec(), finishedColumnarTable.getSchema());
+            final DataTableValueSchema updatedSchema =
+                DataTableValueSchema.create(updatedSpec, finishedColumnarTable.getSchema());
             m_finishedTable =
-                UnsavedColumnarContainerTable.create(m_id, m_schema, finishedColumnarTable,
+                UnsavedColumnarContainerTable.create(m_id, updatedSchema, finishedColumnarTable,
                     m_columnarTable.getStoreFlusher());
         }
         return m_finishedTable;
