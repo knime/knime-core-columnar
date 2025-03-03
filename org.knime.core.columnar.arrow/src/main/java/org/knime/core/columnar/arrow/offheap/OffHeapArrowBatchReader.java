@@ -168,8 +168,8 @@ class OffHeapArrowBatchReader extends AbstractOffHeapArrowBatchReader implements
         private ArrowFileReader(final File file) throws IOException {
             m_in = new MappableReadChannel(file, "r");
 
-            ArrowReader.checkFileSize(m_in);
-            ArrowReader.checkArrowMagic(m_in, true);
+            ArrowReaderWriterUtils.checkFileSize(m_in);
+            ArrowReaderWriterUtils.checkArrowMagic(m_in, true);
             m_footer = readFooter(m_in);
             m_dictionariesPerBatch = getDictionariesPerBatch(m_footer);
         }
