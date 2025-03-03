@@ -236,7 +236,7 @@ class OnHeapArrowBatchWriter implements BatchWriter {
 
         // Remember batch boundary for footer
         var previousBatchEnd = m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
-        m_batchBoundaries.add(previousBatchEnd + Long.valueOf(batch.length()));
+        m_batchBoundaries.add(previousBatchEnd + batch.length());
 
         m_numBatches.incrementAndGet();
     }
