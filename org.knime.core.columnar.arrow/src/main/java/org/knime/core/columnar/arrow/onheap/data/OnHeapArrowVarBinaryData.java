@@ -140,7 +140,7 @@ public final class OnHeapArrowVarBinaryData {
         @Override
         public long usedSizeFor(final int numElements) {
             return ValidityBuffer.usedSizeFor(numElements) //
-                + OffsetBuffer.usedSizeFor(numElements) //
+                + LargeOffsetBuffer.usedSizeFor(numElements) //
                 + m_offsets.getNumData(numElements);
         }
 
