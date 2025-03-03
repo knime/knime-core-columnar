@@ -120,6 +120,14 @@ abstract class AbstractOnHeapArrowWriteData<T, R extends OnHeapArrowReadData> ex
      */
     protected abstract void setNumElements(final int numElements);
 
+    /** Check if the data object is sliced and throw an exception if it is. */
+    private void checkNotSliced() {
+        if (m_offset != 0) {
+            throw new IllegalStateException(
+                "This data object is sliced and does not support this operation. This is an implementation error.");
+        }
+    }
+
     @Override
     public void setMissing(final int index) {
         m_validity.set(index, false);
@@ -136,6 +144,7 @@ abstract class AbstractOnHeapArrowWriteData<T, R extends OnHeapArrowReadData> ex
 
     @Override
     public void expand(final int minimumCapacity) {
+        checkNotSliced();
         if (minimumCapacity > m_capacity) {
             setNumElements(minimumCapacity);
             m_capacity = minimumCapacity;
@@ -144,6 +153,7 @@ abstract class AbstractOnHeapArrowWriteData<T, R extends OnHeapArrowReadData> ex
 
     @Override
     public R close(final int length) {
+        checkNotSliced();
         if (m_capacity != length) {
             setNumElements(length);
         }
