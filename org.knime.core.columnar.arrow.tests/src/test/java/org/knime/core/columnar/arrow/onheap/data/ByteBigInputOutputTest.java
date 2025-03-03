@@ -79,7 +79,7 @@ class ByteBigInputOutputTest {
 
     private static void serdeNull(final ObjectSerializer<?> ser, final ObjectDeserializer<?> de) throws IOException {
         var data = new ByteBigArrayBigList();
-        var output = new ByteBigListDataOutput(data, 0);
+        var output = new ByteBigListDataOutput(data);
         ser.serialize(output, null);
 
         var input = new ByteBigArrayDataInput(data.elements(), 0, data.size64());
@@ -89,7 +89,7 @@ class ByteBigInputOutputTest {
     private static void serdeString(final String s, final String expect, final ObjectSerializer<String> ser,
         final ObjectDeserializer<String> de) throws IOException {
         var data = new ByteBigArrayBigList();
-        var output = new ByteBigListDataOutput(data, 0);
+        var output = new ByteBigListDataOutput(data);
         ser.serialize(output, s);
 
         var input = new ByteBigArrayDataInput(data.elements(), 0, data.size64());
@@ -99,7 +99,7 @@ class ByteBigInputOutputTest {
     private static <T> void serdeT(final T obj, final ObjectSerializer<T> ser, final ObjectDeserializer<T> de)
         throws IOException {
         var data = new ByteBigArrayBigList();
-        var output = new ByteBigListDataOutput(data, 0);
+        var output = new ByteBigListDataOutput(data);
         ser.serialize(output, obj);
 
         var input = new ByteBigArrayDataInput(data.elements(), 0, data.size64());
@@ -109,7 +109,7 @@ class ByteBigInputOutputTest {
     private static void serdeByteArray(final byte[] arr, final ObjectSerializer<byte[]> ser,
         final ObjectDeserializer<byte[]> de) throws IOException {
         var data = new ByteBigArrayBigList();
-        var output = new ByteBigListDataOutput(data, 0);
+        var output = new ByteBigListDataOutput(data);
         ser.serialize(output, arr);
 
         var input = new ByteBigArrayDataInput(data.elements(), 0, data.size64());
@@ -491,7 +491,7 @@ class ByteBigInputOutputTest {
         final ObjectDeserializer<Integer> de = input -> Integer.valueOf(input.readInt());
 
         var data = new ByteBigArrayBigList();
-        var output = new ByteBigListDataOutput(data, 0);
+        var output = new ByteBigListDataOutput(data);
 
         ser.serialize(output, 1);
         ser.serialize(output, 3);
