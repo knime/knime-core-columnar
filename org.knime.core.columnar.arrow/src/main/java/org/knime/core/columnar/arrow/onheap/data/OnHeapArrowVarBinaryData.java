@@ -68,6 +68,7 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.BigArrays;
 import it.unimi.dsi.fastutil.bytes.ByteBigArrayBigList;
 import it.unimi.dsi.fastutil.bytes.ByteBigArrays;
+import it.unimi.dsi.fastutil.bytes.ByteList;
 
 /**
  * Arrow implementation of {@link VarBinaryWriteData} and {@link VarBinaryReadData}.
@@ -105,8 +106,7 @@ public final class OnHeapArrowVarBinaryData {
             m_offsets.add(m_offset + index, val.length);
 
             // Copy val into data array
-            var bigVal = BigArrays.wrap(val); // Note that this wraps the array if it fits the segment size
-            m_data.addElements(m_data.size64(), bigVal);
+            m_data.addAll(ByteList.of(val));
 
             // Set validity bit
             setValid(m_offset + index);
