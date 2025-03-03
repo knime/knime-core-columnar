@@ -87,7 +87,7 @@ public final class OnHeapArrowFloatData {
         @Override
         public void setFloat(final int index, final float val) {
             m_data[index + m_offset] = val;
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         @Override

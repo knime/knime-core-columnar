@@ -133,7 +133,7 @@ public final class OnHeapArrowStringData {
         @Override
         public void setString(final int index, final String val) {
             m_data.set(index + m_offset, val);
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         @Override

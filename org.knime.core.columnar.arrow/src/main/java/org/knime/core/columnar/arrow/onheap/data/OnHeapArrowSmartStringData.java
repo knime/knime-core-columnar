@@ -277,7 +277,7 @@ public final class OnHeapArrowSmartStringData {
         @Override
         public void setString(final int index, final String val) {
             m_data.setString(index + m_offset, val);
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         // >>> LOW LEVEL COPY
@@ -285,7 +285,7 @@ public final class OnHeapArrowSmartStringData {
         @Override
         public void setStringBytes(final int index, final byte[] val) {
             m_data.setStringBytes(index + m_offset, val);
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         @Override

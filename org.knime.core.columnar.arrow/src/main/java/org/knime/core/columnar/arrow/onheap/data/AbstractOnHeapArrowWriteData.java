@@ -133,8 +133,12 @@ abstract class AbstractOnHeapArrowWriteData<T, R extends OnHeapArrowReadData> ex
         m_validity.set(index + m_offset, false);
     }
 
+    /**
+     * Set the value at the given index to valid. Note that for sliced data the offset is added internally such that
+     * this method behaves analog to {@link #setMissing(int)}.
+     */
     protected void setValid(final int index) {
-        m_validity.set(index, true);
+        m_validity.set(index + m_offset, true);
     }
 
     @Override
