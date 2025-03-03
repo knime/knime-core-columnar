@@ -289,7 +289,7 @@ public abstract class AbstractOffHeapArrowDataTest<W extends OffHeapArrowWriteDa
     @Test
     public void testSlicedSetMissing() {
         final int numValues = 32;
-        final int sliceStart = 20;
+        final int sliceStart = 3;
         final int sliceLength = 12;
 
         final W writeData = createWrite(numValues);
