@@ -128,4 +128,14 @@ abstract class AbstractOnHeapArrowReadData<T> extends AbstractReferencedData imp
         m_data = null;
         m_validity = null;
     }
+
+    /**
+     * Check if the data object is sliced and throw an exception if it is.
+     */
+    protected void checkNotSliced() {
+        if (m_offset != 0) {
+            throw new IllegalStateException(
+                "This data object is sliced and does not support this operation. This is an implementation error.");
+        }
+    }
 }
