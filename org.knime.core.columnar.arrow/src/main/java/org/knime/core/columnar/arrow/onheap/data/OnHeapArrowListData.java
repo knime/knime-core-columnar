@@ -99,7 +99,7 @@ public final class OnHeapArrowListData {
             var dataIndex = m_offsets.add(index + m_offset, size);
 
             // Set the validity bit
-            setValid(index + m_offset);
+            setValid(index);
 
             // TODO(AP-23863) be smarter here and do not copy on each new list
             m_data.expand(dataIndex.end());

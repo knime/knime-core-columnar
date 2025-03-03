@@ -87,7 +87,7 @@ public final class OnHeapArrowLongData {
         @Override
         public void setLong(final int index, final long val) {
             m_data[index + m_offset] = val;
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         @Override

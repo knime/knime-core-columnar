@@ -87,7 +87,7 @@ public final class OnHeapArrowDoubleData {
         @Override
         public void setDouble(final int index, final double val) {
             m_data[index + m_offset] = val;
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         @Override
