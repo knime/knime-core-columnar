@@ -192,7 +192,7 @@ public final class OnHeapArrowVarBinaryData {
         @Override
         public byte[] getBytes(final int index) {
             var dataIndex = m_offsets.get(m_offset + index);
-            long length = dataIndex.end() - dataIndex.start();
+            long length = dataIndex.length();
             if (length > Integer.MAX_VALUE) {
                 throw new IllegalArgumentException("Data length exceeds maximum integer value");
             }
