@@ -165,17 +165,18 @@ public final class LargeOffsetBuffer {
     }
 
     /**
-     * Adds an element at the specified index with the given length to the offsets buffer. The index must not be less
-     * than the last index added. Fills up holes in the buffer with elements of length 0 if necessary.
+     * Adds an element at the specified index with the given length to the offsets buffer. The index must larger than
+     * the last index added. Fills up holes in the buffer with elements of length 0 if necessary.
      *
      * @param index the index at which to add the element
      * @param elementLength the length of the element
      * @return a {@code LongDataIndex} representing the start and end indices of the added element
-     * @throws IndexOutOfBoundsException if the index is less than the last index added or greater than the capacity
+     * @throws IndexOutOfBoundsException if the index is not larger than the last index added or greater than the
+     *             capacity
      */
     public LargeDataIndex add(final int index, final long elementLength) {
-        if (index < m_lastIndexAdded) {
-            throw new IndexOutOfBoundsException("Index cannot be less than the last index added");
+        if (index <= m_lastIndexAdded) {
+            throw new IndexOutOfBoundsException("Index must be larger than the last index added");
         }
         Objects.checkIndex(index, numElements());
 
