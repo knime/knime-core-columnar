@@ -53,6 +53,7 @@ import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.knime.core.columnar.arrow.ArrowReaderWriterUtils;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.OffsetProvider;
 import org.knime.core.columnar.arrow.mmap.MappableReadChannel;
 import org.knime.core.columnar.arrow.mmap.MappedMessageSerializer;
@@ -104,8 +105,8 @@ class OffHeapArrowPartialFileBatchReader extends AbstractOffHeapArrowBatchReader
             m_offsetProvider = offsetProvider;
             m_in = new MappableReadChannel(file, "r");
 
-            ArrowReader.checkFileSize(m_in);
-            ArrowReader.checkArrowMagic(m_in, false);
+            ArrowReaderWriterUtils.checkFileSize(m_in);
+            ArrowReaderWriterUtils.checkArrowMagic(m_in, false);
             m_schema = readSchema(m_in);
         }
 

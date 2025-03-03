@@ -45,11 +45,7 @@
  */
 package org.knime.core.columnar.arrow.offheap;
 
-import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_BYTES;
-import static org.knime.core.columnar.arrow.ArrowReaderWriterUtils.ARROW_MAGIC_LENGTH;
-
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -68,7 +64,6 @@ import org.apache.arrow.vector.compression.CompressionCodec;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
-import org.apache.arrow.vector.ipc.SeekableReadChannel;
 import org.apache.arrow.vector.ipc.message.ArrowBodyCompression;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowFieldNode;
@@ -411,40 +406,6 @@ abstract class AbstractOffHeapArrowBatchReader {
 
         @Override
         void close() throws IOException;
-
-        /**
-         * Check if the Arrow file has a valid length. Throws an exception if not.
-         *
-         * @param in the channel on the file
-         * @throws IOException if the channel is too small
-         */
-        static void checkFileSize(final SeekableReadChannel in) throws IOException {
-            if (in.size() <= ARROW_MAGIC_LENGTH * 2 + 4) {
-                throw new IOException("Arrow file invalid: File is too small: " + in.size());
-            }
-        }
-
-        /**
-         * Check if the Arrow has the arrow magic bytes at the beginning or the end. Throws an exception if not.
-         *
-         * @param in the channel on the file
-         * @param end if true, checks if the magic number is at the end of the channel. If false, checks if the magic
-         *            number is at the beginning of the channel
-         * @throws IOException if the magic number is not at the expected location
-         */
-        static void checkArrowMagic(final SeekableReadChannel in, final boolean end) throws IOException {
-            final ByteBuffer buffer = ByteBuffer.allocate(ARROW_MAGIC_LENGTH);
-            if (end) {
-                in.setPosition(in.size() - buffer.remaining());
-            } else {
-                in.setPosition(0);
-            }
-            in.readFully(buffer);
-            buffer.flip();
-            if (!Arrays.equals(buffer.array(), ARROW_MAGIC_BYTES)) {
-                throw new IOException("Arrow file invalid: Magic number missing.");
-            }
-        }
     }
 
     /**
