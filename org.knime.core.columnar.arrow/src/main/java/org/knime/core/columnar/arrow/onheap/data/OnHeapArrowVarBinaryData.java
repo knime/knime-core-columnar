@@ -109,7 +109,7 @@ public final class OnHeapArrowVarBinaryData {
             m_data.addAll(ByteList.of(val));
 
             // Set validity bit
-            setValid(m_offset + index);
+            setValid(index);
         }
 
         @Override
@@ -129,7 +129,7 @@ public final class OnHeapArrowVarBinaryData {
             m_offsets.add(m_offset + index, elementLength);
 
             // Set validity bit
-            setValid(m_offset + index);
+            setValid(index);
         }
 
         @Override

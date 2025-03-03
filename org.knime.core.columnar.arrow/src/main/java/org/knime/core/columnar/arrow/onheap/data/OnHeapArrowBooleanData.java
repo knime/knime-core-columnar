@@ -87,7 +87,7 @@ public final class OnHeapArrowBooleanData {
         @Override
         public void setBoolean(final int index, final boolean val) {
             m_data.set(index + m_offset, val);
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         @Override

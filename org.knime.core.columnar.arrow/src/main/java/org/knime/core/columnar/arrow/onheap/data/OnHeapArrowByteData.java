@@ -87,7 +87,7 @@ public final class OnHeapArrowByteData {
         @Override
         public void setByte(final int index, final byte val) {
             m_data[index + m_offset] = val;
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         @Override

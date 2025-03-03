@@ -87,7 +87,7 @@ public final class OnHeapArrowIntData {
         @Override
         public void setInt(final int index, final int val) {
             m_data[index + m_offset] = val;
-            setValid(index + m_offset);
+            setValid(index);
         }
 
         @Override
