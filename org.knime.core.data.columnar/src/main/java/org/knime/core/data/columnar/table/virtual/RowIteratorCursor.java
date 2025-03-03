@@ -82,9 +82,6 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
 
     RowIteratorCursor(final ValueSchema schema, final CloseableRowIterator iterator,
         final ColumnSelection selection) {
-        if (!selection.isSelected(0)) {
-            throw new IllegalArgumentException("ColumnSelection must contain RowKey");
-        }
         m_accesses = BufferedAccesses.createBufferedAccessRow(schema, selection);
         m_values = new WriteValue<?>[schema.numColumns()];
         Arrays.setAll(m_values, i -> selection.isSelected(i) //
@@ -115,7 +112,9 @@ final class RowIteratorCursor implements LookaheadCursor<ReadAccessRow> {
             //       which we do here, so no need to call setMissing() on all cells first.
             final DataRow row = m_iterator.next();
             assert row.getNumCells() == m_values.length - 1;
-            m_rowKeyValue.setRowKey(row.getKey());
+            if (m_rowKeyValue != null) {
+                m_rowKeyValue.setRowKey(row.getKey());
+            }
             for (int i = 0; i < m_values.length - 1; i++) {
                 WriteValue<?> writeValue = m_values[i + 1];
                 if (writeValue != null) {
