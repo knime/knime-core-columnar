@@ -170,6 +170,7 @@ public final class OnHeapArrowBooleanData {
         @SuppressWarnings("resource") // buffers are owned by the vector
         public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
             var d = (ArrowBooleanReadData)data;
+            d.checkNotSliced();
             var vector = (BitVector)fieldVector;
 
             vector.allocateNew(d.length());

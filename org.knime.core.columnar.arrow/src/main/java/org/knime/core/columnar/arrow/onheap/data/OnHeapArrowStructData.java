@@ -274,6 +274,7 @@ public final class OnHeapArrowStructData {
         @SuppressWarnings("resource") // buffers and child vectors are owned by the vector
         public void copyToVector(final NullableReadData data, final FieldVector vector) {
             ArrowStructReadData d = (ArrowStructReadData)data;
+            d.checkNotSliced();
             StructVector sv = (StructVector)vector;
 
             sv.setInitialCapacity(d.length());

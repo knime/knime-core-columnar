@@ -169,6 +169,7 @@ public final class OnHeapArrowFloatData {
         @SuppressWarnings("resource") // buffers are owned by the vector
         public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
             var d = (ArrowFloatReadData)data;
+            d.checkNotSliced();
             var vector = (Float4Vector)fieldVector;
 
             vector.allocateNew(d.length());
