@@ -231,6 +231,7 @@ public final class OnHeapArrowListData {
         @SuppressWarnings("resource") // buffers and child vectors are owned by the vector
         public void copyToVector(final NullableReadData data, final FieldVector vector) {
             var d = (ArrowListReadData)data;
+            d.checkNotSliced();
             var v = (ListVector)vector;
 
             // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for

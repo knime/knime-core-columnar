@@ -316,6 +316,7 @@ public final class OnHeapArrowVarBinaryData {
         @SuppressWarnings("resource") // buffers are owned by the vector
         public void copyToVector(final NullableReadData data, final FieldVector vector) {
             var d = (ArrowVarBinaryReadData)data;
+            d.checkNotSliced();
             var v = (LargeVarBinaryVector)vector;
 
             // Make sure the buffers are allocated with the correct size

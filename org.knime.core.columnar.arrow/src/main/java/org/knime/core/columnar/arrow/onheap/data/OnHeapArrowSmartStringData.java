@@ -403,6 +403,7 @@ public final class OnHeapArrowSmartStringData {
         @SuppressWarnings("resource") // buffers are owned by the vector
         public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
             var d = (ArrowStringReadData)data;
+            d.checkNotSliced();
             var vector = (VarCharVector)fieldVector;
 
             d.m_data.copyTo(vector);

@@ -170,6 +170,7 @@ public final class OnHeapArrowDoubleData {
         @SuppressWarnings("resource") // buffers are owned by the vector
         public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
             var d = (ArrowDoubleReadData)data;
+            d.checkNotSliced();
             var vector = (Float8Vector)fieldVector;
 
             vector.allocateNew(d.length());

@@ -187,6 +187,7 @@ public final class OnHeapArrowLongData {
         @SuppressWarnings("resource") // buffers are owned by the vector
         public void copyToVector(final NullableReadData data, final FieldVector vector) {
             var d = (ArrowLongReadData)data;
+            d.checkNotSliced();
 
             ((FixedWidthVector)vector).allocateNew(d.length());
 
