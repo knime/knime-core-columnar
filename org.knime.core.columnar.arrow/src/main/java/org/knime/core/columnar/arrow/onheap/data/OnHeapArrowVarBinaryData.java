@@ -114,11 +114,8 @@ public final class OnHeapArrowVarBinaryData {
 
         @Override
         public <T> void setObject(final int index, final T value, final ObjectSerializer<T> serializer) {
-            // Start after all data that has been written so far
-            long startIndex = m_offsets.getNumData(m_offset + index);
-
-            // Create a custom DataOutput that writes directly into m_data
-            var dataOutput = new ByteBigListDataOutput(m_data, startIndex);
+            // Create a custom DataOutput that writes directly into m_data (will write to the end of the list)
+            var dataOutput = new ByteBigListDataOutput(m_data);
 
             try {
                 serializer.serialize(dataOutput, value);
@@ -127,6 +124,7 @@ public final class OnHeapArrowVarBinaryData {
             }
 
             // Add offset to offsets buffer
+            var startIndex = m_offsets.getNumData(m_offset + index);
             var elementLength = dataOutput.getPosition() - startIndex;
             m_offsets.add(m_offset + index, elementLength);
 

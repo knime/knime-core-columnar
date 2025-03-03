@@ -63,35 +63,29 @@ import it.unimi.dsi.fastutil.bytes.ByteBigList;
 class ByteBigListDataOutput implements DataOutput {
     protected ByteBigList m_data;
 
-    protected long m_position;
-
-    public ByteBigListDataOutput(final ByteBigList data, final long startPosition) {
+    public ByteBigListDataOutput(final ByteBigList data) {
         m_data = data;
-        m_position = startPosition;
     }
 
     public long getPosition() {
-        return m_position;
+        return m_data.size64();
     }
 
     @Override
     public void write(final int b) throws IOException {
         m_data.add((byte)b);
-        m_position++;
     }
 
     @Override
     public void write(final byte[] b) throws IOException {
         var bigB = BigArrays.wrap(b); // Note that this just wraps if b has less than SEGMENT_SIZE elements
-        m_data.addElements(m_position, bigB);
-        m_position += b.length;
+        m_data.addElements(getPosition(), bigB);
     }
 
     @Override
     public void write(final byte[] b, final int off, final int len) throws IOException {
         var bigB = BigArrays.wrap(b);
-        m_data.addElements(m_position, bigB, off, len);
-        m_position += len;
+        m_data.addElements(getPosition(), bigB, off, len);
     }
 
     @Override
@@ -107,9 +101,7 @@ class ByteBigListDataOutput implements DataOutput {
     @Override
     public void writeShort(final int v) throws IOException {
         m_data.add((byte)(v & 0xFF));
-        m_position++;
         m_data.add((byte)((v >>> 8) & 0xFF));
-        m_position++;
     }
 
     @Override
@@ -120,20 +112,15 @@ class ByteBigListDataOutput implements DataOutput {
     @Override
     public void writeInt(final int v) throws IOException {
         m_data.add((byte)(v & 0xFF));
-        m_position++;
         m_data.add((byte)((v >>> 8) & 0xFF));
-        m_position++;
         m_data.add((byte)((v >>> 16) & 0xFF));
-        m_position++;
         m_data.add((byte)((v >>> 24) & 0xFF));
-        m_position++;
     }
 
     @Override
     public void writeLong(final long v) throws IOException {
         for (int i = 0; i < 8; i++) {
             m_data.add((byte)(v >>> (i * 8)));
-            m_position++;
         }
     }
 
@@ -152,7 +139,6 @@ class ByteBigListDataOutput implements DataOutput {
         int len = s.length();
         for (int i = 0; i < len; i++) {
             m_data.add((byte)s.charAt(i));
-            m_position++;
         }
     }
 
