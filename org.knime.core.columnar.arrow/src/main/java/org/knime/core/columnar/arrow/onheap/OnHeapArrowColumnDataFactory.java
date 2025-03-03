@@ -115,11 +115,39 @@ public interface OnHeapArrowColumnDataFactory {
     Field getField(String name, LongSupplier dictionaryIdSupplier);
 
     /**
-     * Copy the data to the given arrow vector. The vector is created from the given field but can have an extension
-     * type.
+     * Copies the given column data into the provided Arrow vector.
+     * <p>
+     * Implementers must ensure that the data and validity buffers are correctly copied, and the value count is properly
+     * set. The provided vector is guaranteed to be of the correct type, matching the field returned by
+     * {@link #getField(String, LongSupplier)}.
+     * </p>
+     * <p>
+     * A typical implementation involves:
+     * <ul>
+     * <li>Allocating memory in the vector based on the data length.</li>
+     * <li>Copying the data buffer.</li>
+     * <li>Copying the validity buffer.</li>
+     * <li>Copying child vectors and offset buffers if necessary.</li>
+     * <li>Setting the value count.</li>
+     * </ul>
+     * </p>
+     * <p>
+     * Example:
+     * </p>
      *
-     * @param data the data to copy
-     * @param vector the vector to copy the data to
+     * <pre>
+     * public void copyToVector(final NullableReadData data, final FieldVector fieldVector) {
+     *     var d = (ArrowDoubleReadData)data;
+     *     var vector = (Float8Vector)fieldVector;
+     *     vector.allocateNew(d.length());
+     *     MemoryCopyUtils.copy(d.m_data, vector.getDataBuffer());
+     *     d.m_validity.copyTo(vector.getValidityBuffer());
+     *     vector.setValueCount(d.length());
+     * }
+     * </pre>
+     *
+     * @param data the column data to copy
+     * @param vector the Arrow vector to copy the data into
      */
     void copyToVector(NullableReadData data, FieldVector vector);
 
