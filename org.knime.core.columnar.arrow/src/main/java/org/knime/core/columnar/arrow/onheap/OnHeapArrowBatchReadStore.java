@@ -47,14 +47,12 @@ package org.knime.core.columnar.arrow.onheap;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.knime.core.columnar.arrow.ArrowBatchReadStore;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils;
 import org.knime.core.columnar.arrow.ArrowSchemaUtils;
 import org.knime.core.columnar.arrow.PathBackedFileHandle;
-import org.knime.core.columnar.arrow.compress.ArrowCompressionUtil;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.filter.DefaultColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
@@ -67,11 +65,12 @@ import org.knime.core.columnar.store.BatchReadStore;
  */
 public final class OnHeapArrowBatchReadStore extends AbstractOnHeapArrowBatchReadable implements ArrowBatchReadStore {
 
-    private AtomicInteger m_numBatches;
+    private int m_numBatches;
 
+    private boolean m_useLZ4BlockCompression;
+
+    /** <code>null</code> if not initialized yet. */
     private long[] m_batchBoundaries;
-
-    private Boolean m_useLZ4BlockCompression;
 
     /**
      * Creates a new {@link OnHeapArrowBatchReadStore} instance.
@@ -80,12 +79,7 @@ public final class OnHeapArrowBatchReadStore extends AbstractOnHeapArrowBatchRea
      * @param allocator
      */
     public OnHeapArrowBatchReadStore(final Path path, final BufferAllocator allocator) {
-        this(path, allocator, null);
-    }
-
-    OnHeapArrowBatchReadStore(final Path path, final BufferAllocator allocator, final AtomicInteger numBatches) {
         super(ArrowSchemaUtils.readSchema(path), new PathBackedFileHandle(path), allocator);
-        m_numBatches = numBatches;
     }
 
     @Override
@@ -94,45 +88,43 @@ public final class OnHeapArrowBatchReadStore extends AbstractOnHeapArrowBatchRea
         return new OnHeapArrowBatchReader(m_fileHandle.asFile(), m_allocator, factories, config);
     }
 
-    private final void initMetadata() {
-        try (final OnHeapArrowBatchReader reader =
-            createRandomAccessReader(new DefaultColumnSelection(m_schema.numColumns()))) {
-            m_numBatches = new AtomicInteger(reader.numBatches());
-            m_useLZ4BlockCompression =
-                reader.getMetadata().containsKey(ArrowReaderWriterUtils.ARROW_LZ4_BLOCK_FEATURE_KEY);
-            m_batchBoundaries = ArrowReaderWriterUtils
-                .stringToLongArray(reader.getMetadata().get(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY));
-        } catch (final IOException e) {
-            throw new IllegalStateException("Error when reading footer.", e);
-        }
-    }
-
     @Override
     public int numBatches() {
-        if (m_numBatches == null) {
-            initMetadata();
-        }
-        return m_numBatches.get();
+        initMetadataIfNeccessary();
+        return m_numBatches;
     }
 
-    /**
-     * @return Whether the store's data was persisted using the deprecated
-     *         {@link ArrowCompressionUtil#ARROW_LZ4_BLOCK_COMPRESSION LZ4 block buffer compression} type.
-     */
     @Override
     public boolean isUseLZ4BlockCompression() {
-        if (m_useLZ4BlockCompression == null) {
-            initMetadata();
-        }
+        initMetadataIfNeccessary();
         return m_useLZ4BlockCompression;
     }
 
     @Override
     public long[] getBatchBoundaries() {
-        if (m_batchBoundaries == null) {
-            initMetadata();
-        }
+        initMetadataIfNeccessary();
         return m_batchBoundaries;
     }
 
+    // Note: This method is not synchronized to avoid unnecessary synchronization overhead.
+    private void initMetadataIfNeccessary() {
+        if (m_batchBoundaries == null) {
+            initMetadata();
+        }
+    }
+
+    private synchronized void initMetadata() {
+        if (m_batchBoundaries == null) {
+            try (final OnHeapArrowBatchReader reader =
+                createRandomAccessReader(new DefaultColumnSelection(m_schema.numColumns()))) {
+                m_numBatches = reader.numBatches();
+                m_useLZ4BlockCompression =
+                    reader.getMetadata().containsKey(ArrowReaderWriterUtils.ARROW_LZ4_BLOCK_FEATURE_KEY);
+                m_batchBoundaries = ArrowReaderWriterUtils
+                    .stringToLongArray(reader.getMetadata().get(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY));
+            } catch (final IOException e) {
+                throw new IllegalStateException("Error when reading footer.", e);
+            }
+        }
+    }
 }
