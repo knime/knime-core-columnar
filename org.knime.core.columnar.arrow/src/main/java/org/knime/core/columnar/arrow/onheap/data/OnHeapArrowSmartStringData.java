@@ -76,13 +76,21 @@ public final class OnHeapArrowSmartStringData {
     private OnHeapArrowSmartStringData() {
     }
 
-    interface CopyableStringWriteData extends StringWriteData {
+    /**
+     * NOTE: This interface only serves as a demonstration how low-level copy can be implemented for this string data.
+     * The interface fits the changes suggested in https://bitbucket.org/KNIME/knime-core-columnar/pull-requests/349 for
+     * AP-22106. The methods defined in this interface are not called by the current implementation.
+     * <p>
+     * TODO(AP-22106) Remove this interface when the low-level copy is implemented.
+     */
+    private interface CopyableStringWriteData extends StringWriteData {
         void setStringBytes(int index, byte[] val);
 
         void setFrom(CopyableStringReadData sourceData, int sourceIndex, int targetIndex);
     }
 
-    interface CopyableStringReadData extends StringReadData {
+    /** @see CopyableStringWriteData */
+    private interface CopyableStringReadData extends StringReadData {
         byte[] getStringBytesNullable(int index);
     }
 
