@@ -155,7 +155,7 @@ abstract class AbstractOffHeapArrowBatchReader {
         // Create the ColumnData
         return m_columnSelection.createBatch(i -> {
             try {
-                return m_factories[i].createRead(vectors[i].m_vector, vectors[i].m_nullCount, dictionaries,
+                return m_factories[i].createRead(vectors[i].vector, vectors[i].nullCount, dictionaries,
                     m_factoryVersions[i]);
             } catch (IOException e) {
                 throw new IllegalStateException("Exception while reading column data.", e);
@@ -203,7 +203,7 @@ abstract class AbstractOffHeapArrowBatchReader {
                 final DictionaryDescription description = m_dictionaryDescriptions.get(id);
                 if (description != null) {
                     @SuppressWarnings("resource") // Resource handled by caller (the vector is returned)
-                    final FieldVector vector = description.m_field.createVector(m_allocator); // NOSONAR: See SuppressWarnings
+                    final FieldVector vector = description.field.createVector(m_allocator); // NOSONAR: See SuppressWarnings
 
                     // Load the data into the vector
                     @SuppressWarnings("resource") // Closed by the DictionaryBatch
@@ -212,7 +212,7 @@ abstract class AbstractOffHeapArrowBatchReader {
                         getCompressionCodec(data), m_allocator);
 
                     // Create the dictionary and add it to the provider
-                    provider.put(new Dictionary(vector, description.m_encoding));
+                    provider.put(new Dictionary(vector, description.encoding));
                 }
             }
             return provider;
@@ -412,28 +412,10 @@ abstract class AbstractOffHeapArrowBatchReader {
      * Structure holding a {@link Field} and {@link DictionaryEncoding}. Both needed to create a {@link Dictionary} from
      * a {@link DictionaryBatch}.
      */
-    private static final class DictionaryDescription {
-
-        private final Field m_field;
-
-        private final DictionaryEncoding m_encoding;
-
-        private DictionaryDescription(final Field field, final DictionaryEncoding encoding) {
-            m_field = field;
-            m_encoding = encoding;
-        }
+    private record DictionaryDescription(Field field, DictionaryEncoding encoding) {
     }
 
     /** Structure holding a {@link FieldVector vector} and a {@link ArrowVectorNullCount} for this vector. */
-    private static final class FieldVectorAndNullCount {
-
-        private final FieldVector m_vector;
-
-        private final ArrowVectorNullCount m_nullCount;
-
-        private FieldVectorAndNullCount(final FieldVector vector, final ArrowVectorNullCount nullCount) {
-            m_vector = vector;
-            m_nullCount = nullCount;
-        }
+    private record FieldVectorAndNullCount(FieldVector vector, ArrowVectorNullCount nullCount) {
     }
 }
