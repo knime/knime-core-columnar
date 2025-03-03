@@ -172,7 +172,7 @@ public final class OnHeapArrowListData {
             // Slice the data
             var dataIndex = m_offsets.get(index + m_offset);
             @SuppressWarnings("unchecked")
-            final C data = (C)m_data.slice(dataIndex.start(), dataIndex.end() - dataIndex.start());
+            final C data = (C)m_data.slice(dataIndex.start(), dataIndex.length());
             return data;
         }
 
