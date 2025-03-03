@@ -130,7 +130,7 @@ abstract class AbstractOnHeapArrowWriteData<T, R extends OnHeapArrowReadData> ex
 
     @Override
     public void setMissing(final int index) {
-        m_validity.set(index, false);
+        m_validity.set(index + m_offset, false);
     }
 
     protected void setValid(final int index) {
