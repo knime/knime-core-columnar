@@ -179,10 +179,11 @@ class OffsetBufferTest {
         buffer.add(1, 2);
 
         // Attempt to add at index 0 again (this is not allowed)
-        assertThrows(IndexOutOfBoundsException.class, () -> buffer.add(0, 1));
+        assertThrows(IndexOutOfBoundsException.class, () -> buffer.add(0, 1), "Should not allow overwriting index 0");
+        assertThrows(IndexOutOfBoundsException.class, () -> buffer.add(1, 1), "Should not allow overwriting index 1");
 
-        // Assert that we can still overwrite the last element (idx 1)
-        buffer.add(1, 1);
+        // Assert that we can still add elements after the last
+        buffer.add(2, 1);
     }
 
     /**
