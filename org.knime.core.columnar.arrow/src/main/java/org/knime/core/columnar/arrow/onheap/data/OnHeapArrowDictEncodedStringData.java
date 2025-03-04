@@ -59,7 +59,7 @@ import org.knime.core.columnar.arrow.onheap.OnHeapArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.onheap.data.AbstractOnHeapArrowDictEncodedData.AbstractArrowDictEncodedDataFactory;
 import org.knime.core.columnar.arrow.onheap.data.AbstractOnHeapArrowDictEncodedData.AbstractArrowDictEncodedReadData;
 import org.knime.core.columnar.arrow.onheap.data.AbstractOnHeapArrowDictEncodedData.AbstractArrowDictEncodedWriteData;
-import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowSmartStringData.ArrowStringDataFactory;
+import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowStringData.ArrowStringDataFactory;
 import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowStructData.ArrowStructReadData;
 import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowStructData.ArrowStructWriteData;
 import org.knime.core.columnar.data.StringData.StringReadData;
