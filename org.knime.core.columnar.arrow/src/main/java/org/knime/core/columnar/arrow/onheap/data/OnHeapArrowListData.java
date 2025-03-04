@@ -143,7 +143,9 @@ public final class OnHeapArrowListData {
 
         @Override
         protected void setNumElements(final int numElements) {
-            // Note: m_data is expanded when setting the elements inside the list
+            // Note: m_data is
+            // - expanded when setting the elements inside the list
+            // - shrunk when closing the data in createReadData
             m_validity.setNumElements(numElements);
             m_offsets.setNumElements(numElements);
         }

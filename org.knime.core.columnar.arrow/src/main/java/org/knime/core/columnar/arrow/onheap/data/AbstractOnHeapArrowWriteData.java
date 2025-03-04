@@ -114,9 +114,14 @@ abstract class AbstractOnHeapArrowWriteData<T, R extends OnHeapArrowReadData> ex
     protected abstract R createReadData(final int length);
 
     /**
-     * Expand or shrink the data to the given size.
+     * Adjusts the size of the data storage to the specified number of elements.
+     * <p>
+     * This method is called when expanding the capacity via {@link #expand(int)} or when closing the data with a length
+     * different from its current capacity. Implementations must reallocate or resize the underlying storage as needed.
+     * Shrinking is only relevant when closing the data via {@link #close(int)} and can be handled either here or in
+     * {@link #createReadData(int)}.
      *
-     * @param numElements the new size of the data
+     * @param numElements the new number of elements in the data storage
      */
     protected abstract void setNumElements(final int numElements);
 
