@@ -42,9 +42,6 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
- * History
- *   Nov 30, 2020 (benjamin): created
  */
 package org.knime.core.columnar.arrow.onheap.data;
 
@@ -53,6 +50,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.function.LongSupplier;
 
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.vector.BaseVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -65,76 +64,259 @@ import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.StringData.StringReadData;
 import org.knime.core.columnar.data.StringData.StringWriteData;
 
+import it.unimi.dsi.fastutil.bytes.ByteArrayList;
+
 /**
  * Arrow implementation of {@link StringWriteData} and {@link StringReadData}.
  *
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 public final class OnHeapArrowStringData {
 
     private OnHeapArrowStringData() {
     }
 
-    /** A list of strings that keeps track of the size of the data. */
-    private static final class SizeAwareStringList {
+    /**
+     * NOTE: This interface only serves as a demonstration how low-level copy can be implemented for this string data.
+     * The interface fits the changes suggested in https://bitbucket.org/KNIME/knime-core-columnar/pull-requests/349 for
+     * AP-22106. The methods defined in this interface are not called by the current implementation.
+     * <p>
+     * TODO(AP-22106) Remove this interface when the low-level copy is implemented.
+     */
+    private interface CopyableStringWriteData extends StringWriteData {
+        void setStringBytes(int index, byte[] val);
+
+        void setFrom(CopyableStringReadData sourceData, int sourceIndex, int targetIndex);
+    }
+
+    /** @see CopyableStringWriteData */
+    private interface CopyableStringReadData extends StringReadData {
+        byte[] getStringBytesNullable(int index);
+    }
+
+    // TODO(AP-23864) to make state handling of this object simpler, we could split it into two classes:
+    // one for writing and one for reading. A superclass could hold the data structure and the subclasses could limit
+    // the access to the data structure to either writing or reading.
+    // Consider splitting the String[] and ByteArrayList representations into separate classes. In the current
+    // implementation, it is not immediately obvious what the data size fields track, what the offsets refer to, what
+    // is updated when
+    /**
+     * Holds the data of a string column in a combination of a string array and a byte array.
+     * <p>
+     * Note that none of the two representations is guaranteed to be complete to the last set index.
+     * <p>
+     * The byte[] is complete up to a certain index (the last one that was encoded) ({@link #lastWrittenBytesIndex()})
+     * which is tracked by the offsets buffer. The String[] is sparsely filled. However, it is guaranteed to contain all
+     * values after the {@link #lastWrittenBytesIndex()}.
+     * <p>
+     * Usage constraints:
+     * <ul>
+     * <li>Data must be added with strictly increasing indices</li>
+     * <li>Reading data is only allowed after writing is done</li>
+     * </ul>
+     */
+    private static final class LazyEncodedStringList {
+
+        /*
+         * Thread safety considerations:
+         * - TODO(AP-23864) In `getString` we could decode the same String twice which would result in a wrong estimate
+         *   in totalDataSizeInBytes
+         * - We only set values in m_dataBytes (and m_offsets) during writing (which is not thread-safe anyway) and when
+         *   encoding the data to copy it to a vector. This happens after writing is done.
+         */
 
         private String[] m_data;
 
-        /**
-         * The memory usage of the data in bytes. Remembers the accumulated size at each position of the array. Note
-         * that we use 32-bit offsets when writing the data. However, we might consume more memory than the written
-         * UTF-8 representation because Java Strings use UTF-16 encoding internally.
-         */
+        private final ByteArrayList m_dataBytes;
+
+        private final OffsetBuffer m_offsets;
+
+        // Size of m_data in bytes
+        private long m_totalDataSizeInBytes = 0;
+
+        // Note that this might be `null`. In this case, this object only allows reading and not writing
         private LargeOffsetBuffer m_accumulatedDataSizeInBytes;
 
-        SizeAwareStringList(final int capacity) {
+        public LazyEncodedStringList(final int capacity) {
             m_data = new String[capacity];
-            // TODO(AP-23862) consider the object header size of array class?
+            m_dataBytes = new ByteArrayList();
+            m_offsets = new OffsetBuffer(capacity);
             m_accumulatedDataSizeInBytes = new LargeOffsetBuffer(capacity);
         }
 
-        void set(final int index, final String val) {
-            m_data[index] = val;
-            m_accumulatedDataSizeInBytes.add(index, StringSizeUtils.memorySize(val));
+        private LazyEncodedStringList(final String[] data, final ByteArrayList byteArrayList,
+            final OffsetBuffer offsets) {
+            m_data = data;
+            m_dataBytes = byteArrayList;
+            m_offsets = offsets;
         }
 
-        int capacity() {
+        public int capacity() {
             return m_data.length;
         }
 
-        long usedSizeFor(final int numElements) {
-            return m_accumulatedDataSizeInBytes.getNumData(numElements);
+        /**
+         * Encodes the strings in the range <code>[lastWrittenBytesIndex() + 1, endIdx)</code> into the byte array
+         *
+         * @param endIdx the next index after the last string to encode
+         */
+        private void encode(final int endIdx) {
+            for (var i = m_offsets.lastWrittenIndex() + 1; i < endIdx; i++) {
+                var str = m_data[i];
+                if (str != null) {
+                    // TODO(AP-23858) Is CharsetEncoder faster?
+                    // TODO(AP-23858) Can encode directly to m_dataBytes without a temporary byte[]?
+                    var bytes = str.getBytes(StandardCharsets.UTF_8);
+                    var dataIndex = m_offsets.add(i, bytes.length);
+                    m_dataBytes.addElements(dataIndex.start(), bytes);
+                } else {
+                    m_offsets.add(i, 0);
+                }
+            }
         }
 
-        /** @return the consumed memory of this object in bytes */
-        long sizeOf() {
-            return usedSizeFor(capacity()) // m_data
-                + LargeOffsetBuffer.usedSizeFor(capacity()); // m_accumulatedEncodedSizeInBytes
+        // Writing elements
+
+        public void setString(final int index, final String value) {
+            m_data[index] = value;
+            var memorySize = StringSizeUtils.memorySize(value);
+            m_accumulatedDataSizeInBytes.add(index, memorySize);
+            m_totalDataSizeInBytes += memorySize;
         }
 
         public void setNumElements(final int numElements) {
             m_data = Arrays.copyOf(m_data, numElements);
+            m_offsets.setNumElements(numElements);
             m_accumulatedDataSizeInBytes.setNumElements(numElements);
+            m_totalDataSizeInBytes = m_accumulatedDataSizeInBytes.getNumData(numElements);
+        }
+
+        /**
+         * Copy the data to the given vector. Allocates the necessary memory.
+         *
+         * @param vector the vector to copy the data to
+         */
+        @SuppressWarnings("resource") // The buffers are owned by the vector and closed with it
+        public void copyTo(final BaseVariableWidthVector vector) {
+            encode(capacity());
+            vector.allocateNew(m_dataBytes.size(), capacity());
+            vector.getDataBuffer().setBytes(0, m_dataBytes.elements(), 0, m_dataBytes.size());
+            m_offsets.copyTo(vector.getOffsetBuffer());
+        }
+
+        public void setStringBytes(final int index, final byte[] val) {
+            // Note - we prefer to encode the previous values to decoding this one, because
+            // - it is likely that we need the byte representation of the previous values anyway
+            // - we have two representations of the data in the newer data object, so this will be more flexible and
+            //   efficient to work with
+
+            // Encode the values that not yet encoded
+            encode(index);
+
+            // Copy over the new value
+            var dataIndex = m_offsets.add(index, val.length);
+            System.arraycopy(val, 0, m_dataBytes, dataIndex.start(), val.length);
+        }
+
+        public void setFrom(final LazyEncodedStringList sourceList, final int sourceIndex, final int targetIndex) {
+            // Copy the string
+            // Note that this can be null if the data was just read and not yet decoded. In this case, the
+            // bytes will be set and the string will be decoded on access
+            m_data[targetIndex] = sourceList.m_data[sourceIndex];
+            var memorySize = StringSizeUtils.memorySize(m_data[targetIndex]);
+            m_accumulatedDataSizeInBytes.add(targetIndex, memorySize);
+            m_totalDataSizeInBytes += memorySize;
+
+            // Copy the bytes if they are present (must be present if the string is null)
+            if (sourceList.m_offsets.lastWrittenIndex() >= sourceIndex) {
+                var sourceDataIndex = sourceList.m_offsets.get(sourceIndex);
+                var targetDataIndex = m_offsets.add(targetIndex, sourceDataIndex.length());
+                System.arraycopy(sourceList.m_dataBytes, sourceDataIndex.start(), m_dataBytes, targetDataIndex.start(),
+                    sourceDataIndex.length());
+            }
+        }
+
+        // Accessing elements
+
+        public String getString(final int index) {
+            if (m_data[index] == null) {
+                // Decode the string
+                // TODO(AP-23858) Is CharsetDecoder faster?
+                var dataIndex = m_offsets.get(index);
+                var val =
+                    new String(m_dataBytes.elements(), dataIndex.start(), dataIndex.length(), StandardCharsets.UTF_8);
+
+                m_data[index] = val;
+                // Note: we do not update the accumulated size here because we would need to re-compute the accumulated
+                // size for all following indices. This is not a problem, because we are not using the accumulated size
+                // anymore, because we are done writing and only reading now.
+                m_totalDataSizeInBytes += StringSizeUtils.memorySize(val);
+            }
+
+            return m_data[index];
+        }
+
+        public byte[] getStringBytesNullable(final int index) {
+            if (m_offsets.lastWrittenIndex() >= index) {
+                var dataIndex = m_offsets.get(index);
+                var bytes = new byte[dataIndex.length()];
+                System.arraycopy(m_dataBytes, dataIndex.start(), bytes, 0, bytes.length);
+                return bytes;
+            } else {
+                return null;
+            }
+        }
+
+        public static LazyEncodedStringList createFrom(final ArrowBuf dataBuffer, final ArrowBuf offsetsBuffer,
+            final int numElements) {
+            var offsets = OffsetBuffer.createFrom(offsetsBuffer, numElements);
+            var dataBytes = new byte[offsets.getNumData(numElements)];
+            dataBuffer.getBytes(0, dataBytes);
+            return new LazyEncodedStringList(new String[numElements], new ByteArrayList(dataBytes), offsets);
         }
     }
 
-    /** Arrow implementation of {@link StringReadData}. */
-    public static final class ArrowStringWriteData
-        extends AbstractOnHeapArrowWriteData<SizeAwareStringList, ArrowStringReadData> implements StringWriteData {
+    /**
+     * Holds the data of a string column in a combination of a string array and a byte array. Encoding is done lazily.
+     */
+    public static final class ArrowStringWriteData extends
+        AbstractOnHeapArrowWriteData<LazyEncodedStringList, ArrowStringReadData> implements CopyableStringWriteData {
 
         private ArrowStringWriteData(final int capacity) {
-            super(new SizeAwareStringList(capacity), capacity);
+            super(new LazyEncodedStringList(capacity), capacity);
         }
 
-        private ArrowStringWriteData(final SizeAwareStringList data, final ValidityBuffer validity, final int offset) {
+        private ArrowStringWriteData(final LazyEncodedStringList data, final ValidityBuffer validity,
+            final int offset) {
             super(data, validity, offset, data.capacity());
         }
 
         @Override
         public void setString(final int index, final String val) {
-            m_data.set(index + m_offset, val);
+            m_data.setString(index + m_offset, val);
             setValid(index);
         }
+
+        // >>> LOW LEVEL COPY
+
+        @Override
+        public void setStringBytes(final int index, final byte[] val) {
+            m_data.setStringBytes(index + m_offset, val);
+            setValid(index);
+        }
+
+        @Override
+        public void setFrom(final CopyableStringReadData sourceData, final int sourceIndex, final int targetIndex) {
+            if (sourceData instanceof ArrowStringReadData sourceArrowData) {
+                if (sourceArrowData.isMissing(sourceIndex)) {
+                    setMissing(targetIndex + m_offset);
+                } else {
+                    m_data.setFrom(sourceArrowData.m_data, sourceIndex, targetIndex + m_offset);
+                }
+            }
+        }
+
+        // <<< LOW LEVEL COPY
 
         @Override
         public OnHeapArrowWriteData slice(final int start) {
@@ -143,18 +325,26 @@ public final class OnHeapArrowStringData {
 
         @Override
         public long usedSizeFor(final int numElements) {
-            return m_data.usedSizeFor(numElements) // m_data String[]
-                + ValidityBuffer.usedSizeFor(numElements); // validity buffer
+            return m_data.m_accumulatedDataSizeInBytes.getNumData(numElements) // m_data.m_data
+                + m_data.m_dataBytes.size() // m_data.m_dataBytes
+                + OffsetBuffer.usedSizeFor(m_data.capacity()) // m_data.m_offsets
+                + m_validity.sizeOf();
         }
 
         @Override
         public long sizeOf() {
-            return m_data.sizeOf() + m_validity.sizeOf();
+            return m_data.m_totalDataSizeInBytes // m_data.m_data
+                + m_data.m_dataBytes.size() // m_data.m_dataBytes
+                + m_data.m_offsets.sizeOf() // m_data.m_offsets
+                + m_data.m_accumulatedDataSizeInBytes.sizeOf() // m_data.m_accumulatedDataSizeInBytes
+                + m_validity.sizeOf();
         }
 
         @Override
         protected ArrowStringReadData createReadData(final int length) {
-            return new ArrowStringReadData(m_data.usedSizeFor(length), m_data.m_data, m_validity);
+            m_data.m_accumulatedDataSizeInBytes = null;
+            // note the offsets reflect the current state of the dataBytes (not necessarily all strings of this data)
+            return new ArrowStringReadData(m_data, m_validity);
         }
 
         @Override
@@ -165,35 +355,44 @@ public final class OnHeapArrowStringData {
     }
 
     /** Arrow implementation of {@link StringReadData}. */
-    public static final class ArrowStringReadData extends AbstractOnHeapArrowReadData<String[]>
-        implements StringReadData {
+    public static final class ArrowStringReadData extends AbstractOnHeapArrowReadData<LazyEncodedStringList>
+        implements CopyableStringReadData {
 
-        private final long m_dataSizeInBytes;
-
-        private ArrowStringReadData(final long dataSizeInBytes, final String[] data, final ValidityBuffer validity) {
-            super(data, validity, data.length);
-            m_dataSizeInBytes = dataSizeInBytes;
+        private ArrowStringReadData(final LazyEncodedStringList data, final ValidityBuffer validity) {
+            super(data, validity, data.capacity());
         }
 
-        private ArrowStringReadData(final long dataSizeInBytes, final String[] data, final ValidityBuffer validity,
-            final int offset, final int length) {
+        private ArrowStringReadData(final LazyEncodedStringList data, final ValidityBuffer validity, final int offset,
+            final int length) {
             super(data, validity, offset, length);
-            m_dataSizeInBytes = dataSizeInBytes;
         }
 
         @Override
         public String getString(final int index) {
-            return m_data[index + m_offset];
+            // Assuming not missing (the caller has to check)
+            return m_data.getString(index + m_offset);
+        }
+
+        @Override
+        public byte[] getStringBytesNullable(final int index) {
+            if (!isMissing(index + m_offset)) {
+                return m_data.getStringBytesNullable(index + m_offset);
+            } else {
+                return null;
+            }
         }
 
         @Override
         public OnHeapArrowReadData slice(final int start, final int length) {
-            return new ArrowStringReadData(m_dataSizeInBytes, m_data, m_validity, m_offset + start, length);
+            return new ArrowStringReadData(m_data, m_validity, m_offset + start, length);
         }
 
         @Override
         public long sizeOf() {
-            return m_dataSizeInBytes + m_validity.sizeOf();
+            return m_data.m_totalDataSizeInBytes // m_data.m_data
+                + m_data.m_dataBytes.size() // m_data.m_dataBytes
+                + m_data.m_offsets.sizeOf() // m_data.m_offsets
+                + m_validity.sizeOf();
         }
     }
 
@@ -224,27 +423,10 @@ public final class OnHeapArrowStringData {
             d.checkNotSliced();
             var vector = (VarCharVector)fieldVector;
 
-            vector.allocateNew(d.length());
-
-            // Copy the data
-            for (int i = 0; i < d.length(); i++) {
-                if (!d.isMissing(i)) {
-                    var val = d.getString(i);
-                    if (val != null) {
-                        // TODO(AP-23858) Is CharsetEncoder faster?
-                        // TODO(AP-23858) Can encode directly to the ArrowBuf without a temporary byte[]?
-                        vector.setSafe(i, val.getBytes(StandardCharsets.UTF_8));
-                    } else {
-                        vector.setNull(i);
-                    }
-                } else {
-                    vector.setNull(i);
-                }
-            }
-
-            // Copy the validity
+            d.m_data.copyTo(vector);
             d.m_validity.copyTo(vector.getValidityBuffer());
 
+            vector.setLastSet(d.length() - 1);
             vector.setValueCount(d.length());
         }
 
@@ -255,25 +437,11 @@ public final class OnHeapArrowStringData {
             if (m_version.equals(version)) {
 
                 var valueCount = vector.getValueCount();
-                var v = (VarCharVector)vector;
-
-                long dataSizeInBytes = 0;
-                var data = new String[valueCount];
-
-                for (int i = 0; i < valueCount; i++) {
-                    if (!v.isNull(i)) {
-                        var valueBytes = v.get(i);
-                        if (valueBytes != null) {
-                            // TODO(AP-23858) Is CharsetDecoder faster?
-                            // TODO(AP-23858) Can decode directly from the ArrowBuf without a temporary byte[]?
-                            data[i] = new String(valueBytes, StandardCharsets.UTF_8);
-                            dataSizeInBytes += data[i].length() * 2L;
-                        }
-                    }
-                }
                 var validity = ValidityBuffer.createFrom(vector.getValidityBuffer(), valueCount);
+                var data =
+                    LazyEncodedStringList.createFrom(vector.getDataBuffer(), vector.getOffsetBuffer(), valueCount);
 
-                return new ArrowStringReadData(dataSizeInBytes, data, validity);
+                return new ArrowStringReadData(data, validity);
             } else {
                 throw new IOException(
                     "Cannot read ArrowStringData with version " + version + ". Current version: " + m_version + ".");
@@ -282,8 +450,10 @@ public final class OnHeapArrowStringData {
 
         @Override
         public int initialNumBytesPerElement() {
-            return Long.BYTES // Long offsets for counting the accumulated size
-                + Integer.BYTES; // Compressed OOPs in the data String[]
+            return Long.BYTES // accumulated data size
+                + Integer.BYTES // offsets
+                + Integer.BYTES // Compressed OOPs in the data String[]
+                + Byte.BYTES; // validity
         }
     }
 }

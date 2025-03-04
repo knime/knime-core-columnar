@@ -1,6 +1,7 @@
 /*
  * ------------------------------------------------------------------------
  *
+
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -65,7 +66,7 @@ import org.knime.core.columnar.arrow.onheap.data.OnHeapArrowStringData.ArrowStri
  * Test {@link OnHeapArrowStringData}
  *
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 public class OnHeapArrowStringDataTest extends AbstractOnHeapArrowDataTest<ArrowStringWriteData, ArrowStringReadData> {
 
@@ -111,6 +112,7 @@ public class OnHeapArrowStringDataTest extends AbstractOnHeapArrowDataTest<Arrow
         }
 
         return numDataBytes // data
+            + 4L * (capacity + 1) // 4 bytes per value for bytes offset buffer
             + (long)Math.ceil(capacity / 8.0); // 1 bit per value for validity buffer
     }
 
