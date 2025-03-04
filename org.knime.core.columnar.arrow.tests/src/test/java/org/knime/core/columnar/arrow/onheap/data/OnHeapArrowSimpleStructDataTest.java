@@ -113,9 +113,15 @@ public class OnHeapArrowSimpleStructDataTest
     }
 
     @Override
-    protected long getMinSize(final int valueCount, final int capacity) {
-        return 3 * (long)Math.ceil(capacity / 8.0) // Validity buffers of Struct, Double, and Integer
+    protected long getMinSizeW(final int valueCount, final int capacity) {
+        return 2 * (long)Math.ceil(capacity / 8.0) // Validity buffers of Double, and Integer
             + capacity * 8L // Double: Data buffer
             + capacity * 4L; // Integer: Data buffer
+    }
+
+    @Override
+    protected long getMinSize(final int valueCount, final int capacity) {
+        return getMinSizeW(valueCount, capacity) //
+            + (long)Math.ceil(capacity / 8.0); // Validity buffer of Struct
     }
 }

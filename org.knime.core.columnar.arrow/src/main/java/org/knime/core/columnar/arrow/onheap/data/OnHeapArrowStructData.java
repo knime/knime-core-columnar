@@ -83,13 +83,13 @@ public final class OnHeapArrowStructData {
         extends AbstractOnHeapArrowWriteData<OnHeapArrowWriteData[], ArrowStructReadData> implements StructWriteData {
 
         private ArrowStructWriteData(final int capacity, final OnHeapArrowWriteData[] data) {
-            super(data, capacity);
+            // Note that we set the validity buffer to "null" because the validity is given by the children
+            super(data, null, 0, capacity);
             m_capacity = capacity;
         }
 
-        private ArrowStructWriteData(final OnHeapArrowWriteData[] data, final ValidityBuffer validity, final int offset,
-            final int capacity) {
-            super(data, validity, offset, capacity);
+        private ArrowStructWriteData(final OnHeapArrowWriteData[] data, final int offset, final int capacity) {
+            super(data, null, offset, capacity);
             m_capacity = capacity;
         }
 
@@ -107,12 +107,11 @@ public final class OnHeapArrowStructData {
             for (int i = 0; i < m_data.length; i++) {
                 slicedChildren[i] = m_data[i].slice(start);
             }
-            return new ArrowStructWriteData(slicedChildren, m_validity, m_offset + start, m_capacity - start);
+            return new ArrowStructWriteData(slicedChildren, m_offset + start, m_capacity - start);
         }
 
         @Override
         public void setMissing(final int index) {
-            m_validity.set(m_offset + index, false);
             // Also set all children to missing
             for (NullableWriteData child : m_data) {
                 child.setMissing(index);
@@ -120,8 +119,15 @@ public final class OnHeapArrowStructData {
         }
 
         @Override
+        protected void setValid(final int index) {
+            // Overwritten to ensure that we do not get a NullPointerException by calling set on the validity buffer
+            // which is null
+            // The validity is given by the children and therefore this implementation is empty
+        }
+
+        @Override
         public long usedSizeFor(final int numElements) {
-            long size = ValidityBuffer.usedSizeFor(numElements);
+            long size = 0;
             for (var child : m_data) {
                 size += child.usedSizeFor(numElements);
             }
@@ -130,7 +136,7 @@ public final class OnHeapArrowStructData {
 
         @Override
         public long sizeOf() {
-            long size = m_validity.sizeOf();
+            long size = 0;
             for (var child : m_data) {
                 size += child.sizeOf();
             }
@@ -150,7 +156,6 @@ public final class OnHeapArrowStructData {
         @Override
         public ArrowStructReadData close(final int length) {
             // Note that we do not need to set the length of the children, as they are set in the close method
-            m_validity.setNumElements(length);
             var readData = createReadData(length);
             closeResources();
             return readData;
@@ -166,14 +171,14 @@ public final class OnHeapArrowStructData {
                 validityBuffers[i] = readChildren[i].getValidityBuffer();
             }
 
-            m_validity.setFrom(validityBuffers);
+            var validity = new ValidityBuffer(length);
+            validity.setFrom(validityBuffers);
 
-            return new ArrowStructReadData(readChildren, m_validity, length);
+            return new ArrowStructReadData(readChildren, validity, length);
         }
 
         @Override
         protected void setNumElements(final int numElements) {
-            m_validity.setNumElements(numElements);
             for (NullableWriteData child : m_data) {
                 child.expand(numElements);
             }
