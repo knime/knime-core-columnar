@@ -126,6 +126,9 @@ class OnHeapArrowBatchWriter implements BatchWriter {
     private final List<Long> m_batchBoundaries = new ArrayList<>();
 
     // Initialized on first #write
+    private Field[] m_fields;
+
+    // Initialized on first #write
     private ArrowWriter m_writer;
 
     /**
@@ -174,23 +177,29 @@ class OnHeapArrowBatchWriter implements BatchWriter {
             throw new IllegalStateException("Cannot write batch after closing the writer.");
         }
 
+        if (m_firstWrite) {
+            final var dictionaryIdsForField = newDictionaryIdSupplier();
+            m_fields = new Field[m_factories.length];
+            for (int i = 0; i < m_factories.length; i++) {
+                m_fields[i] = m_factories[i].getField(String.valueOf(i), dictionaryIdsForField);
+            }
+        }
+
         // TODO(AP-23857) create child allocator and close it after writing the batch
 
-        final List<Field> fields = new ArrayList<>(m_factories.length);
+        // Note that the fields for the schema have the resolved type of the dictionary fields as this is needed in the
+        // schema. m_fields has the field for the dictionary keys as this is needed to create the vectors.
+        final List<Field> fieldsForSchema = new ArrayList<>(m_factories.length);
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
-
-        final var dictionaryIdsForField = newDictionaryIdSupplier();
         final var dictionaryIdsForVectors = newDictionaryIdSupplier();
 
         // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
 
             final var data = batch.get(i);
+            final var field = m_fields[i];
             final var factory = m_factories[i];
-
-            // Create the field including the extension type (if using the ExtensionArrowColumnDataFactory)
-            var field = factory.getField(String.valueOf(i), dictionaryIdsForField);
 
             // Note: We create a Vector here and therefore transfer the data to off-heap
             // The compression requires the data to be off-heap
@@ -207,7 +216,7 @@ class OnHeapArrowBatchWriter implements BatchWriter {
 
             if (m_firstWrite) {
                 // Get the field for the schema and collect dictionaries
-                fields.add(mapDictionariesAndField(field, dictionaries, allDictionaries));
+                fieldsForSchema.add(mapDictionariesAndField(field, dictionaries, allDictionaries));
             } else {
                 // Collect the dictionaries
                 mapDictionaries(field, dictionaries, allDictionaries);
@@ -220,7 +229,7 @@ class OnHeapArrowBatchWriter implements BatchWriter {
         // If this is the first call we need to create the writer and write the schema to the file
         if (m_firstWrite) {
             m_firstWrite = false;
-            final Schema schema = new Schema(fields, getMetadata());
+            final Schema schema = new Schema(fieldsForSchema, getMetadata());
 
             m_writer = new ArrowWriter(m_fileHandle.asFile(), schema);
         }
