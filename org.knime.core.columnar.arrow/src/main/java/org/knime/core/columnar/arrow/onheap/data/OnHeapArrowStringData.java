@@ -313,6 +313,8 @@ public final class OnHeapArrowStringData {
                 } else {
                     m_data.setFrom(sourceArrowData.m_data, sourceIndex, targetIndex + m_offset);
                 }
+            } else {
+                // TODO(AP-22106) Implement low-level copy for other implementations
             }
         }
 
