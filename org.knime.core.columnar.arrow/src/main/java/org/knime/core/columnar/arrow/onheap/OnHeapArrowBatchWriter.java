@@ -209,6 +209,7 @@ class OnHeapArrowBatchWriter implements BatchWriter {
             var vector = field.createVector(m_allocator);
             factory.copyToVector(data, vector);
 
+            // TODO(AP-24057) remove support for dictionaries in the writer
             // This is not used anymore but still in the code to test reading of dictionaries for backward compatibility
             @SuppressWarnings("deprecation")
             final DictionaryProvider dictionaries =

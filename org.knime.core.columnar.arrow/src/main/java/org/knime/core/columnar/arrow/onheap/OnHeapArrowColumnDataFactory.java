@@ -112,6 +112,7 @@ public interface OnHeapArrowColumnDataFactory {
      *            from this supplier. Other ids might be used already in the parent data object.
      * @return the Arrow description for the vector type
      */
+    // TODO(AP-24057) delete the dictionaryIdSupplier parameter when removing dictionary support in the writer
     Field getField(String name, LongSupplier dictionaryIdSupplier);
 
     /**
@@ -163,6 +164,7 @@ public interface OnHeapArrowColumnDataFactory {
      * @deprecated use struct-based dictionaries instead. This method is only available to create dictionaries for
      *             testing reading of dictionaries which is supported for backward compatibility.
      */
+    // TODO(AP-24057) delete this method when removing dictionary support in the writer
     @Deprecated
     default DictionaryProvider createDictionaries(final NullableReadData data, final LongSupplier dictionaryIdSupplier,
         final BufferAllocator allocator) {
