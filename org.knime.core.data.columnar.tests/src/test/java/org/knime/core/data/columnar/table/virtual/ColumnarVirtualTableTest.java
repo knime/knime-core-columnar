@@ -107,32 +107,13 @@ final class ColumnarVirtualTableTest {
             .build());
 
     @Test
-    void testAppendNoRowIDInAppendedTable() {
-        testAppend(true, false);
-    }
-
-    @Test
-    void testAppendRowIDInAppendedTable() {
-        testAppend(true, true);
-    }
-
-    @Test
-    void testAppendNoRowID() {
-        testAppend(false, false);
-    }
-
-    @Test
-    void testAppendNoRowIDInFirstColumnButRowIDInSecondColumn() {
-        testAppend(false, true);
-    }
-
-    private static void testAppend(final boolean firstTableHasRowID, final boolean secondTableHasRowID) {
-        var firstSchema = builder(firstTableHasRowID)//
+    void testAppend() {
+        var firstSchema = builder(true)//
             .withColumn("foo", STRING)//
             .withColumn("bar", DOUBLE)//
             .build();
 
-        var secondSchema = builder(secondTableHasRowID)//
+        var secondSchema = builder(false)//
             .withColumn("baz", INT)//
             .withColumn("bla", LONG)//
             .build();
@@ -140,9 +121,9 @@ final class ColumnarVirtualTableTest {
         var firstTable = createTable(firstSchema);
         var secondTable = createTable(secondSchema);
 
-        var appendedTable = firstTable.append_drop_RowIDs_for_appened_tables(List.of(secondTable));
+        var appendedTable = firstTable.append(secondTable);
 
-        var expectedSchema = builder(firstTableHasRowID)//
+        var expectedSchema = builder(true)//
             .withColumn("foo", STRING)//
             .withColumn("bar", DOUBLE)//
             .withColumn("baz", INT)//
