@@ -213,15 +213,12 @@ public final class ColumnarConcatenater {
     }
 
     private DataTableValueSchema concatenate(final DataTableValueSchema[] schemas) {
-        final var tableSpecs = VirtualTableSchemaUtils.extractSpecs(schemas);
         var unionSchemaCreators = new LinkedHashMap<String, ColCreator>();
         for (int t = 0; t < schemas.length; t++) {
             var schema = schemas[t];
-            var spec = tableSpecs[t];
-            for (int c = 0; c < spec.getNumColumns(); c++) {
-                var colSpec = spec.getColumnSpec(c);
-                // +1 because RowIDs are not part of DataTableSpec
-                var valueFactory = schema.getValueFactory(c + 1);
+            for (int c = 1; c < schema.numColumns(); c++) {
+                var colSpec = schema.getDataColumnSpec(c);
+                var valueFactory = schema.getValueFactory(c);
                 unionSchemaCreators
                     .computeIfAbsent(colSpec.getName(), n -> new ColCreator(colSpec, valueFactory))//
                     .merge(colSpec);
