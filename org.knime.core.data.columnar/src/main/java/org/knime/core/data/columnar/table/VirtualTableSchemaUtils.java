@@ -60,8 +60,6 @@ import java.util.stream.Stream;
 
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.append.AppendedRowsTable;
-import org.knime.core.data.container.ColumnRearranger;
-import org.knime.core.data.container.ColumnRearrangerUtils;
 import org.knime.core.data.container.ConcatenateTable;
 import org.knime.core.data.container.JoinedTable;
 import org.knime.core.data.container.RearrangeColumnsTable;
@@ -91,38 +89,6 @@ public final class VirtualTableSchemaUtils {
 
     private static final DataTableValueSchema EMPTY =
         ValueSchemaUtils.create(new DataTableSpec(), new ValueFactory<?, ?>[]{new DefaultRowKeyValueFactory()});
-
-    /**
-     * Concatenates the ColumnarValueSchemas of the provided tables.
-     *
-     * @param tables to concatenate
-     * @return the concatenated ColumnarValueSchema
-     * @throws VirtualTableIncompatibleException if any of the tables were created prior to 4.5.0 or the ValueFactory
-     *             for any of the columns did not match between tables
-     */
-    public static DataTableValueSchema concatenateSchemas(final BufferedDataTable[] tables)
-        throws VirtualTableIncompatibleException {
-
-        final var schemas = extractSchemas(tables);
-        try {
-            ColumnarSchemas.concatenate(List.of(schemas));
-        } catch (IllegalArgumentException ex) {
-            throw new VirtualTableIncompatibleException("Schemas don't match exactly.", ex);
-        }
-
-        final var tableSpecs = extractSpecs(schemas);
-        final var outputSpec = AppendedRowsTable.generateDataTableSpec(tableSpecs);
-        final Map<String, ValueFactory<?, ?>> factoriesByName = new LinkedHashMap<>(outputSpec.getNumColumns());
-        factoriesByName.put("", getRowKeyValueFactory(schemas));
-        // using "" is safe because no column can have an empty name in KNIME
-        for (var column : outputSpec) {
-            final var name = column.getName();
-            for (int i = 0; i < schemas.length; i++) {//NOSONAR
-                checkFactoriesMatch(name, schemas[i], factoriesByName);
-            }
-        }
-        return createSchema(outputSpec, factoriesByName.values());
-    }
 
     private static RowKeyValueFactory<?, ?> getRowKeyValueFactory(final ValueSchema[] schemas)
         throws VirtualTableIncompatibleException {
@@ -196,28 +162,6 @@ public final class VirtualTableSchemaUtils {
     }
 
     /**
-     * Rearranges the ColumnarValueSchema of the provided BufferedDataTable according to the provided rearranger.
-     *
-     * @param table to rearrange
-     * @param rearranger defining how to rearrange
-     * @return the rearranged ColumnarValueSchema
-     * @throws VirtualTableIncompatibleException if the rearranger adds new data or any of the involved tables
-     *             (including reference tables) are not compatible with virtual tables (created prior to 4.5.0 or
-     *             concatenation with varying ValueFactories in any column)
-     */
-    @Deprecated // TODO (TP) Remove
-    public static ValueSchema rearrangeSchema(final BufferedDataTable table, final ColumnRearranger rearranger)
-        throws VirtualTableIncompatibleException {
-        if (!ColumnRearrangerUtils.addsNoNewColumns(rearranger)) {
-            throw new VirtualTableIncompatibleException(
-                "Appending columns via the ColumnRearranger is not yet implemented by the Columnar Table Backend.");
-        }
-        var refSchema = extractSchema(table);
-        // virtual tables can't append new columns (yet), so all columns are from the reference schema
-        return rearrangeSchemas(refSchema, EMPTY, rearranger.createSpec(), i -> true);
-    }
-
-    /**
      * @param schemas to extract the DataTableSpecs from
      * @return the extracted DataTableSpecs
      */
@@ -279,10 +223,36 @@ public final class VirtualTableSchemaUtils {
         }
     }
 
+
+    /**
+     * Extract and concatenate the DataTableValueSchemas of the concatenated tables.
+     */
     private static DataTableValueSchema extractSchemaFromConcatenateTable(final ConcatenateTable table)
         throws VirtualTableIncompatibleException {
-        return concatenateSchemas(table.getReferenceTables());
+
+        final BufferedDataTable[] tables = table.getReferenceTables();
+
+        final var schemas = extractSchemas(tables);
+        try {
+            ColumnarSchemas.concatenate(List.of(schemas));
+        } catch (IllegalArgumentException ex) {
+            throw new VirtualTableIncompatibleException("Schemas don't match exactly.", ex);
+        }
+
+        final DataTableSpec[] tableSpecs = extractSpecs(schemas);
+        final DataTableSpec outputSpec = AppendedRowsTable.generateDataTableSpec(tableSpecs);
+        final Map<String, ValueFactory<?, ?>> factoriesByName = new LinkedHashMap<>(outputSpec.getNumColumns());
+        factoriesByName.put("", getRowKeyValueFactory(schemas));
+        // using "" is safe because no column can have an empty name in KNIME
+        for (var column : outputSpec) {
+            final var name = column.getName();
+            for (int i = 0; i < schemas.length; i++) {//NOSONAR
+                checkFactoriesMatch(name, schemas[i], factoriesByName);
+            }
+        }
+        return createSchema(outputSpec, factoriesByName.values());
     }
+
 
     @SuppressWarnings("resource")
     private static DataTableValueSchema extractSchemaFromRearrangeTable(final RearrangeColumnsTable table)

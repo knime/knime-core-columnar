@@ -255,22 +255,10 @@ public final class ColumnarVirtualTable {
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
 
-    public ColumnarVirtualTable appendMissingValueColumns(final ValueSchema missing) {
-        var missingSchema = dropRowID(missing);
-        var newSchema = appendSchemas(m_valueSchema, missingSchema);
-        var transformSpec = new AppendMissingValuesTransformSpec(missingSchema);
-        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), newSchema);
-    }
-
-    private static ValueSchema dropRowID(final ValueSchema schema) {
-        if (ValueSchemaUtils.hasRowID(schema)) {
-            final var dataColumnSpecs = new DataColumnSpec[schema.numColumns() - 1];
-            final var valueFactories = new ValueFactory<?, ?>[schema.numColumns() - 1];
-            Arrays.setAll(dataColumnSpecs, i -> schema.getDataColumnSpec(i + 1));
-            Arrays.setAll(valueFactories, i -> schema.getValueFactory(i + 1));
-            return ValueSchemaUtils.create(dataColumnSpecs, valueFactories);
-        }
-        return schema;
+    public ColumnarVirtualTable appendMissingValueColumns(final ValueSchema schema) {
+        var transformSpec = new AppendMissingValuesTransformSpec(schema);
+        return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec),
+            appendSchemas(m_valueSchema, schema));
     }
 
     @Deprecated // TODO (TP): remove?
@@ -394,10 +382,6 @@ public final class ColumnarVirtualTable {
         return m_valueSchema.numColumns() == schema.numColumns()//
             && IntStream.range(0, m_valueSchema.numColumns())
                 .allMatch(i -> m_valueSchema.getColumn(i).equalStructure(schema.getColumn(i)));
-    }
-
-    private static ColumnarVirtualTable filterRowID(final ColumnarVirtualTable table) {
-        return ValueSchemaUtils.hasRowID(table.getSchema()) ? table.dropColumns(0) : table;
     }
 
     private static ValueSchema appendSchemas(final ValueSchema... schemas) {
