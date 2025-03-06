@@ -69,7 +69,6 @@ import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable.ColumnarM
 import org.knime.core.data.def.LongCell;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.ValueFactoryUtils;
-import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.schema.ValueSchemaUtils;
@@ -182,41 +181,6 @@ public final class ColumnarVirtualTable {
     }
 
     /**
-     * Assign new random column names.
-     *
-     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
-     */
-    @Deprecated // TODO (TP) remove
-    public ColumnarVirtualTable renameToRandomColumnNames() {
-        return new ColumnarVirtualTable(m_transform,
-            ValueSchemaUtils.renameToRandomColumnNames((DataTableValueSchema)m_valueSchema));
-    }
-
-    //    /**
-    //     * Assign new random column names to the specified columns.
-    //     *
-    //     * @param columnIndices columns to rename (note that indices are including RowKey at 0)
-    //     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with new random column names.
-    //     */
-    //    public ColumnarVirtualTable renameToRandomColumnNames(final int... columnIndices) {
-    //        return new ColumnarVirtualTable(m_transform,
-    //            ValueSchemaUtils.renameToRandomColumnNames(m_valueSchema, columnIndices));
-    //    }
-
-    /**
-     * Assign the specified column names to the specified columns.
-     *
-     * @param columnIndices columns to rename (note that indices are including RowKey at 0)
-     * @param columnNames new names to assign
-     * @return a new {@code ColumnarVirtualTable}, equivalent to this one, but with renamed column.
-     */
-    @Deprecated // TODO (TP) remove
-    public ColumnarVirtualTable renameColumns(final int[] columnIndices, final String[] columnNames) {
-        return new ColumnarVirtualTable(m_transform,
-            ValueSchemaUtils.renameColumns((DataTableValueSchema)m_valueSchema, columnIndices, columnNames));
-    }
-
-    /**
      * Drops columns in the table.
      *
      * @param columnIndices of the columns to drop
@@ -269,41 +233,6 @@ public final class ColumnarVirtualTable {
      */
     public ColumnarVirtualTable append(final ColumnarVirtualTable... tables) {
         return append(Arrays.asList(tables));
-    }
-
-    /**
-     * Appends the provided tables to this table.
-     * <p>
-     * If the appended {@code tables} have RowID columns, these are dropped. Only the RowID of {@code this} table is
-     * kept (if present).
-     *
-     * @param tables to append
-     * @return the appended table
-     */
-    // TODO (TP) Don't drop RowID columns here! This should be separate and ColumnarVirtualTable shouldn't care.
-    @Deprecated
-    public ColumnarVirtualTable append_drop_RowIDs_for_appened_tables(final List<ColumnarVirtualTable> tables) {
-        var tablesWithoutRowIDs = tables.stream()//
-            .map(ColumnarVirtualTable::filterRowID)//
-            .toList();
-        var transformSpec = new AppendTransformSpec();
-        var schema = appendSchemas(collectSchemas(tablesWithoutRowIDs));
-        var transforms = collectTransforms(tablesWithoutRowIDs);
-        return new ColumnarVirtualTable(new TableTransform(transforms, transformSpec), schema);
-    }
-
-    /**
-     * Appends the provided tables to this table.
-     * <p>
-     * If the appended {@code tables} have RowID columns, these are dropped. Only the RowID of {@code this} table is
-     * kept (if present).
-     *
-     * @param tables to append
-     * @return the appended table
-     */
-    @Deprecated
-    public ColumnarVirtualTable append_drop_RowIDs_for_appened_tables(final ColumnarVirtualTable... tables) {
-        return append_drop_RowIDs_for_appened_tables(Arrays.asList(tables));
     }
 
     /**
