@@ -151,8 +151,10 @@ public final class ColumnarVirtualTableMaterializer {
             throw ex;
         } catch (RuntimeException ex) {
             throw ex;
+        } catch (StackOverflowError er) {
+            throw er;
         } catch (Throwable ex) {
-            throw new IllegalStateException("Failed to create append table.", ex);
+            throw new IllegalStateException("%s: %s".formatted(ex.getClass(), ex.getCause()));
         }
     }
 
