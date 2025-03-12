@@ -309,11 +309,29 @@ public final class HeapCachingBatchWritable implements BatchWritable {
             @SuppressWarnings("unchecked")
             final UnaryOperator<NullableWriteData>[] innerWrappers = new UnaryOperator[structSpec.size()];
             Arrays.setAll(innerWrappers, i -> createWriteWrapper(structSpec.getDataSpec(i)));
-            return CachingStructWriteData.createWriteWrapper(innerWrappers);
-        } else {
-            return d -> d;
+            final int[] cachingWrapperIndices = matchingIndices(innerWrappers, CachingWriteDataWrapper.class);
+            if (cachingWrapperIndices.length > 0) {
+                // (if none of the innerWrappers are caching, we don't need to wrap anything)
+                return CachingStructWriteData.createWriteWrapper(innerWrappers, cachingWrapperIndices);
+            }
         }
+        return d -> d;
         // TODO AP-18333: Properly implement caching lists of objects
+    }
+
+    /**
+     * Return indices in {@code objs} of elements that are instances of the specified {@code Class}.
+     */
+    private static <T> int[] matchingIndices(final T[] objs, final Class<?> klass) {
+        int[] indices = new int[objs.length];
+        int j = 0;
+        for (int i = 0; i < objs.length; i++) {
+            if (klass.isInstance(objs[i])) {
+                indices[j] = i;
+                ++j;
+            }
+        }
+        return Arrays.copyOf(indices, j);
     }
 
     @FunctionalInterface
@@ -632,40 +650,47 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     private static final class CachingStructWriteData extends AbstractCachingWriteData<StructWriteData, StructReadData>
         implements StructWriteData {
 
-        static final CachingWriteDataWrapper createWriteWrapper(final UnaryOperator<NullableWriteData>[] innerWrappers) {
+        static final CachingWriteDataWrapper createWriteWrapper(final UnaryOperator<NullableWriteData>[] innerWrappers,
+            final int[] cachingWrapperIndices) {
             return d -> {
                 var delegate = (StructWriteData)d;
-                var cachingChildren = new NullableWriteData[innerWrappers.length];
-                Arrays.setAll(cachingChildren, i -> innerWrappers[i].apply(delegate.getWriteDataAt(i)));
-                return new CachingStructWriteData(delegate, cachingChildren);
+                var wrappedChildren = new NullableWriteData[innerWrappers.length];
+                Arrays.setAll(wrappedChildren, i -> innerWrappers[i].apply(delegate.getWriteDataAt(i)));
+                return new CachingStructWriteData(delegate, wrappedChildren, cachingWrapperIndices);
             };
         }
 
-        private final NullableWriteData[] m_cachingChildren;
+        private final NullableWriteData[] m_wrappedChildren;
 
-        private CachingStructWriteData(final StructWriteData delegate, final NullableWriteData[] cachingChildren) {
+        private final int[] m_cachingChildIndices;
+
+        private CachingStructWriteData(final StructWriteData delegate, final NullableWriteData[] wrappedChildren,
+            final int[] cachingChildIndices) {
             super(delegate);
-            m_cachingChildren = cachingChildren;
+            m_wrappedChildren = wrappedChildren;
+            m_cachingChildIndices = cachingChildIndices;
         }
 
         @Override
         public void setMissingCache(final int index) {
-            for (var child : m_cachingChildren) {
-                ((AbstractCachingWriteData<?, ?>)child).setMissingCache(index);
+            for (int i : m_cachingChildIndices) {
+                var child = (AbstractCachingWriteData<?, ?>)m_wrappedChildren[i];
+                child.setMissingCache(index);
             }
         }
 
         @Override
         void expandCache(final int minimumCapacity) {
-            for (var child : m_cachingChildren) {
-                ((AbstractCachingWriteData<?, ?>)child).expandCache(minimumCapacity);
+            for (int i : m_cachingChildIndices) {
+                var child = (AbstractCachingWriteData<?, ?>)m_wrappedChildren[i];
+                child.expandCache(minimumCapacity);
             }
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <C extends NullableWriteData> C getWriteDataAt(final int index) {
-            return (C)m_cachingChildren[index];
+            return (C)m_wrappedChildren[index];
         }
     }
 
@@ -675,12 +700,12 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         static ReadDataWrapper<NullableReadData, NullableWriteData>
             createReadWrapper(final ReadDataWrapper<NullableReadData, NullableWriteData>[] innerWrappers) {
             return (readData, writeData, batchLength) -> {
-                var cachingChildren = new NullableReadData[innerWrappers.length];
+                var wrappedChildren = new NullableReadData[innerWrappers.length];
                 var readStruct = (StructReadData)readData;
                 var writeStruct = (StructWriteData)writeData;
-                Arrays.setAll(cachingChildren, i -> innerWrappers[i].apply( //
+                Arrays.setAll(wrappedChildren, i -> innerWrappers[i].apply( //
                     readStruct.getReadDataAt(i), writeStruct.getWriteDataAt(i), batchLength));
-                return new CachingStructReadData(readStruct, cachingChildren);
+                return new CachingStructReadData(readStruct, wrappedChildren);
             };
         }
 
@@ -692,17 +717,17 @@ public final class HeapCachingBatchWritable implements BatchWritable {
             };
         }
 
-        private final NullableReadData[] m_cachingChildren;
+        private final NullableReadData[] m_wrappedChildren;
 
-        private CachingStructReadData(final StructReadData delegate, final NullableReadData[] cachingChildren) {
+        private CachingStructReadData(final StructReadData delegate, final NullableReadData[] wrappedChildren) {
             super(delegate);
-            m_cachingChildren = cachingChildren;
+            m_wrappedChildren = wrappedChildren;
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <C extends NullableReadData> C getReadDataAt(final int index) {
-            return (C)m_cachingChildren[index];
+            return (C)m_wrappedChildren[index];
         }
     }
 }
