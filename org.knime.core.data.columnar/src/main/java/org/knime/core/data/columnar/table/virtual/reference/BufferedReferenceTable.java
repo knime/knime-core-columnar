@@ -57,6 +57,7 @@ import org.knime.core.data.columnar.table.VirtualTableSchemaUtils;
 import org.knime.core.data.columnar.table.virtual.ColumnarVirtualTable;
 import org.knime.core.data.columnar.table.virtual.VirtualTableUtils;
 import org.knime.core.data.v2.schema.DataTableValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.table.row.RowAccessible;
 
@@ -78,7 +79,7 @@ final class BufferedReferenceTable extends AbstractReferenceTable {
     }
 
     @Override
-    public DataTableValueSchema getSchema() {
+    public ValueSchema getSchema() {
         return m_schema;
     }
 

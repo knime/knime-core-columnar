@@ -154,7 +154,8 @@ public final class ColumnarConcatenater {
      */
     public VirtualTableExtensionTable concatenate(final BufferedDataTable[] tables,
         final ExecutionMonitor progressMonitor) throws VirtualTableIncompatibleException {
-        var concatenatedSchema = concatenate(VirtualTableSchemaUtils.extractSchemas(tables));
+
+        DataTableValueSchema concatenatedSchema = concatenate(VirtualTableSchemaUtils.extractSchemas(tables));
         final long concatenatedSize = Stream.of(tables).mapToLong(BufferedDataTable::size).sum();
         if (m_checkForDuplicateIDs) {
             checkForDuplicateIDs(progressMonitor, tables, concatenatedSize);

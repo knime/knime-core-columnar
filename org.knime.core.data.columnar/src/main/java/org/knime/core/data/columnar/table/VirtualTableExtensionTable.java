@@ -304,7 +304,7 @@ public final class VirtualTableExtensionTable extends ExtensionTable {
 
     private VirtualTableExtensionTable(final ReferenceTable[] refs, //
         final TableTransform fragmentTableTransform, //
-        final DataTableValueSchema schema, // TODO (TP) dataTableSpec should be taken from DataTableValueSchema
+        final DataTableValueSchema schema,
         final long size, //
         final int tableId) {
         m_tableId = tableId;
