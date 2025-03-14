@@ -168,8 +168,10 @@ try {
         stage("knime-base workflow tests") {
             def testflowsDir = "Testflows (${baseBranch})/knime-base"
             def excludedTestflows = [
-                "\\\\QDate&Time/test_AP-6112_DateTimeDifference\\\\E",
-                "\\\\QDate&Time/test_AP-6963_StringToDurationPeriod\\\\E",
+                "\\\\QDate&Time/deprecated/test_AP-6112_DateTimeDifference\\\\E", // uses missing value cause
+                "\\\\QDate&Time/deprecated/test_AP-6963_StringToDurationPeriod\\\\E", // uses missing value cause
+                "\\\\QDate&Time/test_UIEXT-1670_DateTimeDifference\\\\E", // uses missing value cause
+                "\\\\QDate&Time/test_UIEXT-2157_StringToDuration\\\\E", // uses missing value cause
                 "\\\\QTransformation/test_CollectionCreator3\\\\E",
                 "\\\\QFlow Control/test_endModelCase\\\\E", // TODO AP-20719 - fix this test
             ].join('|')
