@@ -72,14 +72,15 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
      * Creates an {@link UnsavedColumnarContainerTable} wrapping the given table.
      *
      * @param tableId The table id.
+     * @param schema The schema of this table.
      * @param columnarTable The underlying table.
-     * @param storeFlusher The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to disk
-     *            in case the created table is permanently saved to disk. Must not be {@code null} but can be a no-op.
+     * @param storeFlusher The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to
+     *            disk in case the created table is permanently saved to disk. Must not be {@code null} but can be a
+     *            no-op.
      * @return The newly created table.
      */
     public static UnsavedColumnarContainerTable create(final int tableId, final DataTableValueSchema schema,
-        final ColumnarRowReadTable columnarTable,
-        final Flushable storeFlusher) {
+        final ColumnarRowReadTable columnarTable, final Flushable storeFlusher) {
         final var table = new UnsavedColumnarContainerTable(tableId, schema, columnarTable, storeFlusher);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
