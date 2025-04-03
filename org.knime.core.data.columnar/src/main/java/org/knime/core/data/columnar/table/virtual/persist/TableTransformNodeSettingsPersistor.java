@@ -85,6 +85,7 @@ import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.table.virtual.TableTransform;
+import org.knime.core.table.virtual.spec.AppendMapTransformSpec;
 import org.knime.core.table.virtual.spec.AppendMissingValuesTransformSpec;
 import org.knime.core.table.virtual.spec.AppendTransformSpec;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
@@ -424,6 +425,38 @@ public final class TableTransformNodeSettingsPersistor {
                         mapperFactory = (ColumnarMapperFactory)factory;
                     }
                     return new MapTransformSpec(s.getIntArray("column_indices"), mapperFactory);
+                }, (t, s) -> {//NOSONAR
+                    s.addIntArray("column_indices", t.getColumnSelection());
+                    final Object mapperFactory;
+                    if (t.getMapperFactory() instanceof WrappedColumnarMapperWithRowIndexFactory wrapper) {
+                        mapperFactory = wrapper.getMapperWithRowIndexFactory();
+                        // mapperFactory is a ColumnarMapperWithRowIndexFactory
+                    } else {
+                        mapperFactory = t.getMapperFactory();
+                        // mapperFactory is a ColumnarMapperFactory
+                    }
+                    var factoryClass = mapperFactory.getClass();
+                    var persistor = PersistenceRegistry.getPersistor(factoryClass).orElseThrow(
+                        () -> new IllegalArgumentException("No persistor for %s registered.".formatted(factoryClass)));
+                    s.addString("mapper_factory_class", factoryClass.getName());
+                    persistor.save(mapperFactory, s.addNodeSettings("mapper_factory_settings"));
+                }),
+            APPEND_MAP(//
+                AppendMapTransformSpec.class, //
+                (s, c) -> {
+                    var mapperFactoryClass = s.getString("mapper_factory_class");
+                    var persistor = PersistenceRegistry.getPersistor(mapperFactoryClass)
+                        .orElseThrow(() -> new InvalidSettingsException(
+                            "No persistor available for mapper factory %s.".formatted(mapperFactoryClass)));
+                    final Object factory =
+                        persistor.load(s.getNodeSettings("mapper_factory_settings"), c::getDataRepository);
+                    final ColumnarMapperFactory mapperFactory;
+                    if (factory instanceof ColumnarMapperWithRowIndexFactory f) {
+                        mapperFactory = new WrappedColumnarMapperWithRowIndexFactory(f);
+                    } else { // if (factory instanceof ColumnarMapperFactory) {
+                        mapperFactory = (ColumnarMapperFactory)factory;
+                    }
+                    return new AppendMapTransformSpec(s.getIntArray("column_indices"), mapperFactory);
                 }, (t, s) -> {//NOSONAR
                     s.addIntArray("column_indices", t.getColumnSelection());
                     final Object mapperFactory;
