@@ -93,6 +93,7 @@ import org.knime.core.table.schema.DefaultColumnarSchema;
 import org.knime.core.table.schema.DefaultColumnarSchema.Builder;
 import org.knime.core.table.virtual.TableTransform;
 import org.knime.core.table.virtual.VirtualTable;
+import org.knime.core.table.virtual.spec.AppendMapTransformSpec;
 import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
@@ -331,6 +332,49 @@ final class TableTransformNodeSettingsPersistorTest {
     }
 
     @Test
+    void testSaveAppendMap() throws Exception {
+        var id = UUID.randomUUID();
+        var mapperFactory = new TestMapperFactory(3);
+        var schema = ValueSchemaUtils.create(//
+            new ValueSchemaColumn(new DefaultRowKeyValueFactory()), //
+            new ValueSchemaColumn("1", IntCell.TYPE, new IntValueFactory()), //
+            new ValueSchemaColumn("2", DoubleCell.TYPE, new DoubleValueFactory()));
+        var table = new ColumnarVirtualTable(id, schema, CursorType.BASIC).appendMap(mapperFactory, 1);
+        var settings = rootSettings();
+        TableTransformNodeSettingsPersistor.save(table.getProducingTransform(), settings);
+        var transformSettings = getTransformSettings(settings);
+        checkSize(transformSettings, 4);
+        checkSourceSettings(getSubSettings(transformSettings, 0), id);
+        checkAppendMapSettings(getSubSettings(transformSettings, 2), mapperFactory::checkSettings,
+            TestMapperFactory.class, 1, 3);
+        var connectionSettings = getConnectionSettings(settings);
+        checkSize(connectionSettings, 3);
+        checkConnection(getSubSettings(connectionSettings, 0), 0, 1, 0);
+        checkConnection(getSubSettings(connectionSettings, 1), 1, 2, 0);
+        checkConnection(getSubSettings(connectionSettings, 2), 2, 3, 0);
+    }
+
+    @Test
+    void testLoadAppendMap() throws Exception {
+        var settings = rootSettings();
+        settings.addInt("version", 1);
+        var transformSettings = addTransformSettings(settings);
+        var id = UUID.randomUUID();
+        addSourceTransform(id, addSubSettings(transformSettings, 0));
+        addAppendMapSettings(addSubSettings(transformSettings, 1), s -> s.addInt("increment", 42), TestMapperFactory.class,
+            1);
+        var connectionSettings = addConnectionSettings(settings);
+        addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
+        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
+        checkAppendMapTransform(transform, s -> {
+            var wrappedMapperFactory = (WrappedColumnarMapperWithRowIndexFactory)s.getMapperFactory();
+            var testMapperFactory = (TestMapperFactory)wrappedMapperFactory.getMapperWithRowIndexFactory();
+            assertEquals(42, testMapperFactory.m_increment, "Unexpected increment.");
+        });
+        checkSourceTransform(transform.getPrecedingTransforms().get(0), id);
+    }
+
+    @Test
     void testLoadOldMap() throws Exception {
         // Maps which use a row index are saved differently since AP 5.3 (the RowIndex is a dedicated transform spec
         // now). This test checks backwards compatible loading because it doesn't set the "version" key (compare
@@ -366,6 +410,12 @@ final class TableTransformNodeSettingsPersistorTest {
         specChecker.accept((MapTransformSpec)transform.getSpec());
     }
 
+    private static void checkAppendMapTransform(final TableTransform transform,
+        final Consumer<AppendMapTransformSpec> specChecker) {
+        assertInstanceOf(AppendMapTransformSpec.class, transform.getSpec());
+        specChecker.accept((AppendMapTransformSpec)transform.getSpec());
+    }
+
     private static NodeSettingsWO addSubSettings(final NodeSettingsWO settings, final int index) {
         return settings.addNodeSettings(Integer.toString(index));
     }
@@ -392,9 +442,31 @@ final class TableTransformNodeSettingsPersistorTest {
         mapperFactorySettingsChecker.checkSettings(internals.getNodeSettings("mapper_factory_settings"));
     }
 
+    private static void checkAppendMapSettings(final NodeSettingsRO settings,
+        final SettingsChecker mapperFactorySettingsChecker,
+        final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices)
+        throws InvalidSettingsException {
+        checkTransformType(settings, "APPEND_MAP");
+        var internals = settings.getNodeSettings("internal");
+        assertArrayEquals(columnIndices, internals.getIntArray("column_indices"), "Unexpected column indices.");
+        assertEquals(mapperFactoryClass.getName(), internals.getString("mapper_factory_class"),
+            "Unexpected MapperFactory class.");
+        mapperFactorySettingsChecker.checkSettings(internals.getNodeSettings("mapper_factory_settings"));
+    }
+
     private static void addMapSettings(final NodeSettingsWO settings, final Consumer<NodeSettingsWO> mapSettingsAdder,
         final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices) {
         addTransformType(settings, "MAP");
+        var internals = settings.addNodeSettings("internal");
+        internals.addIntArray("column_indices", columnIndices);
+        internals.addString("mapper_factory_class", mapperFactoryClass.getName());
+        mapSettingsAdder.accept(internals.addNodeSettings("mapper_factory_settings"));
+    }
+
+    private static void addAppendMapSettings(final NodeSettingsWO settings,
+        final Consumer<NodeSettingsWO> mapSettingsAdder,
+        final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices) {
+        addTransformType(settings, "APPEND_MAP");
         var internals = settings.addNodeSettings("internal");
         internals.addIntArray("column_indices", columnIndices);
         internals.addString("mapper_factory_class", mapperFactoryClass.getName());
