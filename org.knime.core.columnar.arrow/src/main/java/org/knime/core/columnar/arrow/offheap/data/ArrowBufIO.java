@@ -76,8 +76,6 @@ import org.knime.core.table.util.StringEncoder;
  */
 final class ArrowBufIO {
 
-    private static ThreadLocal<StringEncoder> ENCODER_FACTORY = ThreadLocal.withInitial(StringEncoder::new);
-
     private static final int OFFSET_WIDTH = BaseLargeVariableWidthVector.OFFSET_WIDTH;
 
     /**
@@ -96,7 +94,7 @@ final class ArrowBufIO {
 
         // Deserialize from the data buffer
         final ArrowBufDataInput buf =
-            new ArrowBufDataInput(vector.getDataBuffer(), bufferIndex, nextIndex, ENCODER_FACTORY.get());
+            new ArrowBufDataInput(vector.getDataBuffer(), bufferIndex, nextIndex);
         try {
             return deserializer.deserialize(buf);
         } catch (IOException ex) {
@@ -125,7 +123,7 @@ final class ArrowBufIO {
 
         // Serialize the value to the data buffer
         try {
-            serializer.serialize(new ArrowBufDataOutput(vector, ENCODER_FACTORY.get()), obj);
+            serializer.serialize(new ArrowBufDataOutput(vector), obj);
         } catch (IOException ex) {
             // TODO should the serialize method just throw the IOException?
             throw new IllegalStateException("Error during serialization", ex);
@@ -153,18 +151,14 @@ final class ArrowBufIO {
 
         private final ArrowBuf m_buffer;
 
-        private final StringEncoder m_encoder;
-
         private final long m_nextBufferIndex;
 
         private long m_bufferIndex;
 
-        public ArrowBufDataInput(final ArrowBuf buffer, final long index, final long nextIndex,
-            final StringEncoder encoder) {
+        public ArrowBufDataInput(final ArrowBuf buffer, final long index, final long nextIndex) {
             m_buffer = buffer;
             m_bufferIndex = index;
             m_nextBufferIndex = nextIndex;
-            m_encoder = encoder;
         }
 
         @Override
@@ -382,7 +376,7 @@ final class ArrowBufIO {
         public String readUTF() throws EOFException {
             final byte[] out = new byte[readInt()];
             readFully(out);
-            return m_encoder.decode(out);
+            return StringEncoder.decode(out);
         }
     }
 
@@ -390,14 +384,11 @@ final class ArrowBufIO {
 
         private ArrowBuf m_buffer;
 
-        private StringEncoder m_encoder;
-
         private long m_capacity;
 
         private LargeVarBinaryVector m_vector;
 
-        private ArrowBufDataOutput(final LargeVarBinaryVector vector, final StringEncoder encoder) {
-            m_encoder = encoder;
+        private ArrowBufDataOutput(final LargeVarBinaryVector vector) {
             m_buffer = vector.getDataBuffer();
             m_vector = vector;
             m_capacity = m_buffer.capacity();
@@ -512,7 +503,7 @@ final class ArrowBufIO {
          */
         @Override
         public void writeUTF(final String s) throws UTFDataFormatException {
-            final ByteBuffer encoded = m_encoder.encode(s);
+            final ByteBuffer encoded = StringEncoder.encode(s);
             final int limit = encoded.limit();
             ensureCapacity(limit + Integer.BYTES);
             m_buffer.writeInt(limit);

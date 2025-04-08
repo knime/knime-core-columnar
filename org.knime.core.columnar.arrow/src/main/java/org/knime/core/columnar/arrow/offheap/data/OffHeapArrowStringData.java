@@ -86,8 +86,6 @@ public final class OffHeapArrowStringData {
     public static final class ArrowStringWriteData extends AbstractOffHeapArrowWriteData<VarCharVector>
         implements StringWriteData {
 
-        private StringEncoder m_encoder = new StringEncoder();
-
         private ArrowStringWriteData(final VarCharVector vector) {
             super(vector);
         }
@@ -98,7 +96,7 @@ public final class OffHeapArrowStringData {
 
         @Override
         public void setString(final int index, final String val) {
-            final ByteBuffer encoded = m_encoder.encode(val);
+            final ByteBuffer encoded = StringEncoder.encode(val);
             m_vector.setSafe(m_offset + index, encoded, 0, encoded.limit());
         }
 
@@ -124,8 +122,6 @@ public final class OffHeapArrowStringData {
     public static final class ArrowStringReadData extends AbstractOffHeapArrowReadData<VarCharVector>
         implements StringReadData {
 
-        private final StringEncoder m_decoder = new StringEncoder();
-
         private ArrowStringReadData(final VarCharVector vector, final MissingValues missingValues) {
             super(vector, missingValues);
         }
@@ -137,7 +133,7 @@ public final class OffHeapArrowStringData {
 
         @Override
         public String getString(final int index) {
-            return m_decoder.decode(m_vector.get(m_offset + index));
+            return StringEncoder.decode(m_vector.get(m_offset + index));
         }
 
         @Override
