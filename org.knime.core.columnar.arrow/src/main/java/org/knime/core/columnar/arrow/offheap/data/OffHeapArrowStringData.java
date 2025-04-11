@@ -82,7 +82,7 @@ public final class OffHeapArrowStringData {
     private OffHeapArrowStringData() {
     }
 
-    /** Arrow implementation of {@link StringReadData}. */
+    /** Arrow implementation of {@link StringWriteData}. */
     public static final class ArrowStringWriteData extends AbstractOffHeapArrowWriteData<VarCharVector>
         implements StringWriteData {
 
