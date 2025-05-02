@@ -161,7 +161,8 @@ public final class OnHeapArrowStringData {
      * <p>
      * Strings may be present (decoded as {@code String}) in {@code m_data}, or (encoded as byte sequences) in
      * {@code m_dataBytes}, or both. This class does only provide methods for reading the data, so all strings must be
-     * contained in at least one of these representations. The other representation is created (and cached) when requested.
+     * contained in at least one of these representations. The other representation is created (and cached) when
+     * requested.
      */
     private static final class LazyEncodedStringReadList extends LazyEncodedStringListBase {
 
@@ -182,7 +183,7 @@ public final class OnHeapArrowStringData {
             super(data, byteArrayList, offsets);
         }
 
-        public static LazyEncodedStringReadList createFrom(final ArrowBuf dataBuffer, final ArrowBuf offsetsBuffer,
+        static LazyEncodedStringReadList createFrom(final ArrowBuf dataBuffer, final ArrowBuf offsetsBuffer,
             final int numElements) {
             var offsets = OffsetBuffer.createFrom(offsetsBuffer, numElements);
             var dataBytes = new byte[offsets.getNumData(numElements)];
@@ -196,7 +197,7 @@ public final class OnHeapArrowStringData {
          * @param vector the vector to copy the data to
          */
         @SuppressWarnings("resource") // The buffers are owned by the vector and closed with it
-        public void copyTo(final BaseVariableWidthVector vector) {
+        void copyTo(final BaseVariableWidthVector vector) {
             encode(numElements());
             vector.allocateNew(m_dataBytes.size(), numElements());
             vector.getDataBuffer().setBytes(0, m_dataBytes.elements(), 0, m_dataBytes.size());
@@ -205,11 +206,11 @@ public final class OnHeapArrowStringData {
 
         // Accessing elements
 
-        public int numElements() {
+        int numElements() {
             return m_data.length;
         }
 
-        public String getString(final int index) {
+        String getString(final int index) {
             if (m_data[index] == null) {
                 synchronized (m_data) {
                     if (m_data[index] == null) {
@@ -226,7 +227,7 @@ public final class OnHeapArrowStringData {
             return m_data[index];
         }
 
-        public byte[] getStringBytesNullable(final int index) {
+        byte[] getStringBytesNullable(final int index) {
             if (m_offsets.lastWrittenIndex() >= index) {
                 var dataIndex = m_offsets.get(index);
                 var bytes = new byte[dataIndex.length()];
@@ -252,28 +253,28 @@ public final class OnHeapArrowStringData {
     private static final class LazyEncodedStringWriteList extends LazyEncodedStringListBase {
 
         // Size of m_data in bytes
-        private long m_totalDataSizeInBytes = 0;
+        private long m_totalDataSizeInBytes = 0; // NOSONAR it improves readability to initialize this to 0
 
         // Note that this might be `null`. In this case, this object only allows reading and not writing
-        private final LargeOffsetBuffer m_accumulatedDataSizeInBytes; // TODO (TP) should be final
+        private final LargeOffsetBuffer m_accumulatedDataSizeInBytes;
 
-        public LazyEncodedStringWriteList(final int capacity) {
+        LazyEncodedStringWriteList(final int capacity) {
             super(new String[capacity], new ByteArrayList(), new OffsetBuffer(capacity));
             m_accumulatedDataSizeInBytes = new LargeOffsetBuffer(capacity);
         }
 
-        public int capacity() {
+        int capacity() {
             return m_data.length;
         }
 
-        public void setString(final int index, final String value) {
+        void setString(final int index, final String value) {
             m_data[index] = value;
             var memorySize = StringSizeUtils.memorySize(value);
             m_accumulatedDataSizeInBytes.add(index, memorySize);
             m_totalDataSizeInBytes += memorySize;
         }
 
-        public void setNumElements(final int numElements) {
+        void setNumElements(final int numElements) {
             m_data = Arrays.copyOf(m_data, numElements);
             m_offsets.setNumElements(numElements);
             m_accumulatedDataSizeInBytes.setNumElements(numElements);
@@ -287,7 +288,7 @@ public final class OnHeapArrowStringData {
             }
         }
 
-        public void setStringBytes(final int index, final byte[] val) {
+        void setStringBytes(final int index, final byte[] val) {
             // Note - we prefer to encode the previous values to decoding this one, because
             // - it is likely that we need the byte representation of the previous values anyway
             // - we have two representations of the data in the newer data object, so this will be more flexible and
@@ -301,7 +302,7 @@ public final class OnHeapArrowStringData {
             System.arraycopy(val, 0, m_dataBytes, dataIndex.start(), val.length);
         }
 
-        public void setFrom(final LazyEncodedStringReadList sourceList, final int sourceIndex, final int targetIndex) {
+        void setFrom(final LazyEncodedStringReadList sourceList, final int sourceIndex, final int targetIndex) {
             // Copy the string
             // Note that this can be null if the data was just read and not yet decoded. In this case, the
             // bytes will be set and the string will be decoded on access
@@ -323,8 +324,9 @@ public final class OnHeapArrowStringData {
     /**
      * Holds the data of a string column in a combination of a string array and a byte array. Encoding is done lazily.
      */
-    public static final class ArrowStringWriteData extends
-        AbstractOnHeapArrowWriteData<LazyEncodedStringWriteList, ArrowStringReadData> implements CopyableStringWriteData {
+    public static final class ArrowStringWriteData
+        extends AbstractOnHeapArrowWriteData<LazyEncodedStringWriteList, ArrowStringReadData>
+        implements CopyableStringWriteData {
 
         private ArrowStringWriteData(final int capacity) {
             super(new LazyEncodedStringWriteList(capacity), capacity);
