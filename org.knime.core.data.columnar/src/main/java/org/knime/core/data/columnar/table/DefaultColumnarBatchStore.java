@@ -289,14 +289,15 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             // In case of the heap badger, we put the duplicate check and domain calculation below, because they are designed to
             // work on batches at the moment. This might not be optimal, but is the quickest way to put everything together right now.
             // TODO: move duplicate check and domain calc before the HeapBadger by making them batch-unaware (again).
+            initHeapCache(builder.m_heapCache);
             initDuplicateCheck(builder.m_duplicateCheckExecutor);
             initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
             m_writable = initBatchSizeRecorder(m_writable);
-            initHeapBadger(builder.m_heapCache);
+            initHeapBadger();
             m_writeCursor = m_heapBadger.getWriteCursor();
         } else {
             m_writable = initBatchSizeRecorder(m_writable);
-            initHeapCache(builder.m_heapCache, builder.m_heapCachePersistExecutor,
+            initObjectCache(builder.m_heapCache, builder.m_heapCachePersistExecutor,
                 builder.m_heapCacheSerializeExecutor);
             initDuplicateCheck(builder.m_duplicateCheckExecutor);
             initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
@@ -324,13 +325,15 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         return m_batchSizeRecorder.wrap(writable);
     }
 
-    private void initHeapBadger(final SharedObjectCache cache) {
+    private void initHeapCache(final SharedObjectCache cache) {
         if (cache != null) {
             var heapCache = new HeapCache(m_readable, cache);
             m_readable = heapCache;
             m_writable = new HeapCachingBatchWritable(m_writable, heapCache);
         }
+    }
 
+    private void initHeapBadger() {
         m_heapBadger = new HeapBadger(m_writable, ColumnarPreferenceUtils.getHeapBadgerSerializationExecutor());
         m_writable = null; // FIXME
 
@@ -338,7 +341,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         // The SharedObjectCache is flushed/invalidated outside anyways
     }
 
-    private void initHeapCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
+    private void initObjectCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
         final ExecutorService serializeExec) {
         if (heapCache == null || persistExec == null || serializeExec == null) {
             return;
