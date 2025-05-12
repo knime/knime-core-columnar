@@ -344,10 +344,12 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         @SuppressWarnings("unchecked")
         final ReadDataWrapper<NullableReadData, NullableWriteData>[] wrappers =
             new ReadDataWrapper[schema.numColumns()];
-        Arrays.setAll(wrappers, i -> createReadWrapper(schema.getSpec(i), DataIndex.createColumnIndex(i)));
+        Arrays.setAll(wrappers, i -> createReadWrapper(schema.getSpec(i)));
         return (readData, writeData, batchLength) -> {
             final NullableReadData[] wrapped = new NullableReadData[wrappers.length];
-            Arrays.setAll(wrapped, i -> wrappers[i].apply(readData[i], writeData[i], batchLength));
+            for (int i = 0; i < wrapped.length; ++i) {
+                wrapped[i] = wrappers[i].apply(readData[i], writeData[i], batchLength);
+            }
             return wrapped;
         };
     }
@@ -355,22 +357,27 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     /**
      * @param dataIndex the index of the data (may be nested)
      */
-    private static ReadDataWrapper<NullableReadData, NullableWriteData> createReadWrapper(final DataSpec spec,
-        final DataIndex dataIndex) {
+    private static ReadDataWrapper<NullableReadData, NullableWriteData> createReadWrapper(final DataSpec spec) {
         if (spec instanceof StringDataSpec) {
             return CachingStringReadData.READ_WRAPPER;
         } else if (spec instanceof VarBinaryDataSpec) {
             return CachingVarBinaryReadData.READ_WRAPPER;
         } else if (spec instanceof StructDataSpec structSpec) {
             @SuppressWarnings("unchecked")
-            final ReadDataWrapper<NullableReadData, NullableWriteData>[] innerCachers =
+            final ReadDataWrapper<NullableReadData, NullableWriteData>[] innerWrappers =
                 new ReadDataWrapper[structSpec.size()];
-            Arrays.setAll(innerCachers, i -> createReadWrapper(structSpec.getDataSpec(i), dataIndex.getChild(i)));
-            // TODO (TP): optimization: detect if all wrappers are NOOPs, and return a NOOP
-            return CachingStructReadData.createReadWrapper(innerCachers);
-        } else {
-            return (readData, writeData, batchLength) -> readData;
+            Arrays.setAll(innerWrappers, i -> createReadWrapper(structSpec.getDataSpec(i)));
+            final boolean hasCachingChildren =
+                Arrays.stream(innerWrappers).anyMatch(w -> w instanceof CachingReadDataWrapper);
+            if (hasCachingChildren) {
+                // If none of the innerWrappers are caching, we return the default wrapper.
+                // This is important, because the wrapper that would be created by
+                // CachingStructReadData.createReadWrapper assumes that it will work with a
+                // CachingStructWriteData.
+                return CachingStructReadData.createReadWrapper(innerWrappers);
+            }
         }
+        return (readData, writeData, batchLength) -> readData;
         // TODO AP-18333: Properly implement caching lists of objects
     }
 
@@ -505,7 +512,14 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         }
     }
 
+    // NB: We use this a marker interface to decide whether the children of a StructWriteData are caching or not.
+    @FunctionalInterface
     private interface CachingWriteDataWrapper extends UnaryOperator<NullableWriteData> {
+    }
+
+    // NB: We use this a marker interface to decide whether the children of a StructReadData are caching or not.
+    @FunctionalInterface
+    private interface CachingReadDataWrapper extends ReadDataWrapper<NullableReadData, NullableWriteData> {
     }
 
     private static final class CachingStringWriteData extends AbstractCachingWriteData<StringWriteData, StringReadData>
@@ -541,7 +555,7 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     private static final class CachingStringReadData extends AbstractCachingReadData<StringReadData>
         implements StringReadData {
 
-        static ReadDataWrapper<NullableReadData, NullableWriteData> READ_WRAPPER =
+        static CachingReadDataWrapper READ_WRAPPER =
             (readData, writeData, batchLength) -> {
                 // truncate String[] array held in CachingStringWriteData to batchLength
                 String[] data = ((CachingStringWriteData)writeData).m_data;
@@ -611,7 +625,7 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     private static final class CachingVarBinaryReadData extends AbstractCachingReadData<VarBinaryReadData>
         implements VarBinaryReadData {
 
-        static ReadDataWrapper<NullableReadData, NullableWriteData> READ_WRAPPER =
+        static CachingReadDataWrapper READ_WRAPPER =
             (readData, writeData, batchLength) -> {
                 // truncate Object[] array held in CachingVarBinaryWriteData to batchLength
                 Object[] data = ((CachingVarBinaryWriteData)writeData).m_data;
@@ -697,14 +711,16 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     private static final class CachingStructReadData extends AbstractCachingReadData<StructReadData>
         implements StructReadData {
 
-        static ReadDataWrapper<NullableReadData, NullableWriteData>
+        static CachingReadDataWrapper
             createReadWrapper(final ReadDataWrapper<NullableReadData, NullableWriteData>[] innerWrappers) {
             return (readData, writeData, batchLength) -> {
                 var wrappedChildren = new NullableReadData[innerWrappers.length];
                 var readStruct = (StructReadData)readData;
                 var writeStruct = (StructWriteData)writeData;
-                Arrays.setAll(wrappedChildren, i -> innerWrappers[i].apply( //
-                    readStruct.getReadDataAt(i), writeStruct.getWriteDataAt(i), batchLength));
+                for (int i = 0; i < wrappedChildren.length; ++i) {
+                    wrappedChildren[i] = innerWrappers[i].apply( //
+                        readStruct.getReadDataAt(i), writeStruct.getWriteDataAt(i), batchLength);
+                }
                 return new CachingStructReadData(readStruct, wrappedChildren);
             };
         }
