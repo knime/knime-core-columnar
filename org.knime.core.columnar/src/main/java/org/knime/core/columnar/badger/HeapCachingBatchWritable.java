@@ -239,6 +239,34 @@ public final class HeapCachingBatchWritable implements BatchWritable {
         }
     }
 
+    /**
+     * HeapCachingWriter wraps the BatchWriter of a delegate BatchWritable to monitor cacheable columns and put the into
+     * a HeapCache. (The HeapCache is a BatchReadable that serves cached data if it exists, or falls back to a delegate
+     * BatchReadable). BatchWritable uses three functors to decorate delegate WriteBatches and ReadBatches for
+     * harvesting cacheable data:
+     * <p>
+     * {@code UnaryOperator<NullableWriteData[]> m_wrapWriteData}: This takes a NullableWriteData (from the delegate
+     * BatchWritable) and returns a HeapCachingWriteBatch with decorated NullableWriteData[]. This is achieved by
+     * passing every delegate NullableWriteData through a nested {@code
+     * UnaryOperator<NullableWriteData>}. For non-cached column types, this just passes through the delegate
+     * NullableWriteData. For cached column types (for example String), a NullableWriteData wrapper (a subclass of
+     * AbstractCachingWriteData) is created that also remembers non-serialized data that is set. (For example
+     * CachingStringWriteData maintains a {@code String[] m_data} in addition to passing Strings through to the
+     * decorated StringWriteData.
+     * <p>
+     * {@code ReadDataWrapper<NullableReadData[], NullableWriteData[]> m_wrapReadData}: When the HeapCachingWriteBatch
+     * is closed, it produces a HeapCachingReadBatch that uses those non-serialized data fields. To do this, the
+     * HeapCachingWriteBatch closes its delegate WriteBatch to obtain a delegate ReadBatch. It then applies nested
+     * {@code ReadDataWrapper<NullableReadData,
+     * NullableWriteData>} to each column, passing the NullableReadData from the delegate ReadBatch and the
+     * NullableWriteData from the HeapCachingWriteBatch. For cached column types, the ReadDataWrapper produces a wrapped
+     * NullableReadData which also holds the non-serialized data (which we cannot put into the HeapCache until the
+     * ReadBatch is written because we need the batch index for caching). For non-cached column types, the delegate
+     * NullableReadData is just passed through.
+     * <p>
+     * {@code CacheReadData<NullableReadData[]> m_cacheReadData}: Finally, this is used to put the non-serialized data
+     * into the HeapCache when the HeapCachingReadBatch is written.
+     */
     private final static class HeapCachingWriter implements BatchWriter {
 
         private final BatchWriter m_writerDelegate;
