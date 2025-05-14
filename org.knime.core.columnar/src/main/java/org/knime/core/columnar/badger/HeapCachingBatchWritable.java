@@ -240,9 +240,9 @@ public final class HeapCachingBatchWritable implements BatchWritable {
     }
 
     /**
-     * HeapCachingWriter wraps the BatchWriter of a delegate BatchWritable to monitor cacheable columns and put the into
-     * a HeapCache. (The HeapCache is a BatchReadable that serves cached data if it exists, or falls back to a delegate
-     * BatchReadable). BatchWritable uses three functors to decorate delegate WriteBatches and ReadBatches for
+     * HeapCachingWriter wraps the BatchWriter of a delegate BatchWritable to monitor cacheable columns and put them
+     * into a HeapCache. (The HeapCache is a BatchReadable that serves cached data if it exists, or falls back to a
+     * delegate BatchReadable). BatchWritable uses three functors to decorate delegate WriteBatches and ReadBatches for
      * harvesting cacheable data:
      * <p>
      * {@code UnaryOperator<NullableWriteData[]> m_wrapWriteData}: This takes a NullableWriteData (from the delegate
