@@ -253,7 +253,10 @@ public final class OnHeapArrowStringData {
         // Size of m_data in bytes
         private long m_totalDataSizeInBytes = 0; // NOSONAR it improves readability to initialize this to 0
 
-        // Note that this might be `null`. In this case, this object only allows reading and not writing
+        /**
+         * Keeps history of m_totalDataSizeInBytes while Strings are {@link #setString(int, String) added} so that we
+         * can easily go back when truncating the LazyEncodedStringWriteList in {@link #setNumElements}.
+         */
         private final LargeOffsetBuffer m_accumulatedDataSizeInBytes;
 
         LazyEncodedStringWriteList(final int capacity) {
