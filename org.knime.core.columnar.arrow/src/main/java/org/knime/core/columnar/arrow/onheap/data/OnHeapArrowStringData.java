@@ -144,8 +144,6 @@ public final class OnHeapArrowStringData {
             for (var i = m_offsets.lastWrittenIndex() + 1; i < endIdx; i++) {
                 var str = m_data[i];
                 if (str != null) {
-                    // TODO(AP-23858) Is CharsetEncoder faster?
-                    // TODO(AP-23858) Can encode directly to m_dataBytes without a temporary byte[]?
                     var bytes = str.getBytes(StandardCharsets.UTF_8);
                     var dataIndex = m_offsets.add(i, bytes.length);
                     m_dataBytes.addElements(dataIndex.start(), bytes);
