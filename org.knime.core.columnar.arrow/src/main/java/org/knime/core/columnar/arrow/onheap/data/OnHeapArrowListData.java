@@ -100,13 +100,29 @@ public final class OnHeapArrowListData {
 
             // Set the validity bit
             setValid(index);
-
-            // TODO(AP-23863) be smarter here and do not copy on each new list
-            m_data.expand(dataIndex.end());
+            ensureMinCapacity(dataIndex.end());
 
             @SuppressWarnings("unchecked")
             var data = (C)m_data.slice(dataIndex.start());
             return data;
+        }
+
+        private static final long SOFT_MAX_ARRAY_LENGTH = Integer.MAX_VALUE - 8;
+
+        /**
+         * If necessary, grows m_data to ~1.5 of it's current capacity. This is the same behavior as implemented by JDK
+         * Collections like ArrayList and HashMap.
+         */
+        private void ensureMinCapacity(final int minCapacity) {
+            final int capacity = m_data.capacity();
+            if (capacity < minCapacity) {
+                if (minCapacity > SOFT_MAX_ARRAY_LENGTH) {
+                    throw new OutOfMemoryError("Required capacity " + minCapacity + " is too large");
+                }
+                final int newCapacity =
+                    (int)Math.min(SOFT_MAX_ARRAY_LENGTH, Math.max((long)capacity + capacity >> 1, minCapacity));
+                m_data.expand(newCapacity);
+            }
         }
 
         @Override
