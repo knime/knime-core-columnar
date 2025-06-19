@@ -25,4 +25,6 @@ Require-Bundle: org.knime.core.columnar;bundle-version="[5.6.0,6.0.0)",
  org.bytedeco.javacpp;bundle-version="[1.5.8,2.0.0)",
  org.bytedeco.lz4;bundle-version="[1.9.4,2.0.0)"
 Export-Package: org.knime.core.columnar.arrow,
- org.knime.core.columnar.arrow.compress
+ org.knime.core.columnar.arrow.compress,
+ org.knime.core.columnar.arrow.onheap.data; x-internal:=true; x-friends:="org.knime.core.columnar.benchmarks.tests",
+ it.unimi.dsi.fastutil.bytes; x-internal:=true; x-friends:="org.knime.core.columnar.benchmarks.tests"
