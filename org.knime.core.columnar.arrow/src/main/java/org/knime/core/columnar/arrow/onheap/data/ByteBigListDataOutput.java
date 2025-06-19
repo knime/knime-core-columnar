@@ -50,10 +50,13 @@ package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.DataOutput;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
-import it.unimi.dsi.fastutil.BigArrays;
 import it.unimi.dsi.fastutil.bytes.ByteBigList;
+import it.unimi.dsi.fastutil.bytes.ByteImmutableList;
 
 /**
  * Custom DataOutput that writes directly into a {@link ByteBigList}.
@@ -61,7 +64,15 @@ import it.unimi.dsi.fastutil.bytes.ByteBigList;
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */
 class ByteBigListDataOutput implements DataOutput {
-    protected ByteBigList m_data;
+
+    private final ByteBigList m_data;
+
+    private final byte[] buf4 = new byte[4];
+    private final byte[] buf8 = new byte[8];
+    private final byte[] buffer = new byte[128];
+
+    private static final VarHandle INT = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
+    private static final VarHandle LONG = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
 
     public ByteBigListDataOutput(final ByteBigList data) {
         m_data = data;
@@ -78,14 +89,12 @@ class ByteBigListDataOutput implements DataOutput {
 
     @Override
     public void write(final byte[] b) throws IOException {
-        var bigB = BigArrays.wrap(b); // Note that this just wraps if b has less than SEGMENT_SIZE elements
-        m_data.addElements(getPosition(), bigB);
+        m_data.addAll(ByteImmutableList.of(b));
     }
 
     @Override
     public void write(final byte[] b, final int off, final int len) throws IOException {
-        var bigB = BigArrays.wrap(b);
-        m_data.addElements(getPosition(), bigB, off, len);
+        m_data.addAll(ByteImmutableList.of(b).subList(off, off + len));
     }
 
     @Override
@@ -100,8 +109,8 @@ class ByteBigListDataOutput implements DataOutput {
 
     @Override
     public void writeShort(final int v) throws IOException {
-        m_data.add((byte)(v & 0xFF));
-        m_data.add((byte)((v >>> 8) & 0xFF));
+        m_data.add((byte)v);
+        m_data.add((byte)(v >> 8));
     }
 
     @Override
@@ -111,17 +120,14 @@ class ByteBigListDataOutput implements DataOutput {
 
     @Override
     public void writeInt(final int v) throws IOException {
-        m_data.add((byte)(v & 0xFF));
-        m_data.add((byte)((v >>> 8) & 0xFF));
-        m_data.add((byte)((v >>> 16) & 0xFF));
-        m_data.add((byte)((v >>> 24) & 0xFF));
+        INT.set(buf4, 0, v);
+        write(buf4);
     }
 
     @Override
     public void writeLong(final long v) throws IOException {
-        for (int i = 0; i < 8; i++) {
-            m_data.add((byte)(v >>> (i * 8)));
-        }
+        LONG.set(buf8, 0, v);
+        write(buf8);
     }
 
     @Override
@@ -136,18 +142,42 @@ class ByteBigListDataOutput implements DataOutput {
 
     @Override
     public void writeBytes(final String s) throws IOException {
-        int len = s.length();
-        for (int i = 0; i < len; i++) {
-            m_data.add((byte)s.charAt(i));
+        int remaining = s.length();
+        final int blen = buffer.length;
+        int i = 0;
+        while (remaining > blen) {
+            for (int j = 0; j < blen; j++, i++) {
+                buffer[j] = (byte)s.charAt(i);
+            }
+            write(buffer);
+            remaining -= blen;
         }
+        for (int j = 0; j < remaining; j++, i++) {
+            buffer[j] = (byte)s.charAt(i);
+        }
+        write(buffer, 0, remaining);
     }
 
     @Override
     public void writeChars(final String s) throws IOException {
-        int len = s.length();
-        for (int i = 0; i < len; i++) {
-            writeChar(s.charAt(i));
+        int remaining = s.length();
+        final int blen = buffer.length / 2;
+        int i = 0;
+        while (remaining > blen) {
+            for (int j = 0; j < blen; j++) {
+                int c = s.charAt(i++);
+                buffer[j * 2] = (byte)c;
+                buffer[j * 2 + 1] = (byte)(c >> 8);
+            }
+            write(buffer);
+            remaining -= blen;
         }
+        for (int j = 0; j < remaining; j++) {
+            int c = s.charAt(i++);
+            buffer[j * 2] = (byte)c;
+            buffer[j * 2 + 1] = (byte)(c >> 8);
+        }
+        write(buffer, 0, remaining * 2);
     }
 
     /**
@@ -170,8 +200,6 @@ class ByteBigListDataOutput implements DataOutput {
      */
     @Override
     public void writeUTF(final String s) throws IOException {
-        // TODO(AP-23858) Is CharsetEncoder faster?
-        // TODO(AP-23858) Can encode directly to the underlying ByteBigList without a temporary byte[]?
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
         writeInt(bytes.length);
         write(bytes);
