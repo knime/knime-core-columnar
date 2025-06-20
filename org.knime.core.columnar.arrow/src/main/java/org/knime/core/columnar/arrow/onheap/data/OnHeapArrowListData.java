@@ -107,7 +107,7 @@ public final class OnHeapArrowListData {
             return data;
         }
 
-        private static final long SOFT_MAX_ARRAY_LENGTH = Integer.MAX_VALUE - 8;
+        private static final long SOFT_MAX_ARRAY_LENGTH = Integer.MAX_VALUE - 8L;
 
         /**
          * If necessary, grows m_data to ~1.5 of it's current capacity. This is the same behavior as implemented by JDK
@@ -120,7 +120,7 @@ public final class OnHeapArrowListData {
                     throw new OutOfMemoryError("Required capacity " + minCapacity + " is too large");
                 }
                 final int newCapacity =
-                    (int)Math.min(SOFT_MAX_ARRAY_LENGTH, Math.max((long)capacity + capacity >> 1, minCapacity));
+                    (int)Math.min(SOFT_MAX_ARRAY_LENGTH, Math.max((long)capacity + (capacity >> 1), minCapacity));
                 m_data.expand(newCapacity);
             }
         }
