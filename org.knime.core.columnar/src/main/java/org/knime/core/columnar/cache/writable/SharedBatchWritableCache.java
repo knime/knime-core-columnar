@@ -110,7 +110,7 @@ public final class SharedBatchWritableCache {
     public boolean clear() {
         var numEntries = m_cache.size();
         if (numEntries > 0) {
-            LOGGER.info("Received memory alert. Clearing approximatly %d entries.", numEntries);
+            LOGGER.info("Received memory alert. Clearing approximately {} entries.", numEntries);
             m_cache.invalidateAll();
             return true;
         }
