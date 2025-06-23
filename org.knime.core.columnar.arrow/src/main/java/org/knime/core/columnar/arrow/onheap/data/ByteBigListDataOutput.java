@@ -67,9 +67,9 @@ class ByteBigListDataOutput implements DataOutput {
 
     private final ByteBigList m_data;
 
-    private final byte[] buf4 = new byte[4];
-    private final byte[] buf8 = new byte[8];
-    private final byte[] buffer = new byte[128];
+    private final byte[] m_buf4 = new byte[4];
+    private final byte[] m_buf8 = new byte[8];
+    private final byte[] m_buffer = new byte[128];
 
     private static final VarHandle INT = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
     private static final VarHandle LONG = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
@@ -120,14 +120,14 @@ class ByteBigListDataOutput implements DataOutput {
 
     @Override
     public void writeInt(final int v) throws IOException {
-        INT.set(buf4, 0, v);
-        write(buf4);
+        INT.set(m_buf4, 0, v);
+        write(m_buf4);
     }
 
     @Override
     public void writeLong(final long v) throws IOException {
-        LONG.set(buf8, 0, v);
-        write(buf8);
+        LONG.set(m_buf8, 0, v);
+        write(m_buf8);
     }
 
     @Override
@@ -143,41 +143,43 @@ class ByteBigListDataOutput implements DataOutput {
     @Override
     public void writeBytes(final String s) throws IOException {
         int remaining = s.length();
-        final int blen = buffer.length;
+        final int blen = m_buffer.length;
         int i = 0;
         while (remaining > blen) {
             for (int j = 0; j < blen; j++, i++) {
-                buffer[j] = (byte)s.charAt(i);
+                m_buffer[j] = (byte)s.charAt(i);
             }
-            write(buffer);
+            write(m_buffer);
             remaining -= blen;
         }
         for (int j = 0; j < remaining; j++, i++) {
-            buffer[j] = (byte)s.charAt(i);
+            m_buffer[j] = (byte)s.charAt(i);
         }
-        write(buffer, 0, remaining);
+        write(m_buffer, 0, remaining);
     }
 
     @Override
     public void writeChars(final String s) throws IOException {
         int remaining = s.length();
-        final int blen = buffer.length / 2;
+        final int blen = m_buffer.length / 2;
         int i = 0;
         while (remaining > blen) {
             for (int j = 0; j < blen; j++) {
-                int c = s.charAt(i++);
-                buffer[j * 2] = (byte)c;
-                buffer[j * 2 + 1] = (byte)(c >> 8);
+                int c = s.charAt(i);
+                ++i;
+                m_buffer[j * 2] = (byte)c;
+                m_buffer[j * 2 + 1] = (byte)(c >> 8);
             }
-            write(buffer);
+            write(m_buffer);
             remaining -= blen;
         }
         for (int j = 0; j < remaining; j++) {
-            int c = s.charAt(i++);
-            buffer[j * 2] = (byte)c;
-            buffer[j * 2 + 1] = (byte)(c >> 8);
+            int c = s.charAt(i);
+            ++i;
+            m_buffer[j * 2] = (byte)c;
+            m_buffer[j * 2 + 1] = (byte)(c >> 8);
         }
-        write(buffer, 0, remaining * 2);
+        write(m_buffer, 0, remaining * 2);
     }
 
     /**
