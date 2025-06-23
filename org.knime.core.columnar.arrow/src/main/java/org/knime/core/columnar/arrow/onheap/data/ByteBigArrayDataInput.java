@@ -228,7 +228,10 @@ class ByteBigArrayDataInput implements ReadableDataInput {
             return null;
         }
         final StringBuilder sb = new StringBuilder();
-        while (m_position < m_end && appendToLine(sb)) {
+        while (m_position < m_end) {
+            if (!appendToLine(sb)) {
+                break; // '\n' was encountered
+            }
         }
         return sb.toString();
     }
