@@ -99,6 +99,13 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
         final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
             if (removalNotification.wasEvicted()
+                // TODO (AP-24030): This is a potential concurrency problem.
+                //                  m_clearingCache is not volatile and there is no attempt at synchronization.
+                //                  Other threads (except the one running invalidateAll) may not see up-to-date values
+                //                  of m_clearingCache.
+                //                  Revisit my commit "Revise EvictingCache." (257fc7) which might avoid needing this
+                //                  m_clearingCache flag at all. (This commit was later revoked (913963) because of
+                //                  unclear memory leaks (likely un-related.)
                 || (m_clearingCache && removalNotification.getCause() == RemovalCause.EXPLICIT)) {
                 final DataWithEvictor<K, D> evicted = removalNotification.getValue();
                 evicted.m_evictor.evict(removalNotification.getKey(), evicted.m_data);
@@ -150,6 +157,8 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
     @Override
     public void invalidateAll() {
         m_clearingCache = true;
+
+        // NB. This will trigger RemovalListener
         m_cache.invalidateAll();
         m_cache.cleanUp();
         m_clearingCache = false;
