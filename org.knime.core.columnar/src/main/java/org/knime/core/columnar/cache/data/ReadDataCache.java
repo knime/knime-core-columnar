@@ -203,6 +203,8 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 try {
                     waitForAndHandleFuture();
                 } catch (InterruptedException e) {
+                    // TODO (AP-24030): At this point we already m_globalCache.getRetained() all datas[i] != null.
+                    //                  These need to be released before throwing the IllegalStateException.
                     // Restore interrupted state...
                     Thread.currentThread().interrupt();
                     // when interrupted here (e.g., because the reading node is cancelled), we should not proceed
@@ -225,6 +227,8 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                                 data.release();
                                 datas[i] = cachedData;
                             } else {
+                                // TODO (AP-24030): see (*1) below. Probably this could be m_cachedDataIds.putIfAbsent(ccUID, lock)
+                                //                  Because
                                 m_cachedDataIds.computeIfAbsent(ccUID, k -> new Object());
                                 m_globalCache.put(ccUID, data, m_evictor);
                                 datas[i] = data;
@@ -392,6 +396,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             final var ccUID = entry.getKey();
             final var lock = entry.getValue();
 
+            // TODO (AP-24030): This locking seems suspicious and/or unnecessary. (*1)
+            //                  The other place that locks on m_cachedDataIds values is in
+            //                  ReadDataCache.ReadDataCacheReader.readRetained(int)
+            //                  where we always lock on column 0, i.e., lockUID = new ColumnDataUniqueId(ReadDataCache.this, 0, index)
+            //                  Probably, we just don't need any synchronization here.
             synchronized (lock) {
                 final var data = m_globalCache.removeRetained(ccUID);
                 if (data != null) {
