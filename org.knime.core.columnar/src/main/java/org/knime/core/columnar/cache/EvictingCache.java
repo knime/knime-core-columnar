@@ -135,6 +135,12 @@ public interface EvictingCache<K, D extends ReferencedData> {
      */
     int size();
 
+    /**
+     * Removes all entries from this cache.
+     * <p>
+     * Note that the cache will {@link ReferencedData#release() release} the removed data and its evictors will be
+     * called.
+     */
     void invalidateAll();
 
 }
