@@ -203,11 +203,16 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 try {
                     waitForAndHandleFuture();
                 } catch (InterruptedException e) {
-                    // TODO (AP-24030): At this point we already m_globalCache.getRetained() all datas[i] != null.
-                    //                  These need to be released before throwing the IllegalStateException.
+                    // At this point we already m_globalCache.getRetained() all datas[i] != null.
+                    // These need to be released before re-throwing the Exception.
+                    for (int i : m_selectedColumns) {
+                        if (datas[i] != null) {
+                            datas[i].release();
+                        }
+                    }
                     // Restore interrupted state...
                     Thread.currentThread().interrupt();
-                    // when interrupted here (e.g., because the reading node is cancelled), we should not proceed
+                    // when interrupted here (e.g., because the reading node is cancelled), we should not proceed.
                     // this way, the cache stays in a consistent state
                     throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
                 }
@@ -227,9 +232,10 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                                 data.release();
                                 datas[i] = cachedData;
                             } else {
-                                // TODO (AP-24030): see (*1) below. Probably this could be m_cachedDataIds.putIfAbsent(ccUID, lock)
-                                //                  Because
-                                m_cachedDataIds.computeIfAbsent(ccUID, k -> new Object());
+                                // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
+                                // about the key, except for column 0, where the value is used as a lock to ensure that
+                                // the same is not loaded concurrently by multiple threads.
+                                m_cachedDataIds.putIfAbsent(ccUID, lock);
                                 m_globalCache.put(ccUID, data, m_evictor);
                                 datas[i] = data;
                             }
@@ -392,18 +398,8 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
     private void releaseAllReferencedData() {
         // Drop all globally cached data referenced by this cache
-        for (final var entry : m_cachedDataIds.entrySet()) {
-            final var ccUID = entry.getKey();
-            final var lock = entry.getValue();
-
-            // TODO (AP-24030): This locking seems suspicious and/or unnecessary. (*1)
-            //                  The other place that locks on m_cachedDataIds values is in
-            //                  ReadDataCache.ReadDataCacheReader.readRetained(int)
-            //                  where we always lock on column 0, i.e., lockUID = new ColumnDataUniqueId(ReadDataCache.this, 0, index)
-            //                  Probably, we just don't need any synchronization here.
-            synchronized (lock) {
-                m_globalCache.remove(ccUID);
-            }
+        for (final var ccUID : m_cachedDataIds.keySet()) {
+            m_globalCache.remove(ccUID);
         }
     }
 
