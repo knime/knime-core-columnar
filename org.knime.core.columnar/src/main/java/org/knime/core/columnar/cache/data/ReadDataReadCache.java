@@ -118,7 +118,10 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
                                 data.release();
                                 datas[i] = cachedData;
                             } else {
-                                m_cachedData.computeIfAbsent(ccUID, k -> new Object());
+                                // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
+                                // about the key, except for column 0, where the value is used as a lock to ensure that
+                                // the same is not loaded concurrently by multiple threads.
+                                m_cachedData.putIfAbsent(ccUID, lock);
                                 m_globalCache.put(ccUID, data, m_evictor);
                                 datas[i] = data;
                             }
