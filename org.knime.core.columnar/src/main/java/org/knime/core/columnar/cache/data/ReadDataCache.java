@@ -59,6 +59,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.BatchWritable;
 import org.knime.core.columnar.batch.BatchWriter;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -357,6 +358,7 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
             releaseAllReferencedData();
 
+            m_currentlyWritingBatches.clear();
             m_cachedDataIds.clear();
             m_readableDelegate.close();
         }
@@ -428,6 +430,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
 
         public synchronized void remove(final int i) {
             m_batches.remove(i).release();
+        }
+
+        public synchronized void clear() {
+            m_batches.values().forEach(ReferencedData::release);
+            m_batches.clear();
         }
 
         public synchronized ReadBatch getRetained(final int i) {
