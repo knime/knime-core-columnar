@@ -211,7 +211,7 @@ public final class DefaultTestBatchStore implements TestBatchStore {
 
     private CountDownLatch m_latch;
 
-    private RuntimeException m_exceptionOnWrite;
+    private volatile RuntimeException m_exceptionOnWrite;
 
     public static DefaultTestBatchStore create(final ColumnarSchema schema) {
         return create(schema, null);
