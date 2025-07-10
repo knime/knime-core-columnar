@@ -505,6 +505,11 @@ public class ReadDataCacheTest extends ColumnarTest {
             // Open for writing (which will throw an exception)
             flushLatch.countDown();
 
+            try {
+                store.flush();
+            } catch (IllegalStateException ignored) {
+            }
+
             // Close the store (should not deadlock)
             store.close();
 
