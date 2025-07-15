@@ -55,7 +55,6 @@ import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -108,8 +107,6 @@ public class HeapBadger {
 
     private final BatchWritable m_writeDelegate;
 
-    private final Future<Void> m_serilizationFuture;
-
     /**
      * Constructor
      *
@@ -134,7 +131,7 @@ public class HeapBadger {
         m_badger = new Badger(writable, m_writeCursor.m_buffers, maxNumRowsPerBatch, maxBatchSizeInBytes);
         m_writeDelegate = writable;
         var serializationLoopStarted = new CountDownLatch(1);
-        m_serilizationFuture = Objects.requireNonNullElse(execService, FALLBACK_EXECUTOR_SERVICE).submit(() -> {
+        Objects.requireNonNullElse(execService, FALLBACK_EXECUTOR_SERVICE).submit(() -> {
             serializationLoopStarted.countDown();
             async.serializeLoop(m_badger);
             return null;
@@ -343,8 +340,6 @@ public class HeapBadger {
             //        m_buffers[m_current % m_bufferSize].setFrom(m_access);
             //    }
 
-            rethrowExceptionInErrorCase();
-
             final ReentrantLock lock = this.m_lock;
             debug("[c] ACQUIRING LOCK IN FORWARD");
             lock.lock();
@@ -411,6 +406,12 @@ public class HeapBadger {
 
         @Override
         public void finish() throws InterruptedException, IOException {
+
+            // TODO (TP): if case m_exception != null, the serialization loop
+            //            has already exited and will signal() no more conditions.
+            //            1. We should check for m_exception != null here and rethrow.
+            //            2. We should also make sure to m_serializer.close()
+
             final ReentrantLock lock = this.m_lock;
             lock.lock();
             try {
@@ -437,6 +438,39 @@ public class HeapBadger {
             }
 
             rethrowExceptionInErrorCase();
+        }
+
+        @Override
+        public void close() throws IOException {
+
+            final ReentrantLock lock = this.m_lock;
+            debug("[b] Close -- acquiring LOCK");
+            lock.lock();
+            debug("[b] Close -- LOCKING");
+            try {
+                // TODO (TP): if case m_exception != null, the serialization loop
+                //            has already exited and will signal() no more conditions.
+                //            1. We should check for m_exception != null here and rethrow.
+                //            2. We should also make sure to m_serializer.close()
+                if (m_exception != null) {
+                    return;
+                }
+
+                if (!m_finishing) {
+                    debug("[b] Close -- waiting for closed signal");
+                    m_closing = true;
+                    m_notEmpty.signal();
+                    m_closed.await();
+                }
+
+                m_serializer.close();
+                debug("[b]  close AsyncQueue");
+            } catch (InterruptedException ex) {
+                throw new IOException(ex);
+            } finally {
+                lock.unlock();
+                debug("[b] Close -- UNLOCKING");
+            }
         }
 
         private void rethrowExceptionInErrorCase() throws InterruptedException, IOException {
@@ -477,7 +511,7 @@ public class HeapBadger {
                         debug("[b] - -> m_notEmpty.await();");
                         try {
                             m_notEmpty.await();
-                        } catch (InterruptedException ex) {
+                        } catch (Exception ex) {
                             // in case of an exception, we remember it and quit the serialization loop
                             m_exception = ex;
                             // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
@@ -544,45 +578,6 @@ public class HeapBadger {
                 debug("[b] - 4 -");
 
                 previous_head = head;
-            }
-        }
-
-        @Override
-        public void close() throws IOException {
-            final ReentrantLock lock = this.m_lock;
-            debug("[b] Close -- acquiring LOCK");
-            lock.lock();
-            debug("[b] Close -- LOCKING");
-            try {
-                if (m_exception != null) {
-                    return;
-                }
-
-                if (m_closing) {
-                    return; // multiple threads could call close
-                    // TODO (TP): Actually wait for the other close() calls, too.
-                    //            See suggested solution for finish()
-                }
-
-                if (!m_finishing) {
-                    debug("[b] Close -- waiting for closed signal");
-                    m_closing = true;
-                    // TODO (TP) : Could we just do this instead of interrupting the thread
-                    //             in Badger.close() -> m_serilizationFuture.cancel(true);
-                    //             We will additionally need a boolean m_isClosed flag,
-                    //             in case a thread calls close() again when close() is
-                    //             already done once.
-                    // m_notEmpty.signal();
-                    m_closed.await();
-                }
-
-                debug("[b]  close AsyncQueue");
-            } catch (InterruptedException ex) {
-                throw new IOException(ex);
-            } finally {
-                m_serializer.close();
-                lock.unlock();
-                debug("[b] Close -- UNLOCKING");
             }
         }
     }
@@ -789,7 +784,14 @@ public class HeapBadger {
     //   BadgerWriteCursor
     //
 
-    class BadgerWriteCursor implements ColumnarWriteCursor {
+    // TODO (TP): For now, I'm assuming that:
+    //            WriteCursor should be treated as not thread-safe,
+    //            except for flush() which may be called from the MemoryAlertSystem.
+    //            That is: commit(), finish(), close() are called sequentially by the same thread.
+    //            (or there is outside synchronization if a WriteCursor is handed off between threads).
+    //            flush() however, might happen anytime.
+
+    static class BadgerWriteCursor implements ColumnarWriteCursor {
         private final BufferedAccessRow[] m_buffers;
 
         private final BufferedAccessRow m_access;
@@ -855,15 +857,16 @@ public class HeapBadger {
             debug("[c:{}] BadgerWriteCursor.finish", this);
             if (m_closed) {
                 // TODO (TP): should we rather
-                //              throw new IllegalStateException("Cannot finish a closed write cursor");
-                //            ???
+                //            throw new IllegalStateException("Calling finish() on a WriteCursor that has already been closed.")?
                 debug("[c:{}] !! already closed, ignoring call !!", this);
                 return;
             }
             try {
                 debug("[c:{}]   -> m_queue.finish()", this);
-                m_queue.finish();
                 m_closed = true;
+                m_queue.finish();
+                // NB: Setting m_closed here means that any subsequent close() will not do anything. Therefore, m_queue.finish() should have the same effects as
+                // m_queue.close(): exit the serialization loop and close the queue.
                 debug("[c:{}]   <- m_queue.finish()", this);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e); // let's pretend it is a RuntimeException?
@@ -874,14 +877,13 @@ public class HeapBadger {
         public void close() throws IOException {
             // TODO abort, release resources, ignore exceptions that might have occurred while serializing in m_queue
             if (m_closed) {
+                // TODO (TP): should we rather
+                //            throw new IllegalStateException("Calling close() on a WriteCursor that has already been closed.")?
+                debug("[c:{}] !! already closed, ignoring call !!", this);
                 return;
             }
 
             m_closed = true;
-            // Note that we have to cause the serialization loop to be interrupted before calling `m_queue.close()`.
-            // Otherwise the serialization loop can get stuck in `m_notEmpty.await()` while `m_queue.close()` is waiting
-            // on the `m_closed` condition.
-            m_serilizationFuture.cancel(true);
             m_queue.close();
             debug("[c:{}] --- Closing the Badger Write Cursor ", this);
         }
