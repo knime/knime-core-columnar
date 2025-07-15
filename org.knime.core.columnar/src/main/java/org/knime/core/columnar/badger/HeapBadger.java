@@ -48,6 +48,8 @@
  */
 package org.knime.core.columnar.badger;
 
+import static org.knime.core.columnar.badger.DebugLog.debug;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
@@ -71,7 +73,6 @@ import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
 import org.slf4j.LoggerFactory;
-import org.slf4j.helpers.MessageFormatter;
 
 /**
  * The {@link HeapBadger} takes care of creating batches of roughly the same size, while offering a write cursor to the
@@ -85,8 +86,6 @@ import org.slf4j.helpers.MessageFormatter;
  * @since 5.3
  */
 public class HeapBadger {
-
-    private static final boolean DEBUG = false;
 
     // TODO we should make this depend on the size of the data that we know about in advance
     /** max number of rows in one batch */
@@ -860,42 +859,6 @@ public class HeapBadger {
         @Override
         public long numRows() {
             return m_queue.numRows();
-        }
-    }
-
-    private static void debug(final String msg) {
-        if (DEBUG) {
-            System.out.println(msg);
-        }
-    }
-
-    private static void debug(final String format, final Object arg) {
-        if (DEBUG) {
-            System.out.println(MessageFormatter.format(format, arg).getMessage());
-        }
-    }
-
-    private static void debug(final String format, final int arg) {
-        if (DEBUG) {
-            System.out.println(MessageFormatter.format(format, arg).getMessage());
-        }
-    }
-
-    private static void debug(final String format, final boolean arg) {
-        if (DEBUG) {
-            System.out.println(MessageFormatter.format(format, arg).getMessage());
-        }
-    }
-
-    private static void debug(final String format, final int arg1, final int arg2) {
-        if (DEBUG) {
-            System.out.println(MessageFormatter.format(format, arg1, arg2).getMessage());
-        }
-    }
-
-    private static void debug(final String format, final Object arg1, final int arg2) {
-        if (DEBUG) {
-            System.out.println(MessageFormatter.format(format, arg1, arg2).getMessage());
         }
     }
 }
