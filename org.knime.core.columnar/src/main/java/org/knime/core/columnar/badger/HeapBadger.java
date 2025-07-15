@@ -582,66 +582,10 @@ public class HeapBadger {
         }
     }
 
-    /**
-     * Synchronous serialization queue implementation that is supposed to be useful for debugging. NOTE: not tested very
-     * well yet, might have bugs.
-     */
-    static class SyncQueue implements SerializationQueue {
-        private int m_current = -1;
-
-        private Serializer m_serializer;
-
-        private boolean m_finished;
-
-        @Override
-        public synchronized int forward() throws InterruptedException, IOException {
-            if (m_serializer != null) {
-                m_serializer.serialize(0, 1);
-                m_current++;
-            }
-            return 0;
-        }
-
-        @Override
-        public synchronized long numForwards() {
-            if (!m_finished) {
-                throw new IllegalStateException("queried the size of the table before closing the cursor");
-            }
-            return m_current;
-        }
-
-        @Override
-        public void flush() throws InterruptedException, IOException {
-            // NO OP
-        }
-
-        @Override
-        public synchronized void finish() throws InterruptedException, IOException {
-            // NO OP
-            m_finished = true;
-        }
-
-        @Override
-        public synchronized void serializeLoop(final SerializationQueue.Serializer serializer) {
-            m_serializer = serializer;
-        }
-
-        @Override
-        public int getBufferSize() {
-            return 1;
-        }
-
-        @Override
-        public void close() throws IOException {
-            // NO OP
-        }
-    }
-
     // --------------------------------------------------------------------
     //
     //   Badger
     //
-
     static class Badger implements SerializationQueue.Serializer {
 
         private final BufferedAccessRow[] m_buffers;
