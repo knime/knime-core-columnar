@@ -297,9 +297,6 @@ public class HeapBadger {
             // After the most recent forward(), the cursor modifies buffers[m_current].
             // Initially, before the first forward(), m_current = 0, so the cursor modifies m_buffers[0].
             //
-            // Via the Cursor contract, cursor.forward() needs to be called once, before modifying the first row.
-            // So the Cursor running on top of Async needs to "swallow" the first cursor.forward().
-            //
             // After forward(), everything up to m_buffers[m_current-1] is ready to be serialized.
             // So after the second forward(), m_current=1, and m_buffers[0] is valid. m_buffers[1] is now modified.
             //
