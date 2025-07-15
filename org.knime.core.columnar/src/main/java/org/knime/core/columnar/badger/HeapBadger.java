@@ -331,6 +331,7 @@ public class HeapBadger {
             return m_bufferSize;
         }
 
+        // TODO (TP): rename to commit() ... make sure to update all comments, debug output, etc
         @Override
         public int forward() throws InterruptedException, IOException {
 
@@ -413,6 +414,15 @@ public class HeapBadger {
             final ReentrantLock lock = this.m_lock;
             lock.lock();
             try {
+                // TODO (TP): We can use the following variant if we make sure to use m_finished.signalAll()
+                //                     if (!m_finishing) {
+                //                         m_finishing = true;
+                //                         m_notEmpty.signal();
+                //                     }
+                //                     m_finished.await(); // is reached definitely if errors occurred
+                //            We will additionally need a boolean m_isFinished
+                //            flag, in case a thread calls finish() again when
+                //            finish() is already done once.
                 if (m_finishing) {
                     return; // TODO: actually wait for the other finishing calls to finish, too
                     // TODO (TP): Is this still relevant? What are "the other finishing calls"?
@@ -490,7 +500,7 @@ public class HeapBadger {
                 }
 
                 debug("[b] - 2 -");
-                // Note that m_previous_head..head maybe empty in case we are finishing
+                // Note that previous_head..head maybe empty in case we are finishing
                 try {
                     serializer.serialize(previous_head, head);
                     if (doFinish) {
@@ -550,11 +560,19 @@ public class HeapBadger {
 
                 if (m_closing) {
                     return; // multiple threads could call close
+                    // TODO (TP): Actually wait for the other close() calls, too.
+                    //            See suggested solution for finish()
                 }
 
                 if (!m_finishing) {
                     debug("[b] Close -- waiting for closed signal");
                     m_closing = true;
+                    // TODO (TP) : Could we just do this instead of interrupting the thread
+                    //             in Badger.close() -> m_serilizationFuture.cancel(true);
+                    //             We will additionally need a boolean m_isClosed flag,
+                    //             in case a thread calls close() again when close() is
+                    //             already done once.
+                    // m_notEmpty.signal();
                     m_closed.await();
                 }
 
@@ -629,7 +647,7 @@ public class HeapBadger {
     //   Badger
     //
 
-    class Badger implements SerializationQueue.Serializer {
+    static class Badger implements SerializationQueue.Serializer {
 
         private final BufferedAccessRow[] m_buffers;
 
