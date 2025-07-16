@@ -192,6 +192,14 @@ public class HeapBadger {
     //
     //   Async
     //
+
+    /**
+     * Coordinating between a producer that puts entries-to-serialize into slots of the queue and a consumer
+     * ({@link Serializer}) that serializes and removes completed entries.
+     * <p>
+     * SerializationQueue only manages slot indices and synchronization. It does not manage the actual buffer/slots
+     * holding the entries.
+     */
     interface SerializationQueue extends Closeable {
         interface Serializer {
             void serialize(int previous_head, int head) throws IOException, InterruptedException;
@@ -209,12 +217,18 @@ public class HeapBadger {
         void serializeLoop(Serializer serializer);
 
         /**
+         * Commit the current entry and return the index of the next entry to be written.
+         * Note that the first entry to be written to (before the first {@code commit}) is at index 0.
+         * <p>
+         * If there is no free slot for the next entry, {@code commit()} blocks until the {@link #serializeLoop} makes
+         * progress and a free slot becomes available.
+         * <p>
+         *
          * @return index of buffer to modify
          * @throws InterruptedException if interrupted while waiting
-         * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
+         * @throws IOException if a serializer has failed (in a separate thread) since the last call to commit()
          */
-        // TODO (TP): also rename to commit() ?
-        int forward() throws InterruptedException, IOException;
+        int commit() throws InterruptedException, IOException;
 
         /**
          * Blocks until all queued entries have been processed by the {@link Serializer}.
@@ -223,30 +237,34 @@ public class HeapBadger {
          * It does not necessarily mean that everything is written to files, etc.
          *
          * @throws InterruptedException if interrupted while waiting
-         * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
+         * @throws IOException if a serializer has failed (in a separate thread) since the last call to commit()
          */
         void flush() throws InterruptedException, IOException;
 
         /**
          * Waits for all queued serializations to finish.
          * <p>
-         * When {@code finish()} returns {@link Serializer#serialize} has run on all entries, and @link
-         * {@link Serializer#finish} has been called. No further entries are accepted after {@code finish()}.
+         * When {@code finish()} returns {@link Serializer#serialize} has run on all entries, and
+         * {@link Serializer#finish} has been called.
+         * <p>
+         * No further entries are accepted after {@code finish()}.
          *
          * @throws InterruptedException if interrupted while waiting
-         * @throws IOException if a serializer has failed (in a separate thread) since the last call to forward
+         * @throws IOException if a serializer has failed (in a separate thread) since the last call to commit()
          */
         void finish() throws InterruptedException, IOException;
 
+        /**
+         * @return the number of slots
+         */
         int getBufferSize();
 
         /**
-         * Get the number of times {@link #forward()} has been called.
+         * Get the number of times {@link #commit()} has been called.
          *
-         * @return number of calls to {@link #forward()}
+         * @return number of calls to {@link #commit()}
          */
-        // TODO (TP): rename to numRows() or numCommits() ?
-        long numForwards();
+        long numRows();
     }
 
     static class AsyncQueue implements SerializationQueue {
@@ -291,11 +309,11 @@ public class HeapBadger {
             // initialize indices:
 
             m_current = 0;
-            // After the most recent forward(), the cursor modifies buffers[m_current].
-            // Initially, before the first forward(), m_current = 0, so the cursor modifies m_buffers[0].
+            // After the most recent commit(), the cursor modifies buffers[m_current].
+            // Initially, before the first commit(), m_current = 0, so the cursor modifies m_buffers[0].
             //
-            // After forward(), everything up to m_buffers[m_current-1] is ready to be serialized.
-            // So after the second forward(), m_current=1, and m_buffers[0] is valid. m_buffers[1] is now modified.
+            // After commit(), everything up to m_buffers[m_current-1] is ready to be serialized.
+            // So after the first commit(), m_current=1, and m_buffers[0] is valid. m_buffers[1] is now modified.
             //
             // When the serializer thread reads head:=m_current, it knows everything up to m_buffers[head-1] can be serialized.
             // The first index to be serialized is serializer.m_previous_head.
@@ -303,12 +321,12 @@ public class HeapBadger {
             //   because m_buffers[head] is the first to be serialized in the next round.
 
             m_bound = m_bufferSize;
-            // forward() increments m_current, and blocks if m_current==m_bound afterwards.
-            // Otherwise, the access() returned after forward() would write into the range that is currently serializing.
+            // commit() increments m_current, and blocks if m_current==m_bound afterwards.
+            // Otherwise, the access() returned after commit() would write into the range that is currently serializing.
             //
             // If the first serialization has not finished (maybe it was not even triggered yet) when m_buffers is filled,
             //   m_current==m_bufferSize, that is access() would return the invalid m_buffers[m_bufferSize].
-            // Technically, m_current should wrap around to 0 then, before the forward() returns.
+            // Technically, m_current should wrap around to 0 then, before the commit() returns.
             // However, from the perspective of the serializer, it would be indistinguishable whether nothing has been
             //   written since the last round, or everything.
             //
@@ -319,7 +337,7 @@ public class HeapBadger {
             //   * serializer takes buffers from m_previous_head % m_bufferSize to (head-1) % m_bufferSize.
 
             m_offset = 0;
-            // m_offset is used to calculate getNumForwards() as m_offset + m_current.
+            // m_offset is used to calculate numRows() as m_offset + m_current.
             // When wrapping at m_wrap_at, m_offset is incremented by m_wrap_at.
         }
 
@@ -328,22 +346,16 @@ public class HeapBadger {
             return m_bufferSize;
         }
 
-        // TODO (TP): rename to commit() ... make sure to update all comments, debug output, etc
         @Override
-        public int forward() throws InterruptedException, IOException {
+        public int commit() throws InterruptedException, IOException {
 
             // TODO: throw Exception if finishing==true?
             //       @throws IllegalStateException if called after {@link #finish}
 
-            // TODO: this needs to happen in WriteCursor: (swallow first forward())
-            //    if (m_current >= 0) {
-            //        m_buffers[m_current % m_bufferSize].setFrom(m_access);
-            //    }
-
             final ReentrantLock lock = this.m_lock;
-            debug("[c] ACQUIRING LOCK IN FORWARD");
+            debug("[c] ACQUIRING LOCK IN COMMIT");
             lock.lock();
-            debug("[c] LOCKED IN FORWARD");
+            debug("[c] LOCKED IN COMMIT");
             try {
                 debug("[c]  Q m_current = {}", m_current);
                 debug("[c]  Q m_bound = {}", m_bound);
@@ -362,7 +374,7 @@ public class HeapBadger {
                 debug("[c]  Q m_bound = {}", m_bound);
                 debug("[c]  Q m_offset = {}", m_offset);
             } finally {
-                debug("[c] UNLOCKING IN FORWARD");
+                debug("[c] UNLOCKING IN COMMIT");
                 lock.unlock();
             }
 
@@ -372,7 +384,7 @@ public class HeapBadger {
         }
 
         @Override
-        public long numForwards() {
+        public long numRows() {
             final ReentrantLock lock = this.m_lock;
             lock.lock();
             try {
@@ -514,7 +526,7 @@ public class HeapBadger {
                         } catch (Exception ex) {
                             // in case of an exception, we remember it and quit the serialization loop
                             m_exception = ex;
-                            // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
+                            // to unblock commit() we need to claim that there's more space, but it'll rethrow the exception
                             m_notFull.signal();
                             m_closed.signal();
                             m_finished.signal();
@@ -546,7 +558,7 @@ public class HeapBadger {
                     debug("[b] LOOP ERROR EXIT -- acquiring LOCK");
                     lock.lock();
                     debug("[b] LOOP ERROR EXIT -- LOCKING");
-                    // to unblock forward() we need to claim that there's more space, but it'll rethrow the exception
+                    // to unblock commit() we need to claim that there's more space, but it'll rethrow the exception
                     m_notFull.signal();
                     m_closed.signal();
                     m_finished.signal();
@@ -767,13 +779,13 @@ public class HeapBadger {
 
             try {
                 m_buffers[m_current].setFrom(m_access);
-                debug("[c:{}]   -> m_queue.forward()", this);
-                m_current = m_queue.forward();
+                debug("[c:{}]   -> m_queue.commit()", this);
+                m_current = m_queue.commit();
             } catch (InterruptedException e) {
                 // can throw InterruptedException if the cursor had to wait for free buffers to write to and got interrupted
                 throw new RuntimeException(e); // let's pretend it is a RuntimeException?
             }
-            debug("[c:{}]   <- m_queue.forward()", this);
+            debug("[c:{}]   <- m_queue.commit()", this);
             debug("[c:{}]   m_current = {}", this, m_current);
         }
 
@@ -834,7 +846,7 @@ public class HeapBadger {
 
         @Override
         public long numRows() {
-            return m_queue.numForwards();
+            return m_queue.numRows();
         }
     }
 
