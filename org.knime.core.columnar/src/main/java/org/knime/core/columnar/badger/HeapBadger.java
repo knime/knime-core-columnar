@@ -202,7 +202,20 @@ public class HeapBadger {
      */
     interface SerializationQueue extends Closeable {
         interface Serializer {
-            void serialize(int previous_head, int head) throws IOException, InterruptedException;
+            /**
+             * Serialize slots with indices (modulo {@link #getBufferSize() buffer size}) in the given range
+             * {@code [from, to)}.
+             * <p>
+             * The indices are in the range {@code 0 ≤ from ≤ to < 2 * bufferSize}. Indices should be taken modulo
+             * {@link #getBufferSize()}. (It always holds that {@code from ≤ to}, even when the range modulo buffer size
+             * wraps around the end of the buffer.)
+             *
+             * @param from first index to serialize (inclusive, modulo buffer size)
+             * @param to last index to serialize (exclusive, modulo buffer size)
+             * @throws IOException if an I/O error occurs during serialization
+             * @throws InterruptedException if the calling thread is interrupted during serialization
+             */
+            void serialize(int from, int to) throws IOException, InterruptedException;
 
             void finish() throws IOException;
 
@@ -548,7 +561,13 @@ public class HeapBadger {
                 debug("[b] - 2 -");
                 // Note that previous_head..head maybe empty in case we are finishing
                 try {
-                    serializer.serialize(previous_head, head);
+                    int from = previous_head;
+                    int to = head;
+                    if (to < from) {
+                        from -= m_bufferSize;
+                        to += m_bufferSize;
+                    }
+                    serializer.serialize(from, to);
                     if (doFinish) {
                         serializer.finish();
                     }
@@ -702,14 +721,8 @@ public class HeapBadger {
          * Write buffered rows to the underlying store. Split batches when they become large enough.
          */
         @Override
-        public void serialize(final int previous_head, final int head) throws IOException, InterruptedException {
-            debug("[b] Badger.serialize( previous_head={}, head={} )", previous_head, head);
-            int from = previous_head;
-            int to = head;
-            if (to < from) {
-                from -= m_bufferSize;
-                to += m_bufferSize;
-            }
+        public void serialize(final int from, final int to) throws IOException, InterruptedException {
+            debug("[b] Badger.serialize( from={}, to={} )", from, to);
             for (int i = from; i < to; ++i) {
                 if (Thread.interrupted()) {
                     throw new InterruptedException("Serialization interrupted");
