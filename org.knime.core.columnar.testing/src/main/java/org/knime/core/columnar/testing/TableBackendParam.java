@@ -46,7 +46,7 @@
  * History
  *   Nov 6, 2024 (benjamin): created
  */
-package org.knime.core.columnar.params;
+package org.knime.core.columnar.testing;
 
 import org.knime.core.data.TableBackend;
 import org.knime.core.data.columnar.ColumnarTableBackend;
@@ -56,7 +56,7 @@ import org.knime.core.node.NodeSettings;
 import org.knime.core.node.workflow.WorkflowManager;
 
 /**
- * Enumeration of the different table backends that can be used during benchmarks.
+ * Enumeration of the different table backends that can be used during tests.
  *
  * @author Benjamin Wilhelm, KNIME GmbH, Berlin, Germany
  */

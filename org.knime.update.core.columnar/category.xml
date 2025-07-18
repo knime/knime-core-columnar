@@ -6,6 +6,9 @@
    <feature id="org.knime.features.core.columnar.source">
       <category name="knime-core-columnar"/>
    </feature>
+   <bundle id="org.knime.core.columnar.testing">
+      <category name="knime-core-columnar"/>
+   </bundle>
    <category-def name="knime-core-columnar" label="Build artifacts from knime-core-columnar">
       <description>
          Build artifacts from knime-core-columnar
