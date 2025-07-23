@@ -59,6 +59,9 @@ import org.knime.core.columnar.data.NullableWriteData;
  */
 public interface WriteBatch extends Batch<NullableWriteData>, WriteData {
 
+    // TODO (TP): Should we rename WriteBatch.close(int) to finish(int)
+    //            For WriteCursor etc, close() usually means "abort unfinished operations and release resources"...
+    //            So WriteBatch.finish(int) might be more consistent?
     @Override
     ReadBatch close(int length);
 
