@@ -29,7 +29,7 @@ interface SerializationQueue extends Closeable {
 
         void finish() throws IOException;
 
-        void flush() throws IOException;
+        void flush() throws IOException, InterruptedException;
 
         void close() throws IOException;
     }
@@ -60,6 +60,13 @@ interface SerializationQueue extends Closeable {
      * <p>
      * When {@code flush()} returns {@link Serializer#serialize} has run on all entries, and
      * {@link Serializer#flush} has been called.
+     * <p>
+     * TODO (TP): Clarify concurrency semantics. flush() may be called from any
+     *   thread nd will block (only) that thread until all entries queued at the
+     *   time when flush() was called have been serialized. Other entries might
+     *   have been enqueued in the meantime by the committer thread. (For now
+     *   assuming that there is only one committer thread...)
+     *
      *
      * @throws InterruptedException if interrupted while waiting
      * @throws IOException          if a serializer has failed (in a separate thread) since the last call to commit()
@@ -77,8 +84,13 @@ interface SerializationQueue extends Closeable {
      * @throws InterruptedException if interrupted while waiting
      * @throws IOException          if a serializer has failed (in a separate thread) since the last call to commit()
      */
-    // TODO (TP): Can this be default-implemented as {flush(); close();}
-    void finish() throws InterruptedException, IOException;
+    default void finish() throws InterruptedException, IOException {
+        try {
+            flush();
+        } finally {
+            close();
+        }
+    }
 
     /**
      * @return the number of slots
