@@ -174,7 +174,7 @@ class HeapBadgerWriteCursorTest {
             25, // num rows
             24, // max num rows per batch
             Integer.MAX_VALUE, // max batch size in bytes
-            new int[]{24, 1}, // expected num rows
+            new int[]{10, 15}, // expected num rows
             new int[][]{new int[]{}, //no ints cached
                 new int[]{0} //one string batch cached
             }, // expected cache indices

@@ -53,7 +53,6 @@ import static org.knime.core.columnar.badger.DebugLog.debug;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -69,7 +68,6 @@ import org.knime.core.table.access.BufferedAccesses;
 import org.knime.core.table.access.BufferedAccesses.BufferedAccessRow;
 import org.knime.core.table.row.WriteAccessRow;
 import org.knime.core.table.schema.ColumnarSchema;
-import org.slf4j.LoggerFactory;
 
 /**
  * The {@link HeapBadger} takes care of creating batches of roughly the same size, while offering a write cursor to the
@@ -121,26 +119,12 @@ public class HeapBadger {
 
         int bufferSize = Math.min(20, newBatchSize);
         @SuppressWarnings("resource") // closed in Badger.close()
-        final SerializationQueue async = new AsyncQueue(bufferSize);
-        //        final SerializationQueue async = new SyncQueue();
+        final SerializationQueue async = new DefaultSerializationQueue(bufferSize);
         m_writeCursor = new BadgerWriteCursor(schema, async);
         m_badger = new Badger(writable, m_writeCursor.m_buffers, maxNumRowsPerBatch, maxBatchSizeInBytes);
         m_writeDelegate = writable;
-        var serializationLoopStarted = new CountDownLatch(1);
-        Objects.requireNonNullElse(execService, FALLBACK_EXECUTOR_SERVICE).submit(() -> {
-            serializationLoopStarted.countDown();
-            async.serializeLoop(m_badger);
-            return null;
-        });
-        try {
-            // NB: We wait for the serialization loop to start before returning from the constructor. The closing logic
-            // depends on the serialization loop to be running.
-            serializationLoopStarted.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            LoggerFactory.getLogger(HeapBadger.class)
-                .error("Waiting for serialization loop to start was interrupted. This is a coding error.", e);
-        }
+        Objects.requireNonNullElse(execService, FALLBACK_EXECUTOR_SERVICE)
+            .submit(() -> async.serializeLoop(m_badger));
     }
 
     /**
@@ -305,15 +289,16 @@ public class HeapBadger {
         }
 
         @Override
-        public void finish() throws IOException {
+        public void finish() throws IOException { // TODO (TP): Remove, probably...
             writeCurrentBatch();
             m_writer.close();
         }
 
         @Override
         public void flush() throws IOException {
-            // TODO (TP): implement Badger.flush()
-            throw new UnsupportedOperationException("Not implemented yet. TODO (TP)");
+            debug("[b]  Badger.flush()");
+            writeCurrentBatch();
+            switchToNextBatch();
         }
 
         @Override
@@ -412,8 +397,10 @@ public class HeapBadger {
                 debug("[c:{}]   -> m_queue.finish()", this);
                 m_queue.finish();
                 m_closed = true;
-                // NB: Setting m_closed here means that any subsequent close() will not do anything. Therefore, m_queue.finish() should have the same effects as
-                // m_queue.close(): exit the serialization loop and close the queue.
+                // NB: Setting m_closed here means that any subsequent close()
+                // will not do anything. Therefore, m_queue.finish() should have
+                // the same effects as m_queue.close(): exit the serialization
+                // loop and close the queue.
                 debug("[c:{}]   <- m_queue.finish()", this);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e); // let's pretend it is a RuntimeException?
