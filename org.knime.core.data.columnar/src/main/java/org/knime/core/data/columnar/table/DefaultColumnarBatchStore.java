@@ -337,8 +337,21 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         m_heapBadger = new HeapBadger(m_writable, ColumnarPreferenceUtils.getHeapBadgerSerializationExecutor());
         m_writable = null; // FIXME
 
-        // No need for another MemoryAlertListener. The HeapBadger only keeps a small number of rows in the buffer. We could maybe implement flush instead of finish...
-        // The SharedObjectCache is flushed/invalidated outside anyways
+        m_memListener = new MemoryAlertListener() {
+            @Override
+            @SuppressWarnings("resource") // WriteCursor will be closed by the ColumnarBatchStore
+            protected boolean memoryAlert(final MemoryAlert alert) {
+                new Thread(ThreadUtils.runnableWithContext(() -> {
+                    try {
+                        m_heapBadger.getWriteCursor().flush();
+                    } catch (IOException ex) {
+                        LOGGER.error("Error during enforced premature serialization of object data.", ex);
+                    }
+                })).start();
+                return false;
+            }
+        };
+        MemoryAlertSystem.getInstanceUncollected().addListener(m_memListener);
     }
 
     private void initObjectCache(final SharedObjectCache heapCache, final ExecutorService persistExec,
@@ -414,8 +427,9 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     @Override
     public void close() throws IOException {
-        if (m_heapCache != null) {
+        if (m_memListener != null) {
             MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
+            m_memListener = null;
         }
 
         m_writeCursor.close();
