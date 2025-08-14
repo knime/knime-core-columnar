@@ -87,7 +87,7 @@ public class HeapBadger {
     private static final int DEFAULT_MAX_NUM_ROWS_PER_BATCH = (1 << 15) - 750;
 
     /** max size of a batch */
-    private static final int DEFAULT_MAX_BATCH_SIZE_IN_BYTES = 1 << 23; //26;
+    private static final int DEFAULT_MAX_BATCH_SIZE_IN_BYTES = 1 << 26;
 
     /**
      * The executor service used if none is provided, used for benchmarks and tests. In regular AP execution the service
