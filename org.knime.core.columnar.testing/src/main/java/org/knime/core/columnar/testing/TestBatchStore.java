@@ -64,6 +64,8 @@ public interface TestBatchStore extends BatchStore {
 
     public void blockOnCreateWriteRead(final CountDownLatch latch);
 
+    public void blockOnWrite(final CountDownLatch latch);
+
     public void throwOnWrite(RuntimeException exception);
 
     public List<TestData> getData();
