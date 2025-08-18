@@ -220,7 +220,7 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
             final int[] cols = selection.columns().getSelected();
             if (cols.length > 0 && cols[cols.length - 1] >= numCols) {
                 throw new IndexOutOfBoundsException(
-                    "Selecting column at index " + cols[cols.length - 1] + " in a table with " + numCols + " rows");
+                    "Selecting column at index " + cols[cols.length - 1] + " in a table with " + numCols + " columns");
             }
         }
 
