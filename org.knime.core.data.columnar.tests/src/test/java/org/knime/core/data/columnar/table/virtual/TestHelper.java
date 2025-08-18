@@ -52,20 +52,15 @@ import static java.util.Objects.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.stream.Stream;
-
-import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataTableSpecCreator;
 import org.knime.core.data.def.BooleanCell;
 import org.knime.core.data.def.DoubleCell;
 import org.knime.core.data.def.IntCell;
-import org.knime.core.data.v2.ValueFactory;
-import org.knime.core.data.v2.schema.DataTableValueSchema;
+import org.knime.core.data.v2.schema.DataTableValueSchemaUtils;
 import org.knime.core.data.v2.schema.ValueSchema;
+import org.knime.core.data.v2.schema.ValueSchema.ValueSchemaColumn;
 import org.knime.core.data.v2.value.BooleanValueFactory;
 import org.knime.core.data.v2.value.DefaultRowKeyValueFactory;
 import org.knime.core.data.v2.value.DoubleValueFactory;
@@ -75,13 +70,8 @@ import org.knime.core.table.access.DoubleAccess.DoubleReadAccess;
 import org.knime.core.table.access.IntAccess.IntReadAccess;
 import org.knime.core.table.access.ReadAccess;
 import org.knime.core.table.access.StringAccess.StringReadAccess;
-import org.knime.core.table.access.WriteAccess;
 import org.knime.core.table.row.ReadAccessRow;
-import org.knime.core.table.schema.DataSpec;
-import org.knime.core.table.schema.traits.DataTraits;
 import org.knime.core.table.schema.traits.DefaultDataTraits;
-
-import com.google.common.collect.Iterators;
 
 /**
  * Helper class that holds various mocks to be used by tests related to buffering.
@@ -97,29 +87,11 @@ public class TestHelper {
             new DataColumnSpecCreator("double", DoubleCell.TYPE).createSpec()//
         ).createSpec();
 
-    static final ValueFactory<?, ?>[] VALUE_FACTORIES = {//
-        DefaultRowKeyValueFactory.INSTANCE, //
-        BooleanValueFactory.INSTANCE, //
-        IntValueFactory.INSTANCE, //
-        DoubleValueFactory.INSTANCE//
-    };
-
-    static final DataSpec[] DATA_SPECS = {//
-        DataSpec.stringSpec(), //
-        DataSpec.booleanSpec(), //
-        DataSpec.intSpec(), //
-        DataSpec.doubleSpec()//
-    };
-
-    static final DataTraits[] DATA_TRAITS = {//
-        DefaultDataTraits.EMPTY, //
-        DefaultDataTraits.EMPTY, //
-        DefaultDataTraits.EMPTY, //
-        DefaultDataTraits.EMPTY//
-    };
-
-    static final ValueSchema SCHEMA =
-        new TestColumnarValueSchema(VALUE_FACTORIES, DATA_SPECS, DATA_TRAITS, SOURCE_SPEC);
+    static final ValueSchema SCHEMA = DataTableValueSchemaUtils.create(SOURCE_SPEC, //
+        new ValueSchemaColumn(DefaultRowKeyValueFactory.INSTANCE), //
+        new ValueSchemaColumn(SOURCE_SPEC.getColumnSpec(0), BooleanValueFactory.INSTANCE, DefaultDataTraits.EMPTY), //
+        new ValueSchemaColumn(SOURCE_SPEC.getColumnSpec(1), IntValueFactory.INSTANCE, DefaultDataTraits.EMPTY), //
+        new ValueSchemaColumn(SOURCE_SPEC.getColumnSpec(2), DoubleValueFactory.INSTANCE, DefaultDataTraits.EMPTY));
 
     ReadAccessRow m_readAccessRow;
 
@@ -167,73 +139,4 @@ public class TestHelper {
         when(m_readAccessRow.getAccess(2)).thenReturn(m_intReadAccess);
         when(m_readAccessRow.getAccess(3)).thenReturn(m_doubleReadAccess);
     }
-
-    private static class TestColumnarValueSchema implements DataTableValueSchema {
-
-        private final ValueFactory<?, ?>[] m_valueFactories;
-
-        private final DataTableSpec m_sourceSpec;
-
-        private final DataSpec[] m_dataSpecs;
-
-        private final DataTraits[] m_dataTraits;
-
-        private final DataColumnSpec[] m_columnSpecs;
-
-        TestColumnarValueSchema(final ValueFactory<?, ?>[] valueFactories, final DataSpec[] dataSpecs,
-            final DataTraits[] dataTraits, final DataTableSpec sourceSpec) {
-            m_valueFactories = valueFactories;
-            m_dataSpecs = dataSpecs;
-            m_sourceSpec = sourceSpec;
-            m_dataTraits = dataTraits;
-            m_columnSpecs = new DataColumnSpec[valueFactories.length];
-            Arrays.setAll(m_columnSpecs, i -> i == 0 ? null : sourceSpec.getColumnSpec(i - 1));
-        }
-
-        @Override
-        public int numColumns() {
-            return m_valueFactories.length;
-        }
-
-        @Override
-        public DataSpec getSpec(final int index) {
-            return m_dataSpecs[index];
-        }
-
-        @Override
-        public Iterator<DataSpec> iterator() {
-            return Iterators.forArray(m_dataSpecs);
-        }
-
-        @Override
-        public DataTableSpec getSourceSpec() {
-            return m_sourceSpec;
-        }
-
-        @Override
-        public DataColumnSpec getDataColumnSpec(final int index) {
-            return index == 0 ? null : m_sourceSpec.getColumnSpec(index - 1);
-        }
-
-        @Override
-        public <R extends ReadAccess, W extends WriteAccess> ValueFactory<R, W> getValueFactory(final int index) {
-            return (ValueFactory<R, W>)m_valueFactories[index];
-        }
-
-        @Override
-        public DataTraits getTraits(final int index) {
-            return m_dataTraits[index];
-        }
-
-        @Override
-        public Stream<DataSpec> specStream() {
-            return Arrays.stream(m_dataSpecs);
-        }
-
-        @Override
-        public ValueSchemaColumn getColumn(final int index) {
-            return new ValueSchemaColumn(m_columnSpecs[index], m_valueFactories[index], m_dataTraits[index]);
-        }
-    }
-
 }
