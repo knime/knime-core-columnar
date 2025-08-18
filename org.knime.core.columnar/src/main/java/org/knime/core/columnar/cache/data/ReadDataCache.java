@@ -134,11 +134,12 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             m_numBatches++;
         }
 
-        private final AtomicBoolean m_closed = new AtomicBoolean(false);
+        private boolean m_writer_closed = false;
 
         @Override
-        public synchronized void close() throws IOException {
-            if (!m_closed.getAndSet(true)) {
+        public synchronized void close() {
+            if (!m_writer_closed) {
+                m_writer_closed = true;
                 m_futureQueue.handleDoneFuture();
                 m_futureQueue.enqueueRunnable(() -> {
                     try {
@@ -147,40 +148,13 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                         throw new IllegalStateException("Failed to close writer.", e);
                     }
                 });
-                waitForAllTasksToFinish();
             }
         }
-
-        private void waitForAllTasksToFinish() throws IOException {
-            // We use a {@link CountDownLatch} to _really_ wait for all tasks to finish because
-            // flush() could be interrupted or pick up that the interrupt flag was set. Unfortunately,
-            // the {@link CompletableFuture}s will still continue to be executed, hence we wait with
-            // a latch that is counted down after everything else.
-            final var closedLatch = new CountDownLatch(1);
-            m_futureQueue.enqueueRunnable(closedLatch::countDown);
-            m_futureQueue.enqueueExceptionHandler(ex -> closedLatch.countDown()); // also count down in case of a previous exception
-            try {
-                closedLatch.await();
-            } catch (InterruptedException e) {
-                LOGGER.debug("Interrupted while waiting for tasks to finish");
-            }
-
-            try {
-                // There should not be any tasks left after the previous block,
-                // so this should return immediately. But we still invoke m_future.get()
-                // to notice whether exceptions were thrown.
-                m_futureQueue.waitForAndHandleFuture();
-            } catch (InterruptedException e) {
-                throw new IOException("Close should not be interrupted!", e);
-            }
-        }
-
 
         @Override
         public int initialNumBytesPerElement() {
             return m_writerDelegate.initialNumBytesPerElement();
         }
-
     }
 
     private final class ReadDataCacheReader implements RandomAccessBatchReader {
@@ -329,13 +303,18 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
         return m_readableDelegate.getSchema();
     }
 
+    private final AtomicBoolean m_closed = new AtomicBoolean(false);
+
     @Override
     public synchronized void close() throws IOException {
-        m_writer.close();
-        releaseAllReferencedData();
-        m_currentlyWritingBatches.clear();
-        m_cachedDataIds.clear();
-        m_readableDelegate.close();
+        if (!m_closed.getAndSet(true)) {
+            m_writer.close();
+            waitForAllTasksToFinish();
+            releaseAllReferencedData();
+            m_currentlyWritingBatches.clear();
+            m_cachedDataIds.clear();
+            m_readableDelegate.close();
+        }
     }
 
     private void releaseAllReferencedData() {
@@ -386,6 +365,30 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             }
             batch.retain();
             return batch;
+        }
+    }
+
+    private void waitForAllTasksToFinish() throws IOException {
+        // We use a {@link CountDownLatch} to _really_ wait for all tasks to finish because
+        // flush() could be interrupted or pick up that the interrupt flag was set. Unfortunately,
+        // the {@link CompletableFuture}s will still continue to be executed, hence we wait with
+        // a latch that is counted down after everything else.
+        final var closedLatch = new CountDownLatch(1);
+        m_futureQueue.enqueueRunnable(closedLatch::countDown);
+        m_futureQueue.enqueueExceptionHandler(ex -> closedLatch.countDown()); // also count down in case of a previous exception
+        try {
+            closedLatch.await();
+        } catch (InterruptedException e) {
+            LOGGER.debug("Interrupted while waiting for tasks to finish");
+        }
+
+        try {
+            // There should not be any tasks left after the previous block,
+            // so this should return immediately. But we still invoke m_future.get()
+            // to notice whether exceptions were thrown.
+            m_futureQueue.waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            throw new IOException("Close should not be interrupted!", e);
         }
     }
 
