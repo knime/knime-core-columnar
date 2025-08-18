@@ -89,6 +89,7 @@ import org.knime.core.table.virtual.spec.ConcatenateTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec;
 import org.knime.core.table.virtual.spec.MapTransformSpec.MapperFactory;
 import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory;
+import org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory.Mapper;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec;
 import org.knime.core.table.virtual.spec.ObserverTransformSpec.ObserverFactory;
 import org.knime.core.table.virtual.spec.ObserverTransformUtils;
@@ -296,8 +297,7 @@ public final class ColumnarVirtualTable {
      * Mappers created by this factory have one additional {@code LongReadAccess} input wrt mappers created by the
      * wrapped {@code MapperWithRowIndexFactory}. This additional input represents the row index. When the mapper is
      * {@code run()}, this input is stripped off and passed as the rowIndex argument to the wrapped
-     * {@link org.knime.core.table.virtual.spec.MapTransformUtils.MapperWithRowIndexFactory.Mapper#map(long)
-     * Mapper.map(long)}.
+     * {@link Mapper#map(long) Mapper.map(long)}.
      */
     public static class WrappedColumnarMapperWithRowIndexFactory implements ColumnarMapperFactory {
 
