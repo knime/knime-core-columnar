@@ -206,7 +206,7 @@ try {
                             usernameVariable: 'ARTIFACTORY_LOGIN'),
                         ]) {
                             sh '''
-                                mvn -e -Dmaven.test.failure.ignore=true -Dtycho.localArtifacts=ignore -Dknime.p2.repo=${P2_REPO} clean verify -Pbenchmark
+                                mvn -e -Dtycho.localArtifacts=ignore -Dknime.p2.repo=${P2_REPO} clean verify -Pbenchmark
                             '''
                         }
                     }
