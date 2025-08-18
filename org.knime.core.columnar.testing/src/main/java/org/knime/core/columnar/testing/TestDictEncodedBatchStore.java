@@ -75,6 +75,11 @@ public class TestDictEncodedBatchStore extends DictEncodedBatchWritableReadable 
     }
 
     @Override
+    public void blockOnWrite(final CountDownLatch latch) {
+        m_testDelegate.blockOnWrite(latch);
+    }
+
+    @Override
     public void throwOnWrite(final RuntimeException exception) {
         m_testDelegate.throwOnWrite(exception);
     }
