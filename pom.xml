@@ -46,6 +46,8 @@
 			<modules>
 				<module>org.knime.core.columnar.benchmarks.tests/libs/fetch_jars</module>
 				<module>org.knime.core.columnar.benchmarks.tests</module>
+				<module>org.knime.core.columnar.arrow.benchmarks.tests/libs/fetch_jars</module>
+				<module>org.knime.core.columnar.arrow.benchmarks.tests</module>
 			</modules>
 		<repositories>
 			<repository>
