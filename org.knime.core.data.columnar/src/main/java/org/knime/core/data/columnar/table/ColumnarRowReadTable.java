@@ -218,9 +218,14 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
     private static void selection_validate(final Selection selection, final int numCols, final long numRows) {
         if (!selection.columns().allSelected()) {
             final int[] cols = selection.columns().getSelected();
-            if (cols.length > 0 && cols[cols.length - 1] >= numCols) {
-                throw new IndexOutOfBoundsException(
-                    "Selecting column at index " + cols[cols.length - 1] + " in a table with " + numCols + " columns");
+            if (cols.length > 0) {
+                if (cols[0] < 0) {
+                    throw new IndexOutOfBoundsException("Selecting column at index " + cols[0]);
+                }
+                if (cols[cols.length - 1] >= numCols) {
+                    throw new IndexOutOfBoundsException("Selecting column at index " + cols[cols.length - 1]
+                        + " in a table with " + numCols + " columns");
+                }
             }
         }
 
