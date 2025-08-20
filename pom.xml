@@ -23,7 +23,6 @@
           org.knime.core.columnar.tests/**/*,
           org.knime.core.data.columnar.testing/**/*,
           org.knime.core.data.columnar.tests/**/*,
-          org.knime.core.data.columnar/**/org/knime/core/data/columnar/*,
           org.knime.core.data.columnar/**/org/knime/core/data/columnar/preferences/*
         </sonar.coverage.exclusions>
         <knime.sonar-env>Sonarcloud</knime.sonar-env>
