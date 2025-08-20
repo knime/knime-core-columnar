@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
 import org.knime.core.columnar.badger.BatchingWritable;
+import org.knime.core.columnar.badger.DebugInfo;
 import org.knime.core.columnar.badger.HeapBadger;
 import org.knime.core.columnar.badger.HeapCache;
 import org.knime.core.columnar.badger.HeapCachingBatchWritable;
@@ -270,6 +271,12 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
     private final ColumnarWriteCursor m_writeCursor;
 
     private DefaultColumnarBatchStore(final ColumnarBatchStoreBuilder builder) {
+
+        DebugInfo info = new DebugInfo();
+        info.append("new DefaultColumnarBatchStore ...\n");
+        info.stacktrace(20);
+        System.out.println(info);
+
         m_readStore = builder.m_readDelegate;
 
         m_readable = builder.m_readDelegate;
@@ -449,6 +456,11 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
     @Override
     public void close() throws IOException {
+        DebugInfo info = new DebugInfo();
+        info.append("DefaultColumnarBatchStore.close() called.\n");
+        info.stacktrace(20);
+        System.out.println(info);
+
         if (m_memListener != null) {
             MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
             m_memListener = null;

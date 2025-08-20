@@ -1,10 +1,10 @@
 package org.knime.core.columnar.badger;
 
+import static org.knime.core.columnar.badger.DebugLog.debug;
+
 import java.io.IOException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-
-import static org.knime.core.columnar.badger.DebugLog.debug;
 
 class DefaultSerializationQueue implements SerializationQueue {
     private final int m_bufferSize;
@@ -217,6 +217,8 @@ class DefaultSerializationQueue implements SerializationQueue {
         }
     }
 
+    private final DebugInfo m_messages = new DebugInfo();
+
     @Override
     public void close() throws IOException {
         final ReentrantLock lock = this.m_lock;
@@ -224,6 +226,9 @@ class DefaultSerializationQueue implements SerializationQueue {
         lock.lock();
         debug("[q] close() -- LOCKED");
         try {
+            m_messages.append("close() called\n");
+            m_messages.stacktrace(20);
+
             if (m_closing) {
                 // Do nothing. Queue is already closed (or being closed).
                 debug("[q] close() -- already closed");
@@ -394,7 +399,8 @@ class DefaultSerializationQueue implements SerializationQueue {
 
                 // Future invocations of commit() or flush() on the closed queue will throw this exception.
                 if (m_serialization_exception == null) {
-                    m_serialization_exception = new IOException("SerializationQueue is already closed");
+                    m_serialization_exception =
+                        new IOException("SerializationQueue is already closed. [[ " + m_messages.toString() + " ]]");
                 }
 
                 debug("[s] - acquiring LOCK");
@@ -439,6 +445,7 @@ class DefaultSerializationQueue implements SerializationQueue {
 
                 // If an IOException occurs, close the queue and make sure the
                 // IOException is re-thrown.
+                this.m_messages.append("closing because of IOException");
                 m_closing = true;
                 m_serialization_exception = e;
 
@@ -447,6 +454,7 @@ class DefaultSerializationQueue implements SerializationQueue {
                 continue;
             } catch (InterruptedException e) {
                 // If we are interrupted (for any reason), close the queue.
+                this.m_messages.append("closing because of InterruptedException");
                 m_closing = true;
 
                 // Continue to the next iteration of the while() loop
