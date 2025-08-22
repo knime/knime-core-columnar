@@ -212,8 +212,6 @@ public class HeapBadger {
                 ColumnarAccessFactory factory = ColumnarAccessFactoryMapper.createAccessFactory(schema.getSpec(c));
                 m_accessesToTheCurrentBatch[c] = factory.createWriteAccess(() -> m_batchLocalRowIndex);
             }
-
-            switchToNextBatch();
         }
 
         synchronized int getNumBatchesWritten() {
@@ -224,6 +222,10 @@ public class HeapBadger {
         private void writeBufferedRow(final int row) throws IOException {
             debug("[b] Badger.writeBufferedRow( row={} )", row);
             final BufferedAccessRow bufferedRow = m_buffers[row];
+
+            if (m_current_batch == null ) {
+                switchToNextBatch();
+            }
 
             // Set the data from the buffer
             for (int col = 0; col < m_accessesToTheCurrentBatch.length; ++col) {
@@ -245,21 +247,22 @@ public class HeapBadger {
                 debug("[b]   switch to new batch");
                 // TODO if we have written more data in some columns make sure we do not loose it
                 writeCurrentBatch();
-                switchToNextBatch();
             }
         }
 
         private synchronized void writeCurrentBatch() throws IOException {
             // synchronized so that getNumBatchesWritten and writeCurrentBatch cannot be called at the same time
             debug("[b] Badger.writeCurrentBatch");
-            ReadBatch readBatch = m_current_batch.close(m_batchLocalRowIndex);
-            m_current_batch = null;
-            try {
-                m_writer.write(readBatch);
-            } finally {
-                readBatch.release();
+            if ( m_current_batch != null ) {
+                ReadBatch readBatch = m_current_batch.close(m_batchLocalRowIndex);
+                m_current_batch = null;
+                try {
+                    m_writer.write(readBatch);
+                } finally {
+                    readBatch.release();
+                }
+                m_numBatchesWritten++;
             }
-            m_numBatchesWritten++;
         }
 
         private void switchToNextBatch() {
@@ -295,7 +298,7 @@ public class HeapBadger {
         public void flush() throws IOException {
             debug("[b]  Badger.flush()");
             writeCurrentBatch();
-            switchToNextBatch();
+            clearAccessesToCurrentBatch();
         }
 
         @Override
@@ -304,11 +307,15 @@ public class HeapBadger {
             if (m_current_batch != null) {
                 m_current_batch.release();
                 m_current_batch = null;
-                for (ColumnarWriteAccess access : m_accessesToTheCurrentBatch) {
-                    access.setData(null);
-                }
             }
+            clearAccessesToCurrentBatch();
             m_writer.close();
+        }
+
+        private void clearAccessesToCurrentBatch() {
+            for (ColumnarWriteAccess access : m_accessesToTheCurrentBatch) {
+                access.setData(null);
+            }
         }
     }
 
