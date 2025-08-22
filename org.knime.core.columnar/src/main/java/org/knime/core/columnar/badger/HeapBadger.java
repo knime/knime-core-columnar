@@ -289,12 +289,6 @@ public class HeapBadger {
         }
 
         @Override
-        public void finish() throws IOException { // TODO (TP): Remove, probably...
-            writeCurrentBatch();
-            m_writer.close();
-        }
-
-        @Override
         public void flush() throws IOException {
             debug("[b]  Badger.flush()");
             writeCurrentBatch();

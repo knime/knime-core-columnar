@@ -27,8 +27,6 @@ interface SerializationQueue extends Closeable {
          */
         void serialize(int from, int to) throws IOException, InterruptedException;
 
-        void finish() throws IOException;
-
         void flush() throws IOException, InterruptedException;
 
         void close() throws IOException;
