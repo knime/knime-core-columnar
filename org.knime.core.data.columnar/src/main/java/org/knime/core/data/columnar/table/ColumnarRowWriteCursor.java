@@ -49,9 +49,7 @@ package org.knime.core.data.columnar.table;
 import java.io.Flushable;
 import java.io.IOException;
 
-import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
-import org.knime.core.columnar.store.BatchStore;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.v2.RowRead;
@@ -83,18 +81,19 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
 
     private final RowWrite m_rowWrite;
 
-    private final Flushable m_flushOnForward;
+    private final Flushable m_flushOnCommit;
 
     /**
      * Create a row write cursor
-     * @param store The batch store to write to
-     * @param factories Value factories for the individual columns
-     * @param flushOnForward An optional {@link Flushable} that will be flushed on each forward operation
+     *
+     * @param cursor the ColumnarWriteCursor to write to
+     * @param schema the schema of the table
+     * @param flushOnCommit An optional {@link Flushable} that will be flushed on each commit()
      */
-    ColumnarRowWriteCursor(final BatchStore store, final ValueSchema schema, final Flushable flushOnForward) {
+    ColumnarRowWriteCursor(final ColumnarWriteCursor cursor, final ValueSchema schema, final Flushable flushOnCommit) {
 
-        m_accessCursor = ColumnarWriteCursorFactory.createWriteCursor(store);
-        m_flushOnForward = flushOnForward;
+        m_accessCursor = cursor;
+        m_flushOnCommit = flushOnCommit;
         m_rowWrite = new WriteAccessRowWrite(schema, m_accessCursor.access());
     }
 
@@ -124,8 +123,8 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
 
     private void commit() {
         try {
-            if (m_flushOnForward != null) {
-                m_flushOnForward.flush();
+            if (m_flushOnCommit != null) {
+                m_flushOnCommit.flush();
             }
             m_accessCursor.commit();
         } catch (IOException ex) {
@@ -134,7 +133,7 @@ final class ColumnarRowWriteCursor implements RowWriteCursor {
     }
 
     @Override
-    public final void close() {
+    public void close() {
         try {
             m_accessCursor.close();
         } catch (IOException ex) {
