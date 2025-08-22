@@ -53,6 +53,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
 import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.DataColumnDomain;
 import org.knime.core.data.columnar.domain.DefaultDomainWritableConfig;
@@ -86,7 +87,7 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
 
     private final ColumnStoreFactory m_storeFactory;
 
-    private final ColumnarBatchStore m_store;
+    private final DefaultColumnarBatchStore m_store;
 
     /**
      * Will be {@code null} if {@link ColumnarRowWriteTableSettings#isCalculateDomains()} of the settings object passed
@@ -150,7 +151,9 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
         m_store = builder.build();
         // Will return null if the builder did not include domain calculation.
         m_nullableDomainWritable = m_store.getDomainWritable();
-        m_writeCursor = new ColumnarRowWriteCursor(m_store, m_schema, settings.isForceSynchronousIO() ? m_store : null);
+        @SuppressWarnings("resource") // will be closed by m_writeCursor
+        final ColumnarWriteCursor cursor = m_store.getBatchingWriteCursor();
+        m_writeCursor = new ColumnarRowWriteCursor(cursor, m_schema, settings.isForceSynchronousIO() ? m_store : null);
 
         m_finalizer = ResourceLeakDetector.getInstance().createFinalizer(this, m_writeCursor, m_store);
     }
