@@ -183,7 +183,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public final void close() throws IOException {
+        public void close() throws IOException {
             if (m_currentBatch != null) {
                 m_currentBatch.release();
                 m_currentBatch = null;
@@ -192,7 +192,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public final int getIndex() {
+        public int getIndex() {
             return m_currentIndex;
         }
 
