@@ -253,9 +253,12 @@ public class HeapBadger {
             // synchronized so that getNumBatchesWritten and writeCurrentBatch cannot be called at the same time
             debug("[b] Badger.writeCurrentBatch");
             ReadBatch readBatch = m_current_batch.close(m_batchLocalRowIndex);
-            m_writer.write(readBatch);
-            readBatch.release();
             m_current_batch = null;
+            try {
+                m_writer.write(readBatch);
+            } finally {
+                readBatch.release();
+            }
             m_numBatchesWritten++;
         }
 
@@ -300,6 +303,10 @@ public class HeapBadger {
             debug("[b]  close Badger");
             if (m_current_batch != null) {
                 m_current_batch.release();
+                m_current_batch = null;
+                for (ColumnarWriteAccess access : m_accessesToTheCurrentBatch) {
+                    access.setData(null);
+                }
             }
             m_writer.close();
         }
