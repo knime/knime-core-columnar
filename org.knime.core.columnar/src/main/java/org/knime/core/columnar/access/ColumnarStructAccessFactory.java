@@ -153,9 +153,8 @@ final class ColumnarStructAccessFactory implements ColumnarAccessFactory {
         @Override
         public void setData(final NullableWriteData data) {
             super.setData(data);
-            // the super class does the cast for us
             for (int i = 0; i < m_inner.length; i++) {
-                m_inner[i].setData(m_data.getWriteDataAt(i));
+                m_inner[i].setData(data == null ? null : m_data.getWriteDataAt(i));
             }
         }
 
