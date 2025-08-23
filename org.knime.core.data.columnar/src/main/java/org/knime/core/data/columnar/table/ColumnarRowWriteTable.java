@@ -193,12 +193,8 @@ public final class ColumnarRowWriteTable implements RowWriteAccessible {
     public ColumnarRowReadTable finish() {
         if (m_nullableFinishedTable == null) {
             m_finalizer.close();
-            m_writeCursor.finish();
-            m_writeCursor.close(); // TODO (TP) ColumnarRowWriteCursor.finish() should simultaneously close() !?
             try {
-                // Make sure this actually writes the data underneath. This is needed for the test
-                // testDeduplicateRowIDsWithSuffix and would cause a "writing after closing writer" error.
-                m_store.flush();
+                m_store.finishWriting();
             } catch (IOException ex) {
                 LOGGER.error("Exception while flushing store.", ex);
                 throw new IllegalStateException("Table could not be written to disk.", ex);
