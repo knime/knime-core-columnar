@@ -102,29 +102,31 @@ public class HeapBadger {
     private final BatchWritable m_writeDelegate;
 
     /**
-     * Constructor
+     * Create a HeapBadger and start the serialization queue.
      *
-     * @param writable
-     * @param maxNumRowsPerBatch
-     * @param maxBatchSizeInBytes
-     * @param execService ... or null to use a fallback executor service
+     * @param writable completed badges are written to this writable
+     * @param maxNumRowsPerBatch maximum number of rows in one batch
+     * @param maxBatchSizeInBytes maximum size (in bytes) of one batch
+     * @param execService executor service to run the serialization loop (or {@code null} to use a fallback executor service).
      */
     public HeapBadger(final BatchWritable writable, final int maxNumRowsPerBatch, final int maxBatchSizeInBytes,
         final ExecutorService execService) {
-        ColumnarSchema schema = writable.getSchema();
 
+        // determine the number of rows in the ring buffer for the serialization queue
         @SuppressWarnings("resource")
-        int newBatchSize =
-            Math.min(maxBatchSizeInBytes / writable.getWriter().initialNumBytesPerElement(), maxNumRowsPerBatch);
+        final int bytesPerElement = writable.getWriter().initialNumBytesPerElement();
+        final int newBatchSize = Math.min(maxBatchSizeInBytes / bytesPerElement, maxNumRowsPerBatch);
+        final int bufferSize = Math.min(20, newBatchSize);
 
-        int bufferSize = Math.min(20, newBatchSize);
-        @SuppressWarnings("resource") // closed in Badger.close()
+        @SuppressWarnings("resource") // closed by the BadgerWriteCursor
         final SerializationQueue async = new DefaultSerializationQueue(bufferSize);
-        m_writeCursor = new BadgerWriteCursor(schema, async);
+        m_writeCursor = new BadgerWriteCursor(writable.getSchema(), async);
         m_badger = new Badger(writable, m_writeCursor.m_buffers, maxNumRowsPerBatch, maxBatchSizeInBytes);
         m_writeDelegate = writable;
-        Objects.requireNonNullElse(execService, FALLBACK_EXECUTOR_SERVICE)
-            .submit(() -> async.serializeLoop(m_badger));
+
+        @SuppressWarnings("resource")
+        final ExecutorService exec = Objects.requireNonNullElse(execService, FALLBACK_EXECUTOR_SERVICE);
+        exec.submit(() -> async.serializeLoop(m_badger));
     }
 
     /**
@@ -396,8 +398,6 @@ public class HeapBadger {
         public void finish() throws IOException {
             debug("[c:{}] BadgerWriteCursor.finish", this);
             if (m_closed) {
-                // TODO (TP): should we rather
-                //            throw new IllegalStateException("Calling finish() on a WriteCursor that has already been closed.")?
                 debug("[c:{}] !! already closed, ignoring call !!", this);
                 return;
             }
@@ -417,17 +417,16 @@ public class HeapBadger {
 
         @Override
         public void close() throws IOException {
-            // TODO abort, release resources, ignore exceptions that might have occurred while serializing in m_queue
+            debug("[c:{}] BadgerWriteCursor.close", this);
             if (m_closed) {
-                // TODO (TP): should we rather
-                //            throw new IllegalStateException("Calling close() on a WriteCursor that has already been closed.")?
                 debug("[c:{}] !! already closed, ignoring call !!", this);
                 return;
             }
 
             m_closed = true;
             m_queue.close();
-            debug("[c:{}] --- Closing the Badger Write Cursor ", this);
+
+            // TODO (TP): clear m_buffers[]
         }
 
         @Override
