@@ -425,6 +425,28 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
         return m_readable.createRandomAccessReader(selection);
     }
 
+    void finishWriting() throws IOException {
+        if (m_heapBadger != null && m_memListener != null) {
+            MemoryAlertSystem.getInstanceUncollected().removeListener(m_memListener);
+            m_memListener = null;
+        }
+        // TODO (TP): m_writeCursor.finish() must be called before flush().
+        //   Otherwise, createRandomAccessReader() may be blocked forever in
+        //   BatchWritableCache$BatchWritableCacheWriter.waitForDelegateWriter()
+        //   because the cached table is never flushed to the delegate.
+        //
+        //   A related issue has come up before: in
+        //   https://knime-com.atlassian.net/browse/AP-17824 There is even a
+        //   ticket for implementing a possible solution:
+        //   https://knime-com.atlassian.net/browse/AP-17830
+        //
+        //   This took me FOREVER to find. We should really work on
+        //   https://knime-com.atlassian.net/browse/AP-17830
+        //   to avoid wasting even more time in the future!
+        m_writeCursor.finish();
+        flush();
+    }
+
     @Override
     public void close() throws IOException {
         if (m_memListener != null) {
