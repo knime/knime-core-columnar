@@ -427,6 +427,9 @@ public class HeapBadger {
 
             m_closed = true;
             m_queue.close();
+
+            // TODO (TP): clear m_buffers[]
+
             debug("[c:{}] --- Closing the Badger Write Cursor ", this);
         }
 
