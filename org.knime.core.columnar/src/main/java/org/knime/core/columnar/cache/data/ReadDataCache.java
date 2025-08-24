@@ -218,6 +218,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 final ColumnDataUniqueId lockUID = new ColumnDataUniqueId(ReadDataCache.this, 0, index);
                 final Object lock = m_cachedDataIds.computeIfAbsent(lockUID, k -> new Object());
                 synchronized (lock) {
+                    // TODO (TP): Revise this logic! Synchronizing on lock makes
+                    //   sure that the same batch is not loaded concurrently by
+                    //   multiple threads. However each threads queued to enter
+                    //   the synchronized block will still read the same batch,
+                    //   albeit sequentially, and not use its data.
                     try (RandomAccessBatchReader reader = m_readableDelegate
                         .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
                         final ReadBatch batch = reader.readRetained(index);
@@ -227,6 +232,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                             final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
                             if (cachedData != null) {
                                 data.release();
+                                // TODO (TP): Why do release data here, but not if we put it into the cache?
+                                //   m_globalCache.put(data) will retain the data again!
+                                //   Also: Should we call batch.release() in the end?
                                 datas[i] = cachedData;
                             } else {
                                 // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
