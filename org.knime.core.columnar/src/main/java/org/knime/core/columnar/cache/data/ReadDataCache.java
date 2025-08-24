@@ -126,9 +126,13 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 }
             });
 
+            // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
+            // about the key, except for column 0, where the value is used as a lock to ensure that
+            // the same is not loaded concurrently by multiple threads.
+            final Object lock = new Object();
             for (int i = 0; i < getSchema().numColumns(); i++) {
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, m_numBatches);
-                m_cachedDataIds.put(ccUID, new Object());
+                m_cachedDataIds.put(ccUID, lock);
                 m_globalCache.put(ccUID, batch.get(i), m_evictor);
             }
             m_numBatches++;
