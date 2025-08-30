@@ -163,16 +163,17 @@ class ByteBigArrayDataInput implements ReadableDataInput {
 
     @Override
     public short readShort() throws IOException {
-        int ch1 = readUnsignedByte();
-        int ch2 = readUnsignedByte();
-        return (short)((ch2 << 8) + ch1);
+        if (m_position + 2 > m_end) {
+            throw new EOFException();
+        }
+        final short v = ByteBigArrayHelper.getShort(m_data, m_position);
+        m_position += 2;
+        return v;
     }
 
     @Override
     public int readUnsignedShort() throws IOException {
-        int ch1 = readUnsignedByte();
-        int ch2 = readUnsignedByte();
-        return (ch2 << 8) + ch1;
+        return 0xFFFF & readShort();
     }
 
     @Override
@@ -182,55 +183,94 @@ class ByteBigArrayDataInput implements ReadableDataInput {
 
     @Override
     public int readInt() throws IOException {
-        int ch1 = readUnsignedByte();
-        int ch2 = readUnsignedByte();
-        int ch3 = readUnsignedByte();
-        int ch4 = readUnsignedByte();
-        return ((ch4 << 24) + (ch3 << 16) + (ch2 << 8) + ch1);
+        if (m_position + 4 > m_end) {
+            throw new EOFException();
+        }
+        final int v = ByteBigArrayHelper.getInt(m_data, m_position);
+        m_position += 4;
+        return v;
     }
+
 
     @Override
     public long readLong() throws IOException {
-        long ch1 = (readUnsignedByte());
-        long ch2 = ((long)readUnsignedByte()) << 8;
-        long ch3 = ((long)readUnsignedByte()) << 16;
-        long ch4 = ((long)readUnsignedByte()) << 24;
-        long ch5 = ((long)readUnsignedByte()) << 32;
-        long ch6 = ((long)readUnsignedByte()) << 40;
-        long ch7 = ((long)readUnsignedByte()) << 48;
-        long ch8 = ((long)readUnsignedByte()) << 56;
-        return ch8 + ch7 + ch6 + ch5 + ch4 + ch3 + ch2 + ch1;
+        if (m_position + 8 > m_end) {
+            throw new EOFException();
+        }
+        final long v = ByteBigArrayHelper.getLong(m_data, m_position);
+        m_position += 8;
+        return v;
     }
 
     @Override
     public float readFloat() throws IOException {
-        return Float.intBitsToFloat(readInt());
+        if (m_position + 4 > m_end) {
+            throw new EOFException();
+        }
+        final float v = ByteBigArrayHelper.getFloat(m_data, m_position);
+        m_position += 4;
+        return v;
     }
 
     @Override
     public double readDouble() throws IOException {
-        return Double.longBitsToDouble(readLong());
+        if (m_position + 8 > m_end) {
+            throw new EOFException();
+        }
+        final double v = ByteBigArrayHelper.getDouble(m_data, m_position);
+        m_position += 8;
+        return v;
     }
 
     @Override
     public String readLine() throws IOException {
-        final long maxIndex = m_end - Byte.BYTES;
-        if (m_position > maxIndex) {
+        if (m_position >= m_end) {
             return null;
         }
         final StringBuilder sb = new StringBuilder();
-        do { // NOSONAR
-            final char c = (char)(BigArrays.get(m_data, m_position) & 0xFF);
-            m_position++;
+        while (m_position < m_end) {
+            if (!appendToLine(sb)) {
+                break; // '\n' was encountered
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Reads bytes from BigArray segment into {@code sb}, until the segment end is reached, or {@code \n} is
+     * encountered.
+     *
+     * @param sb buffer to append to
+     * @return {@code true} if more bytes should be read, {@code false} if {@code \n} was encountered.
+     */
+    private boolean appendToLine(final StringBuilder sb) {
+        final int segment = BigArrays.segment(m_position);
+        final int displacement = BigArrays.displacement(m_position);
+        final int end = (int)Math.min(m_end - BigArrays.start(segment), BigArrays.SEGMENT_SIZE);
+        final byte[] data = m_data[segment];
+        final char[] buf = new char[64];
+        int i = displacement;
+        int o = 0;
+        for (; i < end; ++i) {
+            final char c = (char)(data[i] & 0xFF);
             if (c == '\r') {
                 continue;
             }
             if (c == '\n') {
-                break;
+                m_position += i - displacement + 1;
+                sb.append(buf, 0, o);
+                return false;
             }
-            sb.append(c);
-        } while (m_position <= maxIndex);
-        return sb.toString();
+            buf[o] = c;
+            ++o;
+            if (o >= buf.length) {
+                sb.append(buf);
+                o = 0;
+            }
+        }
+        m_position += end - displacement;
+        sb.append(buf, 0, o);
+        return true;
     }
 
     /**

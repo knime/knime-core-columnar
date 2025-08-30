@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.knime.maven</groupId>
 		<artifactId>ap.parent</artifactId>
-		<version>5.6.0</version>
+		<version>5.7.0</version>
 	</parent>
 
 	<groupId>org.knime</groupId>
@@ -14,7 +14,7 @@
 	<name>Aggregator POM for knime-core-columnar</name>
 
 	<properties>
-		<revision>5.6.0</revision>
+		<revision>5.7.0</revision>
 		<changelist>-SNAPSHOT</changelist>
 		<feature-branch-extension.branchListProperty>git.branch</feature-branch-extension.branchListProperty>
 		<feature-branch-extension.appendArtifactoryProperties>false</feature-branch-extension.appendArtifactoryProperties>
@@ -46,6 +46,8 @@
 			<modules>
 				<module>org.knime.core.columnar.benchmarks.tests/libs/fetch_jars</module>
 				<module>org.knime.core.columnar.benchmarks.tests</module>
+				<module>org.knime.core.columnar.arrow.benchmarks.tests/libs/fetch_jars</module>
+				<module>org.knime.core.columnar.arrow.benchmarks.tests</module>
 			</modules>
 		<repositories>
 			<repository>

@@ -3,7 +3,7 @@ Bundle-ManifestVersion: 2
 Automatic-Module-Name: org.knime.core.columnar.arrow
 Bundle-Name: KNIME Columnar Store Plugin - Arrow Implementation
 Bundle-SymbolicName: org.knime.core.columnar.arrow;singleton:=true
-Bundle-Version: 5.6.0.qualifier
+Bundle-Version: 5.7.0.qualifier
 Bundle-ClassPath: .,
  libs/fastutil-8.5.15.jar
 Bundle-Vendor: KNIME AG, Zurich, Switzerland

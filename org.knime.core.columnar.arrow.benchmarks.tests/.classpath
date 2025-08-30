@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry exported="true" kind="lib" path="libs/commons-math3-3.6.1.jar" sourcepath="libs/commons-math3-3.6.1-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jmh-core-1.37.jar" sourcepath="libs/jmh-core-1.37-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jmh-generator-annprocess-1.37.jar" sourcepath="libs/jmh-generator-annprocess-1.37-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="libs/jopt-simple-5.0.4.jar" sourcepath="libs/jopt-simple-5.0.4-sources.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-17">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry kind="src" output="bin/test-classes" path="src">
+		<attributes>
+			<attribute name="test" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="bin/apt-test-classes" path=".apt_generated_tests">
+		<attributes>
+			<attribute name="test" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="bin/apt-classes" path=".apt_generated"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
