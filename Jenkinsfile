@@ -3,7 +3,7 @@ def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRAN
 
 library "knime-pipeline@$BN"
 
-def baseBranch = (BN == KNIMEConstants.NEXT_RELEASE_BRANCH ? "master" : BN.replace("releases/",""))
+def baseBranch = ((BN == KNIMEConstants.NEXT_RELEASE_BRANCH || BN == "releases/STS" || BN == "releases/STS-next") ? "master" : BN.replace("releases/",""))
 
 properties([
     pipelineTriggers([
