@@ -342,7 +342,7 @@ public class HeapBadger {
 
         BadgerWriteCursor(final ColumnarSchema schema, final SerializationQueue queue) {
             m_queue = queue;
-            m_buffers = new BufferedAccessRow[queue.getBufferSize()]; // TODO Async::getBufferSize() instead of field access
+            m_buffers = new BufferedAccessRow[queue.getBufferSize()];
             Arrays.setAll(m_buffers, i -> BufferedAccesses.createBufferedAccessRow(schema));
             m_access = BufferedAccesses.createBufferedAccessRow(schema);
         }
