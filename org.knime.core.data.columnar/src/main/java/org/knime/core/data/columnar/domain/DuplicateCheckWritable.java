@@ -98,9 +98,7 @@ public final class DuplicateCheckWritable implements BatchWritable {
 
             final StringReadData rowKeyData = (StringReadData)batch.get(0);
             rowKeyData.retain();
-            // TODO (TP): What is the point of the future chaining here? We know that m_future is completed at this point. Shouldn't this rather be
-            // m_future = CompletableFuture.runAsync(() -> { // NOSONAR
-            m_future = m_future.thenRunAsync(() -> { // NOSONAR
+            m_future = CompletableFuture.runAsync(() -> { // NOSONAR
                 try {
                     for (int i = 0; i < rowKeyData.length(); i++) {
                         m_duplicateChecker.addKey(rowKeyData.getString(i));
