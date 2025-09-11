@@ -88,13 +88,11 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
         }
 
         /**
-         * Call evictor if the entry was evicted (not explicitly removed/replaced).
+         * Call evictor if the entry was evicted (for any reason).
          * Release data.
          */
         void onRemoval(final RemovalNotification<K, DataWithEvictor<K, D>> removalNotification) {
-            if (removalNotification.wasEvicted()) {
-                m_evictor.evict(removalNotification.getKey(), m_data);
-            }
+            m_evictor.evict(removalNotification.getKey(), m_data);
             m_data.release();
         }
     }
