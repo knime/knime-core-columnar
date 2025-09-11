@@ -74,7 +74,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
     private final class ReadDataReadCacheReader implements RandomAccessBatchReader {
 
-        private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedData.remove(k);
+        private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedDataIds.remove(k);
 
         private final ColumnSelection m_selection;
 
@@ -105,10 +105,15 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
                 // we use the first column's id as a proxy for locking.
                 final ColumnDataUniqueId lockUID = new ColumnDataUniqueId(ReadDataReadCache.this, 0, index);
-                final Object lock = m_cachedData.computeIfAbsent(lockUID, k -> new Object());
+                final Object lock = m_cachedDataIds.computeIfAbsent(lockUID, k -> new Object());
                 synchronized (lock) {
+                    // TODO (TP): Revise this logic! Synchronizing on lock makes
+                    //   sure that the same batch is not loaded concurrently by
+                    //   multiple threads. However each threads queued to enter
+                    //   the synchronized block will still read the same batch,
+                    //   albeit sequentially, and not use its data.
                     try (RandomAccessBatchReader reader = m_readableDelegate
-                            .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
+                        .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
                         final ReadBatch batch = reader.readRetained(index);
                         for (int i : missingCols) {
                             final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataReadCache.this, i, index);
@@ -116,12 +121,15 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
                             final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
                             if (cachedData != null) {
                                 data.release();
+                                // TODO (TP): Why do release data here, but not if we put it into the cache?
+                                //   m_globalCache.put(data) will retain the data again!
+                                //   Also: Should we call batch.release() in the end?
                                 datas[i] = cachedData;
                             } else {
                                 // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
                                 // about the key, except for column 0, where the value is used as a lock to ensure that
                                 // the same is not loaded concurrently by multiple threads.
-                                m_cachedData.putIfAbsent(ccUID, lock);
+                                m_cachedDataIds.putIfAbsent(ccUID, lock);
                                 m_globalCache.put(ccUID, data, m_evictor);
                                 datas[i] = data;
                             }
@@ -146,7 +154,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
     private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
 
-    private Map<ColumnDataUniqueId, Object> m_cachedData = new ConcurrentHashMap<>();
+    private Map<ColumnDataUniqueId, Object> m_cachedDataIds = new ConcurrentHashMap<>();
 
     /**
      * @param readableDelegate the delegate from which to read in case of a cache miss
@@ -169,12 +177,12 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
     @Override
     public synchronized void close() throws IOException {
-        if (m_cachedData != null) {
-            for (final ColumnDataUniqueId id : m_cachedData.keySet()) {
+        if (m_cachedDataIds != null) {
+            for (final ColumnDataUniqueId id : m_cachedDataIds.keySet()) {
                 m_globalCache.remove(id);
             }
-            m_cachedData.clear();
-            m_cachedData = null;
+            m_cachedDataIds.clear();
+            m_cachedDataIds = null;
             m_readableDelegate.close();
         }
     }
