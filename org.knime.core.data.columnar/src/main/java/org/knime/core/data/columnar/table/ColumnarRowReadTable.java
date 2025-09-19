@@ -201,7 +201,7 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
     //            Either that, or the m_rowCursorTracker should move to AbstractColumnarContainerTable as well.
     public RowCursor createRowCursor(final TableFilter filter) {
         if (filter != null) {
-            selection_validate(TableFilterUtils.toSelection(filter, m_size), m_schema.numColumns(), m_size);
+            validateSelection(TableFilterUtils.toSelection(filter, m_size), m_schema.numColumns(), m_size);
         }
         return m_rowCursorTracker
             .createTrackedCursor(() -> ColumnarRowCursorFactory.create(m_store, m_schema, m_size, filter));
@@ -215,7 +215,8 @@ public final class ColumnarRowReadTable implements RandomRowAccessible {
      * @param numRows number of rows of the table that is to be filtered
      * @throws IndexOutOfBoundsException when any index is out of bounds
      */
-    private static void selection_validate(final Selection selection, final int numCols, final long numRows) {
+    // TODO(AP-25045) Move to Selection interface as default method
+    private static void validateSelection(final Selection selection, final int numCols, final long numRows) {
         if (!selection.columns().allSelected()) {
             final int[] cols = selection.columns().getSelected();
             if (cols.length > 0) {

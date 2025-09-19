@@ -256,6 +256,13 @@ public final class ColumnarVirtualTable {
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec), m_valueSchema);
     }
 
+    /**
+     * Append all columns from the given {@code schema} to this table. The values for the appended columns, at every
+     * row, will be {@link ReadAccess#isMissing() missing}.
+     *
+     * @param schema the columns to append
+     * @return the appended table
+     */
     public ColumnarVirtualTable appendMissingValueColumns(final ValueSchema schema) {
         var transformSpec = new AppendMissingValuesTransformSpec(schema);
         return new ColumnarVirtualTable(new TableTransform(m_transform, transformSpec),
@@ -500,8 +507,8 @@ public final class ColumnarVirtualTable {
      * every thread.) The mapper must have exactly one input and exactly one output column.
      *
      * @param mapperFactory produces a mapper that is run for every row in this table.
-     * @param columnIndices indices of columns used by the mapper.
-     * @return a new table with the specified columns replaced by the mapper column
+     * @param columnIndex index of the column to replace.
+     * @return a new table with the specified column replaced by the mapper column
      */
     public ColumnarVirtualTable replaceMap(final ColumnarMapperFactory mapperFactory, final int columnIndex) {
         if (mapperFactory.getOutputSchema().numColumns() != 1) {
@@ -519,8 +526,8 @@ public final class ColumnarVirtualTable {
      * every thread.) The mapper must have exactly one input and exactly one output column.
      *
      * @param mapperFactory produces a mapper that is run for every row in this table.
-     * @param columnIndices indices of columns used by the mapper.
-     * @return a new table with the specified columns replaced by the mapper column
+     * @param columnIndex index of the column to replace.
+     * @return a new table with the specified column replaced by the mapper column
      */
     public ColumnarVirtualTable replaceMap(final ColumnarMapperWithRowIndexFactory mapperFactory,
         final int columnIndex) {

@@ -82,6 +82,8 @@ final class ColumnarRowContainer implements RowContainer, RowWriteAccessible {
 
     private final int m_id;
 
+    // TODO(AP-25044) Promote the ValueSchema inside the ColumnarRowWriteTable to a DataTableValueSchema
+    //                and avoid replicating m_schema here?
     private final DataTableValueSchema m_schema;
 
     private final ColumnarRowWriteTable m_columnarTable;

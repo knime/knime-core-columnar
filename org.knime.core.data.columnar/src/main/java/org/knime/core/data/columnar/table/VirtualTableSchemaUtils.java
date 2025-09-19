@@ -152,6 +152,12 @@ public final class VirtualTableSchemaUtils {
         return createSchema(tableSpec, factories);
     }
 
+    /**
+     * Appends the {@link DataTableSpec specs} of the given {@code tables}.
+     *
+     * @param tables tables whose DataTableSpecs should be concatenated
+     * @return the concatenated {@code DataTableSpec}
+     */
     public static DataTableSpec appendDataTableSpecs(final BufferedDataTable[] tables) {
         DataTableSpec appended = null;
         for (var table : tables) {//NOSONAR
@@ -162,6 +168,8 @@ public final class VirtualTableSchemaUtils {
     }
 
     /**
+     * {@link DataTableValueSchema#getSourceSpec() Extract} the {@code DataTableSpec}s of the given {@code schemas}.
+     *
      * @param schemas to extract the DataTableSpecs from
      * @return the extracted DataTableSpecs
      */
@@ -172,6 +180,8 @@ public final class VirtualTableSchemaUtils {
     }
 
     /**
+     * Extract the {@code DataTableValueSchema}s from the given {@code tables}.
+     *
      * @param tables to extract the DataTableValueSchemas from
      * @return the extracted schemas
      * @throws VirtualTableIncompatibleException if any of the tables is not compatible with columnar virtual tables
@@ -186,6 +196,8 @@ public final class VirtualTableSchemaUtils {
     }
 
     /**
+     * Extract a {@code DataTableValueSchema} from the given {@code table}.
+     *
      * @param table to extract the DataTableValueSchema from
      * @return the extracted schema
      * @throws VirtualTableIncompatibleException if the table is not compatible with columnar virtual tables

@@ -52,7 +52,6 @@ import java.io.File;
 import java.io.Flushable;
 import java.io.IOException;
 
-import org.knime.core.columnar.store.ColumnStoreFactory;
 import org.knime.core.data.v2.schema.DataTableValueSchema;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
@@ -82,30 +81,6 @@ public final class UnsavedColumnarContainerTable extends AbstractColumnarContain
     public static UnsavedColumnarContainerTable create(final int tableId, final DataTableValueSchema schema,
         final ColumnarRowReadTable columnarTable, final Flushable storeFlusher) {
         final var table = new UnsavedColumnarContainerTable(tableId, schema, columnarTable, storeFlusher);
-        // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
-        // the factory methods here?
-        table.initStoreCloser();
-        return table;
-    }
-
-    /**
-     * Creates an {@link UnsavedColumnarContainerTable} from the given store.
-     *
-     * @param tableId The table id.
-     * @param factory The factory which created the underlying store.
-     * @param schema The schema of the table.
-     * @param store The underlying store.
-     * @param storeFlusher The {@link Flushable} (e.g. a cache) we need to flush to make sure all data is written to disk
-     *            in case the created table is permanently saved to disk. Must not be {@code null} but can be a no-op.
-     * @param size The number of rows contained in the table.
-     * @return The newly created table.
-     */
-    @SuppressWarnings("resource") // Columnar table will be closed along with the container table.
-    public static UnsavedColumnarContainerTable create(final int tableId, final ColumnStoreFactory factory,
-        final DataTableValueSchema schema, final ColumnarBatchReadStore store, final Flushable storeFlusher,
-        final long size) {
-        final var table = new UnsavedColumnarContainerTable(tableId, schema,
-            new ColumnarRowReadTable(schema, factory, store, size), storeFlusher);
         // TODO: can't we move this to the constructor (or even to the super class' constructor) and simply get rid of
         // the factory methods here?
         table.initStoreCloser();
