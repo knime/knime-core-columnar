@@ -304,33 +304,12 @@ final class TableTransformNodeSettingsPersistorTest {
         var transformSettings = getTransformSettings(settings);
         checkSize(transformSettings, 3);
         checkSourceSettings(getSubSettings(transformSettings, 0), id);
-        checkMapSettings(getSubSettings(transformSettings, 2), mapperFactory::checkSettings, TestMapperFactory.class, 1,
-            3);
+        checkMapSettings(getSubSettings(transformSettings, 2), "MAP", mapperFactory::checkSettings,
+            TestMapperFactory.class, 1, 3);
         var connectionSettings = getConnectionSettings(settings);
         checkSize(connectionSettings, 2);
         checkConnection(getSubSettings(connectionSettings, 0), 0, 1, 0);
     }
-
-    @Test
-    void testLoadMap() throws Exception {
-        var settings = rootSettings();
-        settings.addInt("version", 1);
-        var transformSettings = addTransformSettings(settings);
-        var id = UUID.randomUUID();
-        addSourceTransform(id, addSubSettings(transformSettings, 0));
-        addMapSettings(addSubSettings(transformSettings, 1), s -> s.addInt("increment", 42), TestMapperFactory.class,
-            1);
-        var connectionSettings = addConnectionSettings(settings);
-        addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
-        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
-        checkMapTransform(transform, s -> {
-            var wrappedMapperFactory = (WrappedColumnarMapperWithRowIndexFactory)s.getMapperFactory();
-            var testMapperFactory = (TestMapperFactory)wrappedMapperFactory.getMapperWithRowIndexFactory();
-            assertEquals(42, testMapperFactory.m_increment, "Unexpected increment.");
-        });
-        checkSourceTransform(transform.getPrecedingTransforms().get(0), id);
-    }
-
     @Test
     void testSaveAppendMap() throws Exception {
         var id = UUID.randomUUID();
@@ -345,7 +324,7 @@ final class TableTransformNodeSettingsPersistorTest {
         var transformSettings = getTransformSettings(settings);
         checkSize(transformSettings, 4);
         checkSourceSettings(getSubSettings(transformSettings, 0), id);
-        checkAppendMapSettings(getSubSettings(transformSettings, 2), mapperFactory::checkSettings,
+        checkMapSettings(getSubSettings(transformSettings, 2), "APPEND_MAP", mapperFactory::checkSettings,
             TestMapperFactory.class, 1, 3);
         var connectionSettings = getConnectionSettings(settings);
         checkSize(connectionSettings, 3);
@@ -355,14 +334,34 @@ final class TableTransformNodeSettingsPersistorTest {
     }
 
     @Test
+    void testLoadMap() throws Exception {
+        var settings = rootSettings();
+        settings.addInt("version", 1);
+        var transformSettings = addTransformSettings(settings);
+        var id = UUID.randomUUID();
+        addSourceTransform(id, addSubSettings(transformSettings, 0));
+        addMapSettings(addSubSettings(transformSettings, 1), "MAP", s -> s.addInt("increment", 42),
+            TestMapperFactory.class, 1);
+        var connectionSettings = addConnectionSettings(settings);
+        addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
+        var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
+        checkMapTransform(transform, s -> {
+            var wrappedMapperFactory = (WrappedColumnarMapperWithRowIndexFactory)s.getMapperFactory();
+            var testMapperFactory = (TestMapperFactory)wrappedMapperFactory.getMapperWithRowIndexFactory();
+            assertEquals(42, testMapperFactory.m_increment, "Unexpected increment.");
+        });
+        checkSourceTransform(transform.getPrecedingTransforms().get(0), id);
+    }
+
+    @Test
     void testLoadAppendMap() throws Exception {
         var settings = rootSettings();
         settings.addInt("version", 1);
         var transformSettings = addTransformSettings(settings);
         var id = UUID.randomUUID();
         addSourceTransform(id, addSubSettings(transformSettings, 0));
-        addAppendMapSettings(addSubSettings(transformSettings, 1), s -> s.addInt("increment", 42), TestMapperFactory.class,
-            1);
+        addMapSettings(addSubSettings(transformSettings, 1), "APPEND_MAP", s -> s.addInt("increment", 42),
+            TestMapperFactory.class, 1);
         var connectionSettings = addConnectionSettings(settings);
         addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
         var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
@@ -383,8 +382,8 @@ final class TableTransformNodeSettingsPersistorTest {
         var transformSettings = addTransformSettings(settings);
         var id = UUID.randomUUID();
         addSourceTransform(id, addSubSettings(transformSettings, 0));
-        addMapSettings(addSubSettings(transformSettings, 1), s -> s.addInt("increment", 42), TestMapperFactory.class,
-            1);
+        addMapSettings(addSubSettings(transformSettings, 1), "MAP", s -> s.addInt("increment", 42),
+            TestMapperFactory.class, 1);
         var connectionSettings = addConnectionSettings(settings);
         addConnection(0, 1, 0, addSubSettings(connectionSettings, 0));
         var transform = TableTransformNodeSettingsPersistor.load(settings, createLoadContext(id));
@@ -431,10 +430,11 @@ final class TableTransformNodeSettingsPersistorTest {
     }
 
     private static void checkMapSettings(final NodeSettingsRO settings,
+        final String transformType,
         final SettingsChecker mapperFactorySettingsChecker,
-        final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices)
-        throws InvalidSettingsException {
-        checkTransformType(settings, "MAP");
+        final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass,
+        final int... columnIndices) throws InvalidSettingsException {
+        checkTransformType(settings, transformType);
         var internals = settings.getNodeSettings("internal");
         assertArrayEquals(columnIndices, internals.getIntArray("column_indices"), "Unexpected column indices.");
         assertEquals(mapperFactoryClass.getName(), internals.getString("mapper_factory_class"),
@@ -442,31 +442,10 @@ final class TableTransformNodeSettingsPersistorTest {
         mapperFactorySettingsChecker.checkSettings(internals.getNodeSettings("mapper_factory_settings"));
     }
 
-    private static void checkAppendMapSettings(final NodeSettingsRO settings,
-        final SettingsChecker mapperFactorySettingsChecker,
-        final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices)
-        throws InvalidSettingsException {
-        checkTransformType(settings, "APPEND_MAP");
-        var internals = settings.getNodeSettings("internal");
-        assertArrayEquals(columnIndices, internals.getIntArray("column_indices"), "Unexpected column indices.");
-        assertEquals(mapperFactoryClass.getName(), internals.getString("mapper_factory_class"),
-            "Unexpected MapperFactory class.");
-        mapperFactorySettingsChecker.checkSettings(internals.getNodeSettings("mapper_factory_settings"));
-    }
-
-    private static void addMapSettings(final NodeSettingsWO settings, final Consumer<NodeSettingsWO> mapSettingsAdder,
-        final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices) {
-        addTransformType(settings, "MAP");
-        var internals = settings.addNodeSettings("internal");
-        internals.addIntArray("column_indices", columnIndices);
-        internals.addString("mapper_factory_class", mapperFactoryClass.getName());
-        mapSettingsAdder.accept(internals.addNodeSettings("mapper_factory_settings"));
-    }
-
-    private static void addAppendMapSettings(final NodeSettingsWO settings,
+    private static void addMapSettings(final NodeSettingsWO settings, final String transformType,
         final Consumer<NodeSettingsWO> mapSettingsAdder,
         final Class<? extends MapperWithRowIndexFactory> mapperFactoryClass, final int... columnIndices) {
-        addTransformType(settings, "APPEND_MAP");
+        addTransformType(settings, transformType);
         var internals = settings.addNodeSettings("internal");
         internals.addIntArray("column_indices", columnIndices);
         internals.addString("mapper_factory_class", mapperFactoryClass.getName());

@@ -88,29 +88,23 @@ final class ColumnarVirtualTableTest {
 
     private static final DataType STRING = StringCell.TYPE;
 
-    private static final Column FOO = new Column("foo", INT);
+    private static final ValueSchemaColumn ROWID = new ValueSchemaColumn(DefaultRowKeyValueFactory.INSTANCE);
 
-    private static final Column BAR = new Column("bar", DOUBLE);
+    private static final ValueSchemaColumn FOO = column("foo", INT);
 
-    private static final Column BAZ = new Column("baz", STRING);
+    private static final ValueSchemaColumn BAR = column("bar", DOUBLE);
 
-    private static final Column BLA = new Column("bla", LONG);
-
-    private static final ColumnarVirtualTable TABLE = createTable(//
-        builder(true)//
-            .withColumn("foo", INT)//
-            .withColumn("bar", DOUBLE)//
-            .withColumn("baz", STRING)//
-            .build());
+    private static final ValueSchemaColumn BAZ = column("baz", STRING);
 
     @Test
     void testAppend() {
-        var firstSchema = builder(true)//
+        var firstSchema = builder()//
+            .withRowID()//
             .withColumn("foo", STRING)//
             .withColumn("bar", DOUBLE)//
             .build();
 
-        var secondSchema = builder(false)//
+        var secondSchema = builder()//
             .withColumn("baz", INT)//
             .withColumn("bla", LONG)//
             .build();
@@ -120,7 +114,8 @@ final class ColumnarVirtualTableTest {
 
         var appendedTable = firstTable.append(secondTable);
 
-        var expectedSchema = builder(true)//
+        var expectedSchema = builder()//
+            .withRowID()//
             .withColumn("foo", STRING)//
             .withColumn("bar", DOUBLE)//
             .withColumn("baz", INT)//
@@ -131,47 +126,73 @@ final class ColumnarVirtualTableTest {
     }
 
     @Test
+    void testAppendWithRowID() {
+        var firstSchema = builder()//
+            .withRowID()//
+            .withColumn("foo", STRING)//
+            .build();
+
+        var secondSchema = builder()//
+            .withRowID()//
+            .withColumn("bar", DOUBLE)//
+            .build();
+
+        var firstTable = createTable(firstSchema);
+        var secondTable = createTable(secondSchema);
+
+        var appendedTable = firstTable.append(secondTable);
+
+        var expectedSchema = builder()//
+            .withRowID()//
+            .withColumn("foo", STRING)//
+            .withRowID()//
+            .withColumn("bar", DOUBLE)//
+            .build();
+
+        assertEquals(expectedSchema, appendedTable.getSchema());
+    }
+
+    @Test
     void testMap() {
-        var table = createTable(builder(true).withColumn("foo", INT).build());
+        var table = createTable(builder().withRowID().withColumn("foo", INT).build());
         var mappedTable = table.map(new TestMapperFactory(), 1);
-        var expectedSchema = builder(false).withColumn("bar", LONG).build();
+        var expectedSchema = builder().withColumn("bar", LONG).build();
         assertEquals(expectedSchema, mappedTable.getSchema());
     }
 
     @Test
     void testPermuteWithRowID() {
-        testPermute(true);
+        var table = createTable(ROWID, FOO, BAR, BAZ);
+        int[] permutation = new int[]{1, 0, 3, 2};
+        var permuted = table.selectColumns(permutation);
+        var expectedSchema = createSchema(FOO, ROWID, BAZ, BAR);
+        assertEquals(expectedSchema, permuted.getSchema());
     }
 
     @Test
     void testPermuteWithoutRowID() {
-        testPermute(false);
-    }
-
-    @Test
-    private static void testPermute(final boolean withRowID) {
-        var table = createTable(withRowID, FOO, BAR, BAZ);
-        int[] permutation = withRowID ? new int[] {0, 3, 1, 2} : new int[] {2, 0, 1};
+        var table = createTable(FOO, BAR, BAZ);
+        int[] permutation = new int[]{2, 0, 1};
         var permuted = table.selectColumns(permutation);
-        var expectedSchema = createSchema(withRowID, BAZ, FOO, BAR);
+        var expectedSchema = createSchema(BAZ, FOO, BAR);
         assertEquals(expectedSchema, permuted.getSchema());
     }
 
     @Test
     void testFilterColumnsWithRowID() {
-        testFilterColumns(true);
+        var table = createTable(ROWID, FOO, BAR, BAZ);
+        var filterIndices = new int[]{0, 2};
+        var filtered = table.selectColumns(filterIndices);
+        var expectedSchema = createSchema(ROWID, BAR);
+        assertEquals(expectedSchema, filtered.getSchema());
     }
 
     @Test
     void testFilterColumnsWithoutRowID() {
-        testFilterColumns(false);
-    }
-
-    private static void testFilterColumns(final boolean withRowID) {
-        var table = createTable(withRowID, FOO, BAR, BAZ);
-        var filterIndices = withRowID ? new int[] {0, 2} : new int[] {1};
+        var table = createTable(FOO, BAR, BAZ);
+        var filterIndices = new int[]{1};
         var filtered = table.selectColumns(filterIndices);
-        var expectedSchema = createSchema(withRowID, BAR);
+        var expectedSchema = createSchema(BAR);
         assertEquals(expectedSchema, filtered.getSchema());
     }
 
@@ -186,7 +207,7 @@ final class ColumnarVirtualTableTest {
 
         @Override
         public ValueSchema getOutputSchema() {
-            return builder(false).withColumn("bar", LONG).build();
+            return builder().withColumn("bar", LONG).build();
         }
 
     }
@@ -195,40 +216,41 @@ final class ColumnarVirtualTableTest {
         return new ColumnarVirtualTable(UUID.randomUUID(), schema, true);
     }
 
-    private static ColumnarVirtualTable createTable(final boolean hasRowID, final Column... columns) {
-        return createTable(createSchema(hasRowID, columns));
+    private static ColumnarVirtualTable createTable(final ValueSchemaColumn... columns) {
+        return createTable(createSchema(columns));
     }
 
-    private static ValueSchema createSchema(final boolean hasRowID, final Column... columns) {
-        var schemaBuilder = builder(hasRowID);
+    private static ValueSchema createSchema(final ValueSchemaColumn... columns) {
+        var schemaBuilder = builder();
         Stream.of(columns).forEach(schemaBuilder::withColumn);
         return schemaBuilder.build();
     }
 
-    private static ValueSchemaBuilder builder(final boolean hasRowID) {
-        return new ValueSchemaBuilder(hasRowID);
+    private static ValueSchemaColumn column(final String name, final DataType type) {
+        return new ValueSchemaColumn(name, type, ValueFactoryUtils.getValueFactory(type, null));
     }
 
-    record Column(String name, DataType type) {
+    private static ValueSchemaBuilder builder() {
+        return new ValueSchemaBuilder();
     }
 
     private static final class ValueSchemaBuilder {
 
         private final List<ValueSchemaColumn> m_columns = new ArrayList<>();
 
-        private ValueSchemaBuilder(final boolean hasRowID) {
-            if (hasRowID) {
-                m_columns.add(new ValueSchemaColumn(DefaultRowKeyValueFactory.INSTANCE));
-            }
-        }
-
-        ValueSchemaBuilder withColumn(final String name, final DataType type) {
-            m_columns.add(new ValueSchemaColumn(name, type, ValueFactoryUtils.getValueFactory(type, null)));
+        ValueSchemaBuilder withRowID() {
+            m_columns.add(new ValueSchemaColumn(DefaultRowKeyValueFactory.INSTANCE));
             return this;
         }
 
-        ValueSchemaBuilder withColumn(final Column column) {
-            return withColumn(column.name, column.type);
+        ValueSchemaBuilder withColumn(final String name, final DataType type) {
+            m_columns.add(column(name, type));
+            return this;
+        }
+
+        ValueSchemaBuilder withColumn(final ValueSchemaColumn column) {
+            m_columns.add(column);
+            return this;
         }
 
         ValueSchema build() {
