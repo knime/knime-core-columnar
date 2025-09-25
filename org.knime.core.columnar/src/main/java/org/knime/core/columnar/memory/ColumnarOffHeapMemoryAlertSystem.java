@@ -116,7 +116,7 @@ public final class ColumnarOffHeapMemoryAlertSystem {
         } else {
             // Another thread already runs the memory alert:
             // Wait for the other thread and use its result
-            LOGGER.debug("Received off-heap memory alert. Listeners are already beeing notified by another thread.");
+            LOGGER.debug("Received off-heap memory alert. Listeners are already being notified by another thread.");
             m_semaphore.acquire();
             var result = m_lastReleaseResult.get();
             m_semaphore.release();
