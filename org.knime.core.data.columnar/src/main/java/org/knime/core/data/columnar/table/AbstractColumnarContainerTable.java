@@ -126,7 +126,9 @@ public abstract class AbstractColumnarContainerTable extends ExtensionTable impl
     @SuppressWarnings("resource")
     AbstractColumnarContainerTable(final LoadContext context) throws InvalidSettingsException {
         final NodeSettingsRO settings = context.getSettings();
-        m_tableId = -1;
+        // tracking all tables by their original table ID (not with "-1"), even when loading as a
+        // temporary table - reason: it is always possible call #putIntoTableRepository(...)
+        m_tableId = context.getTableID();
         final var size = settings.getLong(CFG_TABLE_SIZE);
         final ColumnStoreFactory factory = createInstance(settings.getString(CFG_FACTORY_TYPE));
         // location in saved workflow, e.g. "Foo (#1)/port_1/data.file"
