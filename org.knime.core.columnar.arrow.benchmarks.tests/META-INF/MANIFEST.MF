@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Benchmarks the Arrow implementation of the Columnar Table Backend
 Bundle-SymbolicName: org.knime.core.columnar.arrow.benchmarks.tests;singleton:=true
-Bundle-Version: 5.7.0.qualifier
+Bundle-Version: 5.9.0.qualifier
 Automatic-Module-Name: org.knime.core.columnar.arrow.benchmarks.tests
 Bundle-RequiredExecutionEnvironment: JavaSE-17
 Fragment-Host: org.knime.core.columnar.arrow;bundle-version="[5.7.0, 6.0.0)"

@@ -3,7 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: KNIME Core Columnar Plugin - Testing
 Bundle-SymbolicName: org.knime.core.columnar.testing;singleton:=true
 Automatic-Module-Name: org.knime.core.columnar.testing
-Bundle-Version: 5.6.0.qualifier
+Bundle-Version: 5.9.0.qualifier
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Bundle-RequiredExecutionEnvironment: JavaSE-17
 Bundle-ActivationPolicy: lazy
