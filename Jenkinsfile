@@ -193,7 +193,7 @@ try {
 
     // TODO run on a specific benchmark node
     if (params["RUN_BENCHMARKS"]) {
-        node('maven && java17 && ubuntu22.04 && workflow-tests') {
+        node('maven && java21 && ubuntu22.04 && workflow-tests') {
             stage('Run benchmarks') {
                 withEnv(["MALLOC_ARENA_MAX=1"]) {
                     env.lastStage = env.STAGE_NAME
