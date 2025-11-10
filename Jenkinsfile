@@ -131,7 +131,6 @@ def runBaseWorkflowTests(String vmArgs, String testflowsDir, String testflowsReg
                     "knime-python",
                     "knime-python-legacy",
                     "knime-r",
-                    "knime-scripting-editor",
                     "knime-stats",
                     "knime-streaming",
                     "knime-svg",
