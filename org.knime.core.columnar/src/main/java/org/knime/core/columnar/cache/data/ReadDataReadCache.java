@@ -45,12 +45,13 @@
  */
 package org.knime.core.columnar.cache.data;
 
-import static org.knime.core.columnar.cache.data.ReadDataCache.getSelectedColumns;
+import static org.knime.core.columnar.filter.ColumnSelection.getSelectedColumns;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
@@ -70,11 +71,9 @@ import org.knime.core.table.schema.ColumnarSchema;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class ReadDataReadCache implements RandomAccessBatchReadable {
+public sealed class ReadDataReadCache implements RandomAccessBatchReadable permits ReadDataCache {
 
-    private final class ReadDataReadCacheReader implements RandomAccessBatchReader {
-
-        private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedDataIds.remove(k);
+    sealed class ReadDataReadCacheReader implements RandomAccessBatchReader permits ReadDataCache.ReadDataCacheReader {
 
         private final ColumnSelection m_selection;
 
@@ -118,7 +117,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
 
                 // we use the first column's id as a proxy for locking.
                 final ColumnDataUniqueId lockUID = new ColumnDataUniqueId(ReadDataReadCache.this, 0, index);
-                final Object lock = m_cachedDataIds.computeIfAbsent(lockUID, k -> new Object());
+                final Object lock = m_cachedDataIds.computeIfAbsent(lockUID, k -> lockUID);
                 synchronized (lock) {
 
                     // NB: While we were waiting for the lock, some other thread
@@ -154,11 +153,7 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
                                     // the m_globalCache.
                                     datas[i] = cachedData;
                                 } else {
-                                    // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
-                                    // about the key, except for column 0, where the value is used as a lock to ensure that
-                                    // the same batch is not loaded concurrently by multiple threads.
-                                    m_cachedDataIds.putIfAbsent(ccUID, lock);
-                                    m_globalCache.put(ccUID, data, m_evictor);
+                                    put(ccUID, data);
                                     datas[i] = data;
                                 }
                             }
@@ -176,14 +171,15 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
         public void close() throws IOException {
             // no resources held
         }
-
     }
 
     private final RandomAccessBatchReadable m_readableDelegate;
 
     private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
 
-    private Map<ColumnDataUniqueId, Object> m_cachedDataIds = new ConcurrentHashMap<>();
+    private final Map<ColumnDataUniqueId, ColumnDataUniqueId> m_cachedDataIds = new ConcurrentHashMap<>();
+
+    private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedDataIds.remove(k);
 
     /**
      * @param readableDelegate the delegate from which to read in case of a cache miss
@@ -204,21 +200,40 @@ public final class ReadDataReadCache implements RandomAccessBatchReadable {
         return m_readableDelegate.getSchema();
     }
 
+    /**
+     * Put the given {@code value} into the (local and global) cache with the given {@code key}.
+     */
+    void put(final ColumnDataUniqueId key, final NullableReadData value) {
+        // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
+        // about the key, except for column 0, where the value is used as a lock to ensure that
+        // the same batch is not loaded concurrently by multiple threads.
+        m_globalCache.put(key, value, m_evictor);
+        m_cachedDataIds.putIfAbsent(key, key);
+    }
+
+    final AtomicBoolean m_closed = new AtomicBoolean(false);
+
     @Override
     public synchronized void close() throws IOException {
-        if (m_cachedDataIds != null) {
-            for (final ColumnDataUniqueId id : m_cachedDataIds.keySet()) {
-                m_globalCache.remove(id);
-            }
-            m_cachedDataIds.clear();
-            m_cachedDataIds = null;
-            m_readableDelegate.close();
+        if (!m_closed.getAndSet(true)) {
+            _close();
         }
+    }
+
+    /**
+     * This method is called (once) on the first invocation of {@link #close()}.
+     */
+    void _close() throws IOException {
+        // Drop all globally cached data referenced by this cache
+        for (final var ccUID : m_cachedDataIds.keySet()) {
+            m_globalCache.remove(ccUID);
+        }
+        m_cachedDataIds.clear();
+        m_readableDelegate.close();
     }
 
     @Override
     public long[] getBatchBoundaries() {
         return m_readableDelegate.getBatchBoundaries();
     }
-
 }

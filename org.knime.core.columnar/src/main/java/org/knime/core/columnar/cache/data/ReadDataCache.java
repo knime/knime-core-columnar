@@ -45,19 +45,6 @@
  */
 package org.knime.core.columnar.cache.data;
 
-import java.io.Flushable;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
-
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.batch.BatchWritable;
@@ -67,14 +54,19 @@ import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
-import org.knime.core.columnar.cache.EvictingCache;
-import org.knime.core.columnar.cache.EvictingCache.Evictor;
-import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.FilteredColumnSelection;
-import org.knime.core.table.schema.ColumnarSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.Flushable;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 
 /**
  * A {@link BatchWritable} and {@link RandomAccessBatchReadable} that holds and provides written {@link ReadData} in a
@@ -84,11 +76,28 @@ import org.slf4j.LoggerFactory;
  *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class ReadDataCache implements BatchWritable, RandomAccessBatchReadable, Flushable {
+public final class ReadDataCache extends ReadDataReadCache implements BatchWritable, Flushable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ReadDataCache.class);
 
     private static final String ERROR_ON_INTERRUPT = "Interrupted while waiting for asynchronous write thread.";
+
+    final class ReadDataCacheReader extends ReadDataReadCacheReader {
+        ReadDataCacheReader(ColumnSelection selection) {
+            super(selection);
+        }
+
+        @Override
+        public ReadBatch readRetained(int index) throws IOException {
+            var writingBatch = m_currentlyWritingBatches.getRetained(index);
+            return writingBatch != null ? writingBatch : super.readRetained(index);
+        }
+    }
+
+    @Override
+    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
+        return new ReadDataCacheReader(selection);
+    }
 
     private final class ReadDataCacheWriter implements BatchWriter {
 
@@ -126,14 +135,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
                 }
             });
 
-            // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
-            // about the key, except for column 0, where the value is used as a lock to ensure that
-            // the same batch is not loaded concurrently by multiple threads.
-            final Object lock = new Object();
             for (int i = 0; i < getSchema().numColumns(); i++) {
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, m_numBatches);
-                m_cachedDataIds.put(ccUID, lock);
-                m_globalCache.put(ccUID, batch.get(i), m_evictor);
+                put(ccUID, batch.get(i));
             }
             m_numBatches++;
         }
@@ -161,126 +165,9 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
         }
     }
 
-    private final class ReadDataCacheReader implements RandomAccessBatchReader {
-
-        private final ColumnSelection m_selection;
-
-        private final int[] m_selectedColumns;
-
-        ReadDataCacheReader(final ColumnSelection selection) {
-            m_selection = selection;
-            m_selectedColumns = getSelectedColumns(selection);
-        }
-
-        /**
-         * Try to fill the {@code datas} at the given {@code cols} indices from {@code m_globalCache}.
-         * The indices of columns that could not be filled are returned as an {@code int[]} array.
-         *
-         * @param datas array of datas to populate
-         * @param batch the index of the batch
-         * @param cols the column indices (in datas) to populate
-         * @return the column indices that could not be populated
-         */
-        private int[] populateFromCache(final NullableReadData[] datas, final int batch, final int[] cols) {
-            final int[] missingCols = new int[cols.length];
-            int numMissing = 0;
-            for (int i : cols) {
-                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, batch);
-                final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
-                if (cachedData != null) {
-                    datas[i] = cachedData;
-                } else {
-                    missingCols[numMissing++] = i;
-                }
-            }
-            return Arrays.copyOf(missingCols, numMissing);
-        }
-
-        @Override
-        public ReadBatch readRetained(final int index) throws IOException {
-            var writingBatch = m_currentlyWritingBatches.getRetained(index);
-            if (writingBatch != null) {
-                return writingBatch;
-            }
-
-            final int numColumns = m_selection.numColumns();
-            final NullableReadData[] datas = new NullableReadData[numColumns];
-            int[] missingCols = populateFromCache(datas, index, m_selectedColumns);
-            if (missingCols.length != 0) {
-
-                // we use the first column's id as a proxy for locking.
-                final ColumnDataUniqueId lockUID = new ColumnDataUniqueId(ReadDataCache.this, 0, index);
-                final Object lock = m_cachedDataIds.computeIfAbsent(lockUID, k -> new Object());
-                synchronized (lock) {
-
-                    // NB: While we were waiting for the lock, some other thread
-                    // was reading the batch and might have put the missing
-                    // columns in the cache.
-                    missingCols = populateFromCache(datas, index, missingCols);
-                    if (missingCols.length != 0) {
-                        try (RandomAccessBatchReader reader = m_readableDelegate
-                                .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
-                            final ReadBatch batch = reader.readRetained(index);
-                            for (int i : missingCols) {
-                                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, index);
-                                final NullableReadData data = batch.get(i);
-                                final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
-                                if (cachedData != null) {
-                                    data.release();
-                                    // NB: (TP) Reading this code, I was confused:
-                                    //   - Why do release data here, but not if we put it into the cache (in the else-branch
-                                    //     below)? The m_globalCache.put(data) will retain the data again!
-                                    //   - Shouldn't we call batch.release() in the end?
-                                    //
-                                    // Here is how that works:
-                                    // batch = reader.readRetained(index) above creates a ReadBatch that has all contained
-                                    // data retained (once, for us, the owner of the ReadBatch).
-                                    //
-                                    // If we would release the ReadBatch, all contained data would be released in turn. We
-                                    // don't want that, because we put some of the data into the ReadBatch we assemble to
-                                    // return from this method. However, this particular data we will not put into the
-                                    // assembled ReadBatch, so we release it here.
-                                    //
-                                    // Retaining again when putting the data into the cache in the else-branch is what
-                                    // should happen: There will be one reference from the assembled ReadBatch and one from
-                                    // the m_globalCache.
-                                    datas[i] = cachedData;
-                                } else {
-                                    // NB: It doesn't really matter which value we put into m_cachedDataIds. We only care
-                                    // about the key, except for column 0, where the value is used as a lock to ensure that
-                                    // the same is not loaded concurrently by multiple threads.
-                                    m_cachedDataIds.putIfAbsent(ccUID, lock);
-                                    m_globalCache.put(ccUID, data, m_evictor);
-                                    datas[i] = data;
-                                }
-                            }
-                        } catch (IOException e) {
-                            throw new IllegalStateException("Exception while loading column data.", e);
-                        }
-                    }
-                }
-            }
-
-            return m_selection.createBatch(i -> datas[i]);
-        }
-
-        @Override
-        public void close() throws IOException {
-            // no resources held
-        }
-    }
-
     private final ReadDataCacheWriter m_writer;
 
-    private final RandomAccessBatchReadable m_readableDelegate;
-
-    private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_globalCache;
-
     private final FutureQueue m_futureQueue;
-
-    private final Map<ColumnDataUniqueId, Object> m_cachedDataIds = new ConcurrentHashMap<>();
-
-    private final Evictor<ColumnDataUniqueId, NullableReadData> m_evictor = (k, c) -> m_cachedDataIds.remove(k);
 
     private final ReadBatchRetainingMap m_currentlyWritingBatches = new ReadBatchRetainingMap();
 
@@ -291,11 +178,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
      * @param executor the executor to which to submit asynchronous writes to the delegate
      */
     public ReadDataCache(final BatchWritable writable, final RandomAccessBatchReadable readable,
-        final SharedReadDataCache cache, final ExecutorService executor) {
+                         final SharedReadDataCache cache, final ExecutorService executor) {
+
+        super(readable, cache);
 
         m_writer = new ReadDataCacheWriter(writable.getWriter());
-        m_readableDelegate = readable;
-        m_globalCache = cache.getCache();
         m_futureQueue = new FutureQueue(executor);
     }
 
@@ -316,46 +203,11 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
     }
 
     @Override
-    public RandomAccessBatchReader createRandomAccessReader(final ColumnSelection selection) {
-        return new ReadDataCacheReader(selection);
-    }
-
-    @Override
-    public ColumnarSchema getSchema() {
-        return m_readableDelegate.getSchema();
-    }
-
-    private final AtomicBoolean m_closed = new AtomicBoolean(false);
-
-    @Override
-    public synchronized void close() throws IOException {
-        if (!m_closed.getAndSet(true)) {
-            m_writer.close();
-            waitForAllTasksToFinish();
-            releaseAllReferencedData();
-            m_currentlyWritingBatches.clear();
-            m_cachedDataIds.clear();
-            m_readableDelegate.close();
-        }
-    }
-
-    private void releaseAllReferencedData() {
-        // Drop all globally cached data referenced by this cache
-        for (final var ccUID : m_cachedDataIds.keySet()) {
-            m_globalCache.remove(ccUID);
-        }
-    }
-
-    static int[] getSelectedColumns(final ColumnSelection s) {
-        final int numColumns = s.numColumns();
-        final int[] selected = new int[numColumns];
-        int j = 0;
-        for (int i = 0; i < numColumns; i++) {
-            if (s.isSelected(i)) {
-                selected[j++] = i;
-            }
-        }
-        return j == numColumns ? selected : Arrays.copyOf(selected, j);
+    void _close() throws IOException {
+        m_writer.close();
+        waitForAllTasksToFinish();
+        m_currentlyWritingBatches.clear();
+        super._close();
     }
 
     /**
@@ -477,10 +329,5 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             }
             return new IllegalStateException(error, t);
         }
-    }
-
-    @Override
-    public long[] getBatchBoundaries() {
-        return m_readableDelegate.getBatchBoundaries();
     }
 }
