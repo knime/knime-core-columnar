@@ -208,25 +208,6 @@ public final class ReadDataCache implements BatchWritable, RandomAccessBatchRead
             int[] missingCols = populateFromCache(datas, index, m_selectedColumns);
             if (missingCols.length != 0) {
 
-                try {
-                    // wait until everything written so far is flushed
-                    // TODO (TP)): explain why?
-                    m_futureQueue.waitForAndHandleFuture();
-                } catch (InterruptedException e) {
-                    // At this point we already m_globalCache.getRetained() all datas[i] != null.
-                    // These need to be released before re-throwing the Exception.
-                    for (int i : m_selectedColumns) {
-                        if (datas[i] != null) {
-                            datas[i].release();
-                        }
-                    }
-                    // Restore interrupted state...
-                    Thread.currentThread().interrupt();
-                    // when interrupted here (e.g., because the reading node is cancelled), we should not proceed.
-                    // this way, the cache stays in a consistent state
-                    throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
-                }
-
                 // we use the first column's id as a proxy for locking.
                 final ColumnDataUniqueId lockUID = new ColumnDataUniqueId(ReadDataCache.this, 0, index);
                 final Object lock = m_cachedDataIds.computeIfAbsent(lockUID, k -> new Object());
