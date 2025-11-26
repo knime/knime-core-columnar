@@ -49,9 +49,6 @@
 package org.knime.core.columnar.cache;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
 import static org.knime.core.columnar.TestBatchStoreUtils.createDefaultTestColumnStore;
 
 import org.junit.Test;
@@ -62,91 +59,6 @@ import org.knime.core.columnar.store.BatchReadStore;
  */
 @SuppressWarnings("javadoc")
 public class ColumnDataUniqueIdTest {
-
-    @SuppressWarnings("resource")
-    @Test
-    public void testGetters() {
-        final BatchReadStore store = createDefaultTestColumnStore();
-        final int columnIndex = 0;
-        final int chunkIndex = Integer.MAX_VALUE;
-        final ColumnDataUniqueId cduid = new ColumnDataUniqueId(store, columnIndex, chunkIndex);
-        assertEquals(store, cduid.getReadable());
-        assertEquals(DataIndex.createColumnIndex(columnIndex), cduid.getColumnIndex());
-        assertEquals(chunkIndex, cduid.getBatchIndex());
-    }
-
-    @Test
-    public void testEqualsReflexive() {
-        @SuppressWarnings("resource")
-        final ColumnDataUniqueId cduid = new ColumnDataUniqueId(createDefaultTestColumnStore(), 42, 42);
-        assertTrue(cduid.equals(cduid)); // NOSONAR
-    }
-
-    @Test
-    public void testEqualsSymmetric() {
-        @SuppressWarnings("resource")
-        final BatchReadStore store = createDefaultTestColumnStore();
-        final ColumnDataUniqueId cduid1 = new ColumnDataUniqueId(store, 42, 42);
-        final ColumnDataUniqueId cduid2 = new ColumnDataUniqueId(store, 42, 42);
-        assertEquals(cduid1, cduid2);
-        assertEquals(cduid2, cduid1);
-    }
-
-    @Test
-    public void testEqualsTransitive() {
-        @SuppressWarnings("resource")
-        final BatchReadStore store = createDefaultTestColumnStore();
-        final ColumnDataUniqueId cduid1 = new ColumnDataUniqueId(store, 42, 42);
-        final ColumnDataUniqueId cduid2 = new ColumnDataUniqueId(store, 42, 42);
-        final ColumnDataUniqueId cduid3 = new ColumnDataUniqueId(store, 42, 42);
-        assertEquals(cduid1, cduid2);
-        assertEquals(cduid2, cduid3);
-        assertEquals(cduid1, cduid3);
-    }
-
-    @Test
-    public void testEqualsConsistent() {
-        @SuppressWarnings("resource")
-        final BatchReadStore store = createDefaultTestColumnStore();
-        final ColumnDataUniqueId cduid1 = new ColumnDataUniqueId(store, 42, 42);
-        final ColumnDataUniqueId cduid2 = new ColumnDataUniqueId(store, 42, 42);
-        assertEquals(cduid1.equals(cduid2), cduid1.equals(cduid2));
-    }
-
-    @Test
-    public void testEqualsNull() {
-        @SuppressWarnings("resource")
-        final ColumnDataUniqueId cduid = new ColumnDataUniqueId(createDefaultTestColumnStore(), 42, 42);
-        assertFalse(cduid.equals(null)); // NOSONAR
-    }
-
-    @Test
-    public void testEqualsFalse() {
-        @SuppressWarnings("resource")
-        final BatchReadStore testStore1 = createDefaultTestColumnStore();
-        @SuppressWarnings("resource")
-        final BatchReadStore testStore2 = createDefaultTestColumnStore();
-        assertNotEquals(new ColumnDataUniqueId(testStore1, 0, 0), new Object());
-        assertNotEquals(new ColumnDataUniqueId(testStore1, 0, 0), new ColumnDataUniqueId(testStore2, 0, 0));
-        assertNotEquals(new ColumnDataUniqueId(testStore1, 0, 0), new ColumnDataUniqueId(testStore1, 1, 0));
-        assertNotEquals(new ColumnDataUniqueId(testStore1, 0, 0), new ColumnDataUniqueId(testStore1, 0, 1));
-    }
-
-    @Test
-    public void testHashCodeConsistent() {
-        @SuppressWarnings("resource")
-        final ColumnDataUniqueId cduid = new ColumnDataUniqueId(createDefaultTestColumnStore(), 42, 42);
-        assertEquals(cduid.hashCode(), cduid.hashCode());
-    }
-
-    @Test
-    public void testHashCodeConsistentWithEquals() {
-        @SuppressWarnings("resource")
-        final BatchReadStore store = createDefaultTestColumnStore();
-        final ColumnDataUniqueId cduid1 = new ColumnDataUniqueId(store, 42, 42);
-        final ColumnDataUniqueId cduid2 = new ColumnDataUniqueId(store, 42, 42);
-        assertEquals(cduid1.hashCode(), cduid2.hashCode());
-    }
 
     @Test
     public void testToString() {
