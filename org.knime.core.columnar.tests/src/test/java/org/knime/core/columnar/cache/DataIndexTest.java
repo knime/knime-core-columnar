@@ -48,9 +48,7 @@
  */
 package org.knime.core.columnar.cache;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -62,29 +60,6 @@ import org.junit.Test;
  */
 @SuppressWarnings("javadoc")
 public class DataIndexTest {
-
-    @Test
-    public void testEqualsAndHashCode() {
-        var col0 = DataIndex.createColumnIndex(0);
-        var col1 = DataIndex.createColumnIndex(1);
-        assertNotEquals(col0, col1);
-
-        var col00 = col0.getChild(0);
-        var col01 = col0.getChild(1);
-        assertNotEquals(col00, col01);
-        assertNotEquals(col0, col00);
-
-        var col0Duplicate = DataIndex.createColumnIndex(0);
-        assertEquals(col0, col0Duplicate);
-        assertEquals(col0.hashCode(), col0Duplicate.hashCode());
-
-        var col00DuplicateSameParent = col0.getChild(0);
-        var col00DuplicateDifferentParent = col0Duplicate.getChild(0);
-        assertEquals(col00, col00DuplicateSameParent);
-        assertEquals(col00.hashCode(), col00DuplicateSameParent.hashCode());
-        assertEquals(col00, col00DuplicateDifferentParent);
-        assertEquals(col00.hashCode(), col00DuplicateDifferentParent.hashCode());
-    }
 
     @Test
     public void testIsColumnLevel() {

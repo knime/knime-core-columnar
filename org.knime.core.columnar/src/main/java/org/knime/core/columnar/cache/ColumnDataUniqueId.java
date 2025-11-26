@@ -48,38 +48,19 @@
  */
 package org.knime.core.columnar.cache;
 
-import java.util.Objects;
-
 import org.knime.core.columnar.ReadData;
 import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 
 /**
  * An object that uniquely identifies a {@link ReadData} held by a {@link RandomAccessBatchReadable}.
  *
+ * @param readable the readable holding the data
+ * @param dataIndex the index of the data (may be nested)
+ * @param batchIndex the batch index of the data
+ *
  * @author Marc Bux, KNIME GmbH, Berlin, Germany
  */
-public final class ColumnDataUniqueId {
-
-    private final RandomAccessBatchReadable m_readable;
-
-    private final DataIndex m_dataIndex;
-
-    private final int m_batchIndex;
-
-    private final int m_hashCode;
-
-    /**
-     * @param readable the readable holding the data
-     * @param dataIndex the index of the data (may be nested)
-     * @param batchIndex the batch index of the data
-     */
-    public ColumnDataUniqueId(final RandomAccessBatchReadable readable, final DataIndex dataIndex,
-        final int batchIndex) {
-        m_readable = readable;
-        m_dataIndex = dataIndex;
-        m_batchIndex = batchIndex;
-        m_hashCode = Objects.hash(m_readable, m_dataIndex, m_batchIndex);
-    }
+public record ColumnDataUniqueId(RandomAccessBatchReadable readable, DataIndex dataIndex, int batchIndex) {
 
     /**
      * @param readable the readable holding the data
@@ -91,44 +72,8 @@ public final class ColumnDataUniqueId {
     }
 
     @Override
-    public int hashCode() {
-        return m_hashCode;
-    }
-
-    @Override
-    public boolean equals(final Object object) {
-        if (object == this) {
-            return true;
-        }
-        if (object instanceof ColumnDataUniqueId)
-        {
-            final ColumnDataUniqueId other = (ColumnDataUniqueId)object;
-            return Objects.equals(m_readable, other.m_readable) && m_dataIndex.equals(other.m_dataIndex)
-                && m_batchIndex == other.m_batchIndex;
-        }
-        return false;
-    }
-
-    @Override
     public String toString() {
-        return String.join(",", m_readable.toString(), m_dataIndex.toString(), Integer.toString(m_batchIndex));
-    }
-
-    /**
-     * Obtains the {@link RandomAccessBatchReadable} that holds the uniquely identified data.
-     *
-     * @return the store holding the data
-     */
-    public RandomAccessBatchReadable getReadable() {
-        return m_readable;
-    }
-
-    DataIndex getColumnIndex() {
-        return m_dataIndex;
-    }
-
-    int getBatchIndex() {
-        return m_batchIndex;
+        return String.join(",", readable.toString(), dataIndex.toString(), Integer.toString(batchIndex));
     }
 
     /**
@@ -138,7 +83,7 @@ public final class ColumnDataUniqueId {
      * @return the child at the given index
      */
     public ColumnDataUniqueId getChild(final int index) {
-        return new ColumnDataUniqueId(m_readable, m_dataIndex.getChild(index), m_batchIndex);
+        return new ColumnDataUniqueId(readable, dataIndex.getChild(index), batchIndex);
     }
 
     /**
@@ -146,7 +91,7 @@ public final class ColumnDataUniqueId {
      * @return true if this corresponds to column level data
      */
     public boolean isColumnLevel() {
-        return m_dataIndex.isColumnLevel();
+        return dataIndex.isColumnLevel();
     }
 
 }
