@@ -45,15 +45,14 @@
  */
 package org.knime.core.columnar.cache;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalCause;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.Weigher;
 import org.knime.core.columnar.ReferencedData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
-import com.google.common.cache.Weigher;
 
 /**
  * A thread-safe LoadingEvictingCache that holds data up to a fixed maximum {@link ReferencedData#sizeOf() size} in
@@ -86,18 +85,11 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
             m_data.retain();
             return m_data;
         }
-
-        /**
-         * Call evictor if the entry was evicted (for any reason).
-         * Release data.
-         */
-        void onRemoval(final RemovalNotification<K, DataWithEvictor<K, D>> removalNotification) {
-            m_evictor.evict(removalNotification.getKey(), m_data);
-            m_data.release();
-        }
     }
 
     private final Cache<K, DataWithEvictor<K, D>> m_cache;
+
+    private boolean m_clearingCache = false;
 
     /**
      * @param maxSize the total size (in bytes) the cache should be able to hold
@@ -115,8 +107,14 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
             return Math.max(1, (int)size);
         };
 
-        final RemovalListener<K, DataWithEvictor<K, D>> removalListener =
-                removalNotification -> removalNotification.getValue().onRemoval(removalNotification);
+        final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
+            final DataWithEvictor<K, D> value = removalNotification.getValue();
+            if (removalNotification.wasEvicted()
+                || (m_clearingCache && removalNotification.getCause() == RemovalCause.EXPLICIT)) {
+                value.m_evictor.evict(removalNotification.getKey(), value.m_data);
+            }
+            value.m_data.release();
+        };
 
         m_cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel).maximumWeight(maxSize).weigher(weigher)
             .removalListener(removalListener).build();
@@ -153,8 +151,9 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
     @Override
     public void invalidateAll() {
-        // NB. This will trigger RemovalListener
+        m_clearingCache = true;
         m_cache.invalidateAll();
         m_cache.cleanUp();
+        m_clearingCache = false;
     }
 }
