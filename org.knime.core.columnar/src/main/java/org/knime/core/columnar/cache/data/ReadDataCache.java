@@ -118,8 +118,13 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
         public synchronized void write(final ReadBatch batch) throws IOException {
 
             final var batchId = m_numBatches;
-            m_currentlyWritingBatches.putRetained(batchId, batch);
 
+            for (int i = 0; i < getSchema().numColumns(); i++) {
+                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, batchId);
+                put(ccUID, batch.get(i));
+            }
+
+            m_currentlyWritingBatches.putRetained(batchId, batch);
             m_futureQueue.handleDoneFuture();
             m_futureQueue.enqueueRunnable(() -> { // NOSONAR
                 try {
@@ -129,16 +134,12 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
                         m_writerDelegate.write(batch);
                     }
                 } catch (IOException e) {
-                    throw new IllegalStateException(String.format("Failed to write batch %d.", m_numBatches), e);
+                    throw new IllegalStateException(String.format("Failed to write batch %d.", batchId), e);
                 } finally {
                     m_currentlyWritingBatches.remove(batchId);
                 }
             });
 
-            for (int i = 0; i < getSchema().numColumns(); i++) {
-                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, m_numBatches);
-                put(ccUID, batch.get(i));
-            }
             m_numBatches++;
         }
 
