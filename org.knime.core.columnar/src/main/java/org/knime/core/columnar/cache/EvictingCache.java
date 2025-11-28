@@ -79,7 +79,8 @@ public interface EvictingCache<K, D extends ReferencedData> {
      * <p>
      * The given {@code data} is {@link ReferencedData#retain() retained}.
      * <p>
-     * Note that, if another {@code D} was already associated with the same key, its evictor (if any) will be called.
+     * Note that, if another {@code D} was already associated with the same key, the cache will
+     * {@link ReferencedData#release() release} it (but its evictor will not be called).
      *
      * @param key key with which the specified data is to be associated
      * @param data data to be retained and associated with the specified key
@@ -93,10 +94,10 @@ public interface EvictingCache<K, D extends ReferencedData> {
      * Associates the given data with the given key and places it in the cache.
      * <p>
      * The given {@code data} is {@link ReferencedData#retain() retained}. If, at some point, the data is evicted from
-     * the cache (for any reason), the given {@code evictor} is called and the data is {@link ReferencedData#release()
-     * released}.
+     * the cache the given {@code evictor} is called and the data is {@link ReferencedData#release() released}.
      * <p>
-     * Note that, if another {@code D} was already associated with the same key, its evictor (if any) will be called.
+     * Note that, if another {@code D} was already associated with the same key, the cache will
+     * {@link ReferencedData#release() release} it (but its evictor will not be called).
      *
      * @param key key with which the specified data is to be associated
      * @param data data to be retained and associated with the specified key
@@ -120,8 +121,8 @@ public interface EvictingCache<K, D extends ReferencedData> {
      * Removes the mapping for a key from this cache if it is present (optional operation). Returns the data with which
      * this cache previously associated the key, or {@code null} if the cache contained no mapping for the key.
      * <p>
-     * Note that the cache will {@link ReferencedData#release() release} the removed data and its evictor will be
-     * called.
+     * Note that the cache will {@link ReferencedData#release() release} the removed data (but its evictor will not be
+     * called).
      *
      * @param key key whose mapping is to be removed from the cache
      * @return the data to which the specified key was mapped, or null if the cache contained no mapping for the key
@@ -136,11 +137,13 @@ public interface EvictingCache<K, D extends ReferencedData> {
     int size();
 
     /**
-     * Removes all entries from this cache.
+     * Evicts all entries from this cache.
      * <p>
-     * Note that the cache will {@link ReferencedData#release() release} the removed data and its evictors will be
-     * called.
+     * Note that the cache will {@link ReferencedData#release() release} the
+     * evicted data and its evictors will be called.
      */
+    // TODO (TP): This method should be renamed to evictAll() or clear() to avoid confusion with
+    //            com.google.common.cache.Cache#invalidateAll (which does not count as "eviction")
     void invalidateAll();
 
 }
