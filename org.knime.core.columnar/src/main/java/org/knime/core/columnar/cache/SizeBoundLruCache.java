@@ -108,12 +108,12 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
         };
 
         final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
-            final DataWithEvictor<K, D> value = removalNotification.getValue();
             if (removalNotification.wasEvicted()
                 || (m_clearingCache && removalNotification.getCause() == RemovalCause.EXPLICIT)) {
-                value.m_evictor.evict(removalNotification.getKey(), value.m_data);
+                final DataWithEvictor<K, D> evicted = removalNotification.getValue();
+                evicted.m_evictor.evict(removalNotification.getKey(), evicted.m_data);
+                evicted.m_data.release();
             }
-            value.m_data.release();
         };
 
         m_cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel).maximumWeight(maxSize).weigher(weigher)
@@ -122,7 +122,13 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
     @Override
     public void put(final K key, final D data, final Evictor<? super K, ? super D> evictor) {
-        m_cache.put(key, new DataWithEvictor<>(data, evictor));
+        DataWithEvictor<K, D> value = new DataWithEvictor<K, D>(data, evictor);
+        m_cache.asMap().compute(key, (k, d) -> {
+            if (d != null) {
+                d.m_data.release(); // if we replace data, we have to make sure to release the old data
+            }
+            return value;
+        });
     }
 
     @Override
@@ -141,7 +147,11 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
     @Override
     public D remove(final K key) {
         final DataWithEvictor<K, D> removed = m_cache.asMap().remove(key);
-        return removed == null ? null : removed.m_data;
+        if (removed != null) {
+            removed.m_data.release();;
+            return removed.m_data;
+        }
+        return null;
     }
 
     @Override
