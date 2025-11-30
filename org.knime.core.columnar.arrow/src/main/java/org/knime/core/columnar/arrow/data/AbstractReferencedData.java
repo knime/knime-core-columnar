@@ -72,8 +72,14 @@ public abstract class AbstractReferencedData implements ReferencedData {
     @Override
     public void release() {
         // NB: This is thread safe because this will only be 0 for 1 thread
-        if (m_refCounter.decrementAndGet() == 0) {
+        //        if (m_refCounter.decrementAndGet() == 0) {
+        //            closeResources();
+        //        }
+        int count = m_refCounter.decrementAndGet();
+        if (count == 0) {
             closeResources();
+        } else if (count < 0) {
+            throw new IllegalStateException("Already released data was released again");
         }
     }
 
