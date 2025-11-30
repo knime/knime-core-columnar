@@ -105,6 +105,9 @@ abstract class AbstractOffHeapArrowWriteData<F extends FieldVector> extends Abst
      * @return the vector with the set value count
      */
     protected F closeWithLength(final int length) {
+        if (m_offset != 0 ) {
+            throw new IllegalStateException("Trying to close a AbstractOffHeapArrowWriteData with m_offset != 0");
+        }
         m_vector.setValueCount(length);
         final F vector = m_vector;
         m_vector = null;
@@ -141,6 +144,9 @@ abstract class AbstractOffHeapArrowWriteData<F extends FieldVector> extends Abst
 
     @Override
     protected void closeResources() {
+        if (m_offset != 0) {
+            throw new IllegalStateException("Trying to close a AbstractOffHeapArrowWriteData with m_offset != 0");
+        }
         if (m_vector != null) {
             m_vector.close();
         }
