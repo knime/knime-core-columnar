@@ -51,6 +51,7 @@ import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.Weigher;
 import org.knime.core.columnar.ReferencedData;
+import org.knime.core.columnar.cache.data.ReadDataCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,16 +123,21 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
             .removalListener(removalListener).build();
     }
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SizeBoundLruCache.class);
+
     @Override
     public void put(final K key, final D data, final Evictor<? super K, ? super D> evictor) {
         DataWithEvictor<K, D> value = new DataWithEvictor<K, D>(data, evictor);
-        m_cache.put(key,value);
-//        m_cache.asMap().compute(key, (k, d) -> {
-//            if (d != null) {
-//                d.m_data.release(); // if we replace data, we have to make sure to release the old data
-//            }
-//            return value;
-//        });
+//        m_cache.put(key,value);
+        m_cache.asMap().compute(key, (k, d) -> {
+            if (d != null) {
+                final String msg = "replaced value for key " + k + ": " + d.m_data + " --> " + data;
+//                System.out.println("~   ~  ~ ~~ ~~~ ~~~> SizeBoundLruCache: " + msg);
+                LOGGER.warn(msg);
+//                throw new IllegalStateException(msg);
+            }
+            return value;
+        });
     }
 
     @Override
