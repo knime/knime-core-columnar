@@ -174,6 +174,7 @@ abstract class AbstractOffHeapArrowReadData<F extends FieldVector> extends Abstr
 
     @Override
     protected void closeResources() {
+        assert m_offset == 0 : "Trying to close a AbstractOffHeapArrowReadData with m_offset != 0";
         m_vector.close();
     }
 
