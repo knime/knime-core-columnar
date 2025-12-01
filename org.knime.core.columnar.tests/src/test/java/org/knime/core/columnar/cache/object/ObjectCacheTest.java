@@ -249,7 +249,8 @@ public class ObjectCacheTest extends ColumnarTest {
             data.setString(1, "1");
             assertEquals("0", delegateData.getString(0));
             assertNull(delegateData.getString(1));
-            writer.write(batch.close(1));
+            final ReadBatch readBatch = batch.close(1);
+            writer.write(readBatch);
             writer.close();
             waitForSerialization();
 
@@ -261,7 +262,7 @@ public class ObjectCacheTest extends ColumnarTest {
             assertEquals("0", delegateData.getString(0));
             assertEquals("1", delegateData.getString(1));
 
-            batch.release();
+            readBatch.release();
         }
     }
 
@@ -276,16 +277,17 @@ public class ObjectCacheTest extends ColumnarTest {
             final TestStringData delegateData = (TestStringData)data.m_delegate;
 
             final CountDownLatch blockLatch = blockSerialization();
+            final ReadBatch readBatch;
             try {
                 data.setString(0, "0");
-                batch.close(1);
+                readBatch = batch.close(1);
                 assertNull(delegateData.getString(0));
             } finally {
                 resumeAndWaitForSerialization(blockLatch);
             }
             assertEquals("0", delegateData.getString(0));
 
-            batch.release();
+            readBatch.release();
         }
     }
 
@@ -358,7 +360,7 @@ public class ObjectCacheTest extends ColumnarTest {
                 }
                 data.setString(i, testStrings[i]);
             }
-            batch.close(numStrings);
+            final ReadBatch readBatch = batch.close(numStrings);
             store.flush();
             assertTrue(data.capacity() >= numStrings);
 
@@ -367,7 +369,7 @@ public class ObjectCacheTest extends ColumnarTest {
                 assertEquals(testStrings[i], delegateData.getString(i));
             }
 
-            batch.release();
+            readBatch.release();
         }
     }
 
@@ -404,7 +406,7 @@ public class ObjectCacheTest extends ColumnarTest {
 
             data0.flush();
             data1.flush();
-            batch.close(numStrings);
+            final ReadBatch readBatch = batch.close(numStrings);
 
             // No data should be lost if we expand while we're writing asynchronously
             for (int i = 0; i < numStrings; i++) {
@@ -412,7 +414,7 @@ public class ObjectCacheTest extends ColumnarTest {
                 assertEquals(testStrings[i], delegateData1.getString(i));
             }
 
-            batch.release();
+            readBatch.release();
         }
 
         persistExecutor.shutdownNow();
