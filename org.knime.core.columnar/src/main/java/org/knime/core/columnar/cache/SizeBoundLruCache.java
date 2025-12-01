@@ -55,6 +55,10 @@ import org.knime.core.columnar.cache.data.ReadDataCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * A thread-safe LoadingEvictingCache that holds data up to a fixed maximum {@link ReferencedData#sizeOf() size} in
  * bytes. Once the size threshold is reached, data is evicted from the cache in least-recently-used manner.
@@ -110,14 +114,16 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
 
         final RemovalListener<K, DataWithEvictor<K, D>> removalListener = removalNotification -> {
             final DataWithEvictor<K, D> evicted = removalNotification.getValue();
-            if ( evicted == null ) {
-                return;
-            }
             if (removalNotification.wasEvicted()
                     || (m_clearingCache && removalNotification.getCause() == RemovalCause.EXPLICIT)) {
                 evicted.m_evictor.evict(removalNotification.getKey(), evicted.m_data);
             }
-            evicted.m_data.release();
+            if (removalNotification.getCause() != RemovalCause.EXPLICIT || m_clearingCache) {
+                evicted.m_data.release();
+            }
+            if (removalNotification.getCause() == RemovalCause.EXPLICIT && !m_clearingCache) {
+                removalExplicit.add(evicted);
+            }
         };
 
         m_cache = CacheBuilder.newBuilder().concurrencyLevel(concurrencyLevel).maximumWeight(maxSize).weigher(weigher)
@@ -154,11 +160,16 @@ public final class SizeBoundLruCache<K, D extends ReferencedData> implements Evi
         return null;
     }
 
+    private final Set< DataWithEvictor< K, D > > removalExplicit = ConcurrentHashMap.newKeySet();
+
     @Override
     public D remove(final K key) {
         final DataWithEvictor<K, D> removed = m_cache.asMap().remove(key);
         if (removed != null) {
-//            removed.m_data.release();;
+            if (!removalExplicit.remove(removed)) {
+                throw new IllegalStateException("removed key, but removalListener didn't run");
+            }
+            removed.m_data.release();;
             return removed.m_data;
         }
         return null;
