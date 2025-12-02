@@ -129,30 +129,14 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
                                 final NullableReadData data = batch.get(i);
                                 final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
                                 if (cachedData != null) {
-                                    data.release();
-                                    // NB: (TP) Reading this code, I was confused:
-                                    //   - Why do release data here, but not if we put it into the cache (in the else-branch
-                                    //     below)? The m_globalCache.put(data) will retain the data again!
-                                    //   - Shouldn't we call batch.release() in the end?
-                                    //
-                                    // Here is how that works:
-                                    // batch = reader.readRetained(index) above creates a ReadBatch that has all contained
-                                    // data retained (once, for us, the owner of the ReadBatch).
-                                    //
-                                    // If we would release the ReadBatch, all contained data would be released in turn. We
-                                    // don't want that, because we put some of the data into the ReadBatch we assemble to
-                                    // return from this method. However, this particular data we will not put into the
-                                    // assembled ReadBatch, so we release it here.
-                                    //
-                                    // Retaining again when putting the data into the cache in the else-branch is what
-                                    // should happen: There will be one reference from the assembled ReadBatch and one from
-                                    // the m_globalCache.
-                                    datas[i] = cachedData;
+                                    datas[i] = cachedData; // cachedData is already retained for the ReadBatch we will create
                                 } else {
-                                    put(ccUID, data);
+                                    put(ccUID, data); // retains for the cache
+                                    data.retain(); // retain for the ReadBatch we will construct
                                     datas[i] = data;
                                 }
                             }
+                            batch.release();
                         } catch (IOException e) {
                             throw new IllegalStateException("Exception while loading column data.", e);
                         }
