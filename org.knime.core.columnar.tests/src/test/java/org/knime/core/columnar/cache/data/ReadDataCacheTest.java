@@ -104,23 +104,16 @@ public class ReadDataCacheTest extends ColumnarTest {
         return generateDefaultCachedColumnStore(delegate, generateCache(1));
     }
 
-    private static CountDownLatch delayFlush(final ReadDataCache store) {
+    private static CountDownLatch delayFlush(final TestBatchStore store) {
         final CountDownLatch latch = new CountDownLatch(1);
-        store.enqueueRunnable(() -> {
-            try {
-                latch.await();
-            } catch (InterruptedException ex) {
-                // Restore interrupted state...
-                Thread.currentThread().interrupt();
-            }
-        });
+        store.blockOnWrite(latch);
         return latch;
     }
 
     private static void waitForFlush(final ReadDataCache store, final CountDownLatch latch)
-        throws InterruptedException {
+        throws InterruptedException, IOException {
         latch.countDown();
-        store.waitForAndHandleFuture();
+        store.flush();
     }
 
     private static CountDownLatch blockOnWriteAfterDelayedFlush(final ReadDataCache store, final TestDataTable table) {
@@ -188,7 +181,7 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final ReadDataCache store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
 
-            final CountDownLatch latch = delayFlush(store);
+            final CountDownLatch latch = delayFlush(delegate);
             writeTable(store, table);
             checkUnflushed(table, delegate);
 
@@ -209,7 +202,7 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final ReadDataCache store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
 
-            final CountDownLatch latch = delayFlush(store);
+            final CountDownLatch latch = delayFlush(delegate);
             writeTable(store, table);
             checkUnflushed(table, delegate);
 
@@ -231,7 +224,7 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final ReadDataCache store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
 
-            final CountDownLatch latch = delayFlush(store);
+            final CountDownLatch latch = delayFlush(delegate);
             writeTable(store, table);
             checkUnflushed(table, delegate);
 
@@ -252,7 +245,7 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final ReadDataCache store = generateDefaultCachedColumnStore(delegate);
                 final TestDataTable table = createDefaultTestTable(delegate)) {
 
-            final CountDownLatch latch = delayFlush(store);
+            final CountDownLatch latch = delayFlush(delegate);
             writeTable(store, table);
             checkUnflushed(table, delegate);
 
@@ -277,7 +270,7 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final ReadDataCache store2 = generateDefaultCachedColumnStore(delegate2, cache);
                 final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
-            final CountDownLatch latch1 = delayFlush(store1);
+            final CountDownLatch latch1 = delayFlush(delegate1);
             writeTable(store1, table1);
             checkUnflushed(table1, delegate1);
 
@@ -285,7 +278,7 @@ public class ReadDataCacheTest extends ColumnarTest {
             checkCached(table1);
             checkFlushed(table1, delegate1);
 
-            final CountDownLatch latch2 = delayFlush(store2);
+            final CountDownLatch latch2 = delayFlush(delegate2);
             writeTable(store2, table2); // evict table1
             checkUncached(table1);
 
@@ -322,13 +315,13 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final TestDataTable table = createDefaultTestTable(delegate)) {
 
             // Start writing a table (blocked by flushLatch1)
-            final CountDownLatch flushLatch1 = delayFlush(store);
+            final CountDownLatch flushLatch1 = delayFlush(delegate);
             writeTable(store, table);
             checkUnflushed(table, delegate);
             checkCacheSize(cache, 1);
 
             // Clear the cache - should work even if the write is still blocked
-            cache.getCache().invalidateAll();
+            cache.clear();
             checkCacheSize(cache, 0);
 
             // Flushing the table should still be blocked
@@ -360,13 +353,13 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final TestDataTable table3 = createDefaultTestTable(delegate3)) {
 
             writeTable(store1, table1);
-            store1.waitForAndHandleFuture(); // wait for flush of table1
+            store1.flush(); // wait for flush of table1
             checkCached(table1);
             checkFlushed(table1, delegate1);
             checkCacheSize(cache, 1);
 
-            final CountDownLatch flushLatch2 = delayFlush(store2);
-            final CountDownLatch flushLatch3 = delayFlush(store3);
+            final CountDownLatch flushLatch2 = delayFlush(delegate2);
+            final CountDownLatch flushLatch3 = delayFlush(delegate3);
 
             writeTable(store2, table2); // cache & queue flush of table2
             checkUnflushed(table2, delegate2);
@@ -400,7 +393,7 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final TestDataTable table = createDefaultTestTable(delegate)) {
 
             writeTable(store, table);
-            store.waitForAndHandleFuture(); // wait for flush of table
+            store.flush(); // wait for flush of table
             checkCacheSize(cache, 1);
             checkCached(table);
             checkFlushed(table, delegate);
@@ -425,8 +418,8 @@ public class ReadDataCacheTest extends ColumnarTest {
 
                 writeTable(store2, table2);
                 // wait for flush of tables
-                store1.waitForAndHandleFuture();
-                store2.waitForAndHandleFuture();
+                store1.flush();
+                store2.flush();
                 checkCacheSize(cache, 2);
                 checkCached(table1);
                 checkFlushed(table1, delegate1);
@@ -451,10 +444,10 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final ReadDataCache store2 = generateDefaultCachedColumnStore(delegate2, cache);
                 final TestDataTable table2 = createDefaultTestTable(delegate2)) {
 
-            final CountDownLatch latch1 = delayFlush(store1);
+            final CountDownLatch latch1 = delayFlush(delegate1);
             writeTable(store1, table1);
             waitForFlush(store1, latch1);
-            final CountDownLatch latch2 = delayFlush(store2);
+            final CountDownLatch latch2 = delayFlush(delegate2);
             writeTable(store2, table2); // evict table1
             waitForFlush(store2, latch2);
 
@@ -480,7 +473,7 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final ReadDataCache store1 = generateDefaultCachedColumnStore(delegate1, cache);
                 final TestDataTable table1 = createDefaultTestTable(delegate1)) {
 
-            final CountDownLatch latch1 = delayFlush(store1);
+            final CountDownLatch latch1 = delayFlush(delegate1);
             writeTable(store1, table1);
             latch1.countDown();
             // Close and flush are waiting for each other and can lead to a deadlock.
@@ -499,7 +492,7 @@ public class ReadDataCacheTest extends ColumnarTest {
                 final TestDataTable table = createDefaultTestTable(delegate)) {
 
             delegate.throwOnWrite(new RuntimeException(expectedError));
-            var flushLatch = delayFlush(store);
+            var flushLatch = delayFlush(delegate);
             writeTable(store, table);
 
             // Open for writing (which will throw an exception)

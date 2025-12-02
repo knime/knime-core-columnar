@@ -48,9 +48,14 @@
  */
 package org.knime.core.columnar.cache.data;
 
+import java.util.function.Predicate;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.Weigher;
+import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.cache.ColumnDataUniqueId;
-import org.knime.core.columnar.cache.EvictingCache;
-import org.knime.core.columnar.cache.SizeBoundLruCache;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.knime.core.columnar.store.UseOnHeapColumnStoreProperty;
@@ -67,29 +72,53 @@ public final class SharedReadDataCache {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SharedReadDataCache.class);
 
-    private final EvictingCache<ColumnDataUniqueId, NullableReadData> m_cache;
+    private final Cache<ColumnDataUniqueId, NullableReadData> m_cache;
 
     private final long m_cacheSizeBytes;
 
     /**
-     * @param cacheSizeBytes the size of the cache in bytes
+     * @param cacheSizeBytes the maximum size of the cache in bytes
      * @param concurrencyLevel the allowed concurrency among update operations
      */
     public SharedReadDataCache(final long cacheSizeBytes, final int concurrencyLevel) {
-        m_cache = new SizeBoundLruCache<>(cacheSizeBytes, concurrencyLevel);
+
+        final Weigher<ColumnDataUniqueId, NullableReadData> weigher = (k, v) -> {
+            final long size = v.sizeOf();
+            if (size > Integer.MAX_VALUE) {
+                final Logger logger = LoggerFactory.getLogger(getClass());
+                logger.error("Size of data ({}) is larger than maximum ({}).", size, Integer.MAX_VALUE);
+                return Integer.MAX_VALUE;
+            }
+            return Math.max(1, (int)size);
+        };
+
+        final RemovalListener<ColumnDataUniqueId, NullableReadData> removalListener = removalNotification -> {
+            final NullableReadData data = removalNotification.getValue();
+            if (data != null) {
+                data.release();
+            }
+        };
+
+        m_cache = CacheBuilder.newBuilder() //
+                .concurrencyLevel(concurrencyLevel) //
+                .maximumWeight(cacheSizeBytes) //
+                .weigher(weigher) //
+                .removalListener(removalListener) //
+                .build();
+
         m_cacheSizeBytes = cacheSizeBytes;
 
         if (!UseOnHeapColumnStoreProperty.useOnHeapColumnStore()) {
-            ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(() -> {
-                return clear();
-            });
+            ColumnarOffHeapMemoryAlertSystem.INSTANCE.addMemoryListener(this::clear);
         }
     }
 
     /**
+     * Get the maximum size of this cache in bytes.
+     *
      * @return maximum size of cache in bytes.
      */
-    public final long getMaxSizeInBytes() {
+    public long getMaxSizeInBytes() {
         return m_cacheSizeBytes;
     }
 
@@ -103,16 +132,68 @@ public final class SharedReadDataCache {
         if (numEntries > 0) {
             LOGGER.info("Received memory alert. Clearing approximately {} entries.", numEntries);
             m_cache.invalidateAll();
+            m_cache.cleanUp();
             return true;
         }
         return false;
     }
 
+    /**
+     * Returns the approximate number of key-data mappings in this cache.
+     *
+     * @return the approximate number of key-data mappings in this cache
+     */
     int size() {
-        return m_cache.size();
+        return m_cache.asMap().size();
     }
 
-    EvictingCache<ColumnDataUniqueId, NullableReadData> getCache() {
-        return m_cache;
+    /**
+     * Associates the given data with the given key and places it in the cache.
+     * <p>
+     * The given {@code value} is {@link ReferencedData#retain() retained} for the cache.
+     * <p>
+     * If another value was already associated with the same key, the cache will {@link ReferencedData#release()
+     * release} it.
+     *
+     * @param key key with which the specified data is to be associated
+     * @param value data to be retained and associated with the specified key
+     */
+    void put(final ColumnDataUniqueId key, final NullableReadData value) {
+        value.retain();
+        m_cache.put(key, value);
+    }
+
+    /**
+     * Retain and return the value associated with the specified {@code key}. Returns {@code null} if this cache
+     * contains no mapping for the key.
+     * <p>
+     * The returned data is {@link ReferencedData#retain() retained} for the caller. It is up to the caller to
+     * {@link ReferencedData#release() release} the returned data once it is no longer needed.
+     *
+     * @param key the key
+     * @return retained data to which the specified key is mapped, or null if this cache contains no mapping for the key
+     */
+    NullableReadData getRetained(final ColumnDataUniqueId key) {
+        final NullableReadData cached = m_cache.getIfPresent(key);
+        if (cached != null) {
+            try {
+                cached.retain();
+                return cached;
+            } catch (IllegalStateException e) { // NOSONAR
+                // we should only end up here in the very rare case where the data is evicted in between get() and retain()
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Removes all mappings with keys satisfying the given predicate. Removed values are {@link ReferencedData#release()
+     * released}.
+     *
+     * @param predicate a predicate which returns {@code true} for keys to be removed
+     */
+    void invalidateIf(final Predicate<? super ColumnDataUniqueId> predicate) {
+        m_cache.asMap().keySet().removeIf(predicate);
+        m_cache.cleanUp();
     }
 }
