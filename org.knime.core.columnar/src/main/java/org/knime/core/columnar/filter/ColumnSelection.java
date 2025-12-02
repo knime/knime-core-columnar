@@ -45,6 +45,7 @@
  */
 package org.knime.core.columnar.filter;
 
+import java.util.Arrays;
 import java.util.function.IntFunction;
 
 import org.knime.core.columnar.batch.ReadBatch;
@@ -97,5 +98,23 @@ public interface ColumnSelection {
         } else {
             return new FilteredColumnSelection(numColumns, selection.columns().getSelected(0, numColumns));
         }
+    }
+
+    /**
+     * Return the indices of selected columns in {@code columnSelection} as a {@code int[]} array.
+     *
+     * @param columnSelection the column selection
+     * @return indices of selected columns
+     */
+    static int[] getSelectedColumns(final ColumnSelection columnSelection) {
+        final int numColumns = columnSelection.numColumns();
+        final int[] selected = new int[numColumns];
+        int j = 0;
+        for (int i = 0; i < numColumns; i++) {
+            if (columnSelection.isSelected(i)) {
+                selected[j++] = i;
+            }
+        }
+        return j == numColumns ? selected : Arrays.copyOf(selected, j);
     }
 }
