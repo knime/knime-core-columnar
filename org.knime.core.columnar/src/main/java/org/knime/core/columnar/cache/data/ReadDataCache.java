@@ -205,9 +205,20 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
 
     @Override
     void _close() throws IOException {
-        m_writer.close();
+
         waitForAllTasksToFinish();
-        m_currentlyWritingBatches.clear();
+
+        m_writer.close();
+        try {
+            // Wait for close to finish
+            m_futureQueue.waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            // The interrupt status should have been reset by some previous wait operation,
+            // so if we get interrupted here, something has gone wrong and we throw an exception.
+            throw new IOException("Close should not be interrupted!", e);
+        }
+
+//        m_currentlyWritingBatches.clear();
         super._close();
     }
 
