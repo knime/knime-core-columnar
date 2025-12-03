@@ -218,7 +218,7 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
             throw new IOException("Close should not be interrupted!", e);
         }
 
-//        m_currentlyWritingBatches.clear();
+        m_currentlyWritingBatches.clear();
         super._close();
     }
 
