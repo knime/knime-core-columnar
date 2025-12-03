@@ -166,6 +166,19 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
         }
     }
 
+    @Override
+    void maybeWait() {
+        try {
+            m_futureQueue.waitForAndHandleFuture();
+        } catch (InterruptedException e) {
+            // Restore interrupted state...
+            Thread.currentThread().interrupt();
+            // when interrupted here (e.g., because the reading node is cancelled), we should not proceed
+            // this way, the cache stays in a consistent state
+            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
+        }
+    }
+
     private final ReadDataCacheWriter m_writer;
 
     private final FutureQueue m_futureQueue;

@@ -113,6 +113,8 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
             int[] missingCols = populateFromCache(datas, index, m_selectedColumns);
             if (missingCols.length != 0) {
 
+                maybeWait();
+
                 // no two threads should read the same batch (index) concurrently
                 synchronized (m_locks.get(index)) {
 
@@ -151,6 +153,9 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
         public void close() throws IOException {
             // no resources held
         }
+    }
+
+    void maybeWait() {
     }
 
     private final RandomAccessBatchReadable m_readableDelegate;
