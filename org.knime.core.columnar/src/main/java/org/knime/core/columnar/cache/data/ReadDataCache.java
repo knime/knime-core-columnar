@@ -119,12 +119,12 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
 
             final var batchId = m_numBatches;
 
+            m_currentlyWritingBatches.putRetained(batchId, batch);
             for (int i = 0; i < getSchema().numColumns(); i++) {
                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, batchId);
                 put(ccUID, batch.get(i));
             }
 
-            m_currentlyWritingBatches.putRetained(batchId, batch);
             m_futureQueue.handleDoneFuture();
             m_futureQueue.enqueueRunnable(() -> { // NOSONAR
                 try {
