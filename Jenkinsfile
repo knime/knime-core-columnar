@@ -58,7 +58,7 @@ Map<String, String> getTestflowConfigs() {
     Map<String, String> testflowConfigs = [:]
 
     if (params["USE_LEGACY_BATCHING"] && params["USE_OFF_HEAP"]) {
-        testflowConfigs["LEGACY-BATCH OFF-HEAP"] = "-D${heapBadgerProperty}=false\n-D${onHeapProperty}=false\n-Darrow.memory.debug.allocator=true"
+        testflowConfigs["LEGACY-BATCH OFF-HEAP"] = "-D${heapBadgerProperty}=false\n-D${onHeapProperty}=false"
     }
     if (params["USE_LEGACY_BATCHING"] && params["USE_ON_HEAP"]) {
         testflowConfigs["LEGACY-BATCH ON-HEAP"] = "-D${heapBadgerProperty}=false\n-D${onHeapProperty}=true"
