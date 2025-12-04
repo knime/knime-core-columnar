@@ -91,8 +91,17 @@ abstract class AbstractOffHeapArrowBatchReadable implements BatchReadable, Arrow
         return m_schema;
     }
 
-    protected BufferAllocator getAllocator() {
-        return m_allocator;
+    static String printSchema(final ColumnarSchema schema) {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(schema.getClass().getSimpleName()).append(" (").append(schema.numColumns()).append(" columns) {\n");
+        for (int i = 0; i < schema.numColumns(); i++) {
+            sb.append("   ").append(schema.getSpecWithTraits(i));
+            if (i < schema.numColumns() - 1) {
+                sb.append(",\n");
+            }
+        }
+        sb.append("");
+        return sb.toString();
     }
 
     @Override
@@ -102,7 +111,7 @@ abstract class AbstractOffHeapArrowBatchReadable implements BatchReadable, Arrow
         try {
             m_allocator.close();
         } catch (IllegalStateException e) {
-            throw new IllegalStateException("leak:\n" + verbose, e);
+            throw new IllegalStateException("leak:\n" + verbose + "\n" + printSchema(m_schema) + "\n", e);
         }
         if (allocated > 0) {
             throw new IOException(

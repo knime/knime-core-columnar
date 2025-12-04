@@ -48,7 +48,6 @@ package org.knime.core.columnar.arrow.offheap.data;
 import java.io.IOException;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -150,7 +149,7 @@ public final class OffHeapArrowIntData {
 
         @Override
         public ArrowIntWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+            final int capacity) {
             final IntVector v = (IntVector)vector;
             v.allocateNew(capacity);
             return new ArrowIntWriteData(v);

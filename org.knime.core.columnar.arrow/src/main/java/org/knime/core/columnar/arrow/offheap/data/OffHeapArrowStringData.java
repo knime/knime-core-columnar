@@ -52,7 +52,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BaseVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VarCharVector;
@@ -164,7 +163,7 @@ public final class OffHeapArrowStringData {
 
         @Override
         public ArrowStringWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+            final int capacity) {
             final VarCharVector v = (VarCharVector)vector;
             v.allocateNew(INITAL_BYTES_PER_ELEMENT * capacity, capacity);
             return new ArrowStringWriteData(v);

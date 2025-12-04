@@ -102,12 +102,10 @@ public interface OffHeapArrowColumnDataFactory {
      * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
      *            from this supplier. Other ids might be used already in the parent data object. Also take as many
      *            dictionary ids from the supplier as in {@link #getField(String, LongSupplier)}.
-     * @param allocator the allocator used for memory allocation of dictionary vectors
      * @param capacity the initial capacity to allocate
      * @return the {@link NullableWriteData}
      */
-    OffHeapArrowWriteData createWrite(FieldVector vector, LongSupplier dictionaryIdSupplier, BufferAllocator allocator,
-        int capacity);
+    OffHeapArrowWriteData createWrite(FieldVector vector, LongSupplier dictionaryIdSupplier, int capacity);
 
     // ===================== Reading ColumnReadData ===========================
 
@@ -169,7 +167,7 @@ public interface OffHeapArrowColumnDataFactory {
         final BufferAllocator allocator, final int capacity) {
         final Field field = factory.getField(name, newDictionaryIdSupplier());
         final FieldVector vector = field.createVector(allocator);
-        return factory.createWrite(vector, newDictionaryIdSupplier(), allocator, capacity);
+        return factory.createWrite(vector, newDictionaryIdSupplier(), capacity);
     }
 
     /** A class holding the null count for a vector and its children. */

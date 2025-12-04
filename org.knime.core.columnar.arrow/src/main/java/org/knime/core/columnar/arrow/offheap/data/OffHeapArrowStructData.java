@@ -57,7 +57,6 @@ import java.util.function.LongSupplier;
 import java.util.stream.Stream;
 
 import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -305,7 +304,7 @@ public final class OffHeapArrowStructData {
 
         @Override
         public ArrowStructWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+            final int capacity) {
             final StructVector v = (StructVector)vector;
             // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
             // the child vector
@@ -317,7 +316,7 @@ public final class OffHeapArrowStructData {
             for (int i = 0; i < children.length; i++) {
                 @SuppressWarnings("resource") // Child vector closed with struct vector
                 final FieldVector childVector = v.getChild(childNameAtIndex(i));
-                children[i] = m_inner[i].createWrite(childVector, dictionaryIdSupplier, allocator, capacity);
+                children[i] = m_inner[i].createWrite(childVector, dictionaryIdSupplier, capacity);
             }
             return new ArrowStructWriteData(v, children);
         }

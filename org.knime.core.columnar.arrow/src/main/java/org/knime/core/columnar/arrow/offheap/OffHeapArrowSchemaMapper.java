@@ -53,7 +53,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -249,8 +248,8 @@ final class OffHeapArrowSchemaMapper implements MapperWithTraits<OffHeapArrowCol
 
         @Override
         public OffHeapArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            return m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity);
+            final int capacity) {
+            return m_delegate.createWrite(vector, dictionaryIdSupplier, capacity);
         }
 
         @Override

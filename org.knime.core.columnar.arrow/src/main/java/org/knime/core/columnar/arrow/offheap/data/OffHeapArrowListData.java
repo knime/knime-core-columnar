@@ -54,7 +54,6 @@ import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.complex.BaseRepeatedValueVector;
 import org.apache.arrow.vector.complex.ListVector;
@@ -225,7 +224,7 @@ public final class OffHeapArrowListData {
         @Override
         @SuppressWarnings("resource") // Data vector closed with list vector
         public ArrowListWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+            final int capacity) {
             final ListVector v = (ListVector)vector;
             // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
             // the child vector
@@ -235,7 +234,7 @@ public final class OffHeapArrowListData {
             // Data vector
             final FieldVector dataVector = v.getDataVector();
             final OffHeapArrowWriteData data =
-                m_inner.createWrite(dataVector, dictionaryIdSupplier, allocator, capacity * INITIAL_VALUES_PER_LIST);
+                m_inner.createWrite(dataVector, dictionaryIdSupplier, capacity * INITIAL_VALUES_PER_LIST);
             return new ArrowListWriteData(v, data);
         }
 
