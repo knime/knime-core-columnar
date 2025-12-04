@@ -168,12 +168,12 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
     }
 
     @Override
-    public boolean canForward() {
+    public synchronized boolean canForward() {
         return m_currentRow < m_numRows - 1;
     }
 
     @Override
-    public boolean forward() {
+    public synchronized boolean forward() {
         if (canForward()) {
             moveTo(++m_currentRow);
             return true;
@@ -182,7 +182,7 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
     }
 
     @Override
-    public void moveTo(final long row) {
+    public synchronized void moveTo(final long row) {
         // check whether row is still in current batch
         if (row < m_currentBatchFrom || row >= m_currentBatchTo) {
             // if not: check whether row is out-of-bounds
@@ -244,7 +244,7 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if (m_currentBatch != null) {
             m_currentBatch.release();
             m_currentBatch = null;
@@ -262,7 +262,7 @@ final class DefaultColumnarCursor implements RandomAccessCursor<ReadAccessRow>, 
 
     @Override
     @SuppressWarnings("unchecked")
-    public <A extends ReadAccess> A getAccess(final int index) {
+    public synchronized <A extends ReadAccess> A getAccess(final int index) {
         return (A)m_accesses[index];
     }
 }

@@ -164,7 +164,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public void commit() throws IOException {
+        public synchronized void commit() throws IOException {
             m_numRows++;
             m_currentIndex++;
             if (m_currentIndex > m_currentMaxIndex) {
@@ -173,7 +173,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public long numRows() {
+        public synchronized long numRows() {
             return m_numRows;
         }
 
@@ -183,7 +183,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public final void close() throws IOException {
+        public synchronized void close() throws IOException {
             if (m_currentBatch != null) {
                 m_currentBatch.release();
                 m_currentBatch = null;
@@ -192,12 +192,12 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public final int getIndex() {
+        public synchronized int getIndex() {
             return m_currentIndex;
         }
 
         @Override
-        public void flush() throws IOException {
+        public synchronized void flush() throws IOException {
             throw new UnsupportedOperationException("TODO: ColumnarWriteCursorImpl.flush() should probably not be called?");
             // TODO (TP): This was implemented before as
             //   writeCurrentBatch(m_currentIndex + 1);
@@ -206,7 +206,7 @@ public final class ColumnarWriteCursorFactory {
         }
 
         @Override
-        public void finish() throws IOException {
+        public synchronized void finish() throws IOException {
             writeCurrentBatch(m_currentIndex);
             // TODO: As per contract, this should block until the data is written to disk.
             // But right now we don't do this.
@@ -275,12 +275,12 @@ public final class ColumnarWriteCursorFactory {
 
         @SuppressWarnings("unchecked")
         @Override
-        public <A extends WriteAccess> A getWriteAccess(final int index) {
+        public synchronized <A extends WriteAccess> A getWriteAccess(final int index) {
             return (A)m_accesses[index];
         }
 
         @Override
-        public void setFrom(final ReadAccessRow row) {
+        public synchronized void setFrom(final ReadAccessRow row) {
             for (int i = 0; i < m_accesses.length; i++) {
                 m_accesses[i].setFrom(row.getAccess(i));
             }
