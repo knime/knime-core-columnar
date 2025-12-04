@@ -162,6 +162,7 @@ public class ArrowColumnStoreFactory implements ColumnStoreFactory {
         if (useOnHeapColumnStore()) {
             return new OnHeapArrowBatchStore(schema, fileSupplier, m_compression, childAllocator);
         } else {
+
             return new OffHeapArrowBatchStore(schema, fileSupplier, m_compression, childAllocator);
         }
     }

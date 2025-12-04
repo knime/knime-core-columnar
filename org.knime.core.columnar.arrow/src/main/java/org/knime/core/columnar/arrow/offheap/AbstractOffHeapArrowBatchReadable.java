@@ -115,7 +115,7 @@ abstract class AbstractOffHeapArrowBatchReadable implements BatchReadable, Arrow
         }
         if (allocated > 0) {
             throw new IOException(
-                String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
+                String.format("Store closed with unreleased data. %d bytes of memory leaked.\n" + verbose + "\n" + printSchema(m_schema) + "\n", allocated));
         }
     }
 }
