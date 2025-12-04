@@ -98,7 +98,12 @@ abstract class AbstractOffHeapArrowBatchReadable implements BatchReadable, Arrow
     @Override
     public void close() throws IOException {
         final long allocated = m_allocator.getAllocatedMemory();
-        m_allocator.close();
+        final String verbose = m_allocator.toVerboseString();
+        try {
+            m_allocator.close();
+        } catch (IllegalStateException e) {
+            throw new IllegalStateException("leak:\n" + verbose, e);
+        }
         if (allocated > 0) {
             throw new IOException(
                 String.format("Store closed with unreleased data. %d bytes of memory leaked.", allocated));
