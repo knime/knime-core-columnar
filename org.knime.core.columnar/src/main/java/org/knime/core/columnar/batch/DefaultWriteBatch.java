@@ -94,9 +94,10 @@ public final class DefaultWriteBatch extends AbstractBatch<NullableWriteData> im
         final boolean released = m_refCounter.release();
         assert released : "Trying to close a WriteBatch with outstanding references.";
 
-        final NullableReadData[] datas = Arrays.stream(m_data)//
-                .map(d -> d.close(length))//
-                .toArray(NullableReadData[]::new);
+        final NullableReadData[] datas = new NullableReadData[m_data.length];
+        for (int i = 0; i < m_data.length; ++i) {
+            datas[i] = m_data[i].close(length);
+        }
 
         // The WriteData contract states that: "After closing the data, no other
         // operations are allowed on the WriteData." Setting m_data[i] to null
