@@ -99,7 +99,7 @@ final class TempFileHandle implements FileHandle {
     }
 
     @Override
-    public Path asPath() {
+    public synchronized Path asPath() {
         init();
         return m_path;
     }
