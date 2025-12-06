@@ -297,8 +297,8 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
             m_writeCursor = m_heapBadger.getWriteCursor();
         } else {
             m_writable = initBatchSizeRecorder(m_writable);
-            initObjectCache(builder.m_heapCache, builder.m_heapCachePersistExecutor,
-                builder.m_heapCacheSerializeExecutor);
+            //            initObjectCache(builder.m_heapCache, builder.m_heapCachePersistExecutor,
+            //                builder.m_heapCacheSerializeExecutor);
             initDuplicateCheck(builder.m_duplicateCheckExecutor);
             initDomainCalculation(builder.m_domainCalculationConfig, builder.m_domainCalculationExecutor);
             m_writeCursor = ColumnarWriteCursorFactory.createWriteCursor(m_writable);
