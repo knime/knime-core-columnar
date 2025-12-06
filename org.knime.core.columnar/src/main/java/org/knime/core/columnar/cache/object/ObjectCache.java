@@ -205,7 +205,7 @@ public final class ObjectCache implements BatchWritable, RandomAccessBatchReadab
 
         private final BatchWriter m_writerDelegate;
 
-        private CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
+        private volatile CompletableFuture<Void> m_future = CompletableFuture.completedFuture(null);
 
         /**
          * The number of batches that are already written. Readers use this value to determine if they are accessing the
