@@ -277,7 +277,7 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
         initColumnDataCache(builder.m_columnDataCache, builder.m_columnDataCacheExecutor);
 
-        initSmallTableCache(builder.m_smallTableCache);
+        //        initSmallTableCache(builder.m_smallTableCache);
 
         if (builder.m_dictEncodingEnabled) {
             final var dictEncoded = new DictEncodedBatchWritableReadable(m_writable, m_readable);
