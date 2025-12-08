@@ -159,8 +159,8 @@ public final class SharedReadDataCache {
      * @param value data to be retained and associated with the specified key
      */
     void put(final ColumnDataUniqueId key, final NullableReadData value) {
-        value.retain();
-        m_cache.put(key, value);
+//        value.retain();
+//        m_cache.put(key, value);
     }
 
     /**
