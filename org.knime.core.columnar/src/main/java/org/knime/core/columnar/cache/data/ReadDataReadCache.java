@@ -124,7 +124,8 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
                     missingCols = populateFromCache(datas, index, missingCols);
                     if (missingCols.length != 0) {
                         try (RandomAccessBatchReader reader = m_readableDelegate
-                                .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
+//                                .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
+                                .createRandomAccessReader()) {
                             final ReadBatch batch = reader.readRetained(index);
                             for (int i : missingCols) {
                                 final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataReadCache.this, i, index);
