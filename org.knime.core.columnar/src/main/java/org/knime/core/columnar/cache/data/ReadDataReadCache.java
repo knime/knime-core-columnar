@@ -45,23 +45,22 @@
  */
 package org.knime.core.columnar.cache.data;
 
-import static org.knime.core.columnar.filter.ColumnSelection.getSelectedColumns;
+import org.knime.core.columnar.ReadData;
+import org.knime.core.columnar.batch.RandomAccessBatchReadable;
+import org.knime.core.columnar.batch.RandomAccessBatchReader;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.cache.data.SharedReadDataCache.ColumnDataUniqueId;
+import org.knime.core.columnar.data.NullableReadData;
+import org.knime.core.columnar.filter.ColumnSelection;
+import org.knime.core.columnar.filter.FilteredColumnSelection;
+import org.knime.core.table.schema.ColumnarSchema;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.knime.core.columnar.ReadData;
-import org.knime.core.columnar.batch.RandomAccessBatchReadable;
-import org.knime.core.columnar.batch.RandomAccessBatchReader;
-import org.knime.core.columnar.batch.ReadBatch;
-import org.knime.core.columnar.cache.ColumnDataUniqueId;
-import org.knime.core.columnar.cache.EvictingCache;
-import org.knime.core.columnar.data.NullableReadData;
-import org.knime.core.columnar.filter.ColumnSelection;
-import org.knime.core.columnar.filter.FilteredColumnSelection;
-import org.knime.core.table.schema.ColumnarSchema;
+import static org.knime.core.columnar.filter.ColumnSelection.getSelectedColumns;
 
 /**
  * A {@link RandomAccessBatchReadable} that reads {@link ReadData} from a delegate and places it in a fixed-size
@@ -95,7 +94,7 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
             final int[] missingCols = new int[cols.length];
             int numMissing = 0;
             for (int i : cols) {
-                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataReadCache.this, i, batch);
+                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(m_ownerHandle, i, batch);
                 final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
                 if (cachedData != null) {
                     datas[i] = cachedData;
@@ -113,8 +112,6 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
             int[] missingCols = populateFromCache(datas, index, m_selectedColumns);
             if (missingCols.length != 0) {
 
-                maybeWait();
-
                 // no two threads should read the same batch (index) concurrently
                 synchronized (m_locks.get(index)) {
 
@@ -127,7 +124,7 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
                                 .createRandomAccessReader(new FilteredColumnSelection(numColumns, missingCols))) {
                             final ReadBatch batch = reader.readRetained(index);
                             for (int i : missingCols) {
-                                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataReadCache.this, i, index);
+                                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(m_ownerHandle, i, index);
                                 final NullableReadData data = batch.get(i);
                                 final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
                                 if (cachedData != null) {
@@ -155,12 +152,11 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
         }
     }
 
-    void maybeWait() {
-    }
-
     private final RandomAccessBatchReadable m_readableDelegate;
 
     private final SharedReadDataCache m_globalCache;
+
+    private final SharedReadDataCache.DynamicLatch m_ownerHandle;
 
     private static class Locks {
 
@@ -180,6 +176,7 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
     public ReadDataReadCache(final RandomAccessBatchReadable readableDelegate, final SharedReadDataCache cache) {
         m_readableDelegate = readableDelegate;
         m_globalCache = cache;
+        m_ownerHandle = new SharedReadDataCache.DynamicLatch();
     }
 
     @Override
@@ -199,6 +196,13 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
         m_globalCache.put(key, value);
     }
 
+    /**
+     * Put the given {@code value} into the (local and global) cache with the given {@code key}.
+     */
+    void put(final int columnIndex, final int batchIndex, final NullableReadData value) {
+        m_globalCache.put(new ColumnDataUniqueId(m_ownerHandle, columnIndex, batchIndex), value);
+    }
+
     final AtomicBoolean m_closed = new AtomicBoolean(false);
 
     @Override
@@ -213,7 +217,7 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
      */
     void _close() throws IOException {
         // Drop all globally cached data referenced by this cache
-        m_globalCache.invalidateIf(ccUID -> ccUID.readable() == this);
+        m_globalCache.invalidateAll(m_ownerHandle);
         m_readableDelegate.close();
     }
 

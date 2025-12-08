@@ -53,7 +53,6 @@ import org.knime.core.columnar.batch.RandomAccessBatchReadable;
 import org.knime.core.columnar.batch.RandomAccessBatchReader;
 import org.knime.core.columnar.batch.ReadBatch;
 import org.knime.core.columnar.batch.WriteBatch;
-import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,8 +120,7 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
 
             m_currentlyWritingBatches.putRetained(batchId, batch);
             for (int i = 0; i < getSchema().numColumns(); i++) {
-                final ColumnDataUniqueId ccUID = new ColumnDataUniqueId(ReadDataCache.this, i, batchId);
-                put(ccUID, batch.get(i));
+                put(i, batchId, batch.get(i));
             }
 
             m_futureQueue.handleDoneFuture();
@@ -165,19 +163,6 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
             return m_writerDelegate.initialNumBytesPerElement();
         }
     }
-
-//    @Override
-//    void maybeWait() {
-//        try {
-//            m_futureQueue.waitForAndHandleFuture();
-//        } catch (InterruptedException e) {
-//            // Restore interrupted state...
-//            Thread.currentThread().interrupt();
-//            // when interrupted here (e.g., because the reading node is cancelled), we should not proceed
-//            // this way, the cache stays in a consistent state
-//            throw new IllegalStateException(ERROR_ON_INTERRUPT, e);
-//        }
-//    }
 
     private final ReadDataCacheWriter m_writer;
 

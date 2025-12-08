@@ -48,6 +48,7 @@
  */
 package org.knime.core.columnar.cache.data;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
 import com.google.common.cache.Cache;
@@ -55,7 +56,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.Weigher;
 import org.knime.core.columnar.ReferencedData;
-import org.knime.core.columnar.cache.ColumnDataUniqueId;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.memory.ColumnarOffHeapMemoryAlertSystem;
 import org.knime.core.columnar.store.UseOnHeapColumnStoreProperty;
@@ -97,6 +97,7 @@ public final class SharedReadDataCache {
             if (data != null) {
                 data.release();
             }
+            removalNotification.getKey().owner().decrement();
         };
 
         m_cache = CacheBuilder.newBuilder() //
@@ -159,8 +160,8 @@ public final class SharedReadDataCache {
      * @param value data to be retained and associated with the specified key
      */
     void put(final ColumnDataUniqueId key, final NullableReadData value) {
-//        value.retain();
-//        m_cache.put(key, value);
+        value.retain();
+        m_cache.put(key, value);
     }
 
     /**
@@ -187,13 +188,48 @@ public final class SharedReadDataCache {
     }
 
     /**
+     * TODO revise javadoc
+     * <p>
      * Removes all mappings with keys satisfying the given predicate. Removed values are {@link ReferencedData#release()
      * released}.
-     *
-     * @param predicate a predicate which returns {@code true} for keys to be removed
      */
-    void invalidateIf(final Predicate<? super ColumnDataUniqueId> predicate) {
-        m_cache.asMap().keySet().removeIf(predicate);
+    void invalidateAll(final DynamicLatch owner) {
+        m_cache.asMap().keySet().removeIf(key -> key.owner() == owner);
         m_cache.cleanUp();
+        owner.decrement();
+        owner.await();
     }
+
+    // TODO (TP) document
+    // TODO (TP) rename
+    static class DynamicLatch {
+        private final AtomicInteger count = new AtomicInteger(1);
+        private final Object monitor = new Object();
+
+        void increment() {
+            count.incrementAndGet();
+        }
+
+        void decrement() {
+            if (count.decrementAndGet() == 0) {
+                synchronized (monitor) {
+                    monitor.notifyAll();
+                }
+            }
+        }
+
+        void await() {
+            synchronized (monitor) {
+                while (count.get() != 0) {
+                    try {
+                        monitor.wait();
+                    } catch (InterruptedException ignored) {
+                    }
+                }
+            }
+        }
+    }
+
+    record ColumnDataUniqueId(DynamicLatch owner, int columnIndex, int batchIndex) {}
+
 }
