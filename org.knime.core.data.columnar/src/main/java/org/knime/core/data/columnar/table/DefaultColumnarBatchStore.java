@@ -67,7 +67,6 @@ import org.knime.core.columnar.cache.writable.BatchWritableCache;
 import org.knime.core.columnar.cache.writable.SharedBatchWritableCache;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory;
 import org.knime.core.columnar.cursor.ColumnarWriteCursorFactory.ColumnarWriteCursor;
-import org.knime.core.columnar.data.dictencoding.DictEncodedBatchWritableReadable;
 import org.knime.core.columnar.filter.ColumnSelection;
 import org.knime.core.columnar.store.BatchReadStore;
 import org.knime.core.columnar.store.BatchStore;
@@ -279,11 +278,11 @@ public final class DefaultColumnarBatchStore implements ColumnarBatchStore, Batc
 
         //        initSmallTableCache(builder.m_smallTableCache);
 
-        if (builder.m_dictEncodingEnabled) {
-            final var dictEncoded = new DictEncodedBatchWritableReadable(m_writable, m_readable);
-            m_readable = dictEncoded;
-            m_writable = dictEncoded;
-        }
+        //        if (builder.m_dictEncodingEnabled) {
+        //            final var dictEncoded = new DictEncodedBatchWritableReadable(m_writable, m_readable);
+        //            m_readable = dictEncoded;
+        //            m_writable = dictEncoded;
+        //        }
 
         if (builder.m_useHeapBadger) {
             // In case of the heap badger, we put the duplicate check and domain calculation below, because they are designed to
