@@ -161,6 +161,7 @@ public final class SharedReadDataCache {
      */
     void put(final ColumnDataUniqueId key, final NullableReadData value) {
         value.retain();
+        key.owner().increment();
         m_cache.put(key, value);
     }
 
