@@ -224,7 +224,7 @@ public final class ReadDataCache extends ReadDataReadCache implements BatchWrita
     }
 
     @Override
-    void _close() throws IOException {
+    protected void _close() throws IOException {
 
         waitForAllTasksToFinish();
 
