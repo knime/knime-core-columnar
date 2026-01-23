@@ -202,7 +202,7 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
     /**
      * Put the given {@code value} into the (local and global) cache with the given {@code key}.
      */
-    void put(final ColumnDataKey key, final NullableReadData value) {
+    protected void put(final ColumnDataKey key, final NullableReadData value) {
         m_globalCache.put(key, value);
     }
 
@@ -220,7 +220,7 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
      * <p>
      * This is overridden in {@link ReadDataCache} to do additional clean-up.
      */
-    void _close() throws IOException {
+    protected void _close() throws IOException {
         // Drop all globally cached data referenced by this cache
         m_globalCache.invalidateAll(m_ownerHandle);
         m_readableDelegate.close();
