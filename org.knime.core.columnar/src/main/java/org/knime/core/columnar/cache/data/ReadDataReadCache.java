@@ -130,14 +130,9 @@ public sealed class ReadDataReadCache implements RandomAccessBatchReadable permi
                             for (int i : missingCols) {
                                 final ColumnDataKey ccUID = new ColumnDataKey(m_ownerHandle, i, index);
                                 final NullableReadData data = batch.get(i);
-                                final NullableReadData cachedData = m_globalCache.getRetained(ccUID);
-                                if (cachedData != null) {
-                                    datas[i] = cachedData; // cachedData is already retained for the ReadBatch we will create
-                                } else {
-                                    put(ccUID, data); // retains for the cache
-                                    data.retain(); // retain for the ReadBatch we will construct
-                                    datas[i] = data;
-                                }
+                                put(ccUID, data); // retains for the cache
+                                data.retain(); // retain for the ReadBatch we will construct
+                                datas[i] = data;
                             }
                             batch.release();
                         } catch (IOException e) {
