@@ -110,6 +110,8 @@ public final class DefaultTestBatchStore implements TestBatchStore {
             if (m_storeClosed) {
                 throw new IllegalStateException(ERROR_MESSAGE_STORE_CLOSED);
             }
+
+            waitForWriteLatch();
             if (m_exceptionOnWrite != null) {
                 throw m_exceptionOnWrite;
             }
@@ -209,9 +211,11 @@ public final class DefaultTestBatchStore implements TestBatchStore {
     // this flag is volatile so that when the store is closed in some thread, a reader in another thread will notice
     private volatile boolean m_storeClosed;
 
-    private CountDownLatch m_latch;
+    private volatile CountDownLatch m_latch;
 
-    private RuntimeException m_exceptionOnWrite;
+    private volatile CountDownLatch m_write_latch;
+
+    private volatile RuntimeException m_exceptionOnWrite;
 
     public static DefaultTestBatchStore create(final ColumnarSchema schema) {
         return create(schema, null);
@@ -237,10 +241,23 @@ public final class DefaultTestBatchStore implements TestBatchStore {
         m_latch = latch;
     }
 
+    @Override
+    public void blockOnWrite(final CountDownLatch latch) {
+        m_write_latch = latch;
+    }
+
     private void waitForLatch() {
-        if (m_latch != null) {
+        waitForLatch(m_latch);
+    }
+
+    private void waitForWriteLatch() {
+        waitForLatch(m_write_latch);
+    }
+
+    private void waitForLatch(final CountDownLatch latch) {
+        if (latch != null) {
             try {
-                m_latch.await();
+                latch.await();
             } catch (InterruptedException e) {
                 // Restore interrupted state
                 Thread.currentThread().interrupt();

@@ -48,7 +48,6 @@
  */
 package org.knime.core.columnar.cache;
 
-import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -59,13 +58,11 @@ import com.google.common.base.Preconditions;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class DataIndex {
+public record DataIndex(DataIndex parent, int index) {
 
-    private final int m_index;
-
-    private final DataIndex m_parent;
-
-    private final int m_hashCode;
+    public DataIndex {
+        Preconditions.checkArgument(index >= 0, "Negative indices are not permitted.");
+    }
 
     /**
      * Creates the root index for a column.
@@ -74,19 +71,11 @@ public final class DataIndex {
      * @return an index identifying the root level of the column
      */
     public static DataIndex createColumnIndex(final int columnIndex) {
-        // TODO cache DataIndex objects if object creation proofs to be a performance issue
         return new DataIndex(columnIndex);
     }
 
     private DataIndex(final int columnIndex) {
         this(null, columnIndex);
-    }
-
-    private DataIndex(final DataIndex parent, final int index) {
-        Preconditions.checkArgument(index >= 0, "Negative indices are not permitted.");
-        m_parent = parent;
-        m_index = index;
-        m_hashCode = Objects.hash(parent, index);
     }
 
     /**
@@ -103,32 +92,14 @@ public final class DataIndex {
      * @return true if this index is on column level i.e. it has no parent
      */
     public boolean isColumnLevel() {
-        return m_parent == null;
-    }
-
-    @Override
-    public int hashCode() {
-        return m_hashCode;
-    }
-
-    @Override
-    public boolean equals(final Object obj) {
-        if (obj == this) {
-            return true;
-        } else if (obj instanceof DataIndex) {
-            var other = (DataIndex)obj;
-            return m_index == other.m_index//
-                    && Objects.equals(m_parent, other.m_parent);
-        } else {
-            return false;
-        }
+        return parent == null;
     }
 
     private IntStream indexStream() {
-        if (m_parent == null) {
-            return IntStream.of(m_index);
+        if (parent == null) {
+            return IntStream.of(index);
         } else {
-            return IntStream.concat(m_parent.indexStream(), IntStream.of(m_index));
+            return IntStream.concat(parent.indexStream(), IntStream.of(index));
         }
     }
 
