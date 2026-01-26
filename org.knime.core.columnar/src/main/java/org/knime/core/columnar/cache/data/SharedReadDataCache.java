@@ -267,11 +267,13 @@ public final class SharedReadDataCache {
 
         private void await() {
             decrement();
+            boolean wasInterrupted = false;
             synchronized (monitor) {
                 while (count.get() != 0) {
                     try {
                         monitor.wait();
-                    } catch (InterruptedException ignored) {
+                    } catch (InterruptedException e) {
+                        wasInterrupted = true;
                     }
                 }
             }
@@ -281,6 +283,10 @@ public final class SharedReadDataCache {
             // In practice, we don't reuse DataOwner currently, but better to be
             // sure...
             count.set(1);
+
+            if (wasInterrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }
