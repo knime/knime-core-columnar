@@ -173,7 +173,13 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
             throw new IllegalStateException("Cannot write batch after closing the writer.");
         }
 
-        final List<Field> fields = new ArrayList<>(m_factories.length);
+        // If this is the first call we need to create the writer and write the schema to the file
+        if (m_firstWrite) {
+            m_firstWrite = false;
+            final Schema schema = createSchema(batch, getMetadata());
+            m_writer = new ArrowWriter(m_fileHandle.asFile(), schema);
+        }
+
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         final List<FieldVector> allDictionaries = new ArrayList<>();
 
@@ -186,24 +192,11 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
             final DictionaryProvider dictionaries = factory.getDictionaries(data);
             final Field field = vector.getField();
 
-            if (m_firstWrite) {
-                // Get the field for the schema and collect dictionaries
-                fields.add(mapDictionariesAndField(field, dictionaries, allDictionaries));
-            } else {
-                // Collect the dictionaries
-                mapDictionaries(field, dictionaries, allDictionaries);
-            }
+            // Collect the dictionaries
+            mapDictionaries(field, dictionaries, allDictionaries);
 
             // Collect the vector
             vectors.add(vector);
-        }
-
-        // If this is the first call we need to create the writer and write the schema to the file
-        if (m_firstWrite) {
-            m_firstWrite = false;
-            final Schema schema = new Schema(fields, getMetadata());
-
-            m_writer = new ArrowWriter(m_fileHandle.asFile(), schema);
         }
 
         // Write the dictionaries
@@ -296,6 +289,21 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
             // if the writer is closed by the MemoryLeakDetector long after its workflow has been closed
             LOGGER.debug("The file {} has already been deleted.", absPath);
         }
+    }
+
+    protected Schema createSchema(final ReadBatch batch, final Map<String, String> metadata) {
+
+        final List<Field> fields = new ArrayList<>(m_factories.length);
+        for (int i = 0; i < m_factories.length; i++) {
+            final NullableReadData data = batch.get(i);
+            final OffHeapArrowColumnDataFactory factory = m_factories[i];
+            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
+            final FieldVector vector = factory.getVector(data);
+            final Field field = vector.getField();
+            fields.add(field);
+        }
+
+        return new Schema(fields, metadata);
     }
 
     /** Create and return the metadata for this writer */

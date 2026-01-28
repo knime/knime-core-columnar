@@ -45,8 +45,25 @@
  */
 package org.knime.core.columnar.arrow.offheap;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongSupplier;
+
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.dictionary.Dictionary;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.knime.core.columnar.arrow.compress.ArrowCompression;
+import org.knime.core.columnar.batch.ReadBatch;
+import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.store.FileHandle;
 
 /**
@@ -57,9 +74,104 @@ import org.knime.core.columnar.store.FileHandle;
  */
 class OffHeapArrowBatchWriter extends OffHeapArrowSimpleBatchWriter {
 
+    private boolean m_firstWrite;
+    private boolean m_usesDictionaries;
+    private final OffHeapArrowColumnDataFactory[] m_factories;
+
     OffHeapArrowBatchWriter(final FileHandle file, final OffHeapArrowColumnDataFactory[] factories,
         final ArrowCompression compression, final BufferAllocator allocator) {
+
         super(file, factories, compression, allocator);
+        this.m_factories = factories;
+        this.m_firstWrite = true;
+    }
+
+    @Override
+    public synchronized void write(final ReadBatch batch) throws IOException {
+
+        if (m_firstWrite) {
+            m_usesDictionaries = usesDictionaries(m_factories, batch);
+            System.out.println("+++ useDictionaries = " + m_usesDictionaries);
+            m_firstWrite = false;
+        }
+
+        super.write(batch);
+    }
+
+    @Override
+    protected Schema createSchema(final ReadBatch batch, final Map<String, String> metadata) {
+
+        if (!m_usesDictionaries) {
+            return super.createSchema(batch, metadata);
+        }
+
+        final List<Field> fields = new ArrayList<>(m_factories.length);
+        final AtomicInteger mappedId = new AtomicInteger(0);
+
+        // Loop and collect fields with mapped dictionary IDs
+        for (int i = 0; i < m_factories.length; i++) {
+            final NullableReadData data = batch.get(i);
+            final OffHeapArrowColumnDataFactory factory = m_factories[i];
+            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
+            final FieldVector vector = factory.getVector(data);
+            final DictionaryProvider dictionaries = factory.getDictionaries(data);
+            final Field field = vector.getField();
+            fields.add(mapField(field, dictionaries, mappedId::getAndIncrement));
+        }
+
+        return new Schema(fields, metadata);
+    }
+
+    /** Map the dictionary ids in the given field to new unique ids and convert the type to the message format type */
+    private static Field mapField(final Field field, final DictionaryProvider dictionaries,
+        final LongSupplier nextMappedId) {
+
+        final DictionaryEncoding encoding = field.getDictionary();
+        final DictionaryEncoding mappedEncoding;
+        final ArrowType mappedType;
+        final List<Field> children;
+        if (encoding == null) {
+            // No dictionary encoding: Nothing to do
+            mappedEncoding = null;
+            mappedType = field.getType();
+            children = field.getChildren();
+        } else {
+            // Map the id of this dictionary encoding
+            final long id = encoding.getId();
+            final long mappedId = nextMappedId.getAsLong();
+            final Dictionary dictionary = dictionaries.lookup(id);
+            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
+            final FieldVector vector = dictionary.getVector();
+
+            // Create a mapped DictionaryEncoding with the new id
+            mappedEncoding = new DictionaryEncoding(mappedId, encoding.isOrdered(), encoding.getIndexType());
+            mappedType = dictionary.getVectorType();
+            // The children of this field are the children of the dictionary field
+            children = vector.getField().getChildren();
+        }
+
+        // Call recursively for the children
+        final List<Field> mappedChildren = new ArrayList<>(field.getChildren().size());
+        for (final Field child : children) {
+            mappedChildren.add(mapField(child, dictionaries, nextMappedId));
+        }
+
+        // Create the Field
+        final FieldType fieldType = new FieldType(field.isNullable(), mappedType, mappedEncoding, field.getMetadata());
+        return new Field(field.getName(), fieldType, mappedChildren);
+    }
+
+    // TODO (TP): Where to put this? It should be possible to figure this out from factories alone.
+    static boolean usesDictionaries(final OffHeapArrowColumnDataFactory[] factories, final ReadBatch batch) {
+        for (int i = 0; i < factories.length; i++) {
+            final NullableReadData data = batch.get(i);
+            final OffHeapArrowColumnDataFactory factory = factories[i];
+            final DictionaryProvider dictionaries = factory.getDictionaries(data);
+            if (dictionaries != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }
