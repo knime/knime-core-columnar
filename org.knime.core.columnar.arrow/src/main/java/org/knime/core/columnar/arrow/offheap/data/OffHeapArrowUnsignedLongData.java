@@ -46,9 +46,7 @@
 package org.knime.core.columnar.arrow.offheap.data;
 
 import java.io.IOException;
-import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.UInt8Vector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -161,13 +159,12 @@ final class OffHeapArrowUnsignedLongData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             return Field.nullable(name, MinorType.UINT8.getType());
         }
 
         @Override
-        public ArrowUnsignedLongWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+        public ArrowUnsignedLongWriteData createWrite(final FieldVector vector, final int capacity) {
             final UInt8Vector v = (UInt8Vector)vector;
             v.allocateNew(capacity);
             return new ArrowUnsignedLongWriteData(v);

@@ -77,7 +77,7 @@ import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowLegacyDictionaryUtils.SingletonDictionaryProvider;
 import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowReadData;
 import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowWriteData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -797,13 +797,12 @@ public final class OffHeapTestData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             return Field.nullable(name, MinorType.INT.getType());
         }
 
         @Override
-        public SimpleData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+        public SimpleData createWrite(final FieldVector vector, final int capacity) {
             final IntVector v = (IntVector)vector;
             v.allocateNew(capacity);
             return new SimpleData(v);
@@ -825,11 +824,6 @@ public final class OffHeapTestData {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return null;
-        }
-
-        @Override
         public ArrowColumnDataFactoryVersion getVersion() {
             return m_version;
         }
@@ -841,7 +835,8 @@ public final class OffHeapTestData {
     }
 
     /** A factory for creating, reading and writing {@link DictionaryEncodedData}. */
-    public static final class DictionaryEncodedDataFactory implements OffHeapArrowColumnDataFactory {
+    public static final class DictionaryEncodedDataFactory
+        implements OffHeapLegacyDictionaryArrowColumnDataFactory {
 
         private static final DictionaryEncoding encoding(final long id) {
             return new DictionaryEncoding(id, false, null);
@@ -883,7 +878,7 @@ public final class OffHeapTestData {
         @Override
         public DictionaryProvider getDictionaries(final NullableReadData data) {
             final Dictionary dictionary = ((DictionaryEncodedData)data).m_dictionary;
-            return new ArrowReaderWriterUtils.SingletonDictionaryProvider(dictionary);
+            return new SingletonDictionaryProvider(dictionary);
         }
 
         @Override
@@ -898,7 +893,8 @@ public final class OffHeapTestData {
     }
 
     /** A factory for creating, reading and writing {@link ComplexData} */
-    public static final class ComplexDataFactory implements OffHeapArrowColumnDataFactory {
+    public static final class ComplexDataFactory
+        implements OffHeapLegacyDictionaryArrowColumnDataFactory {
 
         private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
             return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);

@@ -46,7 +46,6 @@
 package org.knime.core.columnar.arrow.offheap;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -55,6 +54,7 @@ import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowReadData;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowVarBinaryData;
 import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowWriteData;
 import org.knime.core.columnar.data.NullableReadData;
 import org.knime.core.columnar.data.NullableWriteData;
@@ -63,18 +63,17 @@ import com.google.common.base.Preconditions;
 
 /**
  * An {@link OffHeapArrowColumnDataFactory} is used for input and output of a specific Arrow column data type. Can be used to
- * create a new empty instance ({@link #getField(String, LongSupplier)} and
- * {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}), wrap vectors and dictionaries that have been
+ * create a new empty instance ({@link #getField(String)} and
+ * {@link #createWrite(FieldVector, int)}), wrap vectors and dictionaries that have been
  * read from a file
  * ({@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)}) and get
- * vectors and dictionaries that need to be written to a file ({@link #getVector(NullableReadData)} and
- * {@link #getDictionaries(NullableReadData)}).
+ * vectors that need to be written to a file ({@link #getVector(NullableReadData)}).
  * </p>
  * The static method {@link #createWrite(OffHeapArrowColumnDataFactory, String, BufferAllocator, int)} can be used to create
  * new {@link NullableWriteData} in just one step.
  * </p>
  * A factor has a {@link ArrowColumnDataFactoryVersion}. Make sure to update the version if
- * {@link #getVector(NullableReadData)} or {@link #getDictionaries(NullableReadData)} change. Implement
+ * {@link #getVector(NullableReadData)} changes. Implement
  * {@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)} such that
  * vectors and dictionaries from all prior versions can be wrapped in an appropriate {@link NullableReadData} object.
  *
@@ -89,30 +88,27 @@ public interface OffHeapArrowColumnDataFactory {
      * Get the Arrow {@link Field} describing the vector of the data object.
      *
      * @param name the name of the field
-     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
-     *            from this supplier. Other ids might be used already in the parent data object.
      * @return the Arrow description for the vector type
      */
-    Field getField(String name, LongSupplier dictionaryIdSupplier);
+    Field getField(String name);
 
     /**
      * Create an empty column data for writing.
      *
-     * @param vector the empty vector with the type according to {@link #getField(String, LongSupplier)}.
-     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
-     *            from this supplier. Other ids might be used already in the parent data object. Also take as many
-     *            dictionary ids from the supplier as in {@link #getField(String, LongSupplier)}.
-     * @param allocator the allocator used for memory allocation of dictionary vectors
+     * @param vector the empty vector with the type according to {@link #getField(String)}.
      * @param capacity the initial capacity to allocate
      * @return the {@link NullableWriteData}
      */
-    OffHeapArrowWriteData createWrite(FieldVector vector, LongSupplier dictionaryIdSupplier, BufferAllocator allocator,
-        int capacity);
+    OffHeapArrowWriteData createWrite(FieldVector vector, int capacity);
 
     // ===================== Reading ColumnReadData ===========================
 
     /**
      * Wrap the given vector and dictionaries into a column data for reading.
+     * <p>
+     * Currently we do not write any data using Arrow dictionaries. Instead we use our own struct-based dictionary
+     * encoding. The only usage of the dictionary {@code provider} is for backwards compatibility with legacy
+     * ZonedDateTime (see {@link OffHeapArrowVarBinaryData}.
      *
      * @param vector the vector holding some data
      * @param nullCount the null count of this vector (and its children)
@@ -133,12 +129,6 @@ public interface OffHeapArrowColumnDataFactory {
     FieldVector getVector(NullableReadData data);
 
     /**
-     * @param data a column data holding some values
-     * @return dictionaries which should be written to disk
-     */
-    DictionaryProvider getDictionaries(NullableReadData data);
-
-    /**
      * @return the current version used for getting the vectors and dictionaries. Not allowed to contain ','.
      */
     ArrowColumnDataFactoryVersion getVersion();
@@ -146,17 +136,9 @@ public interface OffHeapArrowColumnDataFactory {
     // ===================== Utility methods ==================================
 
     /**
-     * @return a new {@link LongSupplier} counting upwards and starting with 0
-     */
-    public static LongSupplier newDictionaryIdSupplier() {
-        final AtomicLong id = new AtomicLong(0);
-        return id::getAndIncrement;
-    }
-
-    /**
      * Utility method to create a new instance of {@link NullableWriteData} with a newly allocated vector. First creates a
-     * field using {@link #getField(String, LongSupplier)}. Then allocates a new vector for this field and creates the
-     * {@link NullableWriteData} using {@link #createWrite(FieldVector, LongSupplier, BufferAllocator, int)}.
+     * field using {@link #getField(String)}. Then allocates a new vector for this field and creates the
+     * {@link NullableWriteData} using {@link #createWrite(FieldVector, int)}.
      *
      * @param factory the factory to create the column data
      * @param name the name of the vector
@@ -165,19 +147,19 @@ public interface OffHeapArrowColumnDataFactory {
      * @return a new {@link NullableWriteData} object
      */
     @SuppressWarnings("resource") // Vector resource handled by ColumnWriteData
-    public static NullableWriteData createWrite(final OffHeapArrowColumnDataFactory factory, final String name,
+    static NullableWriteData createWrite(final OffHeapArrowColumnDataFactory factory, final String name,
         final BufferAllocator allocator, final int capacity) {
-        final Field field = factory.getField(name, newDictionaryIdSupplier());
+        final Field field = factory.getField(name);
         final FieldVector vector = field.createVector(allocator);
-        return factory.createWrite(vector, newDictionaryIdSupplier(), allocator, capacity);
+        return factory.createWrite(vector, capacity);
     }
 
     /** A class holding the null count for a vector and its children. */
-    public static final class ArrowVectorNullCount {
+    final class ArrowVectorNullCount {
 
-        private int m_nullCount;
+        private final int m_nullCount;
 
-        private ArrowVectorNullCount[] m_children;
+        private final ArrowVectorNullCount[] m_children;
 
         /**
          * Create a {@link ArrowVectorNullCount} with the given null count for the vector and its children.

@@ -479,7 +479,7 @@ public class OffHeapArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final OffHeapArrowBatchWriter writer = new OffHeapArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final OffHeapTestArrowBatchWriter writer = new OffHeapTestArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -537,7 +537,7 @@ public class OffHeapArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final OffHeapArrowBatchWriter writer = new OffHeapArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final OffHeapTestArrowBatchWriter writer = new OffHeapTestArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -653,7 +653,7 @@ public class OffHeapArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final OffHeapArrowBatchWriter writer = new OffHeapArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final OffHeapTestArrowBatchWriter writer = new OffHeapTestArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -703,7 +703,7 @@ public class OffHeapArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final OffHeapArrowBatchWriter writer = new OffHeapArrowBatchWriter(m_path, factories, compression, m_alloc)) {
+        try (final OffHeapTestArrowBatchWriter writer = new OffHeapTestArrowBatchWriter(m_path, factories, compression, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -731,12 +731,19 @@ public class OffHeapArrowWriterReaderTest {
     @SuppressWarnings({"unchecked", "resource"})
     private final <T extends NullableWriteData> T createWrite(final OffHeapArrowColumnDataFactory factory,
         final int numValues) {
-        final long firstDictId = new Random().nextInt(1000);
-        final AtomicLong dictId1 = new AtomicLong(firstDictId);
-        final AtomicLong dictId2 = new AtomicLong(firstDictId);
-        final Field field = factory.getField("0", dictId1::getAndIncrement);
-        final FieldVector vector = field.createVector(m_alloc);
-        return (T)factory.createWrite(vector, dictId2::getAndIncrement, m_alloc, numValues);
+
+        if (factory instanceof OffHeapLegacyDictionaryArrowColumnDataFactory f) {
+            final long firstDictId = new Random().nextInt(1000);
+            final AtomicLong dictId1 = new AtomicLong(firstDictId);
+            final AtomicLong dictId2 = new AtomicLong(firstDictId);
+            final Field field = f.getField("0", dictId1::getAndIncrement);
+            final FieldVector vector = field.createVector(m_alloc);
+            return (T)f.createWrite(vector, dictId2::getAndIncrement, m_alloc, numValues);
+        } else {
+            final Field field = factory.getField("0");
+            final FieldVector vector = field.createVector(m_alloc);
+            return (T)factory.createWrite(vector, numValues);
+        }
     }
 
     /**
