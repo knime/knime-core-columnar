@@ -50,9 +50,7 @@ package org.knime.core.columnar.arrow.offheap.data;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
@@ -176,10 +174,9 @@ public final class OffHeapArrowDictEncodedStringData {
         }
 
         @Override
-        public OffHeapArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+        public OffHeapArrowWriteData createWrite(final FieldVector vector, final int capacity) {
             return new ArrowDictEncodedStringWriteData<>(
-                m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity), m_keyType);
+                m_delegate.createWrite(vector, capacity), m_keyType);
         }
 
         @Override

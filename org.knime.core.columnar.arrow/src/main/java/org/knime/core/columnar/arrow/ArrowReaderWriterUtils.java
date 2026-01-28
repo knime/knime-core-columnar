@@ -54,16 +54,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.compression.CompressionCodec;
-import org.apache.arrow.vector.dictionary.Dictionary;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.ipc.SeekableReadChannel;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -230,75 +225,7 @@ public final class ArrowReaderWriterUtils {
         return Arrays.stream(serializedLongs.split(",")).mapToLong(Long::valueOf).toArray();
     }
 
-    /** A dictionary provider only holding one single dictionary */
-    public static final class SingletonDictionaryProvider implements DictionaryProvider {
-
-        private long m_id;
-
-        private final Dictionary m_dictionary;
-
-        /**
-         * Create a dictionary provider only holding the given dictionary.
-         *
-         * @param dictionary the dictionary
-         */
-        public SingletonDictionaryProvider(final Dictionary dictionary) {
-            m_dictionary = dictionary;
-            m_id = dictionary.getEncoding().getId();
-        }
-
-        @Override
-        public Dictionary lookup(final long id) {
-            if (id == m_id) {
-                return m_dictionary;
-            } else {
-                return null;
-            }
-        }
-
-        @Override
-        public Set<Long> getDictionaryIds() {
-            return Collections.singleton(m_id);
-        }
-    }
-
-    /**
-     * A dictionary provider holding a list of dictionary providers. On {@link #lookup(long)} the lookup is performed on
-     * the children dictionary providers until the id is found.
-     */
-    public static final class NestedDictionaryProvider implements DictionaryProvider {
-
-        private final List<DictionaryProvider> m_providers;
-
-        /**
-         * Create a dictionary provider with the given children
-         *
-         * @param providers the providers to lookup the ids
-         */
-        public NestedDictionaryProvider(final List<DictionaryProvider> providers) {
-            m_providers = providers;
-        }
-
-        @Override
-        public Dictionary lookup(final long id) {
-            for (int i = 0; i < m_providers.size(); i++) {
-                final Dictionary dictionary = m_providers.get(i).lookup(id);
-                if (dictionary != null) {
-                    return dictionary;
-                }
-            }
-            return null;
-        }
-
-        @Override
-        public Set<Long> getDictionaryIds() {
-            return m_providers.stream() //
-                .flatMap(p -> p.getDictionaryIds().stream()) //
-                .collect(Collectors.toSet());
-        }
-    }
-
-    /** A provider of byte offsets of record batches and dictionary batches in an Arrow file. */
+    /** A provider of byte offsets of record batches in an Arrow file. */
     public interface OffsetProvider {
 
         /**
@@ -313,6 +240,10 @@ public final class ArrowReaderWriterUtils {
          * @return the offsets of all dictionary batches for the given index
          * @throws IndexOutOfBoundsException if there are no dictionaries for the given index in the file (yet)
          */
-        long[] getDictionaryBatchOffsets(int index);
+        // TODO (TP): Remove this method after removing dictionaries from OnHeap implementation
+        @Deprecated
+        default long[] getDictionaryBatchOffsets(final int index) {
+            throw new UnsupportedOperationException();
+        }
     }
 }
