@@ -313,6 +313,10 @@ public final class ArrowReaderWriterUtils {
          * @return the offsets of all dictionary batches for the given index
          * @throws IndexOutOfBoundsException if there are no dictionaries for the given index in the file (yet)
          */
-        long[] getDictionaryBatchOffsets(int index);
+        // TODO (TP): Remove this method.
+        @Deprecated
+        default long[] getDictionaryBatchOffsets(final int index) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

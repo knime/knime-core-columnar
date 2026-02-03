@@ -55,6 +55,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -174,7 +175,11 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
             m_writer = new ArrowWriter(m_fileHandle.asFile(), schema);
         }
 
-        // Loop and collect vectors
+        // Write the dictionaries
+        final List<FieldVector> dictionaries = getDictionaries(batch);
+        writeDictionaries(m_writer, dictionaries, m_compression, m_allocator);
+
+        // Write the vectors
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
         for (int i = 0; i < m_factories.length; i++) {
             final NullableReadData data = batch.get(i);
@@ -183,12 +188,6 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
             final FieldVector vector = factory.getVector(data);
             vectors.add(vector);
         }
-
-        // Write the dictionaries
-        final List<FieldVector> allDictionaries = getDictionaries(batch);
-        writeDictionaries(m_writer, allDictionaries, m_compression, m_allocator);
-
-        // Write the vectors
         writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
 
         // Remember batch boundary for footer
@@ -198,13 +197,13 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
         m_numBatches.incrementAndGet();
     }
 
+    // protected so that it can be overridden in tests that need to write data with arrow dictionaries
     protected List<FieldVector> getDictionaries(final ReadBatch batch) {
-        return List.of();
+        return Collections.emptyList();
     }
 
     /**
-     * @return an offset provider that can return the offset of each record batch and dictionary batch once it is
-     *         written to the file
+     * @return an offset provider that can return the offset of each record batch once it is written to the file
      */
     OffsetProvider getOffsetProvider() {
         return new OffsetProvider() {
@@ -215,11 +214,6 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
                     throw new IndexOutOfBoundsException("Record batch with index " + index + " not yet written.");
                 }
                 return m_writer.m_recordBlocks.get(index).getOffset();
-            }
-
-            @Override
-            public long[] getDictionaryBatchOffsets(final int index) {
-                throw new UnsupportedOperationException("Should not be used!?");
             }
         };
     }
@@ -310,9 +304,12 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
         for (int id = 0; id < dictionaries.size(); id++) {
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
             final FieldVector vector = dictionaries.get(id);
-            try (final ArrowRecordBatch data =
-                createRecordBatch(List.of(vector), vector.getValueCount(), compression, allocator);
-                    final ArrowDictionaryBatch batch = new ArrowDictionaryBatch(id, data, false)) {
+            try ( //
+                    final ArrowRecordBatch data = //
+                        createRecordBatch(List.of(vector), vector.getValueCount(), compression, allocator);
+                    final ArrowDictionaryBatch batch = //
+                        new ArrowDictionaryBatch(id, data, false);//
+            ) {
                 writer.writeDictionaryBatch(batch);
             }
         }
