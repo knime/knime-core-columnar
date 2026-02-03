@@ -66,7 +66,6 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.TypeLayout;
-import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.ipc.WriteChannel;
@@ -78,10 +77,8 @@ import org.apache.arrow.vector.ipc.message.ArrowFooter;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.ipc.message.IpcOption;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
-import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils;
@@ -180,26 +177,18 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
             m_writer = new ArrowWriter(m_fileHandle.asFile(), schema);
         }
 
+        // Loop and collect vectors
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
-        final List<FieldVector> allDictionaries = new ArrayList<>();
-
-        // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
             final NullableReadData data = batch.get(i);
             final OffHeapArrowColumnDataFactory factory = m_factories[i];
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
             final FieldVector vector = factory.getVector(data);
-            final DictionaryProvider dictionaries = factory.getDictionaries(data);
-            final Field field = vector.getField();
-
-            // Collect the dictionaries
-            mapDictionaries(field, dictionaries, allDictionaries);
-
-            // Collect the vector
             vectors.add(vector);
         }
 
         // Write the dictionaries
+        final List<FieldVector> allDictionaries = getDictionaries(batch);
         writeDictionaries(m_writer, allDictionaries, m_compression, m_allocator);
 
         // Write the vectors
@@ -210,6 +199,10 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
         m_batchBoundaries.add(previousBatchEnd + Long.valueOf(batch.length()));
 
         m_numBatches.incrementAndGet();
+    }
+
+    protected List<FieldVector> getDictionaries(final ReadBatch batch) {
+        return List.of();
     }
 
     /**
@@ -291,6 +284,7 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
         }
     }
 
+    // protected so that it can be overridden in tests that need to write data with arrow dictionaries
     protected Schema createSchema(final ReadBatch batch, final Map<String, String> metadata) {
 
         final List<Field> fields = new ArrayList<>(m_factories.length);
@@ -317,45 +311,6 @@ class OffHeapArrowSimpleBatchWriter implements BatchWriter {
         metadata.put(ARROW_FACTORY_VERSIONS_KEY, factoryVersions);
 
         return metadata;
-    }
-
-    /** Map the dictionary ids in the given field to new unique ids and convert the type to the message format type */
-    private static Field mapDictionariesAndField(final Field field, final DictionaryProvider dictionaries,
-        final List<FieldVector> allDictionaries) {
-        final DictionaryEncoding encoding = field.getDictionary();
-        final DictionaryEncoding mappedEncoding;
-        final ArrowType mappedType;
-        final List<Field> children;
-        if (encoding == null) {
-            // No dictionary encoding: Nothing to do
-            mappedEncoding = null;
-            mappedType = field.getType();
-            children = field.getChildren();
-        } else {
-            // Map the id of this dictionary encoding
-            final long id = encoding.getId();
-            final long mappedId = allDictionaries.size();
-            final Dictionary dictionary = dictionaries.lookup(id);
-            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-            final FieldVector vector = dictionary.getVector();
-            allDictionaries.add(vector);
-
-            // Create a mapped DictionaryEncoding with the new id
-            mappedEncoding = new DictionaryEncoding(mappedId, encoding.isOrdered(), encoding.getIndexType());
-            mappedType = dictionary.getVectorType();
-            // The children of this field are the children of the dictionary field
-            children = vector.getField().getChildren();
-        }
-
-        // Call recursively for the children
-        final List<Field> mappedChildren = new ArrayList<>(field.getChildren().size());
-        for (final Field child : children) {
-            mappedChildren.add(mapDictionariesAndField(child, dictionaries, allDictionaries));
-        }
-
-        // Create the Field
-        final FieldType fieldType = new FieldType(field.isNullable(), mappedType, mappedEncoding, field.getMetadata());
-        return new Field(field.getName(), fieldType, mappedChildren);
     }
 
     /** Get the dictionaries used in the fields and add them to allDictionaries in the correct order */

@@ -99,6 +99,26 @@ class OffHeapArrowBatchWriter extends OffHeapArrowSimpleBatchWriter {
     }
 
     @Override
+    protected List<FieldVector> getDictionaries(final ReadBatch batch) {
+
+        if (!m_usesDictionaries) {
+            return super.getDictionaries(batch);
+        }
+
+        final List<FieldVector> allDictionaries = new ArrayList<>();
+        for (int i = 0; i < m_factories.length; i++) {
+            final NullableReadData data = batch.get(i);
+            final OffHeapArrowColumnDataFactory factory = m_factories[i];
+            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
+            final FieldVector vector = factory.getVector(data);
+            final Field field = vector.getField();
+            final DictionaryProvider dictionaries = factory.getDictionaries(data);
+            mapDictionaries(field, dictionaries, allDictionaries);
+        }
+        return allDictionaries;
+    }
+
+    @Override
     protected Schema createSchema(final ReadBatch batch, final Map<String, String> metadata) {
 
         if (!m_usesDictionaries) {
@@ -159,6 +179,28 @@ class OffHeapArrowBatchWriter extends OffHeapArrowSimpleBatchWriter {
         // Create the Field
         final FieldType fieldType = new FieldType(field.isNullable(), mappedType, mappedEncoding, field.getMetadata());
         return new Field(field.getName(), fieldType, mappedChildren);
+    }
+
+    /** Get the dictionaries used in the fields and add them to allDictionaries in the correct order */
+    private static void mapDictionaries(final Field field, final DictionaryProvider dictionaries,
+        final List<FieldVector> allDictionaries) {
+        final DictionaryEncoding encoding = field.getDictionary();
+        final List<Field> children;
+        if (encoding == null) {
+            children = field.getChildren();
+        } else {
+            // Map the id of this dictionary encoding
+            final long id = encoding.getId();
+            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
+            final FieldVector vector = dictionaries.lookup(id).getVector();
+            allDictionaries.add(vector);
+            // The children of this field are the children of the dictionary field
+            children = vector.getField().getChildren();
+        }
+        // Call recursively for the children
+        for (final Field child : children) {
+            mapDictionaries(child, dictionaries, allDictionaries);
+        }
     }
 
     // TODO (TP): Where to put this? It should be possible to figure this out from factories alone.
