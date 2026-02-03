@@ -123,25 +123,10 @@ class OffHeapArrowPartialFileBatchReader extends AbstractOffHeapArrowBatchReader
 
         @Override
         public synchronized ArrowDictionaryBatch[] readDictionaryBatches(final int index) throws IOException {
-            final long[] offsets = m_offsetProvider.getDictionaryBatchOffsets(index);
-            final ArrowDictionaryBatch[] dictionaryBatches = new ArrowDictionaryBatch[offsets.length];
-            try {
-                for (int i = 0; i < offsets.length; i++) {
-                    @SuppressWarnings("resource") // Resource closed by caller
-                    final ArrowDictionaryBatch batch =
-                        MappedMessageSerializer.deserializeDictionaryBatch(m_in, offsets[i]);
-                    dictionaryBatches[i] = batch;
-                }
-            } catch (final IOException ex) {
-                // Close all batches in case of an exception
-                for (final ArrowDictionaryBatch b : dictionaryBatches) {
-                    if (b != null) {
-                        b.close();
-                    }
-                }
-                throw ex;
-            }
-            return dictionaryBatches;
+            // NB: We support dictionary reading to be able to read tables serialized with
+            // earlier KNIME versions. However, we never write dictionaries. Therefore, we
+            // don't need to support dictionaries when reading partial files.
+            return new ArrowDictionaryBatch[0];
         }
 
         @Override
