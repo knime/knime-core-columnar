@@ -296,7 +296,7 @@ class OffHeapArrowBatchWriter implements BatchWriter {
         final List<Field> fields = new ArrayList<>(m_factories.length);
         for (int i = 0; i < m_factories.length; i++) {
             final OffHeapArrowColumnDataFactory factory = m_factories[i];
-            final Field field = factory.getField(String.valueOf(i), null);
+            final Field field = factory.getField(String.valueOf(i));
             fields.add(field);
         }
 

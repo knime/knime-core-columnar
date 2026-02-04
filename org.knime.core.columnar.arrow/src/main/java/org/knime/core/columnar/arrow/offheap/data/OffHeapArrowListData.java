@@ -51,10 +51,8 @@ package org.knime.core.columnar.arrow.offheap.data;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Objects;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.complex.BaseRepeatedValueVector;
 import org.apache.arrow.vector.complex.ListVector;
@@ -216,16 +214,15 @@ public final class OffHeapArrowListData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            final Field data = m_inner.getField("listData", dictionaryIdSupplier);
+        public Field getField(final String name) {
+            final Field data = m_inner.getField("listData");
             return new Field(name, new FieldType(true, MinorType.LIST.getType(), null),
                 Collections.singletonList(data));
         }
 
         @Override
         @SuppressWarnings("resource") // Data vector closed with list vector
-        public ArrowListWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+        public ArrowListWriteData createWrite(final FieldVector vector, final int capacity) {
             final ListVector v = (ListVector)vector;
             // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
             // the child vector
@@ -235,7 +232,7 @@ public final class OffHeapArrowListData {
             // Data vector
             final FieldVector dataVector = v.getDataVector();
             final OffHeapArrowWriteData data =
-                m_inner.createWrite(dataVector, dictionaryIdSupplier, allocator, capacity * INITIAL_VALUES_PER_LIST);
+                m_inner.createWrite(dataVector, capacity * INITIAL_VALUES_PER_LIST);
             return new ArrowListWriteData(v, data);
         }
 
@@ -257,12 +254,6 @@ public final class OffHeapArrowListData {
                 throw new IOException("Cannot read ArrowListData with version " + version.getVersion()
                     + ". Current version: " + CURRENT_VERSION + ".");
             }
-        }
-
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            final ArrowListReadData d = (ArrowListReadData)data;
-            return m_inner.getDictionaries(d.m_data);
         }
 
         @Override

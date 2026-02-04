@@ -44,73 +44,57 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Nov 4, 2020 (benjamin): created
+ *   11 Dec 2025 (pietzsch): created
  */
-package org.knime.core.columnar.arrow.offheap.data;
+package org.knime.core.columnar.arrow.offheap;
 
-import java.util.Objects;
+import java.util.function.LongSupplier;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.offheap.OffHeapArrowColumnDataFactory;
-import org.knime.core.columnar.data.NullableReadData;
+import org.apache.arrow.vector.dictionary.Dictionary;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowWriteData;
+import org.knime.core.columnar.data.NullableWriteData;
 
 /**
- * Abstract implementation of {@link OffHeapArrowColumnDataFactory} for {@link OffHeapArrowReadData} which extend
- * {@link AbstractOffHeapArrowReadData}. Holds the current version.
- *
- * Overwrite {@link #getDictionaries(NullableReadData)} if the data object contains dictionaries.
- *
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * Provides overrides that allow to inject {@code BufferAllocator} and {@code dictionaryIdSupplier}. This is needed for
+ * creating {@link Dictionary} vectors (which we no longer write in new data, but still want to be able to create for
+ * testing).
  */
-@SuppressWarnings("javadoc")
-abstract class AbstractOffHeapArrowColumnDataFactory implements OffHeapArrowColumnDataFactory {
+interface OffHeapTestArrowColumnDataFactory extends OffHeapArrowColumnDataFactory {
 
-    /** The current version */
-    protected final ArrowColumnDataFactoryVersion m_version;
+    @Override
+    default Field getField(final String name) {
+        return getField(name, null);
+    }
+
+    @Override
+    default OffHeapArrowWriteData createWrite(final FieldVector vector, final int capacity) {
+        return createWrite(vector, null, null, capacity);
+    }
 
     /**
-     * Create a new abstract {@link OffHeapArrowColumnDataFactory}.
+     * Get the Arrow {@link Field} describing the vector of the data object.
      *
-     * @param version the current version
+     * @param name the name of the field
+     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
+     *            from this supplier. Other ids might be used already in the parent data object.
+     * @return the Arrow description for the vector type
      */
-    protected AbstractOffHeapArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
-        m_version = version;
-    }
+    Field getField(final String name, final LongSupplier dictionaryIdSupplier);
 
-    @Override
-    public FieldVector getVector(final NullableReadData data) {
-        return ((AbstractOffHeapArrowReadData<?>)data).m_vector;
-    }
-
-    @Override
-    public ArrowColumnDataFactoryVersion getVersion() {
-        return m_version;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(m_version);
-    }
-
-    @Override
-    public boolean equals(final Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        AbstractOffHeapArrowColumnDataFactory other = (AbstractOffHeapArrowColumnDataFactory)obj;
-        return m_version.equals(other.m_version);
-    }
-
-    @Override
-    public String toString() {
-        return this.getClass().getSimpleName() + ".v" + m_version.getVersion();
-    }
-
+    /**
+     * Create an empty column data for writing.
+     *
+     * @param vector the empty vector with the type according to {@link #getField(String, LongSupplier)}.
+     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
+     *            from this supplier. Other ids might be used already in the parent data object. Also take as many
+     *            dictionary ids from the supplier as in {@link #getField(String, LongSupplier)}.
+     * @param allocator the allocator used for memory allocation of dictionary vectors
+     * @param capacity the initial capacity to allocate
+     * @return the {@link NullableWriteData}
+     */
+    OffHeapArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
+        final BufferAllocator allocator, final int capacity);
 }

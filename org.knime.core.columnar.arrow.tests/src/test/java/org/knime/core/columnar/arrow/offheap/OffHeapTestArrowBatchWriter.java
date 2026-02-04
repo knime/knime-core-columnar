@@ -116,7 +116,7 @@ class OffHeapTestArrowBatchWriter extends OffHeapArrowBatchWriter {
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
             final FieldVector vector = factory.getVector(data);
             final Field field = vector.getField();
-            final DictionaryProvider dictionaries = factory.getDictionaries(data);
+            final DictionaryProvider dictionaries = OffHeapArrowGetDictionaries.getDictionaries(factory, data);
             mapDictionaries(field, dictionaries, allDictionaries);
         }
         return allDictionaries;
@@ -138,7 +138,7 @@ class OffHeapTestArrowBatchWriter extends OffHeapArrowBatchWriter {
             final OffHeapArrowColumnDataFactory factory = m_factories[i];
             @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
             final FieldVector vector = factory.getVector(data);
-            final DictionaryProvider dictionaries = factory.getDictionaries(data);
+            final DictionaryProvider dictionaries = OffHeapArrowGetDictionaries.getDictionaries(factory, data);
             final Field field = vector.getField();
             fields.add(mapField(field, dictionaries, mappedId::getAndIncrement));
         }
@@ -212,7 +212,7 @@ class OffHeapTestArrowBatchWriter extends OffHeapArrowBatchWriter {
         for (int i = 0; i < factories.length; i++) {
             final NullableReadData data = batch.get(i);
             final OffHeapArrowColumnDataFactory factory = factories[i];
-            final DictionaryProvider dictionaries = factory.getDictionaries(data);
+            final DictionaryProvider dictionaries = OffHeapArrowGetDictionaries.getDictionaries(factory, data);
             if (dictionaries != null) {
                 return true;
             }

@@ -44,73 +44,53 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Nov 4, 2020 (benjamin): created
+ *   27 Jan 2026 (pietzsch): created
  */
-package org.knime.core.columnar.arrow.offheap.data;
+package org.knime.core.columnar.arrow.offheap;
 
-import java.util.Objects;
-
-import org.apache.arrow.vector.FieldVector;
-import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.offheap.OffHeapArrowColumnDataFactory;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.knime.core.columnar.data.NullableReadData;
 
 /**
- * Abstract implementation of {@link OffHeapArrowColumnDataFactory} for {@link OffHeapArrowReadData} which extend
- * {@link AbstractOffHeapArrowReadData}. Holds the current version.
+ * TODO javadoc or remove
  *
- * Overwrite {@link #getDictionaries(NullableReadData)} if the data object contains dictionaries.
- *
- * @author Benjamin Wilhelm, KNIME GmbH, Konstanz, Germany
+ * @author pietzsch
  */
-@SuppressWarnings("javadoc")
-abstract class AbstractOffHeapArrowColumnDataFactory implements OffHeapArrowColumnDataFactory {
-
-    /** The current version */
-    protected final ArrowColumnDataFactoryVersion m_version;
+public interface OffHeapArrowGetDictionaries {
 
     /**
-     * Create a new abstract {@link OffHeapArrowColumnDataFactory}.
+     * Split out of OffHeapArrowColumnDataFactory.
+     * <p>
+     * Currently we do not write any data using Arrow dictionaries. Instead we use our own struct-based dictionary
+     * encoding. The only reasons this method is here is so that we can write test data that uses Arrow dictionaries.
      *
-     * @param version the current version
+     * @param data a column data holding some values
+     * @return dictionaries which should be written to disk
      */
-    protected AbstractOffHeapArrowColumnDataFactory(final ArrowColumnDataFactoryVersion version) {
-        m_version = version;
-    }
+    DictionaryProvider getDictionaries(NullableReadData data);
 
-    @Override
-    public FieldVector getVector(final NullableReadData data) {
-        return ((AbstractOffHeapArrowReadData<?>)data).m_vector;
-    }
+    public static DictionaryProvider getDictionaries(final OffHeapArrowColumnDataFactory factory,
+        final NullableReadData data) {
 
-    @Override
-    public ArrowColumnDataFactoryVersion getVersion() {
-        return m_version;
-    }
+        if (factory instanceof OffHeapArrowGetDictionaries f) {
+            return f.getDictionaries(data);
+            //        } else if (factory instanceof ArrowStructDataFactory f) {
+            //            final ArrowStructReadData d = (ArrowStructReadData)data;
+            //            final List<DictionaryProvider> providers = new ArrayList<>();
+            //            for (int i = 0; i < m_inner.length; i++) {
+            //                final DictionaryProvider p = m_inner[i].getDictionaries(d.getReadDataAt(i));
+            //                if (p != null) {
+            //                    providers.add(p);
+            //                }
+            //            }
+            //            return new NestedDictionaryProvider(providers);
+            //        } else if (factory instanceof ArrowListDataFactory f) {
+            //            final ArrowListReadData d = (ArrowListReadData)data;
+            //            return m_inner.getDictionaries(d.m_data);
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(m_version);
-    }
-
-    @Override
-    public boolean equals(final Object obj) {
-        if (this == obj) {
-            return true;
+            // .... else if (factory instanceof ExtensionArrowColumnDataFactory.OffHeapArrowSchemaMapper) ...
         }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        AbstractOffHeapArrowColumnDataFactory other = (AbstractOffHeapArrowColumnDataFactory)obj;
-        return m_version.equals(other.m_version);
-    }
-
-    @Override
-    public String toString() {
-        return this.getClass().getSimpleName() + ".v" + m_version.getVersion();
+        return null;
     }
 
 }

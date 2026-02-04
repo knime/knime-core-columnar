@@ -46,9 +46,7 @@
 package org.knime.core.columnar.arrow.offheap.data;
 
 import java.io.IOException;
-import java.util.function.LongSupplier;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BaseLargeVariableWidthVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.IntVector;
@@ -233,13 +231,13 @@ public final class OffHeapArrowVarBinaryData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             return Field.nullable(name, LargeBinary.INSTANCE);
         }
 
         @Override
-        public ArrowVarBinaryWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+        public ArrowVarBinaryWriteData createWrite(final FieldVector vector,
+            final int capacity) {
             final LargeVarBinaryVector v = (LargeVarBinaryVector)vector;
             v.allocateNew(capacity * INITAL_BYTES_PER_ELEMENT, capacity);
             return new ArrowVarBinaryWriteData(v);

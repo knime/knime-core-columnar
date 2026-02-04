@@ -51,10 +51,8 @@ package org.knime.core.columnar.arrow.offheap.data;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
 import org.knime.core.columnar.arrow.offheap.OffHeapArrowColumnDataFactory;
@@ -335,20 +333,14 @@ public final class AbstractOffHeapArrowDictEncodedData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return m_delegate.getField(name, dictionaryIdSupplier);
+        public Field getField(final String name) {
+            return m_delegate.getField(name);
         }
 
         @SuppressWarnings("rawtypes")
         @Override
         public FieldVector getVector(final NullableReadData data) {
             return m_delegate.getVector(((AbstractArrowDictEncodedReadData)data).m_delegate);
-        }
-
-        @SuppressWarnings("rawtypes")
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return m_delegate.getDictionaries(((AbstractArrowDictEncodedReadData)data).m_delegate);
         }
 
         private OffHeapArrowColumnDataFactory createKeyDataFactory() {

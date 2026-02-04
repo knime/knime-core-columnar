@@ -50,10 +50,8 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -242,15 +240,14 @@ final class OffHeapArrowSchemaMapper implements MapperWithTraits<OffHeapArrowCol
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            var storageField = m_delegate.getField(name, dictionaryIdSupplier);
+        public Field getField(final String name) {
+            var storageField = m_delegate.getField(name);
             return ExtensionTypes.wrapInExtensionTypeIfNecessary(storageField, m_traits);
         }
 
         @Override
-        public OffHeapArrowWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
-            return m_delegate.createWrite(vector, dictionaryIdSupplier, allocator, capacity);
+        public OffHeapArrowWriteData createWrite(final FieldVector vector, final int capacity) {
+            return m_delegate.createWrite(vector, capacity);
         }
 
         @Override
@@ -262,11 +259,6 @@ final class OffHeapArrowSchemaMapper implements MapperWithTraits<OffHeapArrowCol
         @Override
         public FieldVector getVector(final NullableReadData data) {
             return m_delegate.getVector(data);
-        }
-
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return m_delegate.getDictionaries(data);
         }
 
         @Override

@@ -53,11 +53,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.LongSupplier;
 import java.util.stream.Stream;
 
 import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -66,7 +64,6 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.ReferencedData;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.ArrowReaderWriterUtils.NestedDictionaryProvider;
 import org.knime.core.columnar.arrow.offheap.OffHeapArrowColumnDataFactory;
 import org.knime.core.columnar.arrow.offheap.data.AbstractOffHeapArrowReadData.MissingValues;
 import org.knime.core.columnar.data.NullableReadData;
@@ -295,17 +292,16 @@ public final class OffHeapArrowStructData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             final List<Field> children = new ArrayList<>(m_inner.length);
             for (int i = 0; i < m_inner.length; i++) { //NOSONAR
-                children.add(m_inner[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
+                children.add(m_inner[i].getField(childNameAtIndex(i)));
             }
             return new Field(name, new FieldType(true, Struct.INSTANCE, null), children);
         }
 
         @Override
-        public ArrowStructWriteData createWrite(final FieldVector vector, final LongSupplier dictionaryIdSupplier,
-            final BufferAllocator allocator, final int capacity) {
+        public ArrowStructWriteData createWrite(final FieldVector vector, final int capacity) {
             final StructVector v = (StructVector)vector;
             // Note: we must do that before creating the inner data because "allocateNew" overwrites the allocation for
             // the child vector
@@ -317,7 +313,7 @@ public final class OffHeapArrowStructData {
             for (int i = 0; i < children.length; i++) {
                 @SuppressWarnings("resource") // Child vector closed with struct vector
                 final FieldVector childVector = v.getChild(childNameAtIndex(i));
-                children[i] = m_inner[i].createWrite(childVector, dictionaryIdSupplier, allocator, capacity);
+                children[i] = m_inner[i].createWrite(childVector, capacity);
             }
             return new ArrowStructWriteData(v, children);
         }
@@ -370,19 +366,6 @@ public final class OffHeapArrowStructData {
                 // can be the case for legacy date&time data where we used arrow structs directly
                 return false;
             }
-        }
-
-        @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            final ArrowStructReadData d = (ArrowStructReadData)data;
-            final List<DictionaryProvider> providers = new ArrayList<>();
-            for (int i = 0; i < m_inner.length; i++) {
-                final DictionaryProvider p = m_inner[i].getDictionaries(d.getReadDataAt(i));
-                if (p != null) {
-                    providers.add(p);
-                }
-            }
-            return new NestedDictionaryProvider(providers);
         }
 
         @Override

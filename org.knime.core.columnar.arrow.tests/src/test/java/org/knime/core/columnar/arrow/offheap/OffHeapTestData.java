@@ -777,7 +777,7 @@ public final class OffHeapTestData {
     }
 
     /** A factory for creating, reading and writing {@link SimpleData}. */
-    public static final class SimpleDataFactory implements OffHeapArrowColumnDataFactory {
+    public static final class SimpleDataFactory implements OffHeapTestArrowColumnDataFactory {
 
         private final ArrowColumnDataFactoryVersion m_version;
 
@@ -825,11 +825,6 @@ public final class OffHeapTestData {
         }
 
         @Override
-        public DictionaryProvider getDictionaries(final NullableReadData data) {
-            return null;
-        }
-
-        @Override
         public ArrowColumnDataFactoryVersion getVersion() {
             return m_version;
         }
@@ -841,7 +836,8 @@ public final class OffHeapTestData {
     }
 
     /** A factory for creating, reading and writing {@link DictionaryEncodedData}. */
-    public static final class DictionaryEncodedDataFactory implements OffHeapArrowColumnDataFactory {
+    public static final class DictionaryEncodedDataFactory
+        implements OffHeapTestArrowColumnDataFactory, OffHeapArrowGetDictionaries {
 
         private static final DictionaryEncoding encoding(final long id) {
             return new DictionaryEncoding(id, false, null);
@@ -898,7 +894,8 @@ public final class OffHeapTestData {
     }
 
     /** A factory for creating, reading and writing {@link ComplexData} */
-    public static final class ComplexDataFactory implements OffHeapArrowColumnDataFactory {
+    public static final class ComplexDataFactory
+        implements OffHeapTestArrowColumnDataFactory, OffHeapArrowGetDictionaries {
 
         private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
             return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);
