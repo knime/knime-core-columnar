@@ -561,7 +561,7 @@ public abstract class AbstractOffHeapArrowDataTest<W extends OffHeapArrowWriteDa
         // Write
         final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final OffHeapArrowColumnDataFactory[] factories = new OffHeapArrowColumnDataFactory[]{m_factory};
-        try (final OffHeapArrowBatchWriter writer = new OffHeapArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final OffHeapTestArrowBatchWriter writer = new OffHeapTestArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -606,7 +606,7 @@ public abstract class AbstractOffHeapArrowDataTest<W extends OffHeapArrowWriteDa
         // Write
         final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final OffHeapArrowColumnDataFactory[] factories = new OffHeapArrowColumnDataFactory[]{m_factory};
-        try (final OffHeapArrowBatchWriter writer = new OffHeapArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final OffHeapTestArrowBatchWriter writer = new OffHeapTestArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
@@ -652,7 +652,7 @@ public abstract class AbstractOffHeapArrowDataTest<W extends OffHeapArrowWriteDa
         // Write
         final FileHandle tmp = ArrowTestUtils.createTmpKNIMEArrowFileSupplier();
         final OffHeapArrowColumnDataFactory[] factories = new OffHeapArrowColumnDataFactory[]{m_factory};
-        try (final OffHeapArrowBatchWriter writer = new OffHeapArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
+        try (final OffHeapTestArrowBatchWriter writer = new OffHeapTestArrowBatchWriter(tmp, factories, COMPRESSION_CONFIG, m_alloc)) {
             writer.write(batch);
             batch.release();
         }
