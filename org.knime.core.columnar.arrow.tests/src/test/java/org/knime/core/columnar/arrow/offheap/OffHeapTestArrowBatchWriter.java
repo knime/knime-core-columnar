@@ -76,7 +76,7 @@ import org.knime.core.columnar.store.FileHandle;
  * @author Christian Dietz, KNIME GmbH, Konstanz, Germany
  * @author Tobias Pietzsch
  */
-class OffHeapTestArrowBatchWriter extends OffHeapArrowSimpleBatchWriter {
+class OffHeapTestArrowBatchWriter extends OffHeapArrowBatchWriter {
 
     private boolean m_firstWrite;
     private boolean m_usesDictionaries;
