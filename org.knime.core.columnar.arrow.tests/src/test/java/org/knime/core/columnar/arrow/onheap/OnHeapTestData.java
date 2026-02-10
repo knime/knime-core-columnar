@@ -1,4 +1,4 @@
-/*
+/*DictionaryEncodedDataFactory
  * ------------------------------------------------------------------------
  *
  *  Copyright by KNIME AG, Zurich, Switzerland
@@ -475,7 +475,7 @@ public final class OnHeapTestData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             return Field.nullable(name, MinorType.INT.getType());
         }
 
@@ -660,7 +660,7 @@ public final class OnHeapTestData {
     }
 
     /** A factory for creating, reading and writing {@link DictionaryEncodedData}. */
-    public static final class DictionaryEncodedDataFactory implements OnHeapArrowColumnDataFactory {
+    public static final class DictionaryEncodedDataFactory implements OnHeapLegacyDictionaryArrowColumnDataFactory {
 
         private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
             return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);
@@ -1016,7 +1016,7 @@ public final class OnHeapTestData {
         }
     }
 
-    public static final class ComplexDataFactory implements OnHeapArrowColumnDataFactory {
+    public static final class ComplexDataFactory implements OnHeapLegacyDictionaryArrowColumnDataFactory {
 
         private static DictionaryEncoding encoding(final LongSupplier dictionaryIdSupplier) {
             return new DictionaryEncoding(dictionaryIdSupplier.getAsLong(), false, null);

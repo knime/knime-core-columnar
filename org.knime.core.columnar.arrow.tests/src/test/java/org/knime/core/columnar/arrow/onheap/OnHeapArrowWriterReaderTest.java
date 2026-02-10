@@ -398,7 +398,7 @@ public class OnHeapArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final OnHeapArrowBatchWriter writer = new OnHeapArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final OnHeapArrowBatchWriter writer = new OnHeapTestArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -456,7 +456,7 @@ public class OnHeapArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final OnHeapArrowBatchWriter writer = new OnHeapArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final OnHeapArrowBatchWriter writer = new OnHeapTestArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -572,7 +572,7 @@ public class OnHeapArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final OnHeapArrowBatchWriter writer = new OnHeapArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
+        try (final OnHeapArrowBatchWriter writer = new OnHeapTestArrowBatchWriter(m_path, factories, ARROW_NO_COMPRESSION, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }
@@ -622,7 +622,7 @@ public class OnHeapArrowWriterReaderTest {
         }
 
         // Write the data to a file
-        try (final OnHeapArrowBatchWriter writer = new OnHeapArrowBatchWriter(m_path, factories, compression, m_alloc)) {
+        try (final OnHeapArrowBatchWriter writer = new OnHeapTestArrowBatchWriter(m_path, factories, compression, m_alloc)) {
             for (ReadBatch b : batches) {
                 writer.write(b);
             }

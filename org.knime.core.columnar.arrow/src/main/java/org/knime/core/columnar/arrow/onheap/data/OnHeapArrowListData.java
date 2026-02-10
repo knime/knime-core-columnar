@@ -50,7 +50,6 @@ package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.complex.ListVector;
@@ -239,8 +238,8 @@ public final class OnHeapArrowListData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            final Field data = m_children[0].getField("listData", dictionaryIdSupplier);
+        public Field getField(final String name) {
+            final Field data = m_children[0].getField("listData");
             return new Field(name, new FieldType(true, MinorType.LIST.getType(), null),
                 Collections.singletonList(data));
         }
