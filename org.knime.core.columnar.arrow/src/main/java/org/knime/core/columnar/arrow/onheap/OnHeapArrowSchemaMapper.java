@@ -50,10 +50,8 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -246,8 +244,8 @@ final class OnHeapArrowSchemaMapper implements MapperWithTraits<OnHeapArrowColum
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            var storageField = m_delegate.getField(name, dictionaryIdSupplier);
+        public Field getField(final String name) {
+            var storageField = m_delegate.getField(name);
             return ExtensionTypes.wrapInExtensionTypeIfNecessary(storageField, m_traits);
         }
 
@@ -265,13 +263,6 @@ final class OnHeapArrowSchemaMapper implements MapperWithTraits<OnHeapArrowColum
         @Override
         public void copyToVector(final NullableReadData data, final FieldVector vector) {
             m_delegate.copyToVector(data, vector);
-        }
-
-        @Override
-        @Deprecated
-        public DictionaryProvider createDictionaries(final NullableReadData data,
-            final LongSupplier dictionaryIdSupplier, final BufferAllocator allocator) {
-            return m_delegate.createDictionaries(data, dictionaryIdSupplier, allocator);
         }
 
         @Override

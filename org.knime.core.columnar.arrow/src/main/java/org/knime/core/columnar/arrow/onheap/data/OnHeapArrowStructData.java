@@ -51,7 +51,6 @@ package org.knime.core.columnar.arrow.onheap.data;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.LongSupplier;
 import java.util.stream.Stream;
 
 import org.apache.arrow.vector.FieldVector;
@@ -267,10 +266,10 @@ public final class OnHeapArrowStructData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             List<Field> children = new ArrayList<>(m_children.length);
             for (int i = 0; i < m_children.length; i++) {
-                children.add(m_children[i].getField(childNameAtIndex(i), dictionaryIdSupplier));
+                children.add(m_children[i].getField(childNameAtIndex(i)));
             }
             return new Field(name, new FieldType(true, MinorType.STRUCT.getType(), null), children);
         }

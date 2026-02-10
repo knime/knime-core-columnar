@@ -51,7 +51,6 @@ package org.knime.core.columnar.arrow.onheap.data;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -340,8 +339,8 @@ public final class AbstractOnHeapArrowDictEncodedData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
-            return m_children[0].getField(name, dictionaryIdSupplier);
+        public Field getField(final String name) {
+            return m_children[0].getField(name);
         }
 
         @Override

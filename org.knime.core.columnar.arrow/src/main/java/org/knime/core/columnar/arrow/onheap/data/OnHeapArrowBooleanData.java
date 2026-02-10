@@ -46,7 +46,6 @@
 package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.IOException;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
@@ -157,7 +156,7 @@ public final class OnHeapArrowBooleanData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             return Field.nullable(name, MinorType.BIT.getType());
         }
 

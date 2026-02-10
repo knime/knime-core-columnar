@@ -46,7 +46,6 @@
 package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.IOException;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.LargeVarBinaryVector;
@@ -306,7 +305,7 @@ public final class OnHeapArrowVarBinaryData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             return Field.nullable(name, LargeBinary.INSTANCE);
         }
 

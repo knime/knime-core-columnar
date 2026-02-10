@@ -48,7 +48,6 @@ package org.knime.core.columnar.arrow.onheap.data;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.BaseVariableWidthVector;
@@ -460,7 +459,7 @@ public final class OnHeapArrowStringData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             return Field.nullable(name, MinorType.VARCHAR.getType());
         }
 

@@ -60,16 +60,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.TypeLayout;
-import org.apache.arrow.vector.dictionary.Dictionary;
-import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.ipc.WriteChannel;
 import org.apache.arrow.vector.ipc.message.ArrowBlock;
@@ -80,10 +76,7 @@ import org.apache.arrow.vector.ipc.message.ArrowFooter;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.ipc.message.IpcOption;
 import org.apache.arrow.vector.ipc.message.MessageSerializer;
-import org.apache.arrow.vector.types.pojo.ArrowType;
-import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.io.FileUtils;
 import org.knime.core.columnar.arrow.ArrowReaderWriterUtils;
@@ -125,8 +118,8 @@ class OnHeapArrowBatchWriter implements BatchWriter {
 
     private final List<Long> m_batchBoundaries = new ArrayList<>();
 
-    // Initialized on first #write
-    private Field[] m_fields;
+    // protected for use in tests
+    protected final Field[] m_fields;
 
     // Initialized on first #write
     private ArrowWriter m_writer;
@@ -135,9 +128,10 @@ class OnHeapArrowBatchWriter implements BatchWriter {
      * Create an ArrowColumnDataWriter.
      *
      * @param file the file to write to
-     * @param chunkSize the max size of the individual chunks
      * @param factories factories to get the vectors and dictionaries from the data. Must be able to handle the data at
      *            their index.
+     * @param compression compression codec to use
+     * @param allocator Arrow allocator to use
      */
     OnHeapArrowBatchWriter(final FileHandle file, final OnHeapArrowColumnDataFactory[] factories,
         final ArrowCompression compression, final BufferAllocator allocator) {
@@ -147,6 +141,8 @@ class OnHeapArrowBatchWriter implements BatchWriter {
         m_allocator = allocator;
         m_firstWrite = true;
         m_closed = false;
+        m_fields = new Field[factories.length];
+        Arrays.setAll(m_fields, i -> factories[i].getField(String.valueOf(i)));
     }
 
     @Override
@@ -178,29 +174,26 @@ class OnHeapArrowBatchWriter implements BatchWriter {
         }
 
         if (m_firstWrite) {
-            final var dictionaryIdsForField = newDictionaryIdSupplier();
-            m_fields = new Field[m_factories.length];
-            for (int i = 0; i < m_factories.length; i++) {
-                m_fields[i] = m_factories[i].getField(String.valueOf(i), dictionaryIdsForField);
-            }
+            m_firstWrite = false;
+            final Schema schema = createSchema(batch, getMetadata());
+            m_writer = new ArrowWriter(m_fileHandle.asFile(), schema);
         }
+
+        // Write the dictionaries
+        // (This will do nothing here, but is overridden in OffHeapTestArrowBatchWriter to be able to write legacy data
+        // with Arrow dictionaries for testing.)
+        final List<FieldVector> dictionaries = getDictionaries(batch);
+        writeDictionaries(m_writer, dictionaries, m_compression, m_allocator);
+        dictionaries.forEach(FieldVector::close);
 
         // TODO(AP-23857) create child allocator and close it after writing the batch
 
-        // Note that the fields for the schema have the resolved type of the dictionary fields as this is needed in the
-        // schema. m_fields has the field for the dictionary keys as this is needed to create the vectors.
-        final List<Field> fieldsForSchema = new ArrayList<>(m_factories.length);
+        // Write the vectors
         final List<FieldVector> vectors = new ArrayList<>(m_factories.length);
-        final List<FieldVector> allDictionaries = new ArrayList<>();
-        final var dictionaryIdsForVectors = newDictionaryIdSupplier();
-
-        // Loop and collect fields, vectors, dictionaries
         for (int i = 0; i < m_factories.length; i++) {
-
             final var data = batch.get(i);
             final var field = m_fields[i];
             final var factory = m_factories[i];
-
             // Note: We create a Vector here and therefore transfer the data to off-heap
             // The compression requires the data to be off-heap
             // If we could compress from on-heap to off-heap (or to whereever), we would save a copy but would need to
@@ -208,73 +201,42 @@ class OnHeapArrowBatchWriter implements BatchWriter {
             @SuppressWarnings("resource") // Vectors are closed later all at once
             var vector = field.createVector(m_allocator);
             factory.copyToVector(data, vector);
-
-            // TODO(AP-24057) remove support for dictionaries in the writer
-            // This is not used anymore but still in the code to test reading of dictionaries for backward compatibility
-            @SuppressWarnings("deprecation")
-            final DictionaryProvider dictionaries =
-                factory.createDictionaries(data, dictionaryIdsForVectors, m_allocator);
-
-            if (m_firstWrite) {
-                // Get the field for the schema and collect dictionaries
-                fieldsForSchema.add(mapDictionariesAndField(field, dictionaries, allDictionaries));
-            } else {
-                // Collect the dictionaries
-                mapDictionaries(field, dictionaries, allDictionaries);
-            }
-
-            // Collect the vector
             vectors.add(vector);
         }
-
-        // If this is the first call we need to create the writer and write the schema to the file
-        if (m_firstWrite) {
-            m_firstWrite = false;
-            final Schema schema = new Schema(fieldsForSchema, getMetadata());
-
-            m_writer = new ArrowWriter(m_fileHandle.asFile(), schema);
-        }
-
-        // Write the dictionaries
-        writeDictionaries(m_writer, allDictionaries, m_compression, m_allocator);
-
-        // Write the vectors
         writeVectors(m_writer, vectors, batch.length(), m_compression, m_allocator);
-
         vectors.forEach(FieldVector::close);
-        allDictionaries.forEach(FieldVector::close);
 
         // Remember batch boundary for footer
-        var previousBatchEnd = m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
+        long previousBatchEnd = m_batchBoundaries.isEmpty() ? 0 : m_batchBoundaries.get(m_batchBoundaries.size() - 1);
         m_batchBoundaries.add(previousBatchEnd + batch.length());
 
         m_numBatches.incrementAndGet();
     }
 
     /**
-     * @return an offset provider that can return the offset of each record batch and dictionary batch once it is
-     *         written to the file
+     * Get all Arrow dictionaries used in {@code batch}.
+     * <p>
+     * This method is {@code protected} so that it can be overridden in tests that need to write data with arrow
+     * dictionaries.
+     * <p>
+     * Currently we do not write any data using Arrow dictionaries, so this implementation just returns an empty list.
+     *
+     * @param batch unused here, used in derived class
+     * @return list of dictionaries used in batch
+     */
+    protected List<FieldVector> getDictionaries(final ReadBatch batch) {
+        return Collections.emptyList();
+    }
+
+    /**
+     * @return an offset provider that can return the offset of each record batch once it is written to the file
      */
     OffsetProvider getOffsetProvider() {
-        return new OffsetProvider() {
-
-            @Override
-            public long getRecordBatchOffset(final int index) {
-                if (numBatches() <= index) {
-                    throw new IndexOutOfBoundsException("Record batch with index " + index + " not yet written.");
-                }
-                return m_writer.m_recordBlocks.get(index).getOffset();
+        return index -> {
+            if (numBatches() <= index) {
+                throw new IndexOutOfBoundsException("Record batch with index " + index + " not yet written.");
             }
-
-            @Override
-            public long[] getDictionaryBatchOffsets(final int index) {
-                if (numBatches() <= index) {
-                    throw new IndexOutOfBoundsException("Dictionary batch with index " + index + " not yet written.");
-                }
-                return Arrays.stream(m_writer.m_dictionaryBlocks.get(index)) //
-                    .mapToLong(ArrowBlock::getOffset) //
-                    .toArray();
-            }
+            return m_writer.m_recordBlocks.get(index).getOffset();
         };
     }
 
@@ -307,7 +269,7 @@ class OnHeapArrowBatchWriter implements BatchWriter {
     public synchronized void close() throws IOException {
         if (!m_closed) {
             if (!m_firstWrite) {
-                m_writer.writeFooter(m_batchBoundaries.stream().mapToLong(i -> i).toArray());
+                m_writer.writeFooter(getBatchBoundaries());
                 m_writer.close();
                 if (LOGGER.isDebugEnabled()) {
                     logToDebug();
@@ -329,6 +291,21 @@ class OnHeapArrowBatchWriter implements BatchWriter {
         }
     }
 
+    /**
+     * Create Arrow schema.
+     * <p>
+     * This method is {@code protected} so that it can be overridden in tests that need to write data with arrow
+     * dictionaries.
+     *
+     * @param batch unused here, but necessary for derived class OffHeapTestArrowBatchWriter
+     * @param metadata
+     * @return the schema
+     */
+    // TODO (TP): is batch argument required???
+    protected Schema createSchema(final ReadBatch batch, final Map<String, String> metadata) {
+        return new Schema(List.of(m_fields), metadata);
+    }
+
     /** Create and return the metadata for this writer */
     private Map<String, String> getMetadata() {
         final Map<String, String> metadata = new HashMap<>();
@@ -342,98 +319,18 @@ class OnHeapArrowBatchWriter implements BatchWriter {
         return metadata;
     }
 
-    /**
-     * @return a new {@link LongSupplier} counting upwards and starting with 0
-     */
-    private static LongSupplier newDictionaryIdSupplier() {
-        final AtomicLong id = new AtomicLong(0);
-        return id::getAndIncrement;
-    }
-
-    /** Map the dictionary ids in the given field to new unique ids and convert the type to the message format type */
-    private static Field mapDictionariesAndField(final Field field, final DictionaryProvider dictionaries,
-        final List<FieldVector> allDictionaries) {
-        final DictionaryEncoding encoding = field.getDictionary();
-        final DictionaryEncoding mappedEncoding;
-        final ArrowType mappedType;
-        final List<Field> children;
-        if (encoding == null) {
-            // No dictionary encoding: Nothing to do
-            mappedEncoding = null;
-            mappedType = field.getType();
-            children = field.getChildren();
-        } else {
-            // Map the id of this dictionary encoding
-            final long id = encoding.getId();
-            final long mappedId = allDictionaries.size();
-            final Dictionary dictionary = dictionaries.lookup(id);
-            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-            final FieldVector vector = dictionary.getVector();
-            allDictionaries.add(vector);
-
-            // Create a mapped DictionaryEncoding with the new id
-            mappedEncoding = new DictionaryEncoding(mappedId, encoding.isOrdered(), encoding.getIndexType());
-            mappedType = dictionary.getVectorType();
-            // The children of this field are the children of the dictionary field
-            children = vector.getField().getChildren();
-        }
-
-        // Call recursively for the children
-        final List<Field> mappedChildren = new ArrayList<>(field.getChildren().size());
-        for (final Field child : children) {
-            mappedChildren.add(mapDictionariesAndField(child, dictionaries, allDictionaries));
-        }
-
-        // Create the Field
-        final FieldType fieldType = new FieldType(field.isNullable(), mappedType, mappedEncoding, field.getMetadata());
-        return new Field(field.getName(), fieldType, mappedChildren);
-    }
-
-    /** Get the dictionaries used in the fields and add them to allDictionaries in the correct order */
-    private static void mapDictionaries(final Field field, final DictionaryProvider dictionaries,
-        final List<FieldVector> allDictionaries) {
-        final DictionaryEncoding encoding = field.getDictionary();
-        final List<Field> children;
-        if (encoding == null) {
-            children = field.getChildren();
-        } else {
-            // Map the id of this dictionary encoding
-            final long id = encoding.getId();
-            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-            final FieldVector vector = dictionaries.lookup(id).getVector();
-            allDictionaries.add(vector);
-            // The children of this field are the children of the dictionary field
-            children = vector.getField().getChildren();
-        }
-        // Call recursively for the children
-        for (final Field child : children) {
-            mapDictionaries(child, dictionaries, allDictionaries);
-        }
-    }
-
     private static void writeDictionaries(final ArrowWriter writer, final List<FieldVector> dictionaries,
         final ArrowCompression compression, final BufferAllocator allocator) throws IOException {
-        final ArrowDictionaryBatch[] batches = new ArrowDictionaryBatch[dictionaries.size()];
-        try { // NOSONAR: Arrays are not AutoCloseable (and creating a custom collection would be overkill)
-
-            // Collect the batches
-            for (int id = 0; id < dictionaries.size(); id++) {
-                @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
-                final FieldVector vector = dictionaries.get(id);
-                @SuppressWarnings("resource") // Record batch closed with the dictionary batch
-                final ArrowRecordBatch data = createRecordBatch(Collections.singletonList(vector),
-                    vector.getValueCount(), compression, allocator);
-                batches[id] = new ArrowDictionaryBatch(id, data, false);
-            }
-
-            // Write the batches to the file
-            writer.writeDictionaryBatches(batches);
-
-        } finally {
-            for (final ArrowDictionaryBatch b : batches) {
-                if (b != null) {
-                    b.close();
-                }
+        for (int id = 0; id < dictionaries.size(); id++) {
+            @SuppressWarnings("resource") // Vector resource is handled by the ColumnData
+            final FieldVector vector = dictionaries.get(id);
+            try ( //
+                    final ArrowRecordBatch data = //
+                        createRecordBatch(List.of(vector), vector.getValueCount(), compression, allocator);
+                    final ArrowDictionaryBatch batch = //
+                        new ArrowDictionaryBatch(id, data, false);//
+            ) {
+                writer.writeDictionaryBatch(batch);
             }
         }
     }
@@ -507,7 +404,7 @@ class OnHeapArrowBatchWriter implements BatchWriter {
 
         private final IpcOption m_option;
 
-        private final List<ArrowBlock[]> m_dictionaryBlocks;
+        private final List<ArrowBlock> m_dictionaryBlocks;
 
         private final List<ArrowBlock> m_recordBlocks;
 
@@ -530,12 +427,9 @@ class OnHeapArrowBatchWriter implements BatchWriter {
         }
 
         /** Write the given dictionary batch */
-        private void writeDictionaryBatches(final ArrowDictionaryBatch[] batches) throws IOException {
-            final ArrowBlock[] blocks = new ArrowBlock[batches.length];
-            for (int i = 0; i < batches.length; i++) {
-                blocks[i] = MessageSerializer.serialize(m_out, batches[i], m_option);
-            }
-            m_dictionaryBlocks.add(blocks);
+        private void writeDictionaryBatch(final ArrowDictionaryBatch batch) throws IOException {
+            final ArrowBlock block = MessageSerializer.serialize(m_out, batch, m_option);
+            m_dictionaryBlocks.add(block);
         }
 
         /** Write the given data batch */
@@ -551,13 +445,11 @@ class OnHeapArrowBatchWriter implements BatchWriter {
             m_out.writeIntLittleEndian(0);
 
             // Write the footer
-            final List<ArrowBlock> dictBlocks =
-                m_dictionaryBlocks.stream().flatMap(Arrays::stream).collect(Collectors.toList());
             final Map<String, String> metadata = new HashMap<>();
             metadata.put(ArrowReaderWriterUtils.ARROW_BATCH_BOUNDARIES_KEY,
                 ArrowReaderWriterUtils.longArrayToString(batchBoundaries));
             final ArrowFooter footer =
-                new ArrowFooter(m_schema, dictBlocks, m_recordBlocks, metadata, m_option.metadataVersion);
+                new ArrowFooter(m_schema, m_dictionaryBlocks, m_recordBlocks, metadata, m_option.metadataVersion);
             final long footerStart = m_out.getCurrentPosition();
             m_out.write(footer, false);
 

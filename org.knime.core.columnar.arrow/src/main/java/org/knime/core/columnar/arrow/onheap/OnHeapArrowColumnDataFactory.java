@@ -62,13 +62,10 @@ import org.knime.core.columnar.data.NullableWriteData;
  * An {@link OnHeapArrowColumnDataFactory} is used for input and output of a specific on-heap Arrow column data type.
  * Can be used to create a new empty instance ({@link #createWrite(int)}, create one from an existing Arrow vector
  * ({@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)}), and
- * create Apache Arrow vectors and dictionaries that need to be written to a file
- * ({@link #copyToVector(NullableReadData, FieldVector)} and
- * {@link #createDictionaries(NullableReadData, LongSupplier, BufferAllocator)}).
+ * create Apache Arrow vectors that need to be written to a file ({@link #copyToVector(NullableReadData, FieldVector)}).
  * </p>
  * A factory has a {@link ArrowColumnDataFactoryVersion}. Make sure to update the version if
- * {@link #copyToVector(NullableReadData, FieldVector)} or
- * {@link #createDictionaries(NullableReadData, LongSupplier, BufferAllocator)} change. Implement
+ * {@link #copyToVector(NullableReadData, FieldVector)} changes. Implement
  * {@link #createRead(FieldVector, ArrowVectorNullCount, DictionaryProvider, ArrowColumnDataFactoryVersion)} such that
  * vectors and dictionaries from all prior versions can be wrapped in an appropriate {@link NullableReadData} object.
  *
@@ -108,19 +105,16 @@ public interface OnHeapArrowColumnDataFactory {
      * Get the Arrow {@link Field} describing the vector of the data object.
      *
      * @param name the name of the field
-     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
-     *            from this supplier. Other ids might be used already in the parent data object.
      * @return the Arrow description for the vector type
      */
-    // TODO(AP-24057) delete the dictionaryIdSupplier parameter when removing dictionary support in the writer
-    Field getField(String name, LongSupplier dictionaryIdSupplier);
+    Field getField(String name);
 
     /**
      * Copies the given column data into the provided Arrow vector.
      * <p>
      * Implementers must ensure that the data and validity buffers are correctly copied, and the value count is properly
      * set. The provided vector is guaranteed to be of the correct type, matching the field returned by
-     * {@link #getField(String, LongSupplier)}.
+     * {@link #getField(String)}.
      * </p>
      * <p>
      * A typical implementation involves:
@@ -151,25 +145,6 @@ public interface OnHeapArrowColumnDataFactory {
      * @param vector the Arrow vector to copy the data into
      */
     void copyToVector(NullableReadData data, FieldVector vector);
-
-    /**
-     * Get the dictionaries that should be written to disk.
-     *
-     * @param data a column data holding some values
-     * @param dictionaryIdSupplier a supplier for dictionary ids. Make sure to use only dictionaries with ids coming
-     *            from this supplier. Other ids might be used already in the parent data object. Also take as many
-     *            dictionary ids from the supplier as in {@link #getField(String, LongSupplier)}.
-     * @param allocator the allocator to use for creating the dictionaries
-     * @return dictionaries which should be written to disk
-     * @deprecated use struct-based dictionaries instead. This method is only available to create dictionaries for
-     *             testing reading of dictionaries which is supported for backward compatibility.
-     */
-    // TODO(AP-24057) delete this method when removing dictionary support in the writer
-    @Deprecated
-    default DictionaryProvider createDictionaries(final NullableReadData data, final LongSupplier dictionaryIdSupplier,
-        final BufferAllocator allocator) {
-        return null;
-    }
 
     /**
      * @return the current version used for getting the vectors and dictionaries. Not allowed to contain ','.

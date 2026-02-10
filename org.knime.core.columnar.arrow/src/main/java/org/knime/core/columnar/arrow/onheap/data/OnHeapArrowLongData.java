@@ -47,7 +47,6 @@ package org.knime.core.columnar.arrow.onheap.data;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.FixedWidthVector;
@@ -173,7 +172,7 @@ public final class OnHeapArrowLongData {
         }
 
         @Override
-        public Field getField(final String name, final LongSupplier dictionaryIdSupplier) {
+        public Field getField(final String name) {
             if (m_signed) {
                 return Field.nullable(name, MinorType.BIGINT.getType());
             } else {
