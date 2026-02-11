@@ -516,7 +516,7 @@ public class OffHeapArrowWriterReaderTest {
      * @throws IOException
      */
     @Test
-    public void testDictioaryFilteredRead() throws IOException {
+    public void testDictionaryFilteredRead() throws IOException {
         final int numBatches = 2;
         final int numColumns = 5;
         final int capacity = 32;
