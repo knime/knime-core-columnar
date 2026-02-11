@@ -49,7 +49,6 @@
 package org.knime.core.columnar.arrow.offheap.data;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -133,38 +132,6 @@ public final class OffHeapArrowLegacyDictionaryUtils {
             return usesDictionaries(f.m_inner);
         } else {
             return (factory instanceof OffHeapLegacyDictionaryArrowColumnDataFactory);
-        }
-    }
-
-    /** A dictionary provider only holding one single dictionary */
-    public static final class SingletonDictionaryProvider implements DictionaryProvider {
-
-        private long m_id;
-
-        private final Dictionary m_dictionary;
-
-        /**
-         * Create a dictionary provider only holding the given dictionary.
-         *
-         * @param dictionary the dictionary
-         */
-        public SingletonDictionaryProvider(final Dictionary dictionary) {
-            m_dictionary = dictionary;
-            m_id = dictionary.getEncoding().getId();
-        }
-
-        @Override
-        public Dictionary lookup(final long id) {
-            if (id == m_id) {
-                return m_dictionary;
-            } else {
-                return null;
-            }
-        }
-
-        @Override
-        public Set<Long> getDictionaryIds() {
-            return Collections.singleton(m_id);
         }
     }
 

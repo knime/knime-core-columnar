@@ -77,7 +77,6 @@ import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.knime.core.columnar.arrow.ArrowColumnDataFactoryVersion;
-import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowLegacyDictionaryUtils.SingletonDictionaryProvider;
 import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowReadData;
 import org.knime.core.columnar.arrow.offheap.data.OffHeapArrowWriteData;
 import org.knime.core.columnar.data.NullableReadData;
@@ -878,7 +877,7 @@ public final class OffHeapTestData {
         @Override
         public DictionaryProvider getDictionaries(final NullableReadData data) {
             final Dictionary dictionary = ((DictionaryEncodedData)data).m_dictionary;
-            return new SingletonDictionaryProvider(dictionary);
+            return new MapDictionaryProvider(dictionary);
         }
 
         @Override
