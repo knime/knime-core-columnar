@@ -301,7 +301,6 @@ class OnHeapArrowBatchWriter implements BatchWriter {
      * @param metadata
      * @return the schema
      */
-    // TODO (TP): is batch argument required???
     protected Schema createSchema(final ReadBatch batch, final Map<String, String> metadata) {
         return new Schema(List.of(m_fields), metadata);
     }

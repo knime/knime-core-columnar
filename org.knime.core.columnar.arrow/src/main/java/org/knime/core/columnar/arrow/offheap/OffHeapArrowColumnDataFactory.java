@@ -46,7 +46,6 @@
 package org.knime.core.columnar.arrow.offheap;
 
 import java.io.IOException;
-import java.util.function.LongSupplier;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;

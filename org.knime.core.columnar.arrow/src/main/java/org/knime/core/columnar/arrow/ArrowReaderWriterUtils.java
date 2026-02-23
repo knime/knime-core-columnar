@@ -234,16 +234,5 @@ public final class ArrowReaderWriterUtils {
          * @throws IndexOutOfBoundsException if there is no record batch with the given index in the file (yet)
          */
         long getRecordBatchOffset(int index);
-
-        /**
-         * @param index the index of the dictionary batches
-         * @return the offsets of all dictionary batches for the given index
-         * @throws IndexOutOfBoundsException if there are no dictionaries for the given index in the file (yet)
-         */
-        // TODO (TP): Remove this method after removing dictionaries from OnHeap implementation
-        @Deprecated
-        default long[] getDictionaryBatchOffsets(final int index) {
-            throw new UnsupportedOperationException();
-        }
     }
 }
