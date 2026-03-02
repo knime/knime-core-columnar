@@ -216,7 +216,11 @@ public final class OffHeapArrowListData {
 
         @Override
         public Field getField(final String name) {
-            final Field data = m_inner.getField("listData");
+            // Note that we always use the default name ("$data$") for the inner field, If we
+            // use another name, Vectors created from the Field will expose a modified Field
+            // with the inner field named "$data$" anyway. We just use the default name always,
+            // to avoid confusion when writing Schemas.
+            final Field data = m_inner.getField(BaseRepeatedValueVector.DATA_VECTOR_NAME);
             return new Field(name, new FieldType(true, MinorType.LIST.getType(), null),
                 Collections.singletonList(data));
         }
