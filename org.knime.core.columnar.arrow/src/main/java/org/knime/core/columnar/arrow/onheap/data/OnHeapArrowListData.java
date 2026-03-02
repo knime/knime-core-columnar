@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.util.Collections;
 
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.complex.BaseRepeatedValueVector;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.Types.MinorType;
@@ -239,7 +240,11 @@ public final class OnHeapArrowListData {
 
         @Override
         public Field getField(final String name) {
-            final Field data = m_children[0].getField("listData");
+            // Note that we always use the default name ("$data$") for the inner field, If we
+            // use another name, Vectors created from the Field will expose a modified Field
+            // with the inner field named "$data$" anyway. We just use the default name always,
+            // to avoid confusion when writing Schemas.
+            final Field data = m_children[0].getField(BaseRepeatedValueVector.DATA_VECTOR_NAME);
             return new Field(name, new FieldType(true, MinorType.LIST.getType(), null),
                 Collections.singletonList(data));
         }
