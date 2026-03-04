@@ -322,7 +322,7 @@ class OffHeapArrowBatchWriter implements BatchWriter {
                     final ArrowRecordBatch data = //
                         createRecordBatch(List.of(vector), vector.getValueCount(), compression, allocator);
                     final ArrowDictionaryBatch batch = //
-                        new ArrowDictionaryBatch(id, data, false);//
+                        new ArrowDictionaryBatch(id, data, false)//
             ) {
                 writer.writeDictionaryBatch(batch);
             }
