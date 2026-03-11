@@ -1,9 +1,5 @@
 #!groovy
-def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRANCH_NAME : 'releases/2026-06'
-
-library "knime-pipeline@$BN"
-
-def baseBranch = ((BN == KNIMEConstants.NEXT_RELEASE_BRANCH || BN == "releases/STS" || BN == "releases/STS-next") ? "master" : BN.replace("releases/",""))
+library "knime-pipeline@$DEFAULT_LIBRARY_VERSION"
 
 properties([
     pipelineTriggers([
@@ -168,6 +164,15 @@ try {
     }
 
     if (params["KNIME_BASE_WORKFLOW_TESTS"]) {
+        def baseBranch = null
+
+        stage("Determin Basebranch") {
+            node('macosx||macosx-aarch'){
+                checkout scm
+                baseBranch = knimetools.getBaseBranch()
+            }
+        }
+
         stage("knime-base workflow tests") {
             def testflowsDir = "Testflows (${baseBranch})/knime-base"
             def excludedTestflows = [
